@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  input[type='checkbox'].custom-checkbox {
+    position: relative;
+  }
+
+  input[type='checkbox'].custom-checkbox:checked::after {
+    content: '\2714'; 
+    color: rgb(60, 102, 47);
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  /* Remove number input spinner arrows (Chrome, Safari, Edge) */
+  .no-spinner::-webkit-outer-spin-button,
+  .no-spinner::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  /* Remove number input spinner arrows (Firefox) */
+  .no-spinner {
+    -moz-appearance: textfield;
+  }
+}

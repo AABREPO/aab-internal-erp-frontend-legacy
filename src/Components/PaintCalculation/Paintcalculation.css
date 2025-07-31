@@ -1,0 +1,56 @@
+.paint-calculation-form {
+    font-family: Arial, sans-serif;
+    padding: 20px;
+  }
+  
+  header {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  
+  .form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  table th, table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: center;
+  }
+  
+  table th {
+    background-color: #f3f3f3;
+    font-weight: bold;
+  }
+  
+  .floor-header td {
+    font-weight: bold;
+    background-color: #f9f9f9;
+  }
+  
+  .buttons {
+    margin-top: 20px;
+    display: flex;
+    gap: 10px;
+  }
+  
+  button {
+    padding: 10px 20px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    cursor: pointer;
+  }
+  
+  button:hover {
+    background-color: #45a049;
+  }
+  

@@ -1,0 +1,292 @@
+body {
+    background-color: rgb(243, 237, 230);
+    font-family: Arial, sans-serif;
+  }
+  
+  .form-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding-top: 50px;
+  }
+  
+  .header {
+    background-color: white;
+    margin-left: 120px;
+    margin-top: -50px;
+    width: 70%;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .account, .details, .sitename, .vendor-contractor, .quantity, .category, .amount, .comments, .file-attachment {
+    margin-bottom: 20px;
+  }
+  
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+  }
+  
+  .column {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  label {
+    font-weight: 600;
+    margin-bottom: 5px;
+  }
+  
+  select, input {
+    padding: 10px;
+    border: 2px solid rgb(238, 226, 198);
+    border-radius: 5px;
+    font-size: large;
+  }
+  
+  select {
+    height: 45px;
+  }
+  
+  .custom-select {
+    border: 2px solid rgb(238, 226, 198);
+  }
+  
+  .details input, .quantity input, .amount input, .comminput {
+    padding: 10px;
+  }
+  
+  .comminput {
+    width: 100%;
+  }
+
+  .comments label{
+    margin-top: 30px;
+  }
+  
+  .submit-section {
+    display: flex;
+    justify-content: flex-end;
+  }
+  
+  .submit {
+    padding: 10px 20px;
+    background-color: rgb(201, 157, 81);
+    border: none;
+    color: white;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  
+  .submit:hover {
+    background-color: rgb(184, 143, 74);
+  }
+
+  /* Adjusted the layout for swapped elements and moved the Submit button */
+
+/* Adjusted the layout for swapped elements and moved the Submit button */
+
+.amount input{
+  width: 300px;
+  height: 40px;
+}
+
+.category {
+  width: 300px;
+  height: 90px;
+}
+
+.submit-container {
+  margin-top: 20px;
+  text-align: left; /* Aligns the button to the left */
+}
+.account{
+  display: flex;
+  margin-top: -10px;
+  gap: 20px;
+  align-items: center;
+}
+
+.selected-type{
+  color: orangered;
+  margin-left: 40px;
+}
+
+.account h4 {
+  color: rgb(230, 76, 76);
+  font-weight: 600;
+}
+
+.submit {
+  width: 130px;
+  height: 40px;
+  padding: 0px;
+  background-color: rgb(201, 157, 81);
+  border: 2px solid rgb(238, 226, 198);
+  border-radius: 7px;
+}
+.quantity1{
+  display: flex;
+  gap: 30px;
+}
+.quantity input{
+  width: 300px;
+  height: 40px;
+}
+.vendor-contractor-container label{
+  background-color: transparent;
+  margin-left: -320px;
+  margin-top: 10px;
+}
+.select-container .custom-select{
+  border-radius: 7px;
+  width: 300px;
+  height: 45px;
+  margin-left: -320px;
+  margin-top: 7px;
+}
+.select-container .custom-select:focus{
+  outline: none; /* Removes the default outline */
+  border-color: rgb(238, 226, 198);
+}
+.quantity input:focus{
+  outline: none; /* Removes the default outline */
+  border-color: rgb(238, 226, 198);
+}
+.amount input:focus{
+  outline: none; /* Removes the default outline */
+  border-color: rgb(238, 226, 198);
+}
+.category select:focus{
+  outline: none; /* Removes the default outline */
+  border-color: rgb(238, 226, 198);
+}
+.comments input:focus{
+  outline: none; /* Removes the default outline */
+  border-color: rgb(238, 226, 198);
+}
+.select-container,.custom-select:focus{
+  outline: none; /* Removes the default outline */
+  border-color: rgb(238, 226, 198);
+}
+.sitename select{
+height: 43px;
+width: 300px;
+}
+.sitename select:focus{
+  outline: none; /* Removes the default outline */
+  border-color: rgb(238, 226, 198);
+}
+
+.custom-select{
+  width: 300px;
+  height: 45px;
+}
+
+.details label{
+  display: block;
+}
+
+.details input{
+  width: 200px;
+  height: 40px;
+}
+
+/* Mobile view styles only */
+@media (max-width: 600px) {
+  body {
+      background-color: rgb(243, 237, 230);
+      font-family: Arial, sans-serif;
+  }
+  
+  .form-wrapper {
+      padding: 10px; /* Adjust padding for mobile */
+      width: 100%; /* Full width for mobile */
+  }
+
+  .header {
+      margin-left: 0; /* Reset margin for mobile */
+      width: 100%; /* Full width for header */
+      padding: 15px; /* Adjust padding for mobile */
+      margin-top: -23px;
+  }
+
+  .sitename label{
+    margin-top: 10px;
+  }
+
+  
+
+  .row {
+      display: block; /* Stack elements vertically */
+  }
+
+  .column {
+      width: 100%; /* Full width for columns */
+      margin-bottom: 15px; /* Space between elements */
+  }
+
+  .account select{
+    width: 300px;
+  }
+
+  .sitename, .vendor-contractor-container, .quantity, .amount, .category, .comments {
+      width: 300px; /* Full width for all inputs */
+  }
+
+  select, input {
+      width: 100%; /* Full width for selects and inputs */
+      padding: 8px; /* Adjust padding for mobile */
+      font-size: medium; /* Adjust font size */
+  }
+
+  .quantity label{
+    margin-top: 28px;
+  }
+
+  .quantity1 {
+      flex-direction: column; /* Stack quantity and amount */
+  }
+
+  .category label{
+    margin-top: 15px;
+  }
+
+  .submit-container {
+      text-align: center; /* Center the submit button */
+      margin-top: 20px; /* Margin for spacing */
+  }
+
+  button.submit {
+      width: 100%; /* Full width for submit button */
+      padding: 12px; /* Adjust padding */
+      font-size: large; /* Increase font size */
+      background-color: rgb(201, 157, 81); /* Keep existing background color */
+      border: none; /* Remove border */
+      color: white; /* Text color */
+      border-radius: 5px; /* Rounded corners */
+  }
+
+  .vendor-contractor-container label {
+      margin-left: 0; /* Reset margin for mobile */
+      margin-bottom: 5px; /* Space below label */
+  }
+
+  .select-container .custom-select {
+      width: 300px; /* Full width for custom select */
+      margin-top: 10px; /* Margin above custom select */
+      margin-left: 0px;
+  }
+
+  .amount input{
+    margin-bottom: 10px;
+  }
+
+  .selected-type{
+    color: orangered;
+    margin-left: 40px;
+  }
+}

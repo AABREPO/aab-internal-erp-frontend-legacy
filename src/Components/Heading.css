@@ -1,0 +1,104 @@
+/* General link styling */
+.link {
+    text-decoration: none; /* Remove underline */
+    color: black;
+    padding: 0;
+    position: relative;
+    margin-left: 50px;
+    font-size: large;
+    font-weight: 500;
+
+}
+/* Active link styling */
+.link.active {
+    color: black; /* Ensure text color stays black */
+    font-size: large;
+    font-weight: 700;
+    text-decoration: none;
+    padding: 0;
+}
+/* Golden underline styling for the active link */
+.link.active::after {
+    content: "";
+    display: block;
+    width: 100%; 
+    height: 2px;
+    background-color: goldenrod;
+    position: absolute;
+    top: 100%; /* Position the underline directly below the text */
+    left: 0;
+    transition: width 0.3s ease-in-out; /* Smooth transition for the underline */
+    margin-left: 0; /* Center the underline under the text */
+    margin-top: 10px;
+   
+}
+/* Remove underline on hover */
+.link:hover {
+    text-decoration: none; /* Ensure no underline on hover */
+}
+/* Additional styling for h2 elements in the topbar */
+.topbar-title{
+    display: flex;
+    gap: 0;
+}
+.topbar-title h2 {
+    margin-top: 80px; /* Reset margin */
+    padding: 0;
+    
+}
+@media (max-width:600px){
+    .link {
+        text-decoration: none; /* Remove underline */
+        color: black;
+        padding: 0 10px;
+        position: relative;
+        margin-left: 22px;
+    }
+    .topbar-title h2 {
+        margin: 12px; /* Reset margin */
+        padding: 0 10px; /* Add padding around the h2 elements */
+        margin-left: 20px;
+        margin-top: 80px;
+        margin-right: -50px;   
+    }
+    .link.active::after {
+        content: "";
+        display: block;
+        width: 70px; 
+        height: 2px;
+        background-color: goldenrod;
+        position: absolute;
+        top: 100%; /* Position the underline directly below the text */
+        left: 0px;
+        transition: width 0.3s ease-in-out; /* Smooth transition for the underline */
+        margin-left: 0; /* Center the underline under the text */
+    }
+}
+@media (max-width:480px){
+    .link {
+        text-decoration: none; /* Remove underline */
+        color: black;
+        padding: 0 10px;
+        position: relative;
+        margin-left: 20px;
+    }
+    .topbar-title h2 {
+        margin: 12px; /* Reset margin */
+        padding: 0 10px; /* Add padding around the h3 elements */
+        margin-left: 16px;
+        margin-top: 80px;
+        margin-right: -50px;
+    }
+    .link.active::after {
+        content: "";
+        display: block;
+        width: 70px; 
+        height: 2px;
+        background-color: goldenrod;
+        position: absolute;
+        top: 100%; /* Position the underline directly below the text */
+        left: 10px;
+        transition: width 0.3s ease-in-out; /* Smooth transition for the underline */
+        margin-left: 0; /* Center the underline under the text */
+    }
+}

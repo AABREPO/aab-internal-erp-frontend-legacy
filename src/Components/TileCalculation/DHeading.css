@@ -1,0 +1,66 @@
+/* General link styling */
+.link {
+    text-decoration: none;
+    color: black;
+    padding: 10px 15px;
+    position: relative;
+    font-size: large;
+    font-weight: 500;
+    cursor: pointer;
+    margin: 0; /* Reset margin for better alignment */
+    gap: 50px;
+}
+
+/* Active link styling with golden border */
+.link.active {
+    font-weight: 700;
+    color: black;
+    position: relative;
+    gap: 50px;
+}
+
+/* Golden border above .topbar-title bottom border */
+.link.active::after {
+    content: "";
+    display: block;
+    height: 3px; /* Thickness of the golden border */
+    background-color: rgb(250, 181, 6); /* Golden color */
+    position: absolute;
+    bottom: -1px; /* Adjust to position above the gray border */
+    left: 0;
+    width: 100%;
+    gap: 50px;
+}
+
+/* .topbar-title container */
+.topbar-title {
+    display: flex;
+    justify-content: start;
+    align-items: center;
+    gap: 20px;
+    background-color: #FAF6ED;
+    padding-bottom: 10px;
+    position: relative;
+    width: fit-content; /* Adjust width to fit the content */
+    margin-left: 40px;
+    border-bottom: 3px solid #ccc; /* Gray border for the entire container */
+}
+
+/* Adjust spacing for headings */
+.topbar-title h2 {
+    padding: 0;
+    margin: 0;
+    margin-right: 60px;
+    margin-left: 5px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+    .link {
+        font-size: 16px;
+    }
+    .topbar-title {
+        padding-bottom: 8px;
+        margin-left: 15px;
+    }
+}

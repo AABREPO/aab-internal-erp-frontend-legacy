@@ -21,6 +21,8 @@ import PurchaseHeading from './Components/Purchase/PurchaseHeading';
 import ManageHeading from './Components/ManageUsers/ManageHeading';
 import Attendancelog from './Components/Attendances/Attendancelog';
 import InventoryHeading from './Components/ProcurementInventory/InventoryHeading';
+import AdvanceHeading from './Components/Advance Portal/AdvanceHeading';
+import ClaimPaymentHeading from './Components/ClaimPayments/ClaimPaymentHeading';
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
@@ -54,21 +56,23 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/expense-entry/*" element={<Heading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path="/designtool/*" element={<DHeading userRoles={user?.userRoles || []}/>} />
-            <Route path="/invoice-bill/*" element={<InHeading userRoles={user?.userRoles || []}/>} />
-            <Route path="/paints/*" element={<PHeading userRoles={user?.userRoles || []}/>} />
-            <Route path="/rccal/*" element={<RcHeading userRoles={user?.userRoles || []}/>} />
-            <Route path="/bath/*" element={<BHeading userRoles={user?.userRoles || []}/>} />
-            <Route path="/switch/*" element={<SHeading userRoles={user?.userRoles || []}/>} />
-            <Route path="/weekly-payment/*" element={<WeeklyPaymentHeading userRoles={user?.userRoles || []}/>} />
-            <Route path="/rent/*" element={<RHeading userRoles={user?.userRoles || []}/>} />
-            <Route path="/masonary/*" element={<MHeading userRoles={user?.userRoles || []}/>} />
-            <Route path="/carpentry/*" element={<CHeading />} userRoles={user?.userRoles || []}/>
-            <Route path="/entrychecklist/*" element={<BillHeading userRoles={user?.userRoles || []}/>} />
+            <Route path="/designtool/*" element={<DHeading username={user.username} userRoles={user?.userRoles || []}/>} />
+            <Route path="/invoice-bill/*" element={<InHeading username={user.username} userRoles={user?.userRoles || []}/>} />
+            <Route path="/paints/*" element={<PHeading username={user.username} userRoles={user?.userRoles || []}/>} />
+            <Route path="/rccal/*" element={<RcHeading username={user.username} userRoles={user?.userRoles || []}/>} />
+            <Route path="/bath/*" element={<BHeading username={user.username} userRoles={user?.userRoles || []}/>} />
+            <Route path="/switch/*" element={<SHeading username={user.username} userRoles={user?.userRoles || []}/>} />
+            <Route path="/weekly-payment/*" element={<WeeklyPaymentHeading username={user.username} userRoles={user?.userRoles || []}/>} />
+            <Route path="/rent/*" element={<RHeading username={user.username} userRoles={user?.userRoles || []}/>} />
+            <Route path="/masonary/*" element={<MHeading username={user.username} userRoles={user?.userRoles || []}/>} />
+            <Route path="/carpentry/*" element={<CHeading username={user.username} userRoles={user?.userRoles || []}/>}/>
+            <Route path="/entrychecklist/*" element={<BillHeading username={user.username} userRoles={user?.userRoles || []}/>} />
             <Route path='/purchaseorder/*' element={<PurchaseHeading username={user.username} userRoles={user?.userRoles || []}/>} />
             <Route path='/inventory/*' element={<InventoryHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path='/user_manage/*' element={<ManageHeading userRoles={user?.userRoles || []}/>} />
-            <Route path='/attendance' element={<Attendancelog />}/>
+            <Route path='/user_manage/*' element={<ManageHeading username={user.username} userRoles={user?.userRoles || []}/>} />
+            <Route path='/attendance' element={<Attendancelog username={user.username} />}/>
+            <Route path='/portal/*' element={<AdvanceHeading username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path='/Claim/*' element={<ClaimPaymentHeading username={user.username} userRoles={user?.userRoles || []}/>} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </div>

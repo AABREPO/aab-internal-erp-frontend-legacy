@@ -188,6 +188,7 @@ const Summary = () => {
       const matchMode = selectedPaymentMode ? entry.paymentMode === selectedPaymentMode : true;
       return inRange && matchType && matchMode;
     });
+    console.log(rentForms)
     if (dataToUse.length === 0) {
       alert('No data found for the selected date range and filters.');
       return;
@@ -196,18 +197,33 @@ const Summary = () => {
 
     const totalPreviousMonthAmount = dataToUse
       .filter(entry => formatMonth(entry.forTheMonthOf) === previousMonthStr)
-      .reduce((sum, entry) => sum + Number(entry.amount), 0);
+      .reduce((sum, entry) => {
+        const isShopClosure = entry.formType === 'Shop Closure';
+        const amount = isShopClosure ? Number(entry.refundAmount || 0) : Number(entry.amount || 0);
+        return sum + (isShopClosure ? -amount : amount);
+      }, 0);
 
     // Sort alphabetically by tenant name
     dataToUse.sort((a, b) => a.shopNo.localeCompare(b.shopNo, undefined, { numeric: true }));
     // Calculate totals
-    const totalCash = dataToUse
-      .filter(entry => entry.paymentMode === 'Cash')
-      .reduce((sum, entry) => sum + Number(entry.amount), 0);
-    const totalNetBanking = dataToUse
-      .filter(entry => entry.paymentMode === 'Net Banking')
-      .reduce((sum, entry) => sum + Number(entry.amount), 0);
+    let totalCash = 0;
+    let totalNetBanking = 0;
+
+    dataToUse.forEach((entry) => {
+      const isShopClosure = entry.formType === 'Shop Closure';
+      const amt = isShopClosure ? Number(entry.refundAmount || 0) : Number(entry.amount || 0);
+
+      if (entry.paymentMode === 'Cash') {
+        totalCash += isShopClosure ? -amt : amt;
+      }
+
+      if (entry.paymentMode === 'Net Banking') {
+        totalNetBanking += isShopClosure ? -amt : amt;
+      }
+    });
+
     const totalAmount = totalCash + totalNetBanking;
+
     const doc = new jsPDF('landscape');
     doc.setFontSize(11);
     const startX = 14;
@@ -285,7 +301,7 @@ const Summary = () => {
       formatDateTime(entry.timestamp),
       entry.shopNo,
       entry.tenantName,
-      formatINRPlain(entry.amount),
+      formatINRPlain(entry.formType === 'Shop Closure' ? -entry.refundAmount : entry.amount),
       entry.formType,
       formatDate(entry.paidOnDate),
       entry.forTheMonthOf ? formatMonth(entry.forTheMonthOf) : '',
@@ -321,6 +337,95 @@ const Summary = () => {
       }
     });
     doc.save('transactions_by_date_range.pdf');
+  };
+  const exportExportExcel = () => {
+    if (!fromDate || !toDate) {
+      alert("Please select the start date and end date.");
+      return;
+    }
+
+    const from = new Date(fromDate);
+    const to = new Date(toDate);
+    const dataToUse = rentForms.filter(entry => {
+      const entryDate = new Date(entry.paidOnDate);
+      const inRange = entryDate >= from && entryDate <= to;
+      const matchType = selectedTypes ? entry.formType === selectedTypes : true;
+      const matchMode = selectedPaymentMode ? entry.paymentMode === selectedPaymentMode : true;
+      return inRange && matchType && matchMode;
+    });
+
+    if (dataToUse.length === 0) {
+      alert("No data found for the selected date range and filters.");
+      return;
+    }
+
+    const previousMonthStr = formatMonth(getPreviousMonth(fromDate));
+    const todayDateStr = formatDate(new Date());
+
+    // Totals
+    let totalCash = 0;
+    let totalNetBanking = 0;
+    dataToUse.forEach(entry => {
+      const isShopClosure = entry.formType === "Shop Closure";
+      const amount = isShopClosure ? Number(entry.refundAmount || 0) : Number(entry.amount || 0);
+      if (entry.paymentMode === "Cash") totalCash += isShopClosure ? -amount : amount;
+      if (entry.paymentMode === "Net Banking") totalNetBanking += isShopClosure ? -amount : amount;
+    });
+    const totalAmount = totalCash + totalNetBanking;
+
+    // Table header
+    const tableHeaders = [
+      "S.No",
+      "Date",
+      "Shop No",
+      "Tenant Name",
+      "Amount",
+      "Form Type",
+      "Paid On",
+      "For The Month Of",
+      "Payment Mode"
+    ];
+
+    const tableRows = dataToUse.map((entry, index) => {
+      const amountValue = entry.formType === "Shop Closure"
+        ? -Number(entry.refundAmount || 0)
+        : Number(entry.amount || 0);
+      return [
+        index + 1,
+        formatDateTime(entry.timestamp),
+        entry.shopNo,
+        entry.tenantName,
+        amountValue.toFixed(2),
+        entry.formType,
+        formatDate(entry.paidOnDate),
+        entry.forTheMonthOf ? formatMonth(entry.forTheMonthOf) : "",
+        entry.paymentMode
+      ];
+    });
+
+    // Summary header section
+    const summarySection = [
+      ["PROPERTY RENT COLLECTION STATEMENT"],
+      [],
+      ["MONTH", previousMonthStr, "", "", "CASH", totalCash.toFixed(2), "NET BANKING", totalNetBanking.toFixed(2), "TOTAL RENT COLLECTED", totalAmount.toFixed(2)],
+      ["DATE", todayDateStr, "", "", "COLLECTION START", formatDate(fromDate), "COLLECTION END", formatDate(toDate)],
+      [],
+      tableHeaders,
+      ...tableRows
+    ];
+
+    const csvContent = summarySection
+      .map(row => row.map(cell => `"${cell}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "Rent_Collection_Report.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const exportMonthlyPDF = () => {
@@ -468,6 +573,77 @@ const Summary = () => {
 
     doc.save('transactions_by_month.pdf');
   };
+  const exportExportMonthlyExcel = () => {
+    const dataToUse = rentForms.filter(entry => {
+      const matchMonth = entry.forTheMonthOf === selectedMonth;
+      const matchType = selectedType ? entry.formType === selectedType : true;
+      const matchMode = selectedPaymentModeMonth ? entry.paymentMode === selectedPaymentModeMonth : true;
+      return matchMonth && matchType && matchMode;
+    });
+
+    if (dataToUse.length === 0) {
+      alert("No data found for the selected filters.");
+      return;
+    }
+
+    // Totals
+    let totalCash = 0;
+    let totalNetBanking = 0;
+    dataToUse.forEach(entry => {
+      const isShopClosure = entry.formType === "Shop Closure";
+      const amount = isShopClosure ? Number(entry.refundAmount || 0) : Number(entry.amount || 0);
+      if (entry.paymentMode === "Cash") totalCash += isShopClosure ? -amount : amount;
+      if (entry.paymentMode === "Net Banking") totalNetBanking += isShopClosure ? -amount : amount;
+    });
+    const totalAmount = totalCash + totalNetBanking;
+
+    // Sort by Shop No
+    dataToUse.sort((a, b) => a.shopNo.localeCompare(b.shopNo, undefined, { numeric: true }));
+
+    // Header block
+    const summaryHeader = [
+      ["PROPERTY RENT COLLECTION STATEMENT"],
+      [],
+      ["MONTH", formatMonth(selectedMonth), "", "", "CASH", totalCash.toFixed(2), "NET BANKING", totalNetBanking.toFixed(2), "TOTAL RENT COLLECTED", totalAmount.toFixed(2)],
+      ["DATE", formatDate(new Date()), "", "", "COLLECTION START", "", "COLLECTION END", ""],
+      [],
+    ];
+
+    // Table
+    const tableHeaders = ['S.No', 'Date', 'Shop No', 'Tenant Name', 'Amount', 'Form Type', 'Paid On', 'For The Month Of', 'Mode'];
+    const tableRows = dataToUse.map((entry, index) => {
+      const amount = entry.formType === 'Shop Closure'
+        ? -Number(entry.refundAmount || 0)
+        : Number(entry.amount || 0);
+      return [
+        index + 1,
+        formatDateTime(entry.timestamp),
+        entry.shopNo,
+        entry.tenantName,
+        amount.toFixed(2),
+        entry.formType,
+        formatDate(entry.paidOnDate),
+        formatMonth(entry.forTheMonthOf),
+        entry.paymentMode
+      ];
+    });
+
+    const allRows = [...summaryHeader, tableHeaders, ...tableRows];
+
+    const csvContent = allRows
+      .map(row => row.map(cell => `"${cell}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "Monthly_Rent_Collection.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
 
   return (
     <div className="flex justify-start p-10 ml-12 bg-[#FFFFFF] min-h-screen">
@@ -476,12 +652,20 @@ const Summary = () => {
         <div>
           <div className="flex justify-between items-center mb-2.5">
             <h2 className="text-lg font-bold">Date to Date Transaction</h2>
-            <button
-              className="text-red-500 text-sm font-semibold hover:underline cursor-pointer flex items-center"
-              onClick={exportDateRangePDF}
-            >
-              Export PDF
-            </button>
+            <div className="flex gap-3">
+              <button
+                className="text-[#007233] text-sm font-semibold hover:underline cursor-pointer flex items-center"
+                onClick={exportExportExcel}
+              >
+                Export XL
+              </button>
+              <button
+                className="text-red-500 text-sm font-semibold hover:underline cursor-pointer flex items-center"
+                onClick={exportDateRangePDF}
+              >
+                Export PDF
+              </button>
+            </div>
           </div>
           <div className="bg-[#FAF6ED] p-6 rounded shadow-md lg:w-[478px] h-[325px]">
             <div className="grid grid-cols-2 gap-4">
@@ -569,12 +753,21 @@ const Summary = () => {
         <div>
           <div className="flex justify-between items-center mb-2.5">
             <h2 className="text-lg ml-6 font-bold text-left">Rent Month Transaction</h2>
-            <button
-              className="text-red-500 text-sm font-semibold hover:underline cursor-pointer flex items-center"
-              onClick={exportMonthlyPDF}
-            >
-              Export PDF
-            </button>
+            <div className="flex gap-3">
+              <button
+                className="text-[#007233] text-sm font-semibold hover:underline cursor-pointer flex items-center"
+                onClick={exportExportMonthlyExcel}
+              >
+                Export XL
+              </button>
+              <button
+                className="text-red-500 text-sm font-semibold hover:underline cursor-pointer flex items-center"
+                onClick={exportMonthlyPDF}
+              >
+                Export PDF
+              </button>
+            </div>
+
           </div>
           <div className="bg-[#FAF6ED] p-6 ml-6 rounded shadow-md w-[478px] h-[325px]">
             <div className="flex flex-col gap-4 text-left">

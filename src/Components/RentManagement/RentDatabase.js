@@ -536,7 +536,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
             paidOnDate,
             forTheMonthOf,
             attachedFile,
-            editedBy:username,
+            editedBy: username,
         };
         try {
             const response = await fetch(`https://backendaab.in/aabuildersDash/api/rental_forms/update/${editId}`, {
@@ -733,49 +733,49 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                                         <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
                                             <span className="font-normal">Paid On Date: </span>
                                             <span className="font-bold">{selectedDbDate}</span>
-                                            <button onClick={() => {setSelectedDbDate(''); sessionStorage.removeItem('selectedDbDate');}} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                            <button onClick={() => { setSelectedDbDate(''); sessionStorage.removeItem('selectedDbDate'); }} className="text-[#BF9853] ml-1 text-2xl">×</button>
                                         </span>
                                     )}
                                     {dbShopNo && (
                                         <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
                                             <span className="font-normal">Shop N0: </span>
                                             <span className="font-bold">{dbShopNo}</span>
-                                            <button onClick={() => {setDbShopNo(''); sessionStorage.removeItem('dbShopNo');}} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                            <button onClick={() => { setDbShopNo(''); sessionStorage.removeItem('dbShopNo'); }} className="text-[#BF9853] ml-1 text-2xl">×</button>
                                         </span>
                                     )}
                                     {dbTenantName && (
                                         <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
                                             <span className="font-normal">Tenant Name: </span>
                                             <span className="font-bold">{dbTenantName}</span>
-                                            <button onClick={() => {setDbTenantName(''); sessionStorage.removeItem('dbTenantName');}} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                            <button onClick={() => { setDbTenantName(''); sessionStorage.removeItem('dbTenantName'); }} className="text-[#BF9853] ml-1 text-2xl">×</button>
                                         </span>
                                     )}
                                     {dbPaymentMode && (
                                         <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
                                             <span className="font-normal">Payment Mode: </span>
                                             <span className="font-bold">{dbPaymentMode}</span>
-                                            <button onClick={() => {setDbPaymentMode(''); sessionStorage.removeItem('dbPaymentMode');}} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                            <button onClick={() => { setDbPaymentMode(''); sessionStorage.removeItem('dbPaymentMode'); }} className="text-[#BF9853] ml-1 text-2xl">×</button>
                                         </span>
                                     )}
                                     {dbFormType && (
                                         <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
                                             <span className="font-normal">Type: </span>
                                             <span className="font-bold">{dbFormType}</span>
-                                            <button onClick={() => {setDbFormType(''); sessionStorage.removeItem('dbFormType');}} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                            <button onClick={() => { setDbFormType(''); sessionStorage.removeItem('dbFormType'); }} className="text-[#BF9853] ml-1 text-2xl">×</button>
                                         </span>
                                     )}
                                     {selectedDbMonth && (
                                         <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
                                             <span className="font-normal">For The Month Of: </span>
                                             <span className="font-bold">{selectedDbMonth}</span>
-                                            <button onClick={() => {setSelectedDbMonth(''); sessionStorage.removeItem('selectedDbMonth');}} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                            <button onClick={() => { setSelectedDbMonth(''); sessionStorage.removeItem('selectedDbMonth'); }} className="text-[#BF9853] ml-1 text-2xl">×</button>
                                         </span>
                                     )}
                                     {selectedDbENo && (
                                         <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
                                             <span className="font-normal">E No: </span>
                                             <span className="font-bold">{selectedDbENo}</span>
-                                            <button onClick={() => {setSelectedDbENo(''); sessionStorage.removeItem('selectedDbENo');}} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                            <button onClick={() => { setSelectedDbENo(''); sessionStorage.removeItem('selectedDbENo'); }} className="text-[#BF9853] ml-1 text-2xl">×</button>
                                         </span>
                                     )}
                                 </div>
@@ -1513,6 +1513,13 @@ const AuditModal = ({ show, onClose, audits }) => {
         "210px", "150px", "180px", "160px", "160px", "140px",
         "120px", "200px", "130px", "180px", "150px"
     ];
+    const formatDateDDMMYYYY = (dateStr) => {
+        if (!dateStr) return "-";
+        const date = new Date(dateStr);
+        if (isNaN(date)) return "-";
+        return date.toLocaleDateString("en-GB"); // en-GB gives dd/MM/yyyy
+    };
+
     return (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
             <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1400px] mx-4 p-4">
@@ -1538,28 +1545,83 @@ const AuditModal = ({ show, onClose, audits }) => {
                                 <React.Fragment key={index}>
                                     {/* OLD row */}
                                     <tr className="odd:bg-white even:bg-[#FAF6ED]">
-                                        <td style={{ width: '130px' }} className="border pl-2 text-sm text-left whitespace-nowrap">{formatDate(audit.editedDate)}</td>
-                                        <td style={{ width: '120px' }} className="border pl-2 text-sm text-left whitespace-nowrap">{audit.editedBy}</td>
-                                        {fields.map(({ key }, i) => (
-                                            <td key={key} style={{ width: columnWidths[i] }} className="border text-sm text-center">
-                                                {audit[`old${key}`] ?? "-"}
-                                            </td>
-                                        ))}
-                                    </tr>
-                                    <tr className="odd:bg-white even:bg-[#FAF6ED]">
-                                        <td style={{ width: '130px' }} className="border pl-2 text-sm text-left whitespace-nowrap">{formatDate(audit.editedDate)}</td>
-                                        <td style={{ width: '120px' }} className="border pl-2 text-sm text-left whitespace-nowrap">{audit.editedBy}</td>
+                                        <td style={{ width: '130px' }} className="border pl-2 text-sm text-left whitespace-nowrap">
+                                            {formatDate(audit.editedDate)}
+                                        </td>
+                                        <td style={{ width: '120px' }} className="border pl-2 text-sm text-left whitespace-nowrap">
+                                            {audit.editedBy}
+                                        </td>
                                         {fields.map(({ key }, i) => {
-                                            const oldVal = audit[`old${key}`];
-                                            const newVal = audit[`new${key}`];
-                                            const changed = oldVal !== newVal;
+                                            let oldVal = audit[`old${key}`];
+
+                                            // Format amount fields
+                                            if (key.toLowerCase().includes("amount")) {
+                                                oldVal = oldVal && !isNaN(oldVal)
+                                                    ? Number(oldVal).toLocaleString("en-IN")
+                                                    : "-";
+                                            }
+
+                                            // Format paidOnDate fields
+                                            if (key.toLowerCase().includes("paidondate")) {
+                                                oldVal = oldVal
+                                                    ? new Date(oldVal).toLocaleDateString("en-GB") // dd/MM/yyyy
+                                                    : "-";
+                                            }
+
                                             return (
-                                                <td key={key} style={{ width: columnWidths[i] }} className={`border text-sm text-center ${changed ? "bg-[#BF9853] text-black font-bold" : ""}`}>
+                                                <td
+                                                    key={key}
+                                                    style={{ width: columnWidths[i] }}
+                                                    className="border text-sm text-center"
+                                                >
+                                                    {oldVal ?? "-"}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+
+                                    {/* NEW row */}
+                                    <tr className="odd:bg-white even:bg-[#FAF6ED]">
+                                        <td style={{ width: '130px' }} className="border pl-2 text-sm text-left whitespace-nowrap">
+                                            {formatDate(audit.editedDate)}
+                                        </td>
+                                        <td style={{ width: '120px' }} className="border pl-2 text-sm text-left whitespace-nowrap">
+                                            {audit.editedBy}
+                                        </td>
+                                        {fields.map(({ key }, i) => {
+                                            let oldVal = audit[`old${key}`];
+                                            let newVal = audit[`new${key}`];
+
+                                            // Format amount fields
+                                            if (key.toLowerCase().includes("amount")) {
+                                                oldVal = oldVal && !isNaN(oldVal)
+                                                    ? Number(oldVal).toLocaleString("en-IN")
+                                                    : "-";
+                                                newVal = newVal && !isNaN(newVal)
+                                                    ? Number(newVal).toLocaleString("en-IN")
+                                                    : "-";
+                                            }
+
+                                            // Format paidOnDate fields
+                                            if (key.toLowerCase().includes("paidondate")) {
+                                                oldVal = formatDateDDMMYYYY(oldVal);
+                                                newVal = formatDateDDMMYYYY(newVal);
+                                            }
+
+                                            const changed = oldVal !== newVal;
+
+                                            return (
+                                                <td
+                                                    key={key}
+                                                    style={{ width: columnWidths[i] }}
+                                                    className={`border text-sm text-center ${changed ? "bg-[#BF9853] text-black font-bold" : ""}`}
+                                                >
                                                     {newVal ?? "-"}
                                                 </td>
                                             );
                                         })}
                                     </tr>
+
                                 </React.Fragment>
                             ))}
                         </tbody>

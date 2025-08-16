@@ -445,8 +445,6 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         selectedEno,
         expenses
     ]);
-
-
     const handleChange = (e) => {
         const { name, type, value, files } = e.target;
         // Prevent clearing the date field

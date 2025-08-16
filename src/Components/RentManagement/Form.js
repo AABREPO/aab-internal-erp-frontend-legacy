@@ -213,6 +213,17 @@ const Form = () => {
         }
     };
     const handleSubmit = async () => {
+        // ✅ Check if payment mode is selected
+        if (!paymentMode) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Missing Payment Mode',
+                text: 'Please select a Payment Mode before submitting.',
+                confirmButtonColor: '#bf9853'
+            });
+            return;
+        }
+
         setIsSubmitting(true);
         const today = new Date();
         const day = today.getDate();
@@ -224,10 +235,12 @@ const Form = () => {
             return n + (s[(v - 20) % 10] || s[v] || s[0]);
         };
         const date = `${month} ${getOrdinal(day)} ${year}`;
+
         try {
             const rentFormsRes = await fetch("https://backendaab.in/aabuildersDash/api/rental_forms/getAll");
             if (!rentFormsRes.ok) throw new Error("Failed to fetch existing rent forms");
             const rentForms = await rentFormsRes.json();
+
             let pdfUrl = '';
             if (selectedRentFile) {
                 const formData = new FormData();
@@ -241,9 +254,9 @@ const Form = () => {
                 const uploadResult = await uploadResponse.json();
                 pdfUrl = uploadResult.url;
             }
+
             const tenantInfo = shopInfoMap[shopNo];
             const baseMonthlyRent = parseFloat(calculatedRent || 0);
-            // 🧼 Clean and parse amount
             const isStartingMonth = (dateObj) => {
                 const start = new Date(startingDate);
                 return (
@@ -320,6 +333,7 @@ const Form = () => {
                 };
                 submissions.push(form);
             }
+
             for (const form of submissions) {
                 const response = await fetch("https://backendaab.in/aabuildersDash/api/rental_forms/save", {
                     method: "POST",
@@ -333,6 +347,7 @@ const Form = () => {
                     console.log("✅ Form submitted:", form);
                 }
             }
+
             if (selectedType === "Shop Closure") {
                 try {
                     await vacateShop(selectedTenantId, shopNo);
@@ -340,6 +355,7 @@ const Form = () => {
                     console.error("❌ VacateShop failed", err);
                 }
             }
+
             setIsSubmitting(false);
             setShopNo('');
             setTenantName('');
@@ -354,6 +370,7 @@ const Form = () => {
             setIsSubmitting(false);
         }
     };
+
     const vacateShop = async (tenantId, shopNo) => {
         try {
             const response = await fetch(`https://backendaab.in/aabuildersDash/api/tenantShop/vacateShop/${tenantId}/${shopNo}`, {
@@ -428,20 +445,20 @@ const Form = () => {
         }
     };
     useEffect(() => {
-    if (tenantName) {
-        const tenant = tenantShopData.find(t => t.tenantName === tenantName);
-        const shops = tenant?.property?.flatMap(p => p.shops)?.filter(shop => shop.active) || [];
+        if (tenantName) {
+            const tenant = tenantShopData.find(t => t.tenantName === tenantName);
+            const shops = tenant?.property?.flatMap(p => p.shops)?.filter(shop => shop.active) || [];
 
-        const filtered = shops.map(shop => ({
-            label: shop.shopNo,
-            value: shop.shopNo,
-        }));
+            const filtered = shops.map(shop => ({
+                label: shop.shopNo,
+                value: shop.shopNo,
+            }));
 
-        setFilteredShopNoOptions(filtered);
-    } else {
-        setFilteredShopNoOptions(shopNoOptions);
-    }
-}, [tenantName, tenantShopData, shopNoOptions]); // ✅ Added shopNoOptions
+            setFilteredShopNoOptions(filtered);
+        } else {
+            setFilteredShopNoOptions(shopNoOptions);
+        }
+    }, [tenantName, tenantShopData, shopNoOptions]); // ✅ Added shopNoOptions
 
 
     return (

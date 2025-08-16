@@ -2819,7 +2819,9 @@ const RccCalculator = () => {
         }
     };
     const generateFullPDF = async () => {
-        const doc = new jsPDF();
+        const doc = new jsPDF({
+            orientation: "landscape",
+        });
         const formatDateForName = (date) => {
             const d = new Date(date);
             const day = String(d.getDate()).padStart(2, '0');
@@ -2887,9 +2889,11 @@ const RccCalculator = () => {
         let totalAmountPDF = 0;
         const floorMap = {};
         let floorCounter = 0;
-        let previousFloorName = null;
-
         const tableBody = [];
+        let previousFloorName = null;
+        let previousAreaName = null; // track last areaName
+
+        let rowCounter = 1; // Move OUTSIDE the floors loop
 
         filteredFloors
             .filter(floor => floor.tiles.some(tile => selectedAreass[`${floor.floorName}-${floor.areaName}`]))
@@ -2897,7 +2901,6 @@ const RccCalculator = () => {
                 if (!(floor.floorName in floorMap)) {
                     floorMap[floor.floorName] = String.fromCharCode(65 + floorCounter++);
                 }
-
                 const floorLabel = floorMap[floor.floorName];
                 const isNewFloor = floor.floorName !== previousFloorName;
 
@@ -2908,19 +2911,26 @@ const RccCalculator = () => {
                         "", "", "", "", "", "", "", "", ""
                     ]);
                     previousFloorName = floor.floorName;
+                    previousAreaName = null;
                 }
 
-                let rowCounter = 1;
                 floor.tiles.forEach(tile => {
                     if (selectedAreass[`${floor.floorName}-${floor.areaName}`]) {
                         totalAmountPDF += parseFloat(tile.amount) || 0;
 
+                        const isNewArea = floor.areaName !== previousAreaName;
+                        const areaCell = isNewArea
+                            ? { content: floor.areaName, styles: { fontStyle: "bold" } }
+                            : "";
+
                         tableBody.push([
-                            `${rowCounter++}`,
-                            floor.areaName,
+                            isNewArea ? rowCounter++ : "", // Only increment when area name is shown
+                            areaCell,
                             tile.type,
                             tile.size,
                             tile.length || "0",
+                            tile.breadth || "0",
+                            tile.height || "0",
                             tile.quantity || "0",
                             tile.area || "0",
                             tile.deductionArea || "0",
@@ -2928,19 +2938,22 @@ const RccCalculator = () => {
                             tile.rate || "0",
                             tile.amount || "0"
                         ]);
+
+                        previousAreaName = floor.areaName;
                     }
                 });
             });
-
         // --- Add Total Row at End ---
         tableBody.push([
-            { content: "Total", colSpan: 10, styles: { halign: "right", fontStyle: "bold" } },
-            { content: totalAmountPDF.toFixed(2), styles: { fontStyle: "bold", halign: "right" } }
+            { content: "Total", colSpan: 12, styles: { halign: "right", fontStyle: "bold" } },
+            {
+                content: totalAmountPDF.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                styles: { fontStyle: "bold", halign: "right" }
+            }
         ]);
-
         doc.autoTable({
             head: [
-                ["SNo", "Description", "Type", "Size", "L", "Qty", "Area (sqft)", "D Area", "Total Area", "Rate (sqft)", "Total Amount"]
+                ["SNo", "Description", "Type", "Size", "L", "B", "H", "Qty", "Area (sqft)", "D Area", "Total Area", "Rate (sqft)", "Total Amount"]
             ],
             body: tableBody,
             theme: "grid",
@@ -2960,16 +2973,18 @@ const RccCalculator = () => {
             },
             columnStyles: {
                 0: { halign: "center", cellWidth: 12 },
-                1: { halign: "left", cellWidth: 32 },
-                2: { halign: "left", cellWidth: 16 },
-                3: { halign: "left", cellWidth: 20 },
-                4: { halign: "center", cellWidth: 13 },
-                5: { halign: "center", cellWidth: 10 },
-                6: { halign: "center", cellWidth: 17 },
+                1: { halign: "left", cellWidth: 50 },
+                2: { halign: "left", cellWidth: 29 },
+                3: { halign: "center", cellWidth: 20 },
+                4: { halign: "center", cellWidth: 19 },
+                5: { halign: "center", cellWidth: 19 },
+                6: { halign: "center", cellWidth: 19 },
                 7: { halign: "center", cellWidth: 12 },
                 8: { halign: "center", cellWidth: 15 },
                 9: { halign: "center", cellWidth: 15 },
-                10: { halign: "right", cellWidth: 20 },
+                10: { halign: "right", cellWidth: 24 },
+                11: { halign: "center", cellWidth: 15 },
+                12: { halign: "right", cellWidth: 20 },
             },
             margin: { left: 14, right: 14, top: 44 },
             pageBreak: 'auto',
@@ -2994,7 +3009,6 @@ const RccCalculator = () => {
                     doc.setLineWidth(0.6);
                     doc.line(startX, startY, endX, startY);
                 }
-
                 if (data.section === 'body' && data.column.index === 0 && data.cell.text[0] === "No Data") {
                     doc.setFontSize(9);
                     doc.setTextColor(0);
@@ -3372,7 +3386,7 @@ const RccCalculator = () => {
                                                             </div>
                                                         </td>
                                                         <td className="text-center">
-                                                            {floor.areaName !== "ROOF SLAB" && (
+                                                            {!["ROOF SLAB", "SEPTICK TANK", "SUMP TANK", "MAT"].includes(floor.areaName) && (
                                                                 <CreatableSelect
                                                                     className="w-[160px] h-[27px] font-medium -mt-2"
                                                                     styles={{
@@ -3424,7 +3438,7 @@ const RccCalculator = () => {
                                                                     onChange={(e) => handleInteriorTileChange(floorIndex, tileIndex, e)}
                                                                     className="px-2 w-[90px] text-base font-medium h-[27px] bg-transparent hover:border focus:outline-none text-center"
                                                                 />
-                                                                {floor.areaName !== "ROOF SLAB" && (
+                                                                {!["ROOF SLAB", "SEPTICK TANK", "SUMP TANK", "MAT"].includes(floor.areaName) && (
                                                                     <button
                                                                         className="text-[#E4572E]"
                                                                         onClick={() => openLengthPopupScreen(floorIndex, tileIndex)}
@@ -3432,9 +3446,10 @@ const RccCalculator = () => {
                                                                         L
                                                                     </button>
                                                                 )}
+
                                                             </div>
                                                         </td>
-                                                        {floor.areaName !== "ROOF SLAB" && lengthPopupState[`${floorIndex}-${tileIndex}`] && (
+                                                        {!["ROOF SLAB", "SEPTICK TANK", "SUMP TANK", "MAT"].includes(floor.areaName) && lengthPopupState[`${floorIndex}-${tileIndex}`] && (
                                                             <div
                                                                 className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50"
                                                                 onClick={() => closelengthPopup(floorIndex, tileIndex)} >
@@ -3537,7 +3552,7 @@ const RccCalculator = () => {
                                                                 name="breadth"
                                                                 placeholder="B"
                                                                 value={tile.breadth.replace(/"+/g, '"')}
-                                                                readOnly={floor.areaName !== "ROOF SLAB"}
+                                                                readOnly={!["ROOF SLAB", "SEPTICK TANK", "SUMP TANK", "MAT"].includes(floor.areaName)}
                                                                 onChange={(e) => handleInteriorTileChange(floorIndex, tileIndex, e)}
                                                                 className="px-2 w-16 bg-transparent hover:border focus:outline-none text-center"
                                                             />
@@ -3548,7 +3563,7 @@ const RccCalculator = () => {
                                                                 name="height"
                                                                 placeholder="H"
                                                                 value={tile.height}
-                                                                readOnly={floor.areaName !== "ROOF SLAB"}
+                                                                readOnly={!["ROOF SLAB", "SEPTICK TANK", "SUMP TANK", "MAT"].includes(floor.areaName)}
                                                                 onChange={(e) => handleInteriorTileChange(floorIndex, tileIndex, e)}
                                                                 className="px-2 w-[90px] text-base font-medium h-[27px] bg-transparent hover:border focus:outline-none text-center"
                                                             />
@@ -6088,7 +6103,7 @@ const RccCalculator = () => {
                                                             </select>
                                                         </td>
                                                         <td className="text-center">
-                                                            {floor.areaName !== "ROOF SLAB" && (
+                                                            {!["ROOF SLAB", "SEPTICK TANK", "SUMP TANK", "MAT"].includes(floor.areaName) && (
                                                                 <CreatableSelect
                                                                     className="w-[140px] h-[27px] font-medium -mt-2"
                                                                     styles={{
@@ -6160,7 +6175,7 @@ const RccCalculator = () => {
                                                                 name="breadth"
                                                                 placeholder="B"
                                                                 value={tile.breadth.replace(/"+/g, '"')}
-                                                                readOnly={floor.areaName !== "ROOF SLAB"}
+                                                                readOnly={!["ROOF SLAB", "SEPTICK TANK", "SUMP TANK", "MAT"].includes(floor.areaName)}
                                                                 onChange={(e) => handleInteriorTileChange(floorIndex, tileIndex, e)}
                                                                 className="px-2 w-14 bg-transparent hover:border focus:outline-none text-center"
                                                             />
@@ -6171,7 +6186,7 @@ const RccCalculator = () => {
                                                                 name="height"
                                                                 placeholder="H"
                                                                 value={tile.height}
-                                                                rreadOnly={floor.areaName !== "ROOF SLAB"}
+                                                                rreadOnly={!["ROOF SLAB", "SEPTICK TANK", "SUMP TANK", "MAT"].includes(floor.areaName)}
                                                                 onChange={(e) => handleInteriorTileChange(floorIndex, tileIndex, e)}
                                                                 className="px-2 w-[40px] text-base font-medium h-[27px] bg-transparent hover:border focus:outline-none text-center"
                                                             />

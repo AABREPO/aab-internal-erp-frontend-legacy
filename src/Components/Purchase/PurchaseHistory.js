@@ -46,8 +46,8 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
   const [selectedAudit, setSelectedAudit] = useState(null);
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [editableHeader, setEditableHeader] = useState({
-    vendorName: '',
-    clientName: '',
+    vendorId: '',
+    clientId: '',
     date: '',
     eno: '',
   });
@@ -65,10 +65,18 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
     hours = hours ? String(hours).padStart(2, '0') : '12';
     return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
   };
+  const formatDates = (dateStr) => {
+    if (!dateStr) return "N/A";
+    const date = new Date(dateStr);
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0"); // Months are zero-based
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
   const groupedAudits = auditHistory.reduce((acc, audit) => {
-    const date = formatDate(audit.editedAt);
+    const date = formatDate(audit.edited_at);
     const timeKey = date;
-    console.log(timeKey);
     if (!acc[timeKey]) acc[timeKey] = [];
     acc[timeKey].push(audit);
 
@@ -76,6 +84,7 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
   }, {});
 
   const groupedAuditKeys = Object.keys(groupedAudits);
+  console.log(auditHistory);
 
   useEffect(() => {
     fetchPoOrder();
@@ -85,7 +94,6 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/purchase_orders/getAll');
       if (response.ok) {
         const data = await response.json();
-        console.log(data)
         setAllPurchaseOrders(data);
         if (vendor) {
           // Filter all POs that match the vendor name
@@ -141,7 +149,7 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
       if (response.ok) {
         const data = await response.json();
         setPoItemName(data);
-        console.log(data)
+        console.log(data);
       } else {
         console.log('Error fetching tile area names.');
       }
@@ -168,7 +176,7 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
           value: item.siteName,
           label: item.siteName,
           id: item.id,
-          sNo: item.siteNo
+          sNo: item.siteNo,
         }));
         setClientNameOptions(formattedData);
       } catch (error) {
@@ -189,6 +197,7 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
         const formatted = data.map((item) => ({
           value: item.siteEngineer,
           label: item.siteEngineer,
+          id: item.id,
           mobileNumber: item.mobileNumber,
         }));
         setSiteEngineerOptions(formatted);
@@ -231,6 +240,7 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
         const options = data.map(item => ({
           value: item.category,
           label: item.category,
+          id: item.id,
         }));
         setCategoryOptions(options);
       } else {
@@ -252,6 +262,7 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
         const options = data.map(item => ({
           value: item.model,
           label: item.model,
+          id: item.id,
         }));
         setModelOptions(options)
       } else {
@@ -273,6 +284,7 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
         const options = data.map(item => ({
           value: item.typeColor,
           label: item.typeColor,
+          id: item.id,
         }));
         setTypeOptions(options)
       } else {
@@ -294,6 +306,7 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
         const options = data.map(item => ({
           value: item.brand,
           label: item.brand,
+          id: item.id,
         }));
         setBrandOptions(options)
       } else {
@@ -358,30 +371,28 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
   }, [vendor, selectedClientName, poNos, siteInchargeName, selectedPoDate, allPurchaseOrders]);
   const handleHeaderEdit = () => {
     setEditableHeader({
-      vendorName: selectedOrder.vendorName || '',
-      clientName: selectedOrder.clientName || '',
+      vendorId: selectedOrder.vendor_id || '',
+      clientId: selectedOrder.client_id || '',
       date: selectedOrder.date || '',
       eno: selectedOrder.eno || '',
     });
     setIsHeaderEditable(true);
   };
+
   const handleHeaderSave = async () => {
     try {
       const payload = {
-        vendorName: editableHeader.vendorName,
-        clientName: editableHeader.clientName,
+        vendor_id: editableHeader.vendorId,
+        client_id: editableHeader.clientId,
         date: editableHeader.date,
         eno: editableHeader.eno,
       };
-
       // Check if anything has changed
       const hasChanges = Object.keys(payload).some(key => payload[key] !== selectedOrder[key]);
-
       if (!hasChanges) {
         setIsHeaderEditable(false);
         return; // silently return if no changes
       }
-
       const response = await fetch(
         `https://backendaab.in/aabuildersDash/api/purchase_orders/${selectedOrder.id}/edit?editedBy=${username}`,
         {
@@ -392,11 +403,9 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
           body: JSON.stringify(payload),
         }
       );
-
       if (!response.ok) {
         throw new Error('Failed to save header changes.');
       }
-
       const updatedOrder = await response.json();
       setSelectedOrder(updatedOrder);
       setIsHeaderEditable(false);
@@ -413,26 +422,24 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
   useEffect(() => {
     setIsHeaderEditable(false);
     setEditableHeader({
-      vendorName: '',
-      clientName: '',
+      vendorId: '',
+      clientId: '',
       date: '',
       eno: '',
     });
   }, [selectedOrder]);
   const handleHeaderChange = async (field, value) => {
     setEditableHeader((prev) => ({ ...prev, [field]: value }));
-    // When vendorName changes, fetch PO count
-    if (field === 'vendorName') {
+
+    if (field === 'vendorId') {
       try {
         const countResponse = await fetch(
-          `https://backendaab.in/aabuildersDash/api/purchase_orders/countByVendor?vendorName=${value}`
+          `https://backendaab.in/aabuildersDash/api/purchase_orders/countByVendor?vendorId=${value}`
         );
         if (!countResponse.ok) throw new Error("Failed to fetch PO count");
         const vendorCount = await countResponse.json();
-        // Set PO.No based on vendor count
         setEditableHeader((prev) => ({
           ...prev,
-          vendorName: value,
           eno: `${vendorCount + 1}`,
         }));
       } catch (err) {
@@ -440,8 +447,18 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
       }
     }
   };
+
   const generatePDF = (selectedOrder) => {
     const doc = new jsPDF();
+    // Helper to find label from ID
+    const findNameById = (options, id, key) => {
+      const match = options.find(opt => opt.id == id);
+      return match ? match[key] : '';
+    };
+
+    const vendorName = findNameById(vendorOptions, selectedOrder.vendor_id, "label");
+    const clientName = findNameById(clientNameOptions, selectedOrder.client_id, "label");
+    const siteInchargeName = findNameById(siteEngineerOptions, selectedOrder.site_incharge_id, "label");
     doc.setDrawColor(0);
     doc.setLineWidth(0.5);
     doc.rect(10, 10, 190, 41.8);
@@ -458,8 +475,8 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
     doc.setFont("helvetica", "bold");
     doc.text(`VENDOR:`, 12, 37);
     doc.setFont("helvetica", "normal");
-    doc.text(`# ${selectedOrder.ENo}`, 35, 28);
-    doc.text(selectedOrder.vendorName || "", 35, 37);
+    doc.text(`# ${selectedOrder.eno}`, 35, 28);
+    doc.text(vendorName || "", 35, 37);
     doc.setFont("helvetica", "bold");
     doc.text(`DATE:`, 12, 43);
     doc.setFont("helvetica", "normal");
@@ -468,21 +485,21 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
     doc.text("SITE NAME:", 107, 37);
     doc.text("Site Incharge:", 104, 43);
     doc.setFont("helvetica", "normal");
-    doc.text(selectedOrder.clientName || "", 130, 37);
-    doc.text(selectedOrder.siteIncharge || "", 130, 43);
-    if (selectedOrder.siteInchargeMobileNumber) {
+    doc.text(clientName || "", 130, 37);
+    doc.text(siteInchargeName || "", 130, 43);
+    if (selectedOrder.site_incharge_mobile_number) {
       doc.setFont("helvetica", "bold");
       doc.text("Phone:", 115, 49);
       doc.setFont("helvetica", "normal");
-      doc.text(`+91 ${selectedOrder.siteInchargeMobileNumber}`, 130, 49);
+      doc.text(`+91 ${selectedOrder.site_incharge_mobile_number}`, 130, 49);
     }
     const tableBody = selectedOrder.purchaseTable.map((item, index) => [
       index + 1,
-      item.itemName || "",
-      item.category || "",
-      item.model || "",
-      item.brand || "",
-      item.type || "",
+      findNameById(poItemName, item.item_id, "itemName"),
+      findNameById(categoryOptions, item.category_id, "label"),
+      findNameById(modelOptions, item.model_id, "label"),
+      findNameById(brandOptions, item.brand_id, "label"),
+      findNameById(typeOptions, item.type_id, "label"),
       item.quantity || "",
       item.amount || ""
     ]);
@@ -525,8 +542,8 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
         const pageHeight = doc.internal.pageSize.height;
         const pageWidth = doc.internal.pageSize.width;
         doc.setFontSize(5); // small footer font
-        doc.text(`Created By: ${selectedOrder.createdBy}`, 14, pageHeight - 10);
-        doc.text(`Date: ${formatDate(selectedOrder.createdDateTime)}`, pageWidth - 60, pageHeight - 10);
+        doc.text(`Created By: ${selectedOrder.created_by}`, 14, pageHeight - 10);
+        doc.text(`Date: ${formatDate(selectedOrder.created_date_time)}`, pageWidth - 60, pageHeight - 10);
       },
       tableLineColor: [100, 100, 100],
       tableLineWidth: 0.2,
@@ -542,7 +559,7 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
       }
     });
     // 💾 Save the PDF
-    doc.save(`# ${selectedOrder.ENo} - ${formatDateOnly(selectedOrder.date)}-${selectedOrder.clientName}.pdf`);
+    doc.save(`# ${selectedOrder.eno} - ${formatDateOnly(selectedOrder.date)}-${clientName}.pdf`);
   };
   const handleEditClick = (order) => {
     setSelectedOrderForEdit(order);
@@ -579,17 +596,30 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
   };
 
   const handleEditSubmits = async () => {
-    // Replace the edited row in the table
     const updatedTable = selectedOrder.purchaseTable.map((row) =>
       row.id === editRowData.id ? editRowData : row
     );
+
+    // Optional: clean data before sending (remove labels if backend doesn't need them)
+    const cleanedTable = updatedTable.map((row) => ({
+      id: row.id,
+      category_id: row.category_id,
+      item_id: row.item_id,
+      model_id: row.model_id,
+      brand_id: row.brand_id,
+      type_id: row.type_id,
+      quantity: row.quantity,
+      amount: row.amount,
+      totalAmount: row.totalAmount,
+    }));
+
     try {
       const response = await fetch(
         `https://backendaab.in/aabuildersDash/api/purchase_orders/editPurchaseTable/full/${selectedOrder.id}?editedBy=${username}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(updatedTable),
+          body: JSON.stringify(cleanedTable),
         }
       );
       if (response.ok) {
@@ -607,10 +637,30 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
   };
 
   const fetchAudit = async () => {
-    const res = await fetch(`https://backendaab.in/aabuildersDash/api/purchase_orders/audit/${selectedOrder.id}`);
-    const data = await res.json();
-    setAuditHistory(data);
+    try {
+      const res = await fetch(`https://backendaab.in/aabuildersDash/api/purchase_orders/audit/${selectedOrder.id}`);
+
+      if (!res.ok) {
+        console.error("Fetch failed with status:", res.status);
+        return;
+      }
+
+      const text = await res.text(); // get raw text first
+
+      if (!text) {
+        console.warn("Audit response is empty");
+        setAuditHistory([]); // or null, based on your needs
+        return;
+      }
+
+      const data = JSON.parse(text); // safely parse if non-empty
+      setAuditHistory(data);
+
+    } catch (error) {
+      console.error("Error fetching audit data:", error);
+    }
   };
+
   useEffect(() => {
     if (selectedOrder) {
       fetchAudit();
@@ -651,7 +701,7 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
   }, [auditPopupOpen]);
 
   const toggleDeleteStatus = async (order) => {
-    const newStatus = !order.deleted;
+    const newStatus = !order.delete_status;
 
     const confirmMessage = newStatus
       ? 'Are you sure you want to delete this order?'
@@ -661,7 +711,7 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
     if (!confirmed) return;
 
     try {
-      const response = await fetch(`https://backendaab.in/aabuildersDash/api/purchase_orders/markDeleted/${order.id}?deleted=${newStatus}`, {
+      const response = await fetch(`https://backendaab.in/aabuildersDash/api/purchase_orders/markDeleted/${order.id}?deleteStatus=${newStatus}`, {
         method: 'PUT',
       });
       if (response.ok) {
@@ -686,6 +736,7 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
       const itemNameOpts = filteredItems.map(item => ({
         value: item.itemName,
         label: item.itemName,
+        id: item.id,
       }));
 
       setItemNameOptions(itemNameOpts);
@@ -693,6 +744,30 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
       setItemNameOptions([]);
     }
   }, [editRowData?.category, poItemName]);
+
+  useEffect(() => {
+    if (editModalOpen && editRowData?.category_id && categoryOptions.length > 0) {
+      const selectedCategory = categoryOptions.find(cat => cat.id === editRowData.category_id);
+      const categoryName = selectedCategory?.value;
+
+      if (categoryName) {
+        const filteredItems = poItemName.filter(
+          item =>
+            item.category &&
+            item.category.toLowerCase() === categoryName.toLowerCase()
+        );
+
+        const itemNameOpts = filteredItems.map(item => ({
+          id: item.id,
+          value: item.itemName,
+          label: item.itemName
+        }));
+
+        setItemNameOptions(itemNameOpts);
+      }
+    }
+  }, [editModalOpen, editRowData?.category_id, categoryOptions, poItemName]);
+
 
   return (
     <div className="gap-6 [@media(min-width:1450)]w-[1900px] pl-10 bg-[#FFFCF6]">
@@ -799,13 +874,13 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
                       }}>
                       <img src={file} className="w-5 h-5" />
                       <span
-                        title={`${formatDateTime(order.createdDateTime)} - ${order.clientId}`}
-                        className={`font-medium hover:text-[#E4572E] ${selectedOrderId === order.id ? 'text-[#E4572E]' : 'text-black'} ${order.deleted ? 'line-through text-gray-500' : ''}`}
+                        title={`${formatDateOnly(order.date)} - ${order.client_id}`}
+                        className={`font-medium hover:text-[#E4572E] ${selectedOrderId === order.id ? 'text-[#E4572E]' : 'text-black'} ${order.delete_status ? 'line-through text-gray-500' : ''}`}
                       >
-                        {order.eno} - {formatDateTime(order.createdDateTime)} - {
-                          clientNameOptions.find(opt => opt.id === order.clientId)?.label || order.clientId
+                        {order.eno} - {formatDateOnly(order.date)} - {
+                          clientNameOptions.find(opt => opt.id === order.client_id)?.label || order.client_id
                         }
-                        {order.poNotes?.poNotes ? ` - ${order.poNotes.poNotes}` : ""}
+                        {order.po_notes?.po_notes ? ` - ${order.po_notes.po_notes}` : ""}
                       </span>
                     </div>
                     <div className="flex gap-3 pr-2 w-[100px] justify-end">
@@ -817,7 +892,7 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
                       </button>
                       <button onClick={() => toggleDeleteStatus(order)}>
                         <img
-                          src={order.deleted ? undo : remove}
+                          src={order.delete_status ? undo : remove}
                           alt="Toggle Delete"
                           className="w-4 h-4 transform hover:scale-110"
                         />
@@ -864,9 +939,9 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
                         <div className="inline-block ml-2 min-w-[150px]">
                           <Select
                             options={vendorOptions}
-                            value={vendorOptions.find(opt => opt.value === editableHeader.vendorName)}
+                            value={vendorOptions.find(opt => opt.id === editableHeader.vendorId)}  // match by ID
                             onChange={(selectedOption) =>
-                              handleHeaderChange('vendorName', selectedOption?.value || '')
+                              handleHeaderChange('vendorId', selectedOption?.id || '')
                             }
                             isSearchable
                             placeholder="Select Vendor"
@@ -889,9 +964,9 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
                         <div className="inline-block ml-2 min-w-[150px]">
                           <Select
                             options={clientNameOptions}
-                            value={clientNameOptions.find(opt => opt.value === editableHeader.clientName)}
+                            value={clientNameOptions.find(opt => opt.id === editableHeader.clientId)}  // match by ID
                             onChange={(selectedOption) =>
-                              handleHeaderChange('clientName', selectedOption?.value || '')
+                              handleHeaderChange('clientId', selectedOption?.id || '')
                             }
                             isSearchable
                             placeholder="Select Client"
@@ -915,13 +990,13 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
                       <span>
                         <b className='font-medium'>Vendor Name:</b>
                         <b className='font-medium text-[#E4572E]'>
-                          {vendorOptions.find(opt => opt.id === selectedOrder.vendorId)?.label || selectedOrder.vendorId}
+                          {vendorOptions.find(opt => opt.id === selectedOrder.vendor_id)?.label || selectedOrder.vendor_id}
                         </b>
                       </span>
                       <span>
                         <b className='font-medium'>Client Name:</b>
                         <b className='font-medium text-[#E4572E]'>
-                          {clientNameOptions.find(opt => opt.id === selectedOrder.clientId)?.label || selectedOrder.clientId}
+                          {clientNameOptions.find(opt => opt.id === selectedOrder.client_id)?.label || selectedOrder.client_id}
                         </b>
                       </span>
                     </>
@@ -983,16 +1058,31 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
                       {selectedOrder.purchaseTable.map((item, idx) => (
                         <tr key={item.id} className="border-b">
                           <td className="p-2">{idx + 1}</td>
-                          <td className="p-2 min-w-[140px] sm:min-w-[auto]">{item.itemName}</td>
-                          <td className="p-2">{item.category}</td>
-                          <td className="p-2 min-w-[100px] sm:min-w-[auto]">{item.model}</td>
-                          <td className="p-2">{item.brand}</td>
-                          <td className="p-2">{item.type}</td>
+                          <td className="p-2 min-w-[140px] sm:min-w-[auto]">
+                            {poItemName.find(opt => opt.id === item.item_id)?.itemName || ''}
+                          </td>
+
+                          <td className="p-2">
+                            {categoryOptions.find(opt => opt.id === item.category_id)?.label || ''}
+                          </td>
+
+                          <td className="p-2 min-w-[100px] sm:min-w-[auto]">
+                            {modelOptions.find(opt => opt.id === item.model_id)?.label || ''}
+                          </td>
+
+                          <td className="p-2">
+                            {brandOptions.find(opt => opt.id === item.brand_id)?.label || ''}
+                          </td>
+
+                          <td className="p-2">
+                            {typeOptions.find(opt => opt.id === item.type_id)?.label || ''}
+                          </td>
+
                           <td className="p-2">{item.quantity}</td>
                           <td className="p-2">{item.amount}</td>
                           <td className="p-2">{item.totalAmount}</td>
                           <td className="p-2">
-                            {selectedOrder && !selectedOrder.deleted && (
+                            {selectedOrder && !selectedOrder.delete_status && (
                               <div className="flex gap-3 pr-2">
                                 <button
                                   className="rounded-full transition duration-200 ml-2 mr-3"
@@ -1054,7 +1144,7 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
                 {poAuditHistory.length > 0 && (
                   <ul className="space-y-2">
                     {poAuditHistory.map((entry, idx) => {
-                      const editedAtDate = new Date(entry.editedAt);
+                      const editedAtDate = new Date(entry.edited_at);
                       const formattedDate = editedAtDate.toLocaleDateString('en-GB'); // DD/MM/YYYY
                       const formattedTime = editedAtDate.toLocaleTimeString('en-US', {
                         hour: '2-digit',
@@ -1084,8 +1174,8 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
       </div>
       {showAuditModal && selectedAudit && (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-40 flex items-center justify-center">
-          <div className="bg-white p-6 rounded-lg w-[90%] max-w-2xl shadow-lg relative">
-            <h2 className="text-xl font-semibold mb-4">Audit Details - {selectedAudit.editedAt ? formatDateTime(selectedAudit.editedAt) : "N/A"}</h2>
+          <div className="bg-white p-6 rounded-lg w-[100%] max-w-3xl shadow-lg relative">
+            <h2 className="text-xl font-semibold mb-4">Audit Details - {selectedAudit.edited_at ? formatDateTime(selectedAudit.edited_at) : "N/A"}</h2>
             <table className="w-full text-sm border">
               <thead>
                 <tr className="bg-gray-100 text-left">
@@ -1093,7 +1183,7 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
                     "Vendor Name",
                     "Client Name",
                     "Date",
-                    "ENo",
+                    "Po No",
                     "Edited By"
                   ].map((label, index) => (
                     <th key={index} className="p-2 border">{label}</th>
@@ -1104,32 +1194,47 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
                 <tr>
                   {[
                     {
-                      old: selectedAudit.oldVendorName,
-                      new: selectedAudit.newVendorName
+                      old:
+                        vendorOptions.find(v => v.id === selectedAudit.old_vendor_id)?.label ||
+                        `Vendor ID ${selectedAudit.old_vendor_id}`,
+                      new:
+                        vendorOptions.find(v => v.id === selectedAudit.new_vendor_id)?.label ||
+                        `Vendor ID ${selectedAudit.new_vendor_id}`
                     },
                     {
-                      old: selectedAudit.oldClientName,
-                      new: selectedAudit.newClientName
+                      old:
+                        clientNameOptions.find(c => c.id === selectedAudit.old_client_id)?.label ||
+                        `Client ID ${selectedAudit.old_client_id}`,
+                      new:
+                        clientNameOptions.find(c => c.id === selectedAudit.new_client_id)?.label ||
+                        `Client ID ${selectedAudit.new_client_id}`
                     },
                     {
-                      old: selectedAudit.oldDate,
-                      new: selectedAudit.newDate
+                      old: formatDates(selectedAudit.old_date),
+                      new: formatDates(selectedAudit.new_date)
                     },
                     {
-                      old: selectedAudit.oldENo,
-                      new: selectedAudit.newENo
+                      old: selectedAudit.oldeno,
+                      new: selectedAudit.neweno
                     },
                     {
-                      old: "",
-                      new: selectedAudit.editedBy || "Unknown"
+                      old: selectedAudit.edited_by || "Unknown",
+                      new: ""
                     }
                   ].map((field, index) => {
-                    const hasChanged = field.old !== field.new && field.old !== "";
+                    const hasChanged =
+                      field.old !== field.new && field.new !== "" && field.new !== null;
+
                     return (
                       <td key={index} className="p-2 border">
                         <span
-                          className={`px-1 rounded ${hasChanged ? "bg-orange-100 text-orange-700 font-semibold" : ""}`}
-                          title={hasChanged ? `Previous: ${field.old} → Current: ${field.new}` : field.new}
+                          className={`px-1 rounded ${hasChanged ? "bg-orange-100 text-orange-700 font-semibold" : ""
+                            }`}
+                          title={
+                            hasChanged
+                              ? `Previous: ${field.old} → Current: ${field.new}`
+                              : field.old
+                          }
                         >
                           {field.old}
                         </span>
@@ -1191,124 +1296,167 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
             <h2 className="text-xl font-bold mb-4">Edit History</h2>
             <form onSubmit={(e) => { e.preventDefault(); handleEditSubmit(); }} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
+                {/* CATEGORY */}
                 <div>
                   <label>Category</label>
                   <Select
                     options={categoryOptions}
-                    value={categoryOptions.find(opt => opt.value === editRowData?.category)}
+                    value={categoryOptions.find(opt => opt.id === editRowData?.category_id) || null}
                     isSearchable
                     isClearable
                     className="w-full"
                     styles={customStyles}
                     onChange={(selectedOption) => {
-                      const newCategory = selectedOption ? selectedOption.value : '';
+                      const newCategoryId = selectedOption ? selectedOption.id : '';
+                      const newCategoryName = selectedOption ? selectedOption.value : '';
 
-                      // Update category in state
-                      setEditRowData(prev => ({ ...prev, category: newCategory }));
+                      // Update state
+                      setEditRowData(prev => ({
+                        ...prev,
+                        category_id: newCategoryId,
+                        category_name: newCategoryName,
+                        item_id: '',
+                        itemName: ''
+                      }));
 
-                      // Filter Item Names based on the selected category
-                      if (newCategory) {
+                      // Update item name options
+                      if (newCategoryName) {
                         const filteredItems = poItemName.filter(
                           item =>
                             item.category &&
-                            item.category.toLowerCase() === editRowData?.category.toLowerCase()
+                            item.category.toLowerCase() === newCategoryName.toLowerCase()
                         );
 
                         const itemNameOpts = filteredItems.map(item => ({
+                          id: item.id,
                           value: item.itemName,
-                          label: item.itemName,
+                          label: item.itemName
                         }));
 
                         setItemNameOptions(itemNameOpts);
                       } else {
-                        // If category is cleared, clear item name options
                         setItemNameOptions([]);
                       }
-
-                      // Optionally also reset selected item name:
-                      setEditRowData(prev => ({ ...prev, itemName: '' }));
                     }}
                   />
                 </div>
+
+                {/* ITEM NAME */}
                 <div>
                   <label>Item Name</label>
                   <Select
                     options={itemNameOptions}
-                    value={itemNameOptions.find(opt => opt.value === editRowData?.itemName)}
+                    value={itemNameOptions.find(opt => opt.id === editRowData?.item_id) || null}
                     isSearchable
                     isClearable
                     className="w-full"
                     styles={customStyles}
                     onChange={(selectedOption) =>
-                      setEditRowData({ ...editRowData, itemName: selectedOption?.value || '' })
+                      setEditRowData({
+                        ...editRowData,
+                        item_id: selectedOption?.id || '',
+                        itemName: selectedOption?.value || ''
+                      })
                     }
                   />
                 </div>
+
+                {/* MODEL */}
                 <div>
                   <label>Model</label>
                   <Select
                     options={modelOptions}
-                    value={modelOptions.find(opt => opt.value === editRowData?.model)}
+                    value={modelOptions.find(opt => opt.id === editRowData?.model_id) || null}
                     isSearchable
                     isClearable
                     className="w-full"
                     styles={customStyles}
                     onChange={(selectedOption) =>
-                      setEditRowData({ ...editRowData, model: selectedOption?.value || '' })
+                      setEditRowData({
+                        ...editRowData,
+                        model_id: selectedOption?.id || '',
+                        model: selectedOption?.value || ''
+                      })
                     }
                   />
                 </div>
+
+                {/* BRAND */}
                 <div>
                   <label>Brand</label>
                   <Select
                     options={brandOptions}
-                    value={brandOptions.find(opt => opt.value === editRowData?.brand)}
+                    value={brandOptions.find(opt => opt.id === editRowData?.brand_id) || null}
                     isSearchable
                     isClearable
                     className="w-full"
                     styles={customStyles}
                     onChange={(selectedOption) =>
-                      setEditRowData({ ...editRowData, brand: selectedOption?.value || '' })
+                      setEditRowData({
+                        ...editRowData,
+                        brand_id: selectedOption?.id || '',
+                        brand: selectedOption?.value || ''
+                      })
                     }
                   />
                 </div>
+
+                {/* TYPE */}
                 <div>
                   <label>Type</label>
                   <Select
                     options={typeOptions}
-                    value={typeOptions.find(opt => opt.value === editRowData?.type)}
+                    value={typeOptions.find(opt => opt.id === editRowData?.type_id) || null}
                     isSearchable
                     isClearable
                     className="w-full"
                     styles={customStyles}
                     onChange={(selectedOption) =>
-                      setEditRowData({ ...editRowData, type: selectedOption?.value || '' })
+                      setEditRowData({
+                        ...editRowData,
+                        type_id: selectedOption?.id || '',
+                        type: selectedOption?.value || ''
+                      })
                     }
                   />
                 </div>
+
+                {/* QUANTITY */}
                 <div>
                   <label>Quantity</label>
                   <input
                     type="number"
                     value={editRowData?.quantity || ''}
                     onChange={(e) =>
-                      setEditRowData({ ...editRowData, quantity: e.target.value, totalAmount: e.target.value * editRowData.amount })
+                      setEditRowData({
+                        ...editRowData,
+                        quantity: Number(e.target.value),
+                        totalAmount: Number(e.target.value) * editRowData.amount
+                      })
                     }
                     className="w-full border-2 border-[#BF9863] border-opacity-25 p-2 rounded"
                   />
                 </div>
+
+                {/* AMOUNT */}
                 <div>
                   <label>Amount</label>
                   <input
                     type="number"
                     value={editRowData?.amount || ''}
                     onChange={(e) =>
-                      setEditRowData({ ...editRowData, amount: e.target.value, totalAmount: e.target.value * editRowData.quantity })
+                      setEditRowData({
+                        ...editRowData,
+                        amount: Number(e.target.value),
+                        totalAmount: Number(e.target.value) * editRowData.quantity
+                      })
                     }
                     className="w-full border-2 border-[#BF9863] border-opacity-25 p-2 rounded"
                   />
                 </div>
               </div>
+
+              {/* ACTION BUTTONS */}
               <div className="flex justify-end gap-4 mt-4">
                 <button
                   type="button"
@@ -1344,26 +1492,139 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
                 </tr>
               </thead>
               <tbody>
-                {groupedAudits[auditPopupOpen]?.map((entry, idx) => (
-                  <tr key={entry.id} className="border-b">
-                    <td className="p-2 border">{entry.editedBy}</td>
-                    {["ItemName", "Category", "Model", "Brand", "Type", "Quantity", "Amount", "TotalAmount"].map((field) => {
-                      const oldVal = entry[`old${field}`];
-                      const newVal = entry[`new${field}`];
-                      const changed = oldVal !== newVal;
-                      return (
-                        <td
-                          key={field}
-                          className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""
-                            }`}
-                          title={changed ? `Previous: ${oldVal} → Current: ${newVal}` : ""}
-                        >
-                          {oldVal}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
+                {groupedAudits[auditPopupOpen]?.map((entry) => {
+                  // Lookup helpers
+                  const getNameById = (options, id, key = "value") =>
+                    options.find(opt => opt.id === id)?.[key] || "-";
+
+                  const oldTotal = entry.old_quantity * entry.old_amount;
+                  const newTotal = entry.new_quantity * entry.new_amount;
+
+                  return (
+                    <tr key={entry.id} className="border-b">
+                      {/* Edited By */}
+                      <td className="p-2 border">{entry.edited_by}</td>
+
+                      {/* Item */}
+                      {(() => {
+                        const oldVal = getNameById(poItemName, entry.old_item_id);
+                        const newVal = getNameById(poItemName, entry.new_item_id);
+                        const changed = entry.old_item_id !== entry.new_item_id;
+                        return (
+                          <td
+                            className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""}`}
+                            title={changed ? `Previous: ${oldVal} → Current: ${newVal}` : ""}
+                          >
+                            {oldVal}
+                          </td>
+                        );
+                      })()}
+
+                      {/* Category */}
+                      {(() => {
+                        const oldVal = getNameById(categoryOptions, entry.old_category_id);
+                        const newVal = getNameById(categoryOptions, entry.new_category_id);
+                        const changed = entry.old_category_id !== entry.new_category_id;
+                        return (
+                          <td
+                            className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""}`}
+                            title={changed ? `Previous: ${oldVal} → Current: ${newVal}` : ""}
+                          >
+                            {oldVal}
+                          </td>
+                        );
+                      })()}
+
+                      {/* Model */}
+                      {(() => {
+                        const oldVal = getNameById(modelOptions, entry.old_model_id);
+                        const newVal = getNameById(modelOptions, entry.new_model_id);
+                        const changed = entry.old_model_id !== entry.new_model_id;
+                        return (
+                          <td
+                            className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""}`}
+                            title={changed ? `Previous: ${oldVal} → Current: ${newVal}` : ""}
+                          >
+                            {oldVal}
+                          </td>
+                        );
+                      })()}
+
+                      {/* Brand */}
+                      {(() => {
+                        const oldVal = getNameById(brandOptions, entry.old_brand_id);
+                        const newVal = getNameById(brandOptions, entry.new_brand_id);
+                        const changed = entry.old_brand_id !== entry.new_brand_id;
+                        return (
+                          <td
+                            className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""}`}
+                            title={changed ? `Previous: ${oldVal} → Current: ${newVal}` : ""}
+                          >
+                            {oldVal}
+                          </td>
+                        );
+                      })()}
+
+                      {/* Type */}
+                      {(() => {
+                        const oldVal = getNameById(typeOptions, entry.old_type_id);
+                        const newVal = getNameById(typeOptions, entry.new_type_id);
+                        const changed = entry.old_type_id !== entry.new_type_id;
+                        return (
+                          <td
+                            className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""}`}
+                            title={changed ? `Previous: ${oldVal} → Current: ${newVal}` : ""}
+                          >
+                            {oldVal}
+                          </td>
+                        );
+                      })()}
+
+                      {/* Quantity */}
+                      {(() => {
+                        const oldVal = entry.old_quantity;
+                        const newVal = entry.new_quantity;
+                        const changed = oldVal !== newVal;
+                        return (
+                          <td
+                            className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""}`}
+                            title={changed ? `Previous: ${oldVal} → Current: ${newVal}` : ""}
+                          >
+                            {oldVal}
+                          </td>
+                        );
+                      })()}
+
+                      {/* Amount */}
+                      {(() => {
+                        const oldVal = entry.old_amount;
+                        const newVal = entry.new_amount;
+                        const changed = oldVal !== newVal;
+                        return (
+                          <td
+                            className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""}`}
+                            title={changed ? `Previous: ${oldVal} → Current: ${newVal}` : ""}
+                          >
+                            {oldVal}
+                          </td>
+                        );
+                      })()}
+
+                      {/* Total */}
+                      {(() => {
+                        const changed = oldTotal !== newTotal;
+                        return (
+                          <td
+                            className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""}`}
+                            title={changed ? `Previous: ${oldTotal} → Current: ${newTotal}` : ""}
+                          >
+                            {oldTotal}
+                          </td>
+                        );
+                      })()}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
             <div className="flex justify-end mt-4">

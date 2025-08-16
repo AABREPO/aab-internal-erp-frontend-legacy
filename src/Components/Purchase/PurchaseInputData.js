@@ -7,6 +7,9 @@ import edit from '../Images/Edit.svg';
 import Select from "react-select";
 const PurchaseInputData = () => {
   const [isShowModal, setIsShowModal] = useState(false);
+  const [hoveredModelName, setHoveredModelName] = useState(null);
+  const [hoveredBrandName, setHoveredBrandName] = useState(null);
+  const [hoveredTypeColor, setHoveredTypeColor] = useState(null);
   const [siteOptions, setSiteOptions] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [category, setCategory] = useState("");
@@ -394,7 +397,7 @@ const PurchaseInputData = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("http://localhost:8081/api/po_itemNames/upload/csv", {
+      const response = await fetch("https://backendaab.in/aabuildersDash/api/po_itemNames/upload/csv", {
         method: "POST",
         body: formData,
       });
@@ -1067,6 +1070,11 @@ const PurchaseInputData = () => {
   const filteredGroupName = groupNameList.filter((item) =>
     item.groupName.toLowerCase().includes(groupNameSearch.toLowerCase())
   );
+  const getItemNamesForModel = (modelName) => {
+    return poItemName
+      .filter(item => item.otherPOEntityList?.some(entry => entry.modelName === modelName))
+      .map(item => item.itemName);
+  };
 
   const handleSubmitSiteIncharge = async () => {
     // Basic validation
@@ -1359,24 +1367,41 @@ const PurchaseInputData = () => {
             <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
               <table className="table-auto lg:w-80 w-64">
                 <tbody>
-                  {filteredPoModel.map((item, index) => (
-                    <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold">{(poModel.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
-                      <td className="p-2 text-left group flex font-semibold">
-                        <div className="flex flex-grow">
-                          {item.model}
-                        </div>
-                        <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
-                          <button type="button" >
-                            <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditModel(item)} />
-                          </button>
-                          <button >
-                            <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleModelDelete(item.id)} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredPoModel.map((modelItem, index) => {
+                    const itemNamesForThisModel = getItemNamesForModel(modelItem.model);
+                    return (
+                      <tr
+                        key={modelItem.id}
+                        className="border-b odd:bg-white even:bg-[#FAF6ED]"
+                        onMouseEnter={() => setHoveredModelName(modelItem.model)}
+                        onMouseLeave={() => setHoveredModelName(null)}
+                      >
+                        <td className="p-2 text-left font-semibold">
+                          {(poModel.findIndex(acc => acc.id === modelItem.id) + 1).toString().padStart(2, '0')}
+                        </td>
+                        <td className="p-2 text-left group flex font-semibold relative">
+                          <div className="flex flex-grow">{modelItem.model}</div>
+                          <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            <button type="button">
+                              <img src={edit} alt="edit" className="w-4 h-4" onClick={() => openEditModel(modelItem)} />
+                            </button>
+                            <button>
+                              <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleModelDelete(modelItem.id)} />
+                            </button>
+                          </div>
+                          {hoveredModelName === modelItem.model && itemNamesForThisModel.length > 0 && (
+                            <div className="absolute top-8 left-0 z-10 bg-white border border-gray-300 rounded shadow-md p-2 w-48 text-sm">
+                              <ul className="list-disc ml-4">
+                                {itemNamesForThisModel.map((name, idx) => (
+                                  <li key={idx}>{name}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1814,7 +1839,7 @@ const PurchaseInputData = () => {
       )}
       {isPopupOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-md w-[1050px] shadow-lg text-left p-6">
+          <div className="bg-white rounded-md w-[1150px] shadow-lg text-left p-6">
             <div className="flex justify-between items-center border-b pb-2 mb-4">
               <button onClick={() => setIsPopupOpen(false)} className="text-red-500 text-[30px] font-bold">×</button>
             </div>
@@ -1860,7 +1885,7 @@ const PurchaseInputData = () => {
                   placeholder="Test item"
                 />
               </div>
-              <div className="w-[1020px] overflow-x-hidden h-[250px] overflow-y-auto ">
+              <div className="w-[1120px] overflow-x-hidden h-[250px] overflow-y-auto ">
                 {poItemList.otherPOEntityList.map((item, index) => (
                   <div key={index} className="flex flex-wrap gap-4 items-end mb-2">
                     <div>
@@ -1907,7 +1932,7 @@ const PurchaseInputData = () => {
                           }
                         }}
                         formatCreateLabel={(inputValue) => `+ Add "${inputValue}"`}
-                        className="border-2 border-[#BF9853] border-opacity-25 rounded-lg lg:w-[230px] w-64 text-left"
+                        className="border-2 border-[#BF9853] border-opacity-25 rounded-lg lg:w-[320px] w-64 text-left"
                         styles={customSelectStyles}
                       />
                     </div>
@@ -2460,7 +2485,7 @@ const PurchaseInputData = () => {
       )}
       {isItemNameEditPopupOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-md w-[1050px] shadow-lg text-left p-6">
+          <div className="bg-white rounded-md w-[1150px] shadow-lg text-left p-6">
             <div className="flex justify-between items-center border-b pb-2 mb-4">
               <button onClick={() => setIsItemNameEditPopupOpen(false)} className="text-red-500 text-[30px] font-bold">×</button>
             </div>
@@ -2507,7 +2532,7 @@ const PurchaseInputData = () => {
                   placeholder="Test item"
                 />
               </div>
-              <div className="w-[1020px] overflow-x-hidden h-[300px] overflow-y-auto ">
+              <div className="w-[1120px] overflow-x-hidden h-[300px] overflow-y-auto ">
                 {poEditItemList.otherPOEntityList.map((item, index) => (
                   <div key={index} className="flex flex-wrap gap-4 items-end mb-2">
                     <div>
@@ -2522,7 +2547,7 @@ const PurchaseInputData = () => {
                           setPoEditItemList({ ...poEditItemList, otherPOEntityList: updatedList });
                         }}
                         styles={{
-                          container: (base) => ({ ...base, width: 230 }),
+                          container: (base) => ({ ...base, width: 320 }),
                         }}
                       />
                     </div>

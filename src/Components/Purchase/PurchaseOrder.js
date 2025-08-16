@@ -413,6 +413,28 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             id: item.id,
         }));
         setItemNameOptions(itemNameOpts);
+
+        const filteredModels = poModel
+            .filter(item => item.category?.toLowerCase() === categoryValue.toLowerCase())
+            .map(item => ({
+                value: item.model?.trim(),
+                label: item.model?.trim(),
+                id: item.id
+            }))
+            .filter(item => item.value);
+        setModelOptions(filteredModels);
+    };
+
+    const ensureIdFromList = (value, list, key, categoryKey, categoryValue) => {
+        const match = list.find(item =>
+            item[key]?.trim().toLowerCase() === value?.trim().toLowerCase() &&
+            (!categoryKey || item[categoryKey]?.toLowerCase() === categoryValue?.toLowerCase())
+        );
+        return {
+            value,
+            label: value,
+            id: match?.id || 0, // Fallback to 0 if not found
+        };
     };
 
     const handleItemNameChange = (option) => {
@@ -421,10 +443,26 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             setSelectedModel(null);
             setSelectedBrand(null);
             setSelectedType(null);
-            setModelOptions([]);
+            setGroupName('');
+
+            // Restore model options based on category
+            const categoryValue = selectedCategory?.value || '';
+            if (categoryValue) {
+                const categoryMatchedModels = poModel
+                    .filter(item => item.category?.toLowerCase() === categoryValue.toLowerCase())
+                    .map(item => ({
+                        value: item.model?.trim(),
+                        label: item.model?.trim(),
+                        id: item.id
+                    }))
+                    .filter(item => item.value);
+                setModelOptions(categoryMatchedModels);
+            } else {
+                setModelOptions([]);
+            }
+
             setBrandOptions([]);
             setTypeOptions([]);
-            setGroupName('');
             return;
         }
 
@@ -458,10 +496,11 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                 .map(item => ({
                     value: item.model?.trim(),
                     label: item.model?.trim(),
-                    id: item.id // ✅ include ID
+                    id: item.id
                 }))
-                .filter(item => item.value); // Remove empty
+                .filter(item => item.value);
             setModelOptions(categoryMatchedModels);
+
             const categoryMatchedTypes = poType
                 .filter(item => item.category?.toLowerCase() === selectedCategory?.value.toLowerCase())
                 .map(item => ({
@@ -491,21 +530,13 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
         if (selectedItem?.otherPOEntityList?.length > 0) {
             const models = [...new Set(selectedItem.otherPOEntityList.map(e => e.modelName?.trim()).filter(Boolean))];
 
-            const modelOpts = models.map(modelName => {
-                const modelMatch = poModel.find(m =>
-                    m.model?.trim().toLowerCase() === modelName.toLowerCase() &&
-                    (m.category?.toLowerCase() || '') === (selectedCategory?.value.toLowerCase() || '')
-                );
-                return {
-                    value: modelName,
-                    label: modelName,
-                    id: modelMatch?.id || null,
-                };
-            });
+            const modelOpts = models.map(modelName =>
+                ensureIdFromList(modelName, poModel, 'model', 'category', selectedCategory?.value)
+            );
             setModelOptions(modelOpts);
 
             if (modelOpts.length === 1) {
-                const autoModel = modelOpts[0];
+                const autoModel = ensureIdFromList(modelOpts[0].value, poModel, 'model', 'category', selectedCategory?.value);
                 setSelectedModel(autoModel);
 
                 const filteredByModel = selectedItem.otherPOEntityList.filter(
@@ -513,20 +544,9 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                 );
 
                 const brands = [...new Set(filteredByModel.map(e => e.brandName?.trim()).filter(Boolean))];
-
-                const brandOpts = brands.map(brandName => {
-                    const brandMatch = poBrand.find(
-                        b =>
-                            b.brand?.trim().toLowerCase() === brandName.toLowerCase() &&
-                            (!b.category || b.category?.toLowerCase() === selectedCategory?.value.toLowerCase())
-                    );
-                    return {
-                        value: brandName,
-                        label: brandName,
-                        id: brandMatch?.id || null,
-                    };
-                });
-
+                const brandOpts = brands.map(b =>
+                    ensureIdFromList(b, poBrand, 'brand', 'category', selectedCategory?.value)
+                );
                 setBrandOptions(brandOpts);
 
                 if (brandOpts.length === 1) {
@@ -538,32 +558,21 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                     );
 
                     const types = [...new Set(filteredByBrand.map(e => e.typeColor?.trim()).filter(Boolean))];
-
-                    const typeOpts = types.map(typeColor => {
-                        const typeMatch = poType.find(
-                            t =>
-                                t.typeColor?.trim().toLowerCase() === typeColor.toLowerCase() &&
-                                t.category?.toLowerCase() === selectedCategory?.value.toLowerCase()
-                        );
-                        return {
-                            value: typeColor,
-                            label: typeColor,
-                            id: typeMatch?.id || null,
-                        };
-                    });
-
+                    const typeOpts = types.map(t =>
+                        ensureIdFromList(t, poType, 'typeColor', 'category', selectedCategory?.value)
+                    );
                     setTypeOptions(typeOpts);
 
                     if (typeOpts.length === 1) {
                         setSelectedType(typeOpts[0]);
                     }
                 }
-            } else {
+            }
+            else {
                 setBrandOptions([]);
                 setTypeOptions([]);
             }
-        }
-        else {
+        } else {
             setModelOptions([]);
             setBrandOptions([]);
             setTypeOptions([]);
@@ -579,8 +588,31 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
         }
 
         setSelectedModel(option);
+        if (!option) return;
 
-        if (!selectedItemName || !option) return;
+        const isUnmappedCategory = !mappedCategories.some(cat =>
+            cat.label.toLowerCase() === selectedCategory?.value.toLowerCase()
+        );
+
+        // Auto-select itemName if model is selected first
+        if (!selectedItemName) {
+            const matchedItem = poItemName.find(item =>
+                item.category?.toLowerCase() === selectedCategory?.value.toLowerCase() &&
+                item.otherPOEntityList?.some(e => e.modelName?.trim().toLowerCase() === modelValue.toLowerCase())
+            );
+
+            if (matchedItem) {
+                const itemOption = {
+                    value: matchedItem.itemName,
+                    label: matchedItem.itemName,
+                    id: matchedItem.id
+                };
+                setSelectedItemName(itemOption);
+                setGroupName(matchedItem.groupName || '');
+            }
+        }
+
+        if (!selectedItemName) return;
 
         const selectedItem = poItemName.find(
             item =>
@@ -590,26 +622,20 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
         if (!selectedItem) return;
 
         const filtered = selectedItem.otherPOEntityList.filter(
-            e => e.modelName?.trim() === modelValue
-        );
-
-        const isUnmappedCategory = !mappedCategories.some(cat =>
-            cat.label.toLowerCase() === selectedCategory?.value.toLowerCase()
+            e => e.modelName?.trim().toLowerCase() === modelValue.toLowerCase()
         );
 
         if (isUnmappedCategory) {
-            const mappedBrands = new Set();
-            const mappedTypes = new Set();
+            const matchedBrands = poBrand
+                .filter(b => (!b.category || b.category.toLowerCase() === selectedCategory?.value.toLowerCase()))
+                .map(b => ({
+                    value: b.brand?.trim(),
+                    label: b.brand?.trim(),
+                    id: b.id
+                }))
+                .filter(b => b.value);
+            setBrandOptions(matchedBrands);
 
-            poItemName.forEach(item => {
-                item.otherPOEntityList?.forEach(entry => {
-                    if (entry.brandName?.trim()) mappedBrands.add(entry.brandName.trim().toLowerCase());
-                    if (entry.typeColor?.trim()) mappedTypes.add(entry.typeColor.trim().toLowerCase());
-                });
-            });
-            setBrandOptions(brandOptions);
-
-            // ✅ Unmapped Types
             const matchedTypes = poType
                 .filter(t => t.category?.toLowerCase() === selectedCategory?.value.toLowerCase())
                 .map(item => ({
@@ -619,25 +645,33 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                 }))
                 .filter(item => item.value);
             setTypeOptions(matchedTypes);
-
             return;
         }
 
-        // ✅ For mapped categories
         const brands = [...new Set(filtered.map(e => e.brandName?.trim()).filter(Boolean))];
-        const brandOpts = brands.map(val => ({
-            value: val,
-            label: val,
-            id: poBrand.find(
+        const brandOpts = brands.map(val => {
+            const matched = poBrand.find(
                 b =>
                     b.brand?.trim().toLowerCase() === val.toLowerCase() &&
                     (!b.category || b.category.toLowerCase() === selectedCategory?.value.toLowerCase())
-            )?.id || null
-        }));
+            );
+            return {
+                value: val,
+                label: val,
+                id: matched?.id || null
+            };
+        });
         setBrandOptions(brandOpts);
 
-        if (brands.length === 1) {
+        if (brandOpts.length === 1) {
             const autoBrand = brandOpts[0];
+            if (!autoBrand.id) {
+                const fallback = poBrand.find(b =>
+                    b.brand?.trim().toLowerCase() === autoBrand.value.toLowerCase() &&
+                    (!b.category || b.category?.toLowerCase() === selectedCategory?.value.toLowerCase())
+                );
+                autoBrand.id = fallback?.id || null;
+            }
             setSelectedBrand(autoBrand);
 
             const types = [...new Set(
@@ -646,64 +680,93 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                     .map(e => e.typeColor?.trim())
                     .filter(Boolean)
             )];
-            const typeOpts = types.map(val => ({
-                value: val,
-                label: val,
-                id: poType.find(
+
+            const typeOpts = types.map(val => {
+                const matched = poType.find(
                     t =>
                         t.typeColor?.trim().toLowerCase() === val.toLowerCase() &&
                         t.category?.toLowerCase() === selectedCategory?.value.toLowerCase()
-                )?.id || null
-            }));
+                );
+                return {
+                    value: val,
+                    label: val,
+                    id: matched?.id || null
+                };
+            });
+
             setTypeOptions(typeOpts);
 
-
             if (typeOpts.length === 1) {
-                setSelectedType(typeOpts[0]);
+                const autoType = typeOpts[0];
+                if (!autoType.id) {
+                    const fallbackType = poType.find(t =>
+                        t.typeColor?.trim().toLowerCase() === autoType.value.toLowerCase() &&
+                        t.category?.toLowerCase() === selectedCategory?.value.toLowerCase()
+                    );
+                    autoType.id = fallbackType?.id || null;
+                }
+                setSelectedType(autoType);
             }
         } else {
             setTypeOptions([]);
         }
     };
-
     const handleBrandChange = (option) => {
-        const brandValue = option || '';
-        if (selectedBrand !== brandValue) {
+        const brandValue = option?.value?.trim() || '';
+
+        if (selectedBrand?.value !== brandValue) {
             setSelectedType(null);
         }
+
         setSelectedBrand(option);
+
         if (!selectedItemName || !selectedModel || !option) return;
+
         const selectedItem = poItemName.find(
             item =>
-                item.category.toLowerCase() === selectedCategory?.value.toLowerCase() &&
+                item.category?.toLowerCase() === selectedCategory?.value.toLowerCase() &&
                 item.itemName === selectedItemName.value
         );
         if (!selectedItem) return;
+
         const isUnmappedCategory = !mappedCategories.some(cat =>
             cat.label.toLowerCase() === selectedCategory?.value.toLowerCase()
         );
-        if (isUnmappedCategory) {
-            return;
-        }
+        if (isUnmappedCategory) return;
+
         const filtered = selectedItem.otherPOEntityList.filter(
-            e => e.modelName === selectedModel.value && e.brandName === option.value
+            e => e.modelName?.trim() === selectedModel.value?.trim() &&
+                e.brandName?.trim() === brandValue
         );
-        const types = [...new Set(filtered.map(e => e.typeColor))];
-        const typeOpts = types.map(val => ({
-            value: val,
-            label: val,
-            id: poType.find(
+
+        const types = [...new Set(filtered.map(e => e.typeColor?.trim()).filter(Boolean))];
+        const typeOpts = types.map(val => {
+            const matched = poType.find(
                 t =>
                     t.typeColor?.trim().toLowerCase() === val.toLowerCase() &&
                     t.category?.toLowerCase() === selectedCategory?.value.toLowerCase()
-            )?.id || null
-        }));
+            );
+            return {
+                value: val,
+                label: val,
+                id: matched?.id || null
+            };
+        });
         setTypeOptions(typeOpts);
 
         if (typeOpts.length === 1) {
-            setSelectedType(typeOpts[0]);
+            const autoType = typeOpts[0];
+            if (!autoType.id) {
+                const fallback = poType.find(t =>
+                    t.typeColor?.trim().toLowerCase() === autoType.value.toLowerCase() &&
+                    t.category?.toLowerCase() === selectedCategory?.value.toLowerCase()
+                );
+                autoType.id = fallback?.id || null;
+            }
+            setSelectedType(autoType);
         }
     };
+
     const customStyles = {
         control: (provided, state) => ({
             ...provided,
@@ -728,13 +791,28 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
         ) {
             const quantityNumber = Number(quantity);
 
+            const itemLabel = selectedItemName.label;
+            const itemId = selectedItemName.id ?? null;
+
+            const categoryLabel = selectedCategory.value;
+            const categoryId = selectedCategory.id ?? null;
+
+            const modelLabel = selectedModel?.label || '';
+            const modelId = selectedModel?.id ?? null;
+
+            const brandLabel = selectedBrand?.label || '';
+            const brandId = selectedBrand?.id ?? null;
+
+            const typeLabel = selectedType.label;
+            const typeId = selectedType.id ?? null;
+
             const existingIndex = items.findIndex(
                 item =>
-                    item.itemName === selectedItemName.label &&
-                    item.category === selectedCategory?.value &&
-                    item.model === (selectedModel?.label || '') &&
-                    item.brand === (selectedBrand?.label || '') &&
-                    item.type === selectedType.label
+                    item.itemName === itemLabel &&
+                    item.category === categoryLabel &&
+                    item.model === modelLabel &&
+                    item.brand === brandLabel &&
+                    item.type === typeLabel
             );
 
             if (existingIndex !== -1) {
@@ -750,23 +828,36 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                 setItems([
                     ...items,
                     {
-                        itemName: selectedItemName?.label,
-                        itemId: selectedItemName?.id,
-                        category: selectedCategory?.value,
-                        categoryId: selectedCategory?.id,
-                        model: selectedModel?.label || '',
-                        modelId: selectedModel?.id,
-                        brand: selectedBrand?.label || '',
-                        brandId: selectedBrand?.id,
-                        type: selectedType?.label,
-                        typeId: selectedType?.id,
+                        itemName: itemLabel,
+                        itemId: itemId,
+                        category: categoryLabel,
+                        categoryId: categoryId,
+                        model: modelLabel,
+                        modelId: modelId,
+                        brand: brandLabel,
+                        brandId: brandId,
+                        type: typeLabel,
+                        typeId: typeId,
                         quantity,
                         amount: 0,
                     },
                 ]);
             }
 
-            // Clear sessionStorage
+            console.log('Added item:', {
+                itemName: itemLabel,
+                itemId,
+                category: categoryLabel,
+                categoryId,
+                model: modelLabel,
+                modelId,
+                brand: brandLabel,
+                brandId,
+                type: typeLabel,
+                typeId,
+                quantity,
+            });
+
             sessionStorage.removeItem('selectedItemName');
             sessionStorage.removeItem('selectedModel');
             sessionStorage.removeItem('selectedBrand');
@@ -780,8 +871,26 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             setSelectedType(null);
             setQuantity('');
             setGroupName('');
+
+            // ✅ Restore model options based on category
+            const categoryValue = selectedCategory?.value || '';
+            if (categoryValue) {
+                const categoryMatchedModels = poModel
+                    .filter(item => item.category?.toLowerCase() === categoryValue.toLowerCase())
+                    .map(item => ({
+                        value: item.model?.trim(),
+                        label: item.model?.trim(),
+                        id: item.id
+                    }))
+                    .filter(item => item.value);
+                setModelOptions(categoryMatchedModels);
+            } else {
+                setModelOptions([]);
+            }
         }
     };
+
+
     const generatePO = async () => {
         try {
             // Ensure we re-fetch the latest count at generation time
@@ -789,20 +898,21 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             if (!countResponse.ok) throw new Error("Failed to fetch vendor count");
             const vendorCount = await countResponse.json();
             const currentPoNo = vendorCount + 1;
+            console.log("Current PO No:", currentPoNo);
             const payload = {
-                vendorId: selectedVendor?.id,
-                clientId: selectedSite?.id,
+                vendor_id: selectedVendor?.id,
+                client_id: selectedSite?.id,
                 date: date,
-                siteInchargeId: selectedIncharge?.id,
-                siteInchargeMobileNumber: selectedIncharge?.mobileNumber || "",
-                ENo: currentPoNo, // use local variable, not poNo state
-                createdBy: username,
+                site_incharge_id: selectedIncharge?.id,
+                site_incharge_mobile_number: selectedIncharge?.mobileNumber || "",
+                eno: currentPoNo, // use local variable, not poNo state
+                created_by: username,
                 purchaseTable: items.map(item => ({
-                    itemId: item.itemId,
-                    categoryId: item.categoryId,
-                    modelId: item.modelId,
-                    brandId: item.brandId,
-                    typeId: item.typeId,
+                    item_id: item.itemId,
+                    category_id: item.categoryId,
+                    model_id: item.modelId,
+                    brand_id: item.brandId,
+                    type_id: item.typeId,
                     quantity: item.quantity,
                     amount: item.amount,
                 }))
@@ -817,7 +927,9 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             });
             if (response.ok) {
                 const result = await response.json();
-                generatePDF(payload, selectedIncharge.label);
+                generatePDF(payload);
+                console.log(result);
+                window.location.reload();
                 alert("Purchase Order Generated!");
             } else {
                 const error = await response.text();
@@ -854,6 +966,16 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
     }, [hasRestoredSession, selectedCategory, itemNameOptions, selectedItemName, poItemName]);
     const generatePDF = (payload) => {
         const doc = new jsPDF();
+        // Helper to find label from ID
+        const findNameById = (options, id, key) => {
+            const match = options.find(opt => opt.id == id);
+            return match ? match[key] : '';
+        };
+        // Resolve names
+        const vendorName = findNameById(vendorNameOptions, payload.vendor_id, "label");
+        const clientName = findNameById(siteOptions, payload.client_id, "label");
+        const siteInchargeName = findNameById(siteInchargeOptions, payload.site_incharge_id, "label");
+        // Header
         doc.setDrawColor(0);
         doc.setLineWidth(0.5);
         doc.rect(10, 10, 190, 41.8);
@@ -867,48 +989,61 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
         doc.setFont("helvetica", "normal");
         doc.text("181 Madurai Road, Srivilliputtur - 626 125", 105, 28, { align: "center" });
         doc.line(10, 30, 200, 30);
+
         doc.setFont("helvetica", "bold");
         doc.text(`VENDOR:`, 12, 37);
         doc.setFont("helvetica", "normal");
-        doc.text(`# ${payload.ENo}`, 35, 28);
-        doc.text(payload.vendorName || "", 35, 37);
+        doc.text(`# ${payload.eno}`, 35, 28);
+        doc.text(vendorName || "", 35, 37);
+
         doc.setFont("helvetica", "bold");
         doc.text(`DATE:`, 12, 43);
         doc.setFont("helvetica", "normal");
         doc.text(formatDateOnly(payload.date) || "", 35, 43);
+
         doc.setFont("helvetica", "bold");
         doc.text("SITE NAME:", 107, 37);
         doc.text("Site Incharge:", 104, 43);
         doc.setFont("helvetica", "normal");
-        doc.text(payload.clientName || "", 130, 37);
-        doc.text(payload.siteIncharge || "", 130, 43);
-        if (payload.siteInchargeMobileNumber) {
+        doc.text(clientName || "", 130, 37);
+        doc.text(siteInchargeName || "", 130, 43);
+
+        if (payload.site_incharge_mobile_number) {
             doc.setFont("helvetica", "bold");
             doc.text("Phone:", 115, 49);
             doc.setFont("helvetica", "normal");
-            doc.text(`+91 ${payload.siteInchargeMobileNumber}`, 130, 49);
+            doc.text(`+91 ${payload.site_incharge_mobile_number}`, 130, 49);
         }
+
+        // Table content
         const tableBody = payload.purchaseTable.map((item, index) => [
             index + 1,
-            item.itemName || "",
-            item.category || "",
-            item.model || "",
-            item.brand || "",
-            item.type || "",
+            findNameById(poItemName, item.item_id, "itemName"),
+            findNameById(categoryOptions, item.category_id, "label"),
+            findNameById(poModel, item.model_id, "model"),
+            findNameById(poBrand, item.brand_id, "brand"),
+            findNameById(poType, item.type_id, "typeColor"),
             item.quantity || "",
             item.amount || ""
         ]);
+
+
+        // Padding empty rows
         while (tableBody.length < 24) {
             tableBody.push(["", "", "", "", "", "", "", ""]);
         }
+
         const totalQty = payload.purchaseTable.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
         const totalAmount = payload.purchaseTable.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
         tableBody.push([
             "", "", "", "", "",
             { content: `TOTAL`, styles: { fontStyle: "bold", halign: "center" } },
             { content: `${totalQty}`, styles: { fontStyle: "bold", halign: "center" } },
-            { content: ` ${totalAmount}`, styles: { fontStyle: "bold", halign: "center" } }
+            { content: `${totalAmount}`, styles: { fontStyle: "bold", halign: "center" } }
         ]);
+
+        // Table rendering
         doc.autoTable({
             startY: 52,
             margin: { left: 10, right: 10 },
@@ -929,25 +1064,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                 textColor: 0,
                 fontStyle: "bold",
             },
-            didDrawPage: function (data) {
-                const pageHeight = doc.internal.pageSize.height;
-                const pageWidth = doc.internal.pageSize.width;
-                doc.setFontSize(5);
-                doc.text(`Created By: ${username}`, 14, pageHeight - 10);
-                const now = new Date();
-                const day = String(now.getDate()).padStart(2, '0');
-                const month = String(now.getMonth() + 1).padStart(2, '0');
-                const year = now.getFullYear();
-                let hours = now.getHours();
-                const minutes = String(now.getMinutes()).padStart(2, '0');
-                const ampm = hours >= 12 ? 'PM' : 'AM';
-                hours = hours % 12;
-                hours = hours ? hours : 12;
-                const formattedDateTime = `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
-                doc.text(`Date: ${formattedDateTime}`, pageWidth - 60, pageHeight - 10);
-            },
-            tableLineColor: [100, 100, 100],
-            tableLineWidth: 0.2,
             columnStyles: {
                 0: { cellWidth: 12 },
                 1: { cellWidth: 50 },
@@ -957,10 +1073,31 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                 5: { cellWidth: 20 },
                 6: { cellWidth: 13 },
                 7: { cellWidth: 17 }
+            },
+            didDrawPage: function () {
+                const pageHeight = doc.internal.pageSize.height;
+                const pageWidth = doc.internal.pageSize.width;
+                doc.setFontSize(5);
+                doc.text(`Created By: ${payload.created_by || ''}`, 14, pageHeight - 10);
+
+                const now = new Date();
+                const day = String(now.getDate()).padStart(2, '0');
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const year = now.getFullYear();
+                let hours = now.getHours();
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                hours = hours % 12 || 12;
+                const formattedDateTime = `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+                doc.text(`Date: ${formattedDateTime}`, pageWidth - 60, pageHeight - 10);
             }
         });
-        doc.save(`# ${payload.ENo} - ${formatDateOnly(payload.date)}-${payload.clientName}.pdf`);
+
+        // Save PDF
+        doc.save(`# ${payload.eno} - ${formatDateOnly(payload.date)}-${clientName}.pdf`);
     };
+
+
     useEffect(() => {
         if (
             hasRestoredSession &&
@@ -1294,110 +1431,97 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                     );
 
                                                                     if (isUnmappedCategory) {
-                                                                        const mappedModels = new Set();
-                                                                        const mappedTypes = new Set();
-                                                                        const mappedBrands = new Set();
-
-                                                                        poItemName.forEach(item => {
-                                                                            item.otherPOEntityList?.forEach(entry => {
-                                                                                if (entry.modelName?.trim()) mappedModels.add(entry.modelName.trim());
-                                                                                if (entry.typeColor?.trim()) mappedTypes.add(entry.typeColor.trim());
-                                                                                if (entry.brandName?.trim()) mappedBrands.add(entry.brandName.trim().toLowerCase());
-                                                                            });
-                                                                        });
-
-                                                                        const categoryMatchedModels = poModel
-                                                                            .filter(item => item.category?.toLowerCase() === itemCategoryLower)
-                                                                            .map(item => ({
-                                                                                value: item.model?.trim(),
-                                                                                label: item.model?.trim(),
-                                                                                id: item.id
+                                                                        const models = poModel
+                                                                            .filter(m => m.category?.toLowerCase() === itemCategoryLower)
+                                                                            .map(m => ({
+                                                                                value: m.model?.trim(),
+                                                                                label: m.model?.trim(),
+                                                                                id: m.id
                                                                             }))
-                                                                            .filter(item => item.value);
+                                                                            .filter(m => m.value);
 
-                                                                        setModelOptions(categoryMatchedModels);
+                                                                        setModelOptions(models);
 
-                                                                        const categoryMatchedTypes = poType
-                                                                            .filter(item => item.category?.toLowerCase() === itemCategoryLower)
-                                                                            .map(item => ({
-                                                                                value: item.typeColor?.trim(),
-                                                                                label: item.typeColor?.trim(),
-                                                                                id: item.id
+                                                                        const brands = poBrand
+                                                                            .filter(b => !b.category || b.category.toLowerCase() === itemCategoryLower)
+                                                                            .map(b => ({
+                                                                                value: b.brand?.trim(),
+                                                                                label: b.brand?.trim(),
+                                                                                id: b.id
                                                                             }))
-                                                                            .filter(item => item.value);
+                                                                            .filter(b => b.value);
+                                                                        setBrandOptions(brands);
 
-                                                                        setTypeOptions(categoryMatchedTypes);
-
-                                                                        const categoryMatchedBrands = poBrand
-                                                                            .filter(item => {
-                                                                                const brandCategory = item.category?.toLowerCase() || "";
-                                                                                return !brandCategory || brandCategory === itemCategoryLower;
-                                                                            })
-                                                                            .map(item => ({
-                                                                                value: item.brand?.trim(),
-                                                                                label: item.brand?.trim(),
-                                                                                id: item.id
+                                                                        const types = poType
+                                                                            .filter(t => t.category?.toLowerCase() === itemCategoryLower)
+                                                                            .map(t => ({
+                                                                                value: t.typeColor?.trim(),
+                                                                                label: t.typeColor?.trim(),
+                                                                                id: t.id
                                                                             }))
-                                                                            .filter(item => item.value);
-
-                                                                        setBrandOptions(categoryMatchedBrands.map(val => ({ value: val, label: val })));
+                                                                            .filter(t => t.value);
+                                                                        setTypeOptions(types);
 
                                                                         setEditedItem(updated);
                                                                         return;
                                                                     }
-                                                                    // ✅ Mapped category logic
-                                                                    const otherList = selectedItem.otherPOEntityList || [];
 
+                                                                    const otherList = selectedItem.otherPOEntityList || [];
                                                                     const models = [...new Set(otherList.map(e => e.modelName?.trim()).filter(Boolean))];
+
                                                                     const modelOpts = models.map(modelName => {
-                                                                        const modelMatch = poModel.find(m =>
+                                                                        const match = poModel.find(m =>
                                                                             m.model?.trim().toLowerCase() === modelName.toLowerCase() &&
-                                                                            (m.category?.toLowerCase() || '') === (selectedCategory?.value.toLowerCase() || '')
+                                                                            m.category?.toLowerCase() === itemCategoryLower
                                                                         );
                                                                         return {
                                                                             value: modelName,
                                                                             label: modelName,
-                                                                            id: modelMatch?.id || null,
+                                                                            id: match?.id || null
                                                                         };
                                                                     });
+
                                                                     setModelOptions(modelOpts);
 
                                                                     if (models.length === 1) {
                                                                         updated.model = models[0];
 
-                                                                        const filteredByModel = otherList.filter(e => e.modelName === updated.model);
-                                                                        const brands = [...new Set(filteredByModel.map(e => e.brandName?.trim()).filter(Boolean))];
-                                                                        const brandOpts = brands.map(brandName => {
-                                                                            const brandMatch = poBrand.find(
-                                                                                b =>
-                                                                                    b.brand?.trim().toLowerCase() === brandName.toLowerCase() &&
-                                                                                    (!b.category || b.category?.toLowerCase() === selectedCategory?.value.toLowerCase())
+                                                                        const filteredModel = otherList.filter(e => e.modelName === updated.model);
+                                                                        const brands = [...new Set(filteredModel.map(e => e.brandName?.trim()).filter(Boolean))];
+
+                                                                        const brandOpts = brands.map(brand => {
+                                                                            const brandMatch = poBrand.find(b =>
+                                                                                b.brand?.trim().toLowerCase() === brand.toLowerCase() &&
+                                                                                (!b.category || b.category?.toLowerCase() === itemCategoryLower)
                                                                             );
                                                                             return {
-                                                                                value: brandName,
-                                                                                label: brandName,
-                                                                                id: brandMatch?.id || null,
+                                                                                value: brand,
+                                                                                label: brand,
+                                                                                id: brandMatch?.id || null
                                                                             };
                                                                         });
+
                                                                         setBrandOptions(brandOpts);
 
                                                                         if (brands.length === 1) {
                                                                             updated.brand = brands[0];
 
-                                                                            const filteredByBrand = filteredByModel.filter(e => e.brandName === updated.brand);
-                                                                            const types = [...new Set(filteredByBrand.map(e => e.typeColor?.trim()).filter(Boolean))];
-                                                                            const typeOpts = types.map(typeColor => {
+                                                                            const filteredBrand = filteredModel.filter(e => e.brandName === updated.brand);
+                                                                            const types = [...new Set(filteredBrand.map(e => e.typeColor?.trim()).filter(Boolean))];
+
+                                                                            const typeOpts = types.map(type => {
                                                                                 const typeMatch = poType.find(
                                                                                     t =>
-                                                                                        t.typeColor?.trim().toLowerCase() === typeColor.toLowerCase() &&
-                                                                                        t.category?.toLowerCase() === selectedCategory?.value.toLowerCase()
+                                                                                        t.typeColor?.trim().toLowerCase() === type.toLowerCase() &&
+                                                                                        t.category?.toLowerCase() === itemCategoryLower
                                                                                 );
                                                                                 return {
-                                                                                    value: typeColor,
-                                                                                    label: typeColor,
-                                                                                    id: typeMatch?.id || null,
+                                                                                    value: type,
+                                                                                    label: type,
+                                                                                    id: typeMatch?.id || null
                                                                                 };
                                                                             });
+
                                                                             setTypeOptions(typeOpts);
 
                                                                             if (types.length === 1) {
@@ -1413,7 +1537,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
 
                                                                     setEditedItem(updated);
                                                                 }}
-
                                                                 options={poItemName
                                                                     .filter(p => (p.category?.toLowerCase() || "") === (item.category?.toLowerCase() || ""))
                                                                     .map(p => ({ label: p.itemName, value: p.itemName, id: p.id }))
@@ -1436,24 +1559,37 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                 value={editedItem.model ? { label: editedItem.model, value: editedItem.model } : null}
                                                                 onChange={(option) => {
                                                                     const selectedModel = option?.value?.trim() || "";
+                                                                    const itemCategoryLower = item.category?.toLowerCase() || "";
 
                                                                     let updated = {
                                                                         ...editedItem,
                                                                         model: selectedModel,
                                                                         brand: "",
-                                                                        type: "",
+                                                                        type: ""
                                                                     };
 
-                                                                    if (!editedItem.itemName || !selectedModel) {
-                                                                        setBrandOptions([]);
-                                                                        setTypeOptions([]);
-                                                                        setEditedItem(updated);
-                                                                        return;
+                                                                    const isUnmappedCategory = !mappedCategories.some(cat =>
+                                                                        cat.label.toLowerCase() === itemCategoryLower
+                                                                    );
+
+                                                                    // 🔍 Infer itemName from model (if not set)
+                                                                    if (!editedItem.itemName) {
+                                                                        const matchedItem = poItemName.find(p =>
+                                                                            p.category?.toLowerCase() === itemCategoryLower &&
+                                                                            p.otherPOEntityList?.some(e =>
+                                                                                e.modelName?.trim().toLowerCase() === selectedModel.toLowerCase()
+                                                                            )
+                                                                        );
+
+                                                                        if (matchedItem) {
+                                                                            updated.itemName = matchedItem.itemName;
+                                                                        }
                                                                     }
 
-                                                                    const itemCategoryLower = item.category?.toLowerCase() || "";
                                                                     const selectedItem = poItemName.find(
-                                                                        p => p.category?.toLowerCase() === itemCategoryLower && p.itemName === editedItem.itemName
+                                                                        p =>
+                                                                            p.category?.toLowerCase() === itemCategoryLower &&
+                                                                            p.itemName === updated.itemName
                                                                     );
 
                                                                     if (!selectedItem) {
@@ -1463,84 +1599,73 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                         return;
                                                                     }
 
-                                                                    const isUnmappedCategory = !mappedCategories.some(cat =>
-                                                                        cat.label.toLowerCase() === itemCategoryLower
-                                                                    );
+                                                                    const filtered = selectedItem.otherPOEntityList?.filter(
+                                                                        e => e.modelName?.trim().toLowerCase() === selectedModel.toLowerCase()
+                                                                    ) || [];
 
                                                                     if (isUnmappedCategory) {
-                                                                        const mappedBrands = new Set();
-                                                                        const mappedTypes = new Set();
-
-                                                                        poItemName.forEach(item => {
-                                                                            item.otherPOEntityList?.forEach(entry => {
-                                                                                if (entry.brandName?.trim()) mappedBrands.add(entry.brandName.trim().toLowerCase());
-                                                                                if (entry.typeColor?.trim()) mappedTypes.add(entry.typeColor.trim().toLowerCase());
-                                                                            });
-                                                                        });
-
-                                                                        setBrandOptions(brandOptions);
-
-                                                                        // ✅ Unmapped Types
-                                                                        const matchedTypes = poType
-                                                                            .filter(t => t.category?.toLowerCase() === itemCategoryLower)
-                                                                            .map(item => ({
-                                                                                value: item.typeColor?.trim(),
-                                                                                label: item.typeColor?.trim(),
-                                                                                id: item.id
+                                                                        const brands = poBrand
+                                                                            .filter(b => !b.category || b.category.toLowerCase() === itemCategoryLower)
+                                                                            .map(b => ({
+                                                                                value: b.brand?.trim(),
+                                                                                label: b.brand?.trim(),
+                                                                                id: b.id
                                                                             }))
-                                                                            .filter(item => item.value);
+                                                                            .filter(b => b.value);
+                                                                        setBrandOptions(brands);
 
-                                                                        setTypeOptions(matchedTypes);
+                                                                        const types = poType
+                                                                            .filter(t => t.category?.toLowerCase() === itemCategoryLower)
+                                                                            .map(t => ({
+                                                                                value: t.typeColor?.trim(),
+                                                                                label: t.typeColor?.trim(),
+                                                                                id: t.id
+                                                                            }))
+                                                                            .filter(t => t.value);
+                                                                        setTypeOptions(types);
 
                                                                         setEditedItem(updated);
                                                                         return;
                                                                     }
 
-                                                                    // ✅ Mapped category logic
-                                                                    const filtered = selectedItem.otherPOEntityList?.filter(
-                                                                        e => e.modelName?.trim() === selectedModel
-                                                                    ) || [];
-
                                                                     const brands = [...new Set(filtered.map(e => e.brandName?.trim()).filter(Boolean))];
-                                                                    const brandOpts = brands.map(brandName => {
-                                                                        const brandMatch = poBrand.find(b =>
-                                                                            b.brand?.trim().toLowerCase() === brandName.toLowerCase() &&
-                                                                            (!b.category || b.category?.toLowerCase() === itemCategoryLower)
+                                                                    const brandOpts = brands.map(b => {
+                                                                        const brandMatch = poBrand.find(br =>
+                                                                            br.brand?.trim().toLowerCase() === b.toLowerCase() &&
+                                                                            (!br.category || br.category.toLowerCase() === itemCategoryLower)
                                                                         );
                                                                         return {
-                                                                            value: brandName,
-                                                                            label: brandName,
+                                                                            value: b,
+                                                                            label: b,
                                                                             id: brandMatch?.id || null
                                                                         };
                                                                     });
+
                                                                     setBrandOptions(brandOpts);
 
                                                                     if (brands.length === 1) {
-                                                                        const autoBrand = brandOpts[0];
-                                                                        updated.brand = autoBrand.value;
+                                                                        const selectedBrand = brands[0];
+                                                                        updated.brand = selectedBrand;
 
-                                                                        const types = [...new Set(
-                                                                            filtered
-                                                                                .filter(e => e.brandName?.trim() === autoBrand.value?.trim())
-                                                                                .map(e => e.typeColor?.trim())
-                                                                                .filter(Boolean)
-                                                                        )];
-                                                                        const typeOpts = types.map(typeColor => {
-                                                                            const typeMatch = poType.find(
-                                                                                t =>
-                                                                                    t.typeColor?.trim().toLowerCase() === typeColor.toLowerCase() &&
-                                                                                    t.category?.toLowerCase() === itemCategoryLower
+                                                                        const filteredBrand = filtered.filter(e => e.brandName?.trim() === selectedBrand);
+                                                                        const types = [...new Set(filteredBrand.map(e => e.typeColor?.trim()).filter(Boolean))];
+
+                                                                        const typeOpts = types.map(t => {
+                                                                            const match = poType.find(tp =>
+                                                                                tp.typeColor?.trim().toLowerCase() === t.toLowerCase() &&
+                                                                                tp.category?.toLowerCase() === itemCategoryLower
                                                                             );
                                                                             return {
-                                                                                value: typeColor,
-                                                                                label: typeColor,
-                                                                                id: typeMatch?.id || null
+                                                                                value: t,
+                                                                                label: t,
+                                                                                id: match?.id || null
                                                                             };
                                                                         });
+
                                                                         setTypeOptions(typeOpts);
 
-                                                                        if (typeOpts.length === 1) {
-                                                                            updated.type = typeOpts[0].value;
+                                                                        if (types.length === 1) {
+                                                                            updated.type = types[0];
                                                                         }
                                                                     } else {
                                                                         setTypeOptions([]);
@@ -1765,7 +1890,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                             const selectedModel = item.model;
                                                                             const selectedBrand = item.brand;
 
-                                                                            // Set model options for this category
+                                                                            // Model options
                                                                             const modelOpts = poModel
                                                                                 .filter(m => (m.category?.toLowerCase() || "") === itemCategoryLower)
                                                                                 .map(m => ({
@@ -1776,9 +1901,9 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                                 .filter(m => m.value);
                                                                             setModelOptions(modelOpts);
 
-                                                                            // Find selected item from poItemName
                                                                             const selectedItem = poItemName.find(p =>
-                                                                                (p.category?.toLowerCase() || "") === itemCategoryLower && p.itemName === selectedItemName
+                                                                                (p.category?.toLowerCase() || "") === itemCategoryLower &&
+                                                                                p.itemName === selectedItemName
                                                                             );
 
                                                                             if (!selectedItem) {
@@ -1792,87 +1917,70 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                             );
 
                                                                             if (isUnmappedCategory) {
-                                                                                // Prepare sets to exclude mapped data
-                                                                                const mappedBrands = new Set();
-                                                                                const mappedTypes = new Set();
-
-                                                                                poItemName.forEach(po => {
-                                                                                    po.otherPOEntityList?.forEach(entry => {
-                                                                                        if (entry.brandName?.trim()) mappedBrands.add(entry.brandName.trim().toLowerCase());
-                                                                                        if (entry.typeColor?.trim()) mappedTypes.add(entry.typeColor.trim().toLowerCase());
-                                                                                    });
-                                                                                });
-
-                                                                                // Set Brand Options
-                                                                                const categoryMatchedBrands = poBrand
-                                                                                    .filter(p => {
-                                                                                        const brandCategory = p.category?.toLowerCase() || "";
-                                                                                        return !brandCategory || brandCategory === itemCategoryLower;
-                                                                                    })
-                                                                                    .map(item => ({
-                                                                                        value: item.brand?.trim(),
-                                                                                        label: item.brand?.trim(),
-                                                                                        id: item.id
+                                                                                const matchedBrands = poBrand
+                                                                                    .filter(p => !p.category || p.category.toLowerCase() === itemCategoryLower)
+                                                                                    .map(b => ({
+                                                                                        value: b.brand?.trim(),
+                                                                                        label: b.brand?.trim(),
+                                                                                        id: b.id
                                                                                     }))
-                                                                                    .filter(item => item.value);
-                                                                                const unmatchedBrands = [...new Set(
-                                                                                    categoryMatchedBrands.filter(b => !mappedBrands.has(b.toLowerCase()))
-                                                                                )];
-                                                                                setBrandOptions(unmatchedBrands);
+                                                                                    .filter(b => b.value);
+                                                                                setBrandOptions(matchedBrands);
 
-                                                                                // Set Type Options
-                                                                                const categoryMatchedTypes = poType
-                                                                                    .filter(t => (t.category?.toLowerCase() || "") === itemCategoryLower)
-                                                                                    .map(item => ({
-                                                                                        value: item.typeColor?.trim(),
-                                                                                        label: item.typeColor?.trim(),
-                                                                                        id: item.id
-                                                                                    }))
-                                                                                    .filter(item => item.value);
-                                                                                const unmatchedTypes = [...new Set(
-                                                                                    categoryMatchedTypes.filter(t => !mappedTypes.has(t.toLowerCase()))
-                                                                                )];
-                                                                                setTypeOptions(unmatchedTypes);
-                                                                            } else {
-                                                                                // Mapped category: set brand options based on selected model
-                                                                                const filteredByModel = selectedItem.otherPOEntityList?.filter(e => e.modelName === selectedModel) || [];
-                                                                                const brands = [...new Set(filteredByModel.map(e => e.brandName?.trim()).filter(Boolean))];
-                                                                                const brandOpts = poBrand
-                                                                                    .filter(p => {
-                                                                                        const brandCategory = p.category?.toLowerCase() || "";
-                                                                                        return !brandCategory || brandCategory === itemCategoryLower;
-                                                                                    })
-                                                                                    .map(p => ({
-                                                                                        value: p.brand?.trim(),
-                                                                                        label: p.brand?.trim(),
-                                                                                        id: p.id
-                                                                                    }))
-                                                                                    .filter(p => p.value);
-                                                                                setBrandOptions(brandOpts);
-
-
-                                                                                const filteredByBrand = filteredByModel.filter(e => e.brandName === selectedBrand);
-                                                                                const types = [...new Set(filteredByBrand.map(e => e.typeColor?.trim()).filter(Boolean))];
-                                                                                const typeOpts = poType
-                                                                                    .filter(t => (t.category?.toLowerCase() || "") === itemCategoryLower)
+                                                                                const matchedTypes = poType
+                                                                                    .filter(t => t.category?.toLowerCase() === itemCategoryLower)
                                                                                     .map(t => ({
                                                                                         value: t.typeColor?.trim(),
                                                                                         label: t.typeColor?.trim(),
                                                                                         id: t.id
                                                                                     }))
                                                                                     .filter(t => t.value);
-                                                                                setTypeOptions(typeOpts);
+                                                                                setTypeOptions(matchedTypes);
+
+                                                                                return;
                                                                             }
+
+                                                                            // For mapped categories
+                                                                            const filteredModelItems = selectedItem.otherPOEntityList?.filter(e =>
+                                                                                e.modelName?.trim().toLowerCase() === selectedModel?.toLowerCase()
+                                                                            ) || [];
+
+                                                                            const brands = [...new Set(filteredModelItems.map(e => e.brandName?.trim()).filter(Boolean))];
+                                                                            const brandOpts = brands.map(brandName => {
+                                                                                const brandMatch = poBrand.find(
+                                                                                    b => b.brand?.trim().toLowerCase() === brandName.toLowerCase() &&
+                                                                                        (!b.category || b.category.toLowerCase() === itemCategoryLower)
+                                                                                );
+                                                                                return {
+                                                                                    value: brandName,
+                                                                                    label: brandName,
+                                                                                    id: brandMatch?.id || null
+                                                                                };
+                                                                            });
+                                                                            setBrandOptions(brandOpts);
+
+                                                                            const filteredBrandItems = filteredModelItems.filter(e =>
+                                                                                e.brandName?.trim().toLowerCase() === selectedBrand?.toLowerCase()
+                                                                            );
+
+                                                                            const types = [...new Set(filteredBrandItems.map(e => e.typeColor?.trim()).filter(Boolean))];
+                                                                            const typeOpts = types.map(typeColor => {
+                                                                                const typeMatch = poType.find(
+                                                                                    t => t.typeColor?.trim().toLowerCase() === typeColor.toLowerCase() &&
+                                                                                        t.category?.toLowerCase() === itemCategoryLower
+                                                                                );
+                                                                                return {
+                                                                                    value: typeColor,
+                                                                                    label: typeColor,
+                                                                                    id: typeMatch?.id || null
+                                                                                };
+                                                                            });
+                                                                            setTypeOptions(typeOpts);
                                                                         }}
                                                                     >
                                                                         <img src={edit} alt="edit" className="w-4 h-4" />
                                                                     </button>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            const updatedItems = items.filter((_, i) => i !== index);
-                                                                            setItems(updatedItems);
-                                                                        }}
-                                                                    >
+                                                                    <button onClick={() => { const updatedItems = items.filter((_, i) => i !== index); setItems(updatedItems);}}>
                                                                         <img src={deleteIcon} alt="delete" className="w-4 h-4" />
                                                                     </button>
                                                                 </>

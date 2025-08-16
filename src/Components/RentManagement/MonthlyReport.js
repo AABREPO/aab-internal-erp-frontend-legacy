@@ -10,7 +10,7 @@ const MonthlyReport = () => {
     const [monthlyReportUrl, setMonthlyReportUrl] = useState([]);
     const [sortedMonthlyRentReports, setSortedMonthlyRentReports] = useState([]);
     const [selectedReportNumber, setSelectedReportNumber] = useState([]);
-    const [clickedReportNumber,setClickedReportNumber] = useState(null);
+    const [clickedReportNumber, setClickedReportNumber] = useState(null);
     const scrollRef = useRef(null);
     const isDragging = useRef(false);
     const start = useRef({ x: 0, y: 0 });
@@ -131,23 +131,34 @@ const MonthlyReport = () => {
                             </thead>
                             <tbody>
                                 {monthlyReportUrl.map((url, index) => {
-                                    // For each URL, find the corresponding checklist number and date
                                     const MonthlyRentReportData = sortedMonthlyRentReports.find(
                                         (rent) => rent.monthlyReportUrl === url
                                     );
+
                                     const reportNumber = MonthlyRentReportData ? MonthlyRentReportData.reportNumber : '';
-                                    const timestamp = MonthlyRentReportData ? MonthlyRentReportData.timestamp : '';
-                                    // Format the timestamp to DD/MM/YYYY
-                                    const formattedDate = timestamp
-                                        ? new Date(timestamp).toLocaleDateString('en-GB') // 'en-GB' gives DD/MM/YYYY format
-                                        : '';
+                                    const paidOnDate = MonthlyRentReportData ? MonthlyRentReportData.paidOnDate : '';
+
+                                    // Compute last day of month from paidOnDate
+                                    let formattedDate = '';
+                                    if (paidOnDate) {
+                                        const paidDateObj = new Date(paidOnDate);
+                                        // Create a date for the first day of the next month, then subtract 1 day
+                                        const lastDayOfMonth = new Date(
+                                            paidDateObj.getFullYear(),
+                                            paidDateObj.getMonth() + 1,
+                                            0
+                                        );
+                                        formattedDate = lastDayOfMonth.toLocaleDateString('en-GB'); // DD/MM/YYYY
+                                    }
+
                                     const serialNumber = (monthlyReportUrl.length - index).toString().padStart(2, '0');
+
                                     return (
                                         <tr key={index}>
                                             <td className="px-4 py-2 font-bold">{serialNumber}</td>
                                             <td>
-                                                <div className='flex space-x-4'>
-                                                    <img className=' w-5 h-5 font-bold' src={fileDownload} alt='' />
+                                                <div className="flex space-x-4">
+                                                    <img className="w-5 h-5 font-bold" src={fileDownload} alt="" />
                                                     <button
                                                         onClick={(e) => {
                                                             e.preventDefault();
@@ -168,7 +179,7 @@ const MonthlyReport = () => {
                                                         className="underline font-semibold"
                                                         style={{
                                                             color:
-                                                                clickedReportNumber === MonthlyRentReportData.reportNumber
+                                                                clickedReportNumber === MonthlyRentReportData?.reportNumber
                                                                     ? '#ef6f47'
                                                                     : 'black',
                                                         }}
@@ -176,7 +187,6 @@ const MonthlyReport = () => {
                                                         {reportNumber} - {formattedDate} Monthly Rent Report
                                                     </button>
                                                 </div>
-
                                             </td>
                                         </tr>
                                     );

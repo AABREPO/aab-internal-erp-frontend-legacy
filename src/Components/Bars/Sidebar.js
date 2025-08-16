@@ -193,7 +193,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
               }}>
               <p className="text-sm cursor-pointer"><li>Vendor Payments Tracker</li></p>
             </Link>
-            <Link to={hasAccessToModel('Advance Portal') ? '/advancePortal' : '#'}
+            <Link to={hasAccessToModel('Advance Portal') ? 'portal/advancePortal' : '#'}
               className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Advance Portal' ? 'text-red-500' : ''}`}
               onClick={(e) => {
                 if (!hasAccessToModel('Advance Portal')) {
@@ -229,7 +229,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
               }}>
               <p className="text-sm cursor-pointer"><li>Rent Management</li></p>
             </Link>
-            <Link to={hasAccessToModel('Claim Payments') ? '/claimPayments' : '#'}
+            <Link to={hasAccessToModel('Claim Payments') ? '/Claim/claimpaymentsummary' : '#'}
               className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Claim Payments' ? 'text-red-500' : ''
                 }`} onClick={(e) => {
                   if (!hasAccessToModel('Claim Payments')) {

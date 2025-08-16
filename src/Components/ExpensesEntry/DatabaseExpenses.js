@@ -417,7 +417,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         setAccountTypeOptions(getOptions(filtered, "accountType"));
         setEnoOptions([...new Set(filtered.map(item => item.eno).filter(Boolean))]);
 
-    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedAccountType, selectedDate, selectedEno, expenses ]);
+    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedAccountType, selectedDate, selectedEno, expenses]);
     const handleChange = (e) => {
         const { name, type, value, files } = e.target;
         // Prevent clearing the date field
@@ -489,7 +489,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
             setIsSubmitting(false);
         }
     };
-    
+
     const currentItems = filteredExpenses;
     const handleEditClick = (expense) => {
         setEditId(expense.id);
@@ -1427,7 +1427,7 @@ const AuditModal = ({ show, onClose, audits }) => {
     ];
     return (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-            <div className="bg-white rounded-md shadow-lg w-[796px] sm:w-3/4 max-w-[796px] mx-4 p-4">
+            <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1400px] mx-4 p-4">
                 <div className="flex justify-between items-center mt-4 ml-7 mr-7">
                     <h2 className="text-xl font-bold">History</h2>
                     <button onClick={onClose}>
@@ -1456,25 +1456,60 @@ const AuditModal = ({ show, onClose, audits }) => {
                         <tbody>
                             {audits.map((audit, index) => (
                                 <React.Fragment key={index}>
+                                    {/* OLD row */}
                                     <tr className="odd:bg-white even:bg-[#FAF6ED]">
-                                        <td style={{ width: '130px' }} className="border pl-2 text-sm text-left whitespace-nowrap">{formatDate(audit.editedDate)}</td>
-                                        <td style={{ width: '120px' }} className="border pl-2 text-sm text-left whitespace-nowrap">{audit.editedBy}</td>
-                                        {fields.map(({ key }, i) => (
-                                            <td key={key} style={{ width: columnWidths[i] }} className="border text-sm text-center">
-                                                {audit[`old${key}`] ?? "-"}
-                                            </td>
-                                        ))}
+                                        <td style={{ width: '130px' }} className="border pl-2 text-sm text-left whitespace-nowrap">
+                                            {formatDate(audit.editedDate)}
+                                        </td>
+                                        <td style={{ width: '120px' }} className="border pl-2 text-sm text-left whitespace-nowrap">
+                                            {audit.editedBy}
+                                        </td>
+                                        {fields.map(({ key }, i) => {
+                                            let value = audit[`old${key}`];
+
+                                            if (key.toLowerCase().includes("amount")) {
+                                                value = value && !isNaN(value) ? Number(value).toLocaleString("en-IN") : "-";
+                                            }
+                                            if (key.toLowerCase().includes("date")) {
+                                                value = value ? new Date(value).toLocaleDateString("en-GB") : "-";
+                                            }
+
+                                            return (
+                                                <td key={key} style={{ width: columnWidths[i] }} className="border text-sm text-center">
+                                                    {value ?? "-"}
+                                                </td>
+                                            );
+                                        })}
                                     </tr>
+
+                                    {/* NEW row */}
                                     <tr className="odd:bg-white even:bg-[#FAF6ED]">
-                                        <td style={{ width: '130px' }} className="border pl-2 text-sm text-left whitespace-nowrap">{formatDate(audit.editedDate)}</td>
-                                        <td style={{ width: '120px' }} className="border pl-2 text-sm text-left whitespace-nowrap">{audit.editedBy}</td>
+                                        <td style={{ width: '130px' }} className="border pl-2 text-sm text-left whitespace-nowrap">
+                                            {formatDate(audit.editedDate)}
+                                        </td>
+                                        <td style={{ width: '120px' }} className="border pl-2 text-sm text-left whitespace-nowrap">
+                                            {audit.editedBy}
+                                        </td>
                                         {fields.map(({ key }, i) => {
                                             const oldVal = audit[`old${key}`];
-                                            const newVal = audit[`new${key}`];
-                                            const changed = oldVal !== newVal;
+                                            let value = audit[`new${key}`];
+
+                                            if (key.toLowerCase().includes("amount")) {
+                                                value = value && !isNaN(value) ? Number(value).toLocaleString("en-IN") : "-";
+                                            }
+                                            if (key.toLowerCase().includes("date")) {
+                                                value = value ? new Date(value).toLocaleDateString("en-GB") : "-";
+                                            }
+
+                                            const changed = oldVal !== value;
+
                                             return (
-                                                <td key={key} style={{ width: columnWidths[i] }} className={`border text-sm text-center ${changed ? "bg-[#BF9853] text-black font-bold" : ""}`}>
-                                                    {newVal ?? "-"}
+                                                <td
+                                                    key={key}
+                                                    style={{ width: columnWidths[i] }}
+                                                    className={`border text-sm text-center ${changed ? "bg-[#BF9853] text-black font-bold" : ""}`}
+                                                >
+                                                    {value ?? "-"}
                                                 </td>
                                             );
                                         })}

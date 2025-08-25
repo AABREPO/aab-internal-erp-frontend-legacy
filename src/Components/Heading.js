@@ -8,13 +8,13 @@ import EntryChecking from './ExpensesEntry/EntryCheck';
 const Heading = ({ username, userRoles = [] }) => {
     const [activeTab, setActiveTab] = useState(() => {
         const savedTab = localStorage.getItem('activeTab');
-        if (savedTab === 'database' && username !== 'Mahalingam M') {
+        if (savedTab === 'database' && (username !== 'Mahalingam M' && username !== 'Admin')) {
             return 'expense-entry';
         }
         return savedTab || 'expense-entry';
     });
     useEffect(() => {
-        if (activeTab === 'database' && username !== 'Mahalingam M') {
+        if (activeTab === 'database' && (username !== 'Mahalingam M' && username !== 'Admin')) {
             setActiveTab('expense-entry');
         } else {
             localStorage.setItem('activeTab', activeTab);
@@ -48,7 +48,7 @@ const Heading = ({ username, userRoles = [] }) => {
                     onClick={() => setActiveTab('tableview')}>
                     Table View
                 </h2>
-                {username === 'Mahalingam M' && (
+                {(username === 'Mahalingam M' || username === 'Admin') && (
                     <>
                         <h2 className={`link whitespace-nowrap ${activeTab === 'database' ? 'active' : ''}`}
                             onClick={() => setActiveTab('database')}>

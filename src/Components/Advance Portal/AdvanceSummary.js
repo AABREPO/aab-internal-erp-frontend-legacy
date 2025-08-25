@@ -16,6 +16,16 @@ const AdvanceSummary = () => {
   const [siteBillAmount, setSiteBillAmount] = useState(0);
   const [totalBillAmount, setTotalBillAmount] = useState(0);
   const [selectedOption, setSelectedOption] = useState(null);
+  const [selectedProject, setSelectedProject] = useState(null);
+
+  // Sorting state for both tables
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [siteSortConfig, setSiteSortConfig] = useState({ key: null, direction: 'asc' });
+
+  // Tooltip state
+  const [tooltipData, setTooltipData] = useState(null);
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const [tooltipTitle, setTooltipTitle] = useState("");
 
   useEffect(() => {
     const savedContractorVendor = sessionStorage.getItem('selectedContractorOrVendorOption');
@@ -101,24 +111,114 @@ const AdvanceSummary = () => {
   useEffect(() => {
     const fetchSites = async () => {
       try {
-        const res = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
-          headers: { "Content-Type": "application/json" }
+          headers: {
+            "Content-Type": "application/json"
+          }
         });
-        const data = await res.json();
-        setSiteOptions(data.map(item => ({
+        if (!response.ok) {
+          throw new Error("Network response was not ok: " + response.statusText);
+        }
+        const data = await response.json();
+        const formattedData = data.map(item => ({
           value: item.siteName,
           label: item.siteName,
-          id: item.id
-        })));
-      } catch (err) {
-        console.error(err);
+          id: item.id,
+          sNo: item.siteNo
+        }));
+
+        // Add predefined site options with IDs 001, 002, 003, 004
+        const predefinedSiteOptions = [
+          {
+            value: "Mason Advance",
+            label: "Mason Advance",
+            id: "1",
+            sNo: "1"
+          },
+          {
+            value: "Material Advance",
+            label: "Material Advance",
+            id: "2",
+            sNo: "2"
+          },
+          {
+            value: "Weekly Advance",
+            label: "Weekly Advance",
+            id: "3",
+            sNo: "3"
+          },
+          {
+            value: "Excess Advance",
+            label: "Excess Advance",
+            id: "4",
+            sNo: "4"
+          },
+          {
+            value: "Material Rent",
+            label: "Material Rent",
+            id: "",
+            sNo: "5"
+          },
+          {
+            value: "Subhash Kumar - Kunnur",
+            label: "Subhash Kumar - Kunnur",
+            id: "6",
+            sNo: "6"
+          }
+        ];
+
+        // Combine backend data with predefined options
+        const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
+        setSiteOptions(combinedSiteOptions);
+      } catch (error) {
+        console.error("Fetch error: ", error);
+
+        // Fallback: if API fails, still show predefined options
+        const predefinedSiteOptions = [
+          {
+            value: "Mason Advance",
+            label: "Mason Advance",
+            id: "1",
+            sNo: "1"
+          },
+          {
+            value: "Material Advance",
+            label: "Material Advance",
+            id: "2",
+            sNo: "2"
+          },
+          {
+            value: "Weekly Advance",
+            label: "Weekly Advance",
+            id: "3",
+            sNo: "3"
+          },
+          {
+            value: "Excess Advance",
+            label: "Excess Advance",
+            id: "4",
+            sNo: "4"
+          },
+          {
+            value: "Material Rent",
+            label: "Material Rent",
+            id: "",
+            sNo: "5"
+          },
+          {
+            value: "Subhash Kumar - Kunnur",
+            label: "Subhash Kumar - Kunnur",
+            id: "6",
+            sNo: "6"
+          }
+        ];
+        setSiteOptions(predefinedSiteOptions);
       }
     };
     fetchSites();
   }, []);
-
   // Fetch Advance Data
   useEffect(() => {
     const fetchData = async () => {
@@ -184,7 +284,8 @@ const AdvanceSummary = () => {
 
         if (!grouped[project_id]) {
           grouped[project_id] = {
-            projectName: siteOptions.find(s => s.id === project_id)?.label || "-",
+            projectName: siteOptions.find(s => String(s.id) === String(project_id))?.label || "-",
+            projectId: project_id, // Store project ID
             totalAdvance: 0,
             totalBill: 0,
             totalRefund: 0
@@ -207,7 +308,8 @@ const AdvanceSummary = () => {
         return {
           projectName: p.projectName,
           pendingAdvance: pending,
-          billAmount: p.totalBill
+          billAmount: p.totalBill,
+          projectId: p.projectId // Add project ID for tooltip
         };
       });
 
@@ -226,6 +328,136 @@ const AdvanceSummary = () => {
   const sortedSiteOptions = siteOptions.sort((a, b) =>
     a.label.localeCompare(b.label)
   );
+
+  // Sorting functions
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const handleSiteSort = (key) => {
+    let direction = 'asc';
+    if (siteSortConfig.key === key && siteSortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSiteSortConfig({ key, direction });
+  };
+
+  const defaultSort = (data, statusKey = 'pendingAdvance', nameKey = 'projectName') => {
+    return [...data].sort((a, b) => {
+      // Bill Status: Pending (pendingAdvance > 0) comes first
+      const aStatus = a[statusKey] > 0 ? 1 : 0;
+      const bStatus = b[statusKey] > 0 ? 1 : 0;
+      if (aStatus !== bStatus) return bStatus - aStatus; // Descending: Pending first
+
+      // Project Name ascending
+      const aName = (a[nameKey] || '').toLowerCase();
+      const bName = (b[nameKey] || '').toLowerCase();
+      if (aName < bName) return -1;
+      if (aName > bName) return 1;
+      return 0;
+    });
+  };
+  // Sort data functions
+  const sortData = (data, config, statusKey = 'pendingAdvance', nameKey = 'projectName') => {
+    if (!config.key) {
+      return defaultSort(data, statusKey, nameKey);
+    }
+
+    return [...data].sort((a, b) => {
+      let aValue = a[config.key];
+      let bValue = b[config.key];
+
+      // Handle bill status specially
+      if (config.key === 'billStatus') {
+        const aStatus = a.pendingAdvance > 0 ? 'Pending' : 'Bill Settled';
+        const bStatus = b.pendingAdvance > 0 ? 'Pending' : 'Bill Settled';
+        aValue = aStatus;
+        bValue = bStatus;
+      }
+
+      // Handle numeric values
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return config.direction === 'asc' ? aValue - bValue : bValue - aValue;
+      }
+
+      // Handle string values
+      aValue = String(aValue || '').toLowerCase();
+      bValue = String(bValue || '').toLowerCase();
+
+      if (aValue < bValue) {
+        return config.direction === 'asc' ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return config.direction === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+  };
+
+  // Get bill details for tooltip
+  const getBillDetails = (projectId, contractorVendorId, contractorVendorType) => {
+    if (!advanceData.length) return [];
+
+    return advanceData.filter(item => {
+      const matchesProject = item.project_id === projectId;
+      const matchesEntity = contractorVendorType === 'Contractor'
+        ? item.contractor_id === contractorVendorId
+        : item.vendor_id === contractorVendorId;
+
+      return matchesProject && matchesEntity && item.bill_amount > 0;
+    }).map(item => ({
+      date: new Date(item.date).toLocaleDateString('en-GB'),
+      amount: parseFloat(item.bill_amount) || 0
+    }));
+  };
+
+  // Get advance details for tooltip (list all entries affecting "amount")
+  const getAdvanceDetails = (projectId, contractorVendorId, contractorVendorType) => {
+    if (!advanceData.length) return [];
+
+    return advanceData.filter(item => {
+      const matchesProject = item.project_id === projectId;
+      const matchesEntity = contractorVendorType === 'Contractor'
+        ? item.contractor_id === contractorVendorId
+        : item.vendor_id === contractorVendorId;
+
+      // include any non-zero amount entries
+      const hasAmount = (parseFloat(item.amount) || 0) !== 0;
+      return matchesProject && matchesEntity && hasAmount;
+    }).map(item => ({
+      date: new Date(item.date).toLocaleDateString('en-GB'),
+      amount: parseFloat(item.amount) || 0
+    }));
+  };
+
+  // Tooltip handlers
+  const handleMouseEnter = (event, projectId, contractorVendorId, contractorVendorType) => {
+    const billDetails = getBillDetails(projectId, contractorVendorId, contractorVendorType);
+    if (billDetails.length > 0) {
+      setTooltipTitle('Bill Details');
+      setTooltipData(billDetails);
+      setTooltipPosition({ x: event.clientX, y: event.clientY });
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setTooltipData(null);
+    setTooltipTitle("");
+  };
+
+  // Tooltip handlers for Advance column
+  const handleMouseEnterAdvance = (event, projectId, contractorVendorId, contractorVendorType) => {
+    const advanceDetails = getAdvanceDetails(projectId, contractorVendorId, contractorVendorType);
+    if (advanceDetails.length > 0) {
+      setTooltipTitle('Advance Details');
+      setTooltipData(advanceDetails);
+      setTooltipPosition({ x: event.clientX, y: event.clientY });
+    }
+  };
   useEffect(() => {
     if (selectedAdvanceSite) {
       const siteId = selectedAdvanceSite.id;
@@ -258,6 +490,8 @@ const AdvanceSummary = () => {
         if (!grouped[entityId]) {
           grouped[entityId] = {
             name: entityName,
+            entityId: entityId,
+            entityType: entityType,
             pendingAdvance: 0,
             billAmount: 0
           };
@@ -438,7 +672,11 @@ const AdvanceSummary = () => {
     document.body.removeChild(link);
   };
 
+  const filteredProjects = selectedProject
+    ? projectData.filter(proj => proj.projectName === selectedProject.value)
+    : projectData;
 
+  const sortedFilteredData = sortData(filteredProjects, sortConfig, 'pendingAdvance', 'projectName');
 
   return (
     <body>
@@ -458,6 +696,21 @@ const AdvanceSummary = () => {
                     }}
                     className="w-[323px] h-[45px] rounded-lg focus:outline-none"
                     isClearable
+                    styles={customStyles}
+                  />
+                </div>
+                <div className="text-left">
+                  <label className="block font-semibold mb-2">Project Name</label>
+                  <Select
+                    options={projectData.map(proj => ({
+                      value: proj.projectName,
+                      label: proj.projectName
+                    }))}
+                    value={selectedProject}
+                    onChange={(selectedOption) => setSelectedProject(selectedOption)}
+                    className="w-[323px] h-[45px] rounded-lg focus:outline-none"
+                    isClearable
+                    isSearchable
                     styles={customStyles}
                   />
                 </div>
@@ -481,23 +734,67 @@ const AdvanceSummary = () => {
                 <button onClick={exportCSV} className="flex items-center font-bold hover:underline gap-1 text-[#007233]">Export XL</button>
                 <button className="flex items-center font-bold hover:underline gap-1 text-[#BF9853]">Print</button>
               </div>
-              <div className="border-l-8 border-l-[#BF9853] rounded-lg">
-                <table className="w-full border-collapse">
+              <div className="border-l-8 border-l-[#BF9853] rounded-lg h-[680px] overflow-auto">
+                <table className="w-full border-collapse ">
                   <thead>
                     <tr className="bg-[#f8f1e5] text-left">
-                      <th className="p-2">Project Name</th>
-                      <th className="p-2">Pending Advance</th>
-                      <th className="p-2">Bill Amount</th>
-                      <th className="p-2">Bill Status</th>
+                      <th
+                        className="p-2 cursor-pointer hover:bg-gray-200"
+                        onClick={() => handleSort('projectName')}
+                      >
+                        Project Name
+                        {sortConfig.key === 'projectName' && (
+                          <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </th>
+                      <th
+                        className="p-2 cursor-pointer hover:bg-gray-200"
+                        onClick={() => handleSort('pendingAdvance')}
+                      >
+                        Advance
+                        {sortConfig.key === 'pendingAdvance' && (
+                          <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </th>
+                      <th
+                        className="p-2 cursor-pointer hover:bg-gray-200"
+                        onClick={() => handleSort('billAmount')}
+                      >
+                        Bill Amount
+                        {sortConfig.key === 'billAmount' && (
+                          <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </th>
+                      <th
+                        className="p-2 cursor-pointer hover:bg-gray-200"
+                        onClick={() => handleSort('billStatus')}
+                      >
+                        Bill Status
+                        {sortConfig.key === 'billStatus' && (
+                          <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {projectData.length > 0 ? (
-                      projectData.map((proj, idx) => (
+                    {sortedFilteredData.length > 0 ? (
+                      sortedFilteredData.map((proj, idx) => (
                         <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-[#FAF6ED]"}>
-                          <td className="p-2">{proj.projectName}</td>
-                          <td className="p-2">{proj.pendingAdvance.toLocaleString("en-IN")}</td>
-                          <td className="p-2">{proj.billAmount.toLocaleString("en-IN")}</td>
+                          <td className="py-2 px-6 text-left">{proj.projectName}</td>
+                          <td
+                            className="py-2 cursor-help relative"
+                            onMouseEnter={(e) => handleMouseEnterAdvance(e, proj.projectId, selectedContractorOrVendorOption?.id, selectedContractorOrVendorOption?.type)}
+                            onMouseLeave={handleMouseLeave}
+                          >
+                            {proj.pendingAdvance.toLocaleString("en-IN")}
+                          </td>
+                          <td
+                            className="p-2 cursor-help relative"
+                            onMouseEnter={(e) => handleMouseEnter(e, proj.projectId, selectedContractorOrVendorOption?.id, selectedContractorOrVendorOption?.type)}
+                            onMouseLeave={handleMouseLeave}
+                          >
+                            {proj.billAmount.toLocaleString("en-IN")}
+                          </td>
                           <td className="p-2" style={{ color: proj.pendingAdvance > 0 ? "red" : "green" }}>
                             {proj.pendingAdvance > 0 ? "Pending" : "Bill Settled"}
                           </td>
@@ -541,23 +838,67 @@ const AdvanceSummary = () => {
                 <button className="flex items-center gap-1 font-bold hover:underline text-[#BF9853]"> Print</button>
               </div>
 
-              <div className="border-l-8 border-l-[#BF9853] rounded-lg">
+              <div className="border-l-8 border-l-[#BF9853] rounded-lg h-[680px] overflow-auto">
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="bg-[#f8f1e5] text-left">
-                      <th className="p-2">Contractor/Vendor</th>
-                      <th className="p-2">Pending Advance</th>
-                      <th className="p-2">Bill Amount</th>
-                      <th className="p-2">Bill Status</th>
+                      <th
+                        className="p-2 cursor-pointer hover:bg-gray-200"
+                        onClick={() => handleSiteSort('name')}
+                      >
+                        Contractor/Vendor
+                        {siteSortConfig.key === 'name' && (
+                          <span className="ml-1">{siteSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </th>
+                      <th
+                        className="p-2 cursor-pointer hover:bg-gray-200"
+                        onClick={() => handleSiteSort('pendingAdvance')}
+                      >
+                        Advance
+                        {siteSortConfig.key === 'pendingAdvance' && (
+                          <span className="ml-1">{siteSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </th>
+                      <th
+                        className="p-2 cursor-pointer hover:bg-gray-200"
+                        onClick={() => handleSiteSort('billAmount')}
+                      >
+                        Bill Amount
+                        {siteSortConfig.key === 'billAmount' && (
+                          <span className="ml-1">{siteSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </th>
+                      <th
+                        className="p-2 cursor-pointer hover:bg-gray-200"
+                        onClick={() => handleSiteSort('billStatus')}
+                      >
+                        Bill Status
+                        {siteSortConfig.key === 'billStatus' && (
+                          <span className="ml-1">{siteSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {siteDetails.length > 0 ? (
-                      siteDetails.map((d, idx) => (
+                    {sortData(siteDetails, siteSortConfig).length > 0 ? (
+                      sortData(siteDetails, siteSortConfig).map((d, idx) => (
                         <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-[#FAF6ED]"}>
                           <td className="p-2">{d.name}</td>
-                          <td className="p-2">{d.pendingAdvance.toLocaleString("en-IN")}</td>
-                          <td className="p-2">{d.billAmount.toLocaleString("en-IN")}</td>
+                          <td
+                            className="p-2 cursor-help relative"
+                            onMouseEnter={(e) => handleMouseEnterAdvance(e, selectedAdvanceSite?.id, d.entityId, d.entityType)}
+                            onMouseLeave={handleMouseLeave}
+                          >
+                            {d.pendingAdvance.toLocaleString("en-IN")}
+                          </td>
+                          <td
+                            className="p-2 cursor-help relative"
+                            onMouseEnter={(e) => handleMouseEnter(e, selectedAdvanceSite?.id, d.entityId, d.entityType)}
+                            onMouseLeave={handleMouseLeave}
+                          >
+                            {d.billAmount.toLocaleString("en-IN")}
+                          </td>
                           <td className="p-2" style={{ color: d.pendingAdvance > 0 ? "red" : "green" }}>
                             {d.pendingAdvance > 0 ? "Pending" : "Bill Settled"}
                           </td>
@@ -577,6 +918,37 @@ const AdvanceSummary = () => {
           </div>
         </div>
       </div>
+
+      {/* Tooltip Component */}
+      {tooltipData && (
+        <div
+          className="fixed z-50 bg-white text-black p-3 rounded shadow-lg text-sm max-w-xs"
+          style={{
+            left: tooltipPosition.x + 10,
+            top: tooltipPosition.y - 10,
+            pointerEvents: 'none'
+          }}
+        >
+          <div className="font-semibold mb-2">{tooltipTitle || 'Details'}:</div>
+          {tooltipData
+            .slice() // copy to avoid mutating
+            .reverse() // 👈 just reverse order
+            .map((entry, index) => (
+              <div key={index} className="mb-1">
+                <span className="text-gray-600">{entry.date}:</span>
+                <span className="ml-2">₹{entry.amount.toLocaleString('en-IN')}</span>
+              </div>
+            ))}
+          <div className="mt-2 pt-2 border-t border-gray-600">
+            <span className="font-semibold">
+              Total: ₹
+              {tooltipData
+                .reduce((sum, item) => sum + item.amount, 0)
+                .toLocaleString('en-IN')}
+            </span>
+          </div>
+        </div>
+      )}
     </body >
   );
 }

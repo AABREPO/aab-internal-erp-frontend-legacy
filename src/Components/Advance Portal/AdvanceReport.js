@@ -20,6 +20,9 @@ const AdvanceReport = () => {
   const [filteredData, setFilteredData] = useState([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [paymentModeFilter, setPaymentModeFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
 
   const scrollRef = useRef(null);
   const tableRef = useRef(null);
@@ -145,15 +148,110 @@ const AdvanceReport = () => {
   useEffect(() => {
     const fetchSites = async () => {
       try {
-        const res = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json"
+          }
         });
-        const data = await res.json();
-        setSiteOptions(data.map((item) => ({ value: item.siteName, label: item.siteName, id: item.id })));
-      } catch (err) {
-        console.error(err);
+        if (!response.ok) {
+          throw new Error("Network response was not ok: " + response.statusText);
+        }
+        const data = await response.json();
+        const formattedData = data.map(item => ({
+          value: item.siteName,
+          label: item.siteName,
+          id: item.id,
+          sNo: item.siteNo
+        }));
+
+        // Add predefined site options with IDs 001, 002, 003, 004
+        const predefinedSiteOptions = [
+          {
+            value: "Mason Advance",
+            label: "Mason Advance",
+            id: "1",
+            sNo: "1"
+          },
+          {
+            value: "Material Advance",
+            label: "Material Advance",
+            id: "2",
+            sNo: "2"
+          },
+          {
+            value: "Weekly Advance",
+            label: "Weekly Advance",
+            id: "3",
+            sNo: "3"
+          },
+          {
+            value: "Excess Advance",
+            label: "Excess Advance",
+            id: "4",
+            sNo: "4"
+          },
+          {
+            value: "Material Rent",
+            label: "Material Rent",
+            id: "",
+            sNo: "5"
+          },
+          {
+            value: "Subhash Kumar - Kunnur",
+            label: "Subhash Kumar - Kunnur",
+            id: "6",
+            sNo: "6"
+          }
+        ];
+
+        // Combine backend data with predefined options
+        const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
+        setSiteOptions(combinedSiteOptions);
+      } catch (error) {
+        console.error("Fetch error: ", error);
+        
+        // Fallback: if API fails, still show predefined options
+        const predefinedSiteOptions = [
+          {
+            value: "Mason Advance",
+            label: "Mason Advance",
+            id: "1",
+            sNo: "1"
+          },
+          {
+            value: "Material Advance",
+            label: "Material Advance",
+            id: "2",
+            sNo: "2"
+          },
+          {
+            value: "Weekly Advance",
+            label: "Weekly Advance",
+            id: "3",
+            sNo: "3"
+          },
+          {
+            value: "Excess Advance",
+            label: "Excess Advance",
+            id: "4",
+            sNo: "4"
+          },
+          {
+            value: "Material Rent",
+            label: "Material Rent",
+            id: "",
+            sNo: "5"
+          },
+          {
+            value: "Subhash Kumar - Kunnur",
+            label: "Subhash Kumar - Kunnur",
+            id: "6",
+            sNo: "6"
+          }
+        ];
+        setSiteOptions(predefinedSiteOptions);
       }
     };
     fetchSites();
@@ -220,8 +318,18 @@ const AdvanceReport = () => {
       filtered = [];
     }
 
+    // Apply Payment Mode filter
+    if (paymentModeFilter) {
+      filtered = filtered.filter((item) => item.payment_mode === paymentModeFilter);
+    }
+
+    // Apply Type filter
+    if (typeFilter) {
+      filtered = filtered.filter((item) => (item.type || "").toString().toLowerCase() === typeFilter.toLowerCase());
+    }
+
     setFilteredData(filtered);
-  }, [advanceData, startDate, endDate, week, year]);
+  }, [advanceData, startDate, endDate, week, year, paymentModeFilter, typeFilter]);
 
   // fromDate/toDate/totalAdvance computations
   const fromDate = filteredData.length
@@ -231,14 +339,97 @@ const AdvanceReport = () => {
     ? new Date(Math.max(...filteredData.map((r) => new Date(r.date)))).toLocaleDateString("en-GB")
     : "-";
   const totalAdvance = filteredData
-    .filter((r) => r.type !== "Transfer")
+    .filter((r) => r.type !== "Transfer" && r.payment_mode === "Cash")
     .reduce((sum, r) => {
       const amount = r.amount || 0;
-      const bill = r.bill_amount || 0;
-      const refund = r.refund_amount || 0;
-      return sum + (amount - bill - refund);
+      return sum + (amount);
     }, 0)
     .toLocaleString("en-IN");
+
+  // Sorting helpers and memoized sorted rows for rendering
+  const normStr = (v) => (v ?? "").toString().trim().toLowerCase();
+
+  const dateKey = (val) => {
+    if (!val) return -Infinity;
+    const s = String(val).trim();
+    const m1 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (m1) {
+      return new Date(+m1[3], +m1[2] - 1, +m1[1]).getTime();
+    }
+    const t = Date.parse(s);
+    return isNaN(t) ? -Infinity : new Date(new Date(t).toDateString()).getTime();
+  };
+
+  const getLabelById = (options, id) => options.find((o) => String(o.id) === String(id))?.label || "";
+
+  const requestSort = (key) => {
+    setSortConfig((prev) => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === "asc" ? "desc" : "asc" };
+      }
+      return { key, direction: "asc" };
+    });
+  };
+
+  const sortedData = React.useMemo(() => {
+    const data = [...filteredData];
+    const { key, direction } = sortConfig || {};
+    if (!key) return data;
+    if (key === "sno") {
+      return direction === "asc" ? data : data.reverse();
+    }
+
+    const compare = (a, b) => {
+      let va = "";
+      let vb = "";
+      switch (key) {
+        case "date":
+          return dateKey(a.date) - dateKey(b.date);
+        case "cv": {
+          va = getLabelById(contractorOptions, a.contractor_id) || getLabelById(vendorOptions, a.vendor_id);
+          vb = getLabelById(contractorOptions, b.contractor_id) || getLabelById(vendorOptions, b.vendor_id);
+          break;
+        }
+        case "project": {
+          va = getLabelById(siteOptions, a.project_id);
+          vb = getLabelById(siteOptions, b.project_id);
+          break;
+        }
+        case "transfer": {
+          va = getLabelById(siteOptions, a.transfer_site_id);
+          vb = getLabelById(siteOptions, b.transfer_site_id);
+          break;
+        }
+        case "type":
+          va = normStr(a.type);
+          vb = normStr(b.type);
+          break;
+        case "payment_mode":
+          va = normStr(a.payment_mode);
+          vb = normStr(b.payment_mode);
+          break;
+        case "description":
+          va = normStr(a.description);
+          vb = normStr(b.description);
+          break;
+        default:
+          va = "";
+          vb = "";
+      }
+      return va.localeCompare(vb);
+    };
+
+    data.sort((a, b) => {
+      const c = compare(a, b);
+      return direction === "asc" ? c : -c;
+    });
+    return data;
+  }, [filteredData, sortConfig, contractorOptions, vendorOptions, siteOptions]);
+
+  const SortIcon = ({ columnKey }) => {
+    if (sortConfig.key !== columnKey) return null;
+    return <span className="ml-1">{sortConfig.direction === "asc" ? "↑" : "↓"}</span>;
+  };
 
   // Export PDF (landscape) of tableRef
   const handleExportPDF = () => {
@@ -536,17 +727,34 @@ const AdvanceReport = () => {
             />
           </div>
 
-          <div className="flex items-end">
-            <button
-              onClick={() => {
-                setStartDate("");
-                setEndDate("");
-                setWeek(`Week ${String(getCurrentWeekNumber()).padStart(2, "0")}`);
-              }}
-              className="px-3 py-2 border rounded"
+          <div>
+            <label className="block font-semibold mb-1">Payment Mode</label>
+            <select
+              value={paymentModeFilter}
+              onChange={(e) => setPaymentModeFilter(e.target.value)}
+              className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[168px] h-[45px] focus:outline-none"
             >
-              Clear Dates
-            </button>
+              <option value="">All Modes</option>
+              <option value="Cash">Cash</option>
+              <option value="GPay">GPay</option>
+              <option value="Net Banking">Net Banking</option>
+              <option value="Cheque">Cheque</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block font-semibold mb-1">Type</label>
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[168px] h-[45px] focus:outline-none"
+            >
+              <option value="">All Types</option>
+              <option value="Advance">Advance</option>
+              <option value="Bill Settlement">Bill Settlement</option>
+              <option value="Refund">Refund</option>
+              <option value="Transfer">Transfer</option>
+            </select>
           </div>
         </div>
 
@@ -577,14 +785,12 @@ const AdvanceReport = () => {
           </div>
         </div>
       </div>
-
       <div className='w-[1750px] ml-10 bg-white mt-5 pt-5'>
         <div className='space-x-6 flex justify-end mr-20'>
           <button onClick={handleExportPDF} className='text-sm text-[#E4572E] hover:underline font-bold'>Export PDF</button>
           <button onClick={handleExportExcel} className='text-sm text-[#007233] hover:underline font-bold'>Export XL</button>
           <button className='text-sm text-[#BF9853] hover:underline font-bold'>Print</button>
         </div>
-
         <div
           ref={scrollRef}
           className=" rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[630px] overflow-auto select-none ml-5 mr-5"
@@ -596,17 +802,57 @@ const AdvanceReport = () => {
           <table ref={tableRef} className="table-fixed  min-w-[1635px] w-screen border-collapse">
             <thead className='bg-[#FAF6ED]'>
               <tr>
-                <th className="pt-2 pl-3 w-20 font-bold text-left">S.No</th>
-                <th className="pt-2 pl-3 w-36 font-bold text-left">Date</th>
-                <th className="px-2 w-[220px] font-bold text-left">Contractor/Vendor</th>
-                <th className="px-2 w-[270px] font-bold text-left">Project Name</th>
+                <th
+                  className="pt-2 pl-3 w-20 font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                  onClick={() => requestSort("sno")}
+                >
+                  S.No <SortIcon columnKey="sno" />
+                </th>
+                <th
+                  className="pt-2 pl-3 w-36 font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                  onClick={() => requestSort("date")}
+                >
+                  Date <SortIcon columnKey="date" />
+                </th>
+                <th
+                  className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                  onClick={() => requestSort("cv")}
+                >
+                  Contractor/Vendor <SortIcon columnKey="cv" />
+                </th>
+                <th
+                  className="px-2 w-[270px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                  onClick={() => requestSort("project")}
+                >
+                  Project Name <SortIcon columnKey="project" />
+                </th>
                 <th className="px-2 w-[100px] font-bold text-left">Advance</th>
                 <th className="px-2 w-[120px] font-bold text-left">Bill Amount</th>
                 <th className="px-2 w-[120px] font-bold text-left">Refund Amount</th>
-                <th className="px-2 w-[220px] font-bold text-left">Transfer</th>
-                <th className="px-2 w-[160px] font-bold text-left">Type</th>
-                <th className="px-2 w-[120px] font-bold text-left">Mode</th>
-                <th className="px-2 w-[120px] font-bold text-left">Description</th>
+                <th
+                  className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                  onClick={() => requestSort("transfer")}
+                >
+                  Transfer <SortIcon columnKey="transfer" />
+                </th>
+                <th
+                  className="px-2 w-[160px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                  onClick={() => requestSort("type")}
+                >
+                  Type <SortIcon columnKey="type" />
+                </th>
+                <th
+                  className="px-2 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                  onClick={() => requestSort("payment_mode")}
+                >
+                  Mode <SortIcon columnKey="payment_mode" />
+                </th>
+                <th
+                  className="px-2 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                  onClick={() => requestSort("description")}
+                >
+                  Description <SortIcon columnKey="description" />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -615,12 +861,12 @@ const AdvanceReport = () => {
                   <td colSpan="11" className="text-center py-4 text-gray-500 font-semibold">No Entry is available</td>
                 </tr>
               ) : (
-                filteredData.map((row, index) => (
+                sortedData.map((row, index) => (
                   <tr key={row.id || index} className="odd:bg-white even:bg-[#FAF6ED]">
                     <td className="text-sm text-left p-3 w-32 font-semibold">{index + 1}</td>
                     <td className="text-sm text-left p-3 w-32 font-semibold">{new Date(row.date).toLocaleDateString("en-GB")}</td>
                     <td className="text-sm text-left p-3 w-32 font-semibold">{contractorOptions.find(c => c.id === row.contractor_id)?.label || vendorOptions.find(v => v.id === row.vendor_id)?.label || "-"}</td>
-                    <td className="text-sm text-left p-3 w-32 font-semibold">{siteOptions.find(s => s.id === row.project_id)?.label || "-"}</td>
+                    <td className="text-sm text-left p-3 w-32 font-semibold">{siteOptions.find(s => String(s.id) === String(row.project_id))?.label || "-"}</td>
                     <td className="text-sm text-left p-3 w-32 font-semibold">{row.amount?.toLocaleString("en-IN") || "0"}</td>
                     <td className="text-sm text-left p-3 w-32 font-semibold">{row.bill_amount?.toLocaleString("en-IN") || "0"}</td>
                     <td className="text-sm text-left p-3 w-32 font-semibold">{row.refund_amount?.toLocaleString("en-IN") || "0"}</td>

@@ -269,14 +269,14 @@ const Form = ({ username, userRoles = [] }) => {
     };
     const handleUpload = async (e) => {
         e.preventDefault();
-        if (!date || !selectedSite || !amount || !selectedCategory) {
+        if (!date || !selectedSite || !amount || !selectedCategory || !selectedOption) {
             alert('Please fill out all required fields.');
             return;
         }
         setIsSubmitting(true);
         try {
-            if (selectedAccountType === 'Bill Payment' && !selectedFile) {
-                alert('PDF file is required for Bill Payment.');
+            if (selectedAccountType !== 'Daily Wage' && !selectedFile) {
+                alert('PDF file is required for this type.');
                 setIsSubmitting(false);
                 return;
             }
@@ -374,16 +374,14 @@ const Form = ({ username, userRoles = [] }) => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div className="md:col-span-2">
                             <div className="flex mb-4 items-center gap-4">
-                                <h4 className="text-base font-semibold mb-2 text-[#E4572E]">Account Type</h4>
+                                <h4 className="text-base font-semibold mb-2 text-[#E4572E]">Account Type <span className="text-red-500">*</span></h4>
                                 <select className="h-[45px] border-2 border-[#BF9853] rounded-lg px-4 py-2 focus:outline-none border-opacity-[0.20] w-[182px]"
                                     value={selectedAccountType}
                                     onChange={(e) => {
                                         const selectedValue = e.target.value;
                                         setSelectedAccountType(selectedValue);
-
                                         // Find the selected option object
                                         const selectedOption = accountTypeOptions.find(option => option.value === selectedValue);
-
                                         if (selectedOption) {
                                             console.log("Selected ID:", selectedOption.id);
                                         }
@@ -397,7 +395,7 @@ const Form = ({ username, userRoles = [] }) => {
                                 </select>
                             </div>
                             <div className='text-left'>
-                                <label className="text-md font-semibold block mb-1">Date</label>
+                                <label className="text-md font-semibold block mb-1">Date <span className="text-red-500">*</span></label>
                                 <input
                                     type="date"
                                     value={date}
@@ -407,7 +405,7 @@ const Form = ({ username, userRoles = [] }) => {
                             </div>
                         </div>
                         <div className='text-left'>
-                            <label className="text-md font-semibold mb-2  block">Project Name</label>
+                            <label className="text-md font-semibold mb-2  block">Project Name <span className="text-red-500">*</span></label>
                             <Select
                                 options={sortedSiteOptions || []}
                                 placeholder="Select a site..."
@@ -421,7 +419,7 @@ const Form = ({ username, userRoles = [] }) => {
                         </div>
                         <div className='text-left lg:ml-[-570px] md:ml-[-70px]'>
                             <div className='flex'>
-                                <label className="text-md font-semibold mb-2 block">Vendor/Contractor Name</label>
+                                <label className="text-md font-semibold mb-2 block">Vendor/Contractor Name <span className="text-red-500">*</span></label>
                                 {selectedType && <span className="text-xs text-orange-600 font-semibold block ml-10 mt-3">{selectedType}</span>}
                             </div>
                             <Select
@@ -444,7 +442,7 @@ const Form = ({ username, userRoles = [] }) => {
                             />
                         </div>
                         <div className='text-left lg:ml-[-570px] md:ml-[-70px]'>
-                            <label className="text-md font-semibold mb-2 block">Amount</label>
+                            <label className="text-md font-semibold mb-2 block">Amount <span className="text-red-500">*</span></label>
                             <div className="relative w-[290px] h-[45px]">
                                 <span className="absolute top-1/2 left-4 transform -translate-y-1/2 text-gray-600 text-lg">₹</span>
                                 <input
@@ -457,7 +455,7 @@ const Form = ({ username, userRoles = [] }) => {
                             </div>
                         </div>
                         <div className='text-left'>
-                            <label className="text-md font-semibold mb-2 block">Category</label>
+                            <label className="text-md font-semibold mb-2 block">Category <span className="text-red-500">*</span></label>
                             <Select
                                 options={categoryOptions}
                                 value={selectedCategory}

@@ -7,8 +7,7 @@ import Select from 'react-select';
 import download from '../Images/file_download.png'
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-
-const History = ({ username, userRoles = [] }) => {
+const DailyPayment = ({ username, userRoles = [] }) => {
     const [expenses, setExpenses] = useState([]);
     console.log("Expenses Data:", expenses);
     const [payments, setPayments] = useState([]);
@@ -25,6 +24,7 @@ const History = ({ username, userRoles = [] }) => {
     const [selectedWeek, setSelectedWeek] = useState("");
     const [editingRowId, setEditingRowId] = useState('');
     const [editingPaymentId, setEditingPaymentId] = useState('');
+    const [selectedDate, setSelectedDate] = useState(null); // new state
     const [showWeeklyPaymentExpensesModal, setShowWeeklyPaymentExpensesModal] = useState(false);
     const [weeklyPaymentExpensesAudits, setWeeklyPaymentExpensesAudits] = useState([]);
     const [showWeeklyPaymentReceivedModal, setShowWeeklyPaymentReceivedModal] = useState(false);
@@ -56,19 +56,6 @@ const History = ({ username, userRoles = [] }) => {
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const year = date.getFullYear();
         return `${day}-${month}-${year}`;
-    };
-    const formatDate = (dateString) => {
-        const date = new Date(dateString);
-        date.setMinutes(date.getMinutes());
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        let hours = date.getHours();
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        hours = hours % 12;
-        hours = hours ? String(hours).padStart(2, '0') : '12';
-        return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
     };
     useEffect(() => {
         fetchWeeklyType();
@@ -244,10 +231,6 @@ const History = ({ username, userRoles = [] }) => {
         };
     }, []);
 
-    const handlePaymentChange = (e) => {
-        const { name, value } = e.target;
-        setNewPayment((prev) => ({ ...prev, [name]: value }));
-    };
     const handleKeyDown = async (e) => {
         if (e.key === "Enter") {
 
@@ -342,385 +325,7 @@ const History = ({ username, userRoles = [] }) => {
             )
         );
     };
-    const handleEditPayment = (index, field, value) => {
-        setPayments((prevPayments) =>
-            prevPayments.map((payment, i) =>
-                i === index ? { ...payment, [field]: value } : payment
-            )
-        );
-    };
-    function getWeekStartEnd(year, weekNumber) {
-        // Start with Jan 1
-        const simple = new Date(year, 0, 1 + (weekNumber - 1) * 7);
 
-        // ISO week correction (start on Monday)
-        const dow = simple.getDay();
-        const ISOweekStart = simple;
-        if (dow <= 4) {
-            ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1); // Monday
-        } else {
-            ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay()); // Next Monday
-        }
-
-        const ISOweekEnd = new Date(ISOweekStart);
-        ISOweekEnd.setDate(ISOweekStart.getDate() + 6);
-
-        return { start: ISOweekStart, end: ISOweekEnd };
-    }
-    const generatePDF = () => {
-        const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
-        const pageWidth = doc.internal.pageSize.getWidth();
-
-        const year = new Date().getFullYear();
-        const { start, end } = getWeekStartEnd(year, Number(selectedWeek));
-        const weekStartDate = start.toLocaleDateString("en-GB");
-        const weekEndDate = end.toLocaleDateString("en-GB");
-
-        const totalExpenses = expenses.reduce((t, e) => t + Number(e.amount || 0), 0);
-        const totalPayments = payments.reduce((t, p) => t + Number(p.amount || 0), 0);
-        const balance = totalPayments - totalExpenses;
-
-        // ===== FUNCTION TO DRAW HEADER =====
-        const drawHeader = (doc) => {
-            doc.setFontSize(10);
-            doc.setTextColor(0, 0, 0);
-
-            // Outer rectangle + lines
-            doc.rect(20, 24, 810, 65);
-            doc.line(80, 24, 80, 90);
-            doc.line(140, 24, 140, 90);
-            doc.line(440, 24, 440, 90);
-            doc.line(520, 24, 520, 45);
-            doc.line(600, 24, 600, 90);
-            doc.line(730, 24, 730, 90);
-            doc.line(440, 45, 830, 45);
-            doc.line(600, 45, 830, 45);
-
-            doc.text("PS", 30, 60);
-            doc.text(String(selectedWeek || ""), 110, 60);
-            doc.setFontSize(14);
-            doc.setFont("helvetica", "bold");
-            doc.text("WEEKLY PAYMENTS", 180, 60);
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(10);
-
-            doc.text(weekStartDate, 460, 40);
-            doc.text(weekEndDate, 530, 40);
-            doc.text(new Date().toLocaleDateString("en-GB"), 500, 68);
-
-            doc.setFontSize(12);
-            doc.text("EXPENSES", 610, 40);
-            doc.text(totalExpenses.toLocaleString(), 740, 40);
-            doc.text("BALANCE", 610, 68);
-            doc.text(balance.toLocaleString(), 740, 68);
-        };
-
-        // Draw header on first page
-        drawHeader(doc);
-
-        // ===== EXPENSES TABLE =====
-        const expensesHeaders = [["SNO", "Date", "Contractor/Vendor", "Site Name", "Type", "Amount", "AC", "C", ""]];
-        const filteredExpenses = expenses.filter(row => row.type !== "Project Advance" && row.type !== "Staff Advance" && row.type !== "Staff Salary");
-        const expensesData = filteredExpenses.map((row, idx) => [
-            idx + 1,
-            formatDateOnly(row.date),
-            combinedOptions.find(opt =>
-                (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
-                (opt.type === "Vendor" && opt.id === Number(row.vendor_id))
-            )?.label || "",
-            siteOptions.find(opt => opt.id === Number(row.project_id))?.label || "",
-            row.type,
-            Number(row.amount).toLocaleString(),
-            "", "", ""
-        ]);
-
-        autoTable(doc, {
-            head: expensesHeaders,
-            body: expensesData,
-            startY: 90,
-            margin: { left: 20 },
-            tableWidth: 810,
-            theme: "grid",
-            styles: {
-                fontSize: 8,
-                cellPadding: 3,
-                textColor: [0, 0, 0],
-                lineColor: [0, 0, 0],
-                lineWidth: 0.5
-            },
-            headStyles: {
-                textColor: [0, 0, 0],
-                fillColor: [255, 255, 255],
-                lineColor: [0, 0, 0],
-                lineWidth: 1.0,
-                fontStyle: 'bold'
-            },
-            didDrawPage: () => {
-                drawHeader(doc);
-            }
-        });
-
-        // ===== PAYMENTS TABLE =====
-        const paymentsHeaders = [["Date Received", "Amount", "Type"]];
-        const paymentsData = payments.map(r => [
-            formatDate(r.created_at),
-            Number(r.amount).toLocaleString(),
-            r.type || ""
-        ]);
-        paymentsData.push([
-            { content: "TOTAL", styles: { fontStyle: "bold" } },
-            { content: totalPayments.toLocaleString(), styles: { fontStyle: "bold" } },
-            { content: "", styles: { fontStyle: "bold" } }
-        ]);
-
-        // ===== NEW PAGE for remaining tables =====
-        doc.addPage();
-        drawHeader(doc);
-        const baseY = 110;
-
-        autoTable(doc, {
-            head: paymentsHeaders,
-            body: paymentsData,
-            startY: baseY,
-            margin: { left: 20 },
-            tableWidth: 260,
-            theme: "grid",
-            styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
-            headStyles: { textColor: [0, 0, 0], fillColor: [255, 255, 255], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
-            bodyStyles: { fontStyle: 'bold' },
-            didDrawPage: () => {
-                drawHeader(doc);
-            }
-        });
-
-        // ----- HANDOVER DETAILS -----
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.text("HANDOVER DETAILS", 22, baseY + 80);
-
-        autoTable(doc, {
-            head: [["Date Returned", "Amount"]],
-            body: [
-                ["", ""],
-                ["RETURNED", balance.toLocaleString()]
-            ],
-            startY: baseY + 90,
-            margin: { left: 22 },
-            tableWidth: 200,
-            theme: "grid",
-            styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
-            headStyles: { textColor: [0, 0, 0], fillColor: [255, 255, 255], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
-            bodyStyles: { fontStyle: 'bold' },
-            didDrawPage: () => {
-                drawHeader(doc);
-            }
-        });
-
-        // ----- EXTRA -----
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-
-        autoTable(doc, {
-            head: [["Daily Wage", "Extra B"]],
-            body: [
-                ["Example 1", "123"],
-                ["Example 2", "456"]
-            ],
-            startY: baseY + 100,
-            margin: { left: 300 },
-            tableWidth: 200,
-            theme: "grid",
-            styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
-            headStyles: { textColor: [0, 0, 0], fillColor: [255, 255, 255], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
-            bodyStyles: { fontStyle: 'bold' },
-            didDrawPage: () => {
-                drawHeader(doc);
-            }
-        });
-
-        // ----- SUMMARY -----
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.text("SUMMARY", 300, baseY - 5);
-
-        const summaryMap = expenses
-            .filter(expense => Number(expense.amount) > 0)
-            .reduce((acc, expense) => {
-                const type = expense.type;
-                const amount = Number(expense.amount);
-                if (!acc[type]) acc[type] = { count: 0, total: 0 };
-                acc[type].count += 1;
-                acc[type].total += amount;
-                return acc;
-            }, {});
-
-        const summaryData = Object.entries(summaryMap).map(([type, { count, total }]) => [
-            type,
-            Number(total).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-            count
-        ]);
-
-        autoTable(doc, {
-            head: [["Type", "Total"]],
-            body: summaryData.map(r => [r[0], r[1]]),
-            startY: baseY,
-            margin: { left: 300 },
-            tableWidth: 200,
-            theme: "grid",
-            styles: { fontSize: 9, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
-            headStyles: { textColor: [0, 0, 0], fillColor: [255, 255, 255], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
-            bodyStyles: { fontStyle: 'bold' },
-            didDrawPage: () => {
-                drawHeader(doc);
-            },
-            didDrawCell: (data) => {
-                // Only for body rows in first column
-                if (data.section === 'body' && data.column.index === 0) {
-                    const count = summaryData[data.row.index][2];  // third element = count
-                    if (count > 0) {
-                        const textX = data.cell.x - 3; // 10pt to the left of table
-                        const textY = data.cell.y + data.cell.height / 2 + 2; // vertical centering
-                        doc.setFontSize(9);
-                        doc.text(String(count), textX, textY, { align: 'right' });
-                    }
-                }
-            }
-        });
-
-        // draw counts outside table
-        const summaryTable = doc.lastAutoTable;
-        summaryData.forEach((row, i) => {
-            const count = row[2];
-            if (count > 1) {
-                const rowY = summaryTable.body[i].y + 6;
-                const leftX = summaryTable.settings.margin.left - 15;
-                doc.setFontSize(9);
-                doc.text(String(count), leftX, rowY, { align: "right" });
-            }
-        });
-
-        // ===== SUMMARY TOTAL BOX =====
-        const summaryTotal = summaryData.reduce((acc, row) => acc + Number(row[1].replace(/,/g, "")), 0);
-        const summaryBoxY = doc.lastAutoTable.finalY + 15;
-
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "bold");
-        doc.rect(300, summaryBoxY - 12, 200, 20);
-        doc.text(
-            summaryTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-            445,
-            summaryBoxY + 3,
-            { align: "right" }
-        );
-
-        // ===== ADD THREE NEW TABLES WITH FOUR COLUMNS BELOW SUMMARY =====
-        const newTableX = 520;  // Right of summary table
-        let newTableY = baseY;
-
-        // --- Calculate staff advance data ---
-        const staffAdvanceEntries = expenses.filter(e => e.type === "Staff Advance");
-        const staffAdvanceCount = staffAdvanceEntries.length;
-        const staffAdvanceTotal = staffAdvanceEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-
-        // First table (Staff Advance Summary)
-        const staffAdvanceHead = [[
-            String(staffAdvanceCount),       // count
-            "STAFF ADVANCE",                 // static heading
-            "PROJECT NAME",                  // static heading
-            staffAdvanceTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) // total amount
-        ]];
-
-        // Each row will have blank in first column, label in second, project name in third, amount in fourth
-        const staffAdvanceBody = staffAdvanceEntries.map(e => [
-            formatDateOnly(e.date), // show date in first column
-            combinedOptions.find(opt =>
-                (opt.type === "Contractor" && opt.id === Number(e.contractor_id)) ||
-                (opt.type === "Vendor" && opt.id === Number(e.vendor_id))
-            )?.label || "",
-            siteOptions.find(opt => opt.id === Number(e.project_id))?.label || "",
-            Number(e.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-        ]);
-
-
-        autoTable(doc, {
-            head: staffAdvanceHead,
-            body: staffAdvanceBody,
-            startY: newTableY,
-            margin: { left: newTableX },
-            tableWidth: 310,
-            theme: "grid",
-            styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
-            headStyles: { textColor: [0, 0, 0], fillColor: [255, 255, 255], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
-            bodyStyles: { fontStyle: 'bold' },
-            didDrawPage: () => {
-                drawHeader(doc);
-            }
-        });
-        newTableY = doc.lastAutoTable.finalY + 10;
-
-        // --- Calculate staff salary data ---
-        const staffSalaryEntries = expenses.filter(e => e.type === "Staff Salary");
-        const staffSalaryCount = staffSalaryEntries.length;
-        const staffSalaryTotal = staffSalaryEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-
-        // Second table (Staff Salary Summary)
-        const staffSalaryHead = [[
-            String(staffSalaryCount),      // count of Staff Salary entries
-            "STAFF SALARY",                // static heading
-            "PROJECT NAME",                // static heading
-            staffSalaryTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) // total amount
-        ]];
-
-        // Each row: blank first cell, contractor/vendor label second cell, project name third cell, amount fourth cell
-        const staffSalaryBody = staffSalaryEntries.map(e => [
-            formatDateOnly(e.date), // show date in first column
-            combinedOptions.find(opt =>
-                (opt.type === "Contractor" && opt.id === Number(e.contractor_id)) ||
-                (opt.type === "Vendor" && opt.id === Number(e.vendor_id))
-            )?.label || "",
-            siteOptions.find(opt => opt.id === Number(e.project_id))?.label || "",
-            Number(e.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-        ]);
-
-
-        autoTable(doc, {
-            head: staffSalaryHead,
-            body: staffSalaryBody,
-            startY: newTableY,
-            margin: { left: newTableX },
-            tableWidth: 310,
-            theme: "grid",
-            styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
-            headStyles: { textColor: [0, 0, 0], fillColor: [255, 255, 255], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
-            bodyStyles: { fontStyle: 'bold' },
-            didDrawPage: () => {
-                drawHeader(doc);
-            }
-        });
-        newTableY = doc.lastAutoTable.finalY + 10;
-
-        // Third table (unchanged - sample data)
-        autoTable(doc, {
-            head: [["Col1", "Col2", "Col3", "Col4"]],
-            body: [
-                ["I1", "J1", "K1", "L1"],
-                ["I2", "J2", "K2", "L2"]
-            ],
-            startY: newTableY,
-            margin: { left: newTableX },
-            tableWidth: 310,
-            theme: "grid",
-            styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
-            headStyles: { textColor: [0, 0, 0], fillColor: [255, 255, 255], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
-            bodyStyles: { fontStyle: 'bold' },
-            didDrawPage: () => {
-                drawHeader(doc);
-            }
-        });
-        newTableY = doc.lastAutoTable.finalY + 10;
-
-        doc.save(`weekly-report-${selectedWeek || ""}.pdf`);
-    };
     const lastWeekNumber = Math.max(...weeks.map(week => week.number));
 
     console.log("Last Week Number:", lastWeekNumber);
@@ -828,78 +433,65 @@ const History = ({ username, userRoles = [] }) => {
         }
     };
 
-    const handleWeeklyReceivedDelete = async (id) => {
-        const confirmed = window.confirm("Are you sure you want to delete This Expense Data?");
-        if (confirmed) {
-            try {
-                const response = await fetch(`https://backendaab.in/aabuildersDash/api/payments-received/delete/${id}`, {
-                    method: 'DELETE',
-                });
-                if (response.ok) {
-                    alert("Weekly Expenses deleted successfully!!!");
-                    window.location.reload();
-                } else {
-                    console.error("Failed to delete the Weekly Expenses. Status:", response.status);
-                    alert("Error deleting the Weekly Expenses. Please try again.");
-                }
-            } catch (error) {
-                console.error("Error:", error);
-                alert("An error occurred while deleting the Contractor Name.");
-            }
-        } else {
-            console.log("Deletion cancelled.");
+    useEffect(() => {
+        if (weeks.length > 0) {
+            setSelectedWeek(weeks[weeks.length - 1].number); // default last week
         }
-    };
+    }, [weeks]);
+
+    // Helper to format dates
+    const formatDate = (date) =>
+        date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+
+    // Get currently selected week object
+    const currentWeek = weeks.find((w) => w.number === Number(selectedWeek));
+
+    // Generate 7 days if week selected
+    const days = [];
+    if (currentWeek) {
+        const start = new Date(currentWeek.start);
+        for (let i = 0; i < 7; i++) {
+            const day = new Date(start);
+            day.setDate(start.getDate() + i);
+            days.push(day);
+        }
+    }
 
     return (
         <body>
-            <div className='flex  mt-[-29px]'>
-                <button
-                    className=" ml-[1700px] font-semibold text-lg cursor-pointer"
-                    onClick={generatePDF}
-                >
-                    Report
-                </button>
-                <img className='w-6 h-5 mt-1' src={download} />
-            </div>
             <div className='mx-auto w-[1800px] flex gap-8 p-4 pl-8 border-collapse text-left bg-[#FFFFFF] ml-14 mr-6 rounded-md h-[127px]'>
                 <div>
-                    <h1 className='font-semibold'>Select Week</h1>
-                    <div>
-                        <select
-                            className="w-[303px] h-[45px] border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2"
-                            value={selectedWeek}
-                            onChange={(e) => setSelectedWeek(e.target.value)}
-                        >
-                            <option value="">-- Select Week --</option>
-                            {weeks.map((week) => {
-                                const startDate = new Date(week.start);
-                                const endDate = new Date(week.end);
-                                const formatDate = (date) =>
-                                    date.toLocaleDateString("en-GB", {
-                                        day: "numeric",
-                                        month: "long"
-                                    });
-                                return (
-                                    <option key={week.number} value={week.number}>
-                                        {`Week ${week.number}, ${formatDate(startDate)} to ${formatDate(endDate)}`}
-                                    </option>
-                                );
-                            })}
-                        </select>
+                    {days.length > 0 && (
+                        <div className="grid grid-cols-7 gap-2 mt-4">
+                            {days.map((day, idx) => (
+                                <button
+                                    key={idx}
+                                    className={`p-2 rounded-lg border ${selectedDate === day.toISOString().split("T")[0]
+                                            ? "bg-[#BF9853] text-white"
+                                            : "bg-white border-gray-300"
+                                        }`}
+                                    onClick={() => {
+                                        const dateStr = day.toISOString().split("T")[0]; // format yyyy-mm-dd
+                                        setSelectedDate(dateStr);
+                                        setNewExpense(prev => ({ ...prev, date: dateStr })); // set to table
+                                    }}
+                                >
+                                    {formatDate(day)}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Example: Table stays same regardless of day button */}
+                    <div className="mt-6 flex">
+                        <div>
+                            <h2 className="font-semibold">Table Data (Week {selectedWeek})</h2>
+                        </div>
+                        <div>
+                            {selectedDate && <p>Selected day: {selectedDate}</p>}
+                            {/* Your table here: use selectedWeek only */}
+                        </div>
                     </div>
-                </div>
-                <div>
-                    <label className="block font-semibold ">Year</label>
-                    <select
-                        value={year}
-                        onChange={(e) => setYear(e.target.value)}
-                        className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[168px] h-[45px] focus:outline-none"
-                    >
-                        {years.map((y) => (
-                            <option key={y} value={y}>{y}</option>
-                        ))}
-                    </select>
                 </div>
             </div>
             <div className="mt-4 ml-[1440px] ">
@@ -949,6 +541,7 @@ const History = ({ username, userRoles = [] }) => {
                                                     value={newExpense.date}
                                                     onChange={handleExpenseChange}
                                                     onKeyDown={handleKeyDown}
+                                                    disabled={!!selectedDate}
                                                 />
                                             </td>
                                             <td className="px-4 py-2">
@@ -1214,207 +807,7 @@ const History = ({ username, userRoles = [] }) => {
                             </table>
                         </div>
                     </div>
-                    {/* PAYMENTS RECEIVED TABLE */}
-                    <div className="-mt-6">
-                        <div className="block">
-                            <div className="flex justify-between">
-                                <h1 className="font-bold text-base pl-8">Payments Received</h1>
-                                <h1 className="font-bold text-base text-[#E4572E]">
-                                    Total: <span style={{ color: "#E4572E" }}>
-                                        {payments.reduce((total, row) => total + Number(row.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}
-                                    </span>
-                                </h1>
-                            </div>
-                            <div className="rounded-lg ml-9 border-l-8 border-l-[#BF9853] overflow-y-auto max-h-[300px]">
-                                <table className="w-auto border-collapse">
-                                    <thead className="bg-[#FAF6ED] h-12">
-                                        <tr>
-                                            <th className="px-4 py-2 text-left">Date</th>
-                                            <th className="px-4 py-2">Amount</th>
-                                            <th className="px-4 py-2 text-left">Type</th>
-                                            <th>Activity</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {payments.map((row, index) => (
-                                            <tr key={index} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
-                                                <td className="px-4 py-2">
-                                                    {editingPaymentId === (row.id || null) ? (
-                                                        <input
-                                                            type="date"
-                                                            value={row.date || ""}
-                                                            onChange={(e) =>
-                                                                handleEditPayment(index, "date", e.target.value)
-                                                            }
-                                                            className="border-2 border-[#BF9853] border-opacity-25 p-1 rounded-lg bg-transparent w-[130px] h-[40px] focus:outline-none"
-                                                        />
-                                                    ) : (
-                                                        <div className="w-[130px] h-[40px] flex items-center">
-                                                            {formatDateOnly(row.date) || ""}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-2">
-                                                    {editingPaymentId === (row.id || null) ? (
-                                                        <input
-                                                            type="number"
-                                                            value={row.amount || ""}
-                                                            onChange={(e) =>
-                                                                handleEditPayment(index, "amount", e.target.value)
-                                                            }
-                                                            className="border-2 border-[#BF9853] border-opacity-25 rounded-lg bg-transparent w-[100px] h-[40px] focus:outline-none"
-                                                            onWheel={(e) => e.preventDefault()}
-                                                            onFocus={() =>
-                                                                window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })
-                                                            }
-                                                            onBlur={() =>
-                                                                window.removeEventListener("wheel", (e) => e.preventDefault())
-                                                            }
-                                                        />
-                                                    ) : (
-                                                        <div className="w-[100px] h-[40px] flex items-center">
-                                                            {Number(row.amount).toLocaleString('en-IN')}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-2">
-                                                    {editingPaymentId === (row.id || null) ? (
-                                                        <>
-                                                            <select
-                                                                value={row.type || "Weekly"}
-                                                                onChange={(e) =>
-                                                                    handleEditPayment(index, "type", e.target.value)
-                                                                }
-                                                                className="border-2 border-[#BF9853] border-opacity-25 w-[100px] h-[40px] rounded-lg bg-transparent focus:outline-none"
-                                                                disabled={editingPaymentId !== row.id}
-                                                            >
-                                                                <option id='1' value="Weekly">Weekly</option>
-                                                                <option id='2' value="Daily">Daily</option>
-                                                                <option id='3' value="Monthly">Monthly</option>
-                                                            </select>
-                                                        </>
-                                                    ) : (
-                                                        <div className="w-[100px] h-[40px] flex items-center">
-                                                            {row.type}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td className="px-2 py-2">
-                                                    {Number(row.weekly_number) === Number(lastWeekNumber) && (
-                                                        <div className="flex gap-1">
-                                                            {editingPaymentId === row.id ? (
-                                                                <button
-                                                                    className="text-green-600 font-bold text-lg"
-                                                                    onClick={() => saveEditedPaymentReceived(row)}
-                                                                >
-                                                                    ✓
-                                                                </button>
-                                                            ) : (
-                                                                row.type === "Carry (CF)" ? (
-                                                                    <img
-                                                                        className="w-5 h-4 opacity-40 cursor-not-allowed"
-                                                                        src={Edit}
-                                                                        alt="Edit Disabled"
-                                                                    />
-                                                                ) : (
-                                                                    <button onClick={() => setEditingPaymentId(row.id)}>
-                                                                        <img className="w-5 h-4" src={Edit} alt="Edit" />
-                                                                    </button>
-                                                                )
 
-                                                            )}
-                                                            <button className="" onClick={() => handleWeeklyReceivedDelete(row.id)}>
-                                                                <img src={Delete} className="w-5 h-4" alt="Delete" />
-                                                            </button>
-                                                            <button className="" onClick={() => fetchAuditDetailsForPaymentReceived(row.id)}>
-                                                                <img src={history} className="w-5 h-4" alt="Delete" />
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {/* FIXED INPUT ROW */}
-                                        {Number(selectedWeek) === Number(lastWeekNumber) ? (
-                                            <tr>
-                                                <td className="px-4 py-2">
-                                                    <input
-                                                        type="date"
-                                                        name="date"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 rounded-lg w-[130px] h-[40px] focus:outline-none"
-                                                        value={newPayment.date}
-                                                        onChange={handlePaymentChange}
-                                                        onKeyDown={handleKeyDown1}
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-2">
-                                                    <input
-                                                        type="number"
-                                                        name="amount"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 rounded-lg w-[100px] h-[40px] focus:outline-none"
-                                                        value={newPayment.amount}
-                                                        onChange={handlePaymentChange}
-                                                        onKeyDown={handleKeyDown1}
-                                                        onWheel={(e) => e.preventDefault()}
-                                                        onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
-                                                        onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-2">
-                                                    <select
-                                                        name="type"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 w-[100px] h-[40px] rounded-lg focus:outline-none"
-                                                        value={newPayment.type}
-                                                        onChange={handlePaymentChange}
-                                                        onKeyDown={handleKeyDown1}
-                                                    >
-                                                        <option id='1' value="Weekly">Weekly</option>
-                                                        <option id='2' value="Daily">Daily</option>
-                                                        <option id='3' value="Monthly">Monthly</option>
-                                                    </select>
-                                                </td>
-                                                <td></td>
-                                            </tr>
-                                        ) : null}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                        {/* SUMMARY SECTION */}
-                        <div className="mt-4 pt-2 ml-[38px]">
-                            <h2 className="font-bold ml-[-390px] text-lg">Summary</h2>
-                            <div className="overflow-hidden rounded-md border-l-8 border-[#BF9853] text-left">
-                                <table className="w-[345px] border-collapse ">
-                                    <tbody>
-                                        {Object.entries(
-                                            expenses
-                                                .filter(expense => Number(expense.amount) > 0) // only positive amounts
-                                                .reduce((acc, expense) => {
-                                                    const type = expense.type;
-                                                    const amount = Number(expense.amount);
-                                                    acc[type] = (acc[type] || 0) + amount;
-                                                    return acc;
-                                                }, {})
-                                        ).map(([type, total], index, arr) => (
-                                            <tr
-                                                key={type}
-                                                className={`even:bg-[#FAF6ED] odd:bg-[#FFFFFF] ${index === 0 ? "rounded-t-md" : ""
-                                                    } ${index === arr.length - 1 ? "rounded-b-md" : ""}`}
-                                            >
-                                                <td className="font-bold py-1.5 pl-2">{type}</td>
-                                                <td className="font-bold py-1.5 px-4 text-right">
-                                                    {Number(total).toLocaleString("en-US", {
-                                                        minimumFractionDigits: 2,
-                                                        maximumFractionDigits: 2,
-                                                    })}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
                 </div>
                 <AuditModal show={showWeeklyPaymentExpensesModal} onClose={() => setShowWeeklyPaymentExpensesModal(false)} audits={weeklyPaymentExpensesAudits} vendorOptions={vendorOptions} contractorOptions={contractorOptions}
                     siteOptions={siteOptions} />
@@ -1424,7 +817,8 @@ const History = ({ username, userRoles = [] }) => {
         </body >
     )
 }
-export default History
+
+export default DailyPayment
 
 const formatDate = (dateString) => {
     const date = new Date(dateString);

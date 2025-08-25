@@ -10,12 +10,10 @@ import edit from '../Images/Edit.svg';
 const AdvancePortal = ({ username, userRoles = [] }) => {
   const [selectedType, setSelectedType] = useState('Advance')
   const [selectedOption, setSelectedOption] = useState(null);
-  console.log("Selected Option:", selectedOption);
   const [combinedOptions, setCombinedOptions] = useState([]);
   const [vendorOptions, setVendorOptions] = useState([]);
   const [contractorOptions, setContractorOptions] = useState([]);
   const [selectedSite, setSelectedSite] = useState(null);
-  console.log("Selected Site:", selectedSite);
   const [siteOptions, setSiteOptions] = useState([]);
   const [advanceAmount, setAdvanceAmount] = useState('');
   const [dateValue, setDateValue] = useState('');
@@ -30,7 +28,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
   const [description, setDescription] = useState('');
   const [transferSiteId, setTransferSiteId] = useState('');
   const [entryNo, setEntryNo] = useState(1);
-  const [selectedContractorOrVendorOption, setSelectedContractorOrVendorOption] = useState(null);
   const [advanceData, setAdvanceData] = useState([]);
   const [overallAdvance, setOverallAdvance] = useState(0);
   const [selectedAdvanceFile, setSelectedAdvanceFile] = useState(null);
@@ -184,9 +181,93 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
           id: item.id,
           sNo: item.siteNo
         }));
-        setSiteOptions(formattedData);
+
+        // Add predefined site options with IDs 001, 002, 003, 004
+        const predefinedSiteOptions = [
+          {
+            value: "Mason Advance",
+            label: "Mason Advance",
+            id: "1",
+            sNo: "1"
+          },
+          {
+            value: "Material Advance",
+            label: "Material Advance",
+            id: "2",
+            sNo: "2"
+          },
+          {
+            value: "Weekly Advance",
+            label: "Weekly Advance",
+            id: "3",
+            sNo: "3"
+          },
+          {
+            value: "Excess Advance",
+            label: "Excess Advance",
+            id: "4",
+            sNo: "4"
+          },
+          {
+            value: "Material Rent",
+            label: "Material Rent",
+            id: "",
+            sNo: "5"
+          },
+          {
+            value: "Subhash Kumar - Kunnur",
+            label: "Subhash Kumar - Kunnur",
+            id: "6",
+            sNo: "6"
+          }
+        ];
+
+        // Combine backend data with predefined options
+        const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
+        setSiteOptions(combinedSiteOptions);
       } catch (error) {
         console.error("Fetch error: ", error);
+        
+        // Fallback: if API fails, still show predefined options
+        const predefinedSiteOptions = [
+          {
+            value: "Mason Advance",
+            label: "Mason Advance",
+            id: "1",
+            sNo: "1"
+          },
+          {
+            value: "Material Advance",
+            label: "Material Advance",
+            id: "2",
+            sNo: "2"
+          },
+          {
+            value: "Weekly Advance",
+            label: "Weekly Advance",
+            id: "3",
+            sNo: "3"
+          },
+          {
+            value: "Excess Advance",
+            label: "Excess Advance",
+            id: "4",
+            sNo: "4"
+          },
+          {
+            value: "Material Rent",
+            label: "Material Rent",
+            id: "",
+            sNo: "5"
+          },
+          {
+            value: "Subhash Kumar - Kunnur",
+            label: "Subhash Kumar - Kunnur",
+            id: "6",
+            sNo: "6"
+          }
+        ];
+        setSiteOptions(predefinedSiteOptions);
       }
     };
     fetchSites();
@@ -491,7 +572,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
     to.setHours(23, 59, 59, 999);
 
     const filtered = advanceData.filter(entry => {
-      const entryDate = new Date(entry.timestamp);
+      const entryDate = new Date(entry.date);
       const isInDateRange = entryDate >= from && entryDate <= to;
       const isMatchingPayment =
         !filteredPaymentMode || entry.payment_mode === filteredPaymentMode;
@@ -513,7 +594,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
 
     const todayTotal = advanceData
       .filter(entry => {
-        const entryDate = new Date(entry.timestamp);
+        const entryDate = new Date(entry.date);
         entryDate.setHours(0, 0, 0, 0);
         return entryDate.getTime() === today.getTime();
       })
@@ -732,29 +813,26 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
     document.body.removeChild(link);
   };
   useEffect(() => {
-    let totalAdvance = 0;
-    let totalRefund = 0;
-    let totalBill = 0;
-    let totalTransferOut = 0;
-
-    advanceData.forEach(entry => {
-      const amount = parseFloat(entry.amount) || 0;
-      const refund = parseFloat(entry.refund_amount) || 0;
-      const bill = parseFloat(entry.bill_amount) || 0;
-      if (entry.type === 'Advance') {
-        totalAdvance += amount;
-      } else if (entry.type === 'Refund') {
-        totalRefund += refund;
-      } else if (entry.type === 'Bill Settlement') {
-        totalBill += bill;
-      } else if (entry.type === 'Transfer') {
-        totalTransferOut += amount;
-      }
-    });
-
-    const outstanding = totalAdvance - totalRefund - totalBill;
+    const { totalAmount, totalRefund, totalBill } = advanceData.reduce(
+      (acc, entry) => {
+        acc.totalAmount += parseFloat(entry.amount) || 0;
+        acc.totalRefund += parseFloat(entry.refund_amount) || 0;
+        acc.totalBill += parseFloat(entry.bill_amount) || 0;
+        return acc;
+      },
+      { totalAmount: 0, totalRefund: 0, totalBill: 0 }
+    );
+  
+    const outstanding = totalAmount - totalRefund - totalBill;
+  
+    console.log("Total Amount:", totalAmount);
+    console.log("Total Refund:", totalRefund);
+    console.log("Total Bill:", totalBill);
+    console.log("Outstanding:", outstanding);
+  
     setTotalOutstanding(outstanding);
   }, [advanceData]);
+  
   const formatNumber = (num) => {
     if (!num) return '';
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -899,7 +977,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
               <input
                 readOnly
                 type='text'
-                value={formatNumber(todayAmount)}
+                value={todayAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                 className='bg-[#F2F2F2] rounded-lg mt-2 p-2 w-[144px] h-[45px] focus:outline-none'
               />
             </div>
@@ -908,7 +986,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
               <input
                 readOnly
                 type='text'
-                value={formatNumber(totalOutstanding)}
+                value={totalOutstanding.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                 className='bg-[#F2F2F2] p-2 rounded-lg mt-2 w-[144px] h-[45px] focus:outline-none'
               />
             </div>
@@ -926,11 +1004,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                   onChange={(e) => {
                     const newType = e.target.value;
                     setSelectedType(newType);
-
-                    // Clear Amount Given whenever type changes
                     setAdvanceAmount('');
-
-                    // Also clear Bill Amount whenever type changes
                     setBillAmount('');
                   }}
                   className='w-[163px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
@@ -1031,7 +1105,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
               <div className=''>
                 {selectedType === 'Transfer' ? (
                   <>
-                    <label className='font-semibold block'>Site Name</label>
+                    <label className='font-semibold block'>Project Name</label>
                     <Select
                       options={sortedSiteOptions}
                       placeholder="Select a site..."
@@ -1109,9 +1183,9 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                   <span onClick={exportCSV} className='text-[#007233] mr-9 font-semibold hover:underline cursor-pointer'>Export XL</span>
                   <span className=' text-[#BF9853] mr-9 font-semibold hover:underline'>Print</span>
                 </div>
-                <div className='border-l-8 border-l-[#BF9853] rounded-lg'>
+                <div className='border-l-8 border-l-[#BF9853] rounded-lg  h-[400px] overflow-auto'>
                   {selectedOption && selectedSite && (
-                    <table className="w-[900px] mt-4">
+                    <table className="w-[900px]">
                       <thead className="bg-[#FAF6ED] text-left">
                         <tr>
                           <th className="px-3 py-2">Date</th>
@@ -1136,6 +1210,11 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                             const isForCurrentProject = entry.project_id === selectedSite.id;
 
                             return isMatchingVendor && isForCurrentProject;
+                          })
+                          .sort((a, b) => {
+                            const timeA = new Date(a.date || a.timestamp).getTime() || 0;
+                            const timeB = new Date(b.date || b.timestamp).getTime() || 0;
+                            return timeB - timeA;
                           })
                           .map((entry, index) => {
                             const {

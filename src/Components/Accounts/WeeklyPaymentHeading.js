@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import WeeklyPayment from './WeeklyPayment';
 import History from './WeeklyPaymentHistory';
-const WHeading = () => {
+import HandoverPaymentsPage from './WeeklyPaymentHandover';
+import DailyPayment from './DailyPayment';
+const WHeading = ({ username, userRoles = [] }) => {
     const location = useLocation();
     const [activeLink, setActiveLink] = useState(location.pathname);
     const handleLinkClick = (path) => {
@@ -22,6 +24,15 @@ const WHeading = () => {
             </h2>
             <h2>
                 <Link
+                    className={`link ${activeLink === '/weekly-payment/dailypayment' ? 'active' : ''}`}
+                    to="/weekly-payment/dailypayment"
+                    onClick={() => handleLinkClick('/weekly-payment/dailypayment')}
+                > 
+                Daily Payment
+                </Link>
+            </h2>
+            <h2>
+                <Link
                     className={`link ${activeLink === '/weekly-payment/History' ? 'active' : ''}`}
                     to="/weekly-payment/History"
                     onClick={() => handleLinkClick('/weekly-payment/History')}
@@ -29,10 +40,21 @@ const WHeading = () => {
                 History
                 </Link>
             </h2>
+            <h2>
+                <Link
+                    className={`link ${activeLink === '/weekly-payment/Handover' ? 'active' : ''}`}
+                    to="/weekly-payment/Handover"
+                    onClick={() => handleLinkClick('/weekly-payment/Handover')}
+                > 
+                Handover
+                </Link>
+            </h2>
         </div>
         <Routes>
-            <Route path="weeklypayment" element={<WeeklyPayment/>} />
-            <Route path='history' element={<History/>}/>
+            <Route path="weeklypayment" element={<WeeklyPayment  username={username} userRoles={userRoles}/>} />
+            <Route path='history' element={<History  username={username} userRoles={userRoles}/>}/>
+            <Route path='handover' element={<HandoverPaymentsPage username={username} userRoles={userRoles}/>} />
+            <Route path='dailypayment' element={<DailyPayment username={username} userRoles={userRoles}/>} />
         </Routes>
     </div>
     )

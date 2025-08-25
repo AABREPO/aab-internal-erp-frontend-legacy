@@ -24,6 +24,11 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
   const [editingId, setEditingId] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [overallAdvance, setOverallAdvance] = useState(0);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(50);
+
   const scrollRef = useRef(null);
   const isDragging = useRef(false);
   const start = useRef({ x: 0, y: 0 });
@@ -109,9 +114,9 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     if (!isNaN(rawValue)) {
       setEditFormData(prev => {
         if (prev.type === "Refund") {
-          return { ...prev, refund_amount: rawValue };
+          return { ...prev, refund_amount: rawValue, amount: '' };
         } else {
-          return { ...prev, amount: rawValue };
+          return { ...prev, amount: rawValue, refund_amount: '' };
         }
       });
     }
@@ -379,9 +384,93 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
           id: item.id,
           sNo: item.siteNo
         }));
-        setSiteOptions(formattedData);
+
+        // Add predefined site options with IDs 001, 002, 003, 004
+        const predefinedSiteOptions = [
+          {
+            value: "Mason Advance",
+            label: "Mason Advance",
+            id: "1",
+            sNo: "1"
+          },
+          {
+            value: "Material Advance",
+            label: "Material Advance",
+            id: "2",
+            sNo: "2"
+          },
+          {
+            value: "Weekly Advance",
+            label: "Weekly Advance",
+            id: "3",
+            sNo: "3"
+          },
+          {
+            value: "Excess Advance",
+            label: "Excess Advance",
+            id: "4",
+            sNo: "4"
+          },
+          {
+            value: "Material Rent",
+            label: "Material Rent",
+            id: "",
+            sNo: "5"
+          },
+          {
+            value: "Subhash Kumar - Kunnur",
+            label: "Subhash Kumar - Kunnur",
+            id: "6",
+            sNo: "6"
+          }
+        ];
+
+        // Combine backend data with predefined options
+        const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
+        setSiteOptions(combinedSiteOptions);
       } catch (error) {
         console.error("Fetch error: ", error);
+
+        // Fallback: if API fails, still show predefined options
+        const predefinedSiteOptions = [
+          {
+            value: "Mason Advance",
+            label: "Mason Advance",
+            id: "1",
+            sNo: "1"
+          },
+          {
+            value: "Material Advance",
+            label: "Material Advance",
+            id: "2",
+            sNo: "2"
+          },
+          {
+            value: "Weekly Advance",
+            label: "Weekly Advance",
+            id: "3",
+            sNo: "3"
+          },
+          {
+            value: "Excess Advance",
+            label: "Excess Advance",
+            id: "4",
+            sNo: "4"
+          },
+          {
+            value: "Material Rent",
+            label: "Material Rent",
+            id: "",
+            sNo: "5"
+          },
+          {
+            value: "Subhash Kumar - Kunnur",
+            label: "Subhash Kumar - Kunnur",
+            id: "6",
+            sNo: "6"
+          }
+        ];
+        setSiteOptions(predefinedSiteOptions);
       }
     };
     fetchSites();
@@ -427,7 +516,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     contractorOptions.find(c => c.id === id)?.value || "";
 
   const getSiteName = (id) =>
-    siteOptions.find(s => s.id === id)?.value || "";
+    siteOptions.find(s => String(s.id) === String(id))?.value || "";
   const filteredData = advanceData.filter((entry) => {
     // Date filter (exact match since it's type="date")
     if (selectDate) {
@@ -511,10 +600,51 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
         if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
       });
+    } else {
+      // Default sorting: Most recent entries first (by date descending)
+      sortableData.sort((a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        return dateB - dateA; // Descending order (newest first)
+      });
     }
 
     return sortableData;
   }, [filteredData, sortConfig]);
+
+  // Pagination logic
+  const totalPages = Math.ceil(sortedData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentData = sortedData.slice(startIndex, endIndex);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectDate, selectContractororVendorName, selectProjectName, selectTransfer, selectType, selectMode]);
+
+  // Pagination handlers
+  const goToPage = (page) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleItemsPerPageChange = (e) => {
+    const newItemsPerPage = parseInt(e.target.value);
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when changing items per page
+  };
 
   // Calculate totals
   const totalAdvance = advanceData.reduce(
@@ -612,31 +742,17 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
         return base;
       };
 
-      // 👇 If type changed, we need to assign a new entry_no
-      let newEntryNo = editFormData.entry_no;
-      if (isTypeChanged) {
-        const res = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/getAll');
-        const data = await res.json();
-
-        const allEntryNos = data
-          .map(item => parseInt(item.entry_no))
-          .filter(num => !isNaN(num));
-
-        const maxEntryNo = Math.max(...allEntryNos, 0);
-        newEntryNo = (maxEntryNo + 1).toString(); // 💡 Ensure it's a string if backend expects that
-      }
-
       if (isTypeChanged) {
         if (editFormData.type === 'Transfer') {
           const amountValue = parseFloat(editFormData.amount) || 0;
 
           const firstPayload = createPayload({
-            entry_no: newEntryNo,
+            entry_no: editFormData.entry_no,
             amount: -Math.abs(amountValue)
           }, 'Transfer');
 
           const secondPayload = createPayload({
-            entry_no: newEntryNo,
+            entry_no: editFormData.entry_no,
             project_id: parseInt(editFormData.transfer_site_id),
             transfer_site_id: originalRecord?.project_id || 0,
             amount: Math.abs(amountValue)
@@ -660,7 +776,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
           ]);
         } else {
           // New Advance or Refund entry with new entry_no
-          const payload = createPayload({ entry_no: newEntryNo });
+          const payload = createPayload({ entry_no: editFormData.entry_no });
           console.log('Creating new entry after type change:', payload);
 
           const saveRes = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
@@ -676,7 +792,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
         // Clear the original entry
         const clearedData = {
           entry_no: editFormData.entry_no,
-          date: '',
+          date: editFormData.date,
           amount: '',
           project_id: '',
           vendor_id: '',
@@ -760,6 +876,17 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     }
   };
 
+  // 👉 Compute totals
+  const totals = currentData.reduce(
+    (acc, entry) => {
+      acc.amount += Number(entry.amount) || 0;
+      acc.bill_amount += Number(entry.bill_amount) || 0;
+      acc.refund_amount += Number(entry.refund_amount) || 0;
+      return acc;
+    },
+    { amount: 0, bill_amount: 0, refund_amount: 0 }
+  );
+
   return (
     <body>
       <div className='w-[1750px] h-[150px] bg-white ml-10 text-left flex gap-5'>
@@ -767,7 +894,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
           <label className='block mb-2 font-semibold'>Advance Amount</label>
           <input
             className='w-[183px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
-            value={totalAdvance.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+            value={`₹${totalAdvance.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
             readOnly
           />
         </div>
@@ -775,14 +902,14 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
           <label className='block mb-2 font-semibold'>Bill Amount</label>
           <input
             className='w-[183px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
-            value={totalBill.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+            value={`₹${totalBill.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
             readOnly
           />
         </div>
         <div className='ml-8 pt-8'>
           <label className='block mb-2 font-semibold'>Transfer Amount </label>
           <input
-            value={totalTransfer.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+            value={`₹${totalTransfer.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
             readOnly
             className='w-[220px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2' />
         </div>
@@ -790,7 +917,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
           <label className='block mb-2 font-semibold'>Refund Amount</label>
           <input
             className='w-[220px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
-            value={totalRefund.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+            value={`₹${totalRefund.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
             readOnly
           />
         </div>
@@ -862,326 +989,411 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
             <button className='text-sm text-[#BF9853] hover:underline font-bold'>Print</button>
           </div>
         </div>
-        <div
-          ref={scrollRef}
-          className='border-l-8 border-l-[#BF9853] rounded-lg ml-5 overflow-auto mr-5'
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-        >
-          <table className=" w-[1735px] border-collapse mb-4">
-            <thead>
-              <tr className="bg-[#FAF6ED]">
-                <th
-                  className="pt-2 pl-3 w-40 font-bold text-left cursor-pointer"
-                  onClick={() => handleSort('date')}
-                >
-                  Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                </th>
-                <th
-                  className="px-2 w-[220px] font-bold text-left cursor-pointer"
-                  onClick={() => handleSort('vendor')}
-                >
-                  Contractor/Vendor {sortConfig.key === 'vendor' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                </th>
-                <th
-                  className="px-2 w-[300px] font-bold text-left cursor-pointer"
-                  onClick={() => handleSort('project')}
-                >
-                  Project Name {sortConfig.key === 'project' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                </th>
-                <th
-                  className="px-2 w-[350px] font-bold text-left cursor-pointer"
-                  onClick={() => handleSort('transfer')}
-                >
-                  Transfer Site {sortConfig.key === 'transfer' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                </th>
-                <th className="px-2 w-[100px] font-bold text-left">Advance</th>
-                <th className="px-2 w-[170px] font-bold text-left">Bill Payment</th>
-                <th className="px-2 w-[120px] font-bold text-left">Refund</th>
-                <th
-                  className="px-2 w-[120px] font-bold text-left cursor-pointer"
-                  onClick={() => handleSort('type')}
-                >
-                  Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                </th>
-                <th className="px-2 w-[120px] font-bold text-left">Description</th>
-                <th
-                  className="px-2 w-[220px] font-bold text-left cursor-pointer"
-                  onClick={() => handleSort('mode')}
-                >
-                  Mode {sortConfig.key === 'mode' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                </th>
-                <th className="px-2 w-[220px] font-bold text-left">Attached file</th>
-                <th className="px-2 w-[80px] font-bold text-left">E.No</th>
-                <th className="px-2 w-[120px] font-bold text-left">Activity</th>
-              </tr>
-              {showFilters && (
-                <tr>
-                  <th>
-                    <input
-                      type="date"
-                      value={selectDate}
-                      onChange={(e) => setSelectDate(e.target.value)}
-                      className="p-1  mt-3 mb-3 rounded-md bg-transparent w-32 border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
-                      placeholder="Search Date..."
-                    />
+        <div className='border-l-8 border-l-[#BF9853] rounded-lg ml-5 mr-5'>
+          {/* Single Table with Scrollable Container */}
+          <div
+            ref={scrollRef}
+            className='overflow-auto max-h-[600px]'
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+          >
+            <table className="w-[1985px] border-collapse">
+              <thead className="sticky top-0 z-10 bg-white ">
+                <tr className="bg-[#FAF6ED]">
+                  <th
+                    className="pt-2 pl-3 w-60 font-bold text-left cursor-pointer hover:bg-gray-200"
+                    onClick={() => handleSort('date')}
+                  >
+                    Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th>
-                    <Select
-                      options={combinedOptions}
-                      value={selectContractororVendorName ? { value: selectContractororVendorName, label: selectContractororVendorName } : null}
-                      onChange={(opt) => setSelectContractororVendorName(opt ? opt.value : "")}
-                      className=" w-72 focus:outline-none"
-                      placeholder="Search Contractor/Ven..."
-                      isSearchable
-                      isClearable
-                      styles={{
-                        control: (provided, state) => ({
-                          ...provided,
-                          backgroundColor: 'transparent',
-                          borderWidth: '3px',
-                          borderColor: state.isFocused
-                            ? 'rgba(191, 152, 83, 0.2)'
-                            : 'rgba(191, 152, 83, 0.2)',
-                          borderRadius: '6px',
-                          boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                          '&:hover': {
-                            borderColor: 'rgba(191, 152, 83, 0.2)',
-                          },
-                        }),
-                        placeholder: (provided) => ({
-                          ...provided,
-                          color: '#999',
-                          textAlign: 'left',
-                        }),
-                        menu: (provided) => ({
-                          ...provided,
-                          zIndex: 9,
-                        }),
-                        option: (provided, state) => ({
-                          ...provided,
-                          textAlign: 'left',
-                          fontWeight: 'normal',
-                          fontSize: '15px',
-                          backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                          color: 'black',
-                        }),
-                        singleValue: (provided) => ({
-                          ...provided,
-                          textAlign: 'left',
-                          fontWeight: 'normal',
-                          color: 'black',
-                        }),
-                      }}
-                    />
+                  <th
+                    className="px-2 w-[320px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                    onClick={() => handleSort('vendor')}
+                  >
+                    Contractor/Vendor {sortConfig.key === 'vendor' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th>
-                    <Select
-                      options={siteOptions}
-                      value={selectProjectName ? { value: selectProjectName, label: selectProjectName } : null}
-                      onChange={(opt) => setSelectProjectName(opt ? opt.value : "")}
-                      className="w-72 focus:outline-none"
-                      placeholder="Search Project Name..."
-                      isSearchable
-                      isClearable
-                      styles={{
-                        control: (provided, state) => ({
-                          ...provided,
-                          backgroundColor: 'transparent',
-                          borderWidth: '3px',
-                          borderColor: state.isFocused
-                            ? 'rgba(191, 152, 83, 0.2)'
-                            : 'rgba(191, 152, 83, 0.2)',
-                          borderRadius: '6px',
-                          boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                          '&:hover': {
-                            borderColor: 'rgba(191, 152, 83, 0.2)',
-                          },
-                        }),
-                        placeholder: (provided) => ({
-                          ...provided,
-                          color: '#999',
-                          textAlign: 'left',
-                        }),
-                        menu: (provided) => ({
-                          ...provided,
-                          zIndex: 9,
-                        }),
-                        option: (provided, state) => ({
-                          ...provided,
-                          textAlign: 'left',
-                          fontWeight: 'normal',
-                          fontSize: '15px',
-                          backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                          color: 'black',
-                        }),
-                        singleValue: (provided) => ({
-                          ...provided,
-                          textAlign: 'left',
-                          fontWeight: 'normal',
-                          color: 'black',
-                        }),
-                      }}
-                    />
+                  <th
+                    className="px-2 w-[400px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                    onClick={() => handleSort('project')}
+                  >
+                    Project Name {sortConfig.key === 'project' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th>
-                    <Select
-                      options={siteOptions}
-                      value={selectTransfer ? { value: selectTransfer, label: selectTransfer } : null}
-                      onChange={(opt) => setSelectTransfer(opt ? opt.value : "")}
-                      className="w-72 focus:outline-none"
-                      placeholder="Search Transfer Site..."
-                      isSearchable
-                      isClearable
-                      styles={{
-                        control: (provided, state) => ({
-                          ...provided,
-                          backgroundColor: 'transparent',
-                          borderWidth: '3px',
-                          borderColor: state.isFocused
-                            ? 'rgba(191, 152, 83, 0.2)'
-                            : 'rgba(191, 152, 83, 0.2)',
-                          borderRadius: '6px',
-                          boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                          '&:hover': {
-                            borderColor: 'rgba(191, 152, 83, 0.2)',
-                          },
-                        }),
-                        placeholder: (provided) => ({
-                          ...provided,
-                          color: '#999',
-                          textAlign: 'left',
-                        }),
-                        menu: (provided) => ({
-                          ...provided,
-                          zIndex: 9,
-                        }),
-                        option: (provided, state) => ({
-                          ...provided,
-                          textAlign: 'left',
-                          fontWeight: 'normal',
-                          fontSize: '15px',
-                          backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                          color: 'black',
-                        }),
-                        singleValue: (provided) => ({
-                          ...provided,
-                          textAlign: 'left',
-                          fontWeight: 'normal',
-                          color: 'black',
-                        }),
-                      }}
-                    />
+                  <th
+                    className="px-2 w-[450px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                    onClick={() => handleSort('transfer')}
+                  >
+                    Transfer Site {sortConfig.key === 'transfer' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th></th>
-                  <th></th>
-                  <th></th>
-                  <th>
-                    <select
-                      value={selectType}
-                      onChange={(e) => setSelectType(e.target.value)}
-                      className="p-1  mt-3 mb-3 rounded-md bg-transparent w-44 font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
-                      placeholder="Search Type..."
-                    >
-                      <option value=''>Select Type...</option>
-                      <option value='Advance'>Advance</option>
-                      <option value='Bill Settlement'>Bill Settlement</option>
-                      <option value='Refund'>Refund</option>
-                      <option value='Transfer'>Transfer</option>
-                    </select>
+                  <th className="px-2 w-[100px] font-bold text-left">Advance</th>
+                  <th className="px-2 w-[170px] font-bold text-left">Bill Payment</th>
+                  <th className="px-2 w-[120px] font-bold text-left">Refund</th>
+                  <th
+                    className="px-2 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                    onClick={() => handleSort('type')}
+                  >
+                    Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th></th>
-                  <th>
-                    <select
-                      value={selectMode}
-                      onChange={(e) => setSelectMode(e.target.value)}
-                      className="p-1  mt-3 mb-3 rounded-md bg-transparent w-32 font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
-                      placeholder="Search Mode..."
-                    >
-                      <option value=''>Select</option>
-                      <option value='Cash'>Cash</option>
-                      <option value='GPay'>GPay</option>
-                      <option value='Net Banking'>Net Banking</option>
-                    </select>
+                  <th className="px-2 w-[120px] font-bold text-left">Description</th>
+                  <th
+                    className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                    onClick={() => handleSort('mode')}
+                  >
+                    Mode {sortConfig.key === 'mode' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th></th>
-                  <th></th>
-                  <th></th>
+                  <th className="px-2 w-[220px] font-bold text-left">Attached file</th>
+                  <th className="px-2 w-[80px] font-bold text-left">E.No</th>
+                  <th className="px-2 w-[120px] font-bold text-left">Activity</th>
                 </tr>
-              )}
-            </thead>
-            <tbody>
-              {sortedData.length > 0 ? (
-                sortedData.map((entry) => (
-                  <tr key={entry.id} className="odd:bg-white even:bg-[#FAF6ED]">
-                    <td className="text-sm text-left p-2 w-40 font-semibold">{formatDateOnly(entry.date)}</td>
-
-                    {/* Show vendor name if vendor_id exists, else contractor name */}
-                    <td className="text-sm text-left w-[150px] font-semibold">
-                      {entry.vendor_id
-                        ? getVendorName(entry.vendor_id)
-                        : getContractorName(entry.contractor_id)}
-                    </td>
-
-                    {/* Project name */}
-                    <td className="text-sm text-left w-[250px] font-semibold">
-                      {getSiteName(entry.project_id)}
-                    </td>
-
-                    {/* Transfer site name */}
-                    <td className="text-sm text-left font-semibold">
-                      {getSiteName(entry.transfer_site_id)}
-                    </td>
-
-                    {/* Amount */}
-                    <td className="text-sm text-left pl-2 font-semibold">
-                      {entry.amount != null && entry.amount !== ""
-                        ? Number(entry.amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
-                        : ""}
-                    </td>
-
-                    {/* Bill Amount */}
-                    <td className="text-sm text-left pl-2 font-semibold">
-                      {entry.bill_amount != null && entry.bill_amount !== ""
-                        ? Number(entry.bill_amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
-                        : ""}
-                    </td>
-
-                    {/* Refund Amount */}
-                    <td className="text-sm text-left pl-2 font-semibold">
-                      {entry.refund_amount != null && entry.refund_amount !== ""
-                        ? Number(entry.refund_amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
-                        : ""}
-                    </td>
-                    <td className="text-sm text-left font-semibold">{entry.type}</td>
-                    <td className="text-sm text-left font-semibold">{entry.description}</td>
-                    <td className="text-sm text-left font-semibold">{entry.payment_mode}</td>
-                    <td></td>
-                    <td className="text-sm text-left pl-3 font-semibold">{entry.entry_no}</td>
-                    <td className="flex py-2">
-                      <button className="rounded-full transition duration-200 ml-2 mr-3">
-                        <img
-                          src={edit}
-                          onClick={() => handleEditClick(entry)}
-                          alt="Edit"
-                          className=" w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200 "
-                        />
-                      </button>
+                {showFilters && (
+                  <tr className="bg-white border-b border-gray-200">
+                    <th className="pt-2 pb-2">
+                      <input
+                        type="date"
+                        value={selectDate}
+                        onChange={(e) => setSelectDate(e.target.value)}
+                        className="p-1 rounded-md bg-transparent -ml-6 w-32 border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
+                        placeholder="Search Date..."
+                      />
+                    </th>
+                    <th className="pt-2 pb-2">
+                      <Select
+                        options={combinedOptions}
+                        value={selectContractororVendorName ? { value: selectContractororVendorName, label: selectContractororVendorName } : null}
+                        onChange={(opt) => setSelectContractororVendorName(opt ? opt.value : "")}
+                        className="text-xs focus:outline-none w-[180px]"
+                        placeholder="Contractor/Ven..."
+                        isSearchable
+                        isClearable
+                        styles={{
+                          control: (provided, state) => ({
+                            ...provided,
+                            backgroundColor: 'transparent',
+                            borderWidth: '3px',
+                            borderColor: state.isFocused
+                              ? 'rgba(191, 152, 83, 0.2)'
+                              : 'rgba(191, 152, 83, 0.2)',
+                            borderRadius: '6px',
+                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                            '&:hover': {
+                              borderColor: 'rgba(191, 152, 83, 0.2)',
+                            },
+                          }),
+                          placeholder: (provided) => ({
+                            ...provided,
+                            color: '#999',
+                            textAlign: 'left',
+                          }),
+                          menu: (provided) => ({
+                            ...provided,
+                            zIndex: 9,
+                          }),
+                          option: (provided, state) => ({
+                            ...provided,
+                            textAlign: 'left',
+                            fontWeight: 'normal',
+                            fontSize: '15px',
+                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                            color: 'black',
+                          }),
+                          singleValue: (provided) => ({
+                            ...provided,
+                            textAlign: 'left',
+                            fontWeight: 'normal',
+                            color: 'black',
+                          }),
+                        }}
+                      />
+                    </th>
+                    <th className="pt-2 pb-2">
+                      <Select
+                        options={siteOptions}
+                        value={selectProjectName ? { value: selectProjectName, label: selectProjectName } : null}
+                        onChange={(opt) => setSelectProjectName(opt ? opt.value : "")}
+                        className="focus:outline-none text-xs"
+                        placeholder="Project Name..."
+                        isSearchable
+                        isClearable
+                        styles={{
+                          control: (provided, state) => ({
+                            ...provided,
+                            backgroundColor: 'transparent',
+                            borderWidth: '3px',
+                            borderColor: state.isFocused
+                              ? 'rgba(191, 152, 83, 0.2)'
+                              : 'rgba(191, 152, 83, 0.2)',
+                            borderRadius: '6px',
+                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                            '&:hover': {
+                              borderColor: 'rgba(191, 152, 83, 0.2)',
+                            },
+                          }),
+                          placeholder: (provided) => ({
+                            ...provided,
+                            color: '#999',
+                            textAlign: 'left',
+                          }),
+                          menu: (provided) => ({
+                            ...provided,
+                            zIndex: 9,
+                          }),
+                          option: (provided, state) => ({
+                            ...provided,
+                            textAlign: 'left',
+                            fontWeight: 'normal',
+                            fontSize: '15px',
+                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                            color: 'black',
+                          }),
+                          singleValue: (provided) => ({
+                            ...provided,
+                            textAlign: 'left',
+                            fontWeight: 'normal',
+                            color: 'black',
+                          }),
+                        }}
+                      />
+                    </th>
+                    <th className="pt-2 pb-2">
+                      <Select
+                        options={siteOptions}
+                        value={selectTransfer ? { value: selectTransfer, label: selectTransfer } : null}
+                        onChange={(opt) => setSelectTransfer(opt ? opt.value : "")}
+                        className="focus:outline-none text-xs"
+                        placeholder="Transfer Site..."
+                        isSearchable
+                        isClearable
+                        styles={{
+                          control: (provided, state) => ({
+                            ...provided,
+                            backgroundColor: 'transparent',
+                            borderWidth: '3px',
+                            borderColor: state.isFocused
+                              ? 'rgba(191, 152, 83, 0.2)'
+                              : 'rgba(191, 152, 83, 0.2)',
+                            borderRadius: '6px',
+                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                            '&:hover': {
+                              borderColor: 'rgba(191, 152, 83, 0.2)',
+                            },
+                          }),
+                          placeholder: (provided) => ({
+                            ...provided,
+                            color: '#999',
+                            textAlign: 'left',
+                          }),
+                          menu: (provided) => ({
+                            ...provided,
+                            zIndex: 9,
+                          }),
+                          option: (provided, state) => ({
+                            ...provided,
+                            textAlign: 'left',
+                            fontWeight: 'normal',
+                            fontSize: '15px',
+                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                            color: 'black',
+                          }),
+                          singleValue: (provided) => ({
+                            ...provided,
+                            textAlign: 'left',
+                            fontWeight: 'normal',
+                            color: 'black',
+                          }),
+                        }}
+                      />
+                    </th>
+                    <th className='w-[100px] pt-2 pb-2'>{totals.amount.toLocaleString("en-IN")}</th>
+                    <th className='w-[180px] pt-2 pb-2'>{totals.bill_amount.toLocaleString("en-IN")}</th>
+                    <th className='w-[120px] pt-2 pb-2'>{totals.refund_amount.toLocaleString("en-IN")}</th>
+                    <th className="pt-2 pb-2">
+                      <select
+                        value={selectType}
+                        onChange={(e) => setSelectType(e.target.value)}
+                        className="p-1 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                        placeholder="Type..."
+                      >
+                        <option value=''>Select Type...</option>
+                        <option value='Advance'>Advance</option>
+                        <option value='Bill Settlement'>Bill Settlement</option>
+                        <option value='Refund'>Refund</option>
+                        <option value='Transfer'>Transfer</option>
+                      </select>
+                    </th>
+                    <th className="pt-2 pb-2"></th>
+                    <th className="pt-2 pb-2">
+                      <select
+                        value={selectMode}
+                        onChange={(e) => setSelectMode(e.target.value)}
+                        className="p-1 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                        placeholder="Mode..."
+                      >
+                        <option value=''>Select</option>
+                        <option value='Cash'>Cash</option>
+                        <option value='GPay'>GPay</option>
+                        <option value='Net Banking'>Net Banking</option>
+                      </select>
+                    </th>
+                    <th className='w-[220px] pt-2 pb-2'></th>
+                    <th className='w-[80px] pt-2 pb-2'></th>
+                    <th className='w-[120px] pt-2 pb-2'></th>
+                  </tr>
+                )}
+              </thead>
+              <tbody>
+                {currentData.length > 0 ? (
+                  currentData.map((entry) => (
+                    <tr key={entry.id} className="odd:bg-white even:bg-[#FAF6ED]">
+                      <td className="text-sm text-left p-2 w-40 font-semibold">{formatDateOnly(entry.date)}</td>
+                      {/* Show vendor name if vendor_id exists, else contractor name */}
+                      <td className="text-sm text-left w-[150px] font-semibold">
+                        {entry.vendor_id
+                          ? getVendorName(entry.vendor_id)
+                          : getContractorName(entry.contractor_id)}
+                      </td>
+                      {/* Project name */}
+                      <td className="text-sm text-left w-[250px] font-semibold">
+                        {getSiteName(entry.project_id)}
+                      </td>
+                      {/* Transfer site name */}
+                      <td className="text-sm text-left font-semibold">
+                        {getSiteName(entry.transfer_site_id)}
+                      </td>
+                      {/* Amount */}
+                      <td className="text-sm text-left pl-2 font-semibold">
+                        {entry.amount != null && entry.amount !== ""
+                          ? Number(entry.amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })
+                          : ""}
+                      </td>
+                      {/* Bill Amount */}
+                      <td className="text-sm text-left pl-2 font-semibold">
+                        {entry.bill_amount != null && entry.bill_amount !== ""
+                          ? Number(entry.bill_amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })
+                          : ""}
+                      </td>
+                      {/* Refund Amount */}
+                      <td className="text-sm text-left pl-2 font-semibold">
+                        {entry.refund_amount != null && entry.refund_amount !== ""
+                          ? Number(entry.refund_amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })
+                          : ""}
+                      </td>
+                      <td className="text-sm text-left font-semibold">{entry.type}</td>
+                      <td className="text-sm text-left font-semibold">{entry.description}</td>
+                      <td className="text-sm text-left font-semibold">{entry.payment_mode}</td>
+                      <td></td>
+                      <td className="text-sm text-left pl-3 font-semibold">{entry.entry_no}</td>
+                      <td className="flex py-2">
+                        <button className="rounded-full transition duration-200 ml-2 mr-3">
+                          <img
+                            src={edit}
+                            onClick={() => handleEditClick(entry)}
+                            alt="Edit"
+                            className=" w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200 "
+                          />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td className="p-2 text-center text-sm text-gray-400" colSpan={12}>
+                      No data available
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td className="p-2 text-center text-sm text-gray-400" colSpan={12}>
-                    No data available
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
+        {/* Pagination Controls */}
+        {sortedData.length > 0 && (
+          <div className="flex flex-col sm:flex-row justify-between items-center px-5 py-4 bg-white border-t border-gray-200">
+            {/* Items per page selector */}
+            <div className="flex items-center space-x-2 mb-4 sm:mb-0">
+              <label className="text-sm font-medium text-gray-700">Show:</label>
+              <select
+                value={itemsPerPage}
+                onChange={handleItemsPerPageChange}
+                className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent"
+              >
+
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={200}>200</option>
+                <option value={300}>300</option>
+                <option value={400}>400</option>
+                <option value={500}>500</option>
+                <option value={600}>600</option>
+                <option value={700}>700</option>
+                <option value={800}>800</option>
+                <option value={900}>900</option>
+                <option value={1000}>1000</option>
+              </select>
+              <span className="text-sm text-gray-700">entries</span>
+            </div>
+
+            {/* Page info */}
+            <div className="text-sm text-gray-700 mb-4 sm:mb-0">
+              Showing {startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries
+            </div>
+
+            {/* Pagination buttons */}
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={goToPreviousPage}
+                disabled={currentPage === 1}
+                className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === 1
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
+                  }`}
+              >
+                Previous
+              </button>
+
+              {/* Page numbers */}
+              <div className="flex items-center space-x-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => goToPage(pageNum)}
+                      className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === pageNum
+                        ? 'bg-[#BF9853] text-white'
+                        : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
+                        }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={goToNextPage}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === totalPages
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
+                  }`}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+
         {isEditModalOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
             <div className="bg-white p-6 rounded-lg w-[700px]">
@@ -1192,7 +1404,28 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                   <label className='font-semibold text-[#E4572E]'>Select Type</label>
                   <select
                     value={editFormData.type}
-                    onChange={(e) => setEditFormData({ ...editFormData, type: e.target.value })}
+                    onChange={(e) => {
+                      const newType = e.target.value;
+                      setEditFormData(prev => {
+                        const updated = { ...prev, type: newType };
+                        // Reset amount fields based on new type
+                        if (newType === 'Refund') {
+                          updated.amount = '';
+                          updated.bill_amount = '';
+                        } else if (newType === 'Advance') {
+                          updated.refund_amount = '';
+                          updated.bill_amount = '';
+                        } else if (newType === 'Bill Settlement') {
+                          updated.refund_amount = '';
+                          updated.amount = '';
+                        } else if (newType === 'Transfer') {
+                          updated.refund_amount = '';
+                          updated.bill_amount = '';
+                          updated.payment_mode = '';
+                        }
+                        return updated;
+                      });
+                    }}
                     className='w-[163px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
                   >
                     <option value=''>Select Type...</option>
@@ -1261,7 +1494,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                         : 'Amount Given'}
                   </label>
                   <input
-                    value={formatWithCommas(editFormData.amount)}
+                    value={editFormData.type === 'Refund' ? formatWithCommas(editFormData.refund_amount) : formatWithCommas(editFormData.amount)}
                     onChange={handleAmountChange}
                     className='w-[263px] h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
                   />

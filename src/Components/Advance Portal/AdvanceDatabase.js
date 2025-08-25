@@ -20,18 +20,25 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   const [selectDatabaseDate, setSelectDatabaseDate] = useState('');
   const [selectDatabaseContractororVendorName, setSelectDatabaseContractororVendorName] = useState('');
   const [selectDatabaseProjectName, setSelectDatabaseProjectName] = useState('');
-  const [showAdvancePortalModal, setShowAdvancePortalModal] = useState(false);
-  const [file, setFile] = useState(null);
-  const [advancePortalAudits, setAdvancePortalAudits] = useState([]);
   const [selectDatabaseTransfer, setSelectDatabaseTransfer] = useState('');
   const [selectDatabaseType, setSelectDatabaseType] = useState('');
   const [selectDatabaseMode, setSelectDatabaseMode] = useState('');
+  const [showAdvancePortalModal, setShowAdvancePortalModal] = useState(false);
+  const [file, setFile] = useState(null);
+  const [advancePortalAudits, setAdvancePortalAudits] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editFormData, setEditFormData] = useState({});
   const [editingId, setEditingId] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [isOpen, setIsOpen] = useState(false);
+  const [selectedOption, setSelectedOption] = useState(null);
+  const [overallAdvance, setOverallAdvance] = useState(0);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(50);
+
   const scrollRef = useRef(null);
   const isDragging = useRef(false);
   const start = useRef({ x: 0, y: 0 });
@@ -39,6 +46,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   const velocity = useRef({ x: 0, y: 0 });
   const animationFrame = useRef(null);
   const lastMove = useRef({ time: 0, x: 0, y: 0 });
+
   const handleMouseDown = (e) => {
     if (!scrollRef.current) return;
     isDragging.current = true;
@@ -109,17 +117,16 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   useEffect(() => {
     return () => cancelMomentum();
   }, []);
-  const [selectedOption, setSelectedOption] = useState(null);
-  const [overallAdvance, setOverallAdvance] = useState(0);
+
   const handleAmountChange = (e) => {
     const rawValue = e.target.value.replace(/,/g, "");
 
     if (!isNaN(rawValue)) {
       setEditFormData(prev => {
         if (prev.type === "Refund") {
-          return { ...prev, refund_amount: rawValue };
+          return { ...prev, refund_amount: rawValue, amount: '' };
         } else {
-          return { ...prev, amount: rawValue };
+          return { ...prev, amount: rawValue, refund_amount: '' };
         }
       });
     }
@@ -194,26 +201,28 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   }, []);
   useEffect(() => { setCombinedOptions([...vendorOptions, ...contractorOptions]); }, [vendorOptions, contractorOptions]);
   const exportPDF = () => {
-    const doc = new jsPDF("l", "pt", "a4");
+    const doc = new jsPDF("l", "pt", "a4"); // landscape mode
 
-    // Table Column Headers (same order as your table)
-    const tableColumn = [
-      "Time Stamp",
-      "Date",
-      "Contractor/Vendor",
-      "Project Name",
-      "Transfer Site",
-      "Advance",
-      "Bill Payment",
-      "Refund",
-      "Type",
-      "Description",
-      "Mode",
-      "E.No"
+    // Table column headers (same order as your table)
+    const headers = [
+      [
+        "Time Stamp",
+        "Date",
+        "Contractor/Vendor",
+        "Project Name",
+        "Transfer Site",
+        "Advance",
+        "Bill Payment",
+        "Refund",
+        "Type",
+        "Description",
+        "Mode",
+        "E.No"
+      ]
     ];
 
-    // Table Rows
-    const tableRows = sortedData.map(entry => [
+    // Map only filtered table data
+    const rows = sortedData.map((entry) => [
       formatDate(entry.timestamp),
       formatDateOnly(entry.date),
       entry.vendor_id
@@ -230,10 +239,10 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       entry.refund_amount != null && entry.refund_amount !== ""
         ? Number(entry.refund_amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
         : "",
-      entry.type || "",
-      entry.description || "",
-      entry.payment_mode || "",
-      entry.entry_no || ""
+      entry.type,
+      entry.description,
+      entry.payment_mode,
+      entry.entry_no
     ]);
 
     // Add Title
@@ -242,8 +251,8 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
 
     // AutoTable
     doc.autoTable({
-      head: [tableColumn],
-      body: tableRows,
+      head: [headers[0]],
+      body: rows,
       startY: 30,
       styles: {
         fontSize: 8,
@@ -342,10 +351,93 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
           id: item.id,
           sNo: item.siteNo
         }));
-        console.log("Formatted site options:", formattedData);
-        setSiteOptions(formattedData);
+
+        // Add predefined site options with IDs 001, 002, 003, 004
+        const predefinedSiteOptions = [
+          {
+            value: "Mason Advance",
+            label: "Mason Advance",
+            id: "1",
+            sNo: "1"
+          },
+          {
+            value: "Material Advance",
+            label: "Material Advance",
+            id: "2",
+            sNo: "2"
+          },
+          {
+            value: "Weekly Advance",
+            label: "Weekly Advance",
+            id: "3",
+            sNo: "3"
+          },
+          {
+            value: "Excess Advance",
+            label: "Excess Advance",
+            id: "4",
+            sNo: "4"
+          },
+          {
+            value: "Material Rent",
+            label: "Material Rent",
+            id: "",
+            sNo: "5"
+          },
+          {
+            value: "Subhash Kumar - Kunnur",
+            label: "Subhash Kumar - Kunnur",
+            id: "6",
+            sNo: "6"
+          }
+        ];
+
+        // Combine backend data with predefined options
+        const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
+        setSiteOptions(combinedSiteOptions);
       } catch (error) {
         console.error("Fetch error: ", error);
+        
+        // Fallback: if API fails, still show predefined options
+        const predefinedSiteOptions = [
+          {
+            value: "Mason Advance",
+            label: "Mason Advance",
+            id: "1",
+            sNo: "1"
+          },
+          {
+            value: "Material Advance",
+            label: "Material Advance",
+            id: "2",
+            sNo: "2"
+          },
+          {
+            value: "Weekly Advance",
+            label: "Weekly Advance",
+            id: "3",
+            sNo: "3"
+          },
+          {
+            value: "Excess Advance",
+            label: "Excess Advance",
+            id: "4",
+            sNo: "4"
+          },
+          {
+            value: "Material Rent",
+            label: "Material Rent",
+            id: "",
+            sNo: "5"
+          },
+          {
+            value: "Subhash Kumar - Kunnur",
+            label: "Subhash Kumar - Kunnur",
+            id: "6",
+            sNo: "6"
+          }
+        ];
+        setSiteOptions(predefinedSiteOptions);
       }
     };
     fetchSites();
@@ -433,7 +525,8 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
     contractorOptions.find(c => c.id === id)?.value || "";
 
   const getSiteName = (id) =>
-    siteOptions.find(s => s.id === id)?.value || "";
+  siteOptions.find(s => String(s.id) === String(id))?.value || "";
+
   const filteredData = advanceData.filter((entry) => {
     // Timestamp range filter
     if (selectTimeStampDate && selectDatabaseDate) {
@@ -446,7 +539,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       endDate.setHours(23, 59, 59, 999);
 
       // Parse entry timestamp
-      const entryTimestamp = new Date(entry.timestamp);
+      const entryTimestamp = new Date(entry.date);
 
       if (entryTimestamp < startDate || entryTimestamp > endDate) {
         return false;
@@ -545,10 +638,51 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
         if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
       });
+    } else {
+      // Default sorting: Most recent entries first (by date descending)
+      sortableData.sort((a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        return dateB - dateA; // Descending order (newest first)
+      });
     }
 
     return sortableData;
   }, [filteredData, sortConfig]);
+
+  // Pagination logic
+  const totalPages = Math.ceil(sortedData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentData = sortedData.slice(startIndex, endIndex);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectTimeStampDate, selectDatabaseDate, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseMode]);
+
+  // Pagination handlers
+  const goToPage = (page) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleItemsPerPageChange = (e) => {
+    const newItemsPerPage = parseInt(e.target.value);
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when changing items per page
+  };
 
   const handleChange = async (selected) => {
     setSelectedOption(selected);
@@ -673,6 +807,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
           case 'Transfer':
             base.bill_amount = '';
             base.refund_amount = '';
+            base.payment_mode = '';
             break;
           default:
             break;
@@ -700,12 +835,12 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
           const amountValue = parseFloat(editFormData.amount) || 0;
 
           const firstPayload = createPayload({
-            entry_no: newEntryNo,
+            entry_no: editFormData.entry_no,
             amount: -Math.abs(amountValue)
           }, 'Transfer');
 
           const secondPayload = createPayload({
-            entry_no: newEntryNo,
+            entry_no: editFormData.entry_no,
             project_id: parseInt(editFormData.transfer_site_id),
             transfer_site_id: originalRecord?.project_id || 0,
             amount: Math.abs(amountValue)
@@ -729,7 +864,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
           ]);
         } else {
           // New Advance or Refund entry with new entry_no
-          const payload = createPayload({ entry_no: newEntryNo });
+          const payload = createPayload({ entry_no: editFormData.entry_no });
           console.log('Creating new entry after type change:', payload);
 
           const saveRes = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
@@ -745,7 +880,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
         // Clear the original entry
         const clearedData = {
           entry_no: editFormData.entry_no,
-          date: '',
+          date: editFormData.date,
           amount: '',
           project_id: '',
           vendor_id: '',
@@ -843,7 +978,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
 
       const clearedData = {
         entry_no: entryNo, // Preserve entry_no
-        date: '',
+        date: record.date,
         amount: '',
         project_id: '',
         vendor_id: '',
@@ -899,6 +1034,15 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       console.error('Delete error:', error);
     }
   };
+  const totals = currentData.reduce(
+    (acc, entry) => {
+      acc.amount += Number(entry.amount) || 0;
+      acc.bill_amount += Number(entry.bill_amount) || 0;
+      acc.refund_amount += Number(entry.refund_amount) || 0;
+      return acc;
+    },
+    { amount: 0, bill_amount: 0, refund_amount: 0 }
+  );
   return (
     <body>
       <div className='w-[1750px] h-[150px] bg-white ml-10 text-left flex gap-5'>
@@ -908,7 +1052,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
               <label className='block mb-2 font-semibold'>Advance Amount</label>
               <input
                 className='w-[183px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
-                value={totalAdvance.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                value={`₹${totalAdvance.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
                 readOnly
               />
             </div>
@@ -916,14 +1060,14 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
               <label className='block mb-2 font-semibold'>Bill Amount</label>
               <input
                 className='w-[183px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
-                value={totalBill.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                value={`₹${totalBill.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
                 readOnly
               />
             </div>
             <div className='ml-8 pt-8'>
               <label className='block mb-2 font-semibold'>Transfer Amount </label>
               <input
-                value={totalTransfer.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                value={`₹${totalTransfer.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
                 readOnly
                 className='w-[220px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2' />
             </div>
@@ -931,7 +1075,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
               <label className='block mb-2 font-semibold'>Refund Amount</label>
               <input
                 className='w-[220px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
-                value={totalRefund.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                value={`₹${totalRefund.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
                 readOnly
               />
             </div>
@@ -1009,335 +1153,448 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
           </div>
         </div>
 
-        <div
-          ref={scrollRef}
-          className='border-l-8 border-l-[#BF9853] rounded-lg ml-5 overflow-x-auto mr-5'
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-        >
-          <table className=" w-[1865px] border-collapse mb-4">
-            <thead>
-              <tr className="bg-[#FAF6ED]">
-                <th className="py-2 pl-3 w-[340px] font-bold text-left">Time Stamp</th>
-                <th className="pt-2 pl-3 w-[320px] font-bold text-left">Date</th>
-                <th className="px-2 w-[220px] font-bold text-left">Contractor/Vendor</th>
-                <th className="px-2 w-[450px] font-bold text-left">Project Name</th>
-                <th className="px-2 w-[450px] font-bold text-left">Transfer Site </th>
-                <th className="px-2 w-[100px] font-bold text-left">Advance</th>
-                <th className="px-2 w-[180px] font-bold text-left">Bill Payment</th>
-                <th className="px-2 w-[120px] font-bold text-left">Refund</th>
-                <th className="px-2 w-[120px] font-bold text-left">Type</th>
-                <th className="px-2 w-[120px] font-bold text-left">Description</th>
-                <th className="px-2 w-[220px] font-bold text-left">Mode</th>
-                <th className="px-2 w-[220px] font-bold text-left">Attached file</th>
-                <th className="px-2 w-[80px] font-bold text-left">E.No</th>
-                <th className="px-2 w-[120px] font-bold text-left">Activity</th>
-              </tr>
-              {showFilters && (
-                <tr>
-                  <th>
-                    <input
-                      type="date"
-                      value={selectTimeStampDate}
-                      onChange={(e) => setSelectTimeStampDate(e.target.value)}
-                      className="p-1  mt-3 mb-3 rounded-md bg-transparent w-32 border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
-                      placeholder="Search Date..."
-                    />
+        <div className='border-l-8 border-l-[#BF9853] rounded-lg ml-5 mr-5'>
+          {/* Single Table with Scrollable Container */}
+          <div
+            ref={scrollRef}
+            className='overflow-auto max-h-[600px]'
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+          >
+            <table className="w-[1865px] border-collapse">
+              <thead className="sticky top-0 z-10 bg-white">
+                <tr className="bg-[#FAF6ED]">
+                  <th className="py-2 pl-3 w-[340px] font-bold text-left">Time Stamp</th>
+                  <th
+                    className="pt-2 pl-3 w-[320px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                    onClick={() => handleSort('date')}
+                  >
+                    Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th>
-                    <input
-                      type="date"
-                      value={selectDatabaseDate}
-                      onChange={(e) => setSelectDatabaseDate(e.target.value)}
-                      className="p-1  mt-3 mb-3 rounded-md bg-transparent w-32 border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
-                      placeholder="Search Date..."
-                    />
+                  <th
+                    className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                    onClick={() => handleSort('vendor')}
+                  >
+                    Contractor/Vendor {sortConfig.key === 'vendor' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th>
-                    <Select
-                      options={combinedOptions}
-                      value={selectDatabaseContractororVendorName ? { value: selectDatabaseContractororVendorName, label: selectDatabaseContractororVendorName } : null}
-                      onChange={(opt) => setSelectDatabaseContractororVendorName(opt ? opt.value : "")}
-                      className=" w-72 focus:outline-none"
-                      placeholder="Search Contractor/Ven..."
-                      isSearchable
-                      isClearable
-                      styles={{
-                        control: (provided, state) => ({
-                          ...provided,
-                          backgroundColor: 'transparent',
-                          borderWidth: '3px',
-                          borderColor: state.isFocused
-                            ? 'rgba(191, 152, 83, 0.2)'
-                            : 'rgba(191, 152, 83, 0.2)',
-                          borderRadius: '6px',
-                          boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                          '&:hover': {
-                            borderColor: 'rgba(191, 152, 83, 0.2)',
-                          },
-                        }),
-                        placeholder: (provided) => ({
-                          ...provided,
-                          color: '#999',
-                          textAlign: 'left',
-                        }),
-                        menu: (provided) => ({
-                          ...provided,
-                          zIndex: 9,
-                        }),
-                        option: (provided, state) => ({
-                          ...provided,
-                          textAlign: 'left',
-                          fontWeight: 'normal',
-                          fontSize: '15px',
-                          backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                          color: 'black',
-                        }),
-                        singleValue: (provided) => ({
-                          ...provided,
-                          textAlign: 'left',
-                          fontWeight: 'normal',
-                          color: 'black',
-                        }),
-                      }}
-                    />
+                  <th
+                    className="px-2 w-[450px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                    onClick={() => handleSort('project')}
+                  >
+                    Project Name {sortConfig.key === 'project' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th>
-                    <Select
-                      options={siteOptions}
-                      value={selectDatabaseProjectName ? { value: selectDatabaseProjectName, label: selectDatabaseProjectName } : null}
-                      onChange={(opt) => setSelectDatabaseProjectName(opt ? opt.value : "")}
-                      className="w-72 focus:outline-none"
-                      placeholder="Search Project Name..."
-                      isSearchable
-                      isClearable
-                      styles={{
-                        control: (provided, state) => ({
-                          ...provided,
-                          backgroundColor: 'transparent',
-                          borderWidth: '3px',
-                          borderColor: state.isFocused
-                            ? 'rgba(191, 152, 83, 0.2)'
-                            : 'rgba(191, 152, 83, 0.2)',
-                          borderRadius: '6px',
-                          boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                          '&:hover': {
-                            borderColor: 'rgba(191, 152, 83, 0.2)',
-                          },
-                        }),
-                        placeholder: (provided) => ({
-                          ...provided,
-                          color: '#999',
-                          textAlign: 'left',
-                        }),
-                        menu: (provided) => ({
-                          ...provided,
-                          zIndex: 9,
-                        }),
-                        option: (provided, state) => ({
-                          ...provided,
-                          textAlign: 'left',
-                          fontWeight: 'normal',
-                          fontSize: '15px',
-                          backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                          color: 'black',
-                        }),
-                        singleValue: (provided) => ({
-                          ...provided,
-                          textAlign: 'left',
-                          fontWeight: 'normal',
-                          color: 'black',
-                        }),
-                      }}
-                    />
+                  <th
+                    className="px-2 w-[450px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                    onClick={() => handleSort('transfer')}
+                  >
+                    Transfer Site {sortConfig.key === 'transfer' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th>
-                    <Select
-                      options={siteOptions}
-                      value={selectDatabaseTransfer ? { value: selectDatabaseTransfer, label: selectDatabaseTransfer } : null}
-                      onChange={(opt) => setSelectDatabaseTransfer(opt ? opt.value : "")}
-                      className="w-72 focus:outline-none"
-                      placeholder="Search Transfer Site..."
-                      isSearchable
-                      isClearable
-                      styles={{
-                        control: (provided, state) => ({
-                          ...provided,
-                          backgroundColor: 'transparent',
-                          borderWidth: '3px',
-                          borderColor: state.isFocused
-                            ? 'rgba(191, 152, 83, 0.2)'
-                            : 'rgba(191, 152, 83, 0.2)',
-                          borderRadius: '6px',
-                          boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                          '&:hover': {
-                            borderColor: 'rgba(191, 152, 83, 0.2)',
-                          },
-                        }),
-                        placeholder: (provided) => ({
-                          ...provided,
-                          color: '#999',
-                          textAlign: 'left',
-                        }),
-                        menu: (provided) => ({
-                          ...provided,
-                          zIndex: 9,
-                        }),
-                        option: (provided, state) => ({
-                          ...provided,
-                          textAlign: 'left',
-                          fontWeight: 'normal',
-                          fontSize: '15px',
-                          backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                          color: 'black',
-                        }),
-                        singleValue: (provided) => ({
-                          ...provided,
-                          textAlign: 'left',
-                          fontWeight: 'normal',
-                          color: 'black',
-                        }),
-                      }}
-                    />
+                  <th className="px-2 w-[100px] font-bold text-left">Advance</th>
+                  <th className="px-2 w-[180px] font-bold text-left whitespace-nowrap">Bill Payment</th>
+                  <th className="px-2 w-[120px] font-bold text-left">Refund</th>
+                  <th
+                    className="px-2 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                    onClick={() => handleSort('type')}
+                  >
+                    Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th></th>
-                  <th></th>
-                  <th></th>
-                  <th>
-                    <select
-                      value={selectDatabaseType}
-                      onChange={(e) => setSelectDatabaseType(e.target.value)}
-                      className="p-1  mt-3 mb-3 rounded-md bg-transparent w-44 font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
-                      placeholder="Search Type..."
-                    >
-                      <option value=''>Select Type...</option>
-                      <option value='Advance'>Advance</option>
-                      <option value='Bill Settlement'>Bill Settlement</option>
-                      <option value='Refund'>Refund</option>
-                      <option value='Transfer'>Transfer</option>
-                    </select>
+                  <th className="px-2 w-[120px] font-bold text-left">Description</th>
+                  <th
+                    className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                    onClick={() => handleSort('mode')}
+                  >
+                    Mode {sortConfig.key === 'mode' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th></th>
-                  <th>
-                    <select
-                      value={selectDatabaseMode}
-                      onChange={(e) => setSelectDatabaseMode(e.target.value)}
-                      className="p-1  mt-3 mb-3 rounded-md bg-transparent w-32 font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
-                      placeholder="Search Mode..."
-                    >
-                      <option value=''>Select</option>
-                      <option value='Cash'>Cash</option>
-                      <option value='GPay'>GPay</option>
-                      <option value='Net Banking'>Net Banking</option>
-                    </select>
-                  </th>
-                  <th></th>
-                  <th></th>
-                  <th></th>
+                  <th className="px-2 w-[220px] font-bold text-left whitespace-nowrap">Attached file</th>
+                  <th className="px-2 w-[80px] font-bold text-left">E.No</th>
+                  <th className="px-2 w-[120px] font-bold text-left">Activity</th>
                 </tr>
-              )}
-            </thead>
-            <tbody>
-              {sortedData.length > 0 ? (
-                sortedData.map((entry) => (
-                  <tr key={entry.id} className="odd:bg-white even:bg-[#FAF6ED]">
-                    <td className="text-sm text-left p-2 font-semibold">{formatDate(entry.timestamp)}</td>
-                    <td className="text-sm text-left p-2 w-[220px] font-semibold">{formatDateOnly(entry.date)}</td>
+                {showFilters && (
+                  <tr className="bg-white border-b border-gray-200">
+                    <th className="">
+                      <input
+                        type="date"
+                        value={selectTimeStampDate}
+                        onChange={(e) => setSelectTimeStampDate(e.target.value)}
+                        className="p-1  mt-3 mb-3 rounded-md bg-transparent w-[170px] border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
+                        placeholder="Date..."
+                      />
+                    </th>
+                    <th className="">
+                      <input
+                        type="date"
+                        value={selectDatabaseDate}
+                        onChange={(e) => setSelectDatabaseDate(e.target.value)}
+                        className="p-1  mt-3 mb-3 rounded-md bg-transparent w-32 border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
+                        placeholder="Date..."
+                      />
+                    </th>
+                    <th className="">
+                      <Select
+                        options={combinedOptions}
+                        value={selectDatabaseContractororVendorName ? { value: selectDatabaseContractororVendorName, label: selectDatabaseContractororVendorName } : null}
+                        onChange={(opt) => setSelectDatabaseContractororVendorName(opt ? opt.value : "")}
+                        className=" w-[220px] focus:outline-none text-xs"
+                        placeholder="Contractor/Ven..."
+                        isSearchable
+                        isClearable
+                        styles={{
+                          control: (provided, state) => ({
+                            ...provided,
+                            backgroundColor: 'transparent',
+                            borderWidth: '3px',
+                            borderColor: state.isFocused
+                              ? 'rgba(191, 152, 83, 0.2)'
+                              : 'rgba(191, 152, 83, 0.2)',
+                            borderRadius: '6px',
+                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                            '&:hover': {
+                              borderColor: 'rgba(191, 152, 83, 0.2)',
+                            },
+                          }),
+                          placeholder: (provided) => ({
+                            ...provided,
+                            color: '#999',
+                            textAlign: 'left',
+                          }),
+                          menu: (provided) => ({
+                            ...provided,
+                            zIndex: 9,
+                          }),
+                          option: (provided, state) => ({
+                            ...provided,
+                            textAlign: 'left',
+                            fontWeight: 'normal',
+                            fontSize: '15px',
+                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                            color: 'black',
+                          }),
+                          singleValue: (provided) => ({
+                            ...provided,
+                            textAlign: 'left',
+                            fontWeight: 'normal',
+                            color: 'black',
+                          }),
+                        }}
+                      />
+                    </th>
+                    <th className="">
+                      <Select
+                        options={siteOptions}
+                        value={selectDatabaseProjectName ? { value: selectDatabaseProjectName, label: selectDatabaseProjectName } : null}
+                        onChange={(opt) => setSelectDatabaseProjectName(opt ? opt.value : "")}
+                        className="w-[250px] focus:outline-none text-xs"
+                        placeholder="Project Name..."
+                        isSearchable
+                        isClearable
+                        styles={{
+                          control: (provided, state) => ({
+                            ...provided,
+                            backgroundColor: 'transparent',
+                            borderWidth: '3px',
+                            borderColor: state.isFocused
+                              ? 'rgba(191, 152, 83, 0.2)'
+                              : 'rgba(191, 152, 83, 0.2)',
+                            borderRadius: '6px',
+                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                            '&:hover': {
+                              borderColor: 'rgba(191, 152, 83, 0.2)',
+                            },
+                          }),
+                          placeholder: (provided) => ({
+                            ...provided,
+                            color: '#999',
+                            textAlign: 'left',
+                          }),
+                          menu: (provided) => ({
+                            ...provided,
+                            zIndex: 9,
+                          }),
+                          option: (provided, state) => ({
+                            ...provided,
+                            textAlign: 'left',
+                            fontWeight: 'normal',
+                            fontSize: '15px',
+                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                            color: 'black',
+                          }),
+                          singleValue: (provided) => ({
+                            ...provided,
+                            textAlign: 'left',
+                            fontWeight: 'normal',
+                            color: 'black',
+                          }),
+                        }}
+                      />
+                    </th>
+                    <th className="">
+                      <Select
+                        options={siteOptions}
+                        value={selectDatabaseTransfer ? { value: selectDatabaseTransfer, label: selectDatabaseTransfer } : null}
+                        onChange={(opt) => setSelectDatabaseTransfer(opt ? opt.value : "")}
+                        className="w-[250px] focus:outline-none text-xs"
+                        placeholder="Transfer Site..."
+                        isSearchable
+                        isClearable
+                        styles={{
+                          control: (provided, state) => ({
+                            ...provided,
+                            backgroundColor: 'transparent',
+                            borderWidth: '3px',
+                            borderColor: state.isFocused
+                              ? 'rgba(191, 152, 83, 0.2)'
+                              : 'rgba(191, 152, 83, 0.2)',
+                            borderRadius: '6px',
+                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                            '&:hover': {
+                              borderColor: 'rgba(191, 152, 83, 0.2)',
+                            },
+                          }),
+                          placeholder: (provided) => ({
+                            ...provided,
+                            color: '#999',
+                            textAlign: 'left',
+                          }),
+                          menu: (provided) => ({
+                            ...provided,
+                            zIndex: 9,
+                          }),
+                          option: (provided, state) => ({
+                            ...provided,
+                            textAlign: 'left',
+                            fontWeight: 'normal',
+                            fontSize: '15px',
+                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                            color: 'black',
+                          }),
+                          singleValue: (provided) => ({
+                            ...provided,
+                            textAlign: 'left',
+                            fontWeight: 'normal',
+                            color: 'black',
+                          }),
+                        }}
+                      />
+                    </th>
+                    <th className='w-[100px] pt-2 pb-2'>{totals.amount.toLocaleString("en-IN")}</th>
+                    <th className='w-[180px] pt-2 pb-2'>{totals.bill_amount.toLocaleString("en-IN")}</th>
+                    <th className='w-[120px] pt-2 pb-2'>{totals.refund_amount.toLocaleString("en-IN")}</th>
+                    <th className="">
+                      <select
+                        value={selectDatabaseType}
+                        onChange={(e) => setSelectDatabaseType(e.target.value)}
+                        className="p-1  mt-3 mb-3 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                        placeholder="Type..."
+                      >
+                        <option value=''>Select Type...</option>
+                        <option value='Advance'>Advance</option>
+                        <option value='Bill Settlement'>Bill Settlement</option>
+                        <option value='Refund'>Refund</option>
+                        <option value='Transfer'>Transfer</option>
+                      </select>
+                    </th>
+                    <th className='w-[120px]'></th>
+                    <th className="">
+                      <select
+                        value={selectDatabaseMode}
+                        onChange={(e) => setSelectDatabaseMode(e.target.value)}
+                        className="p-1  mt-3 mb-3 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                        placeholder="Mode..."
+                      >
+                        <option value=''>Select</option>
+                        <option value='Cash'>Cash</option>
+                        <option value='GPay'>GPay</option>
+                        <option value='Net Banking'>Net Banking</option>
+                      </select>
+                    </th>
+                    <th className='w-[220px] '></th>
+                    <th className='w-[80px] '></th>
+                    <th className='w-[120px] '></th>
+                  </tr>
+                )}
+              </thead>
+              <tbody>
+                {currentData.length > 0 ? (
+                  currentData.map((entry) => (
+                    <tr key={entry.id} className="odd:bg-white even:bg-[#FAF6ED]">
+                      <td className="text-sm text-left p-2 w-[340px] font-semibold">{formatDate(entry.timestamp)}</td>
+                      <td className="text-sm text-left p-2 w-[220px] font-semibold">{formatDateOnly(entry.date)}</td>
 
-                    {/* Show vendor name if vendor_id exists, else contractor name */}
-                    <td className="text-sm text-left font-semibold">
-                      {entry.vendor_id
-                        ? getVendorName(entry.vendor_id)
-                        : getContractorName(entry.contractor_id)}
-                    </td>
+                      {/* Show vendor name if vendor_id exists, else contractor name */}
+                      <td className="text-sm text-left font-semibold">
+                        {entry.vendor_id
+                          ? getVendorName(entry.vendor_id)
+                          : getContractorName(entry.contractor_id)}
+                      </td>
 
-                    {/* Project name */}
-                    <td className="text-sm text-left w-60 font-semibold">
-                      {getSiteName(entry.project_id)}
-                    </td>
+                      {/* Project name */}
+                      <td className="text-sm text-left w-60 font-semibold">
+                        {getSiteName(entry.project_id)}
+                      </td>
 
-                    {/* Transfer site name */}
-                    <td className="text-sm text-left font-semibold">
-                      {getSiteName(entry.transfer_site_id)}
-                    </td>
+                      {/* Transfer site name */}
+                      <td className="text-sm text-left font-semibold">
+                        {getSiteName(entry.transfer_site_id)}
+                      </td>
 
-                    {/* Amount */}
-                    <td className="text-sm text-left pl-2 font-semibold">
-                      {entry.amount != null && entry.amount !== ""
-                        ? Number(entry.amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
-                        : ""}
-                    </td>
+                      {/* Amount */}
+                      <td className="text-sm text-left pl-2 font-semibold">
+                        {entry.amount != null && entry.amount !== ""
+                          ? Number(entry.amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })
+                          : ""}
+                      </td>
 
-                    {/* Bill Amount */}
-                    <td className="text-sm text-left pl-2 font-semibold">
-                      {entry.bill_amount != null && entry.bill_amount !== ""
-                        ? Number(entry.bill_amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
-                        : ""}
-                    </td>
+                      {/* Bill Amount */}
+                      <td className="text-sm text-left pl-2 font-semibold">
+                        {entry.bill_amount != null && entry.bill_amount !== ""
+                          ? Number(entry.bill_amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })
+                          : ""}
+                      </td>
 
-                    {/* Refund Amount */}
-                    <td className="text-sm text-left pl-2 font-semibold">
-                      {entry.refund_amount != null && entry.refund_amount !== ""
-                        ? Number(entry.refund_amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
-                        : ""}
-                    </td>
-                    <td className="text-sm text-left font-semibold">{entry.type}</td>
-                    <td className="text-sm text-left font-semibold">{entry.description}</td>
-                    <td className="text-sm text-left font-semibold">{entry.payment_mode}</td>
-                    <td></td>
-                    <td className="text-sm text-left pl-3 font-semibold">{entry.entry_no}</td>
-                    <td className=" flex w-[100px] justify-between py-2">
-                      <button className="rounded-full transition duration-200 ml-2 mr-3">
-                        <img
-                          src={edit}
-                          onClick={() => handleEditClick(entry)}
-                          alt="Edit"
-                          className=" w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200 "
-                        />
-                      </button>
-                      <button className=" -ml-5 -mr-2">
-                        <img
-                          src={remove}
-                          alt='delete'
-                          onClick={() => handleDelete(entry.advancePortalId)}
-                          className='  w-4 h-4 transform hover:scale-110 hover:brightness-110 transition duration-200 ' />
-                      </button>
-                      <button onClick={() => fetchAuditDetails(entry.advancePortalId)} className="rounded-full transition duration-200 -mr-1" >
-                        <img
-                          src={history}
-                          alt="history"
-                          className=" w-4 h-5 transform hover:scale-110 hover:brightness-110 transition duration-200 "
-                        />
-                      </button>
+                      {/* Refund Amount */}
+                      <td className="text-sm text-left pl-2 font-semibold">
+                        {entry.refund_amount != null && entry.refund_amount !== ""
+                          ? Number(entry.refund_amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })
+                          : ""}
+                      </td>
+                      <td className="text-sm text-left font-semibold">{entry.type}</td>
+                      <td className="text-sm text-left font-semibold">{entry.description}</td>
+                      <td className="text-sm text-left font-semibold">{entry.payment_mode}</td>
+                      <td></td>
+                      <td className="text-sm text-left pl-3 font-semibold">{entry.entry_no}</td>
+                      <td className=" flex w-[100px] justify-between py-2">
+                        <button className="rounded-full transition duration-200 ml-2 mr-3">
+                          <img
+                            src={edit}
+                            onClick={() => handleEditClick(entry)}
+                            alt="Edit"
+                            className=" w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200 "
+                          />
+                        </button>
+                        <button className=" -ml-5 -mr-2">
+                          <img
+                            src={remove}
+                            alt='delete'
+                            onClick={() => handleDelete(entry.advancePortalId)}
+                            className='  w-4 h-4 transform hover:scale-110 hover:brightness-110 transition duration-200 ' />
+                        </button>
+                        <button onClick={() => fetchAuditDetails(entry.advancePortalId)} className="rounded-full transition duration-200 -mr-1" >
+                          <img
+                            src={history}
+                            alt="history"
+                            className=" w-4 h-5 transform hover:scale-110 hover:brightness-110 transition duration-200 "
+                          />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td className="p-2 text-center text-sm text-gray-400" colSpan={14}>
+                      No data available
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td className="p-2 text-center text-sm text-gray-400" colSpan={12}>
-                    No data available
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
+        {/* Pagination Controls */}
+        {sortedData.length > 0 && (
+          <div className="flex flex-col sm:flex-row justify-between items-center px-5 py-4 bg-white border-t border-gray-200">
+            {/* Items per page selector */}
+            <div className="flex items-center space-x-2 mb-4 sm:mb-0">
+              <label className="text-sm font-medium text-gray-700">Show:</label>
+              <select
+                value={itemsPerPage}
+                onChange={handleItemsPerPageChange}
+                className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent"
+              >
+                
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={200}>200</option>
+                <option value={300}>300</option>
+                <option value={400}>400</option>
+                <option value={500}>500</option>
+                <option value={600}>600</option>
+                <option value={700}>700</option>
+                <option value={800}>800</option>
+                <option value={900}>900</option>
+                <option value={1000}>1000</option>
+              </select>
+              <span className="text-sm text-gray-700">entries</span>
+            </div>
+            {/* Page info */}
+            <div className="text-sm text-gray-700 mb-4 sm:mb-0">
+              Showing {startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries
+            </div>
+            {/* Pagination buttons */}
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={goToPreviousPage}
+                disabled={currentPage === 1}
+                className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === 1
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
+                  }`}
+              >
+                Previous
+              </button>
+              {/* Page numbers */}
+              <div className="flex items-center space-x-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => goToPage(pageNum)}
+                      className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === pageNum
+                          ? 'bg-[#BF9853] text-white'
+                          : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
+                        }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={goToNextPage}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === totalPages
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
+                  }`}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
         {isOpen && (
           <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
             <div className="bg-white rounded-md shadow-lg p-6 w-[400px]">
               <h2 className="text-lg font-semibold mb-4 text-center">
                 Upload Bulk Data
               </h2>
-
               <input
                 type="file"
                 accept=".csv, .sql"
                 onChange={handleFileChange}
                 className="border p-2 w-full mb-4"
               />
-
               <div className="flex justify-center gap-4">
                 <button
                   onClick={handleUpload}
@@ -1366,7 +1623,28 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                   <label className='font-semibold text-[#E4572E]'>Select Type</label>
                   <select
                     value={editFormData.type}
-                    onChange={(e) => setEditFormData({ ...editFormData, type: e.target.value })}
+                    onChange={(e) => {
+                      const newType = e.target.value;
+                      setEditFormData(prev => {
+                        const updated = { ...prev, type: newType };
+                        // Reset amount fields based on new type
+                        if (newType === 'Refund') {
+                          updated.amount = '';
+                          updated.bill_amount = '';
+                        } else if (newType === 'Advance') {
+                          updated.refund_amount = '';
+                          updated.bill_amount = '';
+                        } else if (newType === 'Bill Settlement') {
+                          updated.refund_amount = '';
+                          updated.amount = '';
+                        } else if (newType === 'Transfer') {
+                          updated.refund_amount = '';
+                          updated.bill_amount = '';
+                          updated.payment_mode = '';
+                        }
+                        return updated;
+                      });
+                    }}
                     className='w-[163px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
                   >
                     <option value=''>Select Type...</option>
@@ -1435,7 +1713,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                         : 'Amount Given'}
                   </label>
                   <input
-                    value={formatWithCommas(editFormData.amount)}
+                    value={editFormData.type === 'Refund' ? formatWithCommas(editFormData.refund_amount) : formatWithCommas(editFormData.amount)}
                     onChange={handleAmountChange}
                     className='w-[263px] h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
                   />
@@ -1583,7 +1861,7 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
   };
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-      <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1400px] mx-4 p-4">
+      <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1800px] mx-4 p-2">
         <div className="flex justify-between items-center mt-4 ml-7 mr-7">
           <h2 className="text-xl font-bold">History</h2>
           <button onClick={onClose}>

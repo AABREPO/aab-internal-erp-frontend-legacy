@@ -24,6 +24,7 @@ const History = ({ username, userRoles = [] }) => {
     const [projectId, setProjectId] = useState('');
     const [selectedWeek, setSelectedWeek] = useState("");
     const [editingRowId, setEditingRowId] = useState('');
+    const [employeeOptions, setEmployeeOptions] = useState([]);
     const [editingPaymentId, setEditingPaymentId] = useState('');
     const [showWeeklyPaymentExpensesModal, setShowWeeklyPaymentExpensesModal] = useState(false);
     const [weeklyPaymentExpensesAudits, setWeeklyPaymentExpensesAudits] = useState([]);
@@ -51,24 +52,38 @@ const History = ({ username, userRoles = [] }) => {
         };
     }
     const formatDateOnly = (dateString) => {
-        const date = new Date(dateString);
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}-${month}-${year}`;
+        if (!dateString) return "";
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return "";
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}-${month}-${year}`;
+        } catch (error) {
+            console.error("Error formatting date:", error);
+            return "";
+        }
     };
     const formatDate = (dateString) => {
-        const date = new Date(dateString);
-        date.setMinutes(date.getMinutes());
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        let hours = date.getHours();
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        hours = hours % 12;
-        hours = hours ? String(hours).padStart(2, '0') : '12';
-        return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+        if (!dateString) return "";
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return "";
+            date.setMinutes(date.getMinutes());
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            let hours = date.getHours();
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? String(hours).padStart(2, '0') : '12';
+            return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+        } catch (error) {
+            console.error("Error formatting date:", error);
+            return "";
+        }
     };
     useEffect(() => {
         fetchWeeklyType();
@@ -115,6 +130,34 @@ const History = ({ username, userRoles = [] }) => {
         fetchVendorNames();
     }, []);
     useEffect(() => {
+        const fetchEmployeeDetails = async () => {
+            try {
+                const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
+                    method: "GET",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                });
+                if (!response.ok) {
+                    throw new Error("Network response was not ok: " + response.statusText);
+                }
+                const data = await response.json();
+                const formattedData = data.map(item => ({
+                    value: item.employee_name,
+                    label: item.employee_name,
+                    id: item.id,
+                    type: "Employee",
+                }));
+
+                setEmployeeOptions(formattedData);
+            } catch (error) {
+                console.error("Fetch error: ", error);
+            }
+        };
+        fetchEmployeeDetails();
+    }, []);
+    useEffect(() => {
         const fetchContractorNames = async () => {
             try {
                 const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
@@ -141,7 +184,7 @@ const History = ({ username, userRoles = [] }) => {
         };
         fetchContractorNames();
     }, []);
-    useEffect(() => { setCombinedOptions([...vendorOptions, ...contractorOptions]); }, [vendorOptions, contractorOptions]);
+    useEffect(() => { setCombinedOptions([...vendorOptions, ...contractorOptions, ...employeeOptions]); }, [vendorOptions, contractorOptions, employeeOptions]);
     useEffect(() => {
         const fetchSites = async () => {
             try {
@@ -162,7 +205,59 @@ const History = ({ username, userRoles = [] }) => {
                     id: item.id,
                     sNo: item.siteNo
                 }));
-                setSiteOptions(formattedData);
+                const predefinedSiteOptions = [
+                    {
+                        value: "Mason Advance",
+                        label: "Mason Advance",
+                        id: 1,
+                        sNo: "1"
+                    },
+                    {
+                        value: "Material Advance",
+                        label: "Material Advance",
+                        id: 2,
+                        sNo: "2"
+                    },
+                    {
+                        value: "Weekly Advance",
+                        label: "Weekly Advance",
+                        id: 3,
+                        sNo: "3"
+                    },
+                    {
+                        value: "Excess Advance",
+                        label: "Excess Advance",
+                        id: 4,
+                        sNo: "4"
+                    },
+                    {
+                        value: "Material Rent",
+                        label: "Material Rent",
+                        id: 5,
+                        sNo: "5"
+                    },
+                    {
+                        value: "Subhash Kumar - Kunnur",
+                        label: "Subhash Kumar - Kunnur",
+                        id: 6,
+                        sNo: "6"
+                    },
+                    {
+                        value: "Summary Bill",
+                        label: "Summary Bill",
+                        id: 7,
+                        sNo: "7"
+                    },
+                    {
+                        value: "Daily Wage",
+                        label: "Daily Wage",
+                        id: 8,
+                        sNo: "8"
+                    }
+                ];
+                // Combine backend data with predefined options
+                const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
+                setSiteOptions(combinedSiteOptions);
             } catch (error) {
                 console.error("Fetch error: ", error);
             }
@@ -368,23 +463,35 @@ const History = ({ username, userRoles = [] }) => {
         return { start: ISOweekStart, end: ISOweekEnd };
     }
     const generatePDF = () => {
+        // Safety check for selectedWeek
+        if (!selectedWeek) {
+            alert("Please select a week before generating the PDF.");
+            return;
+        }
         const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
         const pageWidth = doc.internal.pageSize.getWidth();
-
         const year = new Date().getFullYear();
-        const { start, end } = getWeekStartEnd(year, Number(selectedWeek));
+        const weekDates = getWeekStartEnd(year, Number(selectedWeek));
+        // Safety check for valid dates
+        if (!weekDates || !weekDates.start || !weekDates.end) {
+            alert("Error: Could not calculate week dates. Please try again.");
+            return;
+        }
+        const { start, end } = weekDates;
         const weekStartDate = start.toLocaleDateString("en-GB");
         const weekEndDate = end.toLocaleDateString("en-GB");
-
+        // Safety check for expenses and payments arrays
+        if (!Array.isArray(expenses) || !Array.isArray(payments)) {
+            alert("Error: Data not loaded properly. Please refresh the page and try again.");
+            return;
+        }
         const totalExpenses = expenses.reduce((t, e) => t + Number(e.amount || 0), 0);
         const totalPayments = payments.reduce((t, p) => t + Number(p.amount || 0), 0);
         const balance = totalPayments - totalExpenses;
-
         // ===== FUNCTION TO DRAW HEADER =====
         const drawHeader = (doc) => {
             doc.setFontSize(10);
             doc.setTextColor(0, 0, 0);
-
             // Outer rectangle + lines
             doc.rect(20, 24, 810, 65);
             doc.line(80, 24, 80, 90);
@@ -395,7 +502,6 @@ const History = ({ username, userRoles = [] }) => {
             doc.line(730, 24, 730, 90);
             doc.line(440, 45, 830, 45);
             doc.line(600, 45, 830, 45);
-
             doc.text("PS", 30, 60);
             doc.text(String(selectedWeek || ""), 110, 60);
             doc.setFontSize(14);
@@ -403,42 +509,37 @@ const History = ({ username, userRoles = [] }) => {
             doc.text("WEEKLY PAYMENTS", 180, 60);
             doc.setFont("helvetica", "normal");
             doc.setFontSize(10);
-
-            doc.text(weekStartDate, 460, 40);
-            doc.text(weekEndDate, 530, 40);
-            doc.text(new Date().toLocaleDateString("en-GB"), 500, 68);
-
+            doc.text(String(weekStartDate || ""), 460, 40);
+            doc.text(String(weekEndDate || ""), 530, 40);
+            doc.text(String(new Date().toLocaleDateString("en-GB") || ""), 500, 68);
             doc.setFontSize(12);
             doc.text("EXPENSES", 610, 40);
-            doc.text(totalExpenses.toLocaleString(), 740, 40);
+            doc.text(String(totalExpenses.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"), 740, 40);
             doc.text("BALANCE", 610, 68);
-            doc.text(balance.toLocaleString(), 740, 68);
+            doc.text(String(balance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"), 740, 68);
         };
-
         // Draw header on first page
         drawHeader(doc);
-
         // ===== EXPENSES TABLE =====
         const expensesHeaders = [["SNO", "Date", "Contractor/Vendor", "Site Name", "Type", "Amount", "AC", "C", ""]];
-        const filteredExpenses = expenses.filter(row => row.type !== "Project Advance" && row.type !== "Staff Advance" && row.type !== "Staff Salary");
+        const filteredExpenses = expenses.filter(row => row.type !== "Project Advance" && row.type !== "Staff Advance" && row.type !== "Staff Salary"&& row.type !== "Daily");
         const expensesData = filteredExpenses.map((row, idx) => [
-            idx + 1,
-            formatDateOnly(row.date),
-            combinedOptions.find(opt =>
+            String(idx + 1 || ""),
+            String(row.date ? formatDateOnly(row.date) : ""),
+            String(combinedOptions.find(opt =>
                 (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
-                (opt.type === "Vendor" && opt.id === Number(row.vendor_id))
-            )?.label || "",
-            siteOptions.find(opt => opt.id === Number(row.project_id))?.label || "",
-            row.type,
-            Number(row.amount).toLocaleString(),
+                (opt.type === "Vendor" && opt.id === Number(row.vendor_id))||
+                (opt.type === "Employee" && opt.id === Number(row.employee_id))
+            )?.label || ""),
+            String(siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""),
+            String(row.type || ""),
+            String(Number(row.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
             "", "", ""
         ]);
-
         autoTable(doc, {
             head: expensesHeaders,
             body: expensesData,
-            startY: 90,
-            margin: { left: 20 },
+            margin: { top: 90, left: 20 }, // give space for custom header
             tableWidth: 810,
             theme: "grid",
             styles: {
@@ -455,29 +556,30 @@ const History = ({ username, userRoles = [] }) => {
                 lineWidth: 1.0,
                 fontStyle: 'bold'
             },
-            didDrawPage: () => {
-                drawHeader(doc);
+            didDrawPage: (data) => {
+                drawHeader(doc); // always draw your custom header first
+                // Now re-position autotable after header
+                if (data.pageNumber > 1) {
+                    doc.setFontSize(10); // optional: add page label
+                }
             }
         });
-
         // ===== PAYMENTS TABLE =====
         const paymentsHeaders = [["Date Received", "Amount", "Type"]];
         const paymentsData = payments.map(r => [
-            formatDate(r.created_at),
-            Number(r.amount).toLocaleString(),
-            r.type || ""
+            String(r.created_at ? formatDate(r.created_at) : ""),
+            String(Number(r.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
+            String(r.type || "")
         ]);
         paymentsData.push([
             { content: "TOTAL", styles: { fontStyle: "bold" } },
-            { content: totalPayments.toLocaleString(), styles: { fontStyle: "bold" } },
+            { content: String(totalPayments.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"), styles: { fontStyle: "bold" } },
             { content: "", styles: { fontStyle: "bold" } }
         ]);
-
         // ===== NEW PAGE for remaining tables =====
         doc.addPage();
         drawHeader(doc);
         const baseY = 110;
-
         autoTable(doc, {
             head: paymentsHeaders,
             body: paymentsData,
@@ -492,19 +594,17 @@ const History = ({ username, userRoles = [] }) => {
                 drawHeader(doc);
             }
         });
-
         // ----- HANDOVER DETAILS -----
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
-        doc.text("HANDOVER DETAILS", 22, baseY + 80);
-
+        doc.text("HANDOVER DETAILS", 22, baseY + 160);
         autoTable(doc, {
             head: [["Date Returned", "Amount"]],
             body: [
                 ["", ""],
-                ["RETURNED", balance.toLocaleString()]
+                ["RETURNED", "0"]
             ],
-            startY: baseY + 90,
+            startY: baseY + 170,
             margin: { left: 22 },
             tableWidth: 200,
             theme: "grid",
@@ -515,18 +615,29 @@ const History = ({ username, userRoles = [] }) => {
                 drawHeader(doc);
             }
         });
-
         // ----- EXTRA -----
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
-
+        
+        // Filter for Daily type expenses
+        const dailyExpenses = expenses.filter(expense => expense.type === "Daily");
+        const dailyExpenseData = dailyExpenses.map(expense => [
+            String(expense.date ? formatDateOnly(expense.date) : ""), // Date in first column
+            String(Number(expense.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00") // Amount in second column
+        ]);
+        
+        // Calculate total of daily expenses
+        const dailyExpensesTotal = dailyExpenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
+        
+        // If no daily expenses, show a message
+        if (dailyExpenseData.length === 0) {
+            dailyExpenseData.push(["No Daily Expenses", "0.00"]);
+        }
+        
         autoTable(doc, {
-            head: [["Daily Wage", "Extra B"]],
-            body: [
-                ["Example 1", "123"],
-                ["Example 2", "456"]
-            ],
-            startY: baseY + 100,
+            head: [["Daily Wage", `${dailyExpensesTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]],
+            body: dailyExpenseData,
+            startY: baseY + 150,
             margin: { left: 300 },
             tableWidth: 200,
             theme: "grid",
@@ -537,12 +648,10 @@ const History = ({ username, userRoles = [] }) => {
                 drawHeader(doc);
             }
         });
-
         // ----- SUMMARY -----
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.text("SUMMARY", 300, baseY - 5);
-
         const summaryMap = expenses
             .filter(expense => Number(expense.amount) > 0)
             .reduce((acc, expense) => {
@@ -553,16 +662,14 @@ const History = ({ username, userRoles = [] }) => {
                 acc[type].total += amount;
                 return acc;
             }, {});
-
         const summaryData = Object.entries(summaryMap).map(([type, { count, total }]) => [
-            type,
-            Number(total).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+            String(type || ""),
+            String(Number(total || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
             count
         ]);
-
         autoTable(doc, {
             head: [["Type", "Total"]],
-            body: summaryData.map(r => [r[0], r[1]]),
+            body: summaryData.map(r => [String(r[0] || ""), String(r[1] || "0")]),
             startY: baseY,
             margin: { left: 300 },
             tableWidth: 200,
@@ -575,73 +682,70 @@ const History = ({ username, userRoles = [] }) => {
             },
             didDrawCell: (data) => {
                 // Only for body rows in first column
-                if (data.section === 'body' && data.column.index === 0) {
-                    const count = summaryData[data.row.index][2];  // third element = count
-                    if (count > 0) {
-                        const textX = data.cell.x - 3; // 10pt to the left of table
-                        const textY = data.cell.y + data.cell.height / 2 + 2; // vertical centering
-                        doc.setFontSize(9);
-                        doc.text(String(count), textX, textY, { align: 'right' });
+                if (data.section === 'body' && data.column.index === 0 && data.row && data.row.index !== undefined) {
+                    const rowData = summaryData[data.row.index];
+                    if (rowData && rowData[2] !== undefined) {
+                        const count = rowData[2];  // third element = count
+                        if (count > 0 && data.cell && typeof data.cell.x === 'number' && typeof data.cell.y === 'number' && typeof data.cell.height === 'number') {
+                            const textX = data.cell.x - 3; // 10pt to the left of table
+                            const textY = data.cell.y + data.cell.height / 2 + 2; // vertical centering
+                            doc.setFontSize(9);
+                            doc.text(String(count || ""), textX, textY, { align: 'right' });
+                        }
                     }
                 }
             }
         });
-
         // draw counts outside table
         const summaryTable = doc.lastAutoTable;
-        summaryData.forEach((row, i) => {
-            const count = row[2];
-            if (count > 1) {
-                const rowY = summaryTable.body[i].y + 6;
-                const leftX = summaryTable.settings.margin.left - 15;
-                doc.setFontSize(9);
-                doc.text(String(count), leftX, rowY, { align: "right" });
-            }
-        });
-
+        if (summaryTable && summaryTable.body && Array.isArray(summaryTable.body)) {
+            summaryData.forEach((row, i) => {
+                const count = row[2];
+                if (count > 1 && summaryTable.body[i] && typeof summaryTable.body[i].y === 'number') {
+                    const rowY = summaryTable.body[i].y + 6;
+                    const leftX = (summaryTable.settings && summaryTable.settings.margin && summaryTable.settings.margin.left) ? summaryTable.settings.margin.left - 15 : 285;
+                    doc.setFontSize(9);
+                    doc.text(String(count || ""), leftX, rowY, { align: "right" });
+                }
+            });
+        }
         // ===== SUMMARY TOTAL BOX =====
-        const summaryTotal = summaryData.reduce((acc, row) => acc + Number(row[1].replace(/,/g, "")), 0);
-        const summaryBoxY = doc.lastAutoTable.finalY + 15;
-
+        const summaryTotal = summaryData.reduce((acc, row) => acc + Number(String(row[1] || "0").replace(/,/g, "")), 0);
+        const summaryBoxY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 15 : baseY + 100;
         doc.setFontSize(10);
         doc.setFont("helvetica", "bold");
         doc.rect(300, summaryBoxY - 12, 200, 20);
         doc.text(
-            summaryTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+            String(summaryTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
             445,
             summaryBoxY + 3,
             { align: "right" }
         );
-
         // ===== ADD THREE NEW TABLES WITH FOUR COLUMNS BELOW SUMMARY =====
         const newTableX = 520;  // Right of summary table
         let newTableY = baseY;
-
         // --- Calculate staff advance data ---
         const staffAdvanceEntries = expenses.filter(e => e.type === "Staff Advance");
         const staffAdvanceCount = staffAdvanceEntries.length;
         const staffAdvanceTotal = staffAdvanceEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-
         // First table (Staff Advance Summary)
         const staffAdvanceHead = [[
-            String(staffAdvanceCount),       // count
+            String(staffAdvanceCount || "0"),       // count
             "STAFF ADVANCE",                 // static heading
             "PROJECT NAME",                  // static heading
-            staffAdvanceTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) // total amount
+            String(staffAdvanceTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00") // total amount
         ]];
-
         // Each row will have blank in first column, label in second, project name in third, amount in fourth
         const staffAdvanceBody = staffAdvanceEntries.map(e => [
-            formatDateOnly(e.date), // show date in first column
-            combinedOptions.find(opt =>
+            String(e.date ? formatDateOnly(e.date) : ""), // show date in first column
+            String(combinedOptions.find(opt =>
                 (opt.type === "Contractor" && opt.id === Number(e.contractor_id)) ||
-                (opt.type === "Vendor" && opt.id === Number(e.vendor_id))
-            )?.label || "",
-            siteOptions.find(opt => opt.id === Number(e.project_id))?.label || "",
-            Number(e.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                (opt.type === "Vendor" && opt.id === Number(e.vendor_id))||
+                (opt.type === "Employee" && opt.id === Number(e.employee_id))
+            )?.label || ""),
+            String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
+            String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
         ]);
-
-
         autoTable(doc, {
             head: staffAdvanceHead,
             body: staffAdvanceBody,
@@ -656,33 +760,29 @@ const History = ({ username, userRoles = [] }) => {
                 drawHeader(doc);
             }
         });
-        newTableY = doc.lastAutoTable.finalY + 10;
-
+        newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
         // --- Calculate staff salary data ---
         const staffSalaryEntries = expenses.filter(e => e.type === "Staff Salary");
         const staffSalaryCount = staffSalaryEntries.length;
         const staffSalaryTotal = staffSalaryEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-
         // Second table (Staff Salary Summary)
         const staffSalaryHead = [[
-            String(staffSalaryCount),      // count of Staff Salary entries
+            String(staffSalaryCount || "0"),      // count of Staff Salary entries
             "STAFF SALARY",                // static heading
             "PROJECT NAME",                // static heading
-            staffSalaryTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) // total amount
+            String(staffSalaryTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00") // total amount
         ]];
-
         // Each row: blank first cell, contractor/vendor label second cell, project name third cell, amount fourth cell
         const staffSalaryBody = staffSalaryEntries.map(e => [
-            formatDateOnly(e.date), // show date in first column
-            combinedOptions.find(opt =>
+            String(e.date ? formatDateOnly(e.date) : ""), // show date in first column
+            String(combinedOptions.find(opt =>
                 (opt.type === "Contractor" && opt.id === Number(e.contractor_id)) ||
-                (opt.type === "Vendor" && opt.id === Number(e.vendor_id))
-            )?.label || "",
-            siteOptions.find(opt => opt.id === Number(e.project_id))?.label || "",
-            Number(e.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                (opt.type === "Vendor" && opt.id === Number(e.vendor_id))||
+                (opt.type === "Employee" && opt.id === Number(e.employee_id))
+            )?.label || ""),
+            String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
+            String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
         ]);
-
-
         autoTable(doc, {
             head: staffSalaryHead,
             body: staffSalaryBody,
@@ -697,8 +797,7 @@ const History = ({ username, userRoles = [] }) => {
                 drawHeader(doc);
             }
         });
-        newTableY = doc.lastAutoTable.finalY + 10;
-
+        newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
         // Third table (unchanged - sample data)
         autoTable(doc, {
             head: [["Col1", "Col2", "Col3", "Col4"]],
@@ -717,13 +816,10 @@ const History = ({ username, userRoles = [] }) => {
                 drawHeader(doc);
             }
         });
-        newTableY = doc.lastAutoTable.finalY + 10;
-
+        newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
         doc.save(`weekly-report-${selectedWeek || ""}.pdf`);
     };
     const lastWeekNumber = Math.max(...weeks.map(week => week.number));
-
-    console.log("Last Week Number:", lastWeekNumber);
 
     const saveEditedExpense = async (row) => {
         try {
@@ -853,16 +949,16 @@ const History = ({ username, userRoles = [] }) => {
 
     return (
         <body>
-            <div className='flex  mt-[-29px]'>
+            <div className='flex justify-end mt-[-28px] mr-6'>
                 <button
-                    className=" ml-[1700px] font-semibold text-lg cursor-pointer"
+                    className="font-semibold text-lg cursor-pointer flex items-center gap-2"
                     onClick={generatePDF}
                 >
                     Report
+                    <img className='w-6 h-5' src={download} alt="Download" />
                 </button>
-                <img className='w-6 h-5 mt-1' src={download} />
             </div>
-            <div className='mx-auto w-[1800px] flex gap-8 p-4 pl-8 border-collapse text-left bg-[#FFFFFF] ml-14 mr-6 rounded-md h-[127px]'>
+            <div className='mx-auto w-auto lg:flex gap-8 p-4 pl-8 border-collapse text-left bg-[#FFFFFF] ml-[30px] mr-6 rounded-md lg:h-[127px]'>
                 <div>
                     <h1 className='font-semibold'>Select Week</h1>
                     <div>
@@ -902,8 +998,8 @@ const History = ({ username, userRoles = [] }) => {
                     </select>
                 </div>
             </div>
-            <div className="mt-4 ml-[1440px] ">
-                <h1 className="font-bold ml-40 text-xl">
+            <div className="mt-4 flex justify-end mr-6">
+                <h1 className="font-bold text-xl">
                     Balance: <span style={{ color: "#E4572E" }}>
                         {(
                             payments.reduce((total, row) => total + Number(row.amount || 0), 0) -
@@ -912,20 +1008,19 @@ const History = ({ username, userRoles = [] }) => {
                     </span>
                 </h1>
             </div>
-            <div className="mx-auto w-[1800px] p-6 border-collapse bg-[#FFFFFF] ml-14 mr-6 rounded-md">
-                <div className="flex">
+            <div className="mx-auto w-auto p-6 border-collapse bg-[#FFFFFF] ml-[30px] mr-6 rounded-md">
+                <div className="flex justify-between mb-4 w-[1300px]">
                     <h1 className="font-bold text-xl">PS: <span style={{ color: "#E4572E" }}>{selectedWeek}</span> </h1>
-                    <h1 className="font-bold text-base ml-[950px]">
+                    <h1 className="font-bold text-base">
                         Expenses: <span style={{ color: "#E4572E" }}>
                             {expenses.reduce((total, expense) => total + Number(expense.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}
                         </span>
                     </h1>
                 </div>
-                {/* EXPENSES TABLE */}
-                <div className="flex">
-                    <div className="flex gap-10">
-                        <div className="rounded-lg border-l-8 border-l-[#BF9853]">
-                            <table className="w-auto">
+                <div className="flex gap-6">
+                    <div className="flex-[3]">
+                        <div className="rounded-lg border-l-8 border-l-[#BF9853] w-full overflow-auto">
+                            <table className="w-full min-w-[900px] border-collapse">
                                 <thead>
                                     <tr className="bg-[#FAF6ED] h-12">
                                         <th className="px-4 py-2 text-left">Sl.No</th>
@@ -945,7 +1040,7 @@ const History = ({ username, userRoles = [] }) => {
                                                 <input
                                                     type="date"
                                                     name="date"
-                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 rounded-lg w-[130px] h-[40px] focus:outline-none"
+                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 rounded-lg w-[120px] h-[40px] focus:outline-none"
                                                     value={newExpense.date}
                                                     onChange={handleExpenseChange}
                                                     onKeyDown={handleKeyDown}
@@ -954,12 +1049,13 @@ const History = ({ username, userRoles = [] }) => {
                                             <td className="px-4 py-2">
                                                 <Select
                                                     name="contractor"
-                                                    className="w-[202px]"
+                                                    className="w-[180px]"
                                                     value={
                                                         combinedOptions.find(
                                                             opt =>
                                                                 (opt.type === "Contractor" && opt.id === Number(newExpense.contractor_id)) ||
-                                                                (opt.type === "Vendor" && opt.id === Number(newExpense.vendor_id))
+                                                                (opt.type === "Vendor" && opt.id === Number(newExpense.vendor_id))||
+                                                                (opt.type === "Employee" && opt.id === Number(newExpense.employee_id))
                                                         ) || null
                                                     }
                                                     onChange={(selectedOption) => {
@@ -996,10 +1092,10 @@ const History = ({ username, userRoles = [] }) => {
                                                     styles={customStyles}
                                                 />
                                             </td>
-                                            <td className="px-4 py-2">
+                                            <td className="px-2 py-2">
                                                 <Select
                                                     name="project"
-                                                    className="w-[259px]"
+                                                    className="w-[220px]"
                                                     value={siteOptions.find(opt => opt.id === Number(newExpense.project_id)) || null}
                                                     onChange={(selectedOption) => {
                                                         setNewExpense(prev => ({
@@ -1018,7 +1114,7 @@ const History = ({ username, userRoles = [] }) => {
                                             <td className="px-4 py-2 text-left">
                                                 <select
                                                     name="type"
-                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[130px] h-[40px] rounded-lg focus:outline-none"
+                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[120px] h-[40px] rounded-lg focus:outline-none"
                                                     value={newExpense.type}
                                                     onChange={handleInputChange}
                                                     onKeyDown={handleKeyDown}
@@ -1035,7 +1131,7 @@ const History = ({ username, userRoles = [] }) => {
                                                 <input
                                                     type="number"
                                                     name="amount"
-                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[100px] h-[40px] rounded-lg focus:outline-none"
+                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[90px] h-[40px] rounded-lg focus:outline-none"
                                                     value={newExpense.amount}
                                                     onChange={handleExpenseChange}
                                                     onKeyDown={handleKeyDown}
@@ -1054,13 +1150,13 @@ const History = ({ username, userRoles = [] }) => {
                                                     <input
                                                         type="date"
                                                         name="date"
-                                                        className="bg-transparent p-1 rounded w-[100px] h-[40px] focus:outline-none"
+                                                        className="bg-transparent p-1 rounded w-[120px] h-[40px] focus:outline-none"
                                                         value={row.date}
                                                         onChange={(e) => handleEditExpense(row.id, 'date', e.target.value)}
                                                         disabled={editingRowId !== row.id}
                                                     />
                                                 ) : (
-                                                    <div className="w-[130px] h-[40px] flex items-center">
+                                                    <div className="w-[120px] h-[40px] flex items-center">
                                                         {formatDateOnly(row.date) || ""}
                                                     </div>
                                                 )}
@@ -1070,12 +1166,13 @@ const History = ({ username, userRoles = [] }) => {
                                                 {editingRowId === row.id ? (
                                                     <Select
                                                         name="party"
-                                                        className="w-[202px]"
+                                                        className="w-[180px]"
                                                         value={
                                                             combinedOptions.find(
                                                                 opt =>
                                                                     (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
-                                                                    (opt.type === "Vendor" && opt.id === Number(row.vendor_id))
+                                                                    (opt.type === "Vendor" && opt.id === Number(row.vendor_id))||
+                                                                    (opt.type === "Employee" && opt.id === Number(row.employee_id))
                                                             ) || null
                                                         }
                                                         onChange={(selectedOption) => {
@@ -1098,11 +1195,12 @@ const History = ({ username, userRoles = [] }) => {
                                                     />
                                                 ) : (
                                                     // Show label in view mode
-                                                    <div className="w-[205px] h-[40px] flex items-center">
+                                                    <div className="w-[180px] h-[40px] flex items-center">
                                                         {combinedOptions.find(
                                                             opt =>
                                                                 (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
-                                                                (opt.type === "Vendor" && opt.id === Number(row.vendor_id))
+                                                                (opt.type === "Vendor" && opt.id === Number(row.vendor_id))||
+                                                                (opt.type === "Employee" && opt.id === Number(row.employee_id))
                                                         )?.label || ""}
                                                     </div>
                                                 )}
@@ -1112,7 +1210,7 @@ const History = ({ username, userRoles = [] }) => {
                                                 {editingRowId === row.id ? (
                                                     <Select
                                                         name="project"
-                                                        className="w-[259px]"
+                                                        className="w-[220px]"
                                                         value={siteOptions.find(opt => opt.id === Number(row.project_id)) || null}
                                                         onChange={(selectedOption) =>
                                                             handleEditExpense(
@@ -1129,7 +1227,7 @@ const History = ({ username, userRoles = [] }) => {
                                                     />
                                                 ) : (
                                                     // Show label in view mode
-                                                    <div className="w-[259px] h-[40px] flex items-center">
+                                                    <div className="w-[220px] h-[40px] flex items-center">
                                                         {siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""}
                                                     </div>
                                                 )}
@@ -1138,7 +1236,7 @@ const History = ({ username, userRoles = [] }) => {
                                                 {editingRowId === row.id ? (
                                                     <select
                                                         name="type"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[130px] text-left h-[40px] rounded-lg focus:outline-none"
+                                                        className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[120px] text-left h-[40px] rounded-lg focus:outline-none"
                                                         value={row.type}
                                                         onChange={(e) => handleEditExpense(row.id, 'type', e.target.value)}
                                                     >
@@ -1150,7 +1248,7 @@ const History = ({ username, userRoles = [] }) => {
                                                         ))}
                                                     </select>
                                                 ) : (
-                                                    <div className="w-[129px] h-[40px] flex items-center">
+                                                    <div className="w-[120px] h-[40px] flex items-center">
                                                         {row.type}
                                                     </div>
                                                 )}
@@ -1160,7 +1258,7 @@ const History = ({ username, userRoles = [] }) => {
                                                     <input
                                                         type="number"
                                                         name="amount"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[100px] h-[40px] rounded-lg focus:outline-none"
+                                                        className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[90px] h-[40px] rounded-lg focus:outline-none"
                                                         value={row.amount}
                                                         onChange={(e) => handleEditExpense(row.id, 'amount', e.target.value)}
                                                         disabled={editingRowId !== row.id}
@@ -1169,7 +1267,7 @@ const History = ({ username, userRoles = [] }) => {
                                                         onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
                                                     />
                                                 ) : (
-                                                    <div className="w-[129px] h-[40px] flex items-center">
+                                                    <div className="w-[90px] h-[40px] flex items-center">
                                                         {Number(row.amount).toLocaleString('en-IN')}
                                                     </div>
                                                 )}
@@ -1215,18 +1313,18 @@ const History = ({ username, userRoles = [] }) => {
                         </div>
                     </div>
                     {/* PAYMENTS RECEIVED TABLE */}
-                    <div className="-mt-6">
+                    <div className="flex-[1] min-w-0">
                         <div className="block">
-                            <div className="flex justify-between">
-                                <h1 className="font-bold text-base pl-8">Payments Received</h1>
+                            <div className="flex justify-between mb-4">
+                                <h1 className="font-bold text-base">Payments Received</h1>
                                 <h1 className="font-bold text-base text-[#E4572E]">
                                     Total: <span style={{ color: "#E4572E" }}>
                                         {payments.reduce((total, row) => total + Number(row.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}
                                     </span>
                                 </h1>
                             </div>
-                            <div className="rounded-lg ml-9 border-l-8 border-l-[#BF9853] overflow-y-auto max-h-[300px]">
-                                <table className="w-auto border-collapse">
+                            <div className="rounded-lg border-l-8 border-l-[#BF9853] w-full overflow-y-auto max-h-[300px]">
+                                <table className="w-full border-collapse">
                                     <thead className="bg-[#FAF6ED] h-12">
                                         <tr>
                                             <th className="px-4 py-2 text-left">Date</th>
@@ -1246,10 +1344,10 @@ const History = ({ username, userRoles = [] }) => {
                                                             onChange={(e) =>
                                                                 handleEditPayment(index, "date", e.target.value)
                                                             }
-                                                            className="border-2 border-[#BF9853] border-opacity-25 p-1 rounded-lg bg-transparent w-[130px] h-[40px] focus:outline-none"
+                                                            className="border-2 border-[#BF9853] border-opacity-25 p-1 rounded-lg bg-transparent w-[120px] h-[40px] focus:outline-none"
                                                         />
                                                     ) : (
-                                                        <div className="w-[130px] h-[40px] flex items-center">
+                                                        <div className="w-[120px] h-[40px] flex items-center">
                                                             {formatDateOnly(row.date) || ""}
                                                         </div>
                                                     )}
@@ -1262,7 +1360,7 @@ const History = ({ username, userRoles = [] }) => {
                                                             onChange={(e) =>
                                                                 handleEditPayment(index, "amount", e.target.value)
                                                             }
-                                                            className="border-2 border-[#BF9853] border-opacity-25 rounded-lg bg-transparent w-[100px] h-[40px] focus:outline-none"
+                                                            className="border-2 border-[#BF9853] border-opacity-25 rounded-lg bg-transparent w-[90px] h-[40px] focus:outline-none"
                                                             onWheel={(e) => e.preventDefault()}
                                                             onFocus={() =>
                                                                 window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })
@@ -1272,7 +1370,7 @@ const History = ({ username, userRoles = [] }) => {
                                                             }
                                                         />
                                                     ) : (
-                                                        <div className="w-[100px] h-[40px] flex items-center">
+                                                        <div className="w-[90px] h-[40px] flex items-center">
                                                             {Number(row.amount).toLocaleString('en-IN')}
                                                         </div>
                                                     )}
@@ -1285,7 +1383,7 @@ const History = ({ username, userRoles = [] }) => {
                                                                 onChange={(e) =>
                                                                     handleEditPayment(index, "type", e.target.value)
                                                                 }
-                                                                className="border-2 border-[#BF9853] border-opacity-25 w-[100px] h-[40px] rounded-lg bg-transparent focus:outline-none"
+                                                                className="border-2 border-[#BF9853] border-opacity-25 w-[90px] h-[40px] rounded-lg bg-transparent focus:outline-none"
                                                                 disabled={editingPaymentId !== row.id}
                                                             >
                                                                 <option id='1' value="Weekly">Weekly</option>
@@ -1294,7 +1392,7 @@ const History = ({ username, userRoles = [] }) => {
                                                             </select>
                                                         </>
                                                     ) : (
-                                                        <div className="w-[100px] h-[40px] flex items-center">
+                                                        <div className="w-[90px] h-[40px] flex items-center">
                                                             {row.type}
                                                         </div>
                                                     )}
@@ -1341,7 +1439,7 @@ const History = ({ username, userRoles = [] }) => {
                                                     <input
                                                         type="date"
                                                         name="date"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 rounded-lg w-[130px] h-[40px] focus:outline-none"
+                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 rounded-lg w-[120px] h-[40px] focus:outline-none"
                                                         value={newPayment.date}
                                                         onChange={handlePaymentChange}
                                                         onKeyDown={handleKeyDown1}
@@ -1351,7 +1449,7 @@ const History = ({ username, userRoles = [] }) => {
                                                     <input
                                                         type="number"
                                                         name="amount"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 rounded-lg w-[100px] h-[40px] focus:outline-none"
+                                                        className="border-2 border-[#BF9853] border-opacity-25 rounded-lg w-[90px] h-[40px] focus:outline-none"
                                                         value={newPayment.amount}
                                                         onChange={handlePaymentChange}
                                                         onKeyDown={handleKeyDown1}
@@ -1363,7 +1461,7 @@ const History = ({ username, userRoles = [] }) => {
                                                 <td className="px-4 py-2">
                                                     <select
                                                         name="type"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 w-[100px] h-[40px] rounded-lg focus:outline-none"
+                                                        className="border-2 border-[#BF9853] border-opacity-25 w-[90px] h-[40px] rounded-lg focus:outline-none"
                                                         value={newPayment.type}
                                                         onChange={handlePaymentChange}
                                                         onKeyDown={handleKeyDown1}
@@ -1381,10 +1479,10 @@ const History = ({ username, userRoles = [] }) => {
                             </div>
                         </div>
                         {/* SUMMARY SECTION */}
-                        <div className="mt-4 pt-2 ml-[38px]">
-                            <h2 className="font-bold ml-[-390px] text-lg">Summary</h2>
+                        <div className="mt-4 pt-2">
+                            <h2 className="font-bold text-lg mb-2">Summary</h2>
                             <div className="overflow-hidden rounded-md border-l-8 border-[#BF9853] text-left">
-                                <table className="w-[345px] border-collapse ">
+                                <table className="w-full border-collapse">
                                     <tbody>
                                         {Object.entries(
                                             expenses

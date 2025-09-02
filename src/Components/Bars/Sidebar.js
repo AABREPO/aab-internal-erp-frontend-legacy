@@ -252,7 +252,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                 }
                 handleSubmenuItemClick('Weekly Payment Register');
               }}>
-              <p className="text-sm cursor-pointer"><li>Weekly Payment Register</li></p>
+              <p className="text-sm cursor-pointer"><li>Cash Register</li></p>
             </Link>
             <Link
               to={hasAccessToModel('Expense Entry') ? '/expense-entry' : '#'}
@@ -436,7 +436,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
               onClick={() => handleSubmenuItemClick('Attendance')}>
               <p className="text-sm cursor-pointer"><li>Attendance</li></p>
             </Link>
-            <Link to="billview" className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Staff Advance' ? 'text-red-500' : ''}`} 
+            <Link to="/staffadvance/staffAdvance" className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Staff Advance' ? 'text-red-500' : ''}`} 
               onClick={() => handleSubmenuItemClick('Staff Advance')}>
               <p className="text-sm cursor-pointer"><li>Staff Advance</li></p>
             </Link>

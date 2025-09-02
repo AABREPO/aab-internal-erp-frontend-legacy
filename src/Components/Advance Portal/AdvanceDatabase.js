@@ -397,7 +397,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
         setSiteOptions(combinedSiteOptions);
       } catch (error) {
         console.error("Fetch error: ", error);
-        
+
         // Fallback: if API fails, still show predefined options
         const predefinedSiteOptions = [
           {
@@ -525,7 +525,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
     contractorOptions.find(c => c.id === id)?.value || "";
 
   const getSiteName = (id) =>
-  siteOptions.find(s => String(s.id) === String(id))?.value || "";
+    siteOptions.find(s => String(s.id) === String(id))?.value || "";
 
   const filteredData = advanceData.filter((entry) => {
     // Timestamp range filter
@@ -533,14 +533,11 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       // Parse start & end dates from inputs
       const startDate = new Date(selectTimeStampDate);
       const endDate = new Date(selectDatabaseDate);
-
       // Make sure the time portion doesn't interfere
       startDate.setHours(0, 0, 0, 0);
       endDate.setHours(23, 59, 59, 999);
-
       // Parse entry timestamp
       const entryTimestamp = new Date(entry.date);
-
       if (entryTimestamp < startDate || entryTimestamp > endDate) {
         return false;
       }
@@ -559,7 +556,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       const entryTimestamp = new Date(entry.timestamp);
       if (entryTimestamp > endDate) return false;
     }
-
     // Contractor/Vendor filter
     if (selectDatabaseContractororVendorName) {
       const name = entry.vendor_id
@@ -568,35 +564,28 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       if (name.toLowerCase() !== selectDatabaseContractororVendorName.toLowerCase())
         return false;
     }
-
     // Project Name filter
     if (selectDatabaseProjectName) {
       const projectName = getSiteName(entry.project_id) || "";
       if (projectName.toLowerCase() !== selectDatabaseProjectName.toLowerCase())
         return false;
     }
-
     // Transfer Site filter
     if (selectDatabaseTransfer) {
       const transferName = getSiteName(entry.transfer_site_id) || "";
       if (transferName.toLowerCase() !== selectDatabaseTransfer.toLowerCase())
         return false;
     }
-
     // Type filter
     if (selectDatabaseType) {
       if (entry.type?.toLowerCase() !== selectDatabaseType.toLowerCase()) return false;
     }
-
     // Mode filter
     if (selectDatabaseMode) {
       if (entry.payment_mode?.toLowerCase() !== selectDatabaseMode.toLowerCase()) return false;
     }
-
-
     return true; // passes all filters
   });
-
   const sortedData = React.useMemo(() => {
     let sortableData = [...filteredData];
 
@@ -604,11 +593,18 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       sortableData.sort((a, b) => {
         let aValue, bValue;
 
-        // Map keys to actual values in your data
         switch (sortConfig.key) {
+          case 'timestamp':
+            aValue = new Date(a.timestamp);
+            bValue = new Date(b.timestamp);
+            break;
           case 'date':
             aValue = new Date(a.date);
             bValue = new Date(b.date);
+            break;
+          case 'entry_no':
+            aValue = Number(a.entry_no) || 0;
+            bValue = Number(b.entry_no) || 0;
             break;
           case 'vendor':
             aValue = a.vendor_id ? getVendorName(a.vendor_id) : getContractorName(a.contractor_id);
@@ -639,12 +635,8 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
         return 0;
       });
     } else {
-      // Default sorting: Most recent entries first (by date descending)
-      sortableData.sort((a, b) => {
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
-        return dateB - dateA; // Descending order (newest first)
-      });
+      // Default sorting: entry_no descending
+      sortableData.sort((a, b) => Number(b.entry_no) - Number(a.entry_no));
     }
 
     return sortableData;
@@ -1166,7 +1158,12 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
             <table className="w-[1865px] border-collapse">
               <thead className="sticky top-0 z-10 bg-white">
                 <tr className="bg-[#FAF6ED]">
-                  <th className="py-2 pl-3 w-[340px] font-bold text-left">Time Stamp</th>
+                  <th
+                    className="py-2 pl-3 w-[340px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                    onClick={() => handleSort('timestamp')}
+                  >
+                    Time Stamp {sortConfig.key === 'timestamp' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </th>
                   <th
                     className="pt-2 pl-3 w-[320px] font-bold text-left cursor-pointer hover:bg-gray-200"
                     onClick={() => handleSort('date')}
@@ -1208,7 +1205,12 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                     Mode {sortConfig.key === 'mode' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
                   <th className="px-2 w-[220px] font-bold text-left whitespace-nowrap">Attached file</th>
-                  <th className="px-2 w-[80px] font-bold text-left">E.No</th>
+                  <th
+                    className="px-2 w-[140px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                    onClick={() => handleSort('entry_no')}
+                  >
+                    E.No {sortConfig.key === 'entry_no' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </th>
                   <th className="px-2 w-[120px] font-bold text-left">Activity</th>
                 </tr>
                 {showFilters && (
@@ -1410,7 +1412,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                       </select>
                     </th>
                     <th className='w-[220px] '></th>
-                    <th className='w-[80px] '></th>
+                    <th className='w-[140px] '></th>
                     <th className='w-[120px] '></th>
                   </tr>
                 )}
@@ -1421,38 +1423,32 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                     <tr key={entry.id} className="odd:bg-white even:bg-[#FAF6ED]">
                       <td className="text-sm text-left p-2 w-[340px] font-semibold">{formatDate(entry.timestamp)}</td>
                       <td className="text-sm text-left p-2 w-[220px] font-semibold">{formatDateOnly(entry.date)}</td>
-
                       {/* Show vendor name if vendor_id exists, else contractor name */}
                       <td className="text-sm text-left font-semibold">
                         {entry.vendor_id
                           ? getVendorName(entry.vendor_id)
                           : getContractorName(entry.contractor_id)}
                       </td>
-
                       {/* Project name */}
                       <td className="text-sm text-left w-60 font-semibold">
                         {getSiteName(entry.project_id)}
                       </td>
-
                       {/* Transfer site name */}
                       <td className="text-sm text-left font-semibold">
                         {getSiteName(entry.transfer_site_id)}
                       </td>
-
                       {/* Amount */}
                       <td className="text-sm text-left pl-2 font-semibold">
                         {entry.amount != null && entry.amount !== ""
                           ? Number(entry.amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })
                           : ""}
                       </td>
-
                       {/* Bill Amount */}
                       <td className="text-sm text-left pl-2 font-semibold">
                         {entry.bill_amount != null && entry.bill_amount !== ""
                           ? Number(entry.bill_amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })
                           : ""}
                       </td>
-
                       {/* Refund Amount */}
                       <td className="text-sm text-left pl-2 font-semibold">
                         {entry.refund_amount != null && entry.refund_amount !== ""
@@ -1512,7 +1508,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                 onChange={handleItemsPerPageChange}
                 className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent"
               >
-                
                 <option value={50}>50</option>
                 <option value={100}>100</option>
                 <option value={200}>200</option>
@@ -1537,8 +1532,8 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                 onClick={goToPreviousPage}
                 disabled={currentPage === 1}
                 className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === 1
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
                   }`}
               >
                 Previous
@@ -1561,8 +1556,8 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                       key={pageNum}
                       onClick={() => goToPage(pageNum)}
                       className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === pageNum
-                          ? 'bg-[#BF9853] text-white'
-                          : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
+                        ? 'bg-[#BF9853] text-white'
+                        : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
                         }`}
                     >
                       {pageNum}
@@ -1574,8 +1569,8 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                 onClick={goToNextPage}
                 disabled={currentPage === totalPages}
                 className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === totalPages
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
                   }`}
               >
                 Next
@@ -1759,19 +1754,12 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                     className='w-[590px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'>
                   </textarea>
                 </div>
-
               </div>
               <div className="flex justify-end gap-3 mt-4">
-                <button
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 border border-[#BF9853] w-[100px] h-[45px] rounded"
-                >
+                <button onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 border border-[#BF9853] w-[100px] h-[45px] rounded">
                   Cancel
                 </button>
-                <button
-                  onClick={handleUpdate}
-                  className="px-4 py-2 bg-[#BF9853] w-[100px] h-[45px] text-white rounded"
-                >
+                <button onClick={handleUpdate} className="px-4 py-2 bg-[#BF9853] w-[100px] h-[45px] text-white rounded">
                   Save
                 </button>
               </div>
@@ -1800,16 +1788,13 @@ const formatDate = (dateString) => {
   hours = hours ? String(hours).padStart(2, '0') : '12';
   return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
 };
-
 const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, siteOptions }) => {
   if (!show) return null;
-
   const getNameById = (id, options) => {
     if (!id && id !== 0) return "-";
     const found = options.find(opt => String(opt.id) === String(id));
     return found ? found.label : id;
   };
-
   const fields = [
     { oldKey: "old_date", newKey: "new_date", label: "Date", width: "120px" },
     { oldKey: "old_type", newKey: "new_type", label: "Type", width: "100px" },
@@ -1823,7 +1808,6 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
     { oldKey: "old_bill_amount", newKey: "new_bill_amount", label: "Bill Amount", width: "120px" },
     { oldKey: "old_refund_amount", newKey: "new_refund_amount", label: "Refund", width: "100px" },
   ];
-
   const formatDateTime = (dateString) => {
     if (!dateString) return "-";
     const date = new Date(dateString);
@@ -1837,7 +1821,6 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
     hours = String(hours).padStart(2, "0");
     return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
   };
-
   const formatDisplayValue = (value, field) => {
     // If vendor or transfer site is 0, show "-"
     if (
@@ -1847,7 +1830,6 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
     ) {
       return "-";
     }
-
     if (field.lookup) {
       return getNameById(value, field.lookup);
     }
@@ -1868,7 +1850,6 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
             <h2 className="text-xl text-red-500 -mt-10 font-bold">x</h2>
           </button>
         </div>
-
         {/* Scroll container for both vertical and horizontal overflow */}
         <div className="overflow-auto mt-2 max-h-80 border border-l-8 border-l-[#BF9853] rounded-lg ml-7">
           <table className="table-fixed min-w-full bg-white">
@@ -1909,7 +1890,6 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
                     const oldDisplay = formatDisplayValue(audit[f.oldKey], f);
                     const newDisplay = formatDisplayValue(audit[f.newKey], f);
                     const changed = oldDisplay !== newDisplay;
-
                     return (
                       <td
                         key={f.label}

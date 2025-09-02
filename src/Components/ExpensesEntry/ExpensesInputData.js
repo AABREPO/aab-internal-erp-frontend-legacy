@@ -871,7 +871,7 @@ const DTableView = ({username, userRoles = []}) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({Type: editWeeklyType }),
+        body: JSON.stringify({type: editWeeklyType }),
       });
       if (response.ok) {
         closeEditWeeklyTypePopup();

@@ -1029,7 +1029,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
               </div>
               {/* Contractor/Vendor */}
               <div className=''> <div className='flex'>
-                <label className='font-semibold block'>Contractor/Vendor</label>
+                <label className='font-semibold block'>Contractor/Vendor<span className="text-red-500">*</span></label>
               </div>
                 <Select
                   options={combinedOptions}
@@ -1051,7 +1051,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
               </div>
               {/* Project Name */}
               <div>
-                <label className='font-semibold block'>Project Name</label>
+                <label className='font-semibold block'>Project Name<span className="text-red-500">*</span></label>
                 <Select
                   options={sortedSiteOptions || []}
                   placeholder="Select a site..."
@@ -1078,7 +1078,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
               {/* Bill Amount (only for Bill Settlement) */}
               {selectedType === 'Bill Settlement' && (
                 <div>
-                  <label className='font-semibold block'>Bill Amount</label>
+                  <label className='font-semibold block'>Bill Amount<span className="text-red-500">*</span></label>
                   <input
                     value={billAmount}
                     onChange={(e) => setBillAmount(e.target.value)}
@@ -1093,7 +1093,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                     ? 'Transfer Amount'
                     : selectedType === 'Refund'
                       ? 'Refund Amount'
-                      : 'Amount Given'}
+                      : 'Amount Given'}<span className="text-red-500">*</span>
                 </label>
                 <input
                   value={formatWithCommas(advanceAmount)}

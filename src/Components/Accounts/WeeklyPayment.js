@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Edit from '../Images/Edit.svg'
 import Delete from '../Images/Delete.svg'
 import Select from 'react-select';
 import history from '../Images/History.svg';
-
+import Filter from '../Images/filter (3).png'
+import NotesStart from '../Images/notes _start.png';
+import NotesEnd from '../Images/notes_end.png';
 // Helper function to get start and end date of ISO week
 function getStartAndEndDateOfISOWeek(weekNo, year) {
     const simple = new Date(year, 0, 1 + (weekNo - 1) * 7);
@@ -29,21 +31,144 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     const [contractorOptions, setContractorOptions] = useState([]);
     const [siteOptions, setSiteOptions] = useState([]);
     const [combinedOptions, setCombinedOptions] = useState([]);
+    const [employeeOptions, setEmployeeOptions] = useState([]);
     const [selectedProjectName, setSelectedProjectName] = useState(null);
+    const [portalDescriptions, setPortalDescriptions] = useState({});
     const [selectedContractor, setSelectedContractor] = useState(null);
     const [selectedVendor, setSelectedVendor] = useState(null);
+    const [selectedEmployee, setSelectedEmployee] = useState(null);
     const [weeklyTypes, setWeeklyTypes] = useState([]);
     const [showWeeklyPaymentExpensesModal, setShowWeeklyPaymentExpensesModal] = useState(false);
     const [weeklyPaymentExpensesAudits, setWeeklyPaymentExpensesAudits] = useState([]);
     const [showWeeklyPaymentReceivedModal, setShowWeeklyPaymentReceivedModal] = useState(false);
     const [weeklyPaymentReceivedAudits, setWeeklyPaymentReceivedAudits] = useState([]);
+    const [allRefundAmount, setAllRefundAmount] = useState([]);
     const [popup, setPopup] = useState({ show: false, message: "", type: "", dateStr: "" });
     // Expenses
     const [expenses, setExpenses] = useState([]);
+    const [weeklyReceivedTypes, setWeeklyReceivedTypes] = useState([]);
+    const [currentRow, setCurrentRow] = useState([]);
+
+    // Filter state variables
+    const [showFilters, setShowFilters] = useState(false);
+    const [selectDate, setSelectDate] = useState('');
+    const [selectContractororVendorName, setSelectContractororVendorName] = useState('');
+    const [selectProjectName, setSelectProjectName] = useState('');
+    const [selectType, setSelectType] = useState('');
+
+    // Sorting state
+    const [sortConfig, setSortConfig] = useState({
+        key: null,
+        direction: 'asc'
+    });
+
+    // Click and drag scrolling functionality
+    const scrollRef = useRef(null);
+    const isDragging = useRef(false);
+    const start = useRef({ x: 0, y: 0 });
+    const scroll = useRef({ left: 0, top: 0 });
+    const velocity = useRef({ x: 0, y: 0 });
+    const animationFrame = useRef(null);
+    const lastMove = useRef({ time: 0, x: 0, y: 0 });
+
+    const handleMouseDown = (e) => {
+        if (!scrollRef.current) return;
+        isDragging.current = true;
+        start.current = { x: e.clientX, y: e.clientY };
+        scroll.current = {
+            left: scrollRef.current.scrollLeft,
+            top: scrollRef.current.scrollTop,
+        };
+        lastMove.current = {
+            time: Date.now(),
+            x: e.clientX,
+            y: e.clientY,
+        };
+        scrollRef.current.style.cursor = 'grabbing';
+        scrollRef.current.style.userSelect = 'none';
+        cancelMomentum();
+    };
+
+    const handleMouseMove = (e) => {
+        if (!isDragging.current || !scrollRef.current) return;
+        const dx = e.clientX - start.current.x;
+        const dy = e.clientY - start.current.y;
+        const now = Date.now();
+        const dt = now - lastMove.current.time || 16;
+        velocity.current = {
+            x: (e.clientX - lastMove.current.x) / dt,
+            y: (e.clientY - lastMove.current.y) / dt,
+        };
+        scrollRef.current.scrollLeft = scroll.current.left - dx;
+        scrollRef.current.scrollTop = scroll.current.top - dy;
+        lastMove.current = {
+            time: now,
+            x: e.clientX,
+            y: e.clientY,
+        };
+    };
+
+    const handleMouseUp = () => {
+        if (!isDragging.current || !scrollRef.current) return;
+        isDragging.current = false;
+        scrollRef.current.style.cursor = '';
+        scrollRef.current.style.userSelect = '';
+        applyMomentum();
+    };
+
+    const cancelMomentum = () => {
+        if (animationFrame.current) {
+            cancelAnimationFrame(animationFrame.current);
+            animationFrame.current = null;
+        }
+    };
+
+    const applyMomentum = () => {
+        if (!scrollRef.current) return;
+        const friction = 0.95;
+        const minVelocity = 0.1;
+        const step = () => {
+            const { x, y } = velocity.current;
+            if (!scrollRef.current) return;
+            if (Math.abs(x) > minVelocity || Math.abs(y) > minVelocity) {
+                scrollRef.current.scrollLeft -= x * 20;
+                scrollRef.current.scrollTop -= y * 20;
+                velocity.current.x *= friction;
+                velocity.current.y *= friction;
+                animationFrame.current = requestAnimationFrame(step);
+            } else {
+                cancelMomentum();
+            }
+        };
+        animationFrame.current = requestAnimationFrame(step);
+    };
+
+    useEffect(() => {
+        fetchWeeklyReceivedType();
+    }, []);
+    const fetchWeeklyReceivedType = async () => {
+        try {
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/weekly_received_types/getAll');
+            if (response.ok) {
+                const data = await response.json();
+                setWeeklyReceivedTypes(data);
+            } else {
+                console.log('Error fetching Payment Received type.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            console.log('Error fetching Payment Received type.');
+        }
+    };
+    const getTodayDate = () => {
+        const today = new Date();
+        return today.toISOString().split("T")[0];
+    };
     const [newExpense, setNewExpense] = useState({
-        date: "",
+        date: getTodayDate(),
         contractor: "",
         vendor: "",
+        employee: "",
         project: "",
         type: "",
         amount: "",
@@ -53,23 +178,44 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         date: "",
         contractor_id: "",
         vendor_id: "",
+        employee_id: "",
         project_id: "",
         type: "",
         amount: "",
-        advance_portal_id:"",
+        advance_portal_id: "",
+        description: "",
     });
-    const handleEditClick = (row) => {
+    const handleEditClick = async (row) => {
         setEditingRowId(row.id);
+        // Start with row data
+        let description = row.description || "";
+        // ✅ If advance_portal_id exists, fetch its description
+        if (row.advance_portal_id) {
+            try {
+                const res = await fetch(
+                    `https://backendaab.in/aabuildersDash/api/advance_portal/get/${row.advance_portal_id}`
+                );
+                if (!res.ok) throw new Error("Failed to fetch advance portal data");
+
+                const data = await res.json();
+                description = data.description || description; // fallback if no description
+            } catch (error) {
+                console.error("Error fetching advance portal data:", error);
+            }
+        }
         setEditFormData({
             date: row.date,
             contractor_id: row.contractor_id,
             vendor_id: row.vendor_id,
+            employee_id: row.employee_id,
             project_id: row.project_id,
             type: row.type,
             amount: row.amount,
-            advance_portal_id: row.advance_portal_id
+            advance_portal_id: row.advance_portal_id,
+            description: description, // ✅ updated with fetched description if available
         });
     };
+
     const formatDateOnly = (dateString) => {
         const date = new Date(dateString);
         const day = String(date.getDate()).padStart(2, '0');
@@ -79,6 +225,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     };
     const handleEditChange = (e) => {
         const { name, value } = e.target;
+
         if (name === "amount") {
             let numericValue = parseFloat(value);
             if (isNaN(numericValue)) numericValue = "";
@@ -89,6 +236,9 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             if (numericValue < 0) numericValue = 0;
             setEditFormData((prev) => ({ ...prev, amount: numericValue }));
         }
+        else if (name === "description") {
+            setEditFormData((prev) => ({ ...prev, description: value }));
+        }
         else {
             setEditFormData((prev) => ({ ...prev, [name]: value }));
         }
@@ -98,6 +248,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     const [newPayment, setNewPayment] = useState({ date: "", amount: "", type: "Weekly" });
     // Account Closure popup
     const [showPopup, setShowPopup] = useState(false);
+    const [showPopups, setShowPopups] = useState(false);
     const [carryForwardBalance, setCarryForwardBalance] = useState(0);
     const [editingPaymentId, setEditingPaymentId] = useState(null);
     const [editPaymentData, setEditPaymentData] = useState({
@@ -165,6 +316,34 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         fetchVendorNames();
     }, []);
     useEffect(() => {
+        const fetchEmployeeDetails = async () => {
+            try {
+                const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
+                    method: "GET",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                });
+                if (!response.ok) {
+                    throw new Error("Network response was not ok: " + response.statusText);
+                }
+                const data = await response.json();
+                const formattedData = data.map(item => ({
+                    value: item.employee_name,
+                    label: item.employee_name,
+                    id: item.id,
+                    type: "Employee",
+                }));
+
+                setEmployeeOptions(formattedData);
+            } catch (error) {
+                console.error("Fetch error: ", error);
+            }
+        };
+        fetchEmployeeDetails();
+    }, []);
+    useEffect(() => {
         const fetchContractorNames = async () => {
             try {
                 const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
@@ -191,7 +370,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         };
         fetchContractorNames();
     }, []);
-    useEffect(() => { setCombinedOptions([...vendorOptions, ...contractorOptions]); }, [vendorOptions, contractorOptions]);
+    useEffect(() => { setCombinedOptions([...vendorOptions, ...contractorOptions, ...employeeOptions]); }, [vendorOptions, contractorOptions, employeeOptions]);
     useEffect(() => {
         const fetchSites = async () => {
             try {
@@ -212,7 +391,60 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     id: item.id,
                     sNo: item.siteNo
                 }));
-                setSiteOptions(formattedData);
+                const predefinedSiteOptions = [
+                    {
+                        value: "Mason Advance",
+                        label: "Mason Advance",
+                        id: 1,
+                        sNo: "1"
+                    },
+                    {
+                        value: "Material Advance",
+                        label: "Material Advance",
+                        id: 2,
+                        sNo: "2"
+                    },
+                    {
+                        value: "Weekly Advance",
+                        label: "Weekly Advance",
+                        id: 3,
+                        sNo: "3"
+                    },
+                    {
+                        value: "Excess Advance",
+                        label: "Excess Advance",
+                        id: 4,
+                        sNo: "4"
+                    },
+                    {
+                        value: "Material Rent",
+                        label: "Material Rent",
+                        id: 5,
+                        sNo: "5"
+                    },
+                    {
+                        value: "Subhash Kumar - Kunnur",
+                        label: "Subhash Kumar - Kunnur",
+                        id: 6,
+                        sNo: "6"
+                    },
+                    {
+                        value: "Summary Bill",
+                        label: "Summary Bill",
+                        id: 7,
+                        sNo: "7"
+                    },
+                    {
+                        value: "Daily Wage",
+                        label: "Daily Wage",
+                        id: 8,
+                        sNo: "8"
+                    }
+                ];
+
+                // Combine backend data with predefined options
+                const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
+                setSiteOptions(combinedSiteOptions);
             } catch (error) {
                 console.error("Fetch error: ", error);
             }
@@ -243,14 +475,44 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             .then(setCurrentWeekNumber)
             .catch(console.error);
     }, []);
+    // Fetch descriptions for Project Advance rows
+    const fetchPortalDescriptions = useCallback(async (expensesData) => {
+        const projectAdvanceRows = expensesData.filter(row => row.type === "Project Advance" && row.advance_portal_id);
+        const newDescriptions = { ...portalDescriptions };
+
+        for (const row of projectAdvanceRows) {
+            if (!(row.advance_portal_id in newDescriptions)) {
+                try {
+                    const res = await fetch(
+                        `https://backendaab.in/aabuildersDash/api/advance_portal/get/${row.advance_portal_id}`
+                    );
+                    if (res.ok) {
+                        const data = await res.json();
+                        const description = (data.description || "").trim();
+                        newDescriptions[row.advance_portal_id] = description !== "" ? description : undefined;
+                    }
+                } catch (error) {
+                    console.error("Error fetching advance portal data:", error);
+                    newDescriptions[row.advance_portal_id] = undefined;
+                }
+            }
+        }
+
+        setPortalDescriptions(newDescriptions);
+    }, [portalDescriptions]);
+
     // Fetch expenses by currentWeekNumber
     const fetchExpenses = useCallback(() => {
         if (!currentWeekNumber) return;
         fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${currentWeekNumber}`)
             .then((res) => res.json())
-            .then(setExpenses)
+            .then((data) => {
+                setExpenses(data);
+                // Fetch descriptions for all Project Advance rows
+                fetchPortalDescriptions(data);
+            })
             .catch(console.error);
-    }, [currentWeekNumber]);
+    }, [currentWeekNumber, fetchPortalDescriptions]);
     // Fetch payments by currentWeekNumber
     const fetchPayments = useCallback(() => {
         if (!currentWeekNumber) return;
@@ -263,6 +525,16 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             })
             .catch(console.error);
     }, [currentWeekNumber]);
+    const fetchRefundPayments = useCallback(() => {
+        if (!currentWeekNumber) return;
+        fetch(`https://backendaab.in/aabuildersDash/api/refund_received/getAll`)
+            .then((res) => res.json())
+            .then((data) => {
+                setAllRefundAmount(data);
+                console.log("All Refund Data:", data);
+            })
+            .catch(console.error);
+    }, [currentWeekNumber]);
     // Initial fetch of current week number
     useEffect(() => {
         fetchCurrentWeekNumber();
@@ -272,13 +544,16 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         if (currentWeekNumber) {
             fetchExpenses();
             fetchPayments();
+            fetchRefundPayments();
         }
-    }, [currentWeekNumber, fetchExpenses, fetchPayments]);
+    }, [currentWeekNumber, fetchExpenses, fetchPayments, fetchRefundPayments]);
     // Calculations
     const totalExpenses =
         expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0) + (Number(newExpense.amount) || 0);
     const totalPayments =
         payments.reduce((sum, p) => sum + Number(p.amount || 0), 0) + (Number(newPayment.amount) || 0);
+    const totalRefund = allRefundAmount
+        .reduce((sum, p) => sum + Number(p.amount || 0), 0);
     const balance = totalPayments - expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
     // Expense input change with immediate date validation
     const handleExpenseChange = (e) => {
@@ -327,13 +602,13 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             alert("Please fill all fields except date");
             return;
         }
-
         try {
             // ---------- Common object for weekly-expenses ----------
             const expenseForBackend = {
                 date: newExpense.date,
                 contractor_id: selectedContractor ? Number(selectedContractor.id) : null,
                 vendor_id: selectedVendor ? Number(selectedVendor.id) : null,
+                employee_id: selectedEmployee ? Number(selectedEmployee.id) : null,
                 project_id: selectedProjectName ? Number(selectedProjectName.id) : null,
                 type: newExpense.type,
                 amount: Number(newExpense.amount),
@@ -342,7 +617,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 created_at: new Date().toISOString(),
                 advance_portal_id: null, // will be filled if Project Advance
             };
-
             if (newExpense.type === "Project Advance") {
                 // ---------- Save to advance_portal ----------
                 const res = await fetch("https://backendaab.in/aabuildersDash/api/advance_portal/getAll");
@@ -353,7 +627,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                         ? Math.max(...allData.map((item) => item.entry_no || 0))
                         : 0;
                 const nextEntryNo = maxEntryNo + 1;
-
                 const getWeekNumber = () => {
                     const now = new Date();
                     const start = new Date(now.getFullYear(), 0, 1);
@@ -362,7 +635,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     const oneWeek = 604800000; // ms in a week
                     return Math.floor(diff / oneWeek) + 1;
                 };
-
                 const advancePayload = {
                     type: "Advance",
                     date: newExpense.date,
@@ -379,7 +651,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     description: "",
                     file_url: "",
                 };
-
                 const saveAdvance = await fetch("https://backendaab.in/aabuildersDash/api/advance_portal/save", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -387,10 +658,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 });
                 if (!saveAdvance.ok) throw new Error("Failed to save advance");
                 const savedAdvance = await saveAdvance.json();
-
                 // ✅ use correct field name from backend
                 expenseForBackend.advance_portal_id = savedAdvance.advancePortalId;
-
                 // ---------- Save to weekly-expenses ----------
                 const saveWeekly = await fetch("https://backendaab.in/aabuildersDash/api/weekly-expenses/save", {
                     method: "POST",
@@ -399,8 +668,12 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 });
                 if (!saveWeekly.ok) throw new Error("Failed to save weekly expense");
                 const savedWeekly = await saveWeekly.json();
-
-                setExpenses((prev) => [savedAdvance, savedWeekly, ...prev]);
+                setExpenses((prev) => {
+                    const newExpenses = [savedAdvance, savedWeekly, ...prev];
+                    // Fetch descriptions for the new Project Advance rows
+                    fetchPortalDescriptions(newExpenses);
+                    return newExpenses;
+                });
                 window.location.reload();
             } else {
                 // ---------- Normal case (not Project Advance) ----------
@@ -411,10 +684,14 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 });
                 if (!res.ok) throw new Error("Failed to save weekly expense");
                 const saved = await res.json();
-                setExpenses((prev) => [saved, ...prev]);
+                setExpenses((prev) => {
+                    const newExpenses = [saved, ...prev];
+                    // Fetch descriptions for the new Project Advance rows
+                    fetchPortalDescriptions(newExpenses);
+                    return newExpenses;
+                });
                 window.location.reload();
             }
-
             // ---------- Reset fields ----------
             setNewExpense({ date: "", contractor: "", project: "", type: "", amount: "" });
             setSelectedVendor("");
@@ -424,7 +701,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             alert("Error saving expense: " + err.message);
         }
     };
-
     // Payment input change with immediate date validation
     const handlePaymentChange = (e) => {
         const { name, value } = e.target;
@@ -520,10 +796,32 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         return acc;
     }, {});
     const mergedExpenses = Object.entries(groupedExpenses).map(([type, amount]) => ({ type, amount }));
-    const saveEditedExpense = async (row) => { 
+    const saveEditedExpense = async (row) => {
         try {
+
+            // 🔍 Normalize values for comparison
+            const normalize = (val) =>
+                val === null || val === undefined ? "" : String(val).trim();
+
+            // Find what fields actually changed
+            const changedFields = Object.keys(editFormData).filter(
+                (key) => normalize(editFormData[key]) !== normalize(row[key])
+            );
+
+            if (changedFields.length === 0) {
+                console.log("⚡ No changes detected → skipping update.");
+                setEditingRowId(null);
+                return;
+            }
+
+            const onlyDescriptionChanged =
+                changedFields.length === 1 && changedFields[0] === "description";
             // ✅ Case 1: Project Advance → Other (clear advance_portal row)
-            if (row.type === "Project Advance" && editFormData.type !== "Project Advance" && row.advance_portal_id) {
+            if (
+                row.type === "Project Advance" &&
+                editFormData.type !== "Project Advance" &&
+                row.advance_portal_id
+            ) {
                 const clearedData = {
                     amount: null,
                     project_id: null,
@@ -537,11 +835,9 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     payment_mode: null,
                     refund_amount: null,
                     week_no: null,
-                    entry_no: null
+                    entry_no: null,
                 };
-    
-                console.log("➡️ Clearing advance_portal row:", row.advance_portal_id, clearedData);
-    
+
                 const res = await fetch(
                     `https://backendaab.in/aabuildersDash/api/advance_portal/edit/${row.advance_portal_id}?editedBy=${username}`,
                     {
@@ -550,13 +846,17 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                         body: JSON.stringify(clearedData),
                     }
                 );
-    
+
                 const data = await res.json().catch(() => null);
                 console.log("✅ Advance portal cleared response:", res.status, data);
             }
-    
-            // ✅ Case 2: Other → Project Advance
-            if (row.type !== "Project Advance" && editFormData.type === "Project Advance") {
+
+            // ✅ Case 2: Other → Project Advance OR update Project Advance
+            if (
+                (row.type !== "Project Advance" &&
+                    editFormData.type === "Project Advance") ||
+                row.type === "Project Advance"
+            ) {
                 const advancePayload = {
                     type: "Advance",
                     date: editFormData.date,
@@ -569,15 +869,13 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     bill_amount: 0,
                     refund_amount: 0,
                     week_no: editFormData.weekly_number,
-                    description: editFormData.description || "",
+                    description: editFormData.description || "", // 🔥 from popup
                     file_url: editFormData.file_url || "",
                 };
-    
+
                 if (row.advance_portal_id) {
-                    // 🔄 Update existing advance_portal row
-                    console.log("➡️ Updating existing advance_portal:", row.advance_portal_id, advancePayload);
-    
-                    const res = await fetch(
+                    // 🔄 update existing advance row
+                    await fetch(
                         `https://backendaab.in/aabuildersDash/api/advance_portal/edit/${row.advance_portal_id}?editedBy=${username}`,
                         {
                             method: "PUT",
@@ -585,17 +883,12 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                             body: JSON.stringify(advancePayload),
                         }
                     );
-    
-                    const updatedAdvance = await res.json();
-                    console.log("✅ Advance portal updated:", updatedAdvance);
-    
                     editFormData.advance_portal_id = row.advance_portal_id;
                 } else {
-                    // ➕ Create a new advance_portal row
-                    console.log("➡️ Creating new advance_portal:", advancePayload);
-    
                     // 🔹 Generate entry_no like in handleKeyDownExpense
-                    const resAll = await fetch("https://backendaab.in/aabuildersDash/api/advance_portal/getAll");
+                    const resAll = await fetch(
+                        "https://backendaab.in/aabuildersDash/api/advance_portal/getAll"
+                    );
                     if (!resAll.ok) throw new Error("Failed to fetch entry numbers");
                     const allData = await resAll.json();
                     const maxEntryNo =
@@ -603,54 +896,53 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                             ? Math.max(...allData.map((item) => item.entry_no || 0))
                             : 0;
                     const nextEntryNo = maxEntryNo + 1;
-    
-                    advancePayload.entry_no = nextEntryNo; // ✅ assign entry_no
-    
-                    const saveAdvance = await fetch("https://backendaab.in/aabuildersDash/api/advance_portal/save", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(advancePayload),
-                    });
-    
+                    advancePayload.entry_no = nextEntryNo;
+
+                    const saveAdvance = await fetch(
+                        "https://backendaab.in/aabuildersDash/api/advance_portal/save",
+                        {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(advancePayload),
+                        }
+                    );
                     if (!saveAdvance.ok) throw new Error("Failed to save advance");
                     const savedAdvance = await saveAdvance.json();
-    
-                    console.log("✅ Advance portal created:", savedAdvance);
-    
+
                     // attach advance_portal_id into editFormData
                     editFormData.advance_portal_id = savedAdvance.advancePortalId;
-    
-                    // 🔄 ensure weekly-expenses row is updated with the new advance_portal_id
-                    console.log("➡️ Linking new advance_portal_id to weekly-expenses:", savedAdvance.advancePortalId);
                 }
             }
-    
-            // ✅ Case 3: Always update weekly-expenses
-            console.log("➡️ Updating weekly-expenses row:", row.id, editFormData);
-            const response = await fetch(
-                `https://backendaab.in/aabuildersDash/api/weekly-expenses/edit/${row.id}?username=${encodeURIComponent(username)}`,
-                {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(editFormData),
-                }
-            );
-    
-            if (!response.ok) throw new Error("Failed to update expense");
-    
-            const updatedExpense = await response.json();
-            console.log("✅ Weekly-expense updated:", updatedExpense);
+            if (!onlyDescriptionChanged) {
+                // ✅ Always update weekly_expenses
+                const response = await fetch(
+                    `https://backendaab.in/aabuildersDash/api/weekly-expenses/edit/${row.id}?username=${encodeURIComponent(
+                        username
+                    )}`,
+                    {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(editFormData),
+                    }
+                );
+
+                if (!response.ok) throw new Error("Failed to update expense");
+                const updatedExpense = await response.json();
+
+                setExpenses((prevExpenses) => {
+                    const newExpenses = prevExpenses.map((exp) => (exp.id === row.id ? updatedExpense : exp));
+                    // Fetch descriptions for the updated Project Advance rows
+                    fetchPortalDescriptions(newExpenses);
+                    return newExpenses;
+                });
+            }
             window.location.reload();
-    
-            setExpenses((prevExpenses) =>
-                prevExpenses.map((exp) => (exp.id === row.id ? updatedExpense : exp))
-            );
             setEditingRowId(null);
         } catch (error) {
             console.error("❌ Error updating expense:", error);
         }
     };
-    
+
     const customStyles = {
         control: (provided, state) => ({
             ...provided,
@@ -665,6 +957,19 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     };
     const saveEditedPaymentReceived = async (row) => {
         try {
+            // 🔍 Normalize row & form data for fair comparison
+            const normalize = (val) =>
+                val === null || val === undefined ? "" : String(val).trim();
+
+            const hasChanges = Object.keys(editPaymentData).some((key) => {
+                return normalize(editPaymentData[key]) !== normalize(row[key]);
+            });
+
+            if (!hasChanges) {
+                console.log("⚡ No changes detected → skipping update.");
+                setEditingPaymentId(null);
+                return;
+            }
             const response = await fetch(`https://backendaab.in/aabuildersDash/api/payments-received/edit/${row.id} ?username=${encodeURIComponent(username)}`, {
                 method: "PUT", // assuming backend uses PUT
                 headers: {
@@ -731,10 +1036,184 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             console.log("Deletion cancelled.");
         }
     };
+
+    // Filter functions
+    const clearFilters = () => {
+        setSelectDate('');
+        setSelectContractororVendorName('');
+        setSelectProjectName('');
+        setSelectType('');
+    };
+
+    const getVendorName = (id) =>
+        vendorOptions.find(v => v.id === id)?.value || "";
+
+    const getContractorName = (id) =>
+        contractorOptions.find(c => c.id === id)?.value || "";
+    const getEmployeeName = (id) =>
+        employeeOptions.find(c => c.id === id)?.value || "";
+
+    const getSiteName = (id) =>
+        siteOptions.find(s => String(s.id) === String(id))?.value || "";
+
+    // Filtered data based on selected filters
+    const filteredExpenses = expenses.filter((entry) => {
+        // Date filter (exact match since it's type="date")
+        if (selectDate) {
+            // Convert selectDate (YYYY-MM-DD) → DD-M-YYYY
+            const [year, month, day] = selectDate.split("-");
+            const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
+            // Convert entry.date to DD-M-YYYY
+            const entryDateObj = new Date(entry.date);
+            const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
+            if (formattedEntryDate !== formattedSelectDate) return false;
+        }
+        // Contractor/Vendor filter
+        if (selectContractororVendorName) {
+            const name =
+                entry.vendor_id
+                    ? getVendorName(entry.vendor_id)
+                    : getContractorName(entry.contractor_id) || getEmployeeName(entry.employee_id);
+            if (name.toLowerCase() !== selectContractororVendorName.toLowerCase())
+                return false;
+        }
+        // Project Name filter
+        if (selectProjectName) {
+            const projectName = getSiteName(entry.project_id) || "";
+            if (projectName.toLowerCase() !== selectProjectName.toLowerCase())
+                return false;
+        }
+        // Type filter
+        if (selectType) {
+            if (entry.type?.toLowerCase() !== selectType.toLowerCase()) return false;
+        }
+        return true; // passes all filters
+    });
+
+    // Sorting functions
+    const handleSort = (key) => {
+        let direction = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const sortedExpenses = React.useMemo(() => {
+        console.log("Filtered Expenses:", filteredExpenses);
+        let sortableData = [...filteredExpenses].reverse();
+        if (sortConfig.key) {
+            sortableData.sort((a, b) => {
+                let aValue, bValue;
+                switch (sortConfig.key) {
+                    case 'date':
+                        aValue = new Date(a.date);
+                        bValue = new Date(b.date);
+                        break;
+                    case 'contractor_vendor':
+                        aValue = combinedOptions.find(opt =>
+                            (opt.type === "Contractor" && opt.id === Number(a.contractor_id)) ||
+                            (opt.type === "Vendor" && opt.id === Number(a.vendor_id)) ||
+                            (opt.type === "Employee" && opt.id === Number(a.employee_id))
+                        )?.label || "";
+                        bValue = combinedOptions.find(opt =>
+                            (opt.type === "Contractor" && opt.id === Number(b.contractor_id)) ||
+                            (opt.type === "Vendor" && opt.id === Number(b.vendor_id)) ||
+                            (opt.type === "Employee" && opt.id === Number(b.employee_id))
+                        )?.label || "";
+                        break;
+                    case 'project_name':
+                        aValue = siteOptions.find(opt => opt.id === Number(a.project_id))?.label || "";
+                        bValue = siteOptions.find(opt => opt.id === Number(b.project_id))?.label || "";
+                        break;
+                    case 'type':
+                        aValue = a.type || "";
+                        bValue = b.type || "";
+                        break;
+                    default:
+                        return 0;
+                }
+                if (aValue < bValue) {
+                    return sortConfig.direction === 'asc' ? -1 : 1;
+                }
+                if (aValue > bValue) {
+                    return sortConfig.direction === 'asc' ? 1 : -1;
+                }
+                return 0;
+            });
+        } else {
+            // Default sorting: Most recent entries first (by date descending)
+            sortableData.sort((a, b) => {
+                const dateA = new Date(a.date);
+                const dateB = new Date(b.date);
+                return dateB - dateA; // Descending order (newest first)
+            });
+        }
+
+        return sortableData;
+    }, [filteredExpenses, sortConfig, combinedOptions, siteOptions]);
+    const contractorVendorFilterOptions = React.useMemo(() => {
+        const ids = new Set();
+        return filteredExpenses.map(exp => {
+            const option =
+                combinedOptions.find(
+                    opt =>
+                        (opt.type === "Contractor" && opt.id === Number(exp.contractor_id)) ||
+                        (opt.type === "Vendor" && opt.id === Number(exp.vendor_id)) ||
+                        (opt.type === "Employee" && opt.id === Number(exp.employee_id))
+                );
+            if (option && !ids.has(option.id)) {
+                ids.add(option.id);
+                return { value: option.label, label: option.label };
+            }
+            return null;
+        }).filter(Boolean);
+    }, [filteredExpenses, combinedOptions]);
+
+    const projectFilterOptions = React.useMemo(() => {
+        const ids = new Set();
+        return filteredExpenses.map(exp => {
+            const option = siteOptions.find(opt => opt.id === Number(exp.project_id));
+            if (option && !ids.has(option.id)) {
+                ids.add(option.id);
+                return { value: option.label, label: option.label };
+            }
+            return null;
+        }).filter(Boolean);
+    }, [filteredExpenses, siteOptions]);
+    const updateDescription = async (id, description) => {
+        try {
+            const res = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/update/${id}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ description }), // send JSON
+            });
+
+            if (!res.ok) {
+                throw new Error("Failed to update description");
+            }
+
+            const data = await res.json();
+
+            // Update state locally after success
+            setEditFormData((prev) => ({
+                ...prev,
+                description: data.description,
+            }));
+
+            return data;
+        } catch (error) {
+            console.error("❌ Error updating description:", error);
+            alert("Failed to update description");
+        }
+    };
+
     return (
         <div>
             {/* Balance display */}
-            <div className="mt-[-25px] lg:ml-[1580px] ml-[660px]">
+            <div className="mt-[-28px] flex justify-end mr-5">
                 <h1 className="font-bold text-xl">
                     Balance: <span style={{ color: "#E4572E" }}>
                         {(balance - (Number(newExpense.amount) || 0)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2, })}
@@ -743,445 +1222,930 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             </div>
             <div className="mx-auto w-auto p-6 bg-white ml-[30px] mr-6 rounded-md border border-transparent">
                 {/* Header */}
-                <div className="lg:w-[1150px] mt-5">
-                    <div className="flex justify-between  ml-16">
-                        <h1 className="font-bold text-xl">PS: {currentWeekNumber ?? "-"}</h1>
-                        <h1 className="font-bold text-base">
-                            Expenses: <span style={{ color: "#E4572E" }}>{Number(totalExpenses).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}</span>
-                        </h1>
-                    </div>
-                    <div className=" lg:flex ml-16 gap-10" key={currentWeekNumber /* force re-mount on week change */}>
+                <div className="text-left">
+                    <button onClick={() => setShowFilters(!showFilters)}>
+                        <img
+                            src={Filter}
+                            alt="Toggle Filter"
+                            className="w-7 h-7 border border-[#BF9853] rounded-md mb-3"
+                        />
+                    </button>
+                </div>
+                <div className="w-full mt- flex flex-col xl:flex-row gap-6">
+                    <div className="flex-[3] min-w-0">
+                        <div className="flex justify-between mb-4">
+                            <h1 className="font-bold text-xl">PS: {currentWeekNumber ?? "-"}</h1>
+                            <h1 className="font-bold text-base">
+                                Expenses: <span style={{ color: "#E4572E" }}>
+                                    {Number(totalExpenses).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                            </h1>
+                        </div>
+
+                        {/* Filter Section */}
+                        <div className={`text-left flex ${selectDate || selectContractororVendorName || selectProjectName || selectType
+                            ? 'flex-col sm:flex-row sm:justify-between'
+                            : 'flex-row justify-between items-center'
+                            } mb-3 gap-2`}>
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3">
+
+                                {(selectDate || selectContractororVendorName || selectProjectName || selectType) && (
+                                    <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
+                                        {selectDate && (
+                                            <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
+                                                <span className="font-normal">Date: </span>
+                                                <span className="font-bold">{selectDate}</span>
+                                                <button onClick={() => setSelectDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                            </span>
+                                        )}
+                                        {selectContractororVendorName && (
+                                            <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                <span className="font-normal">Contractor/Vendor Name: </span>
+                                                <span className="font-bold">{selectContractororVendorName}</span>
+                                                <button onClick={() => setSelectContractororVendorName('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectProjectName && (
+                                            <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                <span className="font-normal">Project Name:</span>
+                                                <span className="font-bold">{selectProjectName}</span>
+                                                <button onClick={() => setSelectProjectName('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectType && (
+                                            <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                <span className="font-normal">Type: </span>
+                                                <span className="font-bold">{selectType}</span>
+                                                <button onClick={() => setSelectType('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
                         {/* Expenses Table */}
-                        <div className="w-[1100px] rounded-lg border-l-8 border-l-[#BF9853]">
-                            <table className=" border-collapse text-left">
-                                <thead>
-                                    <tr className="bg-[#FAF6ED] h-12">
-                                        <th className="px-4 py-2 text-left">Sl.No</th>
-                                        <th className="px-4 py-2 text-left">Date</th>
-                                        <th className="px-4 py-2 text-left">Contractor/Vendor</th>
-                                        <th className="px-4 py-2 text-left">Project Name</th>
-                                        <th className="px-4 py-2 text-left">Type</th>
-                                        <th className="px-4 py-2 text-left">Amount</th>
-                                        <th className="px-4 py-2 text-left">Activity</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {/* Input Row */}
-                                    <tr>
-                                        <td className="px-4 py-2 font-bold">{expenses.length + 1}.</td>
-                                        <td className="px-4 py-2">
-                                            <input
-                                                type="date"
-                                                name="date"
-                                                className="border-2 border-[#BF9853] border-opacity-25 p-1 rounded-lg w-[130px] h-[38px] focus:outline-none"
-                                                value={newExpense.date}
-                                                onChange={handleExpenseChange}
-                                                onKeyDown={handleKeyDownExpense}
-                                            />
-                                        </td>
-                                        <td className="px-4 py-2">
-                                            <Select
-                                                name="party"
-                                                className="w-[202px]"
-                                                value={selectedContractor || selectedVendor || null} // show whichever is selected
-                                                onChange={(selectedOption) => {
-                                                    if (!selectedOption) {
-                                                        setSelectedContractor(null);
-                                                        setSelectedVendor(null);
-                                                    } else if (selectedOption.type === "Contractor") {
-                                                        setSelectedContractor(selectedOption);
-                                                        setSelectedVendor(null); // clear vendor if contractor selected
-                                                    } else if (selectedOption.type === "Vendor") {
-                                                        setSelectedVendor(selectedOption);
-                                                        setSelectedContractor(null); // clear contractor if vendor selected
-                                                    }
-                                                }}
-                                                options={combinedOptions}
-                                                placeholder="Contractor/Vendor"
-                                                isSearchable
-                                                isClearable
-                                                styles={customStyles}
-                                            />
-                                        </td>
-                                        <td className="px-4 py-2">
-                                            <Select
-                                                name="project"
-                                                className="w-[259px]"
-                                                value={selectedProjectName}
-                                                onChange={(selectedOption) => {
-                                                    setSelectedProjectName(selectedOption); // store the full object
-                                                }}
-                                                options={siteOptions}
-                                                placeholder="Select Site"
-                                                isClearable
-                                                isSearchable
-                                                styles={customStyles}
-                                            />
-                                        </td>
-                                        <td className="px-4 py-2">
-                                            <select
-                                                name="type"
-                                                className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[97px] h-[40px] rounded-lg focus:outline-none"
-                                                value={newExpense.type}
-                                                onChange={handleExpenseChange}
-                                                onKeyDown={handleKeyDownExpense}
+                        <div className="w-full h-[600px] rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden">
+                            {/* Single Table with Scrollable Container */}
+                            <div
+                                ref={scrollRef}
+                                className="overflow-auto max-h-[600px]"
+                                onMouseDown={handleMouseDown}
+                                onMouseMove={handleMouseMove}
+                                onMouseUp={handleMouseUp}
+                                onMouseLeave={handleMouseUp}
+                            >
+                                <table className="w-[1320px] border-collapse text-left">
+                                    <thead className="sticky top-0 z-10 bg-white">
+                                        <tr className="bg-[#FAF6ED]">
+                                            <th className="pt-2 pl-2 w-[60px] font-bold text-left">Sl.No</th>
+                                            <th
+                                                className="pt-2 w-[135px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                                                onClick={() => handleSort('date')}
                                             >
-                                                <option value="">Select</option>
-                                                {weeklyTypes.map((type, index) => (
-                                                    <option key={index} value={type.type}>
-                                                        {type.type}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </td>
-                                        <td className="px-4 py-2">
-                                            <input
-                                                type="number"
-                                                name="amount"
-                                                className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[85px] h-[40px] rounded-lg focus:outline-none no-spinner"
-                                                value={newExpense.amount}
-                                                onChange={handleExpenseChange}
-                                                onKeyDown={handleKeyDownExpense}
-                                                disabled={!newExpense.date || !selectedProjectName}
-                                                min="0"
-                                                step="any"
-                                            />
-                                        </td>
-                                    </tr>
-                                    {/* Existing Expenses */}
-                                    {[...expenses].reverse().map((row, index) => (
-                                        <tr key={row.id} className={`even:bg-[#FAF6ED] odd:bg-[#FFFFFF]`}>
-                                            <td className="px-4 py-2 font-bold">{expenses.length - index}</td>
-                                            {/* Date column */}
-                                            <td className="px-4 py-2">
-                                                {editingRowId === row.id ? (
+                                                Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th
+                                                className="px-1 w-[200px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                                                onClick={() => handleSort('contractor_vendor')}
+                                            >
+                                                Contractor/Vendor {sortConfig.key === 'contractor_vendor' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th
+                                                className="px-1 w-[240px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                                                onClick={() => handleSort('project_name')}
+                                            >
+                                                Project Name {sortConfig.key === 'project_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th
+                                                className="px-1 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                                                onClick={() => handleSort('type')}
+                                            >
+                                                Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="px-1 w-[110px] font-bold text-left">Amount</th>
+                                            <th className="px-1 w-[120px] font-bold text-left">Activity</th>
+                                        </tr>
+                                        {showFilters && (
+                                            <tr className="bg-white border-b border-gray-200">
+                                                <th className="pt-2 pb-2 w-[60px]"></th>
+                                                <th className="pt-2 pb-2 w-[140px]">
                                                     <input
                                                         type="date"
-                                                        name="date"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 rounded-lg w-[130px] h-[32px] focus:outline-none"
-                                                        value={editFormData.date}
-                                                        onChange={handleEditChange}
+                                                        value={selectDate}
+                                                        onChange={(e) => setSelectDate(e.target.value)}
+                                                        className="p-1 rounded-md bg-transparent w-[140px] border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
+                                                        placeholder="Search Date..."
                                                     />
-                                                ) : (
-                                                    formatDateOnly(row.date) || ""
-                                                )}
-                                            </td>
-                                            {/* Contractor column */}
-                                            <td className="px-4 py-2">
-                                                {editingRowId === row.id ? (
+                                                </th>
+                                                <th className="pt-2 pb-2 w-[200px]">
                                                     <Select
-                                                        name="party"
-                                                        className="w-[202px]"
-                                                        value={
-                                                            combinedOptions.find(
-                                                                opt =>
-                                                                    (opt.type === "Contractor" && opt.id === Number(editFormData.contractor_id)) ||
-                                                                    (opt.type === "Vendor" && opt.id === Number(editFormData.vendor_id))
-                                                            ) || null
-                                                        }
-                                                        onChange={(selectedOption) => {
-                                                            if (!selectedOption) {
-                                                                handleEditChange({ target: { name: "contractor_id", value: "" } });
-                                                                handleEditChange({ target: { name: "vendor_id", value: "" } });
-                                                            } else if (selectedOption.type === "Contractor") {
-                                                                handleEditChange({ target: { name: "contractor_id", value: selectedOption.id } });
-                                                                handleEditChange({ target: { name: "vendor_id", value: "" } });
-                                                            } else if (selectedOption.type === "Vendor") {
-                                                                handleEditChange({ target: { name: "vendor_id", value: selectedOption.id } });
-                                                                handleEditChange({ target: { name: "contractor_id", value: "" } });
-                                                            }
+                                                        options={contractorVendorFilterOptions}
+                                                        value={selectContractororVendorName ? { value: selectContractororVendorName, label: selectContractororVendorName } : null}
+                                                        onChange={(opt) => setSelectContractororVendorName(opt ? opt.value : "")}
+                                                        className="text-xs focus:outline-none"
+                                                        placeholder="Contractor/Ven..."
+                                                        isSearchable
+                                                        isClearable
+                                                        styles={{
+                                                            control: (provided, state) => ({
+                                                                ...provided,
+                                                                backgroundColor: 'transparent',
+                                                                borderWidth: '3px',
+                                                                borderColor: state.isFocused
+                                                                    ? 'rgba(191, 152, 83, 0.2)'
+                                                                    : 'rgba(191, 152, 83, 0.2)',
+                                                                borderRadius: '6px',
+                                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                                '&:hover': {
+                                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                                },
+                                                            }),
+                                                            placeholder: (provided) => ({
+                                                                ...provided,
+                                                                color: '#999',
+                                                                textAlign: 'left',
+                                                            }),
+                                                            menu: (provided) => ({
+                                                                ...provided,
+                                                                zIndex: 9,
+                                                            }),
+                                                            option: (provided, state) => ({
+                                                                ...provided,
+                                                                textAlign: 'left',
+                                                                fontWeight: 'normal',
+                                                                fontSize: '15px',
+                                                                backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                                color: 'black',
+                                                            }),
+                                                            singleValue: (provided) => ({
+                                                                ...provided,
+                                                                textAlign: 'left',
+                                                                fontWeight: 'normal',
+                                                                color: 'black',
+                                                            }),
                                                         }}
-                                                        options={combinedOptions}
-                                                        placeholder="Contractor/Vendor"
-                                                        isSearchable
-                                                        styles={customStyles}
                                                     />
-                                                ) : (
-                                                    // Read-only display using combinedOptions
-                                                    <>
-                                                        {combinedOptions.find(
-                                                            opt =>
-                                                                (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
-                                                                (opt.type === "Vendor" && opt.id === Number(row.vendor_id))
-                                                        )?.label || ""} {/* assuming options have a label property */}
-                                                    </>
-                                                )}
-                                            </td>
-                                            {/* Project column */}
-                                            <td className="px-4 py-2">
-                                                {editingRowId === row.id ? (
+                                                </th>
+                                                <th className="pt-2 pb-2 w-[240px]">
                                                     <Select
-                                                        name="project_id"
-                                                        className="w-[259px]"
-                                                        value={siteOptions.find(opt => opt.id === Number(editFormData.project_id)) || null}
-                                                        onChange={(selectedOption) =>
-                                                            handleEditChange({
-                                                                target: { name: "project_id", value: selectedOption ? selectedOption.id : "" }
-                                                            })
-                                                        }
-                                                        options={siteOptions}
-                                                        placeholder="Select Site"
+                                                        options={projectFilterOptions}
+                                                        value={selectProjectName ? { value: selectProjectName, label: selectProjectName } : null}
+                                                        onChange={(opt) => setSelectProjectName(opt ? opt.value : "")}
+                                                        className="focus:outline-none text-xs"
+                                                        placeholder="Project Name..."
                                                         isSearchable
-                                                        styles={customStyles}
+                                                        isClearable
+                                                        styles={{
+                                                            control: (provided, state) => ({
+                                                                ...provided,
+                                                                backgroundColor: 'transparent',
+                                                                borderWidth: '3px',
+                                                                borderColor: state.isFocused
+                                                                    ? 'rgba(191, 152, 83, 0.2)'
+                                                                    : 'rgba(191, 152, 83, 0.2)',
+                                                                borderRadius: '6px',
+                                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                                '&:hover': {
+                                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                                },
+                                                            }),
+                                                            placeholder: (provided) => ({
+                                                                ...provided,
+                                                                color: '#999',
+                                                                textAlign: 'left',
+                                                            }),
+                                                            menu: (provided) => ({
+                                                                ...provided,
+                                                                zIndex: 9,
+                                                            }),
+                                                            option: (provided, state) => ({
+                                                                ...provided,
+                                                                textAlign: 'left',
+                                                                fontWeight: 'normal',
+                                                                fontSize: '15px',
+                                                                backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                                color: 'black',
+                                                            }),
+                                                            singleValue: (provided) => ({
+                                                                ...provided,
+                                                                textAlign: 'left',
+                                                                fontWeight: 'normal',
+                                                                color: 'black',
+                                                            }),
+                                                        }}
                                                     />
-                                                ) : (
-                                                    // Read-only display using siteOptions
-                                                    <>
-                                                        {siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""}
-                                                    </>
-                                                )}
-                                            </td>
-                                            {/* Type column */}
-                                            <td className="px-4 py-2">
-                                                {editingRowId === row.id ? (
-                                                    <select name="type"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[97px] h-[32px] rounded-lg focus:outline-none"
-                                                        value={editFormData.type} onChange={handleEditChange}
+                                                </th>
+                                                <th className="pt-2 pb-2 w-[100px]">
+                                                    <select
+                                                        value={selectType}
+                                                        onChange={(e) => setSelectType(e.target.value)}
+                                                        className="p-1 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                                                        placeholder="Type..."
                                                     >
-                                                        <option value="">Select</option>
+                                                        <option value=''>Select Type...</option>
                                                         {weeklyTypes.map((type, index) => (
                                                             <option key={index} value={type.type}>
                                                                 {type.type}
                                                             </option>
                                                         ))}
                                                     </select>
-                                                ) : (
-                                                    row.type
-                                                )}
+                                                </th>
+                                                <th className="pt-2 pb-2 w-[110px]"></th>
+                                                <th className="pt-2 pb-2 w-[120px]"></th>
+                                            </tr>
+                                        )}
+                                        {/* Input Row */}
+                                        <tr className="bg-white border-b border-gray-200">
+                                            <td className="pt-2 pb-2 w-[60px] font-bold">{expenses.length + 1}.</td>
+                                            <td className="pt-2 pb-2 w-[135px]">
+                                                <input
+                                                    type="date"
+                                                    name="date"
+                                                    className="p-1 rounded-md bg-transparent w-[135px] border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
+                                                    value={newExpense.date}
+                                                    onChange={handleExpenseChange}
+                                                    onKeyDown={handleKeyDownExpense}
+                                                />
                                             </td>
-                                            {/* Amount column */}
-                                            <td className="px-4 py-2">
-                                                {editingRowId === row.id ? (
-                                                    <input
-                                                        type="number"
-                                                        name="amount"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[85px] h-[32px] bg-transparent rounded-lg focus:outline-none no-spinner"
-                                                        value={editFormData.amount}
-                                                        onChange={handleEditChange}
-                                                        min="0"
-                                                        step="any"
-                                                    />
-                                                ) : (
-                                                    Number(row.amount).toLocaleString('en-IN')
-                                                )}
+                                            <td className="pt-2 pb-2 w-[200px]">
+                                                <Select
+                                                    name="party"
+                                                    value={selectedContractor || selectedVendor || selectedEmployee || null}
+                                                    onChange={(selectedOption) => {
+                                                        if (!selectedOption) {
+                                                            setSelectedContractor(null);
+                                                            setSelectedVendor(null);
+                                                            setSelectedEmployee(null);
+                                                        } else if (selectedOption.type === "Contractor") {
+                                                            setSelectedContractor(selectedOption);
+                                                            setSelectedVendor(null);
+                                                            setSelectedEmployee(null);
+                                                        } else if (selectedOption.type === "Vendor") {
+                                                            setSelectedVendor(selectedOption);
+                                                            setSelectedContractor(null);
+                                                            setSelectedEmployee(null);
+                                                        } else if (selectedOption.type === "Employee") {
+                                                            setSelectedVendor(null);
+                                                            setSelectedContractor(null);
+                                                            setSelectedEmployee(selectedOption);
+                                                        }
+                                                    }}
+                                                    options={combinedOptions}
+                                                    placeholder="Contractor/Ven..."
+                                                    isSearchable
+                                                    isClearable
+                                                    menuPortalTarget={document.body}
+                                                    styles={{
+                                                        control: (provided, state) => ({
+                                                            ...provided,
+                                                            backgroundColor: 'transparent',
+                                                            borderWidth: '3px',
+                                                            borderColor: state.isFocused
+                                                                ? 'rgba(191, 152, 83, 0.2)'
+                                                                : 'rgba(191, 152, 83, 0.2)',
+                                                            borderRadius: '6px',
+                                                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                            '&:hover': {
+                                                                borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                            },
+                                                        }),
+                                                        placeholder: (provided) => ({
+                                                            ...provided,
+                                                            color: '#999',
+                                                            textAlign: 'left',
+                                                        }),
+                                                        menu: (provided) => ({
+                                                            ...provided,
+                                                            zIndex: 9,
+                                                        }),
+                                                        option: (provided, state) => ({
+                                                            ...provided,
+                                                            textAlign: 'left',
+                                                            fontWeight: 'normal',
+                                                            fontSize: '15px',
+                                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                            color: 'black',
+                                                        }),
+                                                        singleValue: (provided) => ({
+                                                            ...provided,
+                                                            textAlign: 'left',
+                                                            fontWeight: 'normal',
+                                                            color: 'black',
+                                                        }),
+                                                    }}
+                                                />
                                             </td>
-                                            {/* Edit/Save action column */}
-                                            <td className="px-4 py-2 flex">
-                                                {editingRowId === row.id ? (
-                                                    <button
-                                                        onClick={() => saveEditedExpense(row)}
-                                                        className="text-green-600 font-bold text-lg"
-                                                    >
-                                                        ✓
-                                                    </button>
-                                                ) : (
-                                                    <button onClick={() => handleEditClick(row)}>
-                                                        <img className="w-5 h-4" src={Edit} alt="Edit" />
-                                                    </button>
-                                                )}
-                                                <button className="pl-3">
-                                                    <img src={Delete} className=" w-5 h-4" onClick={() => handleWeeklyExpensesDelete(row.id)} />
-                                                </button>
-                                                <button className="" onClick={() => fetchAuditDetailsForExpense(row.id)}>
-                                                    <img src={history} className="w-5 h-4 ml-2" alt="History" />
-                                                </button>
+                                            <td className="pt-2 pb-2 w-[240px]">
+                                                <Select
+                                                    name="project"
+                                                    value={selectedProjectName}
+                                                    onChange={(selectedOption) => {
+                                                        setSelectedProjectName(selectedOption);
+                                                    }}
+                                                    options={siteOptions}
+                                                    placeholder="Project Name..."
+                                                    isClearable
+                                                    isSearchable
+                                                    menuPortalTarget={document.body}
+                                                    styles={{
+                                                        control: (provided, state) => ({
+                                                            ...provided,
+                                                            backgroundColor: 'transparent',
+                                                            borderWidth: '3px',
+                                                            borderColor: state.isFocused
+                                                                ? 'rgba(191, 152, 83, 0.2)'
+                                                                : 'rgba(191, 152, 83, 0.2)',
+                                                            borderRadius: '6px',
+                                                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                            '&:hover': {
+                                                                borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                            },
+                                                        }),
+                                                        placeholder: (provided) => ({
+                                                            ...provided,
+                                                            color: '#999',
+                                                            textAlign: 'left',
+                                                        }),
+                                                        menu: (provided) => ({
+                                                            ...provided,
+                                                            zIndex: 9,
+                                                        }),
+                                                        option: (provided, state) => ({
+                                                            ...provided,
+                                                            textAlign: 'left',
+                                                            fontWeight: 'normal',
+                                                            fontSize: '15px',
+                                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                            color: 'black',
+                                                        }),
+                                                        singleValue: (provided) => ({
+                                                            ...provided,
+                                                            textAlign: 'left',
+                                                            fontWeight: 'normal',
+                                                            color: 'black',
+                                                        }),
+                                                    }}
+                                                />
                                             </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                        {/* Payments + Account Closure + Summary */}
-                        <div className="-mt-6">
-                            <div className="flex justify-between lg:ml-10 ">
-                                <h1 className="font-bold text-base ">Payments Received</h1>
-                                <h1 className="font-bold text-base text-[#E4572E]">
-                                    Total: <span>{Number(totalPayments).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}</span>
-                                </h1>
-                            </div>
-                            <div className="rounded-lg lg:ml-9 border-l-8 border-l-[#BF9853]" style={{ maxHeight: "400px", overflowY: "auto" }} >
-                                <table className=" border-collapse">
-                                    <thead className="bg-[#FAF6ED] h-12">
-                                        <tr>
-                                            <th className="px-4 py-2 text-left">Date</th>
-                                            <th className="px-4 py-2">Amount</th>
-                                            <th className="px-4 py-2 text-left">Type</th>
-                                            <th className="px-4 py-2 text-left">Activity</th>
+                                            <td className="pt-2 pb-2 w-[100px]">
+                                                <select
+                                                    name="type"
+                                                    className="p-1 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
+                                                    value={newExpense.type}
+                                                    onChange={handleExpenseChange}
+                                                    onKeyDown={handleKeyDownExpense}
+                                                >
+                                                    <option value="">Select Type...</option>
+                                                    {weeklyTypes.map((type, index) => (
+                                                        <option key={index} value={type.type}>
+                                                            {type.type}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </td>
+                                            <td className="pt-2 pb-2 w-[110px]">
+                                                <input
+                                                    type="number"
+                                                    name="amount"
+                                                    className="p-1 rounded-md bg-transparent w-[80px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none no-spinner"
+                                                    value={newExpense.amount}
+                                                    onChange={handleExpenseChange}
+                                                    onKeyDown={handleKeyDownExpense}
+                                                    disabled={!newExpense.date || !selectedProjectName}
+                                                    min="0"
+                                                    step="any"
+                                                />
+                                            </td>
+                                            <td className="pt-2 pb-2 w-[120px]"></td>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {[...payments].map((row, index) => (
-                                            <tr key={row.id || index} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
-                                                <td className="px-2 py-2">
-                                                    {editingPaymentId === (row.id || null) ? (
-                                                        <input
-                                                            type="date"
-                                                            name="date"
-                                                            className="border-2 border-[#BF9853] border-opacity-25 p-1 rounded-lg w-[100px] h-[40px] focus:outline-none"
-                                                            value={editPaymentData.date}
-                                                            onChange={handleEditPaymentChange}
-                                                        />
-                                                    ) : (
-                                                        formatDateOnly(row.date) || ""
-                                                    )}
-                                                </td>
-                                                <td className="px-2 py-2">
-                                                    {editingPaymentId === (row.id || null) ? (
-                                                        <input
-                                                            type="number"
-                                                            name="amount"
-                                                            className="border-2 border-[#BF9853] border-opacity-25 rounded-lg w-[100px] h-[40px] focus:outline-none"
-                                                            value={editPaymentData.amount}
-                                                            onChange={handleEditPaymentChange}
-                                                            min="0"
-                                                            step="any"
-                                                            onWheel={(e) => e.preventDefault()}
-                                                        />
-                                                    ) : (
-                                                        Number(row.amount).toLocaleString('en-IN')
-                                                    )}
-                                                </td>
-                                                <td className="px-2 py-2 flex items-center justify-between">
-                                                    {editingPaymentId === (row.id || null) ? (
-                                                        <>
-                                                            <select
-                                                                name="type"
-                                                                className="border-2 border-[#BF9853] border-opacity-25 w-[100px] h-[40px] rounded-lg focus:outline-none"
-                                                                value={editPaymentData.type} onChange={handleEditPaymentChange}
-                                                            >
-                                                                <option value="Weekly">Weekly</option>
-                                                                <option value="Daily">Daily</option>
-                                                                <option value="Monthly">Monthly</option>
-                                                            </select>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            {row.type}
-                                                        </>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-2">
-                                                    <div className="flex">
-                                                        {editingPaymentId === row.id ? (
-                                                            <button
-                                                                onClick={() => saveEditedPaymentReceived(row)}
-                                                                className="text-green-600 font-bold text-lg"
-                                                                disabled={row.type === "Carry (CF))"} // block save button too
-                                                            >
-                                                                ✓
-                                                            </button>
+                                        {/* Existing Expenses */}
+                                        {sortedExpenses.length > 0 ? (
+                                            sortedExpenses.map((row, index) => (
+                                                <tr key={row.id} className="odd:bg-white even:bg-[#FAF6ED]">
+                                                    <td className="text-sm text-left p-2 w-[60px] font-semibold">{expenses.length - index}</td>
+                                                    {/* Date column */}
+                                                    <td className="text-sm text-left p-2 w-[140px] font-semibold">
+                                                        {editingRowId === row.id ? (
+                                                            <input
+                                                                type="date"
+                                                                name="date"
+                                                                className="p-1 rounded-md bg-transparent w-[120px] border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
+                                                                value={editFormData.date}
+                                                                onChange={handleEditChange}
+                                                            />
                                                         ) : (
-                                                            row.type === "Carry (CF)" ? (
+                                                            formatDateOnly(row.date) || ""
+                                                        )}
+                                                    </td>
+                                                    {/* Contractor column */}
+                                                    <td className="text-sm text-left w-[200px] font-semibold">
+                                                        {editingRowId === row.id ? (
+                                                            <Select
+                                                                name="party"
+                                                                value={
+                                                                    combinedOptions.find(
+                                                                        opt =>
+                                                                            (opt.type === "Contractor" && opt.id === Number(editFormData.contractor_id)) ||
+                                                                            (opt.type === "Vendor" && opt.id === Number(editFormData.vendor_id)) ||
+                                                                            (opt.type === "Employee" && opt.id === Number(editFormData.employee_id))
+                                                                    ) || null
+                                                                }
+                                                                onChange={(selectedOption) => {
+                                                                    if (!selectedOption) {
+                                                                        handleEditChange({ target: { name: "contractor_id", value: "" } });
+                                                                        handleEditChange({ target: { name: "vendor_id", value: "" } });
+                                                                    } else if (selectedOption.type === "Contractor") {
+                                                                        handleEditChange({ target: { name: "contractor_id", value: selectedOption.id } });
+                                                                        handleEditChange({ target: { name: "vendor_id", value: "" } });
+                                                                    } else if (selectedOption.type === "Vendor") {
+                                                                        handleEditChange({ target: { name: "vendor_id", value: selectedOption.id } });
+                                                                        handleEditChange({ target: { name: "contractor_id", value: "" } });
+                                                                    }
+                                                                }}
+                                                                options={combinedOptions}
+                                                                placeholder="Contractor/Ven..."
+                                                                isSearchable
+                                                                styles={{
+                                                                    control: (provided, state) => ({
+                                                                        ...provided,
+                                                                        backgroundColor: 'transparent',
+                                                                        borderWidth: '3px',
+                                                                        borderColor: state.isFocused
+                                                                            ? 'rgba(191, 152, 83, 0.2)'
+                                                                            : 'rgba(191, 152, 83, 0.2)',
+                                                                        borderRadius: '6px',
+                                                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                                        '&:hover': {
+                                                                            borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                                        },
+                                                                    }),
+                                                                    placeholder: (provided) => ({
+                                                                        ...provided,
+                                                                        color: '#999',
+                                                                        textAlign: 'left',
+                                                                    }),
+                                                                    menu: (provided) => ({
+                                                                        ...provided,
+                                                                        zIndex: 9,
+                                                                    }),
+                                                                    option: (provided, state) => ({
+                                                                        ...provided,
+                                                                        textAlign: 'left',
+                                                                        fontWeight: 'normal',
+                                                                        fontSize: '15px',
+                                                                        backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                                        color: 'black',
+                                                                    }),
+                                                                    singleValue: (provided) => ({
+                                                                        ...provided,
+                                                                        textAlign: 'left',
+                                                                        fontWeight: 'normal',
+                                                                        color: 'black',
+                                                                    }),
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            combinedOptions.find(
+                                                                opt =>
+                                                                    (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
+                                                                    (opt.type === "Vendor" && opt.id === Number(row.vendor_id)) ||
+                                                                    (opt.type === "Employee" && opt.id === Number(row.employee_id))
+                                                            )?.label || ""
+                                                        )}
+                                                    </td>
+                                                    {/* Project column */}
+                                                    <td className="text-sm text-left w-[240px] font-semibold">
+                                                        {editingRowId === row.id ? (
+                                                            <Select
+                                                                name="project_id"
+                                                                value={siteOptions.find(opt => opt.id === Number(editFormData.project_id)) || null}
+                                                                onChange={(selectedOption) =>
+                                                                    handleEditChange({
+                                                                        target: { name: "project_id", value: selectedOption ? selectedOption.id : "" }
+                                                                    })
+                                                                }
+                                                                options={siteOptions}
+                                                                placeholder="Project Name..."
+                                                                isSearchable
+                                                                styles={{
+                                                                    control: (provided, state) => ({
+                                                                        ...provided,
+                                                                        backgroundColor: 'transparent',
+                                                                        borderWidth: '3px',
+                                                                        borderColor: state.isFocused
+                                                                            ? 'rgba(191, 152, 83, 0.2)'
+                                                                            : 'rgba(191, 152, 83, 0.2)',
+                                                                        borderRadius: '6px',
+                                                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                                        '&:hover': {
+                                                                            borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                                        },
+                                                                    }),
+                                                                    placeholder: (provided) => ({
+                                                                        ...provided,
+                                                                        color: '#999',
+                                                                        textAlign: 'left',
+                                                                    }),
+                                                                    menu: (provided) => ({
+                                                                        ...provided,
+                                                                        zIndex: 9,
+                                                                    }),
+                                                                    option: (provided, state) => ({
+                                                                        ...provided,
+                                                                        textAlign: 'left',
+                                                                        fontWeight: 'normal',
+                                                                        fontSize: '15px',
+                                                                        backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                                        color: 'black',
+                                                                    }),
+                                                                    singleValue: (provided) => ({
+                                                                        ...provided,
+                                                                        textAlign: 'left',
+                                                                        fontWeight: 'normal',
+                                                                        color: 'black',
+                                                                    }),
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""
+                                                        )}
+                                                    </td>
+                                                    {/* Type column */}
+                                                    <td className="text-sm text-left w-[100px] font-semibold">
+                                                        {editingRowId === row.id ? (
+                                                            <select name="type"
+                                                                className="p-1 rounded-md bg-transparent w-[90px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
+                                                                value={editFormData.type} onChange={handleEditChange}
+                                                            >
+                                                                <option value="">Select Type...</option>
+                                                                {weeklyTypes.map((type, index) => (
+                                                                    <option key={index} value={type.type}>
+                                                                        {type.type}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        ) : (
+                                                            row.type
+                                                        )}
+                                                    </td>
+                                                    {/* Amount column */}
+                                                    <td className="text-sm text-left pl-2 w-[110px] font-semibold">
+                                                        <div className="flex items-center justify-between">
+                                                            <div>
+                                                                {editingRowId === row.id ? (
+                                                                    <input
+                                                                        type="number"
+                                                                        name="amount"
+                                                                        className="p-1 rounded-md bg-transparent w-[80px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none no-spinner"
+                                                                        value={editFormData.amount}
+                                                                        onChange={handleEditChange}
+                                                                        min="0"
+                                                                        step="any"
+                                                                    />
+                                                                ) : (
+                                                                    Number(row.amount).toLocaleString('en-IN')
+                                                                )}
+                                                            </div>
+                                                            <div className="mr-6">
+                                                                {row.type === "Project Advance" ? (
+                                                                    <button
+                                                                        onClick={async () => {
+                                                                            let description = "";
+                                                                            if (row.advance_portal_id) {
+                                                                                try {
+                                                                                    const res = await fetch(
+                                                                                        `https://backendaab.in/aabuildersDash/api/advance_portal/get/${row.advance_portal_id}`
+                                                                                    );
+                                                                                    if (!res.ok) throw new Error("Failed to fetch advance portal data");
+                                                                                    const data = await res.json();
+                                                                                    description = (data.description || "").trim();
+                                                                                    // ✅ Only store if non-empty
+                                                                                    setPortalDescriptions((prev) => ({
+                                                                                        ...prev,
+                                                                                        [row.advance_portal_id]: description !== "" ? description : undefined,
+                                                                                    }));
+                                                                                } catch (error) {
+                                                                                    console.error("Error fetching advance portal data:", error);
+                                                                                }
+                                                                            }
+                                                                            setEditFormData((prev) => ({
+                                                                                ...prev,
+                                                                                description,
+                                                                            }));
+                                                                            setCurrentRow(row);
+                                                                            setShowPopups(true);
+                                                                        }}
+                                                                    >
+                                                                        <img
+                                                                            src={
+                                                                                portalDescriptions[row.advance_portal_id] ? NotesEnd : NotesStart
+                                                                            }
+                                                                            alt="Notes"
+                                                                            className="w-4 h-4 mr-3"
+                                                                        />
+                                                                    </button>
+                                                                ) : (
+                                                                    <button>
+                                                                        <img
+                                                                            src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPC9zdmc+"
+                                                                            alt=""
+                                                                            className="w-4 h-4 mr-3 opacity-0"
+                                                                        />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    {/* Edit/Save action column */}
+                                                    <td className="flex py-2 w-[120px]">
+                                                        {row.contractor_id === 117 && row.project_id === 8 && row.type === "Daily" ? (
+                                                            // 🔒 Restricted row → show nothing or a lock
+                                                            <>                                                                
                                                                 <img
                                                                     className="w-5 h-4 opacity-40 cursor-not-allowed"
                                                                     src={Edit}
                                                                     alt="Edit Disabled"
                                                                 />
-                                                            ) : (
-                                                                <button onClick={() => handleEditPaymentClick(row)}>
-                                                                    <img className="w-5 h-4" src={Edit} alt="Edit" />
+                                                                <img
+                                                                    className="w-5 h-4 opacity-40 cursor-not-allowed ml-3"
+                                                                    src={Delete}
+                                                                    alt="Delete Disabled"
+                                                                />
+                                                                <img
+                                                                    className="w-5 h-4 opacity-40 cursor-not-allowed ml-3"
+                                                                    src={history}
+                                                                    alt="History Disabled"
+                                                                />
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                               
+                                                                {editingRowId === row.id ? (
+                                                                    <button
+                                                                        onClick={() => saveEditedExpense(row)}
+                                                                        className="text-green-600 font-bold text-lg mr-3"
+                                                                    >
+                                                                        ✓
+                                                                    </button>
+                                                                ) : (
+                                                                    <button className="rounded-full transition duration-200 ml-2 mr-3">
+                                                                        <img
+                                                                            src={Edit}
+                                                                            onClick={() => handleEditClick(row)}
+                                                                            alt="Edit"
+                                                                            className="w-4 h-4 transform hover:scale-110 hover:brightness-110 transition duration-200"
+                                                                        />
+                                                                    </button>
+                                                                )}
+                                                                <button className="rounded-full transition duration-200 mr-3">
+                                                                    <img
+                                                                        src={Delete}
+                                                                        className="w-4 h-4 transform hover:scale-110 hover:brightness-110 transition duration-200"
+                                                                        onClick={() => handleWeeklyExpensesDelete(row.id)}
+                                                                        alt="Delete"
+                                                                    />
                                                                 </button>
-                                                            )
+                                                                <button className="rounded-full transition duration-200">
+                                                                    <img
+                                                                        src={history}
+                                                                        className="w-4 h-4 transform hover:scale-110 hover:brightness-110 transition duration-200"
+                                                                        onClick={() => fetchAuditDetailsForExpense(row.id)}
+                                                                        alt="History"
+                                                                    />
+                                                                </button>
+                                                            </>
                                                         )}
-                                                        {/* 👇 Delete button with same Carry Forward restriction */}
-                                                        {row.type === "Carry (CF)" ? (
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td className="p-2 text-center text-sm text-gray-400" colSpan={7}>
+                                                    No data available
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    {/* Payments + Account Closure + Summary */}
+                    <div className="flex-[1] min-w-0">
+                        <div className="flex justify-between flex-wrap mb-4">
+                            <h1 className="font-bold text-base">Payments Received</h1>
+                            <h1 className="font-bold text-base ">
+                                Total: <span style={{ color: "#E4572E" }}>{Number(totalPayments).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            </h1>
+                        </div>
+                        <div className="w-full rounded-lg border-l-8 border-l-[#BF9853] overflow-x-auto" style={{ maxHeight: "400px" }}>
+                            <table className="w-full min-w-[320px] border-collapse">
+                                <thead className="bg-[#FAF6ED] h-12">
+                                    <tr>
+                                        <th className="px-2 py-2 w-[90px] text-left">Date</th>
+                                        <th className="px-2 py-2 w-[90px] text-left">Type</th>
+                                        <th className="px-2 py-2 w-[90px]">Amount</th>                                        
+                                        <th className="px-2 py-2 w-[90px] text-left">Activity</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {[...payments].map((row, index) => (
+                                        <tr key={row.id || index} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
+                                            <td className="px-2 py-2">
+                                                {editingPaymentId === (row.id || null) ? (
+                                                    <input
+                                                        type="date"
+                                                        name="date"
+                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 rounded-lg w-[90px] h-[40px] focus:outline-none"
+                                                        value={editPaymentData.date}
+                                                        onChange={handleEditPaymentChange}
+                                                    />
+                                                ) : (
+                                                    formatDateOnly(row.date) || ""
+                                                )}
+                                            </td>                                            
+                                            <td className="px-2 py-2 flex items-center justify-between">
+                                                {editingPaymentId === (row.id || null) ? (
+                                                    <>
+                                                        <select
+                                                            name="type"
+                                                            className="border-2 border-[#BF9853] border-opacity-25 w-[90px] h-[40px] rounded-lg focus:outline-none"
+                                                            value={editPaymentData.type} onChange={handleEditPaymentChange}
+                                                        >
+                                                            <option value="">Select</option>
+                                                            {weeklyReceivedTypes.map((type, index) => (
+                                                                <option key={index} value={type.received_type}>
+                                                                    {type.received_type}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        {row.type}
+                                                    </>
+                                                )}
+                                            </td>
+                                            <td className="px-2 py-2">
+                                                {editingPaymentId === (row.id || null) ? (
+                                                    <input
+                                                        type="number"
+                                                        name="amount"
+                                                        className="border-2 border-[#BF9853] border-opacity-25 rounded-lg w-[90px] h-[40px] focus:outline-none"
+                                                        value={editPaymentData.amount}
+                                                        onChange={handleEditPaymentChange}
+                                                        min="0"
+                                                        step="any"
+                                                        onWheel={(e) => e.preventDefault()}
+                                                    />
+                                                ) : (
+                                                    Number(row.amount).toLocaleString('en-IN')
+                                                )}
+                                            </td>
+                                            <td className="px-2 py-2">
+                                                <div className="flex">
+                                                    {editingPaymentId === row.id ? (
+                                                        <button
+                                                            onClick={() => saveEditedPaymentReceived(row)}
+                                                            className="text-green-600 font-bold text-lg"
+                                                            disabled={row.type === "Carry (CF))"}
+                                                        >
+                                                            ✓
+                                                        </button>
+                                                    ) : (
+                                                        row.type === "Carry (CF)" ? (
                                                             <img
                                                                 className="w-5 h-4 opacity-40 cursor-not-allowed"
-                                                                src={Delete}
-                                                                alt="Delete Disabled"
+                                                                src={Edit}
+                                                                alt="Edit Disabled"
                                                             />
                                                         ) : (
-                                                            <button className="pl-3">
-                                                                <img src={Delete} className="w-5 h-4" alt="Delete" onClick={() => handleWeeklyReceivedDelete(row.id)} />
+                                                            <button onClick={() => handleEditPaymentClick(row)}>
+                                                                <img className="w-5 h-4" src={Edit} alt="Edit" />
                                                             </button>
-                                                        )}
-                                                        {row.type === "Carry (CF)" ? (
-                                                            <img
-                                                                className="w-5 h-4 opacity-40 cursor-not-allowed"
-                                                                src={history}
-                                                                alt="History Disabled"
-                                                            />
-                                                        ) : (
-                                                            <button className="" onClick={() => fetchAuditDetailsForPaymentReceived(row.id)}>
-                                                                <img src={history} className="w-5 h-4" alt="History" />
-                                                            </button>
-                                                        )}
-                                                    </div>
+                                                        )
+                                                    )}
+                                                    {row.type === "Carry (CF)" ? (
+                                                        <img
+                                                            className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                            src={Delete}
+                                                            alt="Delete Disabled"
+                                                        />
+                                                    ) : (
+                                                        <button className="pl-3">
+                                                            <img src={Delete} className="w-5 h-4" alt="Delete" onClick={() => handleWeeklyReceivedDelete(row.id)} />
+                                                        </button>
+                                                    )}
+                                                    {row.type === "Carry (CF)" ? (
+                                                        <img
+                                                            className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                            src={history}
+                                                            alt="History Disabled"
+                                                        />
+                                                    ) : (
+                                                        <button className="" onClick={() => fetchAuditDetailsForPaymentReceived(row.id)}>
+                                                            <img src={history} className="w-5 h-4" alt="History" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    <tr>
+                                        <td className="px-2 py-2">
+                                            <input
+                                                type="date"
+                                                name="date"
+                                                className="border-2 border-[#BF9853] border-opacity-25 p-1 rounded-lg w-[90px] h-[40px] focus:outline-none"
+                                                value={newPayment.date}
+                                                onChange={handlePaymentChange}
+                                                onKeyDown={handleKeyDownPayment}
+                                            />
+                                        </td>
+                                        
+                                        <td className="px-2 py-2">
+                                            <select
+                                                name="type"
+                                                className="border-2 border-[#BF9853] border-opacity-25 w-[90px] h-[40px] rounded-lg focus:outline-none"
+                                                value={newPayment.type} onChange={handlePaymentChange} onKeyDown={handleKeyDownPayment}>
+                                                <option value="">Select</option>
+                                                {weeklyReceivedTypes.map((type, index) => (
+                                                    <option key={index} value={type.received_type}>
+                                                        {type.received_type}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </td>
+                                        <td className="px-2 py-2">
+                                            <input
+                                                type="number"
+                                                name="amount"
+                                                className="border-2 border-[#BF9853] border-opacity-25 rounded-lg w-[90px] h-[40px] focus:outline-none"
+                                                value={newPayment.amount}
+                                                onChange={handlePaymentChange}
+                                                onKeyDown={handleKeyDownPayment}
+                                                min="0"
+                                                step="any"
+                                                onWheel={(e) => e.preventDefault()}
+                                            />
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div className="mt-4">
+                            <button className="w-full max-w-[320px] h-[36px] bg-[#BF9853] text-white font-bold rounded" onClick={openAccountClosure} >
+                                Account Closure
+                            </button>
+                            {showPopup && (
+                                <AccountClosurePopup
+                                    onClose={() => setShowPopup(false)}
+                                    carryForwardBalance={carryForwardBalance}
+                                    onConfirm={(type, discount) => {
+                                        handleAccountClosure(type, discount);
+                                        setShowPopup(false);
+                                    }}
+                                />
+                            )}
+                        </div>
+                        <div className="mt-4 pt-2">
+                            <h2 className="font-bold text-lg mb-2">Summary</h2>
+                            <div className="overflow-hidden rounded-md border-l-8 border-[#BF9853]">
+                                <table className="w-full max-w-[320px] border-collapse">
+                                    <tbody>
+                                        {mergedExpenses.map((expense, index, arr) => (
+                                            <tr
+                                                key={index}
+                                                className={`even:bg-[#FAF6ED] odd:bg-[#FFFFFF] ${index === 0 ? "rounded-t-md" : ""
+                                                    } ${index === arr.length - 1 ? "rounded-b-md" : ""}`}
+                                            >
+                                                <td className="font-bold py-1.5 pl-2 text-left">{expense.type}</td>
+                                                <td className="font-bold py-1.5 px-4 text-right">
+                                                    {expense.amount.toLocaleString("en-IN", {
+                                                        minimumFractionDigits: 2,
+                                                        maximumFractionDigits: 2,
+                                                    })}
                                                 </td>
                                             </tr>
                                         ))}
-                                        <tr>
-                                            <td className="px-2 py-2">
-                                                <input
-                                                    type="date"
-                                                    name="date"
-                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 rounded-lg w-[120px] h-[40px] focus:outline-none"
-                                                    value={newPayment.date}
-                                                    onChange={handlePaymentChange}
-                                                    onKeyDown={handleKeyDownPayment}
-                                                />
-                                            </td>
-                                            <td className="px-2 py-2">
-                                                <input
-                                                    type="number"
-                                                    name="amount"
-                                                    className="border-2 border-[#BF9853] border-opacity-25 rounded-lg w-[100px] h-[40px] focus:outline-none"
-                                                    value={newPayment.amount}
-                                                    onChange={handlePaymentChange}
-                                                    onKeyDown={handleKeyDownPayment}
-                                                    min="0"
-                                                    step="any"
-                                                    onWheel={(e) => e.preventDefault()}
-                                                />
-                                            </td>
-                                            <td className="px-2 py-2">
-                                                <select
-                                                    name="type"
-                                                    className="border-2 border-[#BF9853] border-opacity-25 w-[100px] h-[40px] rounded-lg focus:outline-none"
-                                                    value={newPayment.type} onChange={handlePaymentChange} onKeyDown={handleKeyDownPayment}>
-                                                    <option value="Weekly">Weekly</option>
-                                                    <option value="Daily">Daily</option>
-                                                    <option value="Monthly">Monthly</option>
-                                                </select>
+
+                                        {/* Total Row */}
+                                        <tr className="bg-[#E5E5E5] font-bold">
+                                            <td className="py-1.5 pl-2 text-left">Total</td>
+                                            <td className="py-1.5 px-4 text-right text-[#E4572E]">
+                                                {mergedExpenses
+                                                    .reduce((sum, exp) => sum + exp.amount, 0)
+                                                    .toLocaleString("en-IN", {
+                                                        minimumFractionDigits: 2,
+                                                        maximumFractionDigits: 2,
+                                                    })}
                                             </td>
                                         </tr>
                                     </tbody>
                                 </table>
-                            </div>
-                            <div className="mt-4 ml-4">
-                                <button className="w-[345px] h-[36px] bg-[#BF9853] text-white font-bold rounded" onClick={openAccountClosure} >
-                                    Account Closure
-                                </button>
-                                {showPopup && (
-                                    <AccountClosurePopup
-                                        onClose={() => setShowPopup(false)}
-                                        carryForwardBalance={carryForwardBalance}
-                                        onConfirm={(type, discount) => {   // 👈 accept discount
-                                            handleAccountClosure(type, discount); // 👈 forward discount
-                                            setShowPopup(false);
-                                        }}
-                                    />
-                                )}
-                            </div>
-                            <div className="mt-4 pt-2 ml-12">
-                                <h2 className="font-bold text-lg">Summary</h2>
-                                <div className="overflow-hidden rounded-md border-l-8 border-[#BF9853]">
-                                    <table className="w-[345px] border-collapse">
-                                        <tbody>
-                                            {mergedExpenses.map((expense, index, arr) => (
-                                                <tr key={index}
-                                                    className={`even:bg-[#FAF6ED] odd:bg-[#FFFFFF] ${index === 0 ? "rounded-t-md" : ""
-                                                        } ${index === arr.length - 1 ? "rounded-b-md" : ""}`}
-                                                >
-                                                    <td className="font-bold py-1.5 pl-2">{expense.type}</td>
-                                                    <td className="font-bold py-1.5 px-4 text-right">
-                                                        {expense.amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2, })}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -1222,6 +2186,45 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
             )}
+            {showPopups && currentRow?.type === "Project Advance" && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                    <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
+                        <label className="block mb-3 text-left">
+                            <span className="font-semibold">Description</span>
+                            <input
+                                type="text"
+                                name="description"
+                                placeholder="Enter description"
+                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                value={editFormData.description || ""}
+                                onChange={handleEditChange}
+                                readOnly={Boolean(currentRow?.description)} // ✅ only read-only if DB already had description
+                            />
+                        </label>
+
+                        <div className="flex justify-end gap-3 mt-4">
+                            <button
+                                onClick={() => setShowPopups(false)}
+                                className="px-4 py-2 bg-gray-200 rounded-lg"
+                            >
+                                Close
+                            </button>
+                            {!portalDescriptions[currentRow?.advance_portal_id] && (
+                                <button
+                                    onClick={async () => {
+                                        await updateDescription(currentRow.advance_portal_id, editFormData.description);
+                                        setShowPopups(false);
+                                    }}
+                                    className="px-4 py-2 bg-green-600 text-white rounded-lg"
+                                >
+                                    Save
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <AuditModal show={showWeeklyPaymentExpensesModal} onClose={() => setShowWeeklyPaymentExpensesModal(false)} audits={weeklyPaymentExpensesAudits} vendorOptions={vendorOptions} contractorOptions={contractorOptions}
                 siteOptions={siteOptions} />
             <AuditModalWeeklyPaymentsReceived show={showWeeklyPaymentReceivedModal} onClose={() => setShowWeeklyPaymentReceivedModal(false)}

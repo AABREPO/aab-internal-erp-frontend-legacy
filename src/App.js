@@ -23,6 +23,7 @@ import Attendancelog from './Components/Attendances/Attendancelog';
 import InventoryHeading from './Components/ProcurementInventory/InventoryHeading';
 import AdvanceHeading from './Components/Advance Portal/AdvanceHeading';
 import ClaimPaymentHeading from './Components/ClaimPayments/ClaimPaymentHeading';
+import StaffHeading from './Components/StaffAdvance/StaffHeading';
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
@@ -73,6 +74,7 @@ function App() {
             <Route path='/attendance' element={<Attendancelog username={user.username} />}/>
             <Route path='/portal/*' element={<AdvanceHeading username={user.username} userRoles={user?.userRoles || []} />} />
             <Route path='/Claim/*' element={<ClaimPaymentHeading username={user.username} userRoles={user?.userRoles || []}/>} />
+            <Route path='/staffadvance/*' element={<StaffHeading username={user.username} userRoles={user?.userRoles || []}/>} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </div>

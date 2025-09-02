@@ -254,12 +254,13 @@ const Ebno = () => {
             })
             .map(detail => {
                 let matchedTenantName = '';
-
+                let matchedTenantRent = null;
                 for (const tenant of ebtenantShopData) {
                     for (const prop of tenant.property || []) {
                         for (const shop of prop.shops || []) {
                             if (shop.shopNo === detail.shopNo && shop.doorNo === detail.doorNo) {
                                 matchedTenantName = tenant.tenantName;
+                                matchedTenantRent = shop.monthlyRent;
                                 break;
                             }
                         }
@@ -271,7 +272,8 @@ const Ebno = () => {
                     property,
                     owner,
                     detail,
-                    tenantName: matchedTenantName
+                    tenantName: matchedTenantName,
+                    rent: matchedTenantRent
                 };
             });
     });
@@ -359,7 +361,152 @@ const Ebno = () => {
 
         doc.save("eb-properties.pdf");
     };
-
+    // ✅ Common helper to filter, sort and prepare rows
+    const prepareEbRows = (filteredEbProperties) => {
+        // Exclude owner Rajendran
+        const filteredRows = filteredEbProperties.filter(
+            ({ owner }) => owner.ownerName !== "Rajendran"
+        );
+        // ✅ Parse shopNo into { prefix, num, suffix }
+        const parseShopNo = (shopNo) => {
+            if (!shopNo) return { prefix: "", num: NaN, suffix: "" };
+            // Match prefix (letters/spaces/hyphen), number, suffix (letters/commas)
+            const match = shopNo.match(/^([A-Za-z -]*?)(\d+)([A-Za-z, ]*)$/);
+            if (match) {
+                return {
+                    prefix: match[1].trim(),   // e.g. "M" or "TC - B"
+                    num: parseInt(match[2], 10), // e.g. 5
+                    suffix: match[3].trim() || "" // e.g. "A" or "A, B"
+                };
+            }
+            // If no number at all → treat whole as prefix
+            return { prefix: shopNo.trim(), num: NaN, suffix: "" };
+        };
+        // ✅ Sorting logic: propertyName → shopNo
+        const sortedRows = filteredRows.sort((a, b) => {
+            if (a.property.propertyName === b.property.propertyName) {
+                const aParsed = parseShopNo(a.detail.shopNo);
+                const bParsed = parseShopNo(b.detail.shopNo);
+                // Compare prefixes (M, TA, TC-B, etc.)
+                if (aParsed.prefix !== bParsed.prefix) {
+                    return aParsed.prefix.localeCompare(bParsed.prefix);
+                }
+                // Compare numbers
+                if (!isNaN(aParsed.num) && !isNaN(bParsed.num)) {
+                    if (aParsed.num !== bParsed.num) {
+                        return aParsed.num - bParsed.num;
+                    }
+                    // ✅ Numbers equal → plain number before suffixed number
+                    if (aParsed.suffix && !bParsed.suffix) return 1;
+                    if (!aParsed.suffix && bParsed.suffix) return -1;
+                    return aParsed.suffix.localeCompare(bParsed.suffix);
+                }
+                // One has no number → fallback to string compare
+                return (a.detail.shopNo || "").localeCompare(b.detail.shopNo || "");
+            }
+            return a.property.propertyName.localeCompare(b.property.propertyName);
+        });
+        // ✅ Prepare table rows for PDF/CSV
+        const tableRows = sortedRows.map(({ property, owner, detail, rent }) => [
+            property.propertyName || "-",
+            owner.ownerName || "-",
+            detail.propertyType || "-",
+            detail.shopNo || "-",
+            detail.floorName || "-",
+            detail.doorNo || "-",
+            detail.area || "-",
+            detail.ebNo || "-",
+            rent || "-"
+        ]);
+        // ✅ Total rent
+        const totalRent = sortedRows.reduce(
+            (sum, { rent }) => sum + (parseFloat(rent) || 0),
+            0
+        );
+        return { tableRows, totalRent };
+    };
+    // ✅ Generate PDF
+    const generatePdfWithRent = () => {
+        const doc = new jsPDF();
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text("EB Property List", 14, 15);
+        const tableColumn = [
+            "Property Name",
+            "Owner Name",
+            "Property",
+            "Shop No",
+            "Floor Name",
+            "Door No",
+            "Area",
+            "EB.No",
+            "Rent"
+        ];
+        const { tableRows, totalRent } = prepareEbRows(filteredEbProperties);
+        // Show total top-right
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "normal");
+        doc.text(
+            `Total Rent: ${Number(totalRent).toLocaleString("en-IN")}`,
+            150,
+            15
+        );
+        autoTable(doc, {
+            head: [tableColumn],
+            body: tableRows,
+            startY: 22,
+            styles: {
+                fontSize: 8,
+                textColor: [0, 0, 0],
+                lineColor: [0, 0, 0],
+                lineWidth: 0.1,
+            },
+            headStyles: {
+                fontStyle: "bold",
+                fillColor: [255, 255, 255],
+                textColor: [0, 0, 0],
+            },
+            bodyStyles: {
+                fontStyle: "normal",
+                fillColor: [255, 255, 255],
+                textColor: [0, 0, 0],
+            },
+            didParseCell: (data) => {
+                data.cell.styles.fillColor = [255, 255, 255];
+            },
+        });
+        doc.save("eb-properties.pdf");
+    };
+    // ✅ Generate CSV
+    const generateCsvWithRent = () => {
+        const headers = [
+            "Property Name",
+            "Owner Name",
+            "Property",
+            "Shop No",
+            "Floor Name",
+            "Door No",
+            "Area",
+            "EB.No",
+            "Rent"
+        ];
+        const { tableRows, totalRent } = prepareEbRows(filteredEbProperties);
+        // Add total row
+        tableRows.push([
+            "TOTAL", "", "", "", "", "", "", "",
+            Number(totalRent).toLocaleString("en-IN")
+        ]);
+        // Convert to CSV
+        const csvContent = [headers, ...tableRows]
+            .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+            .join("\n");
+        // Trigger download
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "eb-properties.csv";
+        link.click();
+    };
     return (
         <div>
             <div className='mx-auto lg:w-[1750px] p-4 lg:pl-8 bg-white lg:ml-7 lg:mr-6 rounded-md text-left flex'>
@@ -551,12 +698,18 @@ const Ebno = () => {
             <div className='mx-auto lg:w-[1750px] p-4 lg:pl-8 mt-6 bg-white lg:ml-7 mr-6 rounded-md'>
                 <div className="flex justify-between">
                     <div></div>
-                    <div>
+                    <div className="flex items-center gap-3 cursor-pointer">
                         <h1
-                            className='font-bold text-sm mt-2 mb-3 text-[#E4572E] cursor-pointer hover:underline'
-                            onClick={generatePdf}
+                            className='text-sm text-[#E4572E] hover:underline font-bold'
+                            onClick={generatePdfWithRent}
                         >
                             Export PDF
+                        </h1>
+                        <h1
+                            className='text-sm text-[#007233] hover:underline font-bold'
+                            onClick={generateCsvWithRent}
+                        >
+                            Export XL
                         </h1>
                     </div>
                 </div>

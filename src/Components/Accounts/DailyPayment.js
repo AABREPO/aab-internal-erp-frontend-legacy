@@ -1,61 +1,413 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import Edit from '../Images/Edit.svg';
 import Delete from '../Images/Delete.svg';
 import history from '../Images/History.svg';
 import Select from 'react-select';
+import fileUpload from '../Images/file_upload.png';
 import download from '../Images/file_download.png'
+import file from '../Images/file.png';
+import Change from '../Images/dropdownchange.png'
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { type } from '@testing-library/user-event/dist/type';
 const DailyPayment = ({ username, userRoles = [] }) => {
     const [expenses, setExpenses] = useState([]);
-    console.log("Expenses Data:", expenses);
-    const [payments, setPayments] = useState([]);
-    const [newExpense, setNewExpense] = useState({ date: "", contractor: "", vendor: "", project: "", type: "", amount: "" });
-    const [newPayment, setNewPayment] = useState({ date: "", amount: "", type: "Weekly" });
+    const [dailyExpenses, setDailyExpenses] = useState([]);
+    const [refundPayments, setRefundPayments] = useState([]);
+    const [expensesCategory, setExpensesCategory] = useState([]);
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [newDailyExpense, setNewDailyExpense] = useState({
+        date: "",
+        labour_id: "",
+        vendor_id: "",
+        contractor_id: "",
+        employee_id: "",
+        project_id: "",
+        quantity: "",
+        type: "Wage",
+        amount: "",
+        extra_amount: ""
+    });
+    const [editDailyExpenseData, setEditDailyExpenseData] = useState({
+        date: "",
+        labour_id: "",
+        vendor_id: "",
+        contractor_id: "",
+        employee_id: "",
+        project_id: "",
+        quantity: "",
+        type: "",
+        amount: "",
+        extra_amount: "",
+    });
     const [weeks, setWeeks] = useState([]);
-    const [vendorOptions, setVendorOptions] = useState([]);
+    const [allRefundAmount, setAllRefundAmount] = useState([]);
     const [contractorOptions, setContractorOptions] = useState([]);
     const [siteOptions, setSiteOptions] = useState([]);
-    const [combinedOptions, setCombinedOptions] = useState([]);
-    const [vendorId, setVendorId] = useState('');
-    const [contractorId, setContractorId] = useState('');
     const [projectId, setProjectId] = useState('');
     const [selectedWeek, setSelectedWeek] = useState("");
-    const [editingRowId, setEditingRowId] = useState('');
+    const [editingDailyExpenseRowId, setEditingDailyExpenseRowId] = useState('');
     const [editingPaymentId, setEditingPaymentId] = useState('');
-    const [selectedDate, setSelectedDate] = useState(null); // new state
     const [showWeeklyPaymentExpensesModal, setShowWeeklyPaymentExpensesModal] = useState(false);
     const [weeklyPaymentExpensesAudits, setWeeklyPaymentExpensesAudits] = useState([]);
     const [showWeeklyPaymentReceivedModal, setShowWeeklyPaymentReceivedModal] = useState(false);
     const [weeklyPaymentReceivedAudits, setWeeklyPaymentReceivedAudits] = useState([]);
-    const [year, setYear] = useState(new Date().getFullYear().toString());
+    const [showExtraAmount, setShowExtraAmount] = useState(false);
     const [weeklyTypes, setWeeklyTypes] = useState([]);
+    const [employeeOptions, setEmployeeOptions] = useState([]);
+    const [vendorOptions, setVendorOptions] = useState([]);
+    const [combinedOptions, setCombinedOptions] = useState([]);
     const currentYear = new Date().getFullYear();
+    const currentWeek = weeks.find((w) => w.number === Number(selectedWeek));
+    const [weeklyReceivedTypes, setWeeklyReceivedTypes] = useState([]);
+    const [isChangeButtonActive, setIsChangeButtonActive] = useState(false);
+    useEffect(() => {
+        fetchWeeklyReceivedType();
+    }, []);
+    const fetchWeeklyReceivedType = async () => {
+        try {
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/weekly_received_types/getAll');
+            if (response.ok) {
+                const data = await response.json();
+                setWeeklyReceivedTypes(data);
+            } else {
+                console.log('Error fetching Payment Received type.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            console.log('Error fetching Payment Received type.');
+        }
+    };
+    useEffect(() => {
+        fetchCategories();
+    }, []);
+    const fetchCategories = async () => {
+        try {
+            const response = await fetch('https://backendaab.in/aabuilderDash/api/expenses_categories/getAll');
+            if (response.ok) {
+                const data = await response.json();
+                setExpensesCategory(data);
+            } else {
+                console.log('Error fetching category.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            console.log('Error fetching category.');
+        }
+    };
+    // Sorting state
+    const [sortConfig, setSortConfig] = useState({
+        key: null,
+        direction: 'asc'
+    });
+
+    // Click and drag scrolling functionality
+    const scrollRef = useRef(null);
+    const isDragging = useRef(false);
+    const start = useRef({ x: 0, y: 0 });
+    const scroll = useRef({ left: 0, top: 0 });
+    const velocity = useRef({ x: 0, y: 0 });
+    const animationFrame = useRef(null);
+    const lastMove = useRef({ time: 0, x: 0, y: 0 });
+    // Move laboursList state declaration here, before it's used in sortedDailyExpenses
+    const [laboursList, setLaboursList] = useState([]);
+    const handleMouseDown = (e) => {
+        if (!scrollRef.current) return;
+        isDragging.current = true;
+        start.current = { x: e.clientX, y: e.clientY };
+        scroll.current = {
+            left: scrollRef.current.scrollLeft,
+            top: scrollRef.current.scrollTop,
+        };
+        lastMove.current = {
+            time: Date.now(),
+            x: e.clientX,
+            y: e.clientY,
+        };
+        scrollRef.current.style.cursor = 'grabbing';
+        scrollRef.current.style.userSelect = 'none';
+        cancelMomentum();
+    };
+
+    const handleMouseMove = (e) => {
+        if (!isDragging.current || !scrollRef.current) return;
+        const dx = e.clientX - start.current.x;
+        const dy = e.clientY - start.current.y;
+        const now = Date.now();
+        const dt = now - lastMove.current.time || 16;
+        velocity.current = {
+            x: (e.clientX - lastMove.current.x) / dt,
+            y: (e.clientY - lastMove.current.y) / dt,
+        };
+        scrollRef.current.scrollLeft = scroll.current.left - dx;
+        scrollRef.current.scrollTop = scroll.current.top - dy;
+        lastMove.current = {
+            time: now,
+            x: e.clientX,
+            y: e.clientY,
+        };
+    };
+
+    const handleMouseUp = () => {
+        if (!isDragging.current || !scrollRef.current) return;
+        isDragging.current = false;
+        scrollRef.current.style.cursor = '';
+        scrollRef.current.style.userSelect = '';
+        applyMomentum();
+    };
+
+    const cancelMomentum = () => {
+        if (animationFrame.current) {
+            cancelAnimationFrame(animationFrame.current);
+            animationFrame.current = null;
+        }
+    };
+
+    const applyMomentum = () => {
+        if (!scrollRef.current) return;
+        const friction = 0.95;
+        const minVelocity = 0.1;
+        const step = () => {
+            const { x, y } = velocity.current;
+            if (!scrollRef.current) return;
+            if (Math.abs(x) > minVelocity || Math.abs(y) > minVelocity) {
+                scrollRef.current.scrollLeft -= x * 20;
+                scrollRef.current.scrollTop -= y * 20;
+                velocity.current.x *= friction;
+                velocity.current.y *= friction;
+                animationFrame.current = requestAnimationFrame(step);
+            } else {
+                cancelMomentum();
+            }
+        };
+        animationFrame.current = requestAnimationFrame(step);
+    };
+
+    // Sorting functions
+    const handleSort = (key) => {
+        let direction = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const sortedDailyExpenses = React.useMemo(() => {
+        let sortableData = [...dailyExpenses];
+
+        if (sortConfig.key) {
+            sortableData.sort((a, b) => {
+                let aValue, bValue;
+
+                switch (sortConfig.key) {
+                    case 'date':
+                        aValue = new Date(a.date);
+                        bValue = new Date(b.date);
+                        break;
+                    case 'labour_name':
+                        if (isChangeButtonActive) {
+                            const getAValue = () => {
+                                const employee = employeeOptions.find(opt => opt.id === Number(a.employee_id));
+                                const vendor = vendorOptions.find(opt => opt.id === Number(a.vendor_id));
+                                const contractor = contractorOptions.find(opt => opt.id === Number(a.contractor_id));
+                                return employee?.label || vendor?.label || contractor?.label || "";
+                            };
+                            const getBValue = () => {
+                                const employee = employeeOptions.find(opt => opt.id === Number(b.employee_id));
+                                const vendor = vendorOptions.find(opt => opt.id === Number(b.vendor_id));
+                                const contractor = contractorOptions.find(opt => opt.id === Number(b.contractor_id));
+                                return employee?.label || vendor?.label || contractor?.label || "";
+                            };
+                            aValue = getAValue();
+                            bValue = getBValue();
+                        } else {
+                            aValue = laboursList.find(opt => opt.id === Number(a.labour_id))?.label || "";
+                            bValue = laboursList.find(opt => opt.id === Number(b.labour_id))?.label || "";
+                        }
+                        break;
+                    case 'project_name':
+                        aValue = siteOptions.find(opt => opt.id === Number(a.project_id))?.label || "";
+                        bValue = siteOptions.find(opt => opt.id === Number(b.project_id))?.label || "";
+                        break;
+                    case 'type':
+                        aValue = a.type || "";
+                        bValue = b.type || "";
+                        break;
+                    case 'amount':
+                        aValue = Number(a.amount || 0) + Number(a.extra_amount || 0);
+                        bValue = Number(b.amount || 0) + Number(b.extra_amount || 0);
+                        break;
+                    default:
+                        return 0;
+                }
+
+                if (aValue < bValue) {
+                    return sortConfig.direction === 'asc' ? -1 : 1;
+                }
+                if (aValue > bValue) {
+                    return sortConfig.direction === 'asc' ? 1 : -1;
+                }
+                return 0;
+            });
+        } else {
+            // Default sorting: Most recent entries first (by date descending)
+            sortableData.sort((a, b) => {
+                const dateA = new Date(a.date);
+                const dateB = new Date(b.date);
+                return dateB - dateA; // Descending order (newest first)
+            });
+        }
+
+        return sortableData;
+    }, [dailyExpenses, sortConfig, laboursList, siteOptions, isChangeButtonActive, combinedOptions, employeeOptions, vendorOptions, contractorOptions]);
+    const getCurrentWeekNumber = () => {
+        const date = new Date();
+        const firstJan = new Date(date.getFullYear(), 0, 1);
+        const days = Math.floor((date - firstJan) / (24 * 60 * 60 * 1000));
+        return Math.ceil((days + firstJan.getDay() + 1) / 7);
+    };
+    const currentWeekNumber = getCurrentWeekNumber();
     const startYear = 2000; // Change if needed
     const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i);
-
+    const [newRefundReceived, setNewRefundReceived] = useState({
+        date: new Date().toISOString().split("T")[0],
+        labour_id: "",
+        amount: ""
+    });
+    const [editRefundPaymentData, setEditRefundPaymentData] = useState({
+        labour_id: "",
+        amount: "",
+    });
+    const [payments, setPayments] = useState([]);
+    const [selectedDate, setSelectedDate] = useState(null);
+    const handleEditClick = (row) => {
+        setEditingDailyExpenseRowId(row.id);
+        setEditDailyExpenseData({
+            date: row.date,
+            labour_id: row.labour_id || "",
+            vendor_id: row.vendor_id || "",
+            contractor_id: row.contractor_id || "",
+            employee_id: row.employee_id || "",
+            project_id: row.project_id,
+            type: row.type,
+            amount: row.amount,
+            extra_amount: row.extra_amount,
+        });
+    };
+    const handleEditRefundClick = (row) => {
+        setEditingPaymentId(row.id);
+        setEditRefundPaymentData({
+            labour_id: row.labour_id,
+            amount: row.amount,
+        });
+    };
+    const handleEditRefundChange = (e) => {
+        const { name, value } = e.target;
+        setEditRefundPaymentData((prev) => ({
+            ...prev,
+            [name]: value,
+        }));
+    };
+    const handleEditRefundLabourChange = (selected) => {
+        setEditRefundPaymentData((prev) => ({
+            ...prev,
+            labour_id: selected ? selected.id : "",
+        }));
+    };
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setSelectedFile(file);
+        }
+        // This ensures the input is cleared even if the same file is selected again next time
+        e.target.value = '';
+    };
     function getStartAndEndDateOfWeek(weekNumber, year) {
         const simple = new Date(year, 0, 1 + (weekNumber - 1) * 7);
         const dayOfWeek = simple.getDay();
         const ISOWeekStart = new Date(simple);
         ISOWeekStart.setDate(simple.getDate() - ((dayOfWeek + 7) % 9)); // Monday
-
         const ISOWeekEnd = new Date(ISOWeekStart);
         ISOWeekEnd.setDate(ISOWeekStart.getDate() + 6); // Saturday (not Sunday)
-
         return {
             number: weekNumber,
             start: ISOWeekStart.toISOString().split("T")[0],
             end: ISOWeekEnd.toISOString().split("T")[0],
         };
     }
+    const fetchExpenses = useCallback(() => {
+        if (!currentWeekNumber) return;
+        fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${currentWeekNumber}`)
+            .then((res) => res.json())
+            .then(setExpenses)
+            .catch(console.error);
+    }, [currentWeekNumber]);
+    const fetchPayments = useCallback(() => {
+        if (!currentWeekNumber) return;
+        fetch(`https://backendaab.in/aabuildersDash/api/payments-received/week/${currentWeekNumber}`)
+            .then((res) => res.json())
+            .then((data) => {
+                // Filter out records where type is "Handover"
+                const filtered = data.filter((payment) => payment.type !== "Handover");
+                setPayments(filtered);
+            })
+            .catch(console.error);
+    }, [currentWeekNumber]);
+    const fetchRefundPayments = useCallback(() => {
+        if (!currentWeekNumber) return;
+        fetch(`https://backendaab.in/aabuildersDash/api/refund_received/getAll`)
+            .then((res) => res.json())
+            .then((data) => {
+                setAllRefundAmount(data);
+            })
+            .catch(console.error);
+    }, [currentWeekNumber]);
+    useEffect(() => {
+        if (currentWeekNumber) {
+            fetchPayments();
+            fetchExpenses();
+            fetchRefundPayments();
+        }
+    }, [currentWeekNumber, fetchPayments, fetchExpenses, fetchRefundPayments]);
+
+    // Cleanup momentum animation on unmount
+    useEffect(() => {
+        return () => {
+            cancelMomentum();
+        };
+    }, []);
     const formatDateOnly = (dateString) => {
         const date = new Date(dateString);
         const day = String(date.getDate()).padStart(2, '0');
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const year = date.getFullYear();
         return `${day}-${month}-${year}`;
+    };
+    useEffect(() => {
+        fetchLaboursList();
+    }, []);
+    const fetchLaboursList = async () => {
+        try {
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
+            if (response.ok) {
+                const data = await response.json();
+                const formattedData = data.map(item => ({
+                    value: item.labour_name,
+                    label: item.labour_name,
+                    id: item.id,
+                    type: "Labour",
+                    salary: item.labour_salary,
+                    extra: item.extra_amount
+                }));
+                setLaboursList(formattedData);
+            } else {
+                console.log('Error fetching Labour names.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            console.log('Error fetching Labour names.');
+        }
     };
     useEffect(() => {
         fetchWeeklyType();
@@ -102,6 +454,34 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         fetchVendorNames();
     }, []);
     useEffect(() => {
+        const fetchEmployeeDetails = async () => {
+            try {
+                const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
+                    method: "GET",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                });
+                if (!response.ok) {
+                    throw new Error("Network response was not ok: " + response.statusText);
+                }
+                const data = await response.json();
+                const formattedData = data.map(item => ({
+                    value: item.employee_name,
+                    label: item.employee_name,
+                    id: item.id,
+                    type: "Employee",
+                }));
+
+                setEmployeeOptions(formattedData);
+            } catch (error) {
+                console.error("Fetch error: ", error);
+            }
+        };
+        fetchEmployeeDetails();
+    }, []);
+    useEffect(() => {
         const fetchContractorNames = async () => {
             try {
                 const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
@@ -128,7 +508,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         };
         fetchContractorNames();
     }, []);
-    useEffect(() => { setCombinedOptions([...vendorOptions, ...contractorOptions]); }, [vendorOptions, contractorOptions]);
+    useEffect(() => { setCombinedOptions([...vendorOptions, ...contractorOptions, ...employeeOptions]); }, [vendorOptions, contractorOptions, employeeOptions]);
     useEffect(() => {
         const fetchSites = async () => {
             try {
@@ -149,25 +529,73 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     id: item.id,
                     sNo: item.siteNo
                 }));
-                setSiteOptions(formattedData);
+                const predefinedSiteOptions = [
+                    {
+                        value: "Mason Advance",
+                        label: "Mason Advance",
+                        id: 1,
+                        sNo: "1"
+                    },
+                    {
+                        value: "Material Advance",
+                        label: "Material Advance",
+                        id: 2,
+                        sNo: "2"
+                    },
+                    {
+                        value: "Weekly Advance",
+                        label: "Weekly Advance",
+                        id: 3,
+                        sNo: "3"
+                    },
+                    {
+                        value: "Excess Advance",
+                        label: "Excess Advance",
+                        id: 4,
+                        sNo: "4"
+                    },
+                    {
+                        value: "Material Rent",
+                        label: "Material Rent",
+                        id: 5,
+                        sNo: "5"
+                    },
+                    {
+                        value: "Subhash Kumar - Kunnur",
+                        label: "Subhash Kumar - Kunnur",
+                        id: 6,
+                        sNo: "6"
+                    },
+                    {
+                        value: "Summary Bill",
+                        label: "Summary Bill",
+                        id: 7,
+                        sNo: "7"
+                    },
+                    {
+                        value: "Daily Wage",
+                        label: "Daily Wage",
+                        id: 8,
+                        sNo: "8"
+                    }
+                ];
+                // Combine backend data with predefined options
+                const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
+                setSiteOptions(combinedSiteOptions);
             } catch (error) {
                 console.error("Fetch error: ", error);
             }
         };
         fetchSites();
     }, []);
-
     useEffect(() => {
         const fetchWeeks = async () => {
             try {
                 const response = await axios.get('https://backendaab.in/aabuildersDash/api/payments-received/active_weeks');
                 const currentYear = new Date().getFullYear();
-
                 const enrichedWeeks = response.data.map((weekNumber) =>
                     getStartAndEndDateOfWeek(weekNumber, currentYear)
                 );
-
-                console.log("Enriched weeks:", enrichedWeeks);
                 setWeeks(enrichedWeeks);
             } catch (error) {
                 console.error('Error fetching active weeks:', error);
@@ -175,182 +603,129 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         };
         fetchWeeks();
     }, []);
-
-    useEffect(() => {
-        const fetchWeekData = async () => {
-            if (!selectedWeek) return;
-
-            try {
-                const [expensesRes, paymentsRes] = await Promise.all([
-                    axios.get(`https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${selectedWeek}`),
-                    axios.get(`https://backendaab.in/aabuildersDash/api/payments-received/week/${selectedWeek}`)
-                ]);
-
-                setExpenses(expensesRes.data);
-                const filteredPayments = paymentsRes.data.filter(
-                    (payment) => payment.type !== "Handover"
-                );
-                setPayments(filteredPayments);
-            } catch (error) {
-                console.error("Error fetching weekly data:", error);
-            }
-        };
-
-        fetchWeekData();
-    }, [selectedWeek]);
     const handleInputChange = (e) => {
-        setNewExpense((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+        setNewDailyExpense((prev) => ({ ...prev, [e.target.name]: e.target.value }));
     };
-
-    const balance = (
-        payments.reduce((total, row) => total + Number(row.amount || 0), 0) -
-        expenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)
-    ).toFixed(2);
-
-    // For new expense input
-    const handleExpenseChange = (e) => {
+    const handleNewPaymentChange = (e) => {
         const { name, value } = e.target;
-        if (name === "amount" && Number(value) > Number(balance)) {
-            alert("Amount cannot exceed the available Balance!");
-            setNewExpense((prev) => ({ ...prev, [name]: "" })); // clear field
-            return;
-        }
-        setNewExpense((prev) => ({ ...prev, [name]: value }));
+        setNewRefundReceived(prev => ({ ...prev, [name]: value }));
     };
+    const handleLabourChange = (selected) => {
+        setNewRefundReceived(prev => ({
+            ...prev,
+            labour_id: selected ? selected.id : ""
+        }));
+    };
+    const handleRefundSubmit = async () => {
+        try {
+            const payload = {
+                date: selectedDate,
+                labour_id: newRefundReceived.labour_id,
+                amount: Number(newRefundReceived.amount),
+                weekly_number: Number(currentWeekNumber),
+            };
+            const response = await axios.post(
+                "https://backendaab.in/aabuildersDash/api/refund_received/save",
+                payload,
+                { headers: { "Content-Type": "application/json" } }
+            );
+            window.location.reload();
+            // Reset form after save
+            setNewRefundReceived({
+                labour_id: null,
+                amount: "",
+            });
+        } catch (error) {
+            console.error("Error saving refund:", error);
+        }
+    };
+    const handleKeyDown = (e) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            handleRefundSubmit();
+        }
+    };
+
+    const handleChangeButtonClick = () => {
+        setIsChangeButtonActive(prev => !prev);
+    };
+
     useEffect(() => {
         const handleWheel = (event) => {
             if (document.activeElement.type === "number") {
                 event.preventDefault();
             }
         };
-
         document.addEventListener("wheel", handleWheel, { passive: false });
-
         return () => {
             document.removeEventListener("wheel", handleWheel);
         };
     }, []);
-
-    const handleKeyDown = async (e) => {
-        if (e.key === "Enter") {
-
-            const payload = {
-                date: newExpense.date,
-                created_at: new Date().toISOString(),
-                contractor_id: contractorId || null,
-                vendor_id: vendorId || null,
-                project_id: projectId || null,
-                type: newExpense.type,
-                amount: parseFloat(newExpense.amount),
-                status: true,
-                weekly_number: Number(selectedWeek),
-                period_start_date: new Date().toISOString().split("T")[0],
-                period_end_date: new Date().toISOString().split("T")[0],
-            };
-
-            try {
-                const response = await fetch("https://backendaab.in/aabuildersDash/api/weekly-expenses/update/save", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify(payload),
-                });
-
-                if (response.ok) {
-                    window.location.reload();
-                    setExpenses((prev) => [{ id: Date.now(), ...newExpense }, ...prev]);
-                    setNewExpense({ date: "", contractor: "", project: "", type: "", amount: "" });
-                    setVendorId('');
-                    setContractorId('');
-                    setProjectId('');
-                } else {
-                    console.error("Failed to save expense. Server responded with:", response.status);
-                }
-            } catch (err) {
-                console.error("Error during expense save:", err);
-            }
-        }
-    };
-
-    const handleKeyDown1 = async (e) => {
-        if (e.key === "Enter") {
-            const paymentPayload = {
-                date: newPayment.date,
-                amount: parseFloat(newPayment.amount),
-                type: newPayment.type,
-                status: true,
-                weekly_number: Number(selectedWeek),
-                period_start_date: new Date().toISOString().split("T")[0],
-                period_end_date: new Date().toISOString().split("T")[0],
-            };
-
-            try {
-                const response = await fetch("https://backendaab.in/aabuildersDash/api/payments-received/update/save", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify(paymentPayload),
-                });
-
-                if (response.ok) {
-                    console.log("✅ Payment saved successfully");
-                    window.location.reload();
-                    setPayments((prev) => [{ id: Date.now(), ...newPayment }, ...prev]);
-                    setNewPayment({ date: "", amount: "", type: "Weekly" });
-                } else {
-                    console.error("❌ Failed to save payment");
-                }
-            } catch (error) {
-                console.error("🚨 Error saving payment:", error);
-            }
-        }
-    };
-
-    const handleEditExpense = (id, field, value) => {
-        if (field === "amount" && Number(value) > Number(balance)) {
-            alert("Amount cannot exceed the available Balance!");
-            // Clear the input for this row
-            setExpenses((prevExpenses) =>
-                prevExpenses.map((expense) =>
-                    expense.id === id ? { ...expense, amount: "" } : expense
-                )
-            );
-            return;
-        }
-        setExpenses((prevExpenses) =>
-            prevExpenses.map((expense) =>
-                expense.id === id ? { ...expense, [field]: value } : expense
-            )
-        );
-    };
-
-    const lastWeekNumber = Math.max(...weeks.map(week => week.number));
-
-    console.log("Last Week Number:", lastWeekNumber);
-
     const saveEditedExpense = async (row) => {
         try {
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/update/${row.id}?username=${encodeURIComponent(username)} `, {
-                method: "PUT", // or "POST", based on your API
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(row),
-            });
+            let pdfUrl = row.file_url || ""; // keep old if already exists
 
-            if (!response.ok) {
-                throw new Error("Failed to update expense");
+            // 🔹 If user picked a file AND no url exists in DB → upload
+            if (selectedFile && !row.file_url) {
+                try {
+                    const formData = new FormData();
+                    const finalName = `${formatDateOnly(editDailyExpenseData.date)}`;
+                    formData.append("file", selectedFile);
+                    formData.append("file_name", finalName);
+
+                    const uploadResponse = await fetch(
+                        "https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive",
+                        {
+                            method: "POST",
+                            body: formData,
+                        }
+                    );
+
+                    if (!uploadResponse.ok) {
+                        throw new Error("File upload failed");
+                    }
+
+                    const uploadResult = await uploadResponse.json();
+                    pdfUrl = uploadResult.url;
+                    console.log("Edited File URL:", pdfUrl);
+                } catch (error) {
+                    console.error("Error uploading file:", error);
+                    alert("Error during file upload. Please try again.");
+                    return;
+                }
             }
-            window.location.reload();
-            if (row.type === "Carry Forward") return;
-            // Optionally show success toast / refresh list
-            setEditingRowId(null);
+
+            const payload = {
+                date: editDailyExpenseData.date,
+                labour_id: Number(editDailyExpenseData.labour_id) || null,
+                vendor_id: Number(editDailyExpenseData.vendor_id) || null,
+                contractor_id: Number(editDailyExpenseData.contractor_id) || null,
+                employee_id: Number(editDailyExpenseData.employee_id) || null,
+                project_id: Number(editDailyExpenseData.project_id),
+                quantity: Number(editDailyExpenseData.quantity) || 0,
+                type: editDailyExpenseData.type,
+                amount: Number(editDailyExpenseData.amount),
+                extra_amount: Number(editDailyExpenseData.extra_amount || 0),
+                file_url: pdfUrl || null,  // 🔹 send url here
+            };
+
+            const response = await axios.put(
+                `https://backendaab.in/aabuildersDash/api/daily-payments/edit/${row.id}?username=${encodeURIComponent(username)}`,
+                payload,
+                { headers: { "Content-Type": "application/json" } }
+            );
+
+            // ✅ Update UI without reload
+            setDailyExpenses((prev) =>
+                prev.map((exp) => (exp.id === row.id ? { ...exp, ...payload } : exp))
+            );
+
+            setEditingDailyExpenseRowId(null); // exit edit mode
         } catch (error) {
             console.error("Error updating expense:", error);
         }
     };
+
     const customStyles = {
         control: (provided, state) => ({
             ...provided,
@@ -363,35 +738,27 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             }
         }),
     };
-    const saveEditedPaymentReceived = async (row) => {
+    const saveEditedRefundPayment = async (id) => {
         try {
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/payments-received/update/${row.id}?username=${encodeURIComponent(username)}`, {
-                method: "PUT", // or "POST", based on your API
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(row),
-            });
-            if (!response.ok) {
-                throw new Error("Failed to update expense");
-            }
-            window.location.reload();
-            // Optionally show success toast / refresh list
-            setEditingPaymentId(null);
+            await axios.put(
+                `https://backendaab.in/aabuildersDash/api/refund_received/edit/${id}?username=${encodeURIComponent(username)}`,
+                editRefundPaymentData
+            );
+            // Update UI immediately
+            setRefundPayments((prev) =>
+                prev.map((row) =>
+                    row.id === id ? { ...row, ...editRefundPaymentData } : row
+                )
+            );
+            setEditingPaymentId(null); // exit edit mode
+            console.log("Refund payment updated successfully");
         } catch (error) {
-            console.error("Error updating expense:", error);
+            console.error("Error updating refund payment:", error);
         }
     };
-
-    useEffect(() => {
-        if (weeks.length > 0) {
-            setSelectedWeek(weeks[weeks.length - 1].number); // last week's number
-        }
-    }, [weeks]);
-
-    const fetchAuditDetailsForExpense = async (expensesId) => {
+    const fetchAuditDetailsForDailyExpense = async (expensesId) => {
         try {
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly_payment_audit/expenses/${expensesId}`);
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/daily_entry_audit/daily_expense/${expensesId}`);
             const data = await response.json();
             setWeeklyPaymentExpensesAudits(data);
             setShowWeeklyPaymentExpensesModal(true);
@@ -399,9 +766,9 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             console.error("Error fetching audit details:", error);
         }
     };
-    const fetchAuditDetailsForPaymentReceived = async (receivedId) => {
+    const fetchAuditDetailsForRefundPaymentReceived = async (receivedId) => {
         try {
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly_payment_audit/payments/${receivedId}`);
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/daily_entry_audit/refund/${receivedId}`);
             const data = await response.json();
             setWeeklyPaymentReceivedAudits(data);
             setShowWeeklyPaymentReceivedModal(true);
@@ -409,20 +776,19 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             console.error("Error fetching audit details:", error);
         }
     };
-
-    const handleWeeklyExpensesDelete = async (id) => {
-        const confirmed = window.confirm("Are you sure you want to delete This Expense Data?");
+    const handleDailyExpensesDelete = async (id) => {
+        const confirmed = window.confirm("Are you sure you want to delete This Daily Expense Data?");
         if (confirmed) {
             try {
-                const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/delete/${id}`, {
+                const response = await fetch(`https://backendaab.in/aabuildersDash/api/daily-payments/delete/${id}`, {
                     method: 'DELETE',
                 });
                 if (response.ok) {
-                    alert("Weekly Expenses deleted successfully!!!");
+                    alert("Daily Expenses deleted successfully!!!");
                     window.location.reload();
                 } else {
-                    console.error("Failed to delete the Weekly Expenses. Status:", response.status);
-                    alert("Error deleting the Weekly Expenses. Please try again.");
+                    console.error("Failed to delete the Daily Expenses. Status:", response.status);
+                    alert("Error deleting the Daily Expenses. Please try again.");
                 }
             } catch (error) {
                 console.error("Error:", error);
@@ -432,21 +798,105 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             console.log("Deletion cancelled.");
         }
     };
-
+    const handleRefundPaymentsDelete = async (id) => {
+        const confirmed = window.confirm("Are you sure you want to delete This Refund Received Data?");
+        if (confirmed) {
+            try {
+                const response = await fetch(`https://backendaab.in/aabuildersDash/api/refund_received/delete/${id}`, {
+                    method: 'DELETE',
+                });
+                if (response.ok) {
+                    alert("Refund Received deleted successfully!!!");
+                    window.location.reload();
+                } else {
+                    console.error("Failed to delete the Refund Received. Status:", response.status);
+                    alert("Error deleting the Refund Received. Please try again.");
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                alert("An error occurred while deleting the Refund Payments.");
+            }
+        } else {
+            console.log("Deletion cancelled.");
+        }
+    };
+    const handleAddExpense = async () => {
+        try {
+            // ✅ Save Daily Entry
+            const payload = {
+                date: selectedDate,
+                created_at: new Date().toISOString(),
+                labour_id: Number(newDailyExpense.labour_id) || null,
+                vendor_id: Number(newDailyExpense.vendor_id) || null,
+                contractor_id: Number(newDailyExpense.contractor_id) || null,
+                employee_id: Number(newDailyExpense.employee_id) || null,
+                project_id: Number(newDailyExpense.project_id),
+                quantity: Number(newDailyExpense.quantity) || 0,
+                type: newDailyExpense.type,
+                amount: Number(newDailyExpense.amount),
+                extra_amount: newDailyExpense.extra_amount ? Number(newDailyExpense.extra_amount) : 0,
+                weekly_number: Number(currentWeekNumber),
+            };
+            await axios.post(
+                "https://backendaab.in/aabuildersDash/api/daily-payments/save",
+                payload,
+                { headers: { "Content-Type": "application/json" } }
+            );
+            // ✅ Save Weekly Expense "meta row" (amount will be recalculated in backend)
+            const expenseForBackend = {
+                date: selectedDate,
+                contractor_id: contractorOptions.find(opt => opt.label === "Company Labour")?.id || null,
+                vendor_id: null,
+                project_id: siteOptions.find(opt => opt.label === "Daily Wage")?.id || null,
+                type: "Daily",
+                amount: 0, // 🔹 always 0 → backend will recalc sum
+                weekly_number: currentWeekNumber,
+                status: false,
+            };
+            await axios.post(
+                "https://backendaab.in/aabuildersDash/api/weekly-expenses/save-daily",
+                expenseForBackend,
+                { headers: { "Content-Type": "application/json" } }
+            );
+            // ✅ Refresh UI
+            await handleDateClick(selectedDate);
+            window.location.reload();
+            // ✅ Reset form
+            setNewDailyExpense({
+                labour_id: "",
+                vendor_id: "",
+                contractor_id: "",
+                employee_id: "",
+                labour_name: "",
+                project_id: "",
+                type: "",
+                amount: "",
+                extra_amount: "",
+            });
+            setShowExtraAmount(false);
+        } catch (error) {
+            console.error("Error saving expense:", error);
+        }
+    };
     useEffect(() => {
         if (weeks.length > 0) {
             setSelectedWeek(weeks[weeks.length - 1].number); // default last week
         }
     }, [weeks]);
-
-    // Helper to format dates
-    const formatDate = (date) =>
-        date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-
-    // Get currently selected week object
-    const currentWeek = weeks.find((w) => w.number === Number(selectedWeek));
-
-    // Generate 7 days if week selected
+    const getCurrentWeekDays = () => {
+        const today = new Date();
+        const dayOfWeek = today.getDay() || 7; // make Sunday = 7
+        const monday = new Date(today);
+        monday.setDate(today.getDate() - dayOfWeek + 1); // back to Monday
+        const days = [];
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(monday);
+            d.setDate(monday.getDate() + i);
+            days.push(d);
+        }
+        return days;
+    };
+    // Generate 7 days if week selected (your existing code)
     const days = [];
     if (currentWeek) {
         const start = new Date(currentWeek.start);
@@ -456,363 +906,687 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             days.push(day);
         }
     }
-
+    const currentWeekDays = getCurrentWeekDays();
+    // Auto select today's date ONCE when component mounts
+    useEffect(() => {
+        if (currentWeekDays.length > 0) {
+            const todayStr = new Date().toISOString().split("T")[0];
+            const matchedDay = currentWeekDays.find(
+                (d) => d.toISOString().split("T")[0] === todayStr
+            );
+            const defaultDate = matchedDay
+                ? matchedDay.toISOString().split("T")[0]
+                : currentWeekDays[0].toISOString().split("T")[0];
+            setSelectedDate(defaultDate);
+            setNewDailyExpense((prev) => ({ ...prev, date: defaultDate }));
+        }
+        // empty dependency array → only run once
+        // DO NOT put currentWeekDays in deps
+    }, []);
+    // format helper
+    const formatDate = (date) =>
+        date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+    const handleDateClick = async (dateStr) => {
+        setSelectedDate(dateStr);
+        setNewDailyExpense((prev) => ({ ...prev, date: dateStr }));
+        try {
+            // Fetch daily expenses
+            const [dailyRes, refundRes] = await Promise.all([
+                axios.get(`https://backendaab.in/aabuildersDash/api/daily-payments/date/${dateStr}`),
+                axios.get(`https://backendaab.in/aabuildersDash/api/refund_received/date/${dateStr}`)
+            ]);
+            setDailyExpenses(dailyRes.data);
+            setRefundPayments(refundRes.data);
+        } catch (error) {
+            console.error("Error fetching data:", error);
+            setDailyExpenses([]);
+            setRefundPayments([]);
+        }
+    };
+    // ✅ get today’s date
+    const today = new Date().toISOString().split("T")[0];
+    if (!selectedDate && currentWeekDays.length > 0) {
+        const todayInWeek = currentWeekDays.find(
+            (d) => d.toISOString().split("T")[0] === today
+        );
+        const defaultDate = todayInWeek
+            ? today
+            : currentWeekDays[0].toISOString().split("T")[0];
+        handleDateClick(defaultDate);
+    }
+    const totalAmount = dailyExpenses
+        .filter(row => row.date === selectedDate)        // only current date rows
+        .reduce((sum, row) => sum + (Number(row.amount || 0) + Number(row.extra_amount || 0)), 0);
+    const totalRefund = allRefundAmount
+        .filter(row => row.date === selectedDate)
+        .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const totalExpenses =
+        expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+    const totalPayments = payments
+        .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const overAllTotalPayments = (totalPayments + totalRefund);
+    const netBalance = totalAmount - totalRefund;
+    const balance = totalPayments - expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
     return (
         <body>
-            <div className='mx-auto w-[1800px] flex gap-8 p-4 pl-8 border-collapse text-left bg-[#FFFFFF] ml-14 mr-6 rounded-md h-[127px]'>
+            <h1 className="font-bold text-xl flex justify-end mr-5 -mt-7">
+                Balance:<span style={{ color: "#E4572E" }}>{Number(balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}</span>
+            </h1>
+            <div className='mx-auto w-auto p-4 pl-8 border-collapse text-left bg-[#FFFFFF] ml-[30px] mr-6 rounded-md lg:h-[147px]'>
+
                 <div>
                     {days.length > 0 && (
-                        <div className="grid grid-cols-7 gap-2 mt-4">
-                            {days.map((day, idx) => (
-                                <button
-                                    key={idx}
-                                    className={`p-2 rounded-lg border ${selectedDate === day.toISOString().split("T")[0]
-                                            ? "bg-[#BF9853] text-white"
-                                            : "bg-white border-gray-300"
-                                        }`}
-                                    onClick={() => {
-                                        const dateStr = day.toISOString().split("T")[0]; // format yyyy-mm-dd
-                                        setSelectedDate(dateStr);
-                                        setNewExpense(prev => ({ ...prev, date: dateStr })); // set to table
-                                    }}
-                                >
-                                    {formatDate(day)}
-                                </button>
-                            ))}
+                        <div className='lg:w-[600px]'>
+                            <div className="grid grid-cols-3 lg:grid-cols-7 gap-2">
+                                {currentWeekDays.map((day, idx) => {
+                                    const dateStr = day.toISOString().split("T")[0];
+                                    return (
+                                        <div
+                                            key={idx}
+                                            className="flex flex-col items-left w-20 mx-auto"
+                                        >
+                                            {/* Day Name */}
+                                            <div className="font-semibold text-[#E4572E]">
+                                                {day.toLocaleDateString("en-US", { weekday: "short" })}
+                                            </div>
+
+                                            {/* Date Button */}
+                                            <button
+                                                onClick={() => handleDateClick(dateStr)}
+                                                className={`p- rounded-lg border text-center w-20 h-[37px] mt-1 ${selectedDate === dateStr
+                                                    ? "bg-[#BF9853] text-white border-[#BF9853]"
+                                                    : "bg-white border-gray-300"
+                                                    }`}
+                                            >
+                                                {formatDate(day)}
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     )}
-
-                    {/* Example: Table stays same regardless of day button */}
                     <div className="mt-6 flex">
                         <div>
-                            <h2 className="font-semibold">Table Data (Week {selectedWeek})</h2>
+                            <h2 className="font-semibold">Table Data (Week {currentWeekNumber})</h2>
                         </div>
                         <div>
-                            {selectedDate && <p>Selected day: {selectedDate}</p>}
+                            {selectedDate && <p>Selected day: {formatDateOnly(selectedDate)}</p>}
                             {/* Your table here: use selectedWeek only */}
                         </div>
                     </div>
                 </div>
             </div>
-            <div className="mt-4 ml-[1440px] ">
-                <h1 className="font-bold ml-40 text-xl">
-                    Balance: <span style={{ color: "#E4572E" }}>
-                        {(
-                            payments.reduce((total, row) => total + Number(row.amount || 0), 0) -
-                            expenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)
-                        ).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}
-                    </span>
+            <div className="mt-4 flex justify-end mr-6">
+                <h1 className="font-bold text-xl">
+                    Net Balance:<span style={{ color: "#E4572E" }}>{Number(netBalance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}</span>
                 </h1>
             </div>
-            <div className="mx-auto w-[1800px] p-6 border-collapse bg-[#FFFFFF] ml-14 mr-6 rounded-md">
-                <div className="flex">
-                    <h1 className="font-bold text-xl">PS: <span style={{ color: "#E4572E" }}>{selectedWeek}</span> </h1>
-                    <h1 className="font-bold text-base ml-[950px]">
-                        Expenses: <span style={{ color: "#E4572E" }}>
-                            {expenses.reduce((total, expense) => total + Number(expense.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}
-                        </span>
-                    </h1>
-                </div>
+            <div className="mx-auto w-auto p-6 border-collapse bg-[#FFFFFF] ml-[30px] mr-6 rounded-md">
                 {/* EXPENSES TABLE */}
-                <div className="flex">
-                    <div className="flex gap-10">
-                        <div className="rounded-lg border-l-8 border-l-[#BF9853]">
-                            <table className="w-auto">
-                                <thead>
-                                    <tr className="bg-[#FAF6ED] h-12">
-                                        <th className="px-4 py-2 text-left">Sl.No</th>
-                                        <th className="px-4 py-2 text-left">Date</th>
-                                        <th className="px-4 py-2 text-left">Contractor/Vendor</th>
-                                        <th className="px-4 py-2 text-left">Project Name</th>
-                                        <th className="px-4 py-2 text-left">Type</th>
-                                        <th className="px-4 py-2 text-left">Amount</th>
-                                        <th>Activity</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {Number(selectedWeek) === Number(lastWeekNumber) ? (
-                                        <tr className="">
-                                            <td className="px-4 py-2 font-bold">{expenses.length + 1}.</td>
-                                            <td className="px-4 py-2">
-                                                <input
-                                                    type="date"
-                                                    name="date"
-                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 rounded-lg w-[130px] h-[40px] focus:outline-none"
-                                                    value={newExpense.date}
-                                                    onChange={handleExpenseChange}
-                                                    onKeyDown={handleKeyDown}
-                                                    disabled={!!selectedDate}
-                                                />
-                                            </td>
-                                            <td className="px-4 py-2">
-                                                <Select
-                                                    name="contractor"
-                                                    className="w-[202px]"
-                                                    value={
-                                                        combinedOptions.find(
-                                                            opt =>
-                                                                (opt.type === "Contractor" && opt.id === Number(newExpense.contractor_id)) ||
-                                                                (opt.type === "Vendor" && opt.id === Number(newExpense.vendor_id))
-                                                        ) || null
-                                                    }
-                                                    onChange={(selectedOption) => {
-                                                        if (!selectedOption) {
-                                                            setNewExpense(prev => ({
-                                                                ...prev,
-                                                                contractor_id: "",
-                                                                vendor_id: ""
-                                                            }));
-                                                            setContractorId("");
-                                                            setVendorId("");
-                                                        } else if (selectedOption.type === "Contractor") {
-                                                            setNewExpense(prev => ({
-                                                                ...prev,
-                                                                contractor_id: selectedOption.id,
-                                                                vendor_id: ""
-                                                            }));
-                                                            setContractorId(selectedOption.id);
-                                                            setVendorId("");
-                                                        } else if (selectedOption.type === "Vendor") {
-                                                            setNewExpense(prev => ({
-                                                                ...prev,
-                                                                vendor_id: selectedOption.id,
-                                                                contractor_id: ""
-                                                            }));
-                                                            setVendorId(selectedOption.id);
-                                                            setContractorId("");
-                                                        }
-                                                    }}
-                                                    options={combinedOptions}
-                                                    placeholder="Contractor/Vendor"
-                                                    isSearchable
-                                                    isClearable
-                                                    styles={customStyles}
-                                                />
-                                            </td>
-                                            <td className="px-4 py-2">
-                                                <Select
-                                                    name="project"
-                                                    className="w-[259px]"
-                                                    value={siteOptions.find(opt => opt.id === Number(newExpense.project_id)) || null}
-                                                    onChange={(selectedOption) => {
-                                                        setNewExpense(prev => ({
-                                                            ...prev,
-                                                            project_id: selectedOption ? selectedOption.id : ""
-                                                        }));
-                                                        setProjectId(selectedOption ? selectedOption.id : "");
-                                                    }}
-                                                    options={siteOptions}
-                                                    placeholder="Select Site"
-                                                    isSearchable
-                                                    isClearable
-                                                    styles={customStyles}
-                                                />
-                                            </td>
-                                            <td className="px-4 py-2 text-left">
-                                                <select
-                                                    name="type"
-                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[130px] h-[40px] rounded-lg focus:outline-none"
-                                                    value={newExpense.type}
-                                                    onChange={handleInputChange}
-                                                    onKeyDown={handleKeyDown}
-                                                >
-                                                    <option value="">Select</option>
-                                                    {weeklyTypes.map((type, index) => (
-                                                        <option key={index} value={type.type}>
-                                                            {type.type}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </td>
-                                            <td className="px-4 py-2 text-left">
-                                                <input
-                                                    type="number"
-                                                    name="amount"
-                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[100px] h-[40px] rounded-lg focus:outline-none"
-                                                    value={newExpense.amount}
-                                                    onChange={handleExpenseChange}
-                                                    onKeyDown={handleKeyDown}
-                                                    onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
-                                                    onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
-                                                />
-                                            </td>
+                <div className="w-full mt- flex flex-col xl:flex-row gap-6">
+                    <div className="flex-[2] min-w-0">
+                        <div className="flex justify-between mb-4">
+                            <h1 className="font-bold text-xl">
+                                PS: {currentWeekNumber}
+                            </h1>
+                            <h1 className="font-bold text-base mr-16">
+                                Expenses:<span style={{ color: "#E4572E" }}>{Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}</span>
+                            </h1>
+                        </div>
+                        <div className="w-full h-[600px] rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden">
+                            {/* Single Table with Scrollable Container */}
+                            <div
+                                ref={scrollRef}
+                                className="overflow-auto max-h-[600px]"
+                                onMouseDown={handleMouseDown}
+                                onMouseMove={handleMouseMove}
+                                onMouseUp={handleMouseUp}
+                                onMouseLeave={handleMouseUp}
+                            >
+                                <table className="w-[1300px] border-collapse text-left">
+                                    <thead className="sticky top-0 z-10 bg-white">
+                                        <tr className="bg-[#FAF6ED] h-12">
+                                            <th className="py-2 px-1 text-left w-[60px]">S.No</th>
+                                            <th
+                                                className="py-2 px-1 text-left w-[200px] cursor-pointer hover:bg-gray-200"
+                                                onClick={() => handleSort('labour_name')}
+                                            >
+                                                Name {sortConfig.key === 'labour_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th
+                                                className="py-2 px-1 text-left w-[220px] cursor-pointer hover:bg-gray-200"
+                                                onClick={() => handleSort('project_name')}
+                                            >
+                                                Project Name {sortConfig.key === 'project_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th
+                                                className="py-2 px-1 text-left w-[120px] cursor-pointer hover:bg-gray-200"
+                                                onClick={() => handleSort('amount')}
+                                            >
+                                                Amount {sortConfig.key === 'amount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="py-2 px-1 text-left w-[60px]">Qty</th>
+                                            <th
+                                                className="py-2 px-1 text-left w-[120px] cursor-pointer hover:bg-gray-200"
+                                                onClick={() => handleSort('type')}
+                                            >
+                                                Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="py-2 px-1 text-left w-[80px]">Activity</th>
                                         </tr>
-                                    ) : null}
-                                    {/* Editable Expense rows */}
-                                    {[...expenses].reverse().map((row, index) => (
-                                        <tr key={row.id} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
-                                            <td className="px-4 py-2 font-bold">{expenses.length - index}</td>
-                                            <td className="px-4 py-2">
-                                                {editingRowId === row.id ? (
-                                                    <input
-                                                        type="date"
-                                                        name="date"
-                                                        className="bg-transparent p-1 rounded w-[100px] h-[40px] focus:outline-none"
-                                                        value={row.date}
-                                                        onChange={(e) => handleEditExpense(row.id, 'date', e.target.value)}
-                                                        disabled={editingRowId !== row.id}
-                                                    />
-                                                ) : (
-                                                    <div className="w-[130px] h-[40px] flex items-center">
-                                                        {formatDateOnly(row.date) || ""}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            {/* Contractor / Vendor column */}
-                                            <td className="px-4 py-2">
-                                                {editingRowId === row.id ? (
-                                                    <Select
-                                                        name="party"
-                                                        className="w-[202px]"
-                                                        value={
-                                                            combinedOptions.find(
-                                                                opt =>
-                                                                    (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
-                                                                    (opt.type === "Vendor" && opt.id === Number(row.vendor_id))
-                                                            ) || null
-                                                        }
-                                                        onChange={(selectedOption) => {
-                                                            if (!selectedOption) {
-                                                                handleEditExpense(row.id, "contractor_id", "");
-                                                                handleEditExpense(row.id, "vendor_id", "");
-                                                            } else if (selectedOption.type === "Contractor") {
-                                                                handleEditExpense(row.id, "contractor_id", selectedOption.id);
-                                                                handleEditExpense(row.id, "vendor_id", "");
-                                                            } else if (selectedOption.type === "Vendor") {
-                                                                handleEditExpense(row.id, "vendor_id", selectedOption.id);
-                                                                handleEditExpense(row.id, "contractor_id", "");
+                                        {Number(currentWeekNumber) === Number(currentWeekNumber) ? (
+                                            <tr className="bg-white border-b border-gray-200">
+                                                <td className="px-1 py-2 font-bold">{dailyExpenses.length + 1}.</td>
+                                                <td className="flex items-center gap-2 py-2">
+                                                    <div>
+                                                        <Select
+                                                            name="labour_id"
+                                                            className="w-[265px]"
+                                                            placeholder={isChangeButtonActive ? "Vendor/Contractor" : "Labour Name"}
+                                                            isSearchable
+                                                            isClearable
+                                                            options={isChangeButtonActive ? combinedOptions : laboursList}
+                                                            styles={customStyles}
+                                                            menuPortalTarget={document.body}
+                                                            value={
+                                                                isChangeButtonActive
+                                                                    ? combinedOptions.find(opt =>
+                                                                        (opt.type === "Employee" && opt.id === Number(newDailyExpense.employee_id)) ||
+                                                                        (opt.type === "Vendor" && opt.id === Number(newDailyExpense.vendor_id)) ||
+                                                                        (opt.type === "Contractor" && opt.id === Number(newDailyExpense.contractor_id))
+                                                                    ) || null
+                                                                    : laboursList.find(opt => opt.id === Number(newDailyExpense.labour_id)) || null
                                                             }
-                                                        }}
-                                                        options={combinedOptions}
-                                                        placeholder="Select Contractor/Vendor"
-                                                        isSearchable
-                                                        isClearable
-                                                        styles={customStyles}
-                                                    />
-                                                ) : (
-                                                    // Show label in view mode
-                                                    <div className="w-[205px] h-[40px] flex items-center">
-                                                        {combinedOptions.find(
-                                                            opt =>
-                                                                (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
-                                                                (opt.type === "Vendor" && opt.id === Number(row.vendor_id))
-                                                        )?.label || ""}
+                                                            onChange={(selectedOption) => {
+                                                                if (selectedOption) {
+                                                                    const { type, id, label, salary } = selectedOption;
+                                                                    setNewDailyExpense(prev => ({
+                                                                        ...prev,
+                                                                        labour_id: type === "Labour" ? id : "",
+                                                                        vendor_id: type === "Vendor" ? id : "",
+                                                                        contractor_id: type === "Contractor" ? id : "",
+                                                                        employee_id: type === "Employee" ? id : "",
+                                                                        labour_name: label,
+                                                                        amount: salary || ""
+                                                                    }));
+                                                                } else {
+                                                                    setNewDailyExpense(prev => ({
+                                                                        ...prev,
+                                                                        labour_id: "",
+                                                                        vendor_id: "",
+                                                                        contractor_id: "",
+                                                                        employee_id: "",
+                                                                        labour_name: "",
+                                                                        amount: ""
+                                                                    }));
+                                                                }
+                                                            }}
+                                                        />
                                                     </div>
-                                                )}
-                                            </td>
-                                            {/* Project column */}
-                                            <td className="px-4 py-2">
-                                                {editingRowId === row.id ? (
+                                                    <div>
+                                                        <button onClick={handleChangeButtonClick}>
+                                                            <img src={Change} className={`w-4 h-4 ${isChangeButtonActive ? 'opacity-70' : ''}`} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                                <td className="px-1 py-2">
                                                     <Select
                                                         name="project"
-                                                        className="w-[259px]"
-                                                        value={siteOptions.find(opt => opt.id === Number(row.project_id)) || null}
-                                                        onChange={(selectedOption) =>
-                                                            handleEditExpense(
-                                                                row.id,
-                                                                "project_id",
-                                                                selectedOption ? selectedOption.id : ""
-                                                            )
-                                                        }
+                                                        value={siteOptions.find(opt => opt.id === Number(newDailyExpense.project_id)) || null}
+                                                        onChange={(selectedOption) => {
+                                                            setNewDailyExpense(prev => ({
+                                                                ...prev,
+                                                                project_id: selectedOption ? selectedOption.id : ""
+                                                            }));
+                                                            setProjectId(selectedOption ? selectedOption.id : "");
+                                                        }}
                                                         options={siteOptions}
-                                                        placeholder="Select Project"
+                                                        menuPortalTarget={document.body}
+                                                        className="w-[260px]"
+                                                        placeholder="Select Site"
                                                         isSearchable
                                                         isClearable
                                                         styles={customStyles}
                                                     />
-                                                ) : (
-                                                    // Show label in view mode
-                                                    <div className="w-[259px] h-[40px] flex items-center">
-                                                        {siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""}
+                                                </td>
+                                                <td className="px-1 py-2 text-left flex items-center gap-2">
+                                                    <div>
+                                                        <input
+                                                            type="number"
+                                                            name="amount"
+                                                            className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[90px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                            value={newDailyExpense.amount || ""}
+                                                            onChange={(e) => setNewDailyExpense(prev => ({ ...prev, amount: e.target.value }))}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === "Enter") {
+                                                                    e.preventDefault();
+                                                                    handleAddExpense();
+                                                                }
+                                                            }}
+                                                        />
                                                     </div>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-2">
-                                                {editingRowId === row.id ? (
+                                                    <div>
+                                                        <button
+                                                            className="font-semibold text-[25px]"
+                                                            onClick={() => setShowExtraAmount(prev => !prev)}
+                                                            type="button"
+                                                        >
+                                                            +
+                                                        </button>
+                                                    </div>
+                                                    {/* Conditionally render extra input */}
+                                                    {showExtraAmount && (
+                                                        <div>
+                                                            <input
+                                                                type="number"
+                                                                name="extra_amount"
+                                                                className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[90px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                                placeholder="Extra"
+                                                                value={newDailyExpense.extra_amount || ""}
+                                                                onChange={(e) => setNewDailyExpense(prev => ({
+                                                                    ...prev,
+                                                                    extra_amount: e.target.value
+                                                                }))}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === "Enter") {
+                                                                        e.preventDefault();
+                                                                        handleAddExpense();
+                                                                    }
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-1 py-2">
+                                                    <input
+                                                        type="number"
+                                                        name="quantity"
+                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[60px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                        value={newDailyExpense.quantity || ""}
+                                                        onChange={(e) => setNewDailyExpense(prev => ({ ...prev, quantity: e.target.value }))}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === "Enter") {
+                                                                e.preventDefault();
+                                                                handleAddExpense();
+                                                            }
+                                                        }}
+                                                    />
+                                                </td>
+                                                <td className="px-1 py-2 text-left">
                                                     <select
                                                         name="type"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[130px] text-left h-[40px] rounded-lg focus:outline-none"
-                                                        value={row.type}
-                                                        onChange={(e) => handleEditExpense(row.id, 'type', e.target.value)}
+                                                        value={newDailyExpense.type}
+                                                        menuPortalTarget={document.body}
+                                                        onChange={handleInputChange}
+                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[120px] h-[40px] rounded-lg focus:outline-none"
                                                     >
                                                         <option value="">Select</option>
-                                                        {weeklyTypes.map((type, index) => (
-                                                            <option key={index} value={type.type}>
-                                                                {type.type}
+                                                        {(isChangeButtonActive ? expensesCategory : weeklyTypes).map((type, index) => (
+                                                            <option key={index} value={isChangeButtonActive ? type.category : type.type}>
+                                                                {isChangeButtonActive ? type.category : type.type}
                                                             </option>
                                                         ))}
                                                     </select>
-                                                ) : (
-                                                    <div className="w-[129px] h-[40px] flex items-center">
-                                                        {row.type}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-2">
-                                                {editingRowId === row.id ? (
-                                                    <input
-                                                        type="number"
-                                                        name="amount"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[100px] h-[40px] rounded-lg focus:outline-none"
-                                                        value={row.amount}
-                                                        onChange={(e) => handleEditExpense(row.id, 'amount', e.target.value)}
-                                                        disabled={editingRowId !== row.id}
-                                                        onWheel={(e) => e.preventDefault()}
-                                                        onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
-                                                        onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
-                                                    />
-                                                ) : (
-                                                    <div className="w-[129px] h-[40px] flex items-center">
-                                                        {Number(row.amount).toLocaleString('en-IN')}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="px-2 py-2 relative">
-                                                {Number(row.weekly_number) === Number(lastWeekNumber) && (
-                                                    <div className="flex gap-2"> {/* <-- Added flex container */}
-                                                        {editingRowId === row.id ? (
+                                                </td>
+
+                                            </tr>
+                                        ) : null}
+                                    </thead>
+                                    <tbody>
+
+                                        {/* Editable Expense rows */}
+                                        {sortedDailyExpenses
+                                            .filter(row => row.date === selectedDate) // only rows for selected date
+                                            .reverse()
+                                            .map((row, index) => (
+                                                <tr key={row.id} className="even:bg-[#FFFFFF] odd:bg-[#FAF6ED] text-left">
+                                                    <td className="px-1 py-2 font-bold text-left">{dailyExpenses.length - index}</td>
+                                                    {/* Contractor / Vendor column */}
+                                                    <td className="px-1 py-2">
+                                                        {editingDailyExpenseRowId === row.id ? (
+                                                            <Select
+                                                                name="labour_id"
+                                                                className="w-[230px]"
+                                                                placeholder={isChangeButtonActive ? "Vendor/Contractor" : "Labour Name"}
+                                                                isSearchable
+                                                                isClearable
+                                                                styles={customStyles}
+                                                                options={isChangeButtonActive ? combinedOptions : laboursList}
+                                                                value={
+                                                                    isChangeButtonActive
+                                                                        ? combinedOptions.find(opt =>
+                                                                            (opt.type === "Employee" && opt.id === Number(editDailyExpenseData.employee_id)) ||
+                                                                            (opt.type === "Vendor" && opt.id === Number(editDailyExpenseData.vendor_id)) ||
+                                                                            (opt.type === "Contractor" && opt.id === Number(editDailyExpenseData.contractor_id))
+                                                                        ) || null
+                                                                        : laboursList.find(opt => opt.id === Number(editDailyExpenseData.labour_id)) || null
+                                                                }
+                                                                onChange={(selectedOption) => {
+                                                                    if (selectedOption) {
+                                                                        const { type, id } = selectedOption;
+                                                                        setEditDailyExpenseData(prev => ({
+                                                                            ...prev,
+                                                                            labour_id: type === "Labour" ? id : "",
+                                                                            vendor_id: type === "Vendor" ? id : "",
+                                                                            contractor_id: type === "Contractor" ? id : "",
+                                                                            employee_id: type === "Employee" ? id : "",
+                                                                        }));
+                                                                    } else {
+                                                                        setEditDailyExpenseData(prev => ({
+                                                                            ...prev,
+                                                                            labour_id: "",
+                                                                            vendor_id: "",
+                                                                            contractor_id: "",
+                                                                            employee_id: "",
+                                                                        }));
+                                                                    }
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            // Show label in view mode
+                                                            <div className="w-[180px] h-[40px] flex items-center">
+                                                                {(() => {
+                                                                    const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
+                                                                    const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
+                                                                    const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
+                                                                    const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
+
+                                                                    // Collect all non-empty labels
+                                                                    const labels = [employee?.label, vendor?.label, contractor?.label, labour?.label].filter(Boolean);
+
+                                                                    return labels.length > 0 ? labels.join(" | ") : "";
+                                                                })()}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    {/* Project column */}
+                                                    <td className="px-1 py-2">
+                                                        {editingDailyExpenseRowId === row.id ? (
+                                                            <Select
+                                                                name="project_id"
+                                                                className="w-[220px]"
+                                                                placeholder="Select Project"
+                                                                isSearchable
+                                                                isClearable
+                                                                styles={customStyles}
+                                                                options={siteOptions}
+                                                                value={siteOptions.find(opt => opt.id === Number(editDailyExpenseData.project_id)) || null}
+                                                                onChange={(selectedOption) =>
+                                                                    setEditDailyExpenseData(prev => ({
+                                                                        ...prev,
+                                                                        project_id: selectedOption ? selectedOption.id : "",
+                                                                    }))
+                                                                }
+                                                            />
+                                                        ) : (
+                                                            // Show label in view mode
+                                                            <div className="w-[220px] h-[40px] flex items-center">
+                                                                {siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-1 py-2 relative group flex gap-2">
+                                                        {editingDailyExpenseRowId === row.id ? (
+                                                            <>
+                                                                <input
+                                                                    type="number"
+                                                                    name="amount"
+                                                                    className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[90px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                                    value={editDailyExpenseData.amount}
+                                                                    onChange={(e) =>
+                                                                        setEditDailyExpenseData(prev => ({ ...prev, amount: e.target.value }))
+                                                                    }
+                                                                />
+                                                                <input
+                                                                    type="number"
+                                                                    name="extra_amount"
+                                                                    className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[90px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                                    value={editDailyExpenseData.extra_amount}
+                                                                    onChange={(e) =>
+                                                                        setEditDailyExpenseData(prev => ({
+                                                                            ...prev,
+                                                                            extra_amount: e.target.value
+                                                                        }))
+                                                                    }
+                                                                />
+                                                            </>
+                                                        ) : (
+                                                            <div className="w-[120px] h-[40px] flex flex-col justify-center leading-tight cursor-default">
+                                                                <span>
+                                                                    {Number((row.amount || 0) + (row.extra_amount || 0)).toLocaleString("en-IN")}
+                                                                </span>
+                                                                {/* Tooltip on hover */}
+                                                                <div className="absolute left-0 top-full mt-1 hidden group-hover:block bg-black text-white text-xs rounded p-2 z-50 shadow-lg whitespace-nowrap">
+                                                                    Amount: {Number(row.amount || 0).toLocaleString('en-IN')} <br />
+                                                                    Extra Amount: {Number(row.extra_amount || 0).toLocaleString('en-IN')}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-1 py-2">
+                                                        <div className="w-[60px] h-[40px] flex items-center">
+                                                            {editingDailyExpenseRowId === row.id ? (
+                                                                <input
+                                                                    type="number"
+                                                                    name="quantity"
+                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[60px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                                    value={editDailyExpenseData.quantity || ""}
+                                                                    onChange={(e) => setEditDailyExpenseData(prev => ({ ...prev, quantity: e.target.value }))}
+                                                                />
+                                                            ) : (
+                                                                row.quantity || ""
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-1 py-2">
+                                                        {editingDailyExpenseRowId === row.id ? (
+                                                            <select
+                                                                name="type"
+                                                                className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[120px] text-left h-[40px] rounded-lg focus:outline-none"
+                                                                value={editDailyExpenseData.type}
+                                                                onChange={(e) =>
+                                                                    setEditDailyExpenseData(prev => ({ ...prev, type: e.target.value }))
+                                                                }
+                                                            >
+                                                                <option value="">Select</option>
+                                                                {(isChangeButtonActive ? expensesCategory : weeklyTypes).map((type, index) => (
+                                                                    <option key={index} value={isChangeButtonActive ? type.category : type.type}>
+                                                                        {isChangeButtonActive ? type.category : type.type}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        ) : (
+                                                            <div className="w-[120px] h-[40px] flex items-center">
+                                                                {row.type}
+                                                            </div>
+                                                        )}
+                                                    </td>
+
+                                                    <td className="px-1 py-2 relative">
+                                                        <div className="flex gap-2 w-[80px]">
+                                                            {row.file_url ? (
+                                                                <a
+                                                                    href={row.file_url}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="cursor-pointer"
+                                                                >
+                                                                    <img src={file} className="w-5 h-4" alt="Open File" />
+                                                                </a>
+                                                            ) : (
+                                                                editingDailyExpenseRowId === row.id && (
+                                                                    <label className="cursor-pointer">
+                                                                        <input
+                                                                            type="file"
+                                                                            accept="application/pdf"
+                                                                            className="hidden"
+                                                                            onChange={(e) => handleFileChange(e, row)}
+                                                                        />
+                                                                        <img
+                                                                            src={fileUpload}
+                                                                            className="w-5 h-4 opacity-70 hover:opacity-100"
+                                                                            alt="Upload File"
+                                                                        />
+                                                                    </label>
+                                                                )
+                                                            )}
+                                                            {/* Edit Button */}
+                                                            {editingDailyExpenseRowId === row.id ? (
+                                                                <button
+                                                                    className="text-green-600 font-bold text-lg relative z-10"
+                                                                    onClick={() => saveEditedExpense(row)}
+                                                                >
+                                                                    ✓
+                                                                </button>
+                                                            ) : (
+                                                                row.type === "Carry Forward" ? (
+                                                                    <img
+                                                                        className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                        src={Edit}
+                                                                        alt="Edit Disabled"
+                                                                    />
+                                                                ) : (
+                                                                    <button onClick={() => handleEditClick(row)}>
+                                                                        <img className="w-5 h-4" src={Edit} alt="Edit" />
+                                                                    </button>
+                                                                )
+                                                            )}
+                                                            {/* Delete Button */}
+                                                            <button onClick={() => handleDailyExpensesDelete(row.id)}>
+                                                                <img src={Delete} className="w-5 h-4" alt="Delete" />
+                                                            </button>
+                                                            {/* History Button */}
+                                                            <button onClick={() => fetchAuditDetailsForDailyExpense(row.id)}>
+                                                                <img src={history} className="w-5 h-4" alt="History" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex-[1] min-w-0 ">
+                        <div className="flex justify-between mb-4">
+                            <h1 className="font-bold text-base">Refund Received</h1>
+                            <h1 className="font-bold text-base">
+                                Total: <span style={{ color: "#E4572E" }}>{Number(totalRefund).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}</span>
+                            </h1>
+                        </div>
+                        <div>
+                            <div className="w-full rounded-lg border-l-8 border-l-[#BF9853] overflow-x-auto" style={{ maxHeight: "400px" }}>
+                                <table className="w-full min-w-[320px] border-collapse">
+                                    <thead className="bg-[#FAF6ED] h-12">
+                                        <tr>
+                                            <th className="px-4 py-2 text-left">Name</th>
+                                            <th className="px-4 py-2">Amount</th>
+                                            <th className="px-4 py-2 text-left">Activity</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {[...refundPayments].map((row, index) => (
+                                            <tr key={row.id || index} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
+                                                <td className="px-1 py-2">
+                                                    {editingPaymentId === row.id ? (
+                                                        <Select
+                                                            name="labour_id"
+                                                            className="w-[180px]"
+                                                            placeholder="Labour Name"
+                                                            isSearchable
+                                                            isClearable
+                                                            value={laboursList.find(opt => opt.id === editRefundPaymentData.labour_id) || null}
+                                                            onChange={handleEditRefundLabourChange}
+                                                            options={laboursList}
+                                                            menuPortalTarget={document.body}
+                                                            styles={customStyles}
+                                                        />
+                                                    ) : (
+                                                        laboursList.find(opt => opt.id === Number(row.labour_id))?.label || ""
+                                                    )}
+                                                </td>
+                                                <td className=" py-2">
+                                                    {editingPaymentId === row.id ? (
+                                                        <input
+                                                            type="number"
+                                                            name="amount"
+                                                            value={editRefundPaymentData.amount}
+                                                            onChange={handleEditRefundChange}
+                                                            className="border-2 border-[#BF9853] border-opacity-25 rounded-lg w-[90px] h-[40px] focus:outline-none no-spinner"
+                                                            min="0"
+                                                            step="any"
+                                                            onWheel={(e) => e.preventDefault()}
+                                                        />
+                                                    ) : (
+                                                        Number(row.amount).toLocaleString("en-IN")
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-2">
+                                                    <div className="flex">
+                                                        {editingPaymentId === row.id ? (
                                                             <button
-                                                                className="text-green-600 font-bold text-lg relative z-10"
-                                                                onClick={() => saveEditedExpense(row)}
+                                                                className="text-green-600 font-bold text-lg"
+                                                                onClick={() => saveEditedRefundPayment(row.id)}
                                                             >
                                                                 ✓
                                                             </button>
                                                         ) : (
-                                                            row.type === "Carry Forward" ? (
-                                                                <img
-                                                                    className="w-5 h-4 opacity-40 cursor-not-allowed"
-                                                                    src={Edit}
-                                                                    alt="Edit Disabled"
-                                                                />
-                                                            ) : (
-                                                                <button onClick={() => setEditingRowId(row.id)}>
-                                                                    <img className="w-5 h-4" src={Edit} alt="Edit" />
-                                                                </button>
-                                                            )
+                                                            <button onClick={() => handleEditRefundClick(row)}>
+                                                                <img className="w-5 h-4" src={Edit} alt="Edit" />
+                                                            </button>
                                                         )}
-
-                                                        {/* Delete Button */}
-                                                        <button className="" onClick={() => handleWeeklyExpensesDelete(row.id)}>
+                                                        <button className="pl-3" onClick={() => handleRefundPaymentsDelete(row.id)}>
                                                             <img src={Delete} className="w-5 h-4" alt="Delete" />
                                                         </button>
-                                                        <button className="" onClick={() => fetchAuditDetailsForExpense(row.id)}>
-                                                            <img src={history} className="w-5 h-4" alt="Delete" />
+                                                        <button onClick={() => fetchAuditDetailsForRefundPaymentReceived(row.id)} className="pl-3">
+                                                            <img src={history} className="w-5 h-4" alt="History" />
                                                         </button>
                                                     </div>
-                                                )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        <tr>
+                                            <td className=" py-2 text-left">
+                                                <Select
+                                                    name="labour_id"
+                                                    className="w-[265px] text-left"
+                                                    placeholder="Labour Name"
+                                                    isSearchable
+                                                    isClearable
+                                                    value={laboursList.find(opt => opt.id === newRefundReceived.labour_id) || null}
+                                                    onChange={handleLabourChange}
+                                                    onKeyDown={handleKeyDown}
+                                                    options={laboursList}
+                                                    styles={customStyles}
+                                                    menuPortalTarget={document.body}
+                                                />
+                                            </td>
+                                            <td className=" py-2">
+                                                <input
+                                                    type="number"
+                                                    name="amount"
+                                                    value={newRefundReceived.amount}
+                                                    onChange={handleNewPaymentChange}
+                                                    onKeyDown={handleKeyDown}
+                                                    className="border-2 border-[#BF9853] border-opacity-25 rounded-lg w-[90px] h-[40px] focus:outline-none no-spinner"
+                                                    min="0"
+                                                    step="any"
+                                                    onWheel={(e) => e.preventDefault()}
+                                                />
                                             </td>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
-
                 </div>
-                <AuditModal show={showWeeklyPaymentExpensesModal} onClose={() => setShowWeeklyPaymentExpensesModal(false)} audits={weeklyPaymentExpensesAudits} vendorOptions={vendorOptions} contractorOptions={contractorOptions}
-                    siteOptions={siteOptions} />
+                <AuditModal show={showWeeklyPaymentExpensesModal} onClose={() => setShowWeeklyPaymentExpensesModal(false)} audits={weeklyPaymentExpensesAudits} laboursList={laboursList} contractorOptions={contractorOptions}
+                    siteOptions={siteOptions} vendorOptions={vendorOptions} employeeOptions={employeeOptions} />
                 <AuditModalWeeklyPaymentsReceived show={showWeeklyPaymentReceivedModal} onClose={() => setShowWeeklyPaymentReceivedModal(false)}
-                    audits={weeklyPaymentReceivedAudits} />
+                    audits={weeklyPaymentReceivedAudits} laboursList={laboursList} />
             </div>
         </body >
     )
@@ -834,7 +1608,7 @@ const formatDate = (dateString) => {
     return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
 };
 
-const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, siteOptions }) => {
+const AuditModal = ({ show, onClose, audits, laboursList, siteOptions, vendorOptions, employeeOptions, contractorOptions }) => {
     if (!show) return null;
 
     const getNameById = (id, options) => {
@@ -847,8 +1621,10 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
         { oldKey: "old_date", newKey: "new_date", label: "Date", width: "120px" },
         { oldKey: "old_type", newKey: "new_type", label: "Type", width: "100px" },
         { oldKey: "old_project_id", newKey: "new_project_id", label: "Project Name", width: "180px", lookup: siteOptions },
-        { oldKey: "old_vendor_id", newKey: "new_vendor_id", label: "Vendor", width: "150px", lookup: vendorOptions },
-        { oldKey: "old_contractor_id", newKey: "new_contractor_id", label: "Contractor", width: "150px", lookup: contractorOptions },
+        { oldKey: "old_labour_id", newKey: "new_labour_id", label: "Labour Name", width: "150px", lookup: laboursList },
+        { oldKey: "old_employee_id", newKey: "new_employee_id", label: "Employee Name", width: "150px", lookup: employeeOptions },
+        { oldKey: "old_vendor_id", newKey: "new_vendor_id", label: "Vendor Name", width: "150px", lookup: vendorOptions },
+        { oldKey: "old_contractor_id", newKey: "new_contractor_id", label: "Contractor Name", width: "150px", lookup: contractorOptions },
         { oldKey: "old_amount", newKey: "new_amount", label: "Amount", width: "100px" },
     ];
 
@@ -867,17 +1643,28 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
     };
 
     const formatDisplayValue = (value, field) => {
-        // If vendor or transfer site is 0, show "-"
+        // If vendor, contractor, labour, employee or transfer site is 0, show "-"
         if (
-            (field.oldKey?.includes("vendor_id") || field.oldKey?.includes("transfer_site_id") ||
-                field.newKey?.includes("vendor_id") || field.newKey?.includes("transfer_site_id")) &&
+            (field.oldKey?.includes("labour_id") || field.oldKey?.includes("vendor_id") || field.oldKey?.includes("contractor_id") || field.oldKey?.includes("employee_id") || field.oldKey?.includes("transfer_site_id") ||
+                field.newKey?.includes("labour_id") || field.newKey?.includes("vendor_id") || field.newKey?.includes("contractor_id") || field.newKey?.includes("employee_id") || field.newKey?.includes("transfer_site_id")) &&
             String(value) === "0"
         ) {
             return "-";
         }
 
         if (field.lookup) {
-            return getNameById(value, field.lookup);
+            // Handle different lookup types based on field label
+            if (field.label.includes("Vendor")) {
+                return getNameById(value, vendorOptions || []);
+            } else if (field.label.includes("Contractor")) {
+                return getNameById(value, contractorOptions || []);
+            } else if (field.label.includes("Labour")) {
+                return getNameById(value, laboursList || []);
+            } else if (field.label.includes("Employee")) {
+                return getNameById(value, employeeOptions || []);
+            } else {
+                return getNameById(value, field.lookup);
+            }
         }
         if (field.label.includes("Amount")) {
             return value ? Number(value).toLocaleString("en-IN") : "-";
@@ -960,7 +1747,7 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
     );
 };
 
-const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits }) => {
+const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits, laboursList }) => {
     if (!show) return null;
 
     const getNameById = (id, options) => {
@@ -972,7 +1759,7 @@ const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits }) => {
     const fields = [
         { oldKey: "old_date", newKey: "new_date", label: "Date", width: "120px" },
         { oldKey: "old_amount", newKey: "new_amount", label: "Amount", width: "100px" },
-        { oldKey: "old_type", newKey: "new_type", label: "Type", width: "100px" },
+        { oldKey: "old_labour_id", newKey: "new_labour_id", label: "Labour Name", width: "150px", lookup: laboursList },
     ];
 
     const formatDateTime = (dateString) => {
@@ -992,8 +1779,8 @@ const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits }) => {
     const formatDisplayValue = (value, field) => {
         // If vendor or transfer site is 0, show "-"
         if (
-            (field.oldKey?.includes("vendor_id") || field.oldKey?.includes("transfer_site_id") ||
-                field.newKey?.includes("vendor_id") || field.newKey?.includes("transfer_site_id")) &&
+            (field.oldKey?.includes("labour_id") || field.oldKey?.includes("transfer_site_id") ||
+                field.newKey?.includes("labour_id") || field.newKey?.includes("transfer_site_id")) &&
             String(value) === "0"
         ) {
             return "-";

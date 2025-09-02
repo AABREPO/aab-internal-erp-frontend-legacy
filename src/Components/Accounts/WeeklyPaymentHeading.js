@@ -1,62 +1,82 @@
-import React, { useState } from 'react';
-import { Link, Route, Routes, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
 import WeeklyPayment from './WeeklyPayment';
 import History from './WeeklyPaymentHistory';
 import HandoverPaymentsPage from './WeeklyPaymentHandover';
 import DailyPayment from './DailyPayment';
+import WeeklyPaymentAddInput from './WeeklyPaymentAddInput';
+import DailyHistory from './DailyHistory';
 const WHeading = ({ username, userRoles = [] }) => {
-    const location = useLocation();
-    const [activeLink, setActiveLink] = useState(location.pathname);
-    const handleLinkClick = (path) => {
-        setActiveLink(path);
-    }
+    const [activeTab, setActiveTab] = useState(
+        localStorage.getItem('activePaintTab') || 'claimpaymentsummary'
+    );
+
+    useEffect(() => {
+        // Save the active tab to localStorage whenever it changes
+        localStorage.setItem('activePaintTab', activeTab);
+    }, [activeTab]);
+
+    const renderContent = () => {
+        switch (activeTab) {
+            case 'weeklypayment':
+                return <WeeklyPayment username={username} userRoles={userRoles} />;
+            case 'dailypayment':
+                return <DailyPayment username={username} userRoles={userRoles} />;
+            case 'dailyhistory':
+                return <DailyHistory username={username} userRoles={userRoles} />;
+            case 'weeklyhistory':
+                return <History username={username} userRoles={userRoles} />;
+            case 'handoverpaymentspage':
+                return <HandoverPaymentsPage username={username} userRoles={userRoles} />;
+            case 'weeklypaymentaddinput':
+                return <WeeklyPaymentAddInput username={username} userRoles={userRoles} />;
+            default:
+                return <WeeklyPayment />;
+        }
+    };
     return (
         <div className="bg-[#FAF6ED]">
-        <div className="topbar-title">
-            <h2 className="mb-2">
-                <Link
-                    className={`link ${activeLink === '/weekly-payment/WeeklyPayment' ? 'active' : ''}`}
-                    to="/weekly-payment/WeeklyPayment"
-                    onClick={() => handleLinkClick('/weekly-payment/WeeklyPayment')}
+            <div className="topbar-title">
+                <h2
+                    className={`link ${activeTab === 'weeklypayment' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('weeklypayment')}
                 >
                     Weekly Payment
-                </Link>
-            </h2>
-            <h2>
-                <Link
-                    className={`link ${activeLink === '/weekly-payment/dailypayment' ? 'active' : ''}`}
-                    to="/weekly-payment/dailypayment"
-                    onClick={() => handleLinkClick('/weekly-payment/dailypayment')}
-                > 
-                Daily Payment
-                </Link>
-            </h2>
-            <h2>
-                <Link
-                    className={`link ${activeLink === '/weekly-payment/History' ? 'active' : ''}`}
-                    to="/weekly-payment/History"
-                    onClick={() => handleLinkClick('/weekly-payment/History')}
-                > 
-                History
-                </Link>
-            </h2>
-            <h2>
-                <Link
-                    className={`link ${activeLink === '/weekly-payment/Handover' ? 'active' : ''}`}
-                    to="/weekly-payment/Handover"
-                    onClick={() => handleLinkClick('/weekly-payment/Handover')}
-                > 
-                Handover
-                </Link>
-            </h2>
+                </h2>
+                <h2
+                    className={`link ${activeTab === 'dailypayment' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('dailypayment')}
+                >
+                    Daily Payment
+                </h2>
+                <h2
+                    className={`link ${activeTab === 'weeklyhistory' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('weeklyhistory')}
+                >
+                    History
+                </h2>
+                <h2
+                    className={`link ${activeTab === 'dailyhistory' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('dailyhistory')}
+                >
+                    Daily History
+                </h2>
+                <h2
+                    className={`link ${activeTab === 'handoverpaymentspage' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('handoverpaymentspage')}
+                >
+                    Handover
+                </h2>                
+                <h2
+                    className={`link ${activeTab === 'weeklypaymentaddinput' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('weeklypaymentaddinput')}
+                >
+                    Add Input
+                </h2>
+            </div>
+            <div className="content">
+                {renderContent()}
+            </div>
         </div>
-        <Routes>
-            <Route path="weeklypayment" element={<WeeklyPayment  username={username} userRoles={userRoles}/>} />
-            <Route path='history' element={<History  username={username} userRoles={userRoles}/>}/>
-            <Route path='handover' element={<HandoverPaymentsPage username={username} userRoles={userRoles}/>} />
-            <Route path='dailypayment' element={<DailyPayment username={username} userRoles={userRoles}/>} />
-        </Routes>
-    </div>
     )
 }
 

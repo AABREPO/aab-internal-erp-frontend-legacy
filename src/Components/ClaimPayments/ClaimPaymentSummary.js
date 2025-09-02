@@ -175,6 +175,10 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
     }
   };
 
+  const unclaimedData = filteredData.filter(
+    row => (receivedAmounts[row.id] || 0) < row.amount
+  );
+
   const sortedSiteOptions = siteOption.sort((a, b) =>
     a.label.localeCompare(b.label)
   );
@@ -219,7 +223,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                 </tr>
               </thead>
               <tbody>
-                {filteredData.map((row, index) => (
+                {unclaimedData.map((row, index) => (
                   <tr key={index} className={`even:bg-[#FAF6ED] odd:bg-[#FFFFFF] font-bold text-[14px]`}>
                     <td className="px-4 py-2">{formatDateOnly(row.date)}</td>
                     <td className="px-4 py-2">{row.siteName}</td>
@@ -279,132 +283,134 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
         </div>
         {/* Modal */}
         {showModal && (
-  <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
-    <div className="bg-white rounded-2xl p-6 w-[700px] relative shadow-xl">
-      {/* Title */}
-      <h2 className="text-xl font-semibold mb-6 text-center">Entry Payment Details</h2>
+          <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
+            <div className="bg-white rounded-2xl p-6 w-[700px] relative shadow-xl">
+              {/* Title */}
+              <h2 className="text-xl font-semibold mb-6 text-center">Entry Payment Details</h2>
 
-      {/* Previous Payments */}
-      {claimPaymentsData.length > 0 ? (
-        claimPaymentsData.map((payment, idx) => (
-          <div key={idx} className="flex gap-4 mb-4">
-            {/* Date */}
-            <div className="flex flex-col text-left w-[168px]">
-              <label className="mb-1 font-bold">Date</label>
-              <input
-                type="text"
-                value={formatDateOnly(payment.date)}
-                readOnly
-                className="border border-[#BF9853]/25 rounded-lg h-[45px] px-3 py-2 "
-              />
-            </div>
+              {/* Previous Payments */}
+              {claimPaymentsData.length > 0 ? (
+                claimPaymentsData.map((payment, idx) => (
+                  <div key={idx} className="flex gap-4 mb-4">
+                    {/* Date */}
+                    <div className="flex flex-col text-left w-[168px]">
+                      <label className="mb-1 font-bold">Date</label>
+                      <input
+                        type="text"
+                        value={formatDateOnly(payment.date)}
+                        readOnly
+                        className="border border-[#BF9853]/25 rounded-lg h-[45px] px-3 py-2 "
+                      />
+                    </div>
 
-            {/* Amount */}
-            <div className="flex flex-col text-left w-[168px]">
-              <label className="mb-1 font-bold">Amount</label>
-              <input
-                type="text"
-                value={Number(payment.amount).toLocaleString()}
-                readOnly
-                className="border border-[#BF9853]/25 rounded-lg h-[45px] px-3 py-2 "
-              />
-            </div>
+                    {/* Amount */}
+                    <div className="flex flex-col text-left w-[168px]">
+                      <label className="mb-1 font-bold">Amount</label>
+                      <input
+                        type="text"
+                        value={Number(payment.amount).toLocaleString()}
+                        readOnly
+                        className="border border-[#BF9853]/25 rounded-lg h-[45px] px-3 py-2 "
+                      />
+                    </div>
 
-            {/* Mode */}
-            <div className="flex flex-col text-left w-[168px]">
-              <label className="mb-1 font-bold">Mode</label>
-              <input
-                type="text"
-                value={payment.payment_mode}
-                readOnly
-                className="border border-[#BF9853]/25 rounded-lg h-[45px] px-3 py-2 "
-              />
-            </div>
+                    {/* Mode */}
+                    <div className="flex flex-col text-left w-[168px]">
+                      <label className="mb-1 font-bold">Mode</label>
+                      <input
+                        type="text"
+                        value={payment.payment_mode}
+                        readOnly
+                        className="border border-[#BF9853]/25 rounded-lg h-[45px] px-3 py-2 "
+                      />
+                    </div>
 
-            {/* CR Button */}
-            <div className="flex flex-col justify-end">
-              <button className="bg-[#BF9853] w-20 h-[45px] rounded-lg text-white font-semibold">CR</button>
+                    {/* CR Button (only for Cash mode) */}
+                    {payment.payment_mode === "Cash" && (
+                      <div className="flex flex-col justify-end">
+                        <button className="bg-[#BF9853] w-20 h-[45px] rounded-lg text-white font-semibold">
+                          CR
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-gray-500 mb-4">No previous payments found.</p>
+              )}
+              {/* New Entry */}
+              <div className="flex gap-4 mb-6">
+                {/* Date */}
+                <div className="flex flex-col text-left w-[168px]">
+                  <label className="mb-1 font-bold">Date</label>
+                  <input
+                    type="date"
+                    value={mainDate}
+                    onChange={(e) => setMainDate(e.target.value)}
+                    className="border border-[#BF9853]/25 rounded-lg h-[45px] px-3 py-2"
+                  />
+                </div>
+
+                {/* Amount */}
+                <div className="flex flex-col text-left w-[168px]">
+                  <label className="mb-1 font-bold">Amount</label>
+                  <input
+                    type="number"
+                    value={popupAmount}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      if (val >= 0 && val <= remainingAmount) {
+                        setPopupAmount(val);
+                      }
+                    }}
+                    placeholder="Enter amount"
+                    className="border border-[#BF9853]/25 rounded-lg h-[45px] px-3 py-2"
+                  />
+                </div>
+
+                {/* Mode */}
+                <div className="flex flex-col text-left w-[168px]">
+                  <label className="mb-1 font-bold">Mode</label>
+                  <select
+                    value={mainMode}
+                    onChange={(e) => setMainMode(e.target.value)}
+                    className="border border-[#BF9853]/25 rounded-lg h-[45px] px-3 py-2"
+                  >
+                    <option value="">Select Mode</option>
+                    <option value="Cash">Cash</option>
+                    <option value="G-pay">G-pay</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                    <option value="UPI">UPI</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Save Buttons */}
+              <div className="flex gap-4 mt-4">
+                <button
+                  onClick={handleSavePayment}
+                  className="bg-[#BF9853] text-white w-[114px] h-[36px] rounded hover:bg-[#a57f3f]"
+                >
+                  Submit
+                </button>
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="border border-[#BF9853] text-[#BF9853] w-[114px] h-[36px] rounded hover:bg-[#f9f5ef]"
+                >
+                  Cancel
+                </button>
+              </div>
+
+              {/* Close Button */}
+              <button
+                onClick={() => setShowModal(false)}
+                className="absolute top-3 right-4 text-xl font-bold text-gray-500 hover:text-black"
+              >
+                ×
+              </button>
             </div>
           </div>
-        ))
-      ) : (
-        <p className="text-sm text-gray-500 mb-4">No previous payments found.</p>
-      )}
-
-      {/* New Entry */}
-      <div className="flex gap-4 mb-6">
-        {/* Date */}
-        <div className="flex flex-col text-left w-[168px]">
-          <label className="mb-1 font-bold">Date</label>
-          <input
-            type="date"
-            value={mainDate}
-            onChange={(e) => setMainDate(e.target.value)}
-            className="border border-[#BF9853]/25 rounded-lg h-[45px] px-3 py-2"
-          />
-        </div>
-
-        {/* Amount */}
-        <div className="flex flex-col text-left w-[168px]">
-          <label className="mb-1 font-bold">Amount</label>
-          <input
-            type="number"
-            value={popupAmount}
-            onChange={(e) => {
-              const val = Number(e.target.value);
-              if (val >= 0 && val <= remainingAmount) {
-                setPopupAmount(val);
-              }
-            }}
-            placeholder="Enter amount"
-            className="border border-[#BF9853]/25 rounded-lg h-[45px] px-3 py-2"
-          />
-        </div>
-
-        {/* Mode */}
-        <div className="flex flex-col text-left w-[168px]">
-          <label className="mb-1 font-bold">Mode</label>
-          <select
-            value={mainMode}
-            onChange={(e) => setMainMode(e.target.value)}
-            className="border border-[#BF9853]/25 rounded-lg h-[45px] px-3 py-2"
-          >
-            <option value="">Select Mode</option>
-            <option value="Cash">Cash</option>
-            <option value="G-pay">G-pay</option>
-            <option value="Bank Transfer">Bank Transfer</option>
-            <option value="UPI">UPI</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Save Buttons */}
-      <div className="flex gap-4 mt-4">
-        <button
-          onClick={handleSavePayment}
-          className="bg-[#BF9853] text-white w-[114px] h-[36px] rounded hover:bg-[#a57f3f]"
-        >
-          Submit
-        </button>
-        <button
-          onClick={() => setShowModal(false)}
-          className="border border-[#BF9853] text-[#BF9853] w-[114px] h-[36px] rounded hover:bg-[#f9f5ef]"
-        >
-          Cancel
-        </button>
-      </div>
-
-      {/* Close Button */}
-      <button
-        onClick={() => setShowModal(false)}
-        className="absolute top-3 right-4 text-xl font-bold text-gray-500 hover:text-black"
-      >
-        ×
-      </button>
-    </div>
-  </div>
-)}
-
+        )}
       </div>
     </body>
   );

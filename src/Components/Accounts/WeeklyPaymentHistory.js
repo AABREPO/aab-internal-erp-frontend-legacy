@@ -472,63 +472,93 @@ const History = ({ username, userRoles = [] }) => {
         const pageWidth = doc.internal.pageSize.getWidth();
         const year = new Date().getFullYear();
         const weekDates = getWeekStartEnd(year, Number(selectedWeek));
+
         // Safety check for valid dates
         if (!weekDates || !weekDates.start || !weekDates.end) {
             alert("Error: Could not calculate week dates. Please try again.");
             return;
         }
+
         const { start, end } = weekDates;
         const weekStartDate = start.toLocaleDateString("en-GB");
         const weekEndDate = end.toLocaleDateString("en-GB");
+
         // Safety check for expenses and payments arrays
         if (!Array.isArray(expenses) || !Array.isArray(payments)) {
             alert("Error: Data not loaded properly. Please refresh the page and try again.");
             return;
         }
+
         const totalExpenses = expenses.reduce((t, e) => t + Number(e.amount || 0), 0);
         const totalPayments = payments.reduce((t, p) => t + Number(p.amount || 0), 0);
         const balance = totalPayments - totalExpenses;
+
+
         // ===== FUNCTION TO DRAW HEADER =====
-        const drawHeader = (doc) => {
+        const drawHeader = (doc, titleText = "") => {
             doc.setFontSize(10);
             doc.setTextColor(0, 0, 0);
+
             // Outer rectangle + lines
-            doc.rect(20, 24, 810, 65);
-            doc.line(80, 24, 80, 90);
-            doc.line(140, 24, 140, 90);
-            doc.line(440, 24, 440, 90);
-            doc.line(520, 24, 520, 45);
-            doc.line(600, 24, 600, 90);
-            doc.line(730, 24, 730, 90);
-            doc.line(440, 45, 830, 45);
-            doc.line(600, 45, 830, 45);
-            doc.text("PS", 30, 60);
-            doc.text(String(selectedWeek || ""), 110, 60);
-            doc.setFontSize(14);
-            doc.setFont("helvetica", "bold");
-            doc.text("WEEKLY PAYMENTS", 180, 60);
+            doc.rect(20, 24, 810, 40);
+
+            // PS label
+            // PS with selected week
             doc.setFont("helvetica", "normal");
             doc.setFontSize(10);
-            doc.text(String(weekStartDate || ""), 460, 40);
-            doc.text(String(weekEndDate || ""), 530, 40);
-            doc.text(String(new Date().toLocaleDateString("en-GB") || ""), 500, 68);
+            doc.text(`PS: ${String(selectedWeek || "")}`, 30, 40);
+
+            // Current Date under PS
+            doc.setFontSize(9);
+            doc.text(String(new Date().toLocaleDateString("en-GB") || ""), 30, 55);
+
+            // Main Title (dynamic)
+            doc.setFontSize(14);
+            doc.setFont("helvetica", "bold");
+            doc.text(titleText, 180, 50);
+
+            // Dates stacked
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(10);
+            doc.text(`START  ${String(weekStartDate || "")}`, 460, 40);
+            doc.text(`END    ${String(weekEndDate || "")}`, 465, 58);
+
+            // === Expenses with green background ===
+            doc.setFillColor(220, 250, 220); // light green
+            doc.rect(620, 25, 190, 18.5, "F"); // background box for Balance
             doc.setFontSize(12);
-            doc.text("EXPENSES", 610, 40);
-            doc.text(String(totalExpenses.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"), 740, 40);
-            doc.text("BALANCE", 610, 68);
-            doc.text(String(balance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"), 740, 68);
+            doc.setFont("helvetica", "bold");
+            doc.text("EXPENSES", 660, 37);
+            doc.text(
+                String(totalExpenses.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
+                730, 37
+            );
+
+            // === Balance with pink background ===
+            doc.setFillColor(250, 220, 220); // light pink
+            doc.rect(620, 44, 190, 18.5, "F"); // background box for Expenses
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text("BALANCE", 660, 58);
+            doc.text(
+                String(balance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
+                740, 58
+            );
         };
-        // Draw header on first page
-        drawHeader(doc);
+
+        // Draw header on first page with "WEEKLY PAYMENT REPORT"
+        drawHeader(doc, "WEEKLY PAYMENT REPORT");
+
+
         // ===== EXPENSES TABLE =====
         const expensesHeaders = [["SNO", "Date", "Contractor/Vendor", "Site Name", "Type", "Amount", "AC", "C", ""]];
-        const filteredExpenses = expenses.filter(row => row.type !== "Project Advance" && row.type !== "Staff Advance" && row.type !== "Staff Salary"&& row.type !== "Daily");
+        const filteredExpenses = expenses.filter(row => row.type !== "Project Advance" && row.type !== "Staff Advance" && row.type !== "Staff Salary" && row.type !== "Daily");
         const expensesData = filteredExpenses.map((row, idx) => [
             String(idx + 1 || ""),
             String(row.date ? formatDateOnly(row.date) : ""),
             String(combinedOptions.find(opt =>
                 (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
-                (opt.type === "Vendor" && opt.id === Number(row.vendor_id))||
+                (opt.type === "Vendor" && opt.id === Number(row.vendor_id)) ||
                 (opt.type === "Employee" && opt.id === Number(row.employee_id))
             )?.label || ""),
             String(siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""),
@@ -539,7 +569,7 @@ const History = ({ username, userRoles = [] }) => {
         autoTable(doc, {
             head: expensesHeaders,
             body: expensesData,
-            margin: { top: 90, left: 20 }, // give space for custom header
+            margin: { top: 64, left: 20 }, // give space for custom header
             tableWidth: 810,
             theme: "grid",
             styles: {
@@ -551,21 +581,24 @@ const History = ({ username, userRoles = [] }) => {
             },
             headStyles: {
                 textColor: [0, 0, 0],
-                fillColor: [255, 255, 255],
+                fillColor: [255, 230, 230],
                 lineColor: [0, 0, 0],
                 lineWidth: 1.0,
-                fontStyle: 'bold'
+                fontStyle: 'normal'
+            },
+            columnStyles: {
+                5: { halign: 'right' } // Amount column
             },
             didDrawPage: (data) => {
-                drawHeader(doc); // always draw your custom header first
-                // Now re-position autotable after header
+                drawHeader(doc);
                 if (data.pageNumber > 1) {
-                    doc.setFontSize(10); // optional: add page label
+                    doc.setFontSize(10);
                 }
-            }
+            },
         });
+
         // ===== PAYMENTS TABLE =====
-        const paymentsHeaders = [["Date Received", "Amount", "Type"]];
+        const paymentsHeaders = [["DATE RECEIVED", "AMOUNT", "TYPE"]];
         const paymentsData = payments.map(r => [
             String(r.created_at ? formatDate(r.created_at) : ""),
             String(Number(r.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
@@ -576,20 +609,37 @@ const History = ({ username, userRoles = [] }) => {
             { content: String(totalPayments.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"), styles: { fontStyle: "bold" } },
             { content: "", styles: { fontStyle: "bold" } }
         ]);
+        paymentsData.push([
+            { content: "BALANCE", styles: { fontStyle: "bold" } },
+            { content: String(balance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"), styles: { fontStyle: "bold" } },
+            { content: "", styles: { fontStyle: "bold" } }
+        ]);
+
         // ===== NEW PAGE for remaining tables =====
         doc.addPage();
-        drawHeader(doc);
+        drawHeader(doc, "WEEKLY PAYMENT STATEMENT");
+
+
         const baseY = 110;
+
+        // Add heading for payments table
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("PAYMENT RECEIVED", 22, baseY - 25);
+
         autoTable(doc, {
             head: paymentsHeaders,
             body: paymentsData,
-            startY: baseY,
+            startY: baseY - 20,
             margin: { left: 20 },
-            tableWidth: 260,
+            tableWidth: 210,
             theme: "grid",
             styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
-            headStyles: { textColor: [0, 0, 0], fillColor: [255, 255, 255], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+            headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
             bodyStyles: { fontStyle: 'bold' },
+            columnStyles: {
+                1: { halign: 'right' } // Amount column
+            },
             didDrawPage: () => {
                 drawHeader(doc);
             }
@@ -597,61 +647,122 @@ const History = ({ username, userRoles = [] }) => {
         // ----- HANDOVER DETAILS -----
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
-        doc.text("HANDOVER DETAILS", 22, baseY + 160);
+        doc.text("HANDOVER DETAILS", 22, baseY + 150);
         autoTable(doc, {
-            head: [["Date Returned", "Amount"]],
+            head: [["DATE RETURNED", "AMOUNT"]],
             body: [
                 ["", ""],
                 ["RETURNED", "0"]
             ],
-            startY: baseY + 170,
+            startY: baseY + 155,
             margin: { left: 22 },
             tableWidth: 200,
             theme: "grid",
             styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
-            headStyles: { textColor: [0, 0, 0], fillColor: [255, 255, 255], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+            headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
             bodyStyles: { fontStyle: 'bold' },
+            columnStyles: {
+                1: { halign: 'right' } // Amount column
+            },
             didDrawPage: () => {
                 drawHeader(doc);
             }
         });
+
+        // ===== DRAW VERTICAL DIVIDER AFTER HANDOVER DETAILS =====
+        const dividerX = 260;  // adjust X position as needed
+        const headerBottomY = 65; // header ends at y=24+55=79
+        const pageHeight = doc.internal.pageSize.getHeight();
+
+        // Draw vertical line (from bottom of header box down to page bottom margin)
+        doc.setDrawColor(0, 0, 0);  // black
+        doc.setLineWidth(0.5);
+        doc.line(dividerX, headerBottomY, dividerX, pageHeight - 0);
+
         // ----- EXTRA -----
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
-        
+
         // Filter for Daily type expenses
         const dailyExpenses = expenses.filter(expense => expense.type === "Daily");
         const dailyExpenseData = dailyExpenses.map(expense => [
             String(expense.date ? formatDateOnly(expense.date) : ""), // Date in first column
             String(Number(expense.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00") // Amount in second column
         ]);
-        
+
         // Calculate total of daily expenses
         const dailyExpensesTotal = dailyExpenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
-        
+
         // If no daily expenses, show a message
         if (dailyExpenseData.length === 0) {
             dailyExpenseData.push(["No Daily Expenses", "0.00"]);
         }
-        
         autoTable(doc, {
-            head: [["Daily Wage", `${dailyExpensesTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]],
+            head: [["DAILY WAGE", "AMOUNT"]],
             body: dailyExpenseData,
-            startY: baseY + 150,
+            startY: baseY + 130,
             margin: { left: 300 },
             tableWidth: 200,
             theme: "grid",
-            styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
-            headStyles: { textColor: [0, 0, 0], fillColor: [255, 255, 255], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
-            bodyStyles: { fontStyle: 'bold' },
+            styles: {
+                fontSize: 8,
+                cellPadding: 3,
+                textColor: [0, 0, 0],
+                lineColor: [0, 0, 0],
+                lineWidth: 0.5
+            },
+            headStyles: {
+                textColor: [0, 0, 0],
+                fillColor: [255, 230, 230],
+                lineColor: [0, 0, 0],
+                lineWidth: 1,
+                fontStyle: 'bold',
+                halign: 'left'  // <-- aligns header cells to the right
+            },
+            bodyStyles: {
+                fontStyle: 'bold'
+            },
+            columnStyles: {
+                0: { halign: 'left' },   // First column stays left-aligned
+                1: { halign: 'right' }   // Second column (amount) right-aligned
+            },
             didDrawPage: () => {
                 drawHeader(doc);
             }
         });
+        // ===== BOX NEXT TO DAILY WAGE =====
+        const dailyWageTable = doc.lastAutoTable;
+        if (dailyWageTable) {
+            // Position the box at the same Y as the Daily Wage table
+            const boxY = dailyWageTable.finalY + 2; // small spacing below table
+            const boxX = 300;  // to the right of the Daily Wage table
+            const boxWidth = 200;
+            const boxHeight = 20;
+            const splitX = boxX + 114; // divider inside the box
+
+            // Draw rectangle
+            doc.rect(boxX, boxY, boxWidth, boxHeight);
+            // Divider line inside box
+            doc.line(splitX, boxY, splitX, boxY + boxHeight);
+
+            // Add "TOTAL" text on left
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.text("TOTAL", boxX + 10, boxY + 13); // 10pt padding left, vertically centered
+
+            // Add total amount on right, right-aligned inside box
+            doc.text(
+                String(dailyExpensesTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })),
+                boxX + boxWidth - 10,
+                boxY + 13,
+                { align: "right" }
+            );
+        }
         // ----- SUMMARY -----
+
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
-        doc.text("SUMMARY", 300, baseY - 5);
+        doc.text("EXPENDITURE PAYMENTS", 300, baseY - 25);
         const summaryMap = expenses
             .filter(expense => Number(expense.amount) > 0)
             .reduce((acc, expense) => {
@@ -668,15 +779,18 @@ const History = ({ username, userRoles = [] }) => {
             count
         ]);
         autoTable(doc, {
-            head: [["Type", "Total"]],
+            head: [["SUMMARY", "TOTAL"]],
             body: summaryData.map(r => [String(r[0] || ""), String(r[1] || "0")]),
-            startY: baseY,
+            startY: baseY - 20,
             margin: { left: 300 },
             tableWidth: 200,
             theme: "grid",
             styles: { fontSize: 9, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
-            headStyles: { textColor: [0, 0, 0], fillColor: [255, 255, 255], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+            headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
             bodyStyles: { fontStyle: 'bold' },
+            columnStyles: {
+                1: { halign: 'right' } // Amount column
+            },
             didDrawPage: () => {
                 drawHeader(doc);
             },
@@ -712,12 +826,22 @@ const History = ({ username, userRoles = [] }) => {
         // ===== SUMMARY TOTAL BOX =====
         const summaryTotal = summaryData.reduce((acc, row) => acc + Number(String(row[1] || "0").replace(/,/g, "")), 0);
         const summaryBoxY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 15 : baseY + 100;
+
         doc.setFontSize(10);
         doc.setFont("helvetica", "bold");
+
+        // Draw outer rectangle
         doc.rect(300, summaryBoxY - 12, 200, 20);
+
+        // Draw vertical line to separate label and amount (choose split point)
+        const splitX = 420;
+        doc.line(splitX, summaryBoxY - 12, splitX, summaryBoxY + 8); // vertical divider inside the box
+
+        // Add label and amount inside the box
+        doc.text("TOTAL", 310, summaryBoxY + 3);
         doc.text(
             String(summaryTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
-            445,
+            490, // keep inside box with some right padding
             summaryBoxY + 3,
             { align: "right" }
         );
@@ -740,7 +864,7 @@ const History = ({ username, userRoles = [] }) => {
             String(e.date ? formatDateOnly(e.date) : ""), // show date in first column
             String(combinedOptions.find(opt =>
                 (opt.type === "Contractor" && opt.id === Number(e.contractor_id)) ||
-                (opt.type === "Vendor" && opt.id === Number(e.vendor_id))||
+                (opt.type === "Vendor" && opt.id === Number(e.vendor_id)) ||
                 (opt.type === "Employee" && opt.id === Number(e.employee_id))
             )?.label || ""),
             String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
@@ -749,13 +873,22 @@ const History = ({ username, userRoles = [] }) => {
         autoTable(doc, {
             head: staffAdvanceHead,
             body: staffAdvanceBody,
-            startY: newTableY,
+            startY: newTableY - 20,
             margin: { left: newTableX },
             tableWidth: 310,
             theme: "grid",
             styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
-            headStyles: { textColor: [0, 0, 0], fillColor: [255, 255, 255], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+            headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
             bodyStyles: { fontStyle: 'bold' },
+            columnStyles: {
+                3: { halign: 'right' } // Amount column
+            },
+            didParseCell: (data) => {
+                // 🔹 Only right-align the header for column index 2
+                if (data.section === 'head' && data.column.index === 3) {
+                    data.cell.styles.halign = 'right';
+                }
+            },
             didDrawPage: () => {
                 drawHeader(doc);
             }
@@ -777,7 +910,7 @@ const History = ({ username, userRoles = [] }) => {
             String(e.date ? formatDateOnly(e.date) : ""), // show date in first column
             String(combinedOptions.find(opt =>
                 (opt.type === "Contractor" && opt.id === Number(e.contractor_id)) ||
-                (opt.type === "Vendor" && opt.id === Number(e.vendor_id))||
+                (opt.type === "Vendor" && opt.id === Number(e.vendor_id)) ||
                 (opt.type === "Employee" && opt.id === Number(e.employee_id))
             )?.label || ""),
             String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
@@ -791,8 +924,11 @@ const History = ({ username, userRoles = [] }) => {
             tableWidth: 310,
             theme: "grid",
             styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
-            headStyles: { textColor: [0, 0, 0], fillColor: [255, 255, 255], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+            headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
             bodyStyles: { fontStyle: 'bold' },
+            columnStyles: {
+                1: { halign: 'right' } // Amount column
+            },
             didDrawPage: () => {
                 drawHeader(doc);
             }
@@ -812,15 +948,21 @@ const History = ({ username, userRoles = [] }) => {
             styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
             headStyles: { textColor: [0, 0, 0], fillColor: [255, 255, 255], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
             bodyStyles: { fontStyle: 'bold' },
+            columnStyles: {
+                1: { halign: 'right' } // Amount column
+            },
             didDrawPage: () => {
                 drawHeader(doc);
             }
         });
+        const lastPeriodEndDate = expenses
+            .map(exp => exp.period_end_date) // extract just the dates
+            .filter(Boolean)                 // keep only truthy values
+            .pop();
         newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
-        doc.save(`weekly-report-${selectedWeek || ""}.pdf`);
+        doc.save(`PR ${selectedWeek || ""} - Weekly Payment Report ${formatDateOnly(lastPeriodEndDate)}.pdf`);
     };
     const lastWeekNumber = Math.max(...weeks.map(week => week.number));
-
     const saveEditedExpense = async (row) => {
         try {
             const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/update/${row.id}?username=${encodeURIComponent(username)} `, {
@@ -873,13 +1015,11 @@ const History = ({ username, userRoles = [] }) => {
             console.error("Error updating expense:", error);
         }
     };
-
     useEffect(() => {
         if (weeks.length > 0) {
             setSelectedWeek(weeks[weeks.length - 1].number); // last week's number
         }
     }, [weeks]);
-
     const fetchAuditDetailsForExpense = async (expensesId) => {
         try {
             const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly_payment_audit/expenses/${expensesId}`);
@@ -900,7 +1040,6 @@ const History = ({ username, userRoles = [] }) => {
             console.error("Error fetching audit details:", error);
         }
     };
-
     const handleWeeklyExpensesDelete = async (id) => {
         const confirmed = window.confirm("Are you sure you want to delete This Expense Data?");
         if (confirmed) {
@@ -923,7 +1062,6 @@ const History = ({ username, userRoles = [] }) => {
             console.log("Deletion cancelled.");
         }
     };
-
     const handleWeeklyReceivedDelete = async (id) => {
         const confirmed = window.confirm("Are you sure you want to delete This Expense Data?");
         if (confirmed) {
@@ -946,7 +1084,6 @@ const History = ({ username, userRoles = [] }) => {
             console.log("Deletion cancelled.");
         }
     };
-
     return (
         <body>
             <div className='flex justify-end mt-[-28px] mr-6'>
@@ -962,11 +1099,8 @@ const History = ({ username, userRoles = [] }) => {
                 <div>
                     <h1 className='font-semibold'>Select Week</h1>
                     <div>
-                        <select
-                            className="w-[303px] h-[45px] border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2"
-                            value={selectedWeek}
-                            onChange={(e) => setSelectedWeek(e.target.value)}
-                        >
+                        <select className="w-[303px] h-[45px] border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2"
+                            value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}>
                             <option value="">-- Select Week --</option>
                             {weeks.map((week) => {
                                 const startDate = new Date(week.start);
@@ -987,11 +1121,8 @@ const History = ({ username, userRoles = [] }) => {
                 </div>
                 <div>
                     <label className="block font-semibold ">Year</label>
-                    <select
-                        value={year}
-                        onChange={(e) => setYear(e.target.value)}
-                        className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[168px] h-[45px] focus:outline-none"
-                    >
+                    <select value={year} onChange={(e) => setYear(e.target.value)}
+                        className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[168px] h-[45px] focus:outline-none">
                         {years.map((y) => (
                             <option key={y} value={y}>{y}</option>
                         ))}
@@ -1054,7 +1185,7 @@ const History = ({ username, userRoles = [] }) => {
                                                         combinedOptions.find(
                                                             opt =>
                                                                 (opt.type === "Contractor" && opt.id === Number(newExpense.contractor_id)) ||
-                                                                (opt.type === "Vendor" && opt.id === Number(newExpense.vendor_id))||
+                                                                (opt.type === "Vendor" && opt.id === Number(newExpense.vendor_id)) ||
                                                                 (opt.type === "Employee" && opt.id === Number(newExpense.employee_id))
                                                         ) || null
                                                     }
@@ -1171,7 +1302,7 @@ const History = ({ username, userRoles = [] }) => {
                                                             combinedOptions.find(
                                                                 opt =>
                                                                     (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
-                                                                    (opt.type === "Vendor" && opt.id === Number(row.vendor_id))||
+                                                                    (opt.type === "Vendor" && opt.id === Number(row.vendor_id)) ||
                                                                     (opt.type === "Employee" && opt.id === Number(row.employee_id))
                                                             ) || null
                                                         }
@@ -1199,7 +1330,7 @@ const History = ({ username, userRoles = [] }) => {
                                                         {combinedOptions.find(
                                                             opt =>
                                                                 (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
-                                                                (opt.type === "Vendor" && opt.id === Number(row.vendor_id))||
+                                                                (opt.type === "Vendor" && opt.id === Number(row.vendor_id)) ||
                                                                 (opt.type === "Employee" && opt.id === Number(row.employee_id))
                                                         )?.label || ""}
                                                     </div>

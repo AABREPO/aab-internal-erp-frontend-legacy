@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Select from 'react-select';
 import Attach from '../Images/Attachfile.svg';
-
 const StaffAdvance = () => {
   // Form state management
   const [formData, setFormData] = useState({
@@ -19,21 +18,17 @@ const StaffAdvance = () => {
     transferAmount: '',
     description: ''
   });
-
   // Table data state
   const [tableData, setTableData] = useState([]);
-
   // Success message state
   const [successMessage, setSuccessMessage] = useState('');
-
   // Loading state
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   // Employee options state
   const [employeeOptions, setEmployeeOptions] = useState([]);
-
   // Fetch employee details on component mount
   useEffect(() => {
+    // Fetch employee details
     const fetchEmployeeDetails = async () => {
       try {
         const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
@@ -53,15 +48,43 @@ const StaffAdvance = () => {
           id: item.id,
           type: "Employee",
         }));
-
         setEmployeeOptions(formattedData);
       } catch (error) {
         console.error("Fetch error: ", error);
       }
     };
+    // Call employee fetch function
     fetchEmployeeDetails();
   }, []);
-
+  const [purposeOptions, setPurposeOptions] = useState([]);
+  // Fetch purpose options from backend on component mount
+  useEffect(() => {
+    const fetchPurposeOptions = async () => {
+      try {
+        const response = await fetch("https://backendaab.in/aabuildersDash/api/purposes/getAll", {
+          method: "GET",
+          headers: { "Content-Type": "application/json" }
+        });
+        if (!response.ok) {
+          console.warn("Purposes API not available, using empty data");
+          setPurposeOptions([]);
+          return;
+        }
+        const data = await response.json();
+        // Format for react-select
+        const formatted = data.map(item => ({
+          value: item.purpose,
+          label: item.purpose,
+          id: item.id
+        }));
+        setPurposeOptions(formatted);
+      } catch (error) {
+        console.warn("Purpose fetch error:", error);
+        setPurposeOptions([]);
+      }
+    };
+    fetchPurposeOptions();
+  }, []);
   // Memoized custom styles to prevent recreation on every render
   const customStyles = useMemo(() => ({
     control: (provided, state) => ({
@@ -75,7 +98,6 @@ const StaffAdvance = () => {
       }
     }),
   }), []);
-
   // Memoized field configuration to prevent recalculation on every render
   const fieldConfig = useMemo(() => {
     switch (formData.selectedType) {
@@ -102,7 +124,6 @@ const StaffAdvance = () => {
         };
     }
   }, [formData.selectedType]);
-
   // Memoized payment mode options
   const paymentModeOptions = useMemo(() => [
     { value: 'Cash', label: 'Cash' },
@@ -110,14 +131,12 @@ const StaffAdvance = () => {
     { value: 'Net Banking', label: 'Net Banking' },
     { value: 'Cheque', label: 'Cheque' }
   ], []);
-
   // Memoized select type options
   const selectTypeOptions = useMemo(() => [
     { value: 'Advance', label: 'Advance' },
     { value: 'Refund', label: 'Refund' },
     { value: 'Transfer', label: 'Transfer' }
   ], []);
-
   // Handle form input changes
   const handleInputChange = useCallback((field, value) => {
     setFormData(prev => ({
@@ -125,71 +144,105 @@ const StaffAdvance = () => {
       [field]: value
     }));
   }, []);
-
-  // Handle form submission
-  const handleSubmit = useCallback((e) => {
+  // Fetch all records and update table data state
+  const fetchRecords = useCallback(async () => {
+    try {
+      const res = await fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all');
+      if (!res.ok) {
+        console.warn('Staff advance API not available, using empty data');
+        setTableData([]);
+        return;
+      }
+      const data = await res.json();
+      setTableData(data);
+    } catch (err) {
+      console.warn('Error fetching records:', err);
+      setTableData([]);
+    }
+  }, []);
+  useEffect(() => {
+    fetchRecords();
+  }, [fetchRecords]);
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
-    
-    // Validate required fields
-    if (!formData.selectedType || !formData.date || !formData.empName || !formData.advanceAmount) {
-      alert('Please fill in all required fields (Type, Date, Employee Name, Advance Amount)');
+    if (!formData.selectedType || !formData.date || !formData.empName) {
+      alert('Please fill in Type, Date, and Employee Name');
       return;
     }
-
-    // Set loading state
+    if ((formData.selectedType === 'Advance' || formData.selectedType === 'Refund') &&
+      (!formData.amountGivenInput || (formData.selectedType === 'Advance' && !formData.paymentMode))) {
+      alert('Please fill the amount and payment mode');
+      return;
+    }
+    if (formData.selectedType === 'Transfer' &&
+      (!formData.purpose || !formData.transferPurpose || !formData.transferAmount)) {
+      alert('Please fill all transfer details');
+      return;
+    }
     setIsSubmitting(true);
-
-    // Simulate processing time (you can remove this in production)
-    setTimeout(() => {
-      // Create new table record
-      const newRecord = {
-        id: Date.now(), // Unique ID for the record
+    try {
+      const resAll = await fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all');
+      let allData = [];
+      if (resAll.ok) {
+        allData = await resAll.json();
+      } else {
+        console.warn('Staff advance API not available for entry number generation');
+      }
+      const maxEntryNo = allData.length > 0 ? Math.max(...allData.map(item => item.entryNo || 0)) : 0;
+      const nextEntryNo = maxEntryNo + 1;
+      const payload = {
+        type: formData.selectedType,
         date: formData.date,
-        advance: formData.advanceAmount,
-        bill: formData.amountGivenInput || '-',
-        transferRefund: formData.selectedType === 'Transfer' ? formData.transferAmount : 
-                       formData.selectedType === 'Refund' ? formData.amountGivenInput : '-',
-        mode: formData.selectedType === 'Transfer' ? 'Transfer' : formData.paymentMode || '-',
-        activity: formData.description || '-',
-        employeeName: formData.empName?.value || '-',
-        purpose: formData.purpose?.value || '-',
-        type: formData.selectedType
+        employee_id: formData.empName.id,
+        staff_payment_mode: formData.paymentMode,
+        staff_refund_amount: formData.selectedType === 'Refund' ? parseFloat(formData.amountGivenInput) || 0 : 0,
+        description: formData.description,
+        file_url: formData.fileUrl || null,
+        entryNo: nextEntryNo,
+        weekNo: 0
       };
-
-      // Add to table data
-      setTableData(prev => [newRecord, ...prev]);
-
-      // Show success message
-      setSuccessMessage('Record added successfully!');
-      
-      // Hide success message after 3 seconds
-      setTimeout(() => setSuccessMessage(''), 3000);
-
-      // Reset form after successful submission
+      if (formData.selectedType === 'Transfer') {
+        payload.from_purpose_id = formData.purpose.id;
+        payload.to_purpose_id = formData.transferPurpose.id;
+        payload.amount = parseFloat(formData.transferAmount) || 0;
+      } else {
+        payload.from_purpose_id = formData.purpose?.id || null;
+        payload.to_purpose_id = null;
+        payload.amount = formData.selectedType === 'Advance' ? parseFloat(formData.amountGivenInput) || 0 : 0;
+      }
+      const saveRes = await fetch('https://backendaab.in/aabuildersDash/api/staff-advance/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!saveRes.ok) {
+        console.warn('Save API not available, simulating success');
+        setSuccessMessage('Record would be saved (API not available)');
+        resetForm();
+        return;
+      }
+      setSuccessMessage('Record saved successfully!');
       resetForm();
-      
-      // Reset loading state
+      await fetchRecords();
+    } catch (error) {
+      console.error('Error saving record:', error);
+      alert('Error saving data');
+    } finally {
       setIsSubmitting(false);
-      
-      console.log('Form submitted:', formData);
-      console.log('New record added:', newRecord);
-    }, 500);
+    }
   }, [formData]);
-
   // Handle keyboard enter key press
   const handleKeyPress = useCallback((e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       handleSubmit(e);
     }
-  }, []);
-
+  }, [handleSubmit]);
   // Check if field is required
   const isRequired = useCallback((field) => {
-    const requiredFields = ['selectedType', 'date', 'empName', 'advanceAmount'];
+    const requiredFields = ['selectedType', 'date', 'empName'];
     return requiredFields.includes(field);
   }, []);
-
   // Reset form
   const resetForm = useCallback(() => {
     setFormData({
@@ -208,12 +261,10 @@ const StaffAdvance = () => {
       description: ''
     });
   }, []);
-
   // Delete table row
   const deleteRow = useCallback((id) => {
     setTableData(prev => prev.filter(record => record.id !== id));
   }, []);
-
   // Clear all table data
   const clearTable = useCallback(() => {
     if (tableData.length > 0) {
@@ -222,63 +273,59 @@ const StaffAdvance = () => {
       setTimeout(() => setSuccessMessage(''), 3000);
     }
   }, [tableData.length]);
-
   // Export functions
   const exportToPDF = useCallback(() => {
     console.log('Exporting to PDF...');
     // Add PDF export logic
   }, []);
-
   const exportToExcel = useCallback(() => {
     console.log('Exporting to Excel...');
     // Add Excel export logic
   }, []);
-
   const printData = useCallback(() => {
     console.log('Printing...');
     // Add print logic
   }, []);
-
   return (
-    <div className="min-h-screen bg-[#FAF6ED]">
-      <div className='bg-white w-full max-w-[1750px] h-[150px] pl-2 ml-10 text-left shadow-sm'>
-        <div className='flex p-7 gap-5 h-full'>
-          <div className=''>
-            <h2 className='font-semibold'>From Date</h2>
+    <div className=" bg-[#FAF6ED]">
+      <div className='bg-white max-w-[1768px] h-auto text-left shadow-sm rounded ml-10 mr-5'>
+        <div className='flex flex-wrap p-6 gap-4 w-full h-full items-start'>
+          <div className='flex-shrink-0'>
+            <h2 className='font-semibold text-sm mb-1'>From Date</h2>
             <input
               type='date'
               value={formData.fromDate}
               onChange={(e) => handleInputChange('fromDate', e.target.value)}
               onKeyPress={handleKeyPress}
-              className='border-2 border-[#BF9853] border-opacity-30 rounded-lg pl-3 mt-2 w-[168px] h-[45px] focus:outline-none'
+              className='border-2 border-[#BF9853] border-opacity-30 rounded-lg pl-3 w-[168px] h-[45px] focus:outline-none focus:border-[#BF9853] transition-colors'
             />
           </div>
-          <div className=''>
-            <h2 className='font-semibold'>To Date</h2>
-                          <input
-                type='date'
-                value={formData.toDate}
-                onChange={(e) => handleInputChange('toDate', e.target.value)}
-                onKeyPress={handleKeyPress}
-                className='border-2 border-[#BF9853] border-opacity-30 rounded-lg pl-3 mt-2 w-[168px] h-[45px] focus:outline-none'
-              />
+          <div className='flex-shrink-0'>
+            <h2 className='font-semibold text-sm mb-1'>To Date</h2>
+            <input
+              type='date'
+              value={formData.toDate}
+              onChange={(e) => handleInputChange('toDate', e.target.value)}
+              onKeyPress={handleKeyPress}
+              className='border-2 border-[#BF9853] border-opacity-30 rounded-lg pl-3 w-[168px] h-[45px] focus:outline-none focus:border-[#BF9853] transition-colors'
+            />
           </div>
-          <div className=''>
-            <h2 className='font-semibold'>Amount Given</h2>
+          <div className='flex-shrink-0'>
+            <h2 className='font-semibold text-sm mb-1'>Amount Given</h2>
             <input
               value={formData.amountGiven}
               onChange={(e) => handleInputChange('amountGiven', e.target.value)}
               onKeyPress={handleKeyPress}
-              className='bg-[#F2F2F2] rounded-lg mt-2 p-2 w-[107px] h-[45px] focus:outline-none'
+              className='bg-[#F2F2F2] rounded-lg p-2 w-[107px] h-[45px] focus:outline-none focus:bg-white focus:border-2 focus:border-[#BF9853] transition-all'
               placeholder="0.00"
             />
           </div>
-          <div className='pt-5'>
+          <div className='flex-shrink-0 pt-6'>
             <select
               value={formData.paymentMode}
               onChange={(e) => handleInputChange('paymentMode', e.target.value)}
               onKeyPress={handleKeyPress}
-              className='w-[133px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 mt-2 rounded-lg focus:outline-none'
+              className='w-[133px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors'
             >
               <option value=''>Select</option>
               {paymentModeOptions.map(option => (
@@ -288,49 +335,47 @@ const StaffAdvance = () => {
               ))}
             </select>
           </div>
-          <div className=''>
-            <h2 className='font-semibold'>Today Amount</h2>
+          <div className='flex-shrink-0'>
+            <h2 className='font-semibold text-sm mb-1'>Today Amount</h2>
             <input
               readOnly
               type='text'
-              className='bg-[#F2F2F2] rounded-lg mt-2 p-2 w-[144px] h-[45px] focus:outline-none'
+              className='bg-[#F2F2F2] rounded-lg p-2 w-[144px] h-[45px] focus:outline-none'
               placeholder="0.00"
             />
           </div>
-          <div className=''>
-            <h2 className='font-semibold'>Total Outstanding</h2>
+          <div className='flex-shrink-0'>
+            <h2 className='font-semibold text-sm mb-1'>Total Outstanding</h2>
             <input
               readOnly
               type='text'
-              className='bg-[#F2F2F2] p-2 rounded-lg mt-2 w-[144px] h-[45px] focus:outline-none'
+              className='bg-[#F2F2F2] p-2 rounded-lg w-[144px] h-[45px] focus:outline-none'
               placeholder="0.00"
             />
           </div>
         </div>
       </div>
-
-      <div className='ml-4 p-6 gap-6'>
+      <div className='p-4 max-w-[1800px] ml-6'>
         {/* Success Message */}
         {successMessage && (
-          <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg">
+          <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg shadow-sm">
             {successMessage}
           </div>
         )}
-        
         {/* Form */}
-        <form onSubmit={handleSubmit} onKeyPress={handleKeyPress} className='bg-white w-full max-w-[1750px] p-6 h-auto rounded-md shadow-sm'>
-          <div className='flex flex-col lg:flex-row gap-6'>
-            <div className='grid grid-cols-2 gap-4 text-left h-auto'>
+        <form onSubmit={handleSubmit} onKeyPress={handleKeyPress} className='bg-white w-full p-6 h-auto rounded shadow-sm'>
+          <div className='flex flex-col xl:flex-row '>
+            <div className='grid grid-cols-1 md:grid-cols-2 gap-6 text-left '>
               {/* Select Type */}
-              <div className='flex items-center gap-3'>
-                <label className='font-semibold text-[#E4572E]'>
+              <div className='space-y-2'>
+                <label className='font-semibold text-[#E4572E] block'>
                   Select Type {isRequired('selectedType') && <span className="text-red-500">*</span>}
                 </label>
                 <select
                   value={formData.selectedType}
                   onChange={(e) => handleInputChange('selectedType', e.target.value)}
                   onKeyPress={handleKeyPress}
-                  className='w-[163px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
+                  className='w-[163px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors'
                 >
                   <option value=''>Select Type...</option>
                   {selectTypeOptions.map(option => (
@@ -340,10 +385,9 @@ const StaffAdvance = () => {
                   ))}
                 </select>
               </div>
-
               {/* Date */}
-              <div className='flex items-center gap-3'>
-                <label className='font-semibold text-[#E4572E]'>
+              <div className='space-y-2'>
+                <label className='font-semibold text-[#E4572E] block'>
                   Date {isRequired('date') && <span className="text-red-500">*</span>}
                 </label>
                 <input
@@ -352,17 +396,14 @@ const StaffAdvance = () => {
                   onChange={(e) => handleInputChange('date', e.target.value)}
                   onKeyPress={handleKeyPress}
                   placeholder='dd-mm-yyyy'
-                  className='w-[144px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
+                  className='w-[144px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors'
                 />
               </div>
-
               {/* EMP Name */}
-              <div>
-                <div className='flex'>
-                  <label className='font-semibold block mb-2'>
-                    EMP Name {isRequired('empName') && <span className="text-red-500">*</span>}
-                  </label>
-                </div>
+              <div className='space-y-2'>
+                <label className='font-semibold block'>
+                  EMP Name {isRequired('empName') && <span className="text-red-500">*</span>}
+                </label>
                 <Select
                   value={formData.empName}
                   onChange={(value) => handleInputChange('empName', value)}
@@ -380,26 +421,24 @@ const StaffAdvance = () => {
                   }}
                 />
               </div>
-
-              {/* Overall Advance */}
-              <div>
-                <label className='font-semibold block mb-2'>Overall Advance</label>
+              <div className='space-y-2'>
+                <label className='font-semibold block'>Overall Advance</label>
                 <input
                   value={formData.overallAdvance}
                   onChange={(e) => handleInputChange('overallAdvance', e.target.value)}
                   onKeyPress={handleKeyPress}
-                  className='w-[263px] h-[45px] px-2 py-1 rounded-lg bg-[#F2F2F2] focus:outline-none'
+                  className='w-[263px] h-[45px] px-2 py-1 rounded-lg bg-[#F2F2F2] focus:outline-none focus:bg-white focus:border-2 focus:border-[#BF9853] transition-all'
                   placeholder="Enter overall advance"
                 />
               </div>
-
               {/* Purpose */}
-              <div>
-                <label className='font-semibold block mb-2'>{fieldConfig.purposeLabel}</label>
+              <div className='space-y-2'>
+                <label className='font-semibold block'>{fieldConfig.purposeLabel}</label>
                 <Select
                   value={formData.purpose}
                   onChange={(value) => handleInputChange('purpose', value)}
-                  placeholder="Select a site..."
+                  options={purposeOptions}
+                  placeholder="Select a purpose..."
                   isSearchable={true}
                   styles={customStyles}
                   isClearable
@@ -412,49 +451,56 @@ const StaffAdvance = () => {
                   }}
                 />
               </div>
-
               {/* Advance Amount */}
-              <div>
-                <label className='font-semibold block mb-2'>
+              <div className='space-y-2'>
+                <label className='font-semibold block'>
                   Advance Amount {isRequired('advanceAmount') && <span className="text-red-500">*</span>}
                 </label>
                 <input
-                  value={formData.advanceAmount}
-                  onChange={(e) => handleInputChange('advanceAmount', e.target.value)}
                   onKeyPress={handleKeyPress}
-                  className='w-[263px] h-[45px] px-2 py-1 rounded-lg bg-[#F2F2F2] focus:outline-none'
+                  className='w-[263px] h-[45px] px-2 py-1 rounded-lg bg-[#F2F2F2] focus:outline-none focus:bg-white focus:border-2 focus:border-[#BF9853] transition-all'
                   placeholder="Enter advance amount"
                 />
               </div>
-
-              {/* Amount Given */}
-              <div>
-                <label className='font-semibold block mb-2'>{fieldConfig.amountGivenLabel}</label>
-                <input
-                  value={formData.amountGivenInput}
-                  onChange={(e) => handleInputChange('amountGivenInput', e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  className='w-[263px] h-[45px] px-2 py-1 rounded-lg border-2 border-[#BF9853] border-opacity-30 focus:outline-none'
-                  placeholder={`Enter ${fieldConfig.amountGivenLabel.toLowerCase()}`}
-                />
+              {/* Amount Given / Purpose To */}
+              <div className='space-y-2'>
+                <label className='font-semibold block'>{fieldConfig.amountGivenLabel}</label>
+                {formData.selectedType === 'Transfer' ? (
+                  <Select
+                    value={formData.transferPurpose}
+                    onChange={(value) => handleInputChange('transferPurpose', value)}
+                    options={purposeOptions}
+                    placeholder="Select purpose to..."
+                    styles={customStyles}
+                    className='w-[263px] h-[45px] rounded-lg focus:outline-none'
+                    isClearable
+                  />
+                ) : (
+                  <input
+                    value={formData.amountGivenInput}
+                    onChange={(e) => handleInputChange('amountGivenInput', e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    className='w-[263px] h-[45px] px-2 py-1 rounded-lg border-2 border-[#BF9853] border-opacity-30 focus:outline-none focus:border-[#BF9853] transition-colors'
+                    placeholder={`Enter ${fieldConfig.amountGivenLabel.toLowerCase()}`}
+                  />
+                )}
               </div>
-
               {/* Conditional Payment Mode/Transfer Amount */}
-              <div>
-                <label className='font-semibold block mb-2'>{fieldConfig.paymentModeLabel}</label>
+              <div className='space-y-2'>
+                <label className='font-semibold block'>{fieldConfig.paymentModeLabel}</label>
                 {formData.selectedType === 'Transfer' ? (
                   <input
                     value={formData.transferAmount}
                     onChange={(e) => handleInputChange('transferAmount', e.target.value)}
                     onKeyPress={handleKeyPress}
-                    className='w-[263px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
+                    className='w-[263px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors'
                     placeholder="Enter transfer amount"
                   />
                 ) : (
                   <select
                     value={formData.paymentMode}
                     onChange={(e) => handleInputChange('paymentMode', e.target.value)}
-                    className='w-[263px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
+                    className='w-[263px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors'
                   >
                     <option value=''>Select</option>
                     {paymentModeOptions.map(option => (
@@ -465,45 +511,40 @@ const StaffAdvance = () => {
                   </select>
                 )}
               </div>
-
               {/* Description */}
-              <div className='col-span-2'>
-                <label className='font-semibold block mb-2'>Description</label>
+              <div className='col-span-1 md:col-span-2 space-y-2'>
+                <label className='font-semibold block'>Description</label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => handleInputChange('description', e.target.value)}
                   onKeyPress={handleKeyPress}
-                  className='w-full border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
+                  className='w-full border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors resize-none'
                   placeholder="Enter description..."
                   rows={3}
                 />
               </div>
-
               {/* File Attachment and Submit */}
-              <div className='col-span-2'>
-                <div className="md:col-span-2 items-center flex">
-                  <div className='flex'>
-                    <label htmlFor="fileInput" className="cursor-pointer flex items-center text-orange-600">
-                      <img className='w-5 h-4' alt='' src={Attach} />
-                      Attach file
-                    </label>
-                    <input
-                      type="file"
-                      id="fileInput"
-                      className="hidden"
-                      onChange={(e) => console.log('File selected:', e.target.files[0])}
-                    />
-                  </div>
+              <div className='col-span-1 md:col-span-2 space-y-4'>
+                <div className="flex items-center">
+                  <label htmlFor="fileInput" className="cursor-pointer flex items-center text-orange-600 hover:text-orange-700 transition-colors">
+                    <img className='w-5 h-4 mr-2' alt='' src={Attach} />
+                    Attach file
+                  </label>
+                  <input
+                    type="file"
+                    id="fileInput"
+                    className="hidden"
+                    onChange={(e) => console.log('File selected:', e.target.files[0])}
+                  />
                 </div>
-                <div className='flex gap-3 mt-3'>
+                <div className='flex gap-3'>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className={`px-6 py-2 rounded flex items-center justify-center transition-colors ${
-                      isSubmitting 
-                        ? 'bg-gray-400 cursor-not-allowed' 
-                        : 'bg-[#c7934c] text-white hover:bg-[#b08542]'
-                    }`}
+                    className={`px-6 py-2 rounded-lg flex items-center justify-center transition-all duration-200 ${isSubmitting
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-[#c7934c] text-white hover:bg-[#b08542] hover:shadow-md'
+                      }`}
                   >
                     {isSubmitting ? (
                       <>
@@ -517,78 +558,93 @@ const StaffAdvance = () => {
                 </div>
               </div>
             </div>
-
-            <div className='flex flex-col ml-0 lg:ml-20'>
-              <div className='flex justify-end flex-wrap gap-4 mb-4'>
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <span>Records: {tableData.length}</span>
+            <div className='flex flex-col xl:ml-8 min-w-0 flex-1'>
+              <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4  p-2  rounded-lg'>
+                <div className="flex items-center gap- text-sm text-gray-600">
                 </div>
-                <input
-                  className='border-2 w-[112px] p-2 border-[#E4572E] text-[#E4572E] font-bold border-opacity-10 rounded h-[33px] bg-[#F2F2F2] focus:outline-none'
-                  placeholder="Search..."
-                />
-                <button
-                  type="button"
-                  onClick={exportToPDF}
-                  className='text-[#E4572E] font-semibold hover:underline cursor-pointer'
-                >
-                  Export PDF
-                </button>
-                <button
-                  type="button"
-                  onClick={exportToExcel}
-                  className='text-[#007233] font-semibold hover:underline cursor-pointer'
-                >
-                  Export XL
-                </button>
-                <button
-                  type="button"
-                  onClick={printData}
-                  className='text-[#BF9853] font-semibold hover:underline cursor-pointer'
-                >
-                  Print
-                </button>
-                {tableData.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={clearTable}
-                    className='text-red-600 font-semibold hover:underline cursor-pointer'
-                    title="Clear all records"
-                  >
-                    Clear All
-                  </button>
-                )}
+                <div className="flex flex-wrap items-center gap-3">
+                  <input
+                    className='border-2 w-[112px] p-2 border-[#E4572E] text-[#E4572E] font-bold border-opacity-10 rounded h-[33px] bg-transparent focus:outline-none focus:border-[#E4572E] transition-colors'
+                    placeholder=""
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={exportToPDF}
+                      className='text-[#E4572E] font-semibold hover:underline cursor-pointer transition-colors'
+                    >
+                      Export PDF
+                    </button>
+                    <button
+                      type="button"
+                      onClick={exportToExcel}
+                      className='text-[#007233] font-semibold hover:underline cursor-pointer transition-colors'
+                    >
+                      Export XL
+                    </button>
+                    <button
+                      type="button"
+                      onClick={printData}
+                      className='text-[#BF9853] font-semibold hover:underline cursor-pointer transition-colors'
+                    >
+                      Print
+                    </button>
+                    {tableData.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={clearTable}
+                        className='text-red-600 font-semibold hover:underline cursor-pointer transition-colors'
+                        title="Clear all records"
+                      >
+                        Clear All
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className='border-l-8 border-l-[#BF9853] rounded-lg h-[500px] overflow-auto'>
-                <table className="w-[1000px]">
-                  <thead className="bg-[#FAF6ED] text-left sticky top-0">
+              <div className='border-l-8 border-l-[#BF9853] rounded-lg h-[500px] overflow-auto shadow-sm bg-white'>
+                <table className="w-full min-w-[800px]">
+                  <thead className="bg-[#FAF6ED] text-left sticky top-0 z-10">
                     <tr>
-                      <th className="px-3 py-2">Date</th>
-                      <th className="px-3 py-2">Advance</th>
-                      <th className="px-3 py-2">Transfer/Refund</th>
-                      <th className="px-3 py-2">Mode</th>
-                      <th className="px-3 py-2">Activity</th>
+                      <th className="px-4 py-3 font-semibold text-gray-700">Date</th>
+                      <th className="px-4 py-3 font-semibold text-gray-700">Advance</th>
+                      <th className="px-4 py-3 font-semibold text-gray-700">Transfer/Refund</th>
+                      <th className="px-4 py-3 font-semibold text-gray-700">Mode</th>
+                      <th className="px-4 py-3 font-semibold text-gray-700">Activity</th>
+                      <th className="px-4 py-3 font-semibold text-gray-700">Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {tableData.length === 0 ? (
                       <tr>
-                        <td colSpan="9" className="px-3 py-4 text-center text-gray-500">
-                          No data available. Fill the form and click "Pay Advance" to add records.
+                        <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
+                          <div className="flex flex-col items-center gap-2">
+                            <span>No data available</span>
+                            <span className="text-sm">Fill the form and click "Pay Advance" to add records</span>
+                          </div>
                         </td>
                       </tr>
                     ) : (
                       tableData.map((record) => (
-                        <tr key={record.id} className="border-b border-gray-200 hover:bg-gray-50">
-                          <td className="px-3 py-2">{record.date}</td>
-                          <td className="px-3 py-2">{record.advance}</td>
-                          <td className="px-3 py-2">{record.transferRefund}</td>
-                          <td className="px-3 py-2">{record.mode}</td>
-                          <td className="px-3 py-2">{record.activity}</td>
-                          <td className="px-3 py-2">
+                        <tr key={record.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3">{record.date}</td>
+                          <td
+                            className="px-4 py-3 font-medium"
+                            style={{ color: record.type === "Refund" ? '#dc2626' : '#059669' }}
+                          >
+                            {record.type === "Refund"
+                              ? -Math.abs(record.staff_refund_amount || 0)
+                              : record.amount}
+                          </td>
+                          <td className="px-4 py-3">
+                            {record.type === "Refund" ? "Refund" : record.staff_refund_amount}
+                          </td>
+                          <td className="px-4 py-3">{record.staff_payment_mode}</td>
+                          <td className="px-4 py-3">{record.activity}</td>
+                          <td className="px-4 py-3">
                             <button
                               onClick={() => deleteRow(record.id)}
-                              className="text-red-600 hover:text-red-800 font-semibold text-sm"
+                              className="text-red-600 hover:text-red-800 font-semibold text-sm p-1 rounded hover:bg-red-50 transition-colors"
                               title="Delete record"
                             >
                               ✕
@@ -607,5 +663,4 @@ const StaffAdvance = () => {
     </div>
   );
 };
-
 export default StaffAdvance;

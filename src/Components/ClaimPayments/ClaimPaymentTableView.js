@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import EditIcon from "../Images/Edit.svg";
+import axios from 'axios';
 
 const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
   const [showModal, setShowModal] = useState(false);
@@ -342,7 +343,73 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
                     {/* Action Column */}
                     <div className="flex items-end gap-2 w-[120px]">
                       {payment.payment_mode === "Cash" && (
-                        <button className="bg-[#BF9853] w-20 h-[45px] rounded-lg text-white font-semibold">
+                        <button
+                          className={`w-20 h-[45px] mr-1 rounded-lg text-white font-semibold 
+                              ${payment.cash_register_status ? "bg-gray-400 cursor-not-allowed" : "bg-[#BF9853]"}`}
+                          disabled={payment.cash_register_status}
+                          onClick={async () => {
+                            if (payment.cash_register_status) return;
+
+                            try {
+                              // 🔹 Check if already exists in backend
+                              const res = await axios.get(
+                                `https://backendaab.in/aabuildersDash/api/cash-register/get/${payment.claimPaymentsId}`
+                              );
+
+                              if (res.data && res.data.length > 0) {
+                                alert("This payment is already in the cash register.");
+                                return;
+                              }
+
+                              // 🔹 1) Save to Cash Register
+                              const cashRegisterPayload = {
+                                claim_payments_id: payment.claimPaymentsId,
+                                date: payment.date,
+                                payment_mode: payment.payment_mode,
+                                amount: payment.amount,
+                                cash_register_status: true,
+                              };
+
+                              await axios.post(
+                                "https://backendaab.in/aabuildersDash/api/cash-register/save",
+                                cashRegisterPayload,
+                                { headers: { "Content-Type": "application/json" } }
+                              );
+
+                              // 🔹 2) Save to Payments Received
+                              const paymentsReceivedPayload = {
+                                date: payment.date,
+                                amount: Number(payment.amount),
+                                type: "Claim",
+                                weekly_number: "",
+                                status: false,
+                              };
+
+                              await axios.post(
+                                "https://backendaab.in/aabuildersDash/api/payments-received/save",
+                                paymentsReceivedPayload,
+                                { headers: { "Content-Type": "application/json" } }
+                              );
+
+                              // 🔹 3) Update ClaimPayments.cashRegisterStatus → true
+                              await axios.put(
+                                `https://backendaab.in/aabuildersDash/api/claim_payments/update-status/${payment.claimPaymentsId}?status=true`
+                              );
+
+                              // 🔹 4) Update UI immediately
+                              setClaimPaymentsData((prev) =>
+                                prev.map((p, i) =>
+                                  i === idx ? { ...p, cashRegisterStatus: true } : p
+                                )
+                              );
+
+                              alert("Added to Cash Register, Payments Received & updated ClaimPayments ✅");
+                            } catch (err) {
+                              console.error("Error adding payment:", err);
+                              alert("Failed to add payment.");
+                            }
+                          }}
+                        >
                           CR
                         </button>
                       )}

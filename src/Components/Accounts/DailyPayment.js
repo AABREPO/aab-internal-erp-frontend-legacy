@@ -11,12 +11,20 @@ import Change from '../Images/dropdownchange.png'
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { type } from '@testing-library/user-event/dist/type';
+import { e } from 'mathjs';
+import NotesStart from '../Images/notes _start.png';
+import NotesEnd from '../Images/notes_end.png';
 const DailyPayment = ({ username, userRoles = [] }) => {
     const [expenses, setExpenses] = useState([]);
     const [dailyExpenses, setDailyExpenses] = useState([]);
     const [refundPayments, setRefundPayments] = useState([]);
     const [expensesCategory, setExpensesCategory] = useState([]);
     const [selectedFile, setSelectedFile] = useState(null);
+    const [showPopups, setShowPopups] = useState(false);
+    const [description, setDescription] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [entryId, setEntryId] = useState(null);
+    const [fileUploadPopup, setFileUploadPopup] = useState(false);
     const [newDailyExpense, setNewDailyExpense] = useState({
         date: "",
         labour_id: "",
@@ -40,6 +48,8 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         type: "",
         amount: "",
         extra_amount: "",
+        description: "",
+        file_url: ""
     });
     const [weeks, setWeeks] = useState([]);
     const [allRefundAmount, setAllRefundAmount] = useState([]);
@@ -62,6 +72,8 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     const currentWeek = weeks.find((w) => w.number === Number(selectedWeek));
     const [weeklyReceivedTypes, setWeeklyReceivedTypes] = useState([]);
     const [isChangeButtonActive, setIsChangeButtonActive] = useState(false);
+    const [currentFileRow, setCurrentFileRow] = useState(null);
+    const [selectedFileForPopup, setSelectedFileForPopup] = useState(null);
     useEffect(() => {
         fetchWeeklyReceivedType();
     }, []);
@@ -101,7 +113,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         key: null,
         direction: 'asc'
     });
-
     // Click and drag scrolling functionality
     const scrollRef = useRef(null);
     const isDragging = useRef(false);
@@ -129,7 +140,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         scrollRef.current.style.userSelect = 'none';
         cancelMomentum();
     };
-
     const handleMouseMove = (e) => {
         if (!isDragging.current || !scrollRef.current) return;
         const dx = e.clientX - start.current.x;
@@ -148,7 +158,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             y: e.clientY,
         };
     };
-
     const handleMouseUp = () => {
         if (!isDragging.current || !scrollRef.current) return;
         isDragging.current = false;
@@ -156,14 +165,12 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         scrollRef.current.style.userSelect = '';
         applyMomentum();
     };
-
     const cancelMomentum = () => {
         if (animationFrame.current) {
             cancelAnimationFrame(animationFrame.current);
             animationFrame.current = null;
         }
     };
-
     const applyMomentum = () => {
         if (!scrollRef.current) return;
         const friction = 0.95;
@@ -183,7 +190,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         };
         animationFrame.current = requestAnimationFrame(step);
     };
-
     // Sorting functions
     const handleSort = (key) => {
         let direction = 'asc';
@@ -192,14 +198,11 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         }
         setSortConfig({ key, direction });
     };
-
     const sortedDailyExpenses = React.useMemo(() => {
         let sortableData = [...dailyExpenses];
-
         if (sortConfig.key) {
             sortableData.sort((a, b) => {
                 let aValue, bValue;
-
                 switch (sortConfig.key) {
                     case 'date':
                         aValue = new Date(a.date);
@@ -241,7 +244,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     default:
                         return 0;
                 }
-
                 if (aValue < bValue) {
                     return sortConfig.direction === 'asc' ? -1 : 1;
                 }
@@ -258,7 +260,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 return dateB - dateA; // Descending order (newest first)
             });
         }
-
         return sortableData;
     }, [dailyExpenses, sortConfig, laboursList, siteOptions, isChangeButtonActive, combinedOptions, employeeOptions, vendorOptions, contractorOptions]);
     const getCurrentWeekNumber = () => {
@@ -293,7 +294,22 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             type: row.type,
             amount: row.amount,
             extra_amount: row.extra_amount,
+            description: row.description || "",
+            file_url: row.file_url || ""
         });
+    };
+    const handleDescriptionClick = (row) => {
+        if (row.description) {
+            // If description exists, show it in a read-only modal
+            setDescription(row.description);
+            setEntryId(null); // No editing allowed
+            setShowPopups(true);
+        } else {
+            // If no description, allow editing
+            setEntryId(row.id);
+            setDescription("");
+            setShowPopups(true);
+        }
     };
     const handleEditRefundClick = (row) => {
         setEditingPaymentId(row.id);
@@ -370,7 +386,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             fetchRefundPayments();
         }
     }, [currentWeekNumber, fetchPayments, fetchExpenses, fetchRefundPayments]);
-
     // Cleanup momentum animation on unmount
     useEffect(() => {
         return () => {
@@ -473,7 +488,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     id: item.id,
                     type: "Employee",
                 }));
-
                 setEmployeeOptions(formattedData);
             } catch (error) {
                 console.error("Fetch error: ", error);
@@ -645,11 +659,9 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             handleRefundSubmit();
         }
     };
-
     const handleChangeButtonClick = () => {
         setIsChangeButtonActive(prev => !prev);
     };
-
     useEffect(() => {
         const handleWheel = (event) => {
             if (document.activeElement.type === "number") {
@@ -663,38 +675,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     }, []);
     const saveEditedExpense = async (row) => {
         try {
-            let pdfUrl = row.file_url || ""; // keep old if already exists
-
-            // 🔹 If user picked a file AND no url exists in DB → upload
-            if (selectedFile && !row.file_url) {
-                try {
-                    const formData = new FormData();
-                    const finalName = `${formatDateOnly(editDailyExpenseData.date)}`;
-                    formData.append("file", selectedFile);
-                    formData.append("file_name", finalName);
-
-                    const uploadResponse = await fetch(
-                        "https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive",
-                        {
-                            method: "POST",
-                            body: formData,
-                        }
-                    );
-
-                    if (!uploadResponse.ok) {
-                        throw new Error("File upload failed");
-                    }
-
-                    const uploadResult = await uploadResponse.json();
-                    pdfUrl = uploadResult.url;
-                    console.log("Edited File URL:", pdfUrl);
-                } catch (error) {
-                    console.error("Error uploading file:", error);
-                    alert("Error during file upload. Please try again.");
-                    return;
-                }
-            }
-
             const payload = {
                 date: editDailyExpenseData.date,
                 labour_id: Number(editDailyExpenseData.labour_id) || null,
@@ -706,26 +686,31 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 type: editDailyExpenseData.type,
                 amount: Number(editDailyExpenseData.amount),
                 extra_amount: Number(editDailyExpenseData.extra_amount || 0),
-                file_url: pdfUrl || null,  // 🔹 send url here
+                description: editDailyExpenseData.description || "",
+                file_url: editDailyExpenseData.file_url || null,  // 🔹 send url here
             };
-
+            const isChanged = Object.keys(payload).some(
+                (key) => String(payload[key]) !== String(row[key] ?? "")
+            );
+            if (!isChanged) {
+                console.log("No changes detected. Skipping update.");
+                setEditingDailyExpenseRowId(null);
+                return;
+            }
             const response = await axios.put(
                 `https://backendaab.in/aabuildersDash/api/daily-payments/edit/${row.id}?username=${encodeURIComponent(username)}`,
                 payload,
                 { headers: { "Content-Type": "application/json" } }
             );
-
             // ✅ Update UI without reload
             setDailyExpenses((prev) =>
                 prev.map((exp) => (exp.id === row.id ? { ...exp, ...payload } : exp))
             );
-
             setEditingDailyExpenseRowId(null); // exit edit mode
         } catch (error) {
             console.error("Error updating expense:", error);
         }
     };
-
     const customStyles = {
         control: (provided, state) => ({
             ...provided,
@@ -822,6 +807,15 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     };
     const handleAddExpense = async () => {
         try {
+            const hasAnyId =
+                (newDailyExpense.labour_id && Number(newDailyExpense.labour_id) > 0) ||
+                (newDailyExpense.contractor_id && Number(newDailyExpense.contractor_id) > 0) ||
+                (newDailyExpense.vendor_id && Number(newDailyExpense.vendor_id) > 0);
+
+            if (!hasAnyId || !newDailyExpense.project_id || !newDailyExpense.type || !newDailyExpense.amount) {
+                alert("Please select all requried details.");
+                return;
+            }
             // ✅ Save Daily Entry
             const payload = {
                 date: selectedDate,
@@ -943,7 +937,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             setRefundPayments([]);
         }
     };
-    // ✅ get today’s date
+    // ✅ get today's date
     const today = new Date().toISOString().split("T")[0];
     if (!selectedDate && currentWeekDays.length > 0) {
         const todayInWeek = currentWeekDays.find(
@@ -957,8 +951,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     const totalAmount = dailyExpenses
         .filter(row => row.date === selectedDate)        // only current date rows
         .reduce((sum, row) => sum + (Number(row.amount || 0) + Number(row.extra_amount || 0)), 0);
-    const totalRefund = allRefundAmount
-        .filter(row => row.date === selectedDate)
+    const totalRefund = refundPayments
         .reduce((sum, p) => sum + Number(p.amount || 0), 0);
     const totalExpenses =
         expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
@@ -967,13 +960,354 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     const overAllTotalPayments = (totalPayments + totalRefund);
     const netBalance = totalAmount - totalRefund;
     const balance = totalPayments - expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+    // PDF Generation function for the left side expenses table
+    const generateExpensesPDF = () => {
+        if (!selectedDate || dailyExpenses.length === 0) {
+            alert("No data available to generate PDF");
+            return;
+        }
+        const doc = new jsPDF();
+        // Add header with PS number, title, date and day
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'bold');
+        // Get day name
+        const dateObj = new Date(selectedDate);
+        const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+        // Calculate center position for the header
+        const pageWidth = doc.internal.pageSize.width;
+        const headerText = `PS: ${currentWeekNumber}`;
+        const headerText1 = "DAILY PAYMENT STATEMENT";
+        const headerText2 = `${formatDateOnly(selectedDate)}`;
+        const headerWidth = doc.getTextWidth(headerText);
+        const headerX = (pageWidth - headerWidth) / 2;
+        doc.text(headerText1, 60, 24);
+        doc.text(headerText2, 170, 20);
+        doc.text(headerText, 14, 20);
+        // Add day name below
+        doc.setFontSize(10);
+        const dayText = dayName;
+        const dayWidth = doc.getTextWidth(dayText);
+        doc.text(dayText, 170, 27);
+        // Add lines above and below
+        doc.setLineWidth(0.5);
+        doc.line(14, 15, pageWidth - 14, 15); // Line above
+        doc.line(14, 30, pageWidth - 14, 30); // Line below
+        // Reset font
+        doc.setFont(undefined, 'normal');
+        // Calculate total amount for selected date
+        const filteredExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate);
+        const totalAmount = filteredExpenses.reduce(
+            (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
+            0
+        );
+        // Calculate total refund amount for selected date
+        const totalRefundAmount = refundPayments.reduce(
+            (sum, row) => sum + Number(row.amount || 0),
+            0
+        );
+        // Reset color for table
+        doc.setTextColor(0, 0, 0);
+        // Expenses table columns (removed Date column)
+        const expensesTableColumn = [
+            "SNO", "PROJECT NAME", "NAME", "QTY", "TYPE", "AMOUNT", "DESCRIPTION"
+        ];
+        // Prepare expenses with projectName and type for sorting
+        const expensesTableRows = filteredExpenses
+            .map((row, index) => {
+                const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
+                const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
+                const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
+                const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
+                const name = [employee?.label, vendor?.label, contractor?.label, labour?.label]
+                    .filter(Boolean).join(" | ") || "";
+                const projectName = siteOptions.find(opt => opt.id === Number(row.project_id))?.label || "";
+                const amount = (row.amount || 0) + (row.extra_amount || 0);
+                const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
+                const quantity = row.quantity || "";
+                const type = row.type || "";
+                const description = row.description || "";
+                return {
+                    sno: index + 1,
+                    projectName,
+                    name,
+                    quantity,
+                    type,
+                    amount: formattedAmount,
+                    description
+                };
+            })
+            // Sort by projectName ASC, then by type DESC
+            .sort((a, b) => {
+                const projectCompare = a.projectName.localeCompare(b.projectName);
+                if (projectCompare !== 0) return projectCompare;
+                return b.type.localeCompare(a.type); // type DESC
+            })
+            // Map to array format for autoTable
+            .map((row, idx) => [
+                (idx + 1).toString(),
+                row.projectName,
+                row.name,
+                row.quantity.toString(),
+                row.type,
+                row.amount,
+                row.description
+            ]);
+        // Add total row for expenses
+        expensesTableRows.push([
+            "",
+            "TOTAL",
+            "",
+            "",
+            "",
+            `${totalAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`,
+            ""
+        ]);
+        // Add Expenses table heading
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text('WAGE EXPENSES', 14, 48);
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text('EXPENDITURE PAYMENTS', 14, 38);
+        // Start expenses table
+        doc.autoTable({
+            startY: 50,
+            head: [expensesTableColumn],
+            body: expensesTableRows,
+            styles: {
+                fontSize: 9,
+                cellPadding: 2,
+                halign: 'left',
+                valign: 'middle',
+                textColor: [80, 80, 80],
+            },
+            headStyles: {
+                fillColor: [255, 248, 220], // Light orange color
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+                lineColor: [200, 200, 200],
+                lineWidth: 0.1,
+            },
+            columnStyles: {
+                0: { cellWidth: 13, halign: 'center', fillColor: [255, 255, 255] },    // SNO - white background
+                1: { cellWidth: 47, halign: 'left' },      // Project Name
+                2: { cellWidth: 30, halign: 'left' },      // Name
+                3: { cellWidth: 12, halign: 'center' },    // Qty
+                4: { cellWidth: 25, halign: 'left' },      // Type
+                5: { cellWidth: 20, halign: 'right' },     // Amount
+                6: { cellWidth: 35, halign: 'left' }       // Description
+            },
+            bodyStyles: {
+                lineWidth: 0.1,
+            },
+            alternateRowStyles: {
+                fillColor: false,
+            }
+        });
+        // Get the end position of the first table
+        const firstTableEndY = doc.lastAutoTable.finalY;
+        // Add some space between tables
+        const spaceBetweenTables = 10;
+        // Refund Received table columns
+        const refundTableColumn = [
+            "SNO", "NAME", "AMOUNT"
+        ];
+        const refundTableRows = refundPayments
+            .reverse()
+            .map((row, index) => {
+                const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
+                const name = labour?.label || "";
+                const amount = Number(row.amount || 0);
+                const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
+                return [
+                    (index + 1).toString(),
+                    name,
+                    formattedAmount
+                ];
+            });
+        // Add total row for refunds
+        refundTableRows.push([
+            "",
+            "TOTAL",
+            `${totalRefundAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
+        ]);
+        const netBalance = totalAmount - totalRefundAmount;
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(`NET BALANCE: ${netBalance.toLocaleString('en-IN')}`, 155, 38);
+        // Add Refund Received table heading
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text('WAGE REFUND', 14, firstTableEndY + spaceBetweenTables - 2);
+        // Add Refund Received table
+        doc.autoTable({
+            startY: firstTableEndY + spaceBetweenTables,
+            head: [refundTableColumn],
+            body: refundTableRows,
+            styles: {
+                fontSize: 9,
+                cellPadding: 2,
+                halign: 'left',
+                valign: 'middle',
+                textColor: [80, 80, 80],
+            },
+            headStyles: {
+                fillColor: [255, 248, 220], // Light orange color
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+                lineColor: [200, 200, 200],
+                lineWidth: 0.1,
+            },
+            bodyStyles: {
+                lineWidth: 0.1,
+            },
+            alternateRowStyles: {
+                fillColor: false,
+            },
+            columnStyles: {
+                0: { cellWidth: 15, halign: 'center', fillColor: [255, 255, 255] },    // SNS - white background
+                1: { cellWidth: 50, halign: 'left' },      // Name
+                2: { cellWidth: 25, halign: 'right' }      // Amount
+            }
+        });
+        const fileName = `PS ${currentWeekNumber} - Daily Payment Statement ${formatDateOnly(selectedDate)}.pdf`;
+        doc.save(fileName);
+    };
+    const handleUpdate = async () => {
+        if (!description.trim()) {
+            alert("Please enter a description");
+            return;
+        }
+        setLoading(true);
+        try {
+            // Find the current expense data to preserve all existing fields
+            const currentExpense = dailyExpenses.find(exp => exp.id === entryId);
+            if (!currentExpense) {
+                throw new Error("Expense not found");
+            }
+            // Create payload with all existing data plus the new description
+            const payload = {
+                date: currentExpense.date,
+                labour_id: Number(currentExpense.labour_id) || null,
+                vendor_id: Number(currentExpense.vendor_id) || null,
+                contractor_id: Number(currentExpense.contractor_id) || null,
+                employee_id: Number(currentExpense.employee_id) || null,
+                project_id: Number(currentExpense.project_id),
+                quantity: Number(currentExpense.quantity) || 0,
+                type: currentExpense.type,
+                amount: Number(currentExpense.amount),
+                extra_amount: Number(currentExpense.extra_amount || 0),
+                description: description.trim(),
+                file_url: currentExpense.file_url || null,
+            };
+            // Use the same API endpoint as saveEditedExpense
+            await axios.put(
+                `https://backendaab.in/aabuildersDash/api/daily-payments/edits/${entryId}?username=${encodeURIComponent(username)}`,
+                payload,
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                }
+            );
+            alert("Description updated successfully!");
+            // Update the local state to reflect the change
+            setDailyExpenses(prev =>
+                prev.map(exp =>
+                    exp.id === entryId
+                        ? { ...exp, description: description.trim() }
+                        : exp
+                )
+            );
+            setShowPopups(false);
+            setEntryId(null);
+            setDescription("");
+        } catch (err) {
+            console.error(err);
+            alert("Failed to update description. Please try again.");
+        } finally {
+            setLoading(false);
+        }
+    };
+    const handleFileUploadClick = (row) => {
+        setCurrentFileRow(row);
+        setSelectedFileForPopup(null);
+        setFileUploadPopup(true);
+    };
+    const handleFileSelectInPopup = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setSelectedFileForPopup(file);
+        }
+        e.target.value = '';
+    };
+    const handleSaveFileFromPopup = async () => {
+        if (!selectedFileForPopup || !currentFileRow) return;
+        try {
+            const project = siteOptions.find(opt => opt.id === Number(currentFileRow.project_id));
+            const siteNo = project?.siteNo || ""; // use siteNo if available, fallback to label
+            // Find matching name from whichever id exists
+            const name =
+                laboursList.find(opt => opt.id === Number(currentFileRow.labour_id))?.label ||
+                vendorOptions.find(opt => opt.id === Number(currentFileRow.vendor_id))?.label ||
+                contractorOptions.find(opt => opt.id === Number(currentFileRow.contractor_id))?.label ||
+                employeeOptions.find(opt => opt.id === Number(currentFileRow.employee_id))?.label ||
+                "";
+            const formData = new FormData();
+            const finalName = `${formatDateOnly(currentFileRow.date)}-${siteNo}-${name}`;
+            formData.append("file", selectedFileForPopup);
+            formData.append("file_name", finalName);
+            const uploadResponse = await fetch(
+                "https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive",
+                {
+                    method: "POST",
+                    body: formData,
+                }
+            );
+            if (!uploadResponse.ok) {
+                throw new Error("File upload failed");
+            }
+            const uploadResult = await uploadResponse.json();
+            const pdfUrl = uploadResult.url;
+            // Update the row with the new file URL while preserving all existing data
+            const payload = {
+                date: currentFileRow.date,
+                labour_id: Number(currentFileRow.labour_id) || null,
+                vendor_id: Number(currentFileRow.vendor_id) || null,
+                contractor_id: Number(currentFileRow.contractor_id) || null,
+                employee_id: Number(currentFileRow.employee_id) || null,
+                project_id: Number(currentFileRow.project_id),
+                quantity: Number(currentFileRow.quantity) || 0,
+                type: currentFileRow.type,
+                amount: Number(currentFileRow.amount),
+                extra_amount: Number(currentFileRow.extra_amount || 0),
+                description: currentFileRow.description || "",
+                file_url: pdfUrl
+            };
+            const response = await axios.put(
+                `https://backendaab.in/aabuildersDash/api/daily-payments/edit/${currentFileRow.id}?username=${encodeURIComponent(username)}`,
+                payload,
+                { headers: { "Content-Type": "application/json" } }
+            );
+            // Update UI without reload
+            setDailyExpenses((prev) =>
+                prev.map((exp) => (exp.id === currentFileRow.id ? { ...exp, file_url: pdfUrl } : exp))
+            );
+            // Close popup and reset state
+            setFileUploadPopup(false);
+            setCurrentFileRow(null);
+            setSelectedFileForPopup(null);
+        } catch (error) {
+            console.error("Error uploading file:", error);
+            alert("Error during file upload. Please try again.");
+        }
+    };
     return (
         <body>
             <h1 className="font-bold text-xl flex justify-end mr-5 -mt-7">
                 Balance:<span style={{ color: "#E4572E" }}>{Number(balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}</span>
             </h1>
-            <div className='mx-auto w-auto p-4 pl-8 border-collapse text-left bg-[#FFFFFF] ml-[30px] mr-6 rounded-md lg:h-[147px]'>
-
+            <div className='mx-auto flex justify-between w-auto p-4 pl-8 border-collapse text-left bg-[#FFFFFF] ml-[30px] mr-6 rounded-md lg:h-[147px]'>
                 <div>
                     {days.length > 0 && (
                         <div className='lg:w-[600px]'>
@@ -981,15 +1315,11 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                 {currentWeekDays.map((day, idx) => {
                                     const dateStr = day.toISOString().split("T")[0];
                                     return (
-                                        <div
-                                            key={idx}
-                                            className="flex flex-col items-left w-20 mx-auto"
-                                        >
+                                        <div key={idx} className="flex flex-col items-left w-20 mx-auto">
                                             {/* Day Name */}
                                             <div className="font-semibold text-[#E4572E]">
                                                 {day.toLocaleDateString("en-US", { weekday: "short" })}
                                             </div>
-
                                             {/* Date Button */}
                                             <button
                                                 onClick={() => handleDateClick(dateStr)}
@@ -1012,9 +1342,11 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         </div>
                         <div>
                             {selectedDate && <p>Selected day: {formatDateOnly(selectedDate)}</p>}
-                            {/* Your table here: use selectedWeek only */}
                         </div>
                     </div>
+                </div>
+                <div className="mr-5">
+                    <button onClick={generateExpensesPDF} className='font-semibold mt-4 mr-5 hover:text-[#E4572E]'>Report</button>
                 </div>
             </div>
             <div className="mt-4 flex justify-end mr-6">
@@ -1036,43 +1368,30 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         </div>
                         <div className="w-full h-[600px] rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden">
                             {/* Single Table with Scrollable Container */}
-                            <div
-                                ref={scrollRef}
-                                className="overflow-auto max-h-[600px]"
-                                onMouseDown={handleMouseDown}
-                                onMouseMove={handleMouseMove}
-                                onMouseUp={handleMouseUp}
-                                onMouseLeave={handleMouseUp}
-                            >
-                                <table className="w-[1300px] border-collapse text-left">
+                            <div ref={scrollRef} className="overflow-auto max-h-[600px]" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
+                                onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} >
+                                <table className="w-[1200px] border-collapse text-left">
                                     <thead className="sticky top-0 z-10 bg-white">
                                         <tr className="bg-[#FAF6ED] h-12">
                                             <th className="py-2 px-1 text-left w-[60px]">S.No</th>
-                                            <th
-                                                className="py-2 px-1 text-left w-[200px] cursor-pointer hover:bg-gray-200"
-                                                onClick={() => handleSort('labour_name')}
-                                            >
+                                            <th className="py-2 px-1 text-left w-[140px] cursor-pointer hover:bg-gray-200"
+                                                onClick={() => handleSort('labour_name')}>
                                                 Name {sortConfig.key === 'labour_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                             </th>
-                                            <th
-                                                className="py-2 px-1 text-left w-[220px] cursor-pointer hover:bg-gray-200"
-                                                onClick={() => handleSort('project_name')}
-                                            >
+                                            <th className="py-2 px-1 text-left w-[170px] cursor-pointer hover:bg-gray-200"
+                                                onClick={() => handleSort('project_name')}>
                                                 Project Name {sortConfig.key === 'project_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                             </th>
-                                            <th
-                                                className="py-2 px-1 text-left w-[120px] cursor-pointer hover:bg-gray-200"
-                                                onClick={() => handleSort('amount')}
-                                            >
+                                            <th className="py-2 px-1 text-left w-[120px] cursor-pointer hover:bg-gray-200"
+                                                onClick={() => handleSort('amount')}>
                                                 Amount {sortConfig.key === 'amount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                             </th>
-                                            <th className="py-2 px-1 text-left w-[60px]">Qty</th>
-                                            <th
-                                                className="py-2 px-1 text-left w-[120px] cursor-pointer hover:bg-gray-200"
-                                                onClick={() => handleSort('type')}
-                                            >
+
+                                            <th className="py-2 px-1 text-left w-[120px] cursor-pointer hover:bg-gray-200"
+                                                onClick={() => handleSort('type')}>
                                                 Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                             </th>
+                                            <th className="py-2 px-1 text-left w-[60px]">Qty</th>
                                             <th className="py-2 px-1 text-left w-[80px]">Activity</th>
                                         </tr>
                                         {Number(currentWeekNumber) === Number(currentWeekNumber) ? (
@@ -1126,11 +1445,11 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                     </div>
                                                     <div>
                                                         <button onClick={handleChangeButtonClick}>
-                                                            <img src={Change} className={`w-4 h-4 ${isChangeButtonActive ? 'opacity-70' : ''}`} />
+                                                            <img src={Change} className={`w-4 h-4 ${isChangeButtonActive ? 'opacity-10' : ''}`} />
                                                         </button>
                                                     </div>
                                                 </td>
-                                                <td className="px-1 py-2">
+                                                <td className="py-2">
                                                     <Select
                                                         name="project"
                                                         value={siteOptions.find(opt => opt.id === Number(newDailyExpense.project_id)) || null}
@@ -1150,7 +1469,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                         styles={customStyles}
                                                     />
                                                 </td>
-                                                <td className="px-1 py-2 text-left flex items-center gap-2">
+                                                <td className="py-2 text-left flex items-center gap-2">
                                                     <div>
                                                         <input
                                                             type="number"
@@ -1198,22 +1517,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                         </div>
                                                     )}
                                                 </td>
-                                                <td className="px-1 py-2">
-                                                    <input
-                                                        type="number"
-                                                        name="quantity"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[60px] h-[40px] rounded-lg focus:outline-none no-spinner"
-                                                        value={newDailyExpense.quantity || ""}
-                                                        onChange={(e) => setNewDailyExpense(prev => ({ ...prev, quantity: e.target.value }))}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === "Enter") {
-                                                                e.preventDefault();
-                                                                handleAddExpense();
-                                                            }
-                                                        }}
-                                                    />
-                                                </td>
-                                                <td className="px-1 py-2 text-left">
+                                                <td className="py-2 text-left">
                                                     <select
                                                         name="type"
                                                         value={newDailyExpense.type}
@@ -1229,21 +1533,36 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                         ))}
                                                     </select>
                                                 </td>
-
+                                                <td className="py-2">
+                                                    <input
+                                                        type="number"
+                                                        name="quantity"
+                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[60px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                        value={newDailyExpense.quantity || ""}
+                                                        onChange={(e) => setNewDailyExpense(prev => ({ ...prev, quantity: e.target.value }))}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === "Enter") {
+                                                                e.preventDefault();
+                                                                handleAddExpense();
+                                                            }
+                                                        }}
+                                                    />
+                                                </td>
+                                                <td>
+                                                </td>
                                             </tr>
                                         ) : null}
                                     </thead>
                                     <tbody>
-
                                         {/* Editable Expense rows */}
                                         {sortedDailyExpenses
                                             .filter(row => row.date === selectedDate) // only rows for selected date
                                             .reverse()
                                             .map((row, index) => (
                                                 <tr key={row.id} className="even:bg-[#FFFFFF] odd:bg-[#FAF6ED] text-left">
-                                                    <td className="px-1 py-2 font-bold text-left">{dailyExpenses.length - index}</td>
+                                                    <td className="py-2 font-bold text-left">{dailyExpenses.length - index}</td>
                                                     {/* Contractor / Vendor column */}
-                                                    <td className="px-1 py-2">
+                                                    <td className="py-2">
                                                         {editingDailyExpenseRowId === row.id ? (
                                                             <Select
                                                                 name="labour_id"
@@ -1291,17 +1610,15 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                                     const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
                                                                     const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
                                                                     const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
-
                                                                     // Collect all non-empty labels
                                                                     const labels = [employee?.label, vendor?.label, contractor?.label, labour?.label].filter(Boolean);
-
                                                                     return labels.length > 0 ? labels.join(" | ") : "";
                                                                 })()}
                                                             </div>
                                                         )}
                                                     </td>
                                                     {/* Project column */}
-                                                    <td className="px-1 py-2">
+                                                    <td className="py-2">
                                                         {editingDailyExpenseRowId === row.id ? (
                                                             <Select
                                                                 name="project_id"
@@ -1326,60 +1643,102 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                             </div>
                                                         )}
                                                     </td>
-                                                    <td className="px-1 py-2 relative group flex gap-2">
-                                                        {editingDailyExpenseRowId === row.id ? (
-                                                            <>
-                                                                <input
-                                                                    type="number"
-                                                                    name="amount"
-                                                                    className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[90px] h-[40px] rounded-lg focus:outline-none no-spinner"
-                                                                    value={editDailyExpenseData.amount}
-                                                                    onChange={(e) =>
-                                                                        setEditDailyExpenseData(prev => ({ ...prev, amount: e.target.value }))
-                                                                    }
-                                                                />
-                                                                <input
-                                                                    type="number"
-                                                                    name="extra_amount"
-                                                                    className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[90px] h-[40px] rounded-lg focus:outline-none no-spinner"
-                                                                    value={editDailyExpenseData.extra_amount}
-                                                                    onChange={(e) =>
-                                                                        setEditDailyExpenseData(prev => ({
-                                                                            ...prev,
-                                                                            extra_amount: e.target.value
-                                                                        }))
-                                                                    }
-                                                                />
-                                                            </>
-                                                        ) : (
-                                                            <div className="w-[120px] h-[40px] flex flex-col justify-center leading-tight cursor-default">
-                                                                <span>
-                                                                    {Number((row.amount || 0) + (row.extra_amount || 0)).toLocaleString("en-IN")}
-                                                                </span>
-                                                                {/* Tooltip on hover */}
-                                                                <div className="absolute left-0 top-full mt-1 hidden group-hover:block bg-black text-white text-xs rounded p-2 z-50 shadow-lg whitespace-nowrap">
-                                                                    Amount: {Number(row.amount || 0).toLocaleString('en-IN')} <br />
-                                                                    Extra Amount: {Number(row.extra_amount || 0).toLocaleString('en-IN')}
-                                                                </div>
+                                                    <td className="py-2 relative group flex ">
+                                                        <div className="flex items-center">
+                                                            <div className='flex items-center gap-2'>
+                                                                {editingDailyExpenseRowId === row.id ? (
+                                                                    <>
+                                                                        <input
+                                                                            type="number"
+                                                                            name="amount"
+                                                                            className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[90px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                                            value={editDailyExpenseData.amount}
+                                                                            onChange={(e) =>
+                                                                                setEditDailyExpenseData(prev => ({ ...prev, amount: e.target.value }))
+                                                                            }
+                                                                        />
+                                                                        <input
+                                                                            type="number"
+                                                                            name="extra_amount"
+                                                                            className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[90px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                                            value={editDailyExpenseData.extra_amount}
+                                                                            onChange={(e) =>
+                                                                                setEditDailyExpenseData(prev => ({
+                                                                                    ...prev,
+                                                                                    extra_amount: e.target.value
+                                                                                }))
+                                                                            }
+                                                                        />
+                                                                    </>
+                                                                ) : (
+                                                                    <div className="w-[120px] h-[40px] flex flex-col justify-center leading-tight cursor-default">
+                                                                        <span>
+                                                                            {Number((row.amount || 0) + (row.extra_amount || 0)).toLocaleString("en-IN")}
+                                                                        </span>
+                                                                        {/* Tooltip on hover */}
+                                                                        <div className="absolute left-0 top-full mt-1 hidden group-hover:block bg-black text-white text-xs rounded p-2 z-50 shadow-lg whitespace-nowrap">
+                                                                            Amount: {Number(row.amount || 0).toLocaleString('en-IN')} <br />
+                                                                            Extra Amount: {Number(row.extra_amount || 0).toLocaleString('en-IN')}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
                                                             </div>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-1 py-2">
-                                                        <div className="w-[60px] h-[40px] flex items-center">
-                                                            {editingDailyExpenseRowId === row.id ? (
-                                                                <input
-                                                                    type="number"
-                                                                    name="quantity"
-                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[60px] h-[40px] rounded-lg focus:outline-none no-spinner"
-                                                                    value={editDailyExpenseData.quantity || ""}
-                                                                    onChange={(e) => setEditDailyExpenseData(prev => ({ ...prev, quantity: e.target.value }))}
-                                                                />
-                                                            ) : (
-                                                                row.quantity || ""
-                                                            )}
+                                                            <div>
+                                                                {editingDailyExpenseRowId === row.id ? (
+                                                                    <div className="w-[20px] h-[40px] flex items-center justify-center text-gray-500 text-sm">
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="w-[20px] h-[40px] flex items-center gap-2">
+                                                                        {row.description ? (
+                                                                            <div className="flex items-center justify-center w-full">
+                                                                                <img
+                                                                                    src={NotesEnd}
+                                                                                    alt="View Description"
+                                                                                    className="w-4 h-4 cursor-pointer opacity-60 hover:opacity-100 flex-shrink-0"
+                                                                                    onClick={() => handleDescriptionClick(row)}
+                                                                                />
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="flex items-center justify-center w-full">
+                                                                                <img
+                                                                                    src={NotesStart}
+                                                                                    alt="Add Description"
+                                                                                    className="w-4 h-4 cursor-pointer opacity-60 hover:opacity-100"
+                                                                                    onClick={() => handleDescriptionClick(row)}
+                                                                                />
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div className="ml-3 flex items-center gap-1">
+                                                                {row.file_url ? (
+                                                                    <a
+                                                                        href={row.file_url}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="cursor-pointer"
+                                                                        title="View File"
+                                                                    >
+                                                                        <img src={file} className="w-4 h-4" alt="Open File" />
+                                                                    </a>
+                                                                ) : (
+                                                                    <button
+                                                                        onClick={() => handleFileUploadClick(row)}
+                                                                        className="cursor-pointer"
+                                                                        title="Upload File"
+                                                                    >
+                                                                        <img
+                                                                            src={fileUpload}
+                                                                            className="w-4 h-4 opacity-70 hover:opacity-100"
+                                                                            alt="Upload File"
+                                                                        />
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </td>
-                                                    <td className="px-1 py-2">
+                                                    <td className="py-2">
                                                         {editingDailyExpenseRowId === row.id ? (
                                                             <select
                                                                 name="type"
@@ -1402,41 +1761,29 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                             </div>
                                                         )}
                                                     </td>
-
-                                                    <td className="px-1 py-2 relative">
-                                                        <div className="flex gap-2 w-[80px]">
-                                                            {row.file_url ? (
-                                                                <a
-                                                                    href={row.file_url}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="cursor-pointer"
-                                                                >
-                                                                    <img src={file} className="w-5 h-4" alt="Open File" />
-                                                                </a>
+                                                    <td className="py-2">
+                                                        <div className="w-[60px] h-[40px] flex items-center">
+                                                            {editingDailyExpenseRowId === row.id ? (
+                                                                <input
+                                                                    type="number"
+                                                                    name="quantity"
+                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[60px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                                    value={editDailyExpenseData.quantity || ""}
+                                                                    onChange={(e) => setEditDailyExpenseData(prev => ({ ...prev, quantity: e.target.value }))}
+                                                                />
                                                             ) : (
-                                                                editingDailyExpenseRowId === row.id && (
-                                                                    <label className="cursor-pointer">
-                                                                        <input
-                                                                            type="file"
-                                                                            accept="application/pdf"
-                                                                            className="hidden"
-                                                                            onChange={(e) => handleFileChange(e, row)}
-                                                                        />
-                                                                        <img
-                                                                            src={fileUpload}
-                                                                            className="w-5 h-4 opacity-70 hover:opacity-100"
-                                                                            alt="Upload File"
-                                                                        />
-                                                                    </label>
-                                                                )
+                                                                <div className="w-[60px] h-[40px] flex items-center text-center">
+                                                                    {row.quantity || ""}
+                                                                </div>
+
                                                             )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-2 relative">
+                                                        <div className="flex gap-2 w-[80px]">
                                                             {/* Edit Button */}
                                                             {editingDailyExpenseRowId === row.id ? (
-                                                                <button
-                                                                    className="text-green-600 font-bold text-lg relative z-10"
-                                                                    onClick={() => saveEditedExpense(row)}
-                                                                >
+                                                                <button className="text-green-600 font-bold text-lg relative z-10" onClick={() => saveEditedExpense(row)}>
                                                                     ✓
                                                                 </button>
                                                             ) : (
@@ -1526,10 +1873,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                 <td className="px-4 py-2">
                                                     <div className="flex">
                                                         {editingPaymentId === row.id ? (
-                                                            <button
-                                                                className="text-green-600 font-bold text-lg"
-                                                                onClick={() => saveEditedRefundPayment(row.id)}
-                                                            >
+                                                            <button className="text-green-600 font-bold text-lg" onClick={() => saveEditedRefundPayment(row.id)}>
                                                                 ✓
                                                             </button>
                                                         ) : (
@@ -1583,6 +1927,138 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         </div>
                     </div>
                 </div>
+                {showPopups && (
+                    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+                        onKeyDown={(e) => {
+                            if (e.key === 'Escape') {
+                                setShowPopups(false);
+                                setEntryId(null);
+                                setDescription("");
+                            }
+                            if (e.key === 'Enter' && entryId && description.trim()) {
+                                handleUpdate();
+                            }
+                        }}
+                        tabIndex={0}
+                    >
+                        <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
+                            <label className="block mb-3 text-left">
+                                <span className="font-semibold">Description</span>
+                                {entryId ? (
+                                    <div>
+                                        <input
+                                            type="text"
+                                            name="description"
+                                            placeholder="Enter description"
+                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                            value={description}
+                                            onChange={(e) => setDescription(e.target.value)}
+                                            maxLength={200}
+                                        />
+                                        <div className="text-xs text-gray-500 mt-1 text-right">
+                                            {description.length}/200 characters
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full bg-gray-50">
+                                        {description}
+                                    </div>
+                                )}
+                            </label>
+                            <div className="flex justify-end gap-3 mt-4">
+                                <button
+                                    onClick={() => {
+                                        setShowPopups(false);
+                                        setEntryId(null);
+                                        setDescription("");
+                                    }}
+                                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                                >
+                                    Close
+                                </button>
+                                {entryId && (
+                                    <button
+                                        onClick={handleUpdate}
+                                        disabled={loading}
+                                        className={`px-4 py-2 rounded-lg ${loading
+                                            ? 'bg-gray-400 cursor-not-allowed'
+                                            : 'bg-green-600 hover:bg-green-700'
+                                            } text-white`}
+                                    >
+                                        {loading ? 'Saving...' : 'Save'}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {fileUploadPopup && (
+                    <div
+                        className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+                        onKeyDown={(e) => {
+                            if (e.key === 'Escape') {
+                                setFileUploadPopup(false);
+                                setCurrentFileRow(null);
+                                setSelectedFileForPopup(null);
+                            }
+                        }}
+                        tabIndex={0}
+                    >
+                        <div className="bg-white rounded-xl shadow-lg p-6 w-[500px]">
+                            <h3 className="text-lg font-semibold mb-4 text-center">
+                                {currentFileRow?.file_url ? 'Change File' : 'Upload File'}
+                            </h3>
+                            {currentFileRow?.file_url && (
+                                <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                                    <p className="text-sm text-gray-600 mb-2">Current file:</p>
+                                    <a href={currentFileRow.file_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-800 underline"
+                                    >
+                                        View Current File
+                                    </a>
+                                </div>
+                            )}
+                            <div className="mb-4">
+                                <label className="block mb-2 text-sm font-medium">
+                                    Select PDF File
+                                </label>
+                                <input
+                                    type="file"
+                                    accept="application/pdf"
+                                    onChange={handleFileSelectInPopup}
+                                    className="w-full p-2 border-2 border-[#BF9853] border-opacity-25 rounded-lg focus:outline-none"
+                                />
+                                {selectedFileForPopup && (
+                                    <p className="text-sm text-green-600 mt-2">
+                                        ✓ {selectedFileForPopup.name} selected
+                                    </p>
+                                )}
+                            </div>
+                            <div className="flex justify-end gap-3 mt-6">
+                                <button
+                                    onClick={() => {
+                                        setFileUploadPopup(false);
+                                        setCurrentFileRow(null);
+                                        setSelectedFileForPopup(null);
+                                    }}
+                                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button onClick={handleSaveFileFromPopup} disabled={!selectedFileForPopup}
+                                    className={`px-4 py-2 rounded-lg ${!selectedFileForPopup
+                                        ? 'bg-gray-400 cursor-not-allowed'
+                                        : 'bg-green-600 hover:bg-green-700'
+                                        } text-white`}
+                                >
+                                    {currentFileRow?.file_url ? 'Update File' : 'Upload File'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 <AuditModal show={showWeeklyPaymentExpensesModal} onClose={() => setShowWeeklyPaymentExpensesModal(false)} audits={weeklyPaymentExpensesAudits} laboursList={laboursList} contractorOptions={contractorOptions}
                     siteOptions={siteOptions} vendorOptions={vendorOptions} employeeOptions={employeeOptions} />
                 <AuditModalWeeklyPaymentsReceived show={showWeeklyPaymentReceivedModal} onClose={() => setShowWeeklyPaymentReceivedModal(false)}
@@ -1591,32 +2067,14 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         </body >
     )
 }
-
 export default DailyPayment
-
-const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    date.setMinutes(date.getMinutes());
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    let hours = date.getHours();
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12;
-    hours = hours ? String(hours).padStart(2, '0') : '12';
-    return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
-};
-
 const AuditModal = ({ show, onClose, audits, laboursList, siteOptions, vendorOptions, employeeOptions, contractorOptions }) => {
     if (!show) return null;
-
     const getNameById = (id, options) => {
         if (!id && id !== 0) return "-";
         const found = options.find(opt => String(opt.id) === String(id));
         return found ? found.label : id;
     };
-
     const fields = [
         { oldKey: "old_date", newKey: "new_date", label: "Date", width: "120px" },
         { oldKey: "old_type", newKey: "new_type", label: "Type", width: "100px" },
@@ -1627,7 +2085,6 @@ const AuditModal = ({ show, onClose, audits, laboursList, siteOptions, vendorOpt
         { oldKey: "old_contractor_id", newKey: "new_contractor_id", label: "Contractor Name", width: "150px", lookup: contractorOptions },
         { oldKey: "old_amount", newKey: "new_amount", label: "Amount", width: "100px" },
     ];
-
     const formatDateTime = (dateString) => {
         if (!dateString) return "-";
         const date = new Date(dateString);
@@ -1641,7 +2098,6 @@ const AuditModal = ({ show, onClose, audits, laboursList, siteOptions, vendorOpt
         hours = String(hours).padStart(2, "0");
         return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
     };
-
     const formatDisplayValue = (value, field) => {
         // If vendor, contractor, labour, employee or transfer site is 0, show "-"
         if (
@@ -1651,7 +2107,6 @@ const AuditModal = ({ show, onClose, audits, laboursList, siteOptions, vendorOpt
         ) {
             return "-";
         }
-
         if (field.lookup) {
             // Handle different lookup types based on field label
             if (field.label.includes("Vendor")) {
@@ -1683,7 +2138,6 @@ const AuditModal = ({ show, onClose, audits, laboursList, siteOptions, vendorOpt
                         <h2 className="text-xl text-red-500 -mt-10 font-bold">x</h2>
                     </button>
                 </div>
-
                 {/* Scroll container for both vertical and horizontal overflow */}
                 <div className="overflow-auto mt-2 max-h-80 border border-l-8 border-l-[#BF9853] rounded-lg ml-7">
                     <table className="table-fixed min-w-full bg-white">
@@ -1692,9 +2146,7 @@ const AuditModal = ({ show, onClose, audits, laboursList, siteOptions, vendorOpt
                                 <th style={{ width: "130px" }}>Time Stamp</th>
                                 <th style={{ width: "120px" }}>Edited By</th>
                                 {fields.map((f) => (
-                                    <th
-                                        key={f.label}
-                                        style={{ width: f.width }}
+                                    <th key={f.label} style={{ width: f.width }}
                                         className="border-b py-2 px-2 text-center font-bold whitespace-nowrap overflow-hidden text-ellipsis"
                                     >
                                         {f.label}
@@ -1704,35 +2156,21 @@ const AuditModal = ({ show, onClose, audits, laboursList, siteOptions, vendorOpt
                         </thead>
                         <tbody>
                             {audits.map((audit, index) => (
-                                <tr
-                                    key={index}
-                                    className="odd:bg-white even:bg-[#FAF6ED]"
-                                >
-                                    <td
-                                        className="whitespace-nowrap overflow-hidden text-ellipsis"
-                                        style={{ width: "130px" }}
-                                    >
+                                <tr key={index} className="odd:bg-white even:bg-[#FAF6ED]">
+                                    <td className="whitespace-nowrap overflow-hidden text-ellipsis" style={{ width: "130px" }} >
                                         {formatDateTime(audit.edited_date)}
                                     </td>
-                                    <td
-                                        className="whitespace-nowrap overflow-hidden text-ellipsis"
-                                        style={{ width: "120px" }}
-                                    >
+                                    <td className="whitespace-nowrap overflow-hidden text-ellipsis" style={{ width: "120px" }} >
                                         {audit.edited_by}
                                     </td>
                                     {fields.map((f) => {
                                         const oldDisplay = formatDisplayValue(audit[f.oldKey], f);
                                         const newDisplay = formatDisplayValue(audit[f.newKey], f);
                                         const changed = oldDisplay !== newDisplay;
-
                                         return (
-                                            <td
-                                                key={f.label}
-                                                style={{ width: f.width }}
-                                                title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
+                                            <td key={f.label} style={{ width: f.width }} title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
                                                 className={`whitespace-nowrap overflow-hidden text-ellipsis px-2 ${changed ? "bg-[#BF9853] font-bold" : ""
-                                                    }`}
-                                            >
+                                                    }`} >
                                                 {oldDisplay}
                                             </td>
                                         );
@@ -1746,22 +2184,18 @@ const AuditModal = ({ show, onClose, audits, laboursList, siteOptions, vendorOpt
         </div>
     );
 };
-
 const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits, laboursList }) => {
     if (!show) return null;
-
     const getNameById = (id, options) => {
         if (!id && id !== 0) return "-";
         const found = options.find(opt => String(opt.id) === String(id));
         return found ? found.label : id;
     };
-
     const fields = [
         { oldKey: "old_date", newKey: "new_date", label: "Date", width: "120px" },
         { oldKey: "old_amount", newKey: "new_amount", label: "Amount", width: "100px" },
         { oldKey: "old_labour_id", newKey: "new_labour_id", label: "Labour Name", width: "150px", lookup: laboursList },
     ];
-
     const formatDateTime = (dateString) => {
         if (!dateString) return "-";
         const date = new Date(dateString);
@@ -1775,7 +2209,6 @@ const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits, laboursList }
         hours = String(hours).padStart(2, "0");
         return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
     };
-
     const formatDisplayValue = (value, field) => {
         // If vendor or transfer site is 0, show "-"
         if (
@@ -1785,7 +2218,6 @@ const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits, laboursList }
         ) {
             return "-";
         }
-
         if (field.lookup) {
             return getNameById(value, field.lookup);
         }
@@ -1806,7 +2238,6 @@ const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits, laboursList }
                         <h2 className="text-xl text-red-500 -mt-10 font-bold">x</h2>
                     </button>
                 </div>
-
                 {/* Scroll container for both vertical and horizontal overflow */}
                 <div className="overflow-auto mt-2 max-h-80 border border-l-8 border-l-[#BF9853] rounded-lg ml-7">
                     <table className="table-fixed min-w-full bg-white">
@@ -1815,9 +2246,7 @@ const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits, laboursList }
                                 <th style={{ width: "130px" }}>Time Stamp</th>
                                 <th style={{ width: "120px" }}>Edited By</th>
                                 {fields.map((f) => (
-                                    <th
-                                        key={f.label}
-                                        style={{ width: f.width }}
+                                    <th key={f.label} style={{ width: f.width }}
                                         className="border-b py-2 px-2 text-center font-bold whitespace-nowrap overflow-hidden text-ellipsis"
                                     >
                                         {f.label}
@@ -1827,32 +2256,19 @@ const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits, laboursList }
                         </thead>
                         <tbody>
                             {audits.map((audit, index) => (
-                                <tr
-                                    key={index}
-                                    className="odd:bg-white even:bg-[#FAF6ED]"
-                                >
-                                    <td
-                                        className="whitespace-nowrap overflow-hidden text-ellipsis"
-                                        style={{ width: "130px" }}
-                                    >
+                                <tr key={index} className="odd:bg-white even:bg-[#FAF6ED]" >
+                                    <td className="whitespace-nowrap overflow-hidden text-ellipsis" style={{ width: "130px" }} >
                                         {formatDateTime(audit.edited_date)}
                                     </td>
-                                    <td
-                                        className="whitespace-nowrap overflow-hidden text-ellipsis"
-                                        style={{ width: "120px" }}
-                                    >
+                                    <td className="whitespace-nowrap overflow-hidden text-ellipsis" style={{ width: "120px" }} >
                                         {audit.edited_by}
                                     </td>
                                     {fields.map((f) => {
                                         const oldDisplay = formatDisplayValue(audit[f.oldKey], f);
                                         const newDisplay = formatDisplayValue(audit[f.newKey], f);
                                         const changed = oldDisplay !== newDisplay;
-
                                         return (
-                                            <td
-                                                key={f.label}
-                                                style={{ width: f.width }}
-                                                title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
+                                            <td key={f.label} style={{ width: f.width }} title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
                                                 className={`whitespace-nowrap overflow-hidden text-ellipsis px-2 ${changed ? "bg-[#BF9853] font-bold" : ""
                                                     }`}
                                             >

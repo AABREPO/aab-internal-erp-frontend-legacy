@@ -4,17 +4,16 @@ import StaffTableview from './StaffTableview';
 import StaffDatabase from './StaffDatabase';
 import StaffReport from './StaffReport';
 import StaffSummary from './StaffSummary';
+import StaffAddInput from './StaffAddInput';
 
 const StaffHeading = ({ username, userRoles = [] }) => {
     const [activeTab, setActiveTab] = useState(
         localStorage.getItem('activePaintTab') || 'staffAdvance'
     );
-
     useEffect(() => {
         // Save the active tab to localStorage whenever it changes
         localStorage.setItem('activePaintTab', activeTab);
     }, [activeTab]);
-
     const renderContent = () => {
         switch (activeTab) {
             case 'staffAdvance':
@@ -23,6 +22,8 @@ const StaffHeading = ({ username, userRoles = [] }) => {
                 return <StaffTableview username={username} userRoles={userRoles} />;
             case 'staffDatabase':
                 return <StaffDatabase username={username} userRoles={userRoles} />;
+            case 'staffInput':
+                return <StaffAddInput username={username} userRoles={userRoles} />;
             case 'staffReport':
                 return <StaffReport username={username} userRoles={userRoles} />;
             case 'staffSummary':
@@ -53,6 +54,12 @@ const StaffHeading = ({ username, userRoles = [] }) => {
                     Database
                 </h2>
                 <h2
+                    className={`link ${activeTab === 'staffInput' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('staffInput')}
+                >
+                    Add Input
+                </h2>
+                <h2
                     className={`link ${activeTab === 'staffReport' ? 'active' : ''}`}
                     onClick={() => setActiveTab('staffReport')}
                 >
@@ -71,5 +78,4 @@ const StaffHeading = ({ username, userRoles = [] }) => {
         </div>
     )
 }
-
 export default StaffHeading

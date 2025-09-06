@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-
+import Select from 'react-select';
+import Change from '../Images/dropdownchange.png'
 const DailyHistory = () => {
     const [selectedWeek, setSelectedWeek] = useState("");
     const [weeks, setWeeks] = useState([]);
@@ -16,12 +17,33 @@ const DailyHistory = () => {
     const [contractorOptions, setContractorOptions] = useState([]);
     const [employeeOptions, setEmployeeOptions] = useState([]);
     const [combinedOptions, setCombinedOptions] = useState([]);
-
+    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+    const [newDailyExpense, setNewDailyExpense] = useState({
+        date: "",
+        labour_id: "",
+        vendor_id: "",
+        contractor_id: "",
+        employee_id: "",
+        project_id: "",
+        quantity: "",
+        type: "",
+        amount: "",
+        extra_amount: "",
+        description: ""
+    });
+    const [showExtraAmount, setShowExtraAmount] = useState(false);
+    const [isChangeButtonActive, setIsChangeButtonActive] = useState(false);
+    const [weeklyTypes, setWeeklyTypes] = useState([]);
+    const [expensesCategory, setExpensesCategory] = useState([]);
+    const [newRefundReceived, setNewRefundReceived] = useState({
+        date: new Date().toISOString().split("T")[0],
+        labour_id: "",
+        amount: ""
+    });
     const currentYear = new Date().getFullYear();
     const currentWeek = weeks.find((w) => w.number === Number(selectedWeek));
     const startYear = 2000;
     const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i);
-
     // Function to get start and end date of a week
     function getStartAndEndDateOfWeek(weekNumber, year) {
         const simple = new Date(year, 0, 1 + (weekNumber - 1) * 7);
@@ -36,7 +58,6 @@ const DailyHistory = () => {
             end: ISOWeekEnd.toISOString().split("T")[0],
         };
     }
-
     // Fetch weeks data
     useEffect(() => {
         const fetchWeeks = async () => {
@@ -53,25 +74,21 @@ const DailyHistory = () => {
         };
         fetchWeeks();
     }, []);
-
     // Set default selected week
     useEffect(() => {
         if (weeks.length > 0) {
             setSelectedWeek(weeks[weeks.length - 1].number); // default last week
         }
     }, [weeks]);
-
     // Fetch weekly data when week changes
     useEffect(() => {
         const fetchWeekData = async () => {
             if (!selectedWeek) return;
-
             try {
                 const [expensesRes, paymentsRes] = await Promise.all([
                     axios.get(`https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${selectedWeek}`),
                     axios.get(`https://backendaab.in/aabuildersDash/api/payments-received/week/${selectedWeek}`)
                 ]);
-
                 setExpenses(expensesRes.data);
                 const filteredPayments = paymentsRes.data.filter(
                     (payment) => payment.type !== "Handover"
@@ -81,10 +98,8 @@ const DailyHistory = () => {
                 console.error("Error fetching weekly data:", error);
             }
         };
-
         fetchWeekData();
     }, [selectedWeek]);
-
     // Fetch options data
     useEffect(() => {
         fetchLaboursList();
@@ -92,13 +107,13 @@ const DailyHistory = () => {
         fetchVendorNames();
         fetchContractorNames();
         fetchEmployeeDetails();
+        fetchWeeklyTypes();
+        fetchExpensesCategory();
     }, []);
-
     // Combine options
-    useEffect(() => { 
-        setCombinedOptions([...vendorOptions, ...contractorOptions, ...employeeOptions]); 
+    useEffect(() => {
+        setCombinedOptions([...vendorOptions, ...contractorOptions, ...employeeOptions]);
     }, [vendorOptions, contractorOptions, employeeOptions]);
-
     const fetchLaboursList = async () => {
         try {
             const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
@@ -119,7 +134,6 @@ const DailyHistory = () => {
             console.log('Error fetching Labour names.');
         }
     };
-
     const fetchSites = async () => {
         try {
             const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
@@ -195,7 +209,6 @@ const DailyHistory = () => {
             console.error("Fetch error: ", error);
         }
     };
-
     const fetchVendorNames = async () => {
         try {
             const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
@@ -220,7 +233,6 @@ const DailyHistory = () => {
             console.error("Fetch error: ", error);
         }
     };
-
     const fetchContractorNames = async () => {
         try {
             const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
@@ -245,7 +257,6 @@ const DailyHistory = () => {
             console.error("Fetch error: ", error);
         }
     };
-
     const fetchEmployeeDetails = async () => {
         try {
             const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
@@ -270,7 +281,42 @@ const DailyHistory = () => {
             console.error("Fetch error: ", error);
         }
     };
-
+    const fetchWeeklyTypes = async () => {
+        try {
+            const response = await fetch("https://backendaab.in/aabuildersDash/api/weekly-types/getAll", {
+                method: "GET",
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            });
+            if (!response.ok) {
+                throw new Error("Network response was not ok: " + response.statusText);
+            }
+            const data = await response.json();
+            setWeeklyTypes(data);
+        } catch (error) {
+            console.error("Fetch error: ", error);
+        }
+    };
+    const fetchExpensesCategory = async () => {
+        try {
+            const response = await fetch("https://backendaab.in/aabuildersDash/api/expenses-category/getAll", {
+                method: "GET",
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            });
+            if (!response.ok) {
+                throw new Error("Network response was not ok: " + response.statusText);
+            }
+            const data = await response.json();
+            setExpensesCategory(data);
+        } catch (error) {
+            console.error("Fetch error: ", error);
+        }
+    };
     // Generate 7 days for selected week
     const getWeekDays = () => {
         const days = [];
@@ -284,9 +330,7 @@ const DailyHistory = () => {
         }
         return days;
     };
-
     const weekDays = getWeekDays();
-
     // Auto select today's date when component mounts or week changes
     useEffect(() => {
         if (weekDays.length > 0) {
@@ -300,27 +344,20 @@ const DailyHistory = () => {
             setSelectedDate(defaultDate);
         }
     }, [currentWeek]);
-
     // Format helper
     const formatDate = (date) =>
         date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-
-    const formatDateOnly = (dateString) => {
-        const date = new Date(dateString);
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}-${month}-${year}`;
-    };
-
     const handleDateClick = async (dateStr) => {
         setSelectedDate(dateStr);
+        setNewDailyExpense((prev) => ({ ...prev, date: dateStr }));
         try {
             // Fetch daily expenses and refund payments for the selected date
             const [dailyRes, refundRes] = await Promise.all([
                 axios.get(`https://backendaab.in/aabuildersDash/api/daily-payments/date/${dateStr}`),
                 axios.get(`https://backendaab.in/aabuildersDash/api/refund_received/date/${dateStr}`)
             ]);
+            console.log("Daily Expenses:", dailyRes.data);
+            console.log("Refund Payments:", refundRes.data);
             setDailyExpenses(dailyRes.data);
             setRefundPayments(refundRes.data);
         } catch (error) {
@@ -329,30 +366,163 @@ const DailyHistory = () => {
             setRefundPayments([]);
         }
     };
-
+    // Custom styles for Select component
+    const customStyles = {
+        control: (provided, state) => ({
+            ...provided,
+            borderWidth: '2px',
+            borderRadius: '8px',
+            borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'rgba(191, 152, 83, 0.2)',
+            boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
+            '&:hover': {
+                borderColor: 'rgba(191, 152, 83, 0.2)',
+            }
+        }),
+    };
     // Calculate totals
     const totalAmount = dailyExpenses
         .filter(row => row.date === selectedDate)
         .reduce((sum, row) => sum + (Number(row.amount || 0) + Number(row.extra_amount || 0)), 0);
-
     const totalRefund = refundPayments
         .reduce((sum, p) => sum + Number(p.amount || 0), 0);
-
     const totalPayments = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
     const overAllTotalPayments = (totalPayments + totalRefund);
     const balance = overAllTotalPayments - expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-
+    const netAmount = totalAmount - totalRefund;
     // Get name by ID helper function
     const getNameById = (id, options) => {
         if (!id && id !== 0) return "-";
         const found = options.find(opt => String(opt.id) === String(id));
         return found ? found.label : id;
     };
-
+    // Sorting function
+    const handleSort = (key) => {
+        let direction = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+    // Input change handler
+    const handleInputChange = (e) => {
+        setNewDailyExpense((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    };
+    // Change button click handler
+    const handleChangeButtonClick = () => {
+        setIsChangeButtonActive(prev => !prev);
+    };
+    // Refund handlers
+    const handleNewPaymentChange = (e) => {
+        const { name, value } = e.target;
+        setNewRefundReceived(prev => ({ ...prev, [name]: value }));
+    };
+    const handleLabourChange = (selected) => {
+        setNewRefundReceived(prev => ({
+            ...prev,
+            labour_id: selected ? selected.id : ""
+        }));
+    };
+    const handleRefundSubmit = async () => {
+        try {
+            if (!newRefundReceived.labour_id || !newRefundReceived.amount) {
+                alert("Please select labour and enter amount.");
+                return;
+            }
+            const payload = {
+                date: selectedDate,
+                labour_id: newRefundReceived.labour_id,
+                amount: Number(newRefundReceived.amount),
+                weekly_number: Number(selectedWeek),
+            };
+            const response = await axios.post(
+                'https://backendaab.in/aabuildersDash/api/refund_received/save',
+                payload
+            );
+            if (response.status === 200) {
+                // Refresh refund data
+                const refundRes = await axios.get(`https://backendaab.in/aabuildersDash/api/refund_received/date/${selectedDate}`);
+                setRefundPayments(refundRes.data);
+                // Reset form after save
+                setNewRefundReceived({
+                    labour_id: "",
+                    amount: "",
+                });
+            }
+        } catch (error) {
+            console.error("Error adding refund:", error);
+            alert("Error adding refund. Please try again.");
+        }
+    };
+    const handleKeyDown = (e) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            handleRefundSubmit();
+        }
+    };
+    // Add expense handler
+    const handleAddExpense = async () => {
+        try {
+            const hasAnyId =
+                (newDailyExpense.labour_id && Number(newDailyExpense.labour_id) > 0) ||
+                (newDailyExpense.contractor_id && Number(newDailyExpense.contractor_id) > 0) ||
+                (newDailyExpense.vendor_id && Number(newDailyExpense.vendor_id) > 0) ||
+                (newDailyExpense.employee_id && Number(newDailyExpense.employee_id) > 0);
+            if (!hasAnyId || !newDailyExpense.project_id || !newDailyExpense.type || !newDailyExpense.amount) {
+                alert("Please select all required details.");
+                return;
+            }
+            const expenseData = {
+                date: selectedDate,
+                created_at: new Date().toISOString(),
+                labour_id: Number(newDailyExpense.labour_id) || null,
+                vendor_id: Number(newDailyExpense.vendor_id) || null,
+                contractor_id: Number(newDailyExpense.contractor_id) || null,
+                employee_id: Number(newDailyExpense.employee_id) || null,
+                project_id: Number(newDailyExpense.project_id),
+                quantity: Number(newDailyExpense.quantity) || 0,
+                type: newDailyExpense.type,
+                amount: Number(newDailyExpense.amount),
+                extra_amount: newDailyExpense.extra_amount ? Number(newDailyExpense.extra_amount) : 0,
+                description: newDailyExpense.description || "",
+                weekly_number: Number(selectedWeek),
+            };
+            await axios.post(
+                'https://backendaab.in/aabuildersDash/api/daily-payments',
+                expenseData
+            );
+            // Refresh data
+            const [dailyRes, refundRes] = await Promise.all([
+                axios.get(`https://backendaab.in/aabuildersDash/api/daily-payments/date/${selectedDate}`),
+                axios.get(`https://backendaab.in/aabuildersDash/api/refund_received/date/${selectedDate}`)
+            ]);
+            setDailyExpenses(dailyRes.data);
+            setRefundPayments(refundRes.data);
+            // Reset form
+            setNewDailyExpense({
+                labour_id: "",
+                vendor_id: "",
+                contractor_id: "",
+                employee_id: "",
+                project_id: "",
+                quantity: "",
+                type: "",
+                amount: "",
+                extra_amount: "",
+                description: ""
+            });
+            setShowExtraAmount(false);
+        } catch (error) {
+            console.error("Error adding expense:", error);
+            alert("Error adding expense. Please try again.");
+        }
+    };
     return (
         <body>
-            <div className='mx-auto w-auto lg:flex gap-8 p-4 pl-8 border-collapse items-center text-left bg-[#FFFFFF] ml-[30px] mr-6 rounded-md lg:h-[150px]'>
-                <div className='flex'>
+            <h1 className="font-bold text-xl flex justify-end mr-20 -mt-7">
+                Balance:<span style={{ color: "#E4572E" }}>{Number(balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}</span>
+            </h1>
+            <div className=' w-full max-w-[1800px] lg:flex gap-4 lg:gap-8 p-4 lg:pl-8 border-collapse items-center text-left bg-[#FFFFFF] ml-10 mr-6 rounded-md lg:h-[150px]'>
+                <div className='lg:flex'>
                     <div>
                         <h1 className='font-semibold'>Select Week</h1>
                         <div>
@@ -399,15 +569,11 @@ const DailyHistory = () => {
                                 {weekDays.map((day, idx) => {
                                     const dateStr = day.toISOString().split("T")[0];
                                     return (
-                                        <div
-                                            key={idx}
-                                            className="flex flex-col items-left w-20 mx-auto"
-                                        >
+                                        <div key={idx} className="flex flex-col items-left w-20 mx-auto">
                                             {/* Day Name */}
                                             <div className="font-semibold text-[#E4572E]">
                                                 {day.toLocaleDateString("en-US", { weekday: "short" })}
                                             </div>
-
                                             {/* Date Button */}
                                             <button
                                                 onClick={() => handleDateClick(dateStr)}
@@ -426,17 +592,15 @@ const DailyHistory = () => {
                     )}
                 </div>
             </div>
-
-            <div className="mt-4 flex justify-end mr-6">
+            <div className="mt-4 flex justify-end mr-4 lg:mr-16">
                 <h1 className="font-bold text-xl">
-                    Balance: <span style={{ color: "#E4572E" }}>
-                        {Number(balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    Net Amount: <span style={{ color: "#E4572E" }}>
+                        {Number(netAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                 </h1>
             </div>
-
-            <div className="mx-auto w-auto p-6 border-collapse bg-[#FFFFFF] ml-[30px] mr-6 rounded-md">
-                <div className="flex justify-between mb-4">
+            <div className="w-full max-w-[1800px] h-auto p-4 lg:p-6 border-collapse bg-[#FFFFFF] ml-10 mr-6 rounded-md">
+                <div className="flex flex-col sm:flex-row sm:justify-between mb-4 w-full">
                     <h1 className="font-bold text-xl">
                         PS: <span style={{ color: "#E4572E" }}>{selectedWeek}</span>
                     </h1>
@@ -446,21 +610,198 @@ const DailyHistory = () => {
                         </span>
                     </h1>
                 </div>
-
                 {/* DATA TABLE */}
-                <div className="flex flex-col xl:flex-row gap-6">
-                    <div className="flex-[2] min-w-0">
+                <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
+                    <div className="flex-1 lg:flex-[3] min-w-0">
                         <div className="w-full h-[500px] rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden">
-                            <div className="overflow-auto h-[500px]">
-                                <table className="w-[1150px] border-collapse text-left">
+                            {/* Single Table with Scrollable Container */}
+                            <div className="overflow-auto max-h-[500px] w-full">
+                                <table className="w-full min-w-[1200px] lg:min-w-[1450px] border-collapse text-left">
                                     <thead className="sticky top-0 z-10 bg-white">
                                         <tr className="bg-[#FAF6ED] h-12">
-                                            <th className="px-2 py-2 text-left w-[60px]">Sl.No</th>
-                                            <th className="py-2 text-left w-[120px]">Date</th>
-                                            <th className="py-2 text-left w-[180px]">Name</th>
-                                            <th className="py-2 text-left w-[220px]">Project Name</th>
-                                            <th className="py-2 text-left w-[120px]">Type</th>
-                                            <th className="py-2 text-left w-[120px]">Amount</th>
+                                            <th className="py-2 px-1 text-left w-[60px]">S.No</th>
+                                            <th
+                                                className="py-2 px-1 text-left w-[200px] cursor-pointer hover:bg-gray-200"
+                                                onClick={() => handleSort('labour_name')}
+                                            >
+                                                Name {sortConfig.key === 'labour_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th
+                                                className="py-2 px-1 text-left w-[220px] cursor-pointer hover:bg-gray-200"
+                                                onClick={() => handleSort('project_name')}
+                                            >
+                                                Project Name {sortConfig.key === 'project_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th
+                                                className="py-2 px-1 text-left w-[120px] cursor-pointer hover:bg-gray-200"
+                                                onClick={() => handleSort('amount')}
+                                            >
+                                                Amount {sortConfig.key === 'amount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="py-2 px-1 text-left w-[60px]">Qty</th>
+                                            <th
+                                                className="py-2 px-1 text-left w-[120px] cursor-pointer hover:bg-gray-200"
+                                                onClick={() => handleSort('type')}
+                                            >
+                                                Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="py-2 px-1 text-left w-[80px]">Activity</th>
+                                        </tr>
+                                        {/* Input Row */}
+                                        <tr className="bg-white border-b border-gray-200">
+                                            <td className="px-1 py-2 font-bold">{dailyExpenses.filter(row => row.date === selectedDate).length + 1}.</td>
+                                            <td className="flex items-center gap-2 py-2">
+                                                <div>
+                                                    <Select
+                                                        name="labour_id"
+                                                        className="w-[265px]"
+                                                        placeholder={isChangeButtonActive ? "Vendor/Contractor" : "Labour Name"}
+                                                        isSearchable
+                                                        isClearable
+                                                        options={isChangeButtonActive ? combinedOptions : laboursList}
+                                                        styles={customStyles}
+                                                        menuPortalTarget={document.body}
+                                                        value={
+                                                            isChangeButtonActive
+                                                                ? combinedOptions.find(opt =>
+                                                                    (opt.type === "Employee" && opt.id === Number(newDailyExpense.employee_id)) ||
+                                                                    (opt.type === "Vendor" && opt.id === Number(newDailyExpense.vendor_id)) ||
+                                                                    (opt.type === "Contractor" && opt.id === Number(newDailyExpense.contractor_id))
+                                                                ) || null
+                                                                : laboursList.find(opt => opt.id === Number(newDailyExpense.labour_id)) || null
+                                                        }
+                                                        onChange={(selectedOption) => {
+                                                            if (selectedOption) {
+                                                                const { type, id, label, salary } = selectedOption;
+                                                                setNewDailyExpense(prev => ({
+                                                                    ...prev,
+                                                                    labour_id: type === "Labour" ? id : "",
+                                                                    vendor_id: type === "Vendor" ? id : "",
+                                                                    contractor_id: type === "Contractor" ? id : "",
+                                                                    employee_id: type === "Employee" ? id : "",
+                                                                    labour_name: label,
+                                                                    amount: salary || ""
+                                                                }));
+                                                            } else {
+                                                                setNewDailyExpense(prev => ({
+                                                                    ...prev,
+                                                                    labour_id: "",
+                                                                    vendor_id: "",
+                                                                    contractor_id: "",
+                                                                    employee_id: "",
+                                                                    labour_name: "",
+                                                                    amount: ""
+                                                                }));
+                                                            }
+                                                        }}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <button onClick={handleChangeButtonClick}>
+                                                        <img src={Change} className={`w-4 h-4 ${isChangeButtonActive ? 'opacity-70' : ''}`} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                            <td className="px-1 py-2">
+                                                <Select
+                                                    name="project"
+                                                    value={siteOptions.find(opt => opt.id === Number(newDailyExpense.project_id)) || null}
+                                                    onChange={(selectedOption) => {
+                                                        setNewDailyExpense(prev => ({
+                                                            ...prev,
+                                                            project_id: selectedOption ? selectedOption.id : ""
+                                                        }));
+                                                    }}
+                                                    options={siteOptions}
+                                                    menuPortalTarget={document.body}
+                                                    className="w-[260px]"
+                                                    placeholder="Select Site"
+                                                    isSearchable
+                                                    isClearable
+                                                    styles={customStyles}
+                                                />
+                                            </td>
+                                            <td className="px-1 py-2 text-left flex items-center gap-2">
+                                                <div>
+                                                    <input
+                                                        type="number"
+                                                        name="amount"
+                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[90px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                        value={newDailyExpense.amount || ""}
+                                                        onChange={(e) => setNewDailyExpense(prev => ({ ...prev, amount: e.target.value }))}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === "Enter") {
+                                                                e.preventDefault();
+                                                                handleAddExpense();
+                                                            }
+                                                        }}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <button
+                                                        className="font-semibold text-[25px]"
+                                                        onClick={() => setShowExtraAmount(prev => !prev)}
+                                                        type="button"
+                                                    >
+                                                        +
+                                                    </button>
+                                                </div>
+                                                {/* Conditionally render extra input */}
+                                                {showExtraAmount && (
+                                                    <div>
+                                                        <input
+                                                            type="number"
+                                                            name="extra_amount"
+                                                            className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[90px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                            placeholder="Extra"
+                                                            value={newDailyExpense.extra_amount || ""}
+                                                            onChange={(e) => setNewDailyExpense(prev => ({
+                                                                ...prev,
+                                                                extra_amount: e.target.value
+                                                            }))}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === "Enter") {
+                                                                    e.preventDefault();
+                                                                    handleAddExpense();
+                                                                }
+                                                            }}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="px-1 py-2">
+                                                <input
+                                                    type="number"
+                                                    name="quantity"
+                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[60px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                    value={newDailyExpense.quantity || ""}
+                                                    onChange={(e) => setNewDailyExpense(prev => ({ ...prev, quantity: e.target.value }))}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === "Enter") {
+                                                            e.preventDefault();
+                                                            handleAddExpense();
+                                                        }
+                                                    }}
+                                                />
+                                            </td>
+                                            <td className="px-1 py-2 text-left">
+                                                <select
+                                                    name="type"
+                                                    value={newDailyExpense.type}
+                                                    onChange={handleInputChange}
+                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[120px] h-[40px] rounded-lg focus:outline-none"
+                                                >
+                                                    <option value="">Select</option>
+                                                    {(isChangeButtonActive ? expensesCategory : weeklyTypes).map((type, index) => (
+                                                        <option key={index} value={isChangeButtonActive ? type.category : type.type}>
+                                                            {isChangeButtonActive ? type.category : type.type}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </td>
+                                            <td className="px-1 py-2">
+
+                                            </td>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -468,14 +809,9 @@ const DailyHistory = () => {
                                             .filter(row => row.date === selectedDate)
                                             .map((row, index) => (
                                                 <tr key={row.id} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
-                                                    <td className="py-2 font-bold">{index + 1}</td>
-                                                    <td className="py-2">
-                                                        <div className="w-[120px] h-[40px] flex items-center">
-                                                            {formatDateOnly(row.date) || ""}
-                                                        </div>
-                                                    </td>
-                                                    <td className="py-2">
-                                                        <div className="w-[180px] h-[40px] flex items-center">
+                                                    <td className="px-1 py-2 font-bold">{index + 1}</td>
+                                                    <td className="px-1 py-2">
+                                                        <div className="w-[200px] h-[40px] flex items-center">
                                                             {(() => {
                                                                 const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
                                                                 const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
@@ -485,21 +821,38 @@ const DailyHistory = () => {
                                                             })()}
                                                         </div>
                                                     </td>
-                                                    <td className="py-2">
+                                                    <td className="px-1 py-2">
                                                         <div className="w-[220px] h-[40px] flex items-center">
                                                             {siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""}
                                                         </div>
                                                     </td>
-                                                    <td className="py-2">
+                                                    <td className="px-1 py-2 relative group flex">
+                                                        <div className="flex items-center">
+                                                            <div className="w-[120px] h-[40px] flex flex-col justify-center leading-tight cursor-default">
+                                                                <span>
+                                                                    {Number((row.amount || 0) + (row.extra_amount || 0)).toLocaleString("en-IN")}
+                                                                </span>
+                                                                {/* Tooltip on hover */}
+                                                                <div className="absolute left-0 top-full mt-1 hidden group-hover:block bg-black text-white text-xs rounded p-2 z-50 shadow-lg whitespace-nowrap">
+                                                                    Amount: {Number(row.amount || 0).toLocaleString('en-IN')} <br />
+                                                                    Extra Amount: {Number(row.extra_amount || 0).toLocaleString('en-IN')}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-1 py-2">
+                                                        <div className="w-[60px] h-[40px] flex items-center">
+                                                            {row.quantity || "-"}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-1 py-2">
                                                         <div className="w-[120px] h-[40px] flex items-center">
                                                             {row.type}
                                                         </div>
                                                     </td>
-                                                    <td className="py-2">
-                                                        <div className="w-[120px] h-[40px] flex flex-col justify-center leading-tight cursor-default">
-                                                            <span>
-                                                                {Number((row.amount || 0) + (row.extra_amount || 0)).toLocaleString("en-IN")}
-                                                            </span>
+                                                    <td className="px-1 py-2">
+                                                        <div className="w-[80px] h-[40px] flex items-center">
+                                                            {row.description || "-"}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -509,40 +862,76 @@ const DailyHistory = () => {
                             </div>
                         </div>
                     </div>
-                    <div className="flex-[1] min-w-0">
+                    <div className="flex-1 lg:flex-[1] min-w-0 lg:max-w-[400px]">
                         <div className="flex justify-between mb-4">
                             <h1 className="font-bold text-base">Refund Received</h1>
                             <h1 className="font-bold text-base">
                                 Total: <span style={{ color: "#E4572E" }}>
-                                    {Number(overAllTotalPayments).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    {Number(totalRefund).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </span>
                             </h1>
                         </div>
-                        <div className="rounded-lg border-l-8 border-l-[#BF9853] w-full" style={{ maxHeight: "400px", overflowY: "auto" }}>
-                            <table className="w-full border-collapse">
-                                <thead className="bg-[#FAF6ED] h-12">
-                                    <tr>
-                                        <th className="px-4 py-2 text-left">Date</th>
-                                        <th className="px-4 py-2 text-left">Name</th>
-                                        <th className="px-4 py-2">Amount</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {refundPayments.map((row, index) => (
-                                        <tr key={row.id || index} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
-                                            <td className="py-2">
-                                                {formatDateOnly(row.date) || ""}
+                        <div>
+                            <div className="w-full rounded-lg border-l-8 border-l-[#BF9853] overflow-x-auto" style={{ maxHeight: "400px" }}>
+                                <table className="w-full min-w-[350px] lg:min-w-[380px] border-collapse">
+                                    <thead className="bg-[#FAF6ED] h-12">
+                                        <tr>
+                                            <th className="px-4 py-2 text-left">Name</th>
+                                            <th className="px-4 py-2">Amount</th>
+                                            <th className="px-4 py-2 text-left">Activity</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {refundPayments.map((row, index) => (
+                                            <tr key={row.id || index} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
+                                                <td className="py-2">
+                                                    {laboursList.find(opt => opt.id === Number(row.labour_id))?.label || ""}
+                                                </td>
+                                                <td className="py-2">
+                                                    {Number(row.amount).toLocaleString("en-IN")}
+                                                </td>
+                                                <td className="py-2">
+                                                    {row.description || "-"}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {/* Refund Input Row */}
+                                        <tr>
+                                            <td className="py-2 text-left">
+                                                <Select
+                                                    name="labour_id"
+                                                    className="w-[265px] text-left"
+                                                    placeholder="Labour Name"
+                                                    isSearchable
+                                                    isClearable
+                                                    value={laboursList.find(opt => opt.id === newRefundReceived.labour_id) || null}
+                                                    onChange={handleLabourChange}
+                                                    onKeyDown={handleKeyDown}
+                                                    options={laboursList}
+                                                    styles={customStyles}
+                                                    menuPortalTarget={document.body}
+                                                />
                                             </td>
                                             <td className="py-2">
-                                                {laboursList.find(opt => opt.id === Number(row.labour_id))?.label || ""}
+                                                <input
+                                                    type="number"
+                                                    name="amount"
+                                                    value={newRefundReceived.amount}
+                                                    onChange={handleNewPaymentChange}
+                                                    onKeyDown={handleKeyDown}
+                                                    className="border-2 border-[#BF9853] border-opacity-25 rounded-lg w-[90px] h-[40px] focus:outline-none no-spinner"
+                                                    min="0"
+                                                    step="any"
+                                                    onWheel={(e) => e.preventDefault()}
+                                                />
                                             </td>
                                             <td className="py-2">
-                                                {Number(row.amount).toLocaleString("en-IN")}
+                                                {/* Empty cell for Activity column */}
                                             </td>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -550,5 +939,4 @@ const DailyHistory = () => {
         </body>
     );
 };
-
 export default DailyHistory;

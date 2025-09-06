@@ -2011,12 +2011,12 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                         <button
                                                             onClick={() => saveEditedPaymentReceived(row)}
                                                             className="text-green-600 font-bold text-lg"
-                                                            disabled={row.type === "Carry (CF))"}
+                                                            disabled={row.type === "Carry (CF))" || row.type === "Wage Refund"}
                                                         >
                                                             ✓
                                                         </button>
                                                     ) : (
-                                                        row.type === "Carry (CF)" ? (
+                                                        row.type === "Carry (CF)" || row.type === "Wage Refund" ? (
                                                             <img
                                                                 className="w-5 h-4 opacity-40 cursor-not-allowed"
                                                                 src={Edit}
@@ -2028,7 +2028,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             </button>
                                                         )
                                                     )}
-                                                    {row.type === "Carry (CF)" ? (
+                                                    {row.type === "Carry (CF)" || row.type === "Wage Refund" ? (
                                                         <img
                                                             className="w-5 h-4 opacity-40 cursor-not-allowed"
                                                             src={Delete}
@@ -2039,7 +2039,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             <img src={Delete} className="w-5 h-4" alt="Delete" onClick={() => handleWeeklyReceivedDelete(row.id)} />
                                                         </button>
                                                     )}
-                                                    {row.type === "Carry (CF)" ? (
+                                                    {row.type === "Carry (CF)" || row.type === "Wage Refund" ? (
                                                         <img
                                                             className="w-5 h-4 opacity-40 cursor-not-allowed"
                                                             src={history}

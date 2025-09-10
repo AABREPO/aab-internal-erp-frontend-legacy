@@ -993,7 +993,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
           {/* Single Table with Scrollable Container */}
           <div
             ref={scrollRef}
-            className='overflow-auto max-h-[600px]'
+            className='overflow-auto max-h-[600px] thin-scrollbar'
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}

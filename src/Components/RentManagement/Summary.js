@@ -501,12 +501,12 @@ const Summary = () => {
     doc.setFontSize(9);
     doc.text(`MONTH`, 16, 23);
     doc.setFontSize(12);
-    doc.text(`${formatMonth(selectedMonth)}`, 32, 23);
+    doc.text(`${formatMonth(selectedMonth)}`, 30, 23);
 
     doc.setFontSize(9);
     doc.text(`DATE`, 18, 33);
     doc.setFontSize(12);
-    doc.text(`${formatDate(new Date())}`, 32, 33);
+    doc.text(`${formatDate(new Date())}`, 30, 33);
 
     doc.setFontSize(9);
     doc.text(`VACANT`, 57, 32);

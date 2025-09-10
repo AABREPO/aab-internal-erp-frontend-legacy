@@ -1,10 +1,59 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, memo, lazy, Suspense } from 'react';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import Select from 'react-select';
 import Filter from '../Images/filter (3).png'
 import edit from '../Images/Edit.svg';
+
+// Lazy load heavy components
+const EditModal = lazy(() => import('./EditModal'));
+
+// Memoized components for better performance
+const TableRow = memo(({ entry, index, onEditClick, getEmployeeName, getPurposeName, formatDateOnly }) => (
+  <tr key={entry.id} className="odd:bg-white even:bg-[#FAF6ED]">
+    <td className="text-sm text-left p-2 w-40 font-semibold">{formatDateOnly(entry.date)}</td>
+    <td className="text-sm text-left w-[150px] font-semibold">
+      {getEmployeeName(entry.employee_id)}
+    </td>
+    <td className="text-sm text-left w-[250px] font-semibold">
+      {getPurposeName(entry.from_purpose_id)}
+    </td>
+    <td className="text-sm text-left font-semibold">
+      {getPurposeName(entry.to_purpose_id)}
+    </td>
+    <td className="text-sm text-left pl-2 font-semibold">
+      {entry.amount != null && entry.amount !== ""
+        ? Number(entry.amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })
+        : ""}
+    </td>
+    <td className="text-sm text-left pl-2 font-semibold">
+      {entry.staff_refund_amount != null && entry.staff_refund_amount !== ""
+        ? Number(entry.staff_refund_amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })
+        : ""}
+    </td>
+    <td className="text-sm text-left font-semibold">{entry.type}</td>
+    <td className="text-sm text-left font-semibold">{entry.staff_payment_mode}</td>
+    <td className="text-sm text-left font-semibold">{entry.description}</td>
+    <td></td>
+    <td className="text-sm text-left pl-3 font-semibold">{entry.entry_no}</td>
+    <td className="flex py-2">
+      <button className="rounded-full transition duration-200 ml-2 mr-3">
+        <img
+          src={edit}
+          onClick={() => onEditClick(entry)}
+          alt="Edit"
+          className=" w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200 "
+        />
+      </button>
+    </td>
+  </tr>
+));
+
 const TableView = ({ username, userRoles = [] }) => {
+  const [vendorOptions, setVendorOptions] = useState([]);
+  const [contractorOptions, setContractorOptions] = useState([]);
+  const [combinedOptions, setCombinedOptions] = useState([]);
+  const [siteOptions, setSiteOptions] = useState([]);
   const [records, setRecords] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [purposes, setPurposes] = useState([]);
@@ -25,58 +74,61 @@ const TableView = ({ username, userRoles = [] }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
   const scrollRef = useRef(null);
+  const [virtualScroll, setVirtualScroll] = useState(false);
+  const [visibleRange, setVisibleRange] = useState({ start: 0, end: 50 });
   const isDragging = useRef(false);
   const start = useRef({ x: 0, y: 0 });
   const scroll = useRef({ left: 0, top: 0 });
   const velocity = useRef({ x: 0, y: 0 });
   const animationFrame = useRef(null);
   const lastMove = useRef({ time: 0, x: 0, y: 0 });
+  // Optimized data fetching with parallel requests
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
+      
       try {
-        let recData = [];
-        try {
-          const recRes = await fetch('/api/staff-advance/all');
-          if (recRes.ok) {
-            recData = await recRes.json();
-          } else {
-            console.warn('Staff advance API not available, using empty data');
-          }
-        } catch (error) {
-          console.warn('Error fetching staff advance data:', error);
-        }
-        let empData = [];
-        try {
-          const empRes = await fetch('https://backendaab.in/aabuildersDash/api/employee_details/getAll', {
+        // Parallel API calls for better performance
+        const [recRes, empRes, purRes] = await Promise.allSettled([
+          fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all'),
+          fetch('https://backendaab.in/aabuildersDash/api/employee_details/getAll', {
             credentials: 'include',
-          });
-          if (empRes.ok) {
-            empData = await empRes.json();
-          } else {
-            console.warn('Employee API not available, using empty data');
-          }
-        } catch (error) {
-          console.warn('Error fetching employee data:', error);
-        }
-        let purData = [];
-        try {
-          const purRes = await fetch('/api/purposes/all');
-          if (purRes.ok) {
-            purData = await purRes.json();
-          } else {
-            console.warn('Purposes API not available, using empty data');
-          }
-        } catch (error) {
-          console.warn('Error fetching purposes data:', error);
-        }
+          }),
+          fetch('https://backendaab.in/aabuildersDash/api/purposes/getAll')
+        ]);
+
+        // Process staff advance data
+        const recData = recRes.status === 'fulfilled' && recRes.value.ok 
+          ? await recRes.value.json() 
+          : [];
+
+        // Process employee data
+        const empData = empRes.status === 'fulfilled' && empRes.value.ok 
+          ? await empRes.value.json() 
+          : [];
+
+        // Process purposes data
+        const purData = purRes.status === 'fulfilled' && purRes.value.ok 
+          ? await purRes.value.json() 
+          : [];
+
         setRecords(recData);
         setEmployees(empData.map(e => ({ id: e.id, label: e.employee_name })));
         setPurposes(purData.map(p => ({ id: p.id, label: p.purpose })));
+
+        // Set warning if any API failed
+        const failedAPIs = [];
+        if (recRes.status === 'rejected' || !recRes.value?.ok) failedAPIs.push('Staff Advance');
+        if (empRes.status === 'rejected' || !empRes.value?.ok) failedAPIs.push('Employee Details');
+        if (purRes.status === 'rejected' || !purRes.value?.ok) failedAPIs.push('Purposes');
+        
+        if (failedAPIs.length > 0) {
+          setError(`Warning: Some data may not be available (${failedAPIs.join(', ')})`);
+        }
       } catch (error) {
         console.error('Error in fetchData:', error);
-        setError('Failed to load data. Some APIs may not be available.');
+        setError('Failed to load data. Please try refreshing the page.');
         setRecords([]);
         setEmployees([]);
         setPurposes([]);
@@ -84,6 +136,7 @@ const TableView = ({ username, userRoles = [] }) => {
         setIsLoading(false);
       }
     };
+    
     fetchData();
   }, []);
   const handleMouseDown = (e) => {
@@ -153,57 +206,296 @@ const TableView = ({ username, userRoles = [] }) => {
     };
     animationFrame.current = requestAnimationFrame(step);
   };
-  const formatWithCommas = (value) => {
+  // Memoized utility functions
+  const formatWithCommas = useCallback((value) => {
     if (!value) return "";
     return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  };
-  const handleSort = (key) => {
+  }, []);
+
+  const formatDateOnly = useCallback((dateString) => {
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  }, []);
+
+  const getEmployeeName = useCallback((id) => employees.find(e => e.id === id)?.label || id, [employees]);
+  const getPurposeName = useCallback((id) => purposes.find(p => p.id === id)?.label || id, [purposes]);
+
+  const handleSort = useCallback((key) => {
     setSortConfig((prev) => {
       if (prev.key === key) {
         return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
       }
       return { key, direction: 'asc' };
     });
-  };
-  const formatDateOnly = (dateString) => {
-    const date = new Date(dateString);
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}-${month}-${year}`;
-  };
-  const getEmployeeName = (id) => employees.find(e => e.id === id)?.label || id;
-  const getPurposeName = (id) => purposes.find(p => p.id === id)?.label || id;
+  }, []);
+  useEffect(() => {
+    const fetchVendorNames = async () => {
+      try {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+        if (!response.ok) {
+          throw new Error("Network response was not ok: " + response.statusText);
+        }
+        const data = await response.json();
+        const formattedData = data.map(item => ({
+          value: item.vendorName,
+          label: item.vendorName,
+          id: item.id,
+          type: "Vendor",
+        }));
+        setVendorOptions(formattedData);
+      } catch (error) {
+        console.error("Fetch error: ", error);
+      }
+    };
+    fetchVendorNames();
+  }, []);
+  useEffect(() => {
+    const fetchContractorNames = async () => {
+      try {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+        if (!response.ok) {
+          throw new Error("Network response was not ok: " + response.statusText);
+        }
+        const data = await response.json();
+        const formattedData = data.map(item => ({
+          value: item.contractorName,
+          label: item.contractorName,
+          id: item.id,
+          type: "Contractor",
+        }));
+        setContractorOptions(formattedData);
+      } catch (error) {
+        console.error("Fetch error: ", error);
+      }
+    };
+    fetchContractorNames();
+  }, []);
+  useEffect(() => { setCombinedOptions([...vendorOptions, ...contractorOptions]); }, [vendorOptions, contractorOptions]);
+  useEffect(() => {
+    const fetchSites = async () => {
+      try {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+        if (!response.ok) {
+          throw new Error("Network response was not ok: " + response.statusText);
+        }
+        const data = await response.json();
+        const formattedData = data.map(item => ({
+          value: item.siteName,
+          label: item.siteName,
+          id: item.id,
+          sNo: item.siteNo
+        }));
+
+        // Add predefined site options with IDs 001, 002, 003, 004
+        const predefinedSiteOptions = [
+          {
+            value: "Mason Advance",
+            label: "Mason Advance",
+            id: "1",
+            sNo: "1"
+          },
+          {
+            value: "Material Advance",
+            label: "Material Advance",
+            id: "2",
+            sNo: "2"
+          },
+          {
+            value: "Weekly Advance",
+            label: "Weekly Advance",
+            id: "3",
+            sNo: "3"
+          },
+          {
+            value: "Excess Advance",
+            label: "Excess Advance",
+            id: "4",
+            sNo: "4"
+          },
+          {
+            value: "Material Rent",
+            label: "Material Rent",
+            id: "",
+            sNo: "5"
+          },
+          {
+            value: "Subhash Kumar - Kunnur",
+            label: "Subhash Kumar - Kunnur",
+            id: "6",
+            sNo: "6"
+          }
+        ];
+
+        // Combine backend data with predefined options
+        const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
+        setSiteOptions(combinedSiteOptions);
+      } catch (error) {
+        console.error("Fetch error: ", error);
+
+        // Fallback: if API fails, still show predefined options
+        const predefinedSiteOptions = [
+          {
+            value: "Mason Advance",
+            label: "Mason Advance",
+            id: "1",
+            sNo: "1"
+          },
+          {
+            value: "Material Advance",
+            label: "Material Advance",
+            id: "2",
+            sNo: "2"
+          },
+          {
+            value: "Weekly Advance",
+            label: "Weekly Advance",
+            id: "3",
+            sNo: "3"
+          },
+          {
+            value: "Excess Advance",
+            label: "Excess Advance",
+            id: "4",
+            sNo: "4"
+          },
+          {
+            value: "Material Rent",
+            label: "Material Rent",
+            id: "",
+            sNo: "5"
+          },
+          {
+            value: "Subhash Kumar - Kunnur",
+            label: "Subhash Kumar - Kunnur",
+            id: "6",
+            sNo: "6"
+          }
+        ];
+        setSiteOptions(predefinedSiteOptions);
+      }
+    };
+    fetchSites();
+  }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectDate, selectEmployeeName, selectPurpose, selectTransferTo, selectType, selectMode]);
+  // Memoized edit handlers
+  const handleEditClick = useCallback((entry) => {
+    setEditingId(entry.staffAdvancePortalId || entry.id);
+    setEditFormData({
+      date: entry.date?.split('T')[0] || '',
+      amount: entry.amount || '',
+      employee_id: entry.employee_id || '',
+      from_purpose_id: entry.from_purpose_id || '',
+      to_purpose_id: entry.to_purpose_id || '',
+      entryNo: entry.entryNo || '',
+      description: entry.description || '',
+      type: entry.type || '',
+      staff_payment_mode: entry.staff_payment_mode || '',
+      staff_refund_amount: entry.staff_refund_amount || ''
+    });
+    setIsEditModalOpen(true);
+  }, []);
+
+  const handleUpdate = useCallback(async () => {
+    try {
+      console.log('Updating record:', editFormData);
+      setIsEditModalOpen(false);
+    } catch (err) {
+      console.error('Update error:', err);
+    }
+  }, [editFormData]);
+  // Debounced filter handlers for better performance
+  const [debouncedFilters, setDebouncedFilters] = useState({
+    selectDate: '',
+    selectEmployeeName: '',
+    selectPurpose: '',
+    selectTransferTo: '',
+    selectType: '',
+    selectMode: ''
+  });
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedFilters({
+        selectDate,
+        selectEmployeeName,
+        selectPurpose,
+        selectTransferTo,
+        selectType,
+        selectMode
+      });
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [selectDate, selectEmployeeName, selectPurpose, selectTransferTo, selectType, selectMode]);
+
+  // Filtered records using debounced filters (moved after debouncedFilters initialization)
   const filteredRecords = useMemo(() => {
     return records.filter((entry) => {
-      if (selectDate) {
-        const [year, month, day] = selectDate.split("-");
+      if (debouncedFilters.selectDate) {
+        const [year, month, day] = debouncedFilters.selectDate.split("-");
         const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
         const entryDateObj = new Date(entry.date);
         const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
         if (formattedEntryDate !== formattedSelectDate) return false;
       }
-      if (selectEmployeeName) {
+      if (debouncedFilters.selectEmployeeName) {
         const employeeName = getEmployeeName(entry.employee_id) || "";
-        if (employeeName.toLowerCase() !== selectEmployeeName.toLowerCase()) return false;
-      }      
-      if (selectPurpose) {
+        if (employeeName.toLowerCase() !== debouncedFilters.selectEmployeeName.toLowerCase()) return false;
+      }
+      if (debouncedFilters.selectPurpose) {
         const purposeName = getPurposeName(entry.from_purpose_id) || "";
-        if (purposeName.toLowerCase() !== selectPurpose.toLowerCase()) return false;
-      }      
-      if (selectTransferTo) {
+        if (purposeName.toLowerCase() !== debouncedFilters.selectPurpose.toLowerCase()) return false;
+      }
+      if (debouncedFilters.selectTransferTo) {
         const transferToName = getPurposeName(entry.to_purpose_id) || "";
-        if (transferToName.toLowerCase() !== selectTransferTo.toLowerCase()) return false;
-      }      
-      if (selectType) {
-        if (entry.type?.toLowerCase() !== selectType.toLowerCase()) return false;
-      }      
-      if (selectMode) {
-        if (entry.staff_payment_mode?.toLowerCase() !== selectMode.toLowerCase()) return false;
-      }      
+        if (transferToName.toLowerCase() !== debouncedFilters.selectTransferTo.toLowerCase()) return false;
+      }
+      if (debouncedFilters.selectType) {
+        if (entry.type?.toLowerCase() !== debouncedFilters.selectType.toLowerCase()) return false;
+      }
+      if (debouncedFilters.selectMode) {
+        if (entry.staff_payment_mode?.toLowerCase() !== debouncedFilters.selectMode.toLowerCase()) return false;
+      }
       return true;
     });
-  }, [records, selectDate, selectEmployeeName, selectPurpose, selectTransferTo, selectType, selectMode]);
+  }, [records, debouncedFilters, getEmployeeName, getPurposeName]);
+
+  // Calculate totals from filtered records
+  const advanceTotal = filteredRecords
+    .filter(r => r.type === 'Advance')
+    .reduce((acc, r) => acc + (r.amount || 0), 0);
+  const transferTotal = filteredRecords
+    .filter(r => r.type === 'Transfer')
+    .reduce((acc, r) => acc + (r.amount > 0 ? r.amount : 0), 0);
+  const refundTotal = filteredRecords
+    .filter(r => r.type === 'Refund')
+    .reduce((acc, r) => acc + (r.staff_refund_amount || 0), 0);
+
+  // Sorted data (moved after filteredRecords initialization)
   const sortedData = useMemo(() => {
     let sortableData = [...filteredRecords];
     if (sortConfig.key) {
@@ -245,47 +537,15 @@ const TableView = ({ username, userRoles = [] }) => {
       sortableData.sort((a, b) => {
         const dateA = new Date(a.date);
         const dateB = new Date(b.date);
-        return dateB - dateA; 
+        return dateB - dateA;
       });
     }
     return sortableData;
-  }, [filteredRecords, sortConfig]);
-  const totalPages = Math.ceil(sortedData.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentData = sortedData.slice(startIndex, endIndex);
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [selectDate, selectEmployeeName, selectPurpose, selectTransferTo, selectType, selectMode]);
-  const goToPage = (page) => {
-    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
-  };
-  const goToNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
-  const goToPreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
-  const handleItemsPerPageChange = (e) => {
-    const newItemsPerPage = parseInt(e.target.value);
-    setItemsPerPage(newItemsPerPage);
-    setCurrentPage(1);
-  };
-  const advanceTotal = filteredRecords
-    .filter(r => r.type === 'Advance')
-    .reduce((acc, r) => acc + (r.amount || 0), 0);
-  const transferTotal = filteredRecords
-    .filter(r => r.type === 'Transfer')
-    .reduce((acc, r) => acc + (r.amount || 0), 0);
-  const refundTotal = filteredRecords
-    .filter(r => r.type === 'Refund')
-    .reduce((acc, r) => acc + (r.staff_refund_amount || 0), 0);
-  const exportPDF = () => {
-    const doc = new jsPDF("l", "pt", "a4"); 
+  }, [filteredRecords, sortConfig, getEmployeeName, getPurposeName]);
+
+  // Memoized export functions (moved after sortedData initialization)
+  const exportPDF = useCallback(() => {
+    const doc = new jsPDF("l", "pt", "a4");
     const headers = [
       [
         "S.No",
@@ -340,12 +600,13 @@ const TableView = ({ username, userRoles = [] }) => {
         lineColor: [0, 0, 0]
       },
       alternateRowStyles: {
-        fillColor: null       
+        fillColor: null
       }
     });
     doc.save("StaffAdvanceData.pdf");
-  };
-  const exportCSV = () => {
+  }, [sortedData, formatDateOnly, getEmployeeName, getPurposeName]);
+
+  const exportCSV = useCallback(() => {
     const csvHeaders = [
       "S.No",
       "Date",
@@ -393,33 +654,79 @@ const TableView = ({ username, userRoles = [] }) => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
-  const handleEditClick = (entry) => {
-    setEditingId(entry.staffAdvancePortalId || entry.id);
-    setEditFormData({
-      date: entry.date?.split('T')[0] || '',
-      amount: entry.amount || '',
-      employee_id: entry.employee_id || '',
-      from_purpose_id: entry.from_purpose_id || '',
-      to_purpose_id: entry.to_purpose_id || '',
-      entryNo: entry.entryNo || '',
-      description: entry.description || '',
-      type: entry.type || '',
-      staff_payment_mode: entry.staff_payment_mode || '',
-      staff_refund_amount: entry.staff_refund_amount || ''
-    });
-    setIsEditModalOpen(true);
-  };
-  const handleUpdate = async () => {
-    try {
-      console.log('Updating record:', editFormData);
-      setIsEditModalOpen(false);
-    } catch (err) {
-      console.error('Update error:', err);
+  }, [sortedData, formatDateOnly, getEmployeeName, getPurposeName]);
+
+  // Virtual scrolling logic for large datasets (moved after sortedData initialization)
+  const totalPages = Math.ceil(sortedData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  
+  // Enable virtual scrolling for datasets larger than 1000 items
+  const shouldUseVirtualScroll = sortedData.length > 1000;
+  
+  const currentData = useMemo(() => {
+    if (shouldUseVirtualScroll && virtualScroll) {
+      return sortedData.slice(visibleRange.start, visibleRange.end);
     }
-  };
+    return sortedData.slice(startIndex, endIndex);
+  }, [sortedData, startIndex, endIndex, shouldUseVirtualScroll, virtualScroll, visibleRange]);
+
+  // Auto-enable virtual scrolling for large datasets
   useEffect(() => {
-    return () => cancelMomentum();
+    if (sortedData.length > 1000 && !virtualScroll) {
+      setVirtualScroll(true);
+      setItemsPerPage(100); // Increase items per page for virtual scrolling
+    } else if (sortedData.length <= 1000 && virtualScroll) {
+      setVirtualScroll(false);
+      setItemsPerPage(50);
+    }
+  }, [sortedData.length, virtualScroll]);
+
+  // Memoized pagination handlers (moved after totalPages calculation)
+  const goToPage = useCallback((page) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  }, [totalPages]);
+
+  const goToNextPage = useCallback(() => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  }, [currentPage, totalPages]);
+
+  const goToPreviousPage = useCallback(() => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  }, [currentPage]);
+
+  const handleItemsPerPageChange = useCallback((e) => {
+    const newItemsPerPage = parseInt(e.target.value);
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1);
+  }, []);
+
+  // Cleanup effect for memory management
+  useEffect(() => {
+    return () => {
+      cancelMomentum();
+      // Clean up any pending timeouts
+      if (animationFrame.current) {
+        cancelAnimationFrame(animationFrame.current);
+      }
+    };
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Remove any event listeners if they were added
+      if (scrollRef.current) {
+        scrollRef.current.removeEventListener('mousedown', handleMouseDown);
+        scrollRef.current.removeEventListener('mousemove', handleMouseMove);
+        scrollRef.current.removeEventListener('mouseup', handleMouseUp);
+        scrollRef.current.removeEventListener('mouseleave', handleMouseUp);
+      }
+    };
   }, []);
   if (isLoading) {
     return (
@@ -432,8 +739,8 @@ const TableView = ({ username, userRoles = [] }) => {
     );
   }
   return (
-    <body>
-      <div className='w-full max-w-[1750px] h-auto bg-white text-left lg:flex gap-5 p-5 ml-10'>
+    <div className="min-h-screen bg-[#faf6ed]">
+      <div className='w-full max-w-[1750px] h-auto bg-white text-left lg:flex gap-5 p-5 ml-10 shadow-sm rounded-lg'>
         <div className=''>
           <label className='block mb-2 font-semibold'>Advance Amount</label>
           <input
@@ -533,9 +840,14 @@ const TableView = ({ username, userRoles = [] }) => {
           </div>
         </div>
         <div className='border-l-8 border-l-[#BF9853] rounded-lg ml-5 mr-5'>
-          <div ref={scrollRef} className='overflow-auto max-h-[600px]'
-            onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
+          <div 
+            ref={scrollRef} 
+            className='overflow-auto max-h-[600px]'
+            style={{ willChange: 'scroll-position' }}
+            onMouseDown={handleMouseDown} 
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp} 
+            onMouseLeave={handleMouseUp}
           >
             <table className="w-full border-collapse">
               <thead className="sticky top-0 z-10 bg-white ">
@@ -766,7 +1078,26 @@ const TableView = ({ username, userRoles = [] }) => {
                   </tr>
                 )}
               </thead>
-              <tbody>                
+              <tbody>
+                {currentData.length > 0 ? (
+                  currentData.map((entry, index) => (
+                    <TableRow
+                      key={entry.id}
+                      entry={entry}
+                      index={index}
+                      onEditClick={handleEditClick}
+                      getEmployeeName={getEmployeeName}
+                      getPurposeName={getPurposeName}
+                      formatDateOnly={formatDateOnly}
+                    />
+                  ))
+                ) : (
+                  <tr>
+                    <td className="p-2 text-center text-sm text-gray-400" colSpan={12}>
+                      No data available
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -844,130 +1175,29 @@ const TableView = ({ username, userRoles = [] }) => {
           </div>
         )}
         {isEditModalOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-            <div className="bg-white p-6 rounded-lg w-[700px]">
-              <h2 className="text-lg font-bold mb-4">Edit Entry</h2>
-              <div className='grid grid-cols-2 gap-4 text-left ml-5'>
-                <div className='flex items-center gap-3'>
-                  <label className='font-semibold text-[#E4572E]'>Select Type</label>
-                  <select value={editFormData.type} onChange={(e) => setEditFormData({ ...editFormData, type: e.target.value })}
-                    className='w-[163px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
-                  >
-                    <option value=''>Select Type...</option>
-                    <option value='Advance'>Advance</option>
-                    <option value='Transfer'>Transfer</option>
-                    <option value='Refund'>Refund</option>
-                  </select>
-                </div>
-                <div className='flex items-center gap-3'>
-                  <label className='font-semibold text-[#E4572E]'>Date</label>
-                  <input
-                    type='date'
-                    placeholder='dd-mm-yyyy'
-                    value={editFormData.date}
-                    onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
-                    className='w-[144px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
-                  />
-                </div>
-                <div className=''>
-                  <div className='flex'>
-                    <label className='font-semibold block'>Employee</label>
-                  </div>
-                  <Select
-                    options={employees}
-                    value={employees.find(emp => emp.id === editFormData.employee_id) || null}
-                    onChange={(selected) => setEditFormData({ ...editFormData, employee_id: selected?.id || '' })}
-                    className='w-[263px] h-[45px] rounded-lg focus:outline-none'
-                    isClearable
-                    styles={{
-                      control: (provided, state) => ({
-                        ...provided,
-                        borderWidth: '2px',
-                        borderRadius: '8px',
-                        borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'rgba(191, 152, 83, 0.2)',
-                        boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
-                        '&:hover': {
-                          borderColor: 'rgba(191, 152, 83, 0.2)',
-                        }
-                      }),
-                    }}
-                  />
-                </div>
-                <div>
-                  <label className='font-semibold block'>Purpose</label>
-                  <Select
-                    options={purposes}
-                    value={purposes.find(purp => purp.id === editFormData.from_purpose_id) || null}
-                    onChange={(selected) => setEditFormData({ ...editFormData, from_purpose_id: selected?.id || '' })}
-                    styles={{
-                      control: (provided, state) => ({
-                        ...provided,
-                        borderWidth: '2px',
-                        borderRadius: '8px',
-                        borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'rgba(191, 152, 83, 0.2)',
-                        boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
-                        '&:hover': {
-                          borderColor: 'rgba(191, 152, 83, 0.2)',
-                        }
-                      }),
-                    }}
-                    isClearable
-                    className='w-[263px] h-[45px] focus:outline-none' />
-                </div>
-                <div>
-                  <label className='font-semibold block'>
-                    {editFormData.type === 'Refund' ? 'Refund Amount' : 'Amount Given'}
-                  </label>
-                  <input
-                    value={editFormData.type === 'Refund' ? formatWithCommas(editFormData.staff_refund_amount) : formatWithCommas(editFormData.amount)}
-                    onChange={(e) => {
-                      const rawValue = e.target.value.replace(/,/g, "");
-                      if (!isNaN(rawValue)) {
-                        if (editFormData.type === "Refund") {
-                          setEditFormData({ ...editFormData, staff_refund_amount: rawValue, amount: '' });
-                        } else {
-                          setEditFormData({ ...editFormData, amount: rawValue, staff_refund_amount: '' });
-                        }
-                      }
-                    }}
-                    className='w-[263px] h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
-                  />
-                </div>
-                <div className=''>
-                  <label className='font-semibold block'>Payment Mode</label>
-                  <select
-                    value={editFormData.staff_payment_mode}
-                    onChange={(e) => setEditFormData({ ...editFormData, staff_payment_mode: e.target.value })}
-                    className='w-[263px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'>
-                    <option value=''>Select</option>
-                    <option value='Cash'>Cash</option>
-                    <option value='GPay'>GPay</option>
-                    <option value='Net Banking'>Net Banking</option>
-                  </select>
-                </div>
-                <div className='col-span-2'>
-                  <label className='font-semibold block'>Description</label>
-                  <textarea
-                    rows={2}
-                    value={editFormData.description}
-                    onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
-                    className='w-[590px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'>
-                  </textarea>
-                </div>
-              </div>
-              <div className="flex justify-end gap-3 mt-4">
-                <button onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 border border-[#BF9853] w-[100px] h-[45px] rounded">
-                  Cancel
-                </button>
-                <button onClick={handleUpdate} className="px-4 py-2 bg-[#BF9853] w-[100px] h-[45px] text-white rounded">
-                  Save
-                </button>
+          <Suspense fallback={
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+              <div className="bg-white p-6 rounded-lg">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#BF9853] mx-auto"></div>
+                <p className="text-center mt-2">Loading...</p>
               </div>
             </div>
-          </div>
+          }>
+            <EditModal
+              isOpen={isEditModalOpen}
+              editFormData={editFormData}
+              setEditFormData={setEditFormData}
+              employees={employees}
+              purposes={purposes}
+              onClose={() => setIsEditModalOpen(false)}
+              onUpdate={handleUpdate}
+              formatWithCommas={formatWithCommas}
+            />
+          </Suspense>
         )}
       </div>
-    </body>
+    </div>
   );
 };
-export default TableView;
+// Memoize the main component to prevent unnecessary re-renders
+export default memo(TableView);

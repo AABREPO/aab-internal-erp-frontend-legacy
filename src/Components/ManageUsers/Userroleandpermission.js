@@ -157,6 +157,11 @@ const Userroleandpermission = () => {
       name: "Manage User",
       level: "Level 1",
     },
+    {
+      id: 31,
+      name: "Loan Portal",
+      level: "Level 1",
+    },
     
   ];
   const [availableModules, setAvailableModules] = useState(modules);

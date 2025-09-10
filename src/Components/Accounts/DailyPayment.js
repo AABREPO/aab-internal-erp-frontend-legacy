@@ -1366,9 +1366,9 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                 Expenses:<span style={{ color: "#E4572E" }}>{Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}</span>
                             </h1>
                         </div>
-                        <div className="w-full h-[600px] rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden">
+                        <div className="w-full h-[600px] rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden ">
                             {/* Single Table with Scrollable Container */}
-                            <div ref={scrollRef} className="overflow-auto max-h-[600px]" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
+                            <div ref={scrollRef} className="overflow-auto max-h-[600px] thin-scrollbar" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
                                 onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} >
                                 <table className="w-[1200px] border-collapse text-left">
                                     <thead className="sticky top-0 z-10 bg-white">

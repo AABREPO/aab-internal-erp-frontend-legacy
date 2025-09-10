@@ -472,57 +472,45 @@ const History = ({ username, userRoles = [] }) => {
         const pageWidth = doc.internal.pageSize.getWidth();
         const year = new Date().getFullYear();
         const weekDates = getWeekStartEnd(year, Number(selectedWeek));
-
         // Safety check for valid dates
         if (!weekDates || !weekDates.start || !weekDates.end) {
             alert("Error: Could not calculate week dates. Please try again.");
             return;
         }
-
         const { start, end } = weekDates;
         const weekStartDate = start.toLocaleDateString("en-GB");
         const weekEndDate = end.toLocaleDateString("en-GB");
-
         // Safety check for expenses and payments arrays
         if (!Array.isArray(expenses) || !Array.isArray(payments)) {
             alert("Error: Data not loaded properly. Please refresh the page and try again.");
             return;
         }
-
         const totalExpenses = expenses.reduce((t, e) => t + Number(e.amount || 0), 0);
         const totalPayments = payments.reduce((t, p) => t + Number(p.amount || 0), 0);
         const balance = totalPayments - totalExpenses;
-
-
         // ===== FUNCTION TO DRAW HEADER =====
         const drawHeader = (doc, titleText = "") => {
             doc.setFontSize(10);
             doc.setTextColor(0, 0, 0);
-
             // Outer rectangle + lines
             doc.rect(20, 24, 810, 40);
-
             // PS label
             // PS with selected week
             doc.setFont("helvetica", "normal");
             doc.setFontSize(10);
             doc.text(`PS: ${String(selectedWeek || "")}`, 30, 40);
-
             // Current Date under PS
             doc.setFontSize(9);
             doc.text(String(new Date().toLocaleDateString("en-GB") || ""), 30, 55);
-
             // Main Title (dynamic)
             doc.setFontSize(14);
             doc.setFont("helvetica", "bold");
             doc.text(titleText, 180, 50);
-
             // Dates stacked
             doc.setFont("helvetica", "normal");
             doc.setFontSize(10);
             doc.text(`START  ${String(weekStartDate || "")}`, 460, 40);
             doc.text(`END    ${String(weekEndDate || "")}`, 465, 58);
-
             // === Expenses with green background ===
             doc.setFillColor(220, 250, 220); // light green
             doc.rect(620, 25, 190, 18.5, "F"); // background box for Balance
@@ -533,7 +521,6 @@ const History = ({ username, userRoles = [] }) => {
                 String(totalExpenses.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
                 730, 37
             );
-
             // === Balance with pink background ===
             doc.setFillColor(250, 220, 220); // light pink
             doc.rect(620, 44, 190, 18.5, "F"); // background box for Expenses
@@ -545,11 +532,8 @@ const History = ({ username, userRoles = [] }) => {
                 740, 58
             );
         };
-
         // Draw header on first page with "WEEKLY PAYMENT REPORT"
         drawHeader(doc, "WEEKLY PAYMENT REPORT");
-
-
         // ===== EXPENSES TABLE =====
         const expensesHeaders = [["SNO", "Date", "Contractor/Vendor", "Site Name", "Type", "Amount", "AC", "C", ""]];
         const filteredExpenses = expenses.filter(row => row.type !== "Project Advance" && row.type !== "Staff Advance" && row.type !== "Staff Salary" && row.type !== "Daily");
@@ -590,13 +574,16 @@ const History = ({ username, userRoles = [] }) => {
                 5: { halign: 'right' } // Amount column
             },
             didDrawPage: (data) => {
-                drawHeader(doc);
+                drawHeader(doc, "WEEKLY PAYMENT REPORT");
                 if (data.pageNumber > 1) {
                     doc.setFontSize(10);
                 }
             },
+            // Enable page breaks for large tables
+            pageBreak: 'auto',
+            // Ensure table continues properly on new pages
+            showHead: 'everyPage',
         });
-
         // ===== PAYMENTS TABLE =====
         const paymentsHeaders = [["DATE RECEIVED", "AMOUNT", "TYPE"]];
         const paymentsData = payments.map(r => [
@@ -614,19 +601,14 @@ const History = ({ username, userRoles = [] }) => {
             { content: String(balance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"), styles: { fontStyle: "bold" } },
             { content: "", styles: { fontStyle: "bold" } }
         ]);
-
         // ===== NEW PAGE for remaining tables =====
         doc.addPage();
         drawHeader(doc, "WEEKLY PAYMENT STATEMENT");
-
-
         const baseY = 110;
-
         // Add heading for payments table
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.text("PAYMENT RECEIVED", 22, baseY - 25);
-
         autoTable(doc, {
             head: paymentsHeaders,
             body: paymentsData,
@@ -647,14 +629,14 @@ const History = ({ username, userRoles = [] }) => {
         // ----- HANDOVER DETAILS -----
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
-        doc.text("HANDOVER DETAILS", 22, baseY + 150);
+        doc.text("HANDOVER DETAILS", 22, baseY + 250);
         autoTable(doc, {
             head: [["DATE RETURNED", "AMOUNT"]],
             body: [
                 ["", ""],
                 ["RETURNED", "0"]
             ],
-            startY: baseY + 155,
+            startY: baseY + 255,
             margin: { left: 22 },
             tableWidth: 200,
             theme: "grid",
@@ -668,31 +650,25 @@ const History = ({ username, userRoles = [] }) => {
                 drawHeader(doc);
             }
         });
-
         // ===== DRAW VERTICAL DIVIDER AFTER HANDOVER DETAILS =====
         const dividerX = 260;  // adjust X position as needed
         const headerBottomY = 65; // header ends at y=24+55=79
         const pageHeight = doc.internal.pageSize.getHeight();
-
         // Draw vertical line (from bottom of header box down to page bottom margin)
         doc.setDrawColor(0, 0, 0);  // black
         doc.setLineWidth(0.5);
         doc.line(dividerX, headerBottomY, dividerX, pageHeight - 0);
-
         // ----- EXTRA -----
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
-
         // Filter for Daily type expenses
         const dailyExpenses = expenses.filter(expense => expense.type === "Daily");
         const dailyExpenseData = dailyExpenses.map(expense => [
             String(expense.date ? formatDateOnly(expense.date) : ""), // Date in first column
             String(Number(expense.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00") // Amount in second column
         ]);
-
         // Calculate total of daily expenses
         const dailyExpensesTotal = dailyExpenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
-
         // If no daily expenses, show a message
         if (dailyExpenseData.length === 0) {
             dailyExpenseData.push(["No Daily Expenses", "0.00"]);
@@ -700,7 +676,7 @@ const History = ({ username, userRoles = [] }) => {
         autoTable(doc, {
             head: [["DAILY WAGE", "AMOUNT"]],
             body: dailyExpenseData,
-            startY: baseY + 130,
+            startY: baseY + 140,
             margin: { left: 300 },
             tableWidth: 200,
             theme: "grid",
@@ -739,17 +715,14 @@ const History = ({ username, userRoles = [] }) => {
             const boxWidth = 200;
             const boxHeight = 20;
             const splitX = boxX + 114; // divider inside the box
-
             // Draw rectangle
             doc.rect(boxX, boxY, boxWidth, boxHeight);
             // Divider line inside box
             doc.line(splitX, boxY, splitX, boxY + boxHeight);
-
             // Add "TOTAL" text on left
             doc.setFontSize(10);
             doc.setFont("helvetica", "bold");
             doc.text("TOTAL", boxX + 10, boxY + 13); // 10pt padding left, vertically centered
-
             // Add total amount on right, right-aligned inside box
             doc.text(
                 String(dailyExpensesTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })),
@@ -759,7 +732,6 @@ const History = ({ username, userRoles = [] }) => {
             );
         }
         // ----- SUMMARY -----
-
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.text("EXPENDITURE PAYMENTS", 300, baseY - 25);
@@ -826,17 +798,13 @@ const History = ({ username, userRoles = [] }) => {
         // ===== SUMMARY TOTAL BOX =====
         const summaryTotal = summaryData.reduce((acc, row) => acc + Number(String(row[1] || "0").replace(/,/g, "")), 0);
         const summaryBoxY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 15 : baseY + 100;
-
         doc.setFontSize(10);
         doc.setFont("helvetica", "bold");
-
         // Draw outer rectangle
         doc.rect(300, summaryBoxY - 12, 200, 20);
-
         // Draw vertical line to separate label and amount (choose split point)
         const splitX = 420;
         doc.line(splitX, summaryBoxY - 12, splitX, summaryBoxY + 8); // vertical divider inside the box
-
         // Add label and amount inside the box
         doc.text("TOTAL", 310, summaryBoxY + 3);
         doc.text(
@@ -972,7 +940,6 @@ const History = ({ username, userRoles = [] }) => {
                 },
                 body: JSON.stringify(row),
             });
-
             if (!response.ok) {
                 throw new Error("Failed to update expense");
             }
@@ -1426,7 +1393,6 @@ const History = ({ username, userRoles = [] }) => {
                                                                 </button>
                                                             )
                                                         )}
-
                                                         {/* Delete Button */}
                                                         <button className="" onClick={() => handleWeeklyExpensesDelete(row.id)}>
                                                             <img src={Delete} className="w-5 h-4" alt="Delete" />
@@ -1625,8 +1591,7 @@ const History = ({ username, userRoles = [] }) => {
                                                     return acc;
                                                 }, {})
                                         ).map(([type, total], index, arr) => (
-                                            <tr
-                                                key={type}
+                                            <tr key={type}
                                                 className={`even:bg-[#FAF6ED] odd:bg-[#FFFFFF] ${index === 0 ? "rounded-t-md" : ""
                                                     } ${index === arr.length - 1 ? "rounded-b-md" : ""}`}
                                             >
@@ -1654,30 +1619,13 @@ const History = ({ username, userRoles = [] }) => {
     )
 }
 export default History
-
-const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    date.setMinutes(date.getMinutes());
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    let hours = date.getHours();
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12;
-    hours = hours ? String(hours).padStart(2, '0') : '12';
-    return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
-};
-
 const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, siteOptions }) => {
     if (!show) return null;
-
     const getNameById = (id, options) => {
         if (!id && id !== 0) return "-";
         const found = options.find(opt => String(opt.id) === String(id));
         return found ? found.label : id;
     };
-
     const fields = [
         { oldKey: "old_date", newKey: "new_date", label: "Date", width: "120px" },
         { oldKey: "old_type", newKey: "new_type", label: "Type", width: "100px" },
@@ -1686,7 +1634,6 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
         { oldKey: "old_contractor_id", newKey: "new_contractor_id", label: "Contractor", width: "150px", lookup: contractorOptions },
         { oldKey: "old_amount", newKey: "new_amount", label: "Amount", width: "100px" },
     ];
-
     const formatDateTime = (dateString) => {
         if (!dateString) return "-";
         const date = new Date(dateString);
@@ -1700,9 +1647,7 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
         hours = String(hours).padStart(2, "0");
         return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
     };
-
     const formatDisplayValue = (value, field) => {
-        // If vendor or transfer site is 0, show "-"
         if (
             (field.oldKey?.includes("vendor_id") || field.oldKey?.includes("transfer_site_id") ||
                 field.newKey?.includes("vendor_id") || field.newKey?.includes("transfer_site_id")) &&
@@ -1710,7 +1655,6 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
         ) {
             return "-";
         }
-
         if (field.lookup) {
             return getNameById(value, field.lookup);
         }
@@ -1731,8 +1675,6 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
                         <h2 className="text-xl text-red-500 -mt-10 font-bold">x</h2>
                     </button>
                 </div>
-
-                {/* Scroll container for both vertical and horizontal overflow */}
                 <div className="overflow-auto mt-2 max-h-80 border border-l-8 border-l-[#BF9853] rounded-lg ml-7">
                     <table className="table-fixed min-w-full bg-white">
                         <thead className="bg-[#FAF6ED]">
@@ -1740,9 +1682,7 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
                                 <th style={{ width: "130px" }}>Time Stamp</th>
                                 <th style={{ width: "120px" }}>Edited By</th>
                                 {fields.map((f) => (
-                                    <th
-                                        key={f.label}
-                                        style={{ width: f.width }}
+                                    <th key={f.label} style={{ width: f.width }}
                                         className="border-b py-2 px-2 text-center font-bold whitespace-nowrap overflow-hidden text-ellipsis"
                                     >
                                         {f.label}
@@ -1752,32 +1692,19 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
                         </thead>
                         <tbody>
                             {audits.map((audit, index) => (
-                                <tr
-                                    key={index}
-                                    className="odd:bg-white even:bg-[#FAF6ED]"
-                                >
-                                    <td
-                                        className="whitespace-nowrap overflow-hidden text-ellipsis"
-                                        style={{ width: "130px" }}
-                                    >
+                                <tr key={index} className="odd:bg-white even:bg-[#FAF6ED]">
+                                    <td className="whitespace-nowrap overflow-hidden text-ellipsis" style={{ width: "130px" }}>
                                         {formatDateTime(audit.edited_date)}
                                     </td>
-                                    <td
-                                        className="whitespace-nowrap overflow-hidden text-ellipsis"
-                                        style={{ width: "120px" }}
-                                    >
+                                    <td className="whitespace-nowrap overflow-hidden text-ellipsis" style={{ width: "120px" }}>
                                         {audit.edited_by}
                                     </td>
                                     {fields.map((f) => {
                                         const oldDisplay = formatDisplayValue(audit[f.oldKey], f);
                                         const newDisplay = formatDisplayValue(audit[f.newKey], f);
                                         const changed = oldDisplay !== newDisplay;
-
                                         return (
-                                            <td
-                                                key={f.label}
-                                                style={{ width: f.width }}
-                                                title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
+                                            <td key={f.label} style={{ width: f.width }} title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
                                                 className={`whitespace-nowrap overflow-hidden text-ellipsis px-2 ${changed ? "bg-[#BF9853] font-bold" : ""
                                                     }`}
                                             >
@@ -1794,22 +1721,18 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
         </div>
     );
 };
-
 const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits }) => {
     if (!show) return null;
-
     const getNameById = (id, options) => {
         if (!id && id !== 0) return "-";
         const found = options.find(opt => String(opt.id) === String(id));
         return found ? found.label : id;
     };
-
     const fields = [
         { oldKey: "old_date", newKey: "new_date", label: "Date", width: "120px" },
         { oldKey: "old_amount", newKey: "new_amount", label: "Amount", width: "100px" },
         { oldKey: "old_type", newKey: "new_type", label: "Type", width: "100px" },
     ];
-
     const formatDateTime = (dateString) => {
         if (!dateString) return "-";
         const date = new Date(dateString);
@@ -1823,9 +1746,7 @@ const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits }) => {
         hours = String(hours).padStart(2, "0");
         return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
     };
-
     const formatDisplayValue = (value, field) => {
-        // If vendor or transfer site is 0, show "-"
         if (
             (field.oldKey?.includes("vendor_id") || field.oldKey?.includes("transfer_site_id") ||
                 field.newKey?.includes("vendor_id") || field.newKey?.includes("transfer_site_id")) &&
@@ -1833,7 +1754,6 @@ const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits }) => {
         ) {
             return "-";
         }
-
         if (field.lookup) {
             return getNameById(value, field.lookup);
         }
@@ -1854,8 +1774,6 @@ const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits }) => {
                         <h2 className="text-xl text-red-500 -mt-10 font-bold">x</h2>
                     </button>
                 </div>
-
-                {/* Scroll container for both vertical and horizontal overflow */}
                 <div className="overflow-auto mt-2 max-h-80 border border-l-8 border-l-[#BF9853] rounded-lg ml-7">
                     <table className="table-fixed min-w-full bg-white">
                         <thead className="bg-[#FAF6ED]">
@@ -1863,9 +1781,7 @@ const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits }) => {
                                 <th style={{ width: "130px" }}>Time Stamp</th>
                                 <th style={{ width: "120px" }}>Edited By</th>
                                 {fields.map((f) => (
-                                    <th
-                                        key={f.label}
-                                        style={{ width: f.width }}
+                                    <th key={f.label} style={{ width: f.width }}
                                         className="border-b py-2 px-2 text-center font-bold whitespace-nowrap overflow-hidden text-ellipsis"
                                     >
                                         {f.label}
@@ -1875,32 +1791,19 @@ const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits }) => {
                         </thead>
                         <tbody>
                             {audits.map((audit, index) => (
-                                <tr
-                                    key={index}
-                                    className="odd:bg-white even:bg-[#FAF6ED]"
-                                >
-                                    <td
-                                        className="whitespace-nowrap overflow-hidden text-ellipsis"
-                                        style={{ width: "130px" }}
-                                    >
+                                <tr key={index} className="odd:bg-white even:bg-[#FAF6ED]">
+                                    <td className="whitespace-nowrap overflow-hidden text-ellipsis" style={{ width: "130px" }}>
                                         {formatDateTime(audit.edited_date)}
                                     </td>
-                                    <td
-                                        className="whitespace-nowrap overflow-hidden text-ellipsis"
-                                        style={{ width: "120px" }}
-                                    >
+                                    <td className="whitespace-nowrap overflow-hidden text-ellipsis" style={{ width: "120px" }}>
                                         {audit.edited_by}
                                     </td>
                                     {fields.map((f) => {
                                         const oldDisplay = formatDisplayValue(audit[f.oldKey], f);
                                         const newDisplay = formatDisplayValue(audit[f.newKey], f);
                                         const changed = oldDisplay !== newDisplay;
-
                                         return (
-                                            <td
-                                                key={f.label}
-                                                style={{ width: f.width }}
-                                                title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
+                                            <td key={f.label} style={{ width: f.width }} title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
                                                 className={`whitespace-nowrap overflow-hidden text-ellipsis px-2 ${changed ? "bg-[#BF9853] font-bold" : ""
                                                     }`}
                                             >

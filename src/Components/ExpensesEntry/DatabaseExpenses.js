@@ -43,6 +43,10 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     const [selectedDate, setSelectedDate] = useState('');
     const [selectedAccountType, setSelectedAccountType] = useState('');
     const [showFilters, setShowFilters] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(50);
+    const [sortField, setSortField] = useState('');
+    const [sortDirection, setSortDirection] = useState('asc');
     const [userPermissions, setUserPermissions] = useState([]);
     const moduleName = "Expense Entry";
     useEffect(() => {
@@ -401,6 +405,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
             );
         });
         setFilteredExpenses(filtered);
+        setCurrentPage(1); // Reset to first page when filters change
         // Set total amount
         const total = filtered.reduce((sum, item) => sum + Number(item.amount || 0), 0);
         setTotalAmount(total);
@@ -490,7 +495,49 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         }
     };
 
-    const currentItems = filteredExpenses;
+    // Sorting function
+    const handleSort = (field) => {
+        if (sortField === field) {
+            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortField(field);
+            setSortDirection('asc');
+        }
+        setCurrentPage(1); // Reset to first page when sorting
+    };
+
+    // Sort data
+    const sortedExpenses = [...filteredExpenses].sort((a, b) => {
+        if (!sortField) return 0;
+        
+        let aValue = a[sortField];
+        let bValue = b[sortField];
+        
+        // Handle different data types
+        if (sortField === 'date') {
+            aValue = new Date(aValue);
+            bValue = new Date(bValue);
+        } else if (sortField === 'eno') {
+            aValue = parseInt(aValue) || 0;
+            bValue = parseInt(bValue) || 0;
+        } else if (sortField === 'timestamp') {
+            aValue = new Date(aValue);
+            bValue = new Date(bValue);
+        } else {
+            aValue = String(aValue || '').toLowerCase();
+            bValue = String(bValue || '').toLowerCase();
+        }
+        
+        if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    // Pagination logic
+    const totalPages = Math.ceil(sortedExpenses.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const currentItems = sortedExpenses.slice(startIndex, endIndex);
     const handleEditClick = (expense) => {
         setEditId(expense.id);
         setFormData(expense);
@@ -540,6 +587,9 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         setSelectedDate('');
         setSelectedEno('');
         setFilteredExpenses(expenses);
+        setCurrentPage(1);
+        setSortField('');
+        setSortDirection('asc');
     };
     const exportToCSV = () => {
         const headers = [
@@ -711,7 +761,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                     <div>
                         <div
                             ref={scrollRef}
-                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[760px] overflow-x-auto select-none no-scrollbar"
+                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[600px] overflow-x-auto select-none thin-scrollbar"
                             onMouseDown={handleMouseDown}
                             onMouseMove={handleMouseMove}
                             onMouseUp={handleMouseUp}
@@ -719,18 +769,68 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                             <table className="table-fixed  min-w-[1765px] w-screen border-collapse">
                                 <thead>
                                     <tr className="bg-[#FAF6ED]">
-                                        <th className="px-3 w-44 font-bold text-left">Time stamp</th>
-                                        <th className="pt-2 w-36 font-bold text-left">Date</th>
-                                        <th className="px-2 w-[300px] font-bold text-left">Project Name</th>
-                                        <th className="px-2 w-[220px] font-bold text-left">Vendor</th>
-                                        <th className="px-2 w-[220px] font-bold text-left">Contractor</th>
+                                        <th 
+                                            className="px-3 w-44 font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                                            onClick={() => handleSort('timestamp')}
+                                        >
+                                            Time stamp {sortField === 'timestamp' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th 
+                                            className="pt-2 w-36 font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                                            onClick={() => handleSort('date')}
+                                        >
+                                            Date {sortField === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th 
+                                            className="px-2 w-[300px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                                            onClick={() => handleSort('siteName')}
+                                        >
+                                            Project Name {sortField === 'siteName' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th 
+                                            className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                                            onClick={() => handleSort('vendor')}
+                                        >
+                                            Vendor {sortField === 'vendor' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th 
+                                            className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                                            onClick={() => handleSort('contractor')}
+                                        >
+                                            Contractor {sortField === 'contractor' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                        </th>
                                         <th className="px-2 w-[120px] font-bold text-left">Quantity</th>
                                         <th className="px-2 w-[120px] font-bold text-left">Amount</th>
-                                        <th className="px-2 w-[120px] font-bold text-left">Comments</th>
-                                        <th className="px-2 w-[220px] font-bold text-left">Category</th>
-                                        <th className="px-2 w-[220px] font-bold text-left">A/C Type</th>
-                                        <th className="px-2 w-[220px] font-bold text-left">Machine Tools</th>
-                                        <th className="px-2 w-[120px] font-bold text-left">E.No</th>
+                                        <th 
+                                            className="px-2 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                                            onClick={() => handleSort('comments')}
+                                        >
+                                            Comments {sortField === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th 
+                                            className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                                            onClick={() => handleSort('category')}
+                                        >
+                                            Category {sortField === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th 
+                                            className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                                            onClick={() => handleSort('accountType')}
+                                        >
+                                            A/C Type {sortField === 'accountType' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th 
+                                            className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                                            onClick={() => handleSort('machineTools')}
+                                        >
+                                            Machine Tools {sortField === 'machineTools' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th 
+                                            className="px-2 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                                            onClick={() => handleSort('eno')}
+                                        >
+                                            E.No {sortField === 'eno' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                        </th>
                                         <th className="px-2 w-[120px] font-bold text-left">Activity</th>
                                         <th className="px-3 w-[120px] font-bold text-left">Attach file</th>
                                     </tr>
@@ -1115,6 +1215,93 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                 </tbody>
                             </table>
                         </div>
+                        
+                        {/* Pagination Controls */}
+                        <div className="flex items-center justify-between mt-4 px-4 py-3 bg-white border-t border-gray-200">
+                            <div className="flex items-center space-x-2">
+                                <span className="text-sm text-gray-700">Items per page:</span>
+                                <select
+                                    value={itemsPerPage}
+                                    onChange={(e) => {
+                                        setItemsPerPage(Number(e.target.value));
+                                        setCurrentPage(1);
+                                    }}
+                                    className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                >
+                                    <option value={25}>25</option>
+                                    <option value={50}>50</option>
+                                    <option value={100}>100</option>
+                                    <option value={200}>200</option>
+                                </select>
+                            </div>
+                            
+                            <div className="flex items-center space-x-2">
+                                <span className="text-sm text-gray-700">
+                                    Showing {startIndex + 1} to {Math.min(endIndex, sortedExpenses.length)} of {sortedExpenses.length} entries
+                                </span>
+                            </div>
+                            
+                            <div className="flex items-center space-x-1">
+                                <button
+                                    onClick={() => setCurrentPage(1)}
+                                    disabled={currentPage === 1}
+                                    className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                >
+                                    First
+                                </button>
+                                <button
+                                    onClick={() => setCurrentPage(currentPage - 1)}
+                                    disabled={currentPage === 1}
+                                    className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                >
+                                    Previous
+                                </button>
+                                
+                                {/* Page numbers */}
+                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                    let pageNum;
+                                    if (totalPages <= 5) {
+                                        pageNum = i + 1;
+                                    } else if (currentPage <= 3) {
+                                        pageNum = i + 1;
+                                    } else if (currentPage >= totalPages - 2) {
+                                        pageNum = totalPages - 4 + i;
+                                    } else {
+                                        pageNum = currentPage - 2 + i;
+                                    }
+                                    
+                                    return (
+                                        <button
+                                            key={pageNum}
+                                            onClick={() => setCurrentPage(pageNum)}
+                                            className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${
+                                                currentPage === pageNum
+                                                    ? 'bg-[#BF9853] text-white border-[#BF9853]'
+                                                    : 'border-gray-300 hover:bg-gray-50'
+                                            }`}
+                                        >
+                                            {pageNum}
+                                        </button>
+                                    );
+                                })}
+                                
+                                <button
+                                    onClick={() => setCurrentPage(currentPage + 1)}
+                                    disabled={currentPage === totalPages}
+                                    className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                >
+                                    Next
+                                </button>
+                                <button
+                                    onClick={() => setCurrentPage(totalPages)}
+                                    disabled={currentPage === totalPages}
+                                    className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                >
+                                    Last
+                                </button>
+                            </div>
+                        </div>
+                        
                         <Modal
                             isOpen={modalIsOpen}
                             onRequestClose={handleCancel}

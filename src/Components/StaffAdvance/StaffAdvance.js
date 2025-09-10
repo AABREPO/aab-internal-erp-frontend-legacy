@@ -18,8 +18,16 @@ const StaffAdvance = () => {
     transferAmount: '',
     description: ''
   });
+  const [staffFromDate, setStaffFromDate] = useState('');
+  const [staffToDate, setStaffToDate] = useState('');
+  const [staffPaymentMode, setStaffPaymentMode] = useState('');
+  const [staffAmountGiven, setStaffAdmountGiven] = useState('');
+  const [staffTodayAmount, setTodayAmount] = useState('');
+  const [staffTotalOutstanding, setStaffTotalOutstanding] = useState('');
   // Table data state
   const [tableData, setTableData] = useState([]);
+  // Filtered table data state - only shows when both EMP Name and Purpose are selected
+  const [filteredTableData, setFilteredTableData] = useState([]);
   // Success message state
   const [successMessage, setSuccessMessage] = useState('');
   // Loading state
@@ -160,9 +168,219 @@ const StaffAdvance = () => {
       setTableData([]);
     }
   }, []);
+
+  // Filter table data based on selected employee and purpose
+  const filterTableData = useCallback(() => {
+    if (!formData.empName || !formData.purpose) {
+      // If either EMP Name or Purpose is not selected, show empty table
+      setFilteredTableData([]);
+      return;
+    }
+
+    // Filter data based on selected employee and purpose
+    const filtered = tableData.filter(record => {
+      // Check for employee match - try different possible field names
+      const matchesEmployee = record.employee_name === formData.empName.value ||
+        record.employee_id === formData.empName.id ||
+        record.emp_name === formData.empName.value;
+
+      // Check for purpose match - try different possible field names
+      const matchesPurpose = record.purpose === formData.purpose.value ||
+        record.purpose_id === formData.purpose.id ||
+        record.from_purpose_id === formData.purpose.id;
+
+      return matchesEmployee && matchesPurpose;
+    });
+
+    setFilteredTableData(filtered);
+  }, [tableData, formData.empName, formData.purpose]);
   useEffect(() => {
     fetchRecords();
   }, [fetchRecords]);
+
+  // Filter table data whenever tableData, empName, or purpose changes
+  useEffect(() => {
+    filterTableData();
+  }, [filterTableData]);
+
+  // Calculate total advance amount for selected employee
+  const calculateTotalAdvance = useCallback(() => {
+    if (!formData.empName || !tableData.length) {
+      return 0;
+    }
+
+    const employeeRecords = tableData.filter(record => {
+      // Check for employee match - try different possible field names
+      return record.employee_name === formData.empName.value ||
+        record.employee_id === formData.empName.id ||
+        record.emp_name === formData.empName.value;
+    });
+
+    const totalAdvance = employeeRecords.reduce((total, record) => {
+      if (record.type === 'Advance') {
+        return total + (parseFloat(record.amount) || 0);
+      } else if (record.type === 'Refund') {
+        return total - (parseFloat(record.staff_refund_amount) || 0);
+      }
+      return total;
+    }, 0);
+
+    return totalAdvance;
+  }, [formData.empName, tableData]);
+
+  // Update overall advance when employee selection changes
+  useEffect(() => {
+    const totalAdvance = calculateTotalAdvance();
+    setFormData(prev => ({
+      ...prev,
+      overallAdvance: totalAdvance.toFixed(2)
+    }));
+  }, [calculateTotalAdvance]);
+
+  // Calculate total amount for selected purpose and employee
+  const calculatePurposeTotal = useCallback(() => {
+    if (!formData.purpose || !formData.empName || !tableData.length) {
+      return 0;
+    }
+    const purposeId = formData.purpose.id;
+    const employeeId = formData.empName.id;
+    const purposeRecords = tableData.filter(record => {
+      // Check for employee match first
+      const employeeMatch = record.employee_name === formData.empName.value ||
+        record.employee_id === employeeId ||
+        record.emp_name === formData.empName.value;
+      if (!employeeMatch) return false;
+      // Check if purpose matches (only from_purpose_id for all record types)
+      return record.purpose === formData.purpose.value ||
+        record.purpose_id === purposeId ||
+        record.from_purpose_id === purposeId;
+    });
+    const totalAmount = purposeRecords.reduce((total, record) => {
+      const amount = parseFloat(record.amount) || 0;
+      const refund = parseFloat(record.staff_refund_amount) || 0;
+      if (record.type === "Advance") {
+        return total + amount;
+      } else if (record.type === "Refund") {
+        return total - refund;
+      } else if (record.type === "Transfer") {
+        // For transfer records, the amount field already contains the correct sign
+        // Negative amount means money going out from this purpose
+        return total + amount; // amount is already negative, so this subtracts
+      }
+      return total;
+    }, 0);
+    return totalAmount;
+  }, [formData.purpose, formData.empName, tableData]);
+  // Update advance amount when purpose or employee selection changes
+  useEffect(() => {
+    const purposeTotal = calculatePurposeTotal();
+    setFormData(prev => ({
+      ...prev,
+      advanceAmount: purposeTotal.toFixed(2)
+    }));
+  }, [calculatePurposeTotal]);
+  // Calculate total amount given to all employees based on date range and payment mode
+  const calculateTotalAmountGiven = useCallback(() => {
+    if (!tableData.length) {
+      return 0;
+    }
+    // Only calculate if both dates are selected (main filter)
+    if (!staffFromDate || !staffToDate) {
+      return 0;
+    }
+    let filteredRecords = tableData;
+    // Filter by date range (both dates are required - main filter)
+    filteredRecords = filteredRecords.filter(record => {
+      const recordDate = new Date(record.date);
+      const fromDate = new Date(staffFromDate);
+      const toDate = new Date(staffToDate);
+      return recordDate >= fromDate && recordDate <= toDate;
+    });
+    // Filter by payment mode (additional filter - optional)
+    if (staffPaymentMode) {
+      filteredRecords = filteredRecords.filter(record => 
+        record.staff_payment_mode === staffPaymentMode
+      );
+    }
+    // Calculate net amount given (Advance amount minus Refund amount)
+    const totalAmount = filteredRecords.reduce((total, record) => {
+      if (record.type === 'Advance') {
+        return total + (parseFloat(record.amount) || 0);
+      } else if (record.type === 'Refund') {
+        return total - (parseFloat(record.staff_refund_amount) || 0);
+      }
+      return total;
+    }, 0);
+    return totalAmount;
+  }, [tableData, staffFromDate, staffToDate, staffPaymentMode]);
+  // Update amount given when filters change
+  useEffect(() => {
+    const totalAmount = calculateTotalAmountGiven();
+    // Show "0.00" if both dates are not selected, otherwise show the calculated amount
+    if (!staffFromDate || !staffToDate) {
+      setStaffAdmountGiven("0.00");
+    } else {
+      setStaffAdmountGiven(totalAmount.toLocaleString('en-IN', { 
+        minimumFractionDigits: 2, 
+        maximumFractionDigits: 2 
+      }));
+    }
+  }, [calculateTotalAmountGiven, staffFromDate, staffToDate, staffPaymentMode]);
+  // Calculate today's amount for all employees (without any filters)
+  const calculateTodayAmount = useCallback(() => {
+    if (!tableData.length) {
+      return 0;
+    }
+    const today = new Date();
+    const todayString = today.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+    const todayRecords = tableData.filter(record => {
+      const recordDate = new Date(record.date).toISOString().split('T')[0];
+      return recordDate === todayString;
+    });
+    const todayAmount = todayRecords.reduce((total, record) => {
+      if (record.type === 'Advance') {
+        return total + (parseFloat(record.amount) || 0);
+      } else if (record.type === 'Refund') {
+        return total - (parseFloat(record.staff_refund_amount) || 0);
+      }
+      return total;
+    }, 0);
+    return todayAmount;
+  }, [tableData]);
+  // Calculate total outstanding amount for all employees (without any filters)
+  const calculateTotalOutstanding = useCallback(() => {
+    if (!tableData.length) {
+      return 0;
+    }
+    const totalOutstanding = tableData.reduce((total, record) => {
+      if (record.type === 'Advance') {
+        return total + (parseFloat(record.amount) || 0);
+      } else if (record.type === 'Refund') {
+        return total - (parseFloat(record.staff_refund_amount) || 0);
+      }
+      return total;
+    }, 0);
+
+    return totalOutstanding;
+  }, [tableData]);
+
+  // Update today amount when table data changes
+  useEffect(() => {
+    const todayAmount = calculateTodayAmount();
+    setTodayAmount(todayAmount.toLocaleString('en-IN', { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    }));
+  }, [calculateTodayAmount]);
+
+  // Update total outstanding when table data changes
+  useEffect(() => {
+    const totalOutstanding = calculateTotalOutstanding();
+    setStaffTotalOutstanding(totalOutstanding.toLocaleString('en-IN', { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    }));
+  }, [calculateTotalOutstanding]);
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     if (!formData.selectedType || !formData.date || !formData.empName) {
@@ -264,15 +482,18 @@ const StaffAdvance = () => {
   // Delete table row
   const deleteRow = useCallback((id) => {
     setTableData(prev => prev.filter(record => record.id !== id));
+    // The filtered data will be updated automatically via useEffect
   }, []);
   // Clear all table data
   const clearTable = useCallback(() => {
-    if (tableData.length > 0) {
-      setTableData([]);
-      setSuccessMessage('All records cleared!');
+    if (filteredTableData.length > 0) {
+      // Remove only the filtered records from the main table data
+      const filteredIds = filteredTableData.map(record => record.id);
+      setTableData(prev => prev.filter(record => !filteredIds.includes(record.id)));
+      setSuccessMessage('Filtered records cleared!');
       setTimeout(() => setSuccessMessage(''), 3000);
     }
-  }, [tableData.length]);
+  }, [filteredTableData.length, filteredTableData]);
   // Export functions
   const exportToPDF = useCallback(() => {
     console.log('Exporting to PDF...');
@@ -294,9 +515,8 @@ const StaffAdvance = () => {
             <h2 className='font-semibold text-sm mb-1'>From Date</h2>
             <input
               type='date'
-              value={formData.fromDate}
-              onChange={(e) => handleInputChange('fromDate', e.target.value)}
-              onKeyPress={handleKeyPress}
+              value={staffFromDate}
+              onChange={(e) => setStaffFromDate(e.target.value)}
               className='border-2 border-[#BF9853] border-opacity-30 rounded-lg pl-3 w-[168px] h-[45px] focus:outline-none focus:border-[#BF9853] transition-colors'
             />
           </div>
@@ -304,27 +524,24 @@ const StaffAdvance = () => {
             <h2 className='font-semibold text-sm mb-1'>To Date</h2>
             <input
               type='date'
-              value={formData.toDate}
-              onChange={(e) => handleInputChange('toDate', e.target.value)}
-              onKeyPress={handleKeyPress}
+              value={staffToDate}
+              onChange={(e) => setStaffToDate(e.target.value)}
               className='border-2 border-[#BF9853] border-opacity-30 rounded-lg pl-3 w-[168px] h-[45px] focus:outline-none focus:border-[#BF9853] transition-colors'
             />
           </div>
           <div className='flex-shrink-0'>
             <h2 className='font-semibold text-sm mb-1'>Amount Given</h2>
             <input
-              value={formData.amountGiven}
-              onChange={(e) => handleInputChange('amountGiven', e.target.value)}
-              onKeyPress={handleKeyPress}
+              value={staffAmountGiven}
+              readOnly
               className='bg-[#F2F2F2] rounded-lg p-2 w-[107px] h-[45px] focus:outline-none focus:bg-white focus:border-2 focus:border-[#BF9853] transition-all'
               placeholder="0.00"
             />
           </div>
           <div className='flex-shrink-0 pt-6'>
             <select
-              value={formData.paymentMode}
-              onChange={(e) => handleInputChange('paymentMode', e.target.value)}
-              onKeyPress={handleKeyPress}
+              value={staffPaymentMode}
+              onChange={(e) => setStaffPaymentMode(e.target.value)}
               className='w-[133px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors'
             >
               <option value=''>Select</option>
@@ -340,6 +557,7 @@ const StaffAdvance = () => {
             <input
               readOnly
               type='text'
+              value={staffTodayAmount}
               className='bg-[#F2F2F2] rounded-lg p-2 w-[144px] h-[45px] focus:outline-none'
               placeholder="0.00"
             />
@@ -349,6 +567,7 @@ const StaffAdvance = () => {
             <input
               readOnly
               type='text'
+              value={staffTotalOutstanding}
               className='bg-[#F2F2F2] p-2 rounded-lg w-[144px] h-[45px] focus:outline-none'
               placeholder="0.00"
             />
@@ -425,10 +644,9 @@ const StaffAdvance = () => {
                 <label className='font-semibold block'>Overall Advance</label>
                 <input
                   value={formData.overallAdvance}
-                  onChange={(e) => handleInputChange('overallAdvance', e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  className='w-[263px] h-[45px] px-2 py-1 rounded-lg bg-[#F2F2F2] focus:outline-none focus:bg-white focus:border-2 focus:border-[#BF9853] transition-all'
-                  placeholder="Enter overall advance"
+                  readOnly
+                  className='w-[263px] h-[45px] px-2 py-1 rounded-lg bg-[#F2F2F2] focus:outline-none cursor-not-allowed'
+                  placeholder="0.00"
                 />
               </div>
               {/* Purpose */}
@@ -457,9 +675,10 @@ const StaffAdvance = () => {
                   Advance Amount {isRequired('advanceAmount') && <span className="text-red-500">*</span>}
                 </label>
                 <input
-                  onKeyPress={handleKeyPress}
-                  className='w-[263px] h-[45px] px-2 py-1 rounded-lg bg-[#F2F2F2] focus:outline-none focus:bg-white focus:border-2 focus:border-[#BF9853] transition-all'
-                  placeholder="Enter advance amount"
+                  value={formData.advanceAmount}
+                  readOnly
+                  className='w-[263px] h-[45px] px-2 py-1 rounded-lg bg-[#F2F2F2] focus:outline-none cursor-not-allowed'
+                  placeholder="0.00"
                 />
               </div>
               {/* Amount Given / Purpose To */}
@@ -566,6 +785,8 @@ const StaffAdvance = () => {
                   <input
                     className='border-2 w-[112px] p-2 border-[#E4572E] text-[#E4572E] font-bold border-opacity-10 rounded h-[33px] bg-transparent focus:outline-none focus:border-[#E4572E] transition-colors'
                     placeholder=""
+                    readOnly
+                    value={formData.advanceAmount}
                   />
                   <div className="flex gap-2">
                     <button
@@ -589,16 +810,6 @@ const StaffAdvance = () => {
                     >
                       Print
                     </button>
-                    {tableData.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={clearTable}
-                        className='text-red-600 font-semibold hover:underline cursor-pointer transition-colors'
-                        title="Clear all records"
-                      >
-                        Clear All
-                      </button>
-                    )}
                   </div>
                 </div>
               </div>
@@ -610,22 +821,26 @@ const StaffAdvance = () => {
                       <th className="px-4 py-3 font-semibold text-gray-700">Advance</th>
                       <th className="px-4 py-3 font-semibold text-gray-700">Transfer/Refund</th>
                       <th className="px-4 py-3 font-semibold text-gray-700">Mode</th>
-                      <th className="px-4 py-3 font-semibold text-gray-700">Activity</th>
-                      <th className="px-4 py-3 font-semibold text-gray-700">Action</th>
+                      <th className=" py-3 font-semibold text-gray-700">Activity</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {tableData.length === 0 ? (
+                    {filteredTableData.length === 0 ? (
                       <tr>
                         <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
                           <div className="flex flex-col items-center gap-2">
                             <span>No data available</span>
-                            <span className="text-sm">Fill the form and click "Pay Advance" to add records</span>
+                            <span className="text-sm">
+                              {!formData.empName || !formData.purpose
+                                ? "Select both EMP Name and Purpose to view related data"
+                                : "No records found for the selected employee and purpose"
+                              }
+                            </span>
                           </div>
                         </td>
                       </tr>
                     ) : (
-                      tableData.map((record) => (
+                      filteredTableData.map((record) => (
                         <tr key={record.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
                           <td className="px-4 py-3">{record.date}</td>
                           <td
@@ -640,16 +855,7 @@ const StaffAdvance = () => {
                             {record.type === "Refund" ? "Refund" : record.staff_refund_amount}
                           </td>
                           <td className="px-4 py-3">{record.staff_payment_mode}</td>
-                          <td className="px-4 py-3">{record.activity}</td>
-                          <td className="px-4 py-3">
-                            <button
-                              onClick={() => deleteRow(record.id)}
-                              className="text-red-600 hover:text-red-800 font-semibold text-sm p-1 rounded hover:bg-red-50 transition-colors"
-                              title="Delete record"
-                            >
-                              ✕
-                            </button>
-                          </td>
+                          <td className=" py-3">{record.activity}</td>
                         </tr>
                       ))
                     )}

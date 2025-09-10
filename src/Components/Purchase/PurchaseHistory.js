@@ -10,7 +10,6 @@ import download from '../Images/downloads.png'
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
-
 const PurchaseHistory = ({ username, userRoles = [] }) => {
   const [allPurchaseOrders, setAllPurchaseOrders] = useState([]);
   const [purchaseOrders, setPurchaseOrders] = useState([]);
@@ -84,8 +83,6 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
   }, {});
 
   const groupedAuditKeys = Object.keys(groupedAudits);
-  console.log(auditHistory);
-
   useEffect(() => {
     fetchPoOrder();
   }, [vendor]);
@@ -95,6 +92,7 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
       if (response.ok) {
         const data = await response.json();
         setAllPurchaseOrders(data);
+        console.log(data);
         if (vendor) {
           // Filter all POs that match the vendor name
           const matchingPOs = data.filter(po => po.vendorName === vendor);

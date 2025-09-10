@@ -14,7 +14,6 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
   const [mainMode, setMainMode] = useState('');
   const [receivedAmounts, setReceivedAmounts] = useState({});
   const [actualAmount, setActualAmount] = useState(0);
-  const [collectedAmount, setCollectedAmount] = useState(0);
   const [claimPaymentsData, setClaimPaymentsData] = useState([]);
   const [remainingAmount, setRemainingAmount] = useState(0);
   const [editingIndex, setEditingIndex] = useState(null);
@@ -40,7 +39,6 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
         console.error(err.message);
       });
   }, []);
-
   useEffect(() => {
     const fetchSites = async () => {
       try {
@@ -73,7 +71,6 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
   useEffect(() => {
     const fetchReceivedAmounts = async () => {
       const amounts = {};
-
       for (const row of filteredData) {
         try {
           const res = await fetch(`https://backendaab.in/aabuildersDash/api/claim_payments/get/${row.id}`);
@@ -86,27 +83,12 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
           amounts[row.id] = 0;
         }
       }
-
       setReceivedAmounts(amounts);
     };
-
     if (filteredData.length > 0) {
       fetchReceivedAmounts();
     }
   }, [filteredData]);
-
-  const customStyles = {
-    control: (provided, state) => ({
-      ...provided,
-      borderWidth: '2px',
-      borderRadius: '8px',
-      borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'rgba(191, 152, 83, 0.2)',
-      boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
-      '&:hover': {
-        borderColor: 'rgba(191, 152, 83, 0.2)',
-      }
-    }),
-  };
   useEffect(() => {
     if (selectedRow) {
       // Use mainInputAmount if it exists (updated amount), otherwise use original amount
@@ -114,28 +96,22 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
       setPopupAmount(baseAmount || "");
     }
   }, [selectedRow]);
-
   const getToday = () => {
     const today = new Date();
     return today.toISOString().split("T")[0];  // "YYYY-MM-DD"
   };
-
   const handleOpenModal = async (row) => {
     setMainDate(getToday());
     setActualAmount(row.amount);
     setSelectedRow(row);
-
     try {
       const response = await fetch(`https://backendaab.in/aabuildersDash/api/claim_payments/get/${row.id}`);
       const claimPayments = await response.json();
-
       const totalReceived = claimPayments.reduce(
         (sum, payment) => sum + Number(payment.amount),
         0
       );
-
       const remaining = row.amount - totalReceived;
-
       setRemainingAmount(remaining > 0 ? remaining : 0);
       setPopupAmount(remaining > 0 ? remaining : 0); // Prefill but editable
       console.log("Claim Payments: ", claimPayments);
@@ -159,14 +135,12 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
       amount: popupAmount,
       cash_register_status: false,
     };
-
     try {
       const response = await fetch("https://backendaab.in/aabuildersDash/api/claim_payments/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newPayment),
       });
-
       if (response.ok) {
         alert("Payment saved successfully!");
         window.location.reload();
@@ -180,7 +154,6 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
       alert("Error occurred while saving payment.");
     }
   };
-
   const claimedData = filteredData.filter(
     row => (receivedAmounts[row.id] || 0) >= row.amount
   );
@@ -194,7 +167,6 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
     const year = date.getFullYear();
     return `${day}-${month}-${year}`;
   };
-
   return (
     <body>
       <div className='bg-white w-[1700px] h-[500px] p-10 ml-10'>
@@ -230,7 +202,6 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
                       {(() => {
                         const actualAmount = row.amount;
                         const received = receivedAmounts[row.id] || 0;
-
                         if (received === 0) {
                           return (
                             <button
@@ -349,19 +320,16 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
                           disabled={payment.cash_register_status}
                           onClick={async () => {
                             if (payment.cash_register_status) return;
-
                             try {
-                              // 🔹 Check if already exists in backend
+                              //Check if already exists in backend
                               const res = await axios.get(
                                 `https://backendaab.in/aabuildersDash/api/cash-register/get/${payment.claimPaymentsId}`
                               );
-
                               if (res.data && res.data.length > 0) {
                                 alert("This payment is already in the cash register.");
                                 return;
                               }
-
-                              // 🔹 1) Save to Cash Register
+                              //Save to Cash Register
                               const cashRegisterPayload = {
                                 claim_payments_id: payment.claimPaymentsId,
                                 date: payment.date,
@@ -369,14 +337,12 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
                                 amount: payment.amount,
                                 cash_register_status: true,
                               };
-
                               await axios.post(
                                 "https://backendaab.in/aabuildersDash/api/cash-register/save",
                                 cashRegisterPayload,
                                 { headers: { "Content-Type": "application/json" } }
                               );
-
-                              // 🔹 2) Save to Payments Received
+                              //Save to Payments Received
                               const paymentsReceivedPayload = {
                                 date: payment.date,
                                 amount: Number(payment.amount),
@@ -384,25 +350,21 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
                                 weekly_number: "",
                                 status: false,
                               };
-
                               await axios.post(
                                 "https://backendaab.in/aabuildersDash/api/payments-received/save",
                                 paymentsReceivedPayload,
                                 { headers: { "Content-Type": "application/json" } }
                               );
-
-                              // 🔹 3) Update ClaimPayments.cashRegisterStatus → true
+                              //Update ClaimPayments.cashRegisterStatus → true
                               await axios.put(
                                 `https://backendaab.in/aabuildersDash/api/claim_payments/update-status/${payment.claimPaymentsId}?status=true`
                               );
-
-                              // 🔹 4) Update UI immediately
+                              // Update UI immediately
                               setClaimPaymentsData((prev) =>
                                 prev.map((p, i) =>
                                   i === idx ? { ...p, cashRegisterStatus: true } : p
                                 )
                               );
-
                               alert("Added to Cash Register, Payments Received & updated ClaimPayments ✅");
                             } catch (err) {
                               console.error("Error adding payment:", err);
@@ -453,7 +415,6 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
                     className="border border-[#BF9853]/25 rounded-lg h-[45px] px-3 py-2"
                   />
                 </div>
-
                 {/* Mode */}
                 <div className="flex flex-col text-left w-[168px]">
                   <label className="mb-1 font-bold">Mode</label>
@@ -470,8 +431,6 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
                   </select>
                 </div>
               </div>
-
-              {/* Save Buttons */}
               {/* Action Buttons */}
               <div className="flex gap-4 mt-4">
                 {editingIndex !== null ? (
@@ -501,7 +460,6 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
                   </button>
                 )}
               </div>
-
               {/* Close Button */}
               <button
                 onClick={() => setShowModal(false)}
@@ -516,5 +474,4 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
     </body>
   )
 }
-
 export default ClaimPaymentTableView

@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import Select from 'react-select';
-import Change from '../Images/dropdownchange.png'
+import Change from '../Images/dropdownchange.png';
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 const DailyHistory = () => {
     const [selectedWeek, setSelectedWeek] = useState("");
     const [weeks, setWeeks] = useState([]);
@@ -516,6 +518,291 @@ const DailyHistory = () => {
             alert("Error adding expense. Please try again.");
         }
     };
+    const sortedDailyExpenses = React.useMemo(() => {
+            let sortableData = [...dailyExpenses];
+            if (sortConfig.key) {
+                sortableData.sort((a, b) => {
+                    let aValue, bValue;
+                    switch (sortConfig.key) {
+                        case 'date':
+                            aValue = new Date(a.date);
+                            bValue = new Date(b.date);
+                            break;
+                        case 'labour_name':
+                            if (isChangeButtonActive) {
+                                const getAValue = () => {
+                                    const employee = employeeOptions.find(opt => opt.id === Number(a.employee_id));
+                                    const vendor = vendorOptions.find(opt => opt.id === Number(a.vendor_id));
+                                    const contractor = contractorOptions.find(opt => opt.id === Number(a.contractor_id));
+                                    return employee?.label || vendor?.label || contractor?.label || "";
+                                };
+                                const getBValue = () => {
+                                    const employee = employeeOptions.find(opt => opt.id === Number(b.employee_id));
+                                    const vendor = vendorOptions.find(opt => opt.id === Number(b.vendor_id));
+                                    const contractor = contractorOptions.find(opt => opt.id === Number(b.contractor_id));
+                                    return employee?.label || vendor?.label || contractor?.label || "";
+                                };
+                                aValue = getAValue();
+                                bValue = getBValue();
+                            } else {
+                                aValue = laboursList.find(opt => opt.id === Number(a.labour_id))?.label || "";
+                                bValue = laboursList.find(opt => opt.id === Number(b.labour_id))?.label || "";
+                            }
+                            break;
+                        case 'project_name':
+                            aValue = siteOptions.find(opt => opt.id === Number(a.project_id))?.label || "";
+                            bValue = siteOptions.find(opt => opt.id === Number(b.project_id))?.label || "";
+                            break;
+                        case 'type':
+                            aValue = a.type || "";
+                            bValue = b.type || "";
+                            break;
+                        case 'amount':
+                            aValue = Number(a.amount || 0) + Number(a.extra_amount || 0);
+                            bValue = Number(b.amount || 0) + Number(b.extra_amount || 0);
+                            break;
+                        default:
+                            return 0;
+                    }
+                    if (aValue < bValue) {
+                        return sortConfig.direction === 'asc' ? -1 : 1;
+                    }
+                    if (aValue > bValue) {
+                        return sortConfig.direction === 'asc' ? 1 : -1;
+                    }
+                    return 0;
+                });
+            } else {
+                // Default sorting: Most recent entries first (by date descending)
+                sortableData.sort((a, b) => {
+                    const dateA = new Date(a.date);
+                    const dateB = new Date(b.date);
+                    return dateB - dateA; // Descending order (newest first)
+                });
+            }
+            return sortableData;
+        }, [dailyExpenses, sortConfig, laboursList, siteOptions, isChangeButtonActive, combinedOptions, employeeOptions, vendorOptions, contractorOptions]);
+    const formatDateOnly = (dateString) => {
+        const date = new Date(dateString);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}-${month}-${year}`;
+    };
+    const generateExpensesPDF = () => {
+            if (!selectedDate || dailyExpenses.length === 0) {
+                alert("No data available to generate PDF");
+                return;
+            }
+            const doc = new jsPDF();
+            // Add header with PS number, title, date and day
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            // Get day name
+            const dateObj = new Date(selectedDate);
+            const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+            // Calculate center position for the header
+            const pageWidth = doc.internal.pageSize.width;
+            const headerText = `PS: ${selectedWeek}`;
+            const headerText1 = "DAILY PAYMENT STATEMENT";
+            const headerText2 = `${formatDateOnly(selectedDate)}`;
+            const headerWidth = doc.getTextWidth(headerText);
+            const headerX = (pageWidth - headerWidth) / 2;
+            doc.text(headerText1, 60, 24);
+            doc.text(headerText2, 170, 20);
+            doc.text(headerText, 14, 20);
+            // Add day name below
+            doc.setFontSize(10);
+            const dayText = dayName;
+            const dayWidth = doc.getTextWidth(dayText);
+            doc.text(dayText, 170, 27);
+            // Add lines above and below
+            doc.setLineWidth(0.5);
+            doc.line(14, 15, pageWidth - 14, 15); // Line above
+            doc.line(14, 30, pageWidth - 14, 30); // Line below
+            // Reset font
+            doc.setFont(undefined, 'normal');
+            // Calculate total amount for selected date
+            const filteredExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate);
+            const totalAmount = filteredExpenses.reduce(
+                (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
+                0
+            );
+            // Calculate total refund amount for selected date
+            const totalRefundAmount = refundPayments.reduce(
+                (sum, row) => sum + Number(row.amount || 0),
+                0
+            );
+            // Reset color for table
+            doc.setTextColor(0, 0, 0);
+            // Expenses table columns (removed Date column)
+            const expensesTableColumn = [
+                "SNO", "PROJECT NAME", "NAME", "QTY", "TYPE", "AMOUNT", "DESCRIPTION"
+            ];
+            // Prepare expenses with projectName and type for sorting
+            const expensesTableRows = filteredExpenses
+                .map((row, index) => {
+                    const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
+                    const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
+                    const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
+                    const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
+                    const name = [employee?.label, vendor?.label, contractor?.label, labour?.label]
+                        .filter(Boolean).join(" | ") || "";
+                    const projectName = siteOptions.find(opt => opt.id === Number(row.project_id))?.label || "";
+                    const amount = (row.amount || 0) + (row.extra_amount || 0);
+                    const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
+                    const quantity = row.quantity || "";
+                    const type = row.type || "";
+                    const description = row.description || "";
+                    return {
+                        sno: index + 1,
+                        projectName,
+                        name,
+                        quantity,
+                        type,
+                        amount: formattedAmount,
+                        description
+                    };
+                })
+                // Sort by projectName ASC, then by type DESC
+                .sort((a, b) => {
+                    const projectCompare = a.projectName.localeCompare(b.projectName);
+                    if (projectCompare !== 0) return projectCompare;
+                    return b.type.localeCompare(a.type); // type DESC
+                })
+                // Map to array format for autoTable
+                .map((row, idx) => [
+                    (idx + 1).toString(),
+                    row.projectName,
+                    row.name,
+                    row.quantity.toString(),
+                    row.type,
+                    row.amount,
+                    row.description
+                ]);
+            // Add total row for expenses
+            expensesTableRows.push([
+                "",
+                "TOTAL",
+                "",
+                "",
+                "",
+                `${totalAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`,
+                ""
+            ]);
+            const netBalance = totalAmount - totalRefundAmount;
+            // Add Expenses table heading
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "normal");
+            doc.text(`NET BALANCE: ${netBalance.toLocaleString('en-IN')}`, 155, 38);
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text('WAGE EXPENSES', 14, 48);
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text('EXPENDITURE PAYMENTS', 14, 38);
+            // Start expenses table
+            doc.autoTable({
+                startY: 50,
+                head: [expensesTableColumn],
+                body: expensesTableRows,
+                styles: {
+                    fontSize: 9,
+                    cellPadding: 2,
+                    halign: 'left',
+                    valign: 'middle',
+                    textColor: [80, 80, 80],
+                },
+                headStyles: {
+                    fillColor: [255, 248, 220], // Light orange color
+                    textColor: [0, 0, 0],
+                    fontStyle: 'bold',
+                    lineColor: [200, 200, 200],
+                    lineWidth: 0.1,
+                },
+                columnStyles: {
+                    0: { cellWidth: 13, halign: 'center', fillColor: [255, 255, 255] },    // SNO - white background
+                    1: { cellWidth: 47, halign: 'left' },      // Project Name
+                    2: { cellWidth: 34, halign: 'left' },      // Name
+                    3: { cellWidth: 12, halign: 'center' },    // Qty
+                    4: { cellWidth: 22, halign: 'left' },      // Type
+                    5: { cellWidth: 18, halign: 'right' },     // Amount
+                    6: { cellWidth: 35, halign: 'left' }       // Description
+                },
+                bodyStyles: {
+                    lineWidth: 0.1,
+                },
+                alternateRowStyles: {
+                    fillColor: false,
+                }
+            });
+            // Get the end position of the first table
+            const firstTableEndY = doc.lastAutoTable.finalY;
+            // Add some space between tables
+            const spaceBetweenTables = 10;
+            // Refund Received table columns
+            const refundTableColumn = [
+                "SNO", "NAME", "AMOUNT"
+            ];
+            const refundTableRows = refundPayments
+                .reverse()
+                .map((row, index) => {
+                    const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
+                    const name = labour?.label || "";
+                    const amount = Number(row.amount || 0);
+                    const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
+                    return [
+                        (index + 1).toString(),
+                        name,
+                        formattedAmount
+                    ];
+                });
+            // Add total row for refunds
+            refundTableRows.push([
+                "",
+                "TOTAL",
+                `${totalRefundAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
+            ]);
+            
+            
+            // Add Refund Received table heading
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text('WAGE REFUND', 14, firstTableEndY + spaceBetweenTables - 2);
+            // Add Refund Received table
+            doc.autoTable({
+                startY: firstTableEndY + spaceBetweenTables,
+                head: [refundTableColumn],
+                body: refundTableRows,
+                styles: {
+                    fontSize: 9,
+                    cellPadding: 2,
+                    halign: 'left',
+                    valign: 'middle',
+                    textColor: [80, 80, 80],
+                },
+                headStyles: {
+                    fillColor: [255, 248, 220], // Light orange color
+                    textColor: [0, 0, 0],
+                    fontStyle: 'bold',
+                    lineColor: [200, 200, 200],
+                    lineWidth: 0.1,
+                },
+                bodyStyles: {
+                    lineWidth: 0.1,
+                },
+                alternateRowStyles: {
+                    fillColor: false,
+                },
+                columnStyles: {
+                    0: { cellWidth: 15, halign: 'center', fillColor: [255, 255, 255] },    // SNS - white background
+                    1: { cellWidth: 50, halign: 'left' },      // Name
+                    2: { cellWidth: 25, halign: 'right' }      // Amount
+                }
+            });
+            const fileName = `PS ${selectedWeek} - Daily Payment Statement ${formatDateOnly(selectedDate)}.pdf`;
+            doc.save(fileName);
+        };
     return (
         <body>
             <h1 className="font-bold text-xl flex justify-end mr-20 -mt-7">
@@ -590,6 +877,9 @@ const DailyHistory = () => {
                             </div>
                         </div>
                     )}
+                </div>
+                <div className="mr-5">
+                    <button onClick={generateExpensesPDF} className='font-semibold mt-4 mr-5 hover:text-[#E4572E]'>Report</button>
                 </div>
             </div>
             <div className="mt-4 flex justify-end mr-4 lg:mr-16">
@@ -852,7 +1142,7 @@ const DailyHistory = () => {
                                                     </td>
                                                     <td className="px-1 py-2">
                                                         <div className="w-[80px] h-[40px] flex items-center">
-                                                            {row.description || "-"}
+                                                           
                                                         </div>
                                                     </td>
                                                 </tr>

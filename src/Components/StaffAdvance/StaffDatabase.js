@@ -50,7 +50,7 @@ const StaffDatabase = () => {
         // Fetch staff advance records
         let recData = [];
         try {
-          const recRes = await fetch('/api/staff-advance/all');
+          const recRes = await fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all');
           if (recRes.ok) {
             recData = await recRes.json();
           } else {
@@ -78,7 +78,7 @@ const StaffDatabase = () => {
         // Fetch purposes data
         let purData = [];
         try {
-          const purRes = await fetch('/api/purposes/all');
+          const purRes = await fetch('https://backendaab.in/aabuildersDash/api/purposes/getAll');
           if (purRes.ok) {
             purData = await purRes.json();
           } else {
@@ -349,7 +349,7 @@ const StaffDatabase = () => {
     .reduce((acc, r) => acc + (r.amount || 0), 0);
   const transferTotal = filteredRecords
     .filter(r => r.type === 'Transfer')
-    .reduce((acc, r) => acc + (r.amount || 0), 0);
+    .reduce((acc, r) => acc + (r.amount > 0 ? r.amount : 0), 0);
   const refundTotal = filteredRecords
     .filter(r => r.type === 'Refund')
     .reduce((acc, r) => acc + (r.staff_refund_amount || 0), 0);
@@ -515,27 +515,27 @@ const StaffDatabase = () => {
 
   return (
     <body>
-      <div className='w-full max-w-[1750px] h-auto bg-white text-left lg:flex gap-5 p-5 ml-10'>
+      <div className='w-full max-w-[1750px] h-auto bg-white text-left flex  sm:flex-row gap-3 p-3 sm:p-5 mx-2 ml-10 mr-10'>
         <div className=''>
-          <label className='block mb-2 font-semibold'>Advance Amount</label>
+          <label className='block mb-2 font-semibold text-sm sm:text-base'>Advance Amount</label>
           <input
-            className='w-[183px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
+            className='w-full max-w-[183px] h-[40px] sm:h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2 text-sm sm:text-base'
             value={`₹${advanceTotal.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
             readOnly
           />
         </div>
-        <div className=' '>
-          <label className='block mb-2 font-semibold'>Transfer Amount</label>
+        <div className=''>
+          <label className='block mb-2 font-semibold text-sm sm:text-base'>Transfer Amount</label>
           <input
-            className='w-[220px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
+            className='w-full max-w-[220px] h-[40px] sm:h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2 text-sm sm:text-base'
             value={`₹${transferTotal.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
             readOnly
           />
         </div>
         <div className=''>
-          <label className='block mb-2 font-semibold'>Refund Amount</label>
+          <label className='block mb-2 font-semibold text-sm sm:text-base'>Refund Amount</label>
           <input
-            className='w-[220px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
+            className='w-full max-w-[220px] h-[40px] sm:h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2 text-sm sm:text-base'
             value={`₹${refundTotal.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
             readOnly
           />
@@ -548,78 +548,78 @@ const StaffDatabase = () => {
           <p>{error}</p>
         </div>
       )}
-      <div className='w-full max-w-[1750px] bg-white mt-5 pt-5 ml-10'>
+      <div className='w-full max-w-[1750px] bg-white mt-3 sm:mt-5 pt-3 sm:pt-5 mx-2 ml-10 mr-5'>
         <div
           className={`text-left flex ${selectDate || selectEmployeeName || selectPurpose || selectTransferTo || selectType || selectMode
-            ? 'flex-col sm:flex-row sm:justify-between'
-            : 'flex-row justify-between items-center'
-            } mb-3 gap-2`}>
+            ? 'flex-col lg:flex-row lg:justify-between'
+            : 'flex-col sm:flex-row sm:justify-between sm:items-center'
+            } mb-3 gap-3 sm:gap-2`}>
           <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3">
-            <button className='pl-2' onClick={() => setShowFilters(!showFilters)}>
+            <button className='pl-0 sm:pl-2' onClick={() => setShowFilters(!showFilters)}>
               <img
                 src={Filter}
                 alt="Toggle Filter"
-                className="w-7 h-7 border border-[#BF9853] rounded-md ml-3"
+                className="w-6 h-6 sm:w-7 sm:h-7 border border-[#BF9853] rounded-md ml-0 sm:ml-3"
               />
             </button>
             {(selectDate || selectEmployeeName || selectPurpose || selectTransferTo || selectType || selectMode) && (
               <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
                 {selectDate && (
-                  <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
+                  <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 py-1 text-xs sm:text-sm font-medium w-fit">
                     <span className="font-normal">Date: </span>
                     <span className="font-bold">{selectDate}</span>
-                    <button onClick={() => setSelectDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                    <button onClick={() => setSelectDate('')} className="text-[#BF9853] ml-1 text-lg sm:text-2xl">×</button>
                   </span>
                 )}
                 {selectEmployeeName && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
+                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-xs sm:text-sm font-medium w-fit">
                     <span className="font-normal">Employee: </span>
                     <span className="font-bold">{selectEmployeeName}</span>
-                    <button onClick={() => setSelectEmployeeName('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                    <button onClick={() => setSelectEmployeeName('')} className="text-[#BF9853] text-lg sm:text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectPurpose && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
+                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-xs sm:text-sm font-medium w-fit">
                     <span className="font-normal">Purpose:</span>
                     <span className="font-bold">{selectPurpose}</span>
-                    <button onClick={() => setSelectPurpose('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                    <button onClick={() => setSelectPurpose('')} className="text-[#BF9853] text-lg sm:text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectTransferTo && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
+                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-xs sm:text-sm font-medium w-fit">
                     <span className="font-normal">Transfer To: </span>
                     <span className="font-bold">{selectTransferTo}</span>
-                    <button onClick={() => setSelectTransferTo('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                    <button onClick={() => setSelectTransferTo('')} className="text-[#BF9853] text-lg sm:text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectType && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
+                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-xs sm:text-sm font-medium w-fit">
                     <span className="font-normal">Type: </span>
                     <span className="font-bold">{selectType}</span>
-                    <button onClick={() => setSelectType('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                    <button onClick={() => setSelectType('')} className="text-[#BF9853] text-lg sm:text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectMode && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
+                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-xs sm:text-sm font-medium w-fit">
                     <span className="font-normal">Mode: </span>
                     <span className="font-bold">{selectMode}</span>
-                    <button onClick={() => setSelectMode('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                    <button onClick={() => setSelectMode('')} className="text-[#BF9853] text-lg sm:text-2xl ml-1">×</button>
                   </span>
                 )}
               </div>
             )}
           </div>
-          <div className='space-x-4 flex justify-end mr-4'>
-            <button onClick={exportPDF} className='text-sm text-[#E4572E] hover:underline font-bold'>Export PDF</button>
-            <button onClick={exportCSV} className='text-sm text-[#007233] hover:underline font-bold'>Export XL</button>
-            <button className='text-sm text-[#BF9853] hover:underline font-bold'>Print</button>
+          <div className='flex flex-col sm:flex-row gap-2 sm:gap-4 sm:justify-end sm:mr-4'>
+            <button onClick={exportPDF} className='text-xs sm:text-sm text-[#E4572E] hover:underline font-bold text-left sm:text-right'>Export PDF</button>
+            <button onClick={exportCSV} className='text-xs sm:text-sm text-[#007233] hover:underline font-bold text-left sm:text-right'>Export XL</button>
+            <button className='text-xs sm:text-sm text-[#BF9853] hover:underline font-bold text-left sm:text-right'>Print</button>
           </div>
         </div>
-        <div className='border-l-8 border-l-[#BF9853] rounded-lg ml-5 mr-5'>
+        <div className='border-l-8 border-l-[#BF9853] rounded-lg ml-2 sm:ml-5 mr-2 sm:mr-5'>
           {/* Single Table with Scrollable Container */}
           <div
             ref={scrollRef}
-            className='overflow-auto max-h-[600px]'
+            className='overflow-auto max-h-[400px] sm:max-h-[600px]'
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
@@ -629,72 +629,81 @@ const StaffDatabase = () => {
               <thead className="sticky top-0 z-10 bg-white ">
                 <tr className="bg-[#FAF6ED]">
                   <th
-                    className="pt-2 pl-3 min-w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                    className="pt-2 pl-1 sm:pl-3 min-w-[80px] sm:min-w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 text-xs sm:text-sm"
                     onClick={() => handleSort('date')}
                   >
-                    Timestamp {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <span className="hidden sm:inline">Timestamp</span>
+                    <span className="sm:hidden">Time</span> {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
                   <th
-                    className="pt-2 pl-3 min-w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                    className="pt-2 pl-1 sm:pl-3 min-w-[80px] sm:min-w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 text-xs sm:text-sm"
                     onClick={() => handleSort('date')}
                   >
                     Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
                   <th
-                    className="px-2 min-w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                    className="px-1 sm:px-2 min-w-[120px] sm:min-w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 text-xs sm:text-sm"
                     onClick={() => handleSort('employee')}
                   >
-                    Contractor/Vendor {sortConfig.key === 'employee' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <span className="hidden sm:inline">Contractor/Vendor</span>
+                    <span className="sm:hidden">Employee</span> {sortConfig.key === 'employee' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
                   <th
-                    className="px-2 min-w-[200px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                    className="px-1 sm:px-2 min-w-[150px] sm:min-w-[200px] font-bold text-left cursor-pointer hover:bg-gray-200 text-xs sm:text-sm"
                     onClick={() => handleSort('purpose')}
                   >
                     Purpose {sortConfig.key === 'purpose' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
                   <th
-                    className="px-2 min-w-[200px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                    className="px-1 sm:px-2 min-w-[150px] sm:min-w-[200px] font-bold text-left cursor-pointer hover:bg-gray-200 text-xs sm:text-sm"
                     onClick={() => handleSort('transfer')}
                   >
-                    Transfer To {sortConfig.key === 'transfer' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <span className="hidden sm:inline">Transfer To</span>
+                    <span className="sm:hidden">Transfer</span> {sortConfig.key === 'transfer' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="px-2 min-w-[80px] font-bold text-left">Advance</th>
-                  <th className="px-2 min-w-[80px] font-bold text-left">Refund</th>
+                  <th className="px-1 sm:px-2 min-w-[60px] sm:min-w-[80px] font-bold text-left text-xs sm:text-sm">Advance</th>
+                  <th className="px-1 sm:px-2 min-w-[60px] sm:min-w-[80px] font-bold text-left text-xs sm:text-sm">Refund</th>
                   <th
-                    className="px-2 min-w-[80px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                    className="px-1 sm:px-2 min-w-[60px] sm:min-w-[80px] font-bold text-left cursor-pointer hover:bg-gray-200 text-xs sm:text-sm"
                     onClick={() => handleSort('type')}
                   >
                     Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
                   <th
-                    className="px-2 min-w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 pl-3"
+                    className="px-1 sm:px-2 min-w-[80px] sm:min-w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 text-xs sm:text-sm"
                     onClick={() => handleSort('mode')}
                   >
                     Mode {sortConfig.key === 'mode' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="px-2 min-w-[100px] font-bold text-left">Description</th>
-                  <th className="px-2 min-w-[80px] font-bold text-left">Attached file</th>
-                  <th className="px-2 min-w-[60px] font-bold text-left">E.No</th>
-                  <th className="px-2 min-w-[80px] font-bold text-left">Activity</th>
+                  <th className="px-1 sm:px-2 min-w-[80px] sm:min-w-[100px] font-bold text-left text-xs sm:text-sm">
+                    <span className="hidden sm:inline">Description</span>
+                    <span className="sm:hidden">Desc</span>
+                  </th>
+                  <th className="px-1 sm:px-2 min-w-[60px] sm:min-w-[80px] font-bold text-left text-xs sm:text-sm">
+                    <span className="hidden sm:inline">Attached file</span>
+                    <span className="sm:hidden">File</span>
+                  </th>
+                  <th className="px-1 sm:px-2 min-w-[50px] sm:min-w-[60px] font-bold text-left text-xs sm:text-sm">E.No</th>
+                  <th className="px-1 sm:px-2 min-w-[60px] sm:min-w-[80px] font-bold text-left text-xs sm:text-sm">Activity</th>
                 </tr>
                 {showFilters && (
                   <tr className="bg-white border-b border-gray-200">
-                    <th className="pt-2 pb-2 w-44">
+                    <th className="pt-2 pb-2 min-w-[120px] sm:w-44">
                       <input
                         type="date"
-                        className="p-1 rounded-md bg-transparent w-32 border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none mr-10"
+                        className="p-1 rounded-md bg-transparent w-full max-w-[120px] sm:w-32 border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs sm:text-sm"
                       />
                     </th>
-                    <th className="pt-2 pb-2 w-44">
+                    <th className="pt-2 pb-2 min-w-[120px] sm:w-44">
                       <input
                         type="date"
                         value={selectDate}
                         onChange={(e) => setSelectDate(e.target.value)}
-                        className="p-1 rounded-md bg-transparent w-32 border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none mr-10"
+                        className="p-1 rounded-md bg-transparent w-full max-w-[120px] sm:w-32 border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs sm:text-sm"
                         placeholder="Search Date..."
                       />
                     </th>
-                    <th className="pt-2 pb-2 w-[220px]">
+                    <th className="pt-2 pb-2 min-w-[150px] sm:w-[220px]">
                       <Select
                         options={employees}
                         value={selectEmployeeName ? { value: selectEmployeeName, label: selectEmployeeName } : null}
@@ -716,11 +725,14 @@ const StaffDatabase = () => {
                             '&:hover': {
                               borderColor: 'rgba(191, 152, 83, 0.2)',
                             },
+                            minHeight: '32px',
+                            fontSize: '12px',
                           }),
                           placeholder: (provided) => ({
                             ...provided,
                             color: '#999',
                             textAlign: 'left',
+                            fontSize: '12px',
                           }),
                           menu: (provided) => ({
                             ...provided,
@@ -730,7 +742,7 @@ const StaffDatabase = () => {
                             ...provided,
                             textAlign: 'left',
                             fontWeight: 'normal',
-                            fontSize: '15px',
+                            fontSize: '12px',
                             backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
                             color: 'black',
                           }),
@@ -739,11 +751,12 @@ const StaffDatabase = () => {
                             textAlign: 'left',
                             fontWeight: 'normal',
                             color: 'black',
+                            fontSize: '12px',
                           }),
                         }}
                       />
                     </th>
-                    <th className="pt-2 pb-2 w-[300px]">
+                    <th className="pt-2 pb-2 min-w-[180px] sm:w-[300px]">
                       <Select
                         options={purposes}
                         value={selectPurpose ? { value: selectPurpose, label: selectPurpose } : null}
@@ -765,11 +778,14 @@ const StaffDatabase = () => {
                             '&:hover': {
                               borderColor: 'rgba(191, 152, 83, 0.2)',
                             },
+                            minHeight: '32px',
+                            fontSize: '12px',
                           }),
                           placeholder: (provided) => ({
                             ...provided,
                             color: '#999',
                             textAlign: 'left',
+                            fontSize: '12px',
                           }),
                           menu: (provided) => ({
                             ...provided,
@@ -779,7 +795,7 @@ const StaffDatabase = () => {
                             ...provided,
                             textAlign: 'left',
                             fontWeight: 'normal',
-                            fontSize: '15px',
+                            fontSize: '12px',
                             backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
                             color: 'black',
                           }),
@@ -788,11 +804,12 @@ const StaffDatabase = () => {
                             textAlign: 'left',
                             fontWeight: 'normal',
                             color: 'black',
+                            fontSize: '12px',
                           }),
                         }}
                       />
                     </th>
-                    <th className="pt-2 pb-2 w-[350px]">
+                    <th className="pt-2 pb-2 min-w-[200px] sm:w-[350px]">
                       <Select
                         options={purposes}
                         value={selectTransferTo ? { value: selectTransferTo, label: selectTransferTo } : null}
@@ -814,11 +831,14 @@ const StaffDatabase = () => {
                             '&:hover': {
                               borderColor: 'rgba(191, 152, 83, 0.2)',
                             },
+                            minHeight: '32px',
+                            fontSize: '12px',
                           }),
                           placeholder: (provided) => ({
                             ...provided,
                             color: '#999',
                             textAlign: 'left',
+                            fontSize: '12px',
                           }),
                           menu: (provided) => ({
                             ...provided,
@@ -828,7 +848,7 @@ const StaffDatabase = () => {
                             ...provided,
                             textAlign: 'left',
                             fontWeight: 'normal',
-                            fontSize: '15px',
+                            fontSize: '12px',
                             backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
                             color: 'black',
                           }),
@@ -837,17 +857,18 @@ const StaffDatabase = () => {
                             textAlign: 'left',
                             fontWeight: 'normal',
                             color: 'black',
+                            fontSize: '12px',
                           }),
                         }}
                       />
                     </th>
                     <th className=' pt-2 pb-2'></th>
                     <th className=' pt-2 pb-2'></th>
-                    <th className="pt-2 pb-2">
+                    <th className="pt-2 pb-2 min-w-[100px]">
                       <select
                         value={selectType}
                         onChange={(e) => setSelectType(e.target.value)}
-                        className="p-1 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                        className="p-1 rounded-md bg-transparent w-full max-w-[100px] sm:w-[120px] h-[32px] sm:h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
                         placeholder="Type..."
                       >
                         <option value=''>Select Type...</option>
@@ -856,11 +877,11 @@ const StaffDatabase = () => {
                         <option value='Refund'>Refund</option>
                       </select>
                     </th>
-                    <th className="pt-2 pb-2">
+                    <th className="pt-2 pb-2 min-w-[100px]">
                       <select
                         value={selectMode}
                         onChange={(e) => setSelectMode(e.target.value)}
-                        className="p-1 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                        className="p-1 rounded-md bg-transparent w-full max-w-[100px] sm:w-[120px] h-[32px] sm:h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
                         placeholder="Mode..."
                       >
                         <option value=''>Select</option>
@@ -877,21 +898,86 @@ const StaffDatabase = () => {
                 )}
               </thead>
               <tbody>
-                
+                {currentData.length > 0 ? (
+                  currentData.map((entry) => (
+                    <tr key={entry.id} className="odd:bg-white even:bg-[#FAF6ED]">
+                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[80px] sm:min-w-[100px] font-semibold">
+                        <span className="hidden sm:inline">{formatDate(entry.timestamp)}</span>
+                        <span className="sm:hidden">{formatDate(entry.timestamp).split(' ')[1]}</span>
+                      </td>
+                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[80px] sm:min-w-[100px] font-semibold">{formatDateOnly(entry.date)}</td>
+                      {/* Employee Name */}
+                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[120px] sm:min-w-[150px] font-semibold">
+                        <span className="truncate block max-w-[120px] sm:max-w-[150px]" title={getEmployeeName(entry.employee_id)}>
+                          {getEmployeeName(entry.employee_id)}
+                        </span>
+                      </td>
+                      {/* Purpose */}
+                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[150px] sm:min-w-[200px] font-semibold">
+                        <span className="truncate block max-w-[150px] sm:max-w-[200px]" title={getPurposeName(entry.from_purpose_id)}>
+                          {getPurposeName(entry.from_purpose_id)}
+                        </span>
+                      </td>
+                      {/* Transfer Purpose */}
+                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[150px] sm:min-w-[200px] font-semibold">
+                        <span className="truncate block max-w-[150px] sm:max-w-[200px]" title={getPurposeName(entry.to_purpose_id)}>
+                          {getPurposeName(entry.to_purpose_id)}
+                        </span>
+                      </td>
+                      {/* Amount */}
+                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[60px] sm:min-w-[80px] font-semibold">
+                        {entry.amount != null && entry.amount !== ""
+                          ? Number(entry.amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })
+                          : ""}
+                      </td>
+                      {/* Refund Amount */}
+                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[60px] sm:min-w-[80px] font-semibold">
+                        {entry.staff_refund_amount != null && entry.staff_refund_amount !== ""
+                          ? Number(entry.staff_refund_amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })
+                          : ""}
+                      </td>
+                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[60px] sm:min-w-[80px] font-semibold">{entry.type}</td>
+                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[80px] sm:min-w-[100px] font-semibold">{entry.staff_payment_mode}</td>
+                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[80px] sm:min-w-[100px] font-semibold">
+                        <span className="truncate block max-w-[80px] sm:max-w-[100px]" title={entry.description}>
+                          {entry.description}
+                        </span>
+                      </td>
+                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[60px] sm:min-w-[80px]"></td>
+                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[50px] sm:min-w-[60px] font-semibold">{entry.entry_no}</td>
+                      <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[60px] sm:min-w-[80px]">
+                        <button className="rounded-full transition duration-200 ml-1 sm:ml-2 mr-1 sm:mr-3">
+                          <img
+                            src={edit}
+                            onClick={() => handleEditClick(entry)}
+                            alt="Edit"
+                            className="w-3 h-4 sm:w-4 sm:h-6 transform hover:scale-110 hover:brightness-110 transition duration-200"
+                          />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td className="p-2 text-center text-sm text-gray-400" colSpan={12}>
+                      No data available
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
         </div>
         {/* Pagination Controls */}
         {sortedData.length > 0 && (
-          <div className="flex flex-col sm:flex-row justify-between items-center px-5 py-4 bg-white border-t border-gray-200">
+          <div className="flex flex-col sm:flex-row justify-between items-center px-3 sm:px-5 py-3 sm:py-4 bg-white border-t border-gray-200 mx-2 sm:mx-0">
             {/* Items per page selector */}
-            <div className="flex items-center space-x-2 mb-4 sm:mb-0">
-              <label className="text-sm font-medium text-gray-700">Show:</label>
+            <div className="flex items-center space-x-2 mb-3 sm:mb-0">
+              <label className="text-xs sm:text-sm font-medium text-gray-700">Show:</label>
               <select
                 value={itemsPerPage}
                 onChange={handleItemsPerPageChange}
-                className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent"
+                className="border border-gray-300 rounded-md px-1 sm:px-2 py-1 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent"
               >
                 <option value={50}>50</option>
                 <option value={100}>100</option>
@@ -905,46 +991,48 @@ const StaffDatabase = () => {
                 <option value={900}>900</option>
                 <option value={1000}>1000</option>
               </select>
-              <span className="text-sm text-gray-700">entries</span>
+              <span className="text-xs sm:text-sm text-gray-700">entries</span>
             </div>
 
             {/* Page info */}
-            <div className="text-sm text-gray-700 mb-4 sm:mb-0">
-              Showing {startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries
+            <div className="text-xs sm:text-sm text-gray-700 mb-3 sm:mb-0 text-center">
+              <span className="hidden sm:inline">Showing {startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries</span>
+              <span className="sm:hidden">{startIndex + 1}-{Math.min(endIndex, sortedData.length)} of {sortedData.length}</span>
             </div>
 
             {/* Pagination buttons */}
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1 sm:space-x-2">
               <button
                 onClick={goToPreviousPage}
                 disabled={currentPage === 1}
-                className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === 1
+                className={`px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium rounded-md ${currentPage === 1
                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
                   }`}
               >
-                Previous
+                <span className="hidden sm:inline">Previous</span>
+                <span className="sm:hidden">Prev</span>
               </button>
 
               {/* Page numbers */}
               <div className="flex items-center space-x-1">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
                   let pageNum;
-                  if (totalPages <= 5) {
+                  if (totalPages <= 3) {
                     pageNum = i + 1;
-                  } else if (currentPage <= 3) {
+                  } else if (currentPage <= 2) {
                     pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
+                  } else if (currentPage >= totalPages - 1) {
+                    pageNum = totalPages - 2 + i;
                   } else {
-                    pageNum = currentPage - 2 + i;
+                    pageNum = currentPage - 1 + i;
                   }
 
                   return (
                     <button
                       key={pageNum}
                       onClick={() => goToPage(pageNum)}
-                      className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === pageNum
+                      className={`px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium rounded-md ${currentPage === pageNum
                         ? 'bg-[#BF9853] text-white'
                         : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
                         }`}
@@ -958,7 +1046,7 @@ const StaffDatabase = () => {
               <button
                 onClick={goToNextPage}
                 disabled={currentPage === totalPages}
-                className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === totalPages
+                className={`px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium rounded-md ${currentPage === totalPages
                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
                   }`}
@@ -969,17 +1057,17 @@ const StaffDatabase = () => {
           </div>
         )}
         {isEditModalOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-            <div className="bg-white p-6 rounded-lg w-[700px]">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
+            <div className="bg-white p-4 sm:p-6 rounded-lg w-full max-w-[700px] max-h-[90vh] overflow-y-auto">
               <h2 className="text-lg font-bold mb-4">Edit Entry</h2>
-              <div className='grid grid-cols-2 gap-4 text-left ml-5'>
+              <div className='grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-left ml-0 sm:ml-5'>
                 {/* Select Type */}
-                <div className='flex items-center gap-3'>
-                  <label className='font-semibold text-[#E4572E]'>Select Type</label>
+                <div className='flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3'>
+                  <label className='font-semibold text-[#E4572E] text-sm sm:text-base'>Select Type</label>
                   <select
                     value={editFormData.type}
                     onChange={(e) => setEditFormData({ ...editFormData, type: e.target.value })}
-                    className='w-[163px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
+                    className='w-full sm:w-[163px] h-[40px] sm:h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
                   >
                     <option value=''>Select Type...</option>
                     <option value='Advance'>Advance</option>
@@ -988,26 +1076,26 @@ const StaffDatabase = () => {
                   </select>
                 </div>
                 {/* Date */}
-                <div className='flex items-center gap-3'>
-                  <label className='font-semibold text-[#E4572E]'>Date</label>
+                <div className='flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3'>
+                  <label className='font-semibold text-[#E4572E] text-sm sm:text-base'>Date</label>
                   <input
                     type='date'
                     placeholder='dd-mm-yyyy'
                     value={editFormData.date}
                     onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
-                    className='w-[144px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
+                    className='w-full sm:w-[144px] h-[40px] sm:h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
                   />
                 </div>
                 {/* Employee */}
-                <div className=''>
+                <div className='sm:col-span-1'>
                   <div className='flex'>
-                    <label className='font-semibold block'>Employee</label>
+                    <label className='font-semibold block text-sm sm:text-base'>Employee</label>
                   </div>
                   <Select
                     options={employees}
                     value={employees.find(emp => emp.id === editFormData.employee_id) || null}
                     onChange={(selected) => setEditFormData({ ...editFormData, employee_id: selected?.id || '' })}
-                    className='w-[263px] h-[45px] rounded-lg focus:outline-none'
+                    className='w-full sm:w-[263px] h-[40px] sm:h-[45px] rounded-lg focus:outline-none'
                     isClearable
                     styles={{
                       control: (provided, state) => ({
@@ -1018,14 +1106,24 @@ const StaffDatabase = () => {
                         boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
                         '&:hover': {
                           borderColor: 'rgba(191, 152, 83, 0.2)',
-                        }
+                        },
+                        minHeight: '40px',
+                        fontSize: '14px',
+                      }),
+                      placeholder: (provided) => ({
+                        ...provided,
+                        fontSize: '14px',
+                      }),
+                      singleValue: (provided) => ({
+                        ...provided,
+                        fontSize: '14px',
                       }),
                     }}
                   />
                 </div>
                 {/* Purpose */}
-                <div>
-                  <label className='font-semibold block'>Purpose</label>
+                <div className='sm:col-span-1'>
+                  <label className='font-semibold block text-sm sm:text-base'>Purpose</label>
                   <Select
                     options={purposes}
                     value={purposes.find(purp => purp.id === editFormData.from_purpose_id) || null}
@@ -1039,15 +1137,25 @@ const StaffDatabase = () => {
                         boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
                         '&:hover': {
                           borderColor: 'rgba(191, 152, 83, 0.2)',
-                        }
+                        },
+                        minHeight: '40px',
+                        fontSize: '14px',
+                      }),
+                      placeholder: (provided) => ({
+                        ...provided,
+                        fontSize: '14px',
+                      }),
+                      singleValue: (provided) => ({
+                        ...provided,
+                        fontSize: '14px',
                       }),
                     }}
                     isClearable
-                    className='w-[263px] h-[45px] focus:outline-none' />
+                    className='w-full sm:w-[263px] h-[40px] sm:h-[45px] focus:outline-none' />
                 </div>
                 {/* Amount */}
-                <div>
-                  <label className='font-semibold block'>
+                <div className='sm:col-span-1'>
+                  <label className='font-semibold block text-sm sm:text-base'>
                     {editFormData.type === 'Refund' ? 'Refund Amount' : 'Amount Given'}
                   </label>
                   <input
@@ -1062,16 +1170,16 @@ const StaffDatabase = () => {
                         }
                       }
                     }}
-                    className='w-[263px] h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
+                    className='w-full sm:w-[263px] h-[40px] sm:h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
                   />
                 </div>
                 {/* Payment Mode */}
-                <div className=''>
-                  <label className='font-semibold block'>Payment Mode</label>
+                <div className='sm:col-span-1'>
+                  <label className='font-semibold block text-sm sm:text-base'>Payment Mode</label>
                   <select
                     value={editFormData.staff_payment_mode}
                     onChange={(e) => setEditFormData({ ...editFormData, staff_payment_mode: e.target.value })}
-                    className='w-[263px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'>
+                    className='w-full sm:w-[263px] h-[40px] sm:h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'>
                     <option value=''>Select</option>
                     <option value='Cash'>Cash</option>
                     <option value='GPay'>GPay</option>
@@ -1079,26 +1187,26 @@ const StaffDatabase = () => {
                   </select>
                 </div>
                 {/* Description */}
-                <div className='col-span-2'>
-                  <label className='font-semibold block'>Description</label>
+                <div className='col-span-1 sm:col-span-2'>
+                  <label className='font-semibold block text-sm sm:text-base'>Description</label>
                   <textarea
                     rows={2}
                     value={editFormData.description}
                     onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
-                    className='w-[590px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'>
+                    className='w-full sm:w-[590px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'>
                   </textarea>
                 </div>
               </div>
-              <div className="flex justify-end gap-3 mt-4">
+              <div className="flex flex-col sm:flex-row justify-end gap-3 mt-4">
                 <button
                   onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 border border-[#BF9853] w-[100px] h-[45px] rounded"
+                  className="px-4 py-2 border border-[#BF9853] w-full sm:w-[100px] h-[40px] sm:h-[45px] rounded text-sm sm:text-base"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleUpdate}
-                  className="px-4 py-2 bg-[#BF9853] w-[100px] h-[45px] text-white rounded"
+                  className="px-4 py-2 bg-[#BF9853] w-full sm:w-[100px] h-[40px] sm:h-[45px] text-white rounded text-sm sm:text-base"
                 >
                   Save
                 </button>
@@ -1112,3 +1220,16 @@ const StaffDatabase = () => {
 }
 
 export default StaffDatabase
+const formatDate = (dateString) => {
+  const date = new Date(dateString);
+  date.setMinutes(date.getMinutes());
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  let hours = date.getHours();
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? String(hours).padStart(2, '0') : '12';
+  return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+};

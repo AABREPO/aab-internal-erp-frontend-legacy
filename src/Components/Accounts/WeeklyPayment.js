@@ -531,7 +531,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             .then((res) => res.json())
             .then((data) => {
                 setAllRefundAmount(data);
-                console.log("All Refund Data:", data);
             })
             .catch(console.error);
     }, [currentWeekNumber]);
@@ -848,7 +847,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 );
 
                 const data = await res.json().catch(() => null);
-                console.log("✅ Advance portal cleared response:", res.status, data);
             }
 
             // ✅ Case 2: Other → Project Advance OR update Project Advance
@@ -1100,7 +1098,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     };
 
     const sortedExpenses = React.useMemo(() => {
-        console.log("Filtered Expenses:", filteredExpenses);
         let sortableData = [...filteredExpenses].reverse();
         if (sortConfig.key) {
             sortableData.sort((a, b) => {
@@ -1209,7 +1206,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             alert("Failed to update description");
         }
     };
-
     return (
         <div>
             {/* Balance display */}
@@ -1283,13 +1279,12 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                 )}
                             </div>
                         </div>
-
                         {/* Expenses Table */}
                         <div className="w-full h-[600px] rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden">
                             {/* Single Table with Scrollable Container */}
                             <div
                                 ref={scrollRef}
-                                className="overflow-auto max-h-[600px]"
+                                className="overflow-auto max-h-[600px] thin-scrollbar"
                                 onMouseDown={handleMouseDown}
                                 onMouseMove={handleMouseMove}
                                 onMouseUp={handleMouseUp}

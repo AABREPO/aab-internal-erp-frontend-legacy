@@ -205,6 +205,18 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
               }}>
               <p className="text-sm cursor-pointer"><li>Advance Portal</li></p>
             </Link>
+            <Link to={hasAccessToModel('Loan Portal') ? 'loan/loanportal' : '#'}
+              className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Loan Portal' ? 'text-red-500' : ''}`}
+              onClick={(e) => {
+                if (!hasAccessToModel('Loan Portal')) {
+                  e.preventDefault();
+                  alert("No permissions for this page");
+                  return;
+                }
+                handleSubmenuItemClick('Loan Portal');
+              }}>
+              <p className="text-sm cursor-pointer"><li>Loan Portal</li></p>
+            </Link>
             <Link to={hasAccessToModel('Payment Receipt') ? '/paymentReceipt' : '#'}
               className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Payment Receipt' ? 'text-red-500' : ''}`}
               onClick={(e) => {
@@ -454,7 +466,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
             </Link>
           </div>
         )}
-        <div className="mt-[20rem] ml-4 w-44">
+        <div className="mt-[6rem] ml-4 w-44">
           <p style={{ fontSize: '16px', marginTop: '1rem' }}>
             <span className="font-semibold">Last Updated:</span>{' '}
             <span className="font-light">{buildTime || 'Not available'}</span>

@@ -1119,19 +1119,19 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                 <tbody>
                                     {currentItems.map((expense, index) => (
                                         <tr key={expense.id} className="odd:bg-white even:bg-[#FAF6ED]">
-                                            <td className=" text-sm text-left pl-3 w-32 font-semibold">{formatDateOnly(expense.date)}</td>
-                                            <td className=" text-sm text-left w-60 font-semibold">{expense.siteName}</td>
-                                            <td className=" text-sm text-left font-semibold">{expense.vendor}</td>
-                                            <td className=" text-sm text-left font-semibold">{expense.contractor}</td>
-                                            <td className=" text-sm text-left font-semibold">{expense.quantity}</td>
-                                            <td className="text-sm text-left pl-2 font-semibold">
+                                            <td className=" text-sm text-left pl-3 w-32 ">{formatDateOnly(expense.date)}</td>
+                                            <td className=" text-sm text-left w-60 ">{expense.siteName}</td>
+                                            <td className=" text-sm text-left ">{expense.vendor}</td>
+                                            <td className=" text-sm text-left ">{expense.contractor}</td>
+                                            <td className=" text-sm text-left ">{expense.quantity}</td>
+                                            <td className="text-sm text-left pl-2 ">
                                                 ₹{Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </td>
-                                            <td className=" text-sm text-left font-semibold">{expense.comments}</td>
-                                            <td className=" text-sm text-left font-semibold">{expense.category}</td>
-                                            <td className=" text-sm text-left font-semibold">{expense.accountType}</td>
-                                            <td className=" text-sm text-left font-semibold">{expense.machineTools}</td>
-                                            <td className=" text-sm text-left pl-3 font-semibold">{expense.eno}</td>
+                                            <td className=" text-sm text-left ">{expense.comments}</td>
+                                            <td className=" text-sm text-left ">{expense.category}</td>
+                                            <td className=" text-sm text-left ">{expense.accountType}</td>
+                                            <td className=" text-sm text-left ">{expense.machineTools}</td>
+                                            <td className=" text-sm text-left pl-3 ">{expense.eno}</td>
                                             <td className=" flex py-2">
                                                 {userPermissions.includes("Edit") && (
                                                     <button onClick={() => handleEditClick(expense)} className="rounded-full transition duration-200 ml-2 mr-3">
@@ -1147,7 +1147,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                 {expense.billCopy ? (
                                                     <a
                                                         href={expense.billCopy}
-                                                        className="text-red-500 underline font-semibold"
+                                                        className="text-red-500 underline "
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                     >
@@ -1179,6 +1179,14 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                     <option value={50}>50</option>
                                     <option value={100}>100</option>
                                     <option value={200}>200</option>
+                                    <option value={300}>300</option>
+                                    <option value={400}>400</option>
+                                    <option value={500}>500</option>
+                                    <option value={600}>600</option>
+                                    <option value={700}>700</option>
+                                    <option value={800}>800</option>
+                                    <option value={900}>900</option>
+                                    <option value={1000}>1000</option>
                                 </select>
                             </div>                            
                             <div className="flex items-center space-x-2">
@@ -1187,17 +1195,11 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                 </span>
                             </div>                            
                             <div className="flex items-center space-x-1">
-                                <button
-                                    onClick={() => setCurrentPage(1)}
-                                    disabled={currentPage === 1}
-                                    className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
-                                >
-                                    First
-                                </button>
+
                                 <button
                                     onClick={() => setCurrentPage(currentPage - 1)}
                                     disabled={currentPage === 1}
-                                    className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                    className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
                                 >
                                     Previous
                                 </button>                                
@@ -1220,7 +1222,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                             className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${
                                                 currentPage === pageNum
                                                     ? 'bg-[#BF9853] text-white border-[#BF9853]'
-                                                    : 'border-gray-300 hover:bg-gray-50'
+                                                    : 'border-gray-300 hover:bg-[#BF9853] hover:text-white'
                                             }`}
                                         >
                                             {pageNum}
@@ -1230,17 +1232,11 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                 <button
                                     onClick={() => setCurrentPage(currentPage + 1)}
                                     disabled={currentPage === totalPages}
-                                    className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                    className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
                                 >
                                     Next
                                 </button>
-                                <button
-                                    onClick={() => setCurrentPage(totalPages)}
-                                    disabled={currentPage === totalPages}
-                                    className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
-                                >
-                                    Last
-                                </button>
+
                             </div>
                         </div>                        
                         <Modal

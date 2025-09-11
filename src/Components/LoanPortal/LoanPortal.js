@@ -6,6 +6,7 @@ import "jspdf-autotable";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import edit from '../Images/Edit.svg';
+import axios from 'axios';
 
 const LoanPortal = ({ username, userRoles = [] }) => {
   const [selectedType, setSelectedType] = useState('Loan')
@@ -33,6 +34,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
   const [purpose, setPurpose] = useState('');
   const [entryNo, setEntryNo] = useState(1);
   const [selectedContractorOrVendorOption, setSelectedContractorOrVendorOption] = useState(null);
+  const [transferSelection, setTransferSelection] = useState(null);
   const [loanData, setLoanData] = useState([]);
   const [selectedLoanFile, setSelectedLoanFile] = useState(null);
   const fileInputRef = useRef(null);
@@ -43,9 +45,9 @@ const LoanPortal = ({ username, userRoles = [] }) => {
 
   // Memoized options to prevent unnecessary re-renders
   const purposeOptions = useMemo(() => [
-    { value: 'Machine Loan', label: 'Machine Loan', id: 1, type: 'Purpose'},
-    { value: 'Material Loan', label: 'Material Loan', id: 2, type: 'Purpose'},
-    { value: 'Equipment Loan', label: 'Equipment Loan', id: 3, type: 'Purpose'  },
+    { value: 'Machine Loan', label: 'Machine Loan', id: 1, type: 'Purpose' },
+    { value: 'Material Loan', label: 'Material Loan', id: 2, type: 'Purpose' },
+    { value: 'Equipment Loan', label: 'Equipment Loan', id: 3, type: 'Purpose' },
     { value: 'Working Capital', label: 'Working Capital', id: 4, type: 'Purpose' },
     { value: 'Other', label: 'Other', id: 5, type: 'Purpose' }
   ], []);
@@ -70,7 +72,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
     const savedpaymentMode = sessionStorage.getItem('paymentMode');
     const saveddescription = sessionStorage.getItem('description');
     const savedpurpose = sessionStorage.getItem('purpose');
-    
+
     try {
       if (savedselectedType) setSelectedType(JSON.parse(savedselectedType));
       if (savedContractorVendor) setSelectedOption(JSON.parse(savedContractorVendor));
@@ -86,7 +88,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
     } catch (error) {
       console.error("Error parsing sessionStorage data:", error);
     }
-    
+
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
@@ -278,7 +280,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/loan_portal/getAll');
+        const response = await fetch('http://localhost:8082/api/loans/all');
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
@@ -334,9 +336,9 @@ const LoanPortal = ({ username, userRoles = [] }) => {
     } else {
       localStorage.removeItem("loanContractorVendor");
     }
-    
+
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/loan_portal/getAll');
+      const response = await fetch('http://localhost:8082/api/loans/all');
       if (!response.ok) {
         throw new Error('Failed to fetch data');
       }
@@ -363,13 +365,13 @@ const LoanPortal = ({ username, userRoles = [] }) => {
 
 
   // Combine vendor and contractor options
-  useEffect(() => { 
-    setCombinedOptions([...vendorOptions, ...contractorOptions]); 
+  useEffect(() => {
+    setCombinedOptions([...vendorOptions, ...contractorOptions]);
   }, [vendorOptions, contractorOptions]);
 
   // Combine site and purpose options
-  useEffect(() => { 
-    setCombinedSitePurposeOptions([...siteOptions, ...purposeOptions]); 
+  useEffect(() => {
+    setCombinedSitePurposeOptions([...siteOptions, ...purposeOptions]);
   }, [siteOptions, purposeOptions]);
 
   // Memoized custom styles for Select components
@@ -387,104 +389,47 @@ const LoanPortal = ({ username, userRoles = [] }) => {
   }), []);
 
   // Optimized handleSubmit with useCallback
-  const handleSubmit = useCallback(async () => {
-    // Validation based on selected type
-    if (!selectedOption) {
-      toast.error("Please select Contractor/Vendor", {
-        position: "top-center",
-        autoClose: 3000,
-        theme: "colored"
-      });
-      return;
-    }
-    
-    if (selectedType === 'Transfer') {
-      if (!transferTo || !transferAmount) {
-        toast.error("Please fill Transfer To and Transfer Amount", {
-          position: "top-center",
-          autoClose: 3000,
-          theme: "colored"
-        });
-        return;
-      }
-    } else {
-      if (!amountGiven || !paymentMode) {
-        toast.error("Please fill necessary details", {
-          position: "top-center",
-          autoClose: 3000,
-          theme: "colored"
-        });
-        return;
-      }
-    }
+  const handleSubmit = async () => {
+    const payload = {
+      type: selectedType,
+      date: dateValue,
+      amount:
+        selectedType === "Loan"
+          ? parseFloat(amountGiven) || 0
+          : selectedType === "Transfer"
+            ? parseFloat(transferAmount) || 0
+            : 0,
+      loan_payment_mode: paymentMode,
+      loan_refund_amount: selectedType === "Refund" ? parseFloat(amountGiven) || 0 : 0,
+      from_purpose_id: purpose || 0,
+      transfer_Project_id: transferSelection?.type === "Site" ? transferSelection.id : 0,
+      to_purpose_id: transferSelection?.type === "Purpose" ? transferSelection.id : 0,
+      vendor_id: selectedOption?.type === "Vendor" ? selectedOption.id : 0,
+      contractor_id: selectedOption?.type === "Contractor" ? selectedOption.id : 0,
+      entry_no: entryNo || null,
+      description,
+      file_url: ""
+    };
 
-    setIsSubmitting(true);
-
+    console.log("🚀 Payload ready to send:", payload);
     try {
-      const res = await fetch('https://backendaab.in/aabuildersDash/api/loan_portal/getAll');
-      if (!res.ok) throw new Error('Failed to fetch entry numbers');
-
-      const allData = await res.json();
-      const maxEntryNo = allData.length > 0 ? Math.max(...allData.map(item => item.entry_no || 0)) : 0;
-      const nextEntryNo = maxEntryNo + 1;
-
-      const payload = {
-        type: selectedType,
-        date: dateValue,
-        vendor_id: selectedOption?.type === 'Vendor' ? selectedOption.id : 0,
-        contractor_id: selectedOption?.type === 'Contractor' ? selectedOption.id : 0,
-        project_id: selectedSite?.id || 0,
-        payment_mode: selectedType === 'Transfer' ? 'Transfer' : paymentMode,
-        loan_amount: selectedType === 'Transfer' ? parseFloat(transferAmount) || 0 : parseFloat(amountGiven) || 0,
-        transfer_to: selectedType === 'Transfer' ? transferTo : '',
-        overall_loan: parseFloat(overallLoan) || 0,
-        purpose: purpose,
-        entry_no: nextEntryNo,
-        week_no: getWeekNumber(),
-        description: description,
-        file_url: '',
-      };
-
-      await fetch('https://backendaab.in/aabuildersDash/api/loan_portal/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+      const response = await fetch("http://localhost:8082/api/loans/save", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify(payload)
-      });
-
-      toast.success('Loan saved successfully!', {
-        position: "top-center",
-        autoClose: 3000,
-        theme: "colored"
-      });
-
-      // Reset form
-      setAmountGiven('');
-      setTransferTo('');
-      setTransferAmount('');
-      setDescription('');
-      setPaymentMode('');
-      setPurpose('');
-      setEntryNo(nextEntryNo);
-      
-      // Refresh data
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/loan_portal/getAll');
-      if (response.ok) {
-        const data = await response.json();
-        setLoanData(data);
-      }
-
+      });  
+      if (!response.ok) {
+        throw new Error(`Failed to save loan: ${response.status}`);
+      }  
+      const data = await response.json();
+      console.log("✅ Loan saved successfully:", data);
+      window.location.reload();
     } catch (error) {
-      console.error('Error submitting data:', error);
-      toast.error('Failed to save data!', {
-        position: "top-center",
-        autoClose: 3000,
-        theme: "colored"
-      });
-    } finally {
-      setIsSubmitting(false);
+      console.error("❌ Error saving loan:", error);
     }
-  }, [selectedOption, selectedType, transferTo, transferAmount, amountGiven, paymentMode, dateValue, selectedSite, overallLoan, purpose, description]);
+  };
 
   // Function to get the current week number
   const getWeekNumber = () => {
@@ -494,17 +439,14 @@ const LoanPortal = ({ username, userRoles = [] }) => {
     const oneWeek = 604800000;
     return Math.floor(diff / oneWeek) + 1;
   };
-
   useEffect(() => {
     const today = new Date();
     const formatted = today.toISOString().split('T')[0];
     setDateValue(formatted);
   }, []);
-
   // Memoized filtered loan data for better performance
   const filteredLoanData = useMemo(() => {
     if (!selectedOption) return [];
-    
     return loanData
       .filter(entry => {
         const isMatchingVendor =
@@ -528,11 +470,9 @@ const LoanPortal = ({ username, userRoles = [] }) => {
       setFilteredAmount(0);
       return;
     }
-
     const from = new Date(fromDate);
     const to = new Date(toDate);
     to.setHours(23, 59, 59, 999);
-
     const filtered = loanData.filter(entry => {
       const entryDate = new Date(entry.date);
       const isInDateRange = entryDate >= from && entryDate <= to;
@@ -540,12 +480,10 @@ const LoanPortal = ({ username, userRoles = [] }) => {
         !filteredPaymentMode || entry.mode === filteredPaymentMode;
       return isInDateRange && isMatchingPayment;
     });
-
     const total = filtered.reduce((sum, entry) => {
       const amount = parseFloat(entry.loan_amount) || 0;
       return sum + amount;
     }, 0);
-
     setFilteredAmount(total);
   }, [fromDate, toDate, filteredPaymentMode, loanData]);
 
@@ -553,7 +491,6 @@ const LoanPortal = ({ username, userRoles = [] }) => {
   useEffect(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
     const todayTotal = loanData
       .filter(entry => {
         const entryDate = new Date(entry.date);
@@ -564,7 +501,6 @@ const LoanPortal = ({ username, userRoles = [] }) => {
         const amount = parseFloat(entry.loan_amount) || 0;
         return sum + amount;
       }, 0);
-
     setTodayAmount(todayTotal);
   }, [loanData]);
 
@@ -600,21 +536,18 @@ const LoanPortal = ({ username, userRoles = [] }) => {
 
   const handleUpdate = useCallback(async () => {
     try {
-      const res = await fetch(`https://backendaab.in/aabuildersDash/api/loan_portal/edit/${editingId}?editedBy=${username}`, {
+      const res = await fetch(`http://localhost:8082/api/loans/${editingId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editFormData)
       });
-
       if (!res.ok) throw new Error('Failed to update');
-      
       // Refresh data instead of reloading the page
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/loan_portal/getAll');
+      const response = await fetch('http://localhost:8082/api/loans/all');
       if (response.ok) {
         const data = await response.json();
         setLoanData(data);
       }
-      
       setIsEditModalOpen(false);
       toast.success('Entry updated successfully!', {
         position: "top-center",
@@ -763,7 +696,9 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                     >
                       <option value=''>Select Purpose</option>
                       {purposeOptions.map(option => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -781,14 +716,14 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                   {/* Dynamic Amount/Transfer To Field */}
                   <div className='space-y-2'>
                     <label className='font-semibold block text-sm sm:text-base'>
-                      {selectedType === 'Transfer' ? 'Transfer To' : 
-                       selectedType === 'Refund' ? 'Amount' : 'Amount Given'}
+                      {selectedType === 'Transfer' ? 'Transfer To' :
+                        selectedType === 'Refund' ? 'Amount' : 'Amount Given'}
                     </label>
                     {selectedType === 'Transfer' ? (
                       <Select
                         options={combinedSitePurposeOptions}
-                        value={combinedSitePurposeOptions.find(option => option.value === transferTo)}
-                        onChange={(selected) => setTransferTo(selected?.value || '')}
+                        value={transferSelection}
+                        onChange={(selected) => setTransferSelection(selected || null)}
                         className='w-full rounded-lg focus:outline-none'
                         isClearable
                         styles={customStyles}
@@ -904,35 +839,35 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                         </thead>
                         <tbody>
                           {filteredLoanData.map((entry, index) => {
-                              const { date, loan_amount, transfer_refund, mode } = entry;
+                            const { date, loan_amount, transfer_refund, mode } = entry;
 
-                              return (
-                                <tr key={index} className="border-t">
-                                  <td className="px-2 py-2 text-xs sm:text-sm font-semibold">
-                                    {new Date(date).toLocaleDateString('en-GB')}
-                                  </td>
-                                  <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold">
-                                    {parseFloat(loan_amount || 0).toLocaleString('en-IN')}
-                                  </td>
-                                  <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold">
-                                    {transfer_refund || ''}
-                                  </td>
-                                  <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold">
-                                    {mode || ''}
-                                  </td>
-                                  <td className="px-2 py-2">
-                                    <button className="rounded-full transition duration-200">
-                                      <img
-                                        src={edit}
-                                        onClick={() => handleEditClick(entry)}
-                                        alt="Edit"
-                                        className="w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200"
-                                      />
-                                    </button>
-                                  </td>
-                                </tr>
-                              );
-                            })}
+                            return (
+                              <tr key={index} className="border-t">
+                                <td className="px-2 py-2 text-xs sm:text-sm font-semibold">
+                                  {new Date(date).toLocaleDateString('en-GB')}
+                                </td>
+                                <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold">
+                                  {parseFloat(loan_amount || 0).toLocaleString('en-IN')}
+                                </td>
+                                <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold">
+                                  {transfer_refund || ''}
+                                </td>
+                                <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold">
+                                  {mode || ''}
+                                </td>
+                                <td className="px-2 py-2">
+                                  <button className="rounded-full transition duration-200">
+                                    <img
+                                      src={edit}
+                                      onClick={() => handleEditClick(entry)}
+                                      alt="Edit"
+                                      className="w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200"
+                                    />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

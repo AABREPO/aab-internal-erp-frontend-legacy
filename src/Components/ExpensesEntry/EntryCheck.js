@@ -3,8 +3,9 @@ import axios from 'axios';
 import Modal from 'react-modal';
 import Select from 'react-select';
 import Reload from '../Images/rotate-right.png'
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 Modal.setAppElement('#root');
-
 const EntryChecking = () => {
     const [filteredCount, setFilteredCount] = useState(0);
     const [totalAmount, setTotalAmount] = useState(0);
@@ -20,6 +21,8 @@ const EntryChecking = () => {
     const [accountTypeOptions, setAccountTypeOptions] = useState([]);
     const [selectedMachineTools, setSelectedMachineTools] = useState('');
     const [selectedDate, setSelectedDate] = useState('');
+    const [selectedStartDate, setSelectedStartDate] = useState('');
+    const [selectedEndDate, setSelectedEndDate] = useState('');
     const [selectedAccountType, setSelectedAccountType] = useState('');
     const scrollRef = useRef(null);
     const isDragging = useRef(false);
@@ -122,6 +125,7 @@ const EntryChecking = () => {
     }, []);
     useEffect(() => {
         const filtered = expenses.filter(expense => {
+            const expenseDate = new Date(expense.date).toISOString().slice(0, 10);
             return (
                 (selectedSiteName ? expense.siteName === selectedSiteName : true) &&
                 (selectedVendor ? expense.vendor === selectedVendor : true) &&
@@ -130,6 +134,8 @@ const EntryChecking = () => {
                 (selectedMachineTools ? expense.machineTools === selectedMachineTools : true) &&
                 (selectedAccountType ? expense.accountType === selectedAccountType : true) &&
                 (selectedDate ? expense.timestamp.split('T')[0] === selectedDate : true) &&
+                (selectedStartDate ? expenseDate >= selectedStartDate : true) &&
+                (selectedEndDate ? expenseDate <= selectedEndDate : true) &&
                 (selectedEno ? String(expense.eno) === String(selectedEno) : true)
             );
         });
@@ -137,7 +143,7 @@ const EntryChecking = () => {
         setFilteredCount(filtered.length);
         const total = filtered.reduce((sum, item) => sum + Number(item.amount || 0), 0);
         setTotalAmount(total);
-    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedEno, selectedAccountType, selectedDate, expenses]);
+    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedEno, selectedAccountType, selectedDate, selectedStartDate, selectedEndDate, expenses]);
     const formatDateOnly = (dateString) => {
         const date = new Date(dateString);
         const day = String(date.getDate()).padStart(2, '0');
@@ -153,8 +159,76 @@ const EntryChecking = () => {
         setSelectedMachineTools('');
         setSelectedAccountType('');
         setSelectedDate('');
+        setSelectedStartDate('');
+        setSelectedEndDate('');
         setSelectedEno('');
         setFilteredExpenses(expenses);
+    };
+    const generateFilteredPDF = () => {
+        if (filteredExpenses.length === 0) {
+            alert("No filtered data to export. Please apply some filters first.");
+            return;
+        }
+        const doc = new jsPDF({ orientation: "landscape" });
+        doc.setFontSize(16);
+        doc.text("Filtered Expenses Report", 14, 15);
+        doc.setFontSize(10);
+        let yPosition = 25;        
+        if (selectedStartDate || selectedEndDate) {
+            const formatDateForPDF = (dateString) => {
+                if (!dateString) return '';
+                const [year, month, day] = dateString.split('-');
+                return `${day}/${month}/${year}`;
+            };            
+            const dateRange = selectedStartDate && selectedEndDate 
+                ? `${formatDateForPDF(selectedStartDate)} to ${formatDateForPDF(selectedEndDate)}`
+                : selectedStartDate 
+                    ? `From ${formatDateForPDF(selectedStartDate)}`
+                    : `Until ${formatDateForPDF(selectedEndDate)}`;
+            doc.text(`Date Range: ${dateRange}`, 14, yPosition);
+            yPosition += 8;
+        }        
+        if (selectedVendor) {
+            doc.text(`Vendor: ${selectedVendor}`, 14, yPosition);
+            yPosition += 8;
+        }        
+        if (selectedContractor) {
+            doc.text(`Contractor: ${selectedContractor}`, 14, yPosition);
+            yPosition += 8;
+        }        
+        if (selectedAccountType) {
+            doc.text(`Account Type: ${selectedAccountType}`, 14, yPosition);
+            yPosition += 8;
+        }        
+        doc.text(`Total Entries: ${filteredCount}`, 14, yPosition);
+        yPosition += 8;
+        doc.text(`Total Amount: ${totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, yPosition);        
+        autoTable(doc, {
+            startY: yPosition + 10,
+            head: [['Time Stamp', 'Date', 'E.No', 'Project Name', 'Vendor', 'Contractor', 
+                   'A/C Type', 'Quantity', 'Amount', 'Comments', 'Category']],
+            body: filteredExpenses.map(exp => [
+                formatDate(exp.timestamp),
+                formatDateOnly(exp.date),
+                exp.eno,
+                exp.siteName,
+                exp.vendor,
+                exp.contractor,
+                exp.accountType,
+                exp.quantity,
+                Number(exp.amount).toLocaleString('en-IN'),
+                exp.comments,
+                exp.category
+            ]),
+            styles: {
+                fontSize: 7,
+            },
+            headStyles: {
+                fillColor: [191, 152, 83],
+            },
+        });
+        const dateStr = new Date().toISOString().slice(0, 10);
+        doc.save(`Filtered_Expenses_Report_${dateStr}.pdf`);
     };
     const customSelectStyles = {
         control: (provided, state) => ({
@@ -178,24 +252,38 @@ const EntryChecking = () => {
         }),
         singleValue: (provided) => ({ ...provided, textAlign: 'left', color: 'black' }),
     };
-    const isAnyFilterSelected = selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools;
+    const isAnyFilterSelected = selectedDate || selectedStartDate || selectedEndDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools;
     return (
         <body className=' bg-[#FAF6ED]'>
             <div>
                 <div className="w-full max-w-[1860px] h-full mx-auto p-4 bg-white shadow-lg">
                     <div
-                        className={`text-left flex ${selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools
+                        className={`text-left flex ${selectedDate || selectedStartDate || selectedEndDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools
                             ? 'flex-col sm:flex-row sm:justify-between'
                             : 'flex-row justify-between items-center'
                             } mb-3 gap-2`}>
                         <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3">
-                            {(selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools) && (
+                            {(selectedDate || selectedStartDate || selectedEndDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools) && (
                                 <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
                                     {selectedDate && (
                                         <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
                                             <span className="font-normal">Date: </span>
                                             <span className="font-bold">{selectedDate}</span>
                                             <button onClick={() => setSelectedDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                        </span>
+                                    )}
+                                    {selectedStartDate && (
+                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
+                                            <span className="font-normal">From: </span>
+                                            <span className="font-bold">{selectedStartDate}</span>
+                                            <button onClick={() => setSelectedStartDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                        </span>
+                                    )}
+                                    {selectedEndDate && (
+                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
+                                            <span className="font-normal">To: </span>
+                                            <span className="font-bold">{selectedEndDate}</span>
+                                            <button onClick={() => setSelectedEndDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
                                         </span>
                                     )}
                                     {selectedVendor && (
@@ -236,9 +324,13 @@ const EntryChecking = () => {
                                 </div>
                             )}
                         </div>
-                        <div>
-                            <button
-                                onClick={clearFilters}
+                        <div className="flex gap-2">
+                            <button onClick={generateFilteredPDF}
+                                className='w-32 h-9 border border-[#E4572E] rounded-md font-semibold text-sm text-[#E4572E] flex items-center justify-center gap-2'
+                            >
+                                Generate PDF
+                            </button>
+                            <button onClick={clearFilters}
                                 className='w-36 h-9 border border-[#BF9853] rounded-md font-semibold text-sm text-[#BF9853] flex items-center justify-center gap-2'
                             >
                                 <img className='w-4 h-4' src={Reload} alt="Reload" />
@@ -246,8 +338,7 @@ const EntryChecking = () => {
                             </button>
                         </div>
                     </div>
-                    <div className="grid gap-2 lg:grid-cols-6 md:grid-cols-3 sm:grid-cols-1">
-                        {/* Date of Entry */}
+                    <div className="grid gap-2 lg:grid-cols-8 md:grid-cols-4 sm:grid-cols-1">
                         <div className="flex flex-col">
                             <label className="font-bold text-left">Date Of Entry:</label>
                             <input
@@ -257,7 +348,24 @@ const EntryChecking = () => {
                                 className="p-2 mt-2 rounded-md bg-transparent w-full border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
                             />
                         </div>
-                        {/* Vendor */}
+                        <div className="flex flex-col">
+                            <label className="font-bold text-left">From Date:</label>
+                            <input
+                                type="date"
+                                value={selectedStartDate}
+                                onChange={(e) => setSelectedStartDate(e.target.value)}
+                                className="p-2 mt-2 rounded-md bg-transparent w-full border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
+                            />
+                        </div>
+                        <div className="flex flex-col">
+                            <label className="font-bold text-left">To Date:</label>
+                            <input
+                                type="date"
+                                value={selectedEndDate}
+                                onChange={(e) => setSelectedEndDate(e.target.value)}
+                                className="p-2 mt-2 rounded-md bg-transparent w-full border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
+                            />
+                        </div>
                         <div className="flex flex-col">
                             <label className="font-bold text-left">Vendor:</label>
                             <Select
@@ -270,7 +378,6 @@ const EntryChecking = () => {
                                 styles={customSelectStyles}
                             />
                         </div>
-                        {/* Contractor */}
                         <div className="flex flex-col">
                             <label className="font-bold text-left">Contractor:</label>
                             <Select
@@ -283,7 +390,6 @@ const EntryChecking = () => {
                                 styles={customSelectStyles}
                             />
                         </div>
-                        {/* Account Type */}
                         <div className="flex flex-col">
                             <label className="font-bold text-left">A/C Type:</label>
                             <Select
@@ -306,22 +412,15 @@ const EntryChecking = () => {
                             <label className="font-bold text-left">Amount:</label>
                             <div className="w-full h-11 p-2 mt-3 rounded-lg border-[4px] border-[#FAF6ED] text-left">
                                 {isAnyFilterSelected
-                                    ? `₹${Number(totalAmount).toLocaleString('en-US', {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                    })}`
+                                    ? `₹${Number(totalAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}`
                                     : ''}
                             </div>
                         </div>
                     </div>
                     {isAnyFilterSelected && (
-                        <div
-                            ref={scrollRef}
+                        <div ref={scrollRef}
                             className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[620px] overflow-scroll select-none"
-                            onMouseDown={handleMouseDown}
-                            onMouseMove={handleMouseMove}
-                            onMouseUp={handleMouseUp}
-                            onMouseLeave={handleMouseUp}
+                            onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
                         >
                             <table className="table-fixed  min-w-[1765px] w-screen border-collapse">
                                 <thead>
@@ -358,11 +457,8 @@ const EntryChecking = () => {
                                             <td className="px-2 text-left font-semibold">{expense.category}</td>
                                             <td className="px-4 text-sm">
                                                 {expense.billCopy ? (
-                                                    <a
-                                                        href={expense.billCopy}
-                                                        className="text-red-500 underline font-semibold"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
+                                                    <a href={expense.billCopy} className="text-red-500 underline font-semibold"
+                                                        target="_blank" rel="noopener noreferrer"
                                                     >
                                                         View
                                                     </a>

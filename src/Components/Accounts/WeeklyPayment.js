@@ -1379,6 +1379,22 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                 fontWeight: 'normal',
                                                                 color: 'black',
                                                             }),
+                                                            indicatorSeparator: () => ({
+                                                                display: 'none'
+                                                            }),
+                                                            indicatorsContainer: (provided) => ({
+                                                                ...provided,
+                                                                height: '40px',
+                                                                gap: '0px'
+                                                            }),
+                                                            clearIndicator: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px'
+                                                            }),
+                                                            dropdownIndicator: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px'
+                                                            })
                                                         }}
                                                     />
                                                 </th>
@@ -1428,6 +1444,22 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                 fontWeight: 'normal',
                                                                 color: 'black',
                                                             }),
+                                                            indicatorSeparator: () => ({
+                                                                display: 'none'
+                                                            }),
+                                                            indicatorsContainer: (provided) => ({
+                                                                ...provided,
+                                                                height: '40px',
+                                                                gap: '0px'
+                                                            }),
+                                                            clearIndicator: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px'
+                                                            }),
+                                                            dropdownIndicator: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px'
+                                                            })
                                                         }}
                                                     />
                                                 </th>
@@ -1528,6 +1560,22 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             fontWeight: 'normal',
                                                             color: 'black',
                                                         }),
+                                                        indicatorSeparator: () => ({
+                                                            display: 'none'
+                                                        }),
+                                                        indicatorsContainer: (provided) => ({
+                                                            ...provided,
+                                                            height: '40px',
+                                                            gap: '0px'
+                                                        }),
+                                                        clearIndicator: (provided) => ({
+                                                            ...provided,
+                                                            padding: '2px'
+                                                        }),
+                                                        dropdownIndicator: (provided) => ({
+                                                            ...provided,
+                                                            padding: '2px'
+                                                        })
                                                     }}
                                                 />
                                             </td>
@@ -1580,6 +1628,22 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             fontWeight: 'normal',
                                                             color: 'black',
                                                         }),
+                                                        indicatorSeparator: () => ({
+                                                            display: 'none'
+                                                        }),
+                                                        indicatorsContainer: (provided) => ({
+                                                            ...provided,
+                                                            height: '40px',
+                                                            gap: '0px'
+                                                        }),
+                                                        clearIndicator: (provided) => ({
+                                                            ...provided,
+                                                            padding: '2px'
+                                                        }),
+                                                        dropdownIndicator: (provided) => ({
+                                                            ...provided,
+                                                            padding: '2px'
+                                                        })
                                                     }}
                                                 />
                                             </td>
@@ -1700,6 +1764,22 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                         fontWeight: 'normal',
                                                                         color: 'black',
                                                                     }),
+                                                                    indicatorSeparator: () => ({
+                                                                        display: 'none'
+                                                                    }),
+                                                                    indicatorsContainer: (provided) => ({
+                                                                        ...provided,
+                                                                        height: '40px',
+                                                                        gap: '0px'
+                                                                    }),
+                                                                    clearIndicator: (provided) => ({
+                                                                        ...provided,
+                                                                        padding: '2px'
+                                                                    }),
+                                                                    dropdownIndicator: (provided) => ({
+                                                                        ...provided,
+                                                                        padding: '2px'
+                                                                    })
                                                                 }}
                                                             />
                                                         ) : (
@@ -1762,6 +1842,22 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                         fontWeight: 'normal',
                                                                         color: 'black',
                                                                     }),
+                                                                    indicatorSeparator: () => ({
+                                                                        display: 'none'
+                                                                    }),
+                                                                    indicatorsContainer: (provided) => ({
+                                                                        ...provided,
+                                                                        height: '40px',
+                                                                        gap: '0px'
+                                                                    }),
+                                                                    clearIndicator: (provided) => ({
+                                                                        ...provided,
+                                                                        padding: '2px'
+                                                                    }),
+                                                                    dropdownIndicator: (provided) => ({
+                                                                        ...provided,
+                                                                        padding: '2px'
+                                                                    })
                                                                 }}
                                                             />
                                                         ) : (

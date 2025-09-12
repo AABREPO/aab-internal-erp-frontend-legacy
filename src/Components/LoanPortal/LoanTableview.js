@@ -5,7 +5,6 @@ import Select from 'react-select';
 import Filter from '../Images/filter (3).png'
 import Reload from '../Images/rotate-right.png'
 import edit from '../Images/Edit.svg';
-
 const LoanTableview = ({ username, userRoles = [] }) => {
   const [vendorOptions, setVendorOptions] = useState([]);
   const [contractorOptions, setContractorOptions] = useState([]);
@@ -25,11 +24,9 @@ const LoanTableview = ({ username, userRoles = [] }) => {
   const [editingId, setEditingId] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [overallLoan, setOverallLoan] = useState(0);
-
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
-
   const scrollRef = useRef(null);
   const isDragging = useRef(false);
   const start = useRef({ x: 0, y: 0 });
@@ -37,7 +34,6 @@ const LoanTableview = ({ username, userRoles = [] }) => {
   const velocity = useRef({ x: 0, y: 0 });
   const animationFrame = useRef(null);
   const lastMove = useRef({ time: 0, x: 0, y: 0 });
-
   // Drag functionality for table scrolling
   const handleMouseDown = (e) => {
     if (!scrollRef.current) return;
@@ -56,7 +52,6 @@ const LoanTableview = ({ username, userRoles = [] }) => {
     scrollRef.current.style.userSelect = 'none';
     cancelMomentum();
   };
-
   const handleMouseMove = (e) => {
     if (!isDragging.current || !scrollRef.current) return;
     const dx = e.clientX - start.current.x;
@@ -75,7 +70,6 @@ const LoanTableview = ({ username, userRoles = [] }) => {
       y: e.clientY,
     };
   };
-
   const handleMouseUp = () => {
     if (!isDragging.current || !scrollRef.current) return;
     isDragging.current = false;
@@ -83,14 +77,12 @@ const LoanTableview = ({ username, userRoles = [] }) => {
     scrollRef.current.style.userSelect = '';
     applyMomentum();
   };
-
   const cancelMomentum = () => {
     if (animationFrame.current) {
       cancelAnimationFrame(animationFrame.current);
       animationFrame.current = null;
     }
   };
-
   const applyMomentum = () => {
     if (!scrollRef.current) return;
     const friction = 0.95;
@@ -110,13 +102,11 @@ const LoanTableview = ({ username, userRoles = [] }) => {
     };
     animationFrame.current = requestAnimationFrame(step);
   };
-
   // Helper functions
   const formatWithCommas = (value) => {
     if (!value) return "";
     return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
-
   const formatDateOnly = (dateString) => {
     const date = new Date(dateString);
     const day = String(date.getDate()).padStart(2, '0');
@@ -124,34 +114,26 @@ const LoanTableview = ({ username, userRoles = [] }) => {
     const year = date.getFullYear();
     return `${day}-${month}-${year}`;
   };
-
   const getVendorName = (id) =>
     vendorOptions.find(v => v.id === id)?.value || "";
-
   const getContractorName = (id) =>
     contractorOptions.find(c => c.id === id)?.value || "";
-
   const getSiteName = (id) =>
     siteOptions.find(s => String(s.id) === String(id))?.value || "";
-
   // Calculate totals for loan data
   const totalLoanAmount = loanData.reduce(
     (sum, entry) => sum + (Number(entry.loan_amount) || 0),
     0
   );
-
   const totalPaidAmount = loanData.reduce(
     (sum, entry) => sum + (Number(entry.paid_amount) || 0),
     0
   );
-
   const totalRemainingAmount = totalLoanAmount - totalPaidAmount;
-
   // Data fetching and filtering logic
   useEffect(() => {
     return () => cancelMomentum();
   }, []);
-
   useEffect(() => {
     const fetchVendorNames = async () => {
       try {
@@ -179,7 +161,6 @@ const LoanTableview = ({ username, userRoles = [] }) => {
     };
     fetchVendorNames();
   }, []);
-
   useEffect(() => {
     const fetchContractorNames = async () => {
       try {
@@ -207,11 +188,9 @@ const LoanTableview = ({ username, userRoles = [] }) => {
     };
     fetchContractorNames();
   }, []);
-
   useEffect(() => { 
     setCombinedOptions([...vendorOptions, ...contractorOptions]); 
   }, [vendorOptions, contractorOptions]);
-
   useEffect(() => {
     const fetchSites = async () => {
       try {
@@ -239,11 +218,10 @@ const LoanTableview = ({ username, userRoles = [] }) => {
     };
     fetchSites();
   }, []);
-
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/loan_portal/getAll');
+        const response = await fetch('http://localhost:8082/api/loans/all');
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
@@ -255,16 +233,6 @@ const LoanTableview = ({ username, userRoles = [] }) => {
     };
     fetchData();
   }, []);
-
-  const clearFilters = () => {
-    setSelectDate('');
-    setSelectContractororVendorName('');
-    setSelectProjectName('');
-    setSelectTransfer('');
-    setSelectType('');
-    setSelectMode('');
-  };
-
   // Filtered data based on selected filters
   const filteredData = loanData.filter((entry) => {
     // Date filter
@@ -300,7 +268,6 @@ const LoanTableview = ({ username, userRoles = [] }) => {
     }
     return true;
   });
-
   // Sorting functionality
   const handleSort = (key) => {
     setSortConfig((prev) => {
@@ -310,14 +277,11 @@ const LoanTableview = ({ username, userRoles = [] }) => {
       return { key, direction: 'asc' };
     });
   };
-
   const sortedData = React.useMemo(() => {
     let sortableData = [...filteredData];
-
     if (sortConfig.key) {
       sortableData.sort((a, b) => {
         let aValue, bValue;
-
         switch (sortConfig.key) {
           case 'date':
             aValue = new Date(a.date);
@@ -342,7 +306,6 @@ const LoanTableview = ({ username, userRoles = [] }) => {
           default:
             return 0;
         }
-
         if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
         if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
@@ -355,44 +318,36 @@ const LoanTableview = ({ username, userRoles = [] }) => {
         return dateB - dateA;
       });
     }
-
     return sortableData;
   }, [filteredData, sortConfig]);
-
   // Pagination logic
   const totalPages = Math.ceil(sortedData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentData = sortedData.slice(startIndex, endIndex);
-
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [selectDate, selectContractororVendorName, selectProjectName, selectType, selectMode]);
-
   // Pagination handlers
   const goToPage = (page) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   };
-
   const goToNextPage = () => {
     if (currentPage < totalPages) {
       setCurrentPage(currentPage + 1);
     }
   };
-
   const goToPreviousPage = () => {
     if (currentPage > 1) {
       setCurrentPage(currentPage - 1);
     }
   };
-
   const handleItemsPerPageChange = (e) => {
     const newItemsPerPage = parseInt(e.target.value);
     setItemsPerPage(newItemsPerPage);
     setCurrentPage(1);
   };
-
   // Export functionality
   const exportPDF = () => {
     const doc = new jsPDF("l", "pt", "a4"); 
@@ -410,8 +365,7 @@ const LoanTableview = ({ username, userRoles = [] }) => {
         "Payment Mode",
         "E.No"
       ]
-    ];
-    
+    ];    
     const rows = sortedData.map((entry, index) => [
       index + 1,
       formatDateOnly(entry.date),
@@ -430,8 +384,7 @@ const LoanTableview = ({ username, userRoles = [] }) => {
       entry.description,
       entry.payment_mode,
       entry.entry_no
-    ]);
-    
+    ]);    
     doc.setFontSize(12);
     doc.text("Loan Data Table", 40, 30);
     doc.autoTable({
@@ -457,10 +410,8 @@ const LoanTableview = ({ username, userRoles = [] }) => {
         fillColor: null       
       }
     });
-
     doc.save("LoanData.pdf");
   };
-
   const exportCSV = () => {
     const csvHeaders = [
       "S.No",
@@ -475,7 +426,6 @@ const LoanTableview = ({ username, userRoles = [] }) => {
       "Payment Mode",
       "E.No"
     ];
-
     const csvRows = sortedData.map((entry, index) => [
       index + 1,
       formatDateOnly(entry.date),
@@ -495,7 +445,6 @@ const LoanTableview = ({ username, userRoles = [] }) => {
       entry.payment_mode,
       entry.entry_no
     ]);
-
     const csvString = [
       csvHeaders.join(","),
       ...csvRows.map(row =>
@@ -504,7 +453,6 @@ const LoanTableview = ({ username, userRoles = [] }) => {
           .join(",")
       )
     ].join("\n");
-
     const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -513,10 +461,8 @@ const LoanTableview = ({ username, userRoles = [] }) => {
     link.click();
     document.body.removeChild(link);
   };
-
   return (
     <body>
-      {/* Summary Cards */}
       <div className='w-[1750px] h-[150px] bg-white ml-10 text-left flex gap-5'>
         <div className='ml-8 pt-8'>
           <label className='block mb-2 font-semibold'>Loan Amount</label>
@@ -543,8 +489,6 @@ const LoanTableview = ({ username, userRoles = [] }) => {
           />
         </div>
       </div>
-      
-      {/* Table Container */}
       <div className='w-[1750px] ml-10 bg-white mt-5 pt-5'>
         <div
           className={`text-left flex ${selectDate || selectContractororVendorName || selectProjectName || selectType || selectMode
@@ -553,11 +497,7 @@ const LoanTableview = ({ username, userRoles = [] }) => {
             } mb-3 gap-2`}>
           <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3">
             <button className='pl-2' onClick={() => setShowFilters(!showFilters)}>
-              <img
-                src={Filter}
-                alt="Toggle Filter"
-                className="w-7 h-7 border border-[#BF9853] rounded-md ml-3"
-              />
+              <img src={Filter} alt="Toggle Filter" className="w-7 h-7 border border-[#BF9853] rounded-md ml-3" />
             </button>
             {(selectDate || selectContractororVendorName || selectProjectName || selectType || selectMode) && (
               <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
@@ -606,48 +546,37 @@ const LoanTableview = ({ username, userRoles = [] }) => {
           </div>
         </div>
         <div className='border-l-8 border-l-[#BF9853] rounded-lg ml-5 mr-5'>
-          {/* Single Table with Scrollable Container */}
-          <div
-            ref={scrollRef}
-            className='overflow-auto max-h-[600px]'
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
+          <div ref={scrollRef} className='overflow-auto max-h-[600px]'
+            onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
           >
             <table className="w-[1955px] border-collapse">
               <thead className="sticky top-0 z-10 bg-white ">
                 <tr className="bg-[#FAF6ED]">
-                  <th
-                    className="pt-2 pl-3 w-44 font-bold text-left cursor-pointer hover:bg-gray-200"
+                  <th className="pt-2 pl-3 w-44 font-bold text-left cursor-pointer hover:bg-gray-200"
                     onClick={() => handleSort('date')}
                   >
                     Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th
-                    className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                  <th className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200"
                     onClick={() => handleSort('vendor')}
                   >
-                    Contractor/Vendor {sortConfig.key === 'vendor' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    Associate {sortConfig.key === 'vendor' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th
-                    className="px-2 w-[300px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                  <th className="px-2 w-[300px] font-bold text-left cursor-pointer hover:bg-gray-200"
                     onClick={() => handleSort('project')}
                   >
-                    Project Name {sortConfig.key === 'project' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    Purpose {sortConfig.key === 'project' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="px-2 w-[120px] font-bold text-left">Loan Amount</th>
-                  <th className="px-2 w-[170px] font-bold text-left">Paid Amount</th>
-                  <th className="px-2 w-[120px] font-bold text-left">Remaining</th>
-                  <th
-                    className="px-2 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                  <th className="px-2 w-[120px] font-bold text-left">Transfer To</th>
+                  <th className="px-2 w-[170px] font-bold text-left">Loan</th>
+                  <th className="px-2 w-[120px] font-bold text-left">Refund</th>
+                  <th className="px-2 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200"
                     onClick={() => handleSort('type')}
                   >
-                    Loan Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
                   <th className="px-2 w-[120px] font-bold text-left">Description</th>
-                  <th
-                    className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 pl-3"
+                  <th className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 pl-3"
                     onClick={() => handleSort('mode')}
                   >
                     Mode {sortConfig.key === 'mode' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
@@ -806,29 +735,25 @@ const LoanTableview = ({ username, userRoles = [] }) => {
                     <tr key={entry.id} className="odd:bg-white even:bg-[#FAF6ED]">
                       <td className="text-sm text-left p-2 w-44 font-semibold">{formatDateOnly(entry.date)}</td>
                       <td className="text-sm text-left w-[250px] font-semibold">
-                        {entry.vendor_id
-                          ? getVendorName(entry.vendor_id)
-                          : getContractorName(entry.contractor_id)}
+                        {entry.vendor_id? getVendorName(entry.vendor_id) : getContractorName(entry.contractor_id)}
                       </td>
                       <td className="text-sm text-left w-[420px] font-semibold">
-                        {getSiteName(entry.project_id)}
+                        {(entry.from_purpose_id)}
+                      </td>
+                      <td className="text-sm text-left w-[140px] font-semibold">
+                        {entry.transfer_Project_id}
                       </td>
                       <td className="text-sm text-left pl-2 w-[140px] font-semibold">
-                        {entry.loan_amount != null && entry.loan_amount !== ""
-                          ? Number(entry.loan_amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
-                          : ""}
-                      </td>
-                      <td className="text-sm text-left pl-2 font-semibold w-[220px]">
-                        {entry.paid_amount != null && entry.paid_amount !== ""
-                          ? Number(entry.paid_amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
+                        {entry.amount != null && entry.amount !== ""
+                          ? Number(entry.amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
                           : ""}
                       </td>
                       <td className="text-sm text-left pl-2 font-semibold w-[150px]">
-                        {(Number(entry.loan_amount) - Number(entry.paid_amount)).toLocaleString("en-US", { maximumFractionDigits: 0 })}
-                      </td>
-                      <td className="text-sm text-left font-semibold w-[200px]">{entry.loan_type}</td>
+                        {(Number(entry.loan_refund_amount)).toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                      </td>                      
+                      <td className="text-sm text-left font-semibold w-[200px]">{entry.type}</td>
                       <td className="text-sm text-left font-semibold w-[140px]">{entry.description}</td>
-                      <td className="text-sm text-left font-semibold w-[300px] pl-3">{entry.payment_mode}</td>
+                      <td className="text-sm text-left font-semibold w-[300px] pl-3">{entry.loan_payment_mode}</td>
                       <td className="text-sm text-left pl-3 font-semibold w-[90px]">{entry.entry_no}</td>
                       <td className="flex py-2 w-[150px]">
                         <button className="rounded-full transition duration-200 ml-2 mr-3">
@@ -868,15 +793,11 @@ const LoanTableview = ({ username, userRoles = [] }) => {
             </table>
           </div>
         </div>
-        {/* Pagination Controls */}
         {sortedData.length > 0 && (
           <div className="flex flex-col sm:flex-row justify-between items-center px-5 py-4 bg-white border-t border-gray-200">
-            {/* Items per page selector */}
             <div className="flex items-center space-x-2 mb-4 sm:mb-0">
               <label className="text-sm font-medium text-gray-700">Show:</label>
-              <select
-                value={itemsPerPage}
-                onChange={handleItemsPerPageChange}
+              <select value={itemsPerPage} onChange={handleItemsPerPageChange}
                 className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent"
               >
                 <option value={50}>50</option>
@@ -893,17 +814,11 @@ const LoanTableview = ({ username, userRoles = [] }) => {
               </select>
               <span className="text-sm text-gray-700">entries</span>
             </div>
-
-            {/* Page info */}
             <div className="text-sm text-gray-700 mb-4 sm:mb-0">
               Showing {startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries
             </div>
-
-            {/* Pagination buttons */}
             <div className="flex items-center space-x-2">
-              <button
-                onClick={goToPreviousPage}
-                disabled={currentPage === 1}
+              <button onClick={goToPreviousPage} disabled={currentPage === 1}
                 className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === 1
                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
@@ -911,8 +826,6 @@ const LoanTableview = ({ username, userRoles = [] }) => {
               >
                 Previous
               </button>
-
-              {/* Page numbers */}
               <div className="flex items-center space-x-1">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let pageNum;
@@ -925,11 +838,8 @@ const LoanTableview = ({ username, userRoles = [] }) => {
                   } else {
                     pageNum = currentPage - 2 + i;
                   }
-
                   return (
-                    <button
-                      key={pageNum}
-                      onClick={() => goToPage(pageNum)}
+                    <button key={pageNum} onClick={() => goToPage(pageNum)}
                       className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === pageNum
                         ? 'bg-[#BF9853] text-white'
                         : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
@@ -940,10 +850,7 @@ const LoanTableview = ({ username, userRoles = [] }) => {
                   );
                 })}
               </div>
-
-              <button
-                onClick={goToNextPage}
-                disabled={currentPage === totalPages}
+              <button onClick={goToNextPage} disabled={currentPage === totalPages}
                 className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === totalPages
                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
@@ -954,32 +861,23 @@ const LoanTableview = ({ username, userRoles = [] }) => {
             </div>
           </div>
         )}
-        {/* Edit Modal */}
         {isEditModalOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
             <div className="bg-white p-6 rounded-lg w-[700px]">
               <h2 className="text-lg font-bold mb-4">Edit Loan Entry</h2>
               <div className='grid grid-cols-2 gap-4 text-left ml-5'>
-                {/* Date */}
                 <div className='flex items-center gap-3'>
                   <label className='font-semibold text-[#E4572E]'>Date</label>
-                  <input
-                    type='date'
-                    placeholder='dd-mm-yyyy'
-                    value={editFormData.date}
+                  <input type='date' placeholder='dd-mm-yyyy' value={editFormData.date}
                     onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
                     className='w-[144px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
                   />
                 </div>
-                {/* Contractor/Vendor */}
                 <div className=''>
                   <div className='flex'>
                     <label className='font-semibold block'>Contractor/Vendor</label>
                   </div>
-                  <Select
-                    options={combinedOptions}
-                    value={selectedOption}
-                    onChange={(opt) => setSelectedOption(opt)}
+                  <Select options={combinedOptions} value={selectedOption} onChange={(opt) => setSelectedOption(opt)}
                     className='w-[263px] h-[45px] rounded-lg focus:outline-none'
                     isClearable
                     styles={{
@@ -996,13 +894,9 @@ const LoanTableview = ({ username, userRoles = [] }) => {
                     }}
                   />
                 </div>
-                {/* Project Name */}
                 <div>
                   <label className='font-semibold block'>Project Name</label>
-                  <Select
-                    options={siteOptions || []}
-                    placeholder="Select a site..."
-                    isSearchable={true}
+                  <Select options={siteOptions || []} placeholder="Select a site..." isSearchable={true}
                     value={siteOptions.find(site => site.id === editFormData.project_id) || null}
                     onChange={(selected) => setEditFormData({ ...editFormData, project_id: selected?.id || '' })}
                     styles={{
@@ -1020,7 +914,6 @@ const LoanTableview = ({ username, userRoles = [] }) => {
                     isClearable
                     className='w-[263px] h-[45px] focus:outline-none' />
                 </div>
-                {/* Loan Amount */}
                 <div>
                   <label className='font-semibold block'>Loan Amount</label>
                   <input
@@ -1034,11 +927,9 @@ const LoanTableview = ({ username, userRoles = [] }) => {
                     className='w-[263px] h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
                   />
                 </div>
-                {/* Paid Amount */}
                 <div>
                   <label className='font-semibold block'>Paid Amount</label>
-                  <input
-                    value={formatWithCommas(editFormData.paid_amount)}
+                  <input value={formatWithCommas(editFormData.paid_amount)}
                     onChange={(e) => {
                       const rawValue = e.target.value.replace(/,/g, "");
                       if (!isNaN(rawValue)) {
@@ -1048,11 +939,9 @@ const LoanTableview = ({ username, userRoles = [] }) => {
                     className='w-[263px] h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
                   />
                 </div>
-                {/* Loan Type */}
                 <div>
                   <label className='font-semibold block'>Loan Type</label>
-                  <select
-                    value={editFormData.loan_type}
+                  <select value={editFormData.loan_type}
                     onChange={(e) => setEditFormData({ ...editFormData, loan_type: e.target.value })}
                     className='w-[263px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'>
                     <option value=''>Select Type...</option>
@@ -1062,11 +951,9 @@ const LoanTableview = ({ username, userRoles = [] }) => {
                     <option value='Vehicle Loan'>Vehicle Loan</option>
                   </select>
                 </div>
-                {/* Payment Mode */}
                 <div>
                   <label className='font-semibold block'>Payment Mode</label>
-                  <select
-                    value={editFormData.payment_mode}
+                  <select value={editFormData.payment_mode}
                     onChange={(e) => setEditFormData({ ...editFormData, payment_mode: e.target.value })}
                     className='w-[263px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'>
                     <option value=''>Select</option>
@@ -1075,28 +962,19 @@ const LoanTableview = ({ username, userRoles = [] }) => {
                     <option value='Net Banking'>Net Banking</option>
                   </select>
                 </div>
-                {/* Description */}
                 <div className='col-span-2'>
                   <label className='font-semibold block'>Description</label>
-                  <textarea
-                    rows={2}
-                    value={editFormData.description}
+                  <textarea rows={2} value={editFormData.description}
                     onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
                     className='w-[590px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'>
                   </textarea>
                 </div>
               </div>
               <div className="flex justify-end gap-3 mt-4">
-                <button
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 border border-[#BF9853] w-[100px] h-[45px] rounded"
-                >
+                <button onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 border border-[#BF9853] w-[100px] h-[45px] rounded" >
                   Cancel
                 </button>
-                <button
-                  onClick={() => {/* handleUpdate() */}}
-                  className="px-4 py-2 bg-[#BF9853] w-[100px] h-[45px] text-white rounded"
-                >
+                <button onClick={() => {/* handleUpdate() */}} className="px-4 py-2 bg-[#BF9853] w-[100px] h-[45px] text-white rounded" >
                   Save
                 </button>
               </div>
@@ -1107,5 +985,4 @@ const LoanTableview = ({ username, userRoles = [] }) => {
     </body>
   )
 }
-
 export default LoanTableview

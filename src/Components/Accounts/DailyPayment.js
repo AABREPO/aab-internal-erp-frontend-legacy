@@ -722,6 +722,22 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 borderColor: 'rgba(191, 152, 83, 0.2)',
             }
         }),
+        indicatorSeparator: () => ({
+            display: 'none'
+        }),
+        indicatorsContainer: (provided) => ({
+            ...provided,
+            height: '40px',
+            gap: '0px'
+        }),
+        clearIndicator: (provided) => ({
+            ...provided,
+            padding: '2px'
+        }),
+        dropdownIndicator: (provided) => ({
+            ...provided,
+            padding: '2px'
+        })
     };
     const saveEditedRefundPayment = async (id) => {
         try {
@@ -1518,26 +1534,72 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                     )}
                                                 </td>
                                                 <td className="py-2 text-left">
-                                                    <select
+                                                    <Select
                                                         name="type"
-                                                        value={newDailyExpense.type}
+                                                        value={(isChangeButtonActive ? expensesCategory : weeklyTypes).find(option => 
+                                                            (isChangeButtonActive ? option.category : option.type) === newDailyExpense.type
+                                                        ) ? {
+                                                            value: newDailyExpense.type,
+                                                            label: newDailyExpense.type
+                                                        } : null}
+                                                        onChange={(selectedOption) => {
+                                                            setNewDailyExpense(prev => ({
+                                                                ...prev,
+                                                                type: selectedOption ? selectedOption.value : ""
+                                                            }));
+                                                        }}
+                                                        options={(isChangeButtonActive ? expensesCategory : weeklyTypes).map((type, index) => ({
+                                                            value: isChangeButtonActive ? type.category : type.type,
+                                                            label: isChangeButtonActive ? type.category : type.type
+                                                        }))}
+                                                        placeholder="Select"
+                                                        isSearchable={true}
+                                                        isClearable={true}
                                                         menuPortalTarget={document.body}
-                                                        onChange={handleInputChange}
-                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[120px] h-[40px] rounded-lg focus:outline-none"
-                                                    >
-                                                        <option value="">Select</option>
-                                                        {(isChangeButtonActive ? expensesCategory : weeklyTypes).map((type, index) => (
-                                                            <option key={index} value={isChangeButtonActive ? type.category : type.type}>
-                                                                {isChangeButtonActive ? type.category : type.type}
-                                                            </option>
-                                                        ))}
-                                                    </select>
+                                                        className="w-[165px]"
+                                                        styles={{
+                                                            control: (provided, state) => ({
+                                                                ...provided,
+                                                                minHeight: '40px',
+                                                                border: '2px solid rgba(191, 152, 83, 0.25)',
+                                                                borderRadius: '8px',
+                                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                                '&:hover': {
+                                                                    border: '2px solid rgba(191, 152, 83, 0.5)'
+                                                                }
+                                                            }),
+                                                            valueContainer: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px 8px'
+                                                            }),
+                                                            input: (provided) => ({
+                                                                ...provided,
+                                                                margin: '0px'
+                                                            }),
+                                                            indicatorSeparator: () => ({
+                                                                display: 'none'
+                                                            }),
+                                                            indicatorsContainer: (provided) => ({
+                                                                ...provided,
+                                                                height: '40px',
+                                                                gap: '0px'
+                                                            }),
+                                                            clearIndicator: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px'
+                                                            }),
+                                                            dropdownIndicator: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px'
+                                                            })
+                                                        }}
+                                                    />
                                                 </td>
                                                 <td className="py-2">
                                                     <input
                                                         type="number"
                                                         name="quantity"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[60px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[50px] h-[40px] rounded-lg focus:outline-none no-spinner"
                                                         value={newDailyExpense.quantity || ""}
                                                         onChange={(e) => setNewDailyExpense(prev => ({ ...prev, quantity: e.target.value }))}
                                                         onKeyDown={(e) => {
@@ -1638,7 +1700,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                             />
                                                         ) : (
                                                             // Show label in view mode
-                                                            <div className="w-[220px] h-[40px] flex items-center">
+                                                            <div className="w-[260px] h-[40px] flex items-center">
                                                                 {siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""}
                                                             </div>
                                                         )}
@@ -1740,21 +1802,67 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                     </td>
                                                     <td className="py-2">
                                                         {editingDailyExpenseRowId === row.id ? (
-                                                            <select
+                                                            <Select
                                                                 name="type"
-                                                                className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[120px] text-left h-[40px] rounded-lg focus:outline-none"
-                                                                value={editDailyExpenseData.type}
-                                                                onChange={(e) =>
-                                                                    setEditDailyExpenseData(prev => ({ ...prev, type: e.target.value }))
-                                                                }
-                                                            >
-                                                                <option value="">Select</option>
-                                                                {(isChangeButtonActive ? expensesCategory : weeklyTypes).map((type, index) => (
-                                                                    <option key={index} value={isChangeButtonActive ? type.category : type.type}>
-                                                                        {isChangeButtonActive ? type.category : type.type}
-                                                                    </option>
-                                                                ))}
-                                                            </select>
+                                                                value={(isChangeButtonActive ? expensesCategory : weeklyTypes).find(option => 
+                                                                    (isChangeButtonActive ? option.category : option.type) === editDailyExpenseData.type
+                                                                ) ? {
+                                                                    value: editDailyExpenseData.type,
+                                                                    label: editDailyExpenseData.type
+                                                                } : null}
+                                                                onChange={(selectedOption) => {
+                                                                    setEditDailyExpenseData(prev => ({
+                                                                        ...prev,
+                                                                        type: selectedOption ? selectedOption.value : ""
+                                                                    }));
+                                                                }}
+                                                                options={(isChangeButtonActive ? expensesCategory : weeklyTypes).map((type, index) => ({
+                                                                    value: isChangeButtonActive ? type.category : type.type,
+                                                                    label: isChangeButtonActive ? type.category : type.type
+                                                                }))}
+                                                                placeholder="Select"
+                                                                isSearchable={true}
+                                                                isClearable={true}
+                                                                className="w-[165px]"
+                                                                menuPortalTarget={document.body}
+                                                                styles={{
+                                                                    control: (provided, state) => ({
+                                                                        ...provided,
+                                                                        minHeight: '40px',
+                                                                        border: '2px solid rgba(191, 152, 83, 0.25)',
+                                                                        borderRadius: '8px',
+                                                                        backgroundColor: 'transparent',
+                                                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                                        '&:hover': {
+                                                                            border: '2px solid rgba(191, 152, 83, 0.5)'
+                                                                        }
+                                                                    }),
+                                                                    valueContainer: (provided) => ({
+                                                                        ...provided,
+                                                                        padding: '2px 8px'
+                                                                    }),
+                                                                    input: (provided) => ({
+                                                                        ...provided,
+                                                                        margin: '0px'
+                                                                    }),
+                                                                    indicatorSeparator: () => ({
+                                                                        display: 'none'
+                                                                    }),
+                                                                    indicatorsContainer: (provided) => ({
+                                                                        ...provided,
+                                                                        height: '40px',
+                                                                        gap: '0px'
+                                                                    }),
+                                                                    clearIndicator: (provided) => ({
+                                                                        ...provided,
+                                                                        padding: '2px'
+                                                                    }),
+                                                                    dropdownIndicator: (provided) => ({
+                                                                        ...provided,
+                                                                        padding: '2px'
+                                                                    })
+                                                                }}
+                                                            />
                                                         ) : (
                                                             <div className="w-[120px] h-[40px] flex items-center">
                                                                 {row.type}

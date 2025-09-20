@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import Select from 'react-select';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import Filter from '../Images/filter (3).png'
 import Reload from '../Images/rotate-right.png'
 import edit from '../Images/Edit.svg';
@@ -22,9 +24,18 @@ const LoanTableview = ({ username, userRoles = [] }) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editFormData, setEditFormData] = useState({});
   const [editingId, setEditingId] = useState(null);
+  const [editSelectedType, setEditSelectedType] = useState('Loan');
+  const [editSelectedOption, setEditSelectedOption] = useState(null);
+  const [editSelectedSite, setEditSelectedSite] = useState(null);
+  const [editPurpose, setEditPurpose] = useState('');
+  const [editTransferSelection, setEditTransferSelection] = useState(null);
+  const [editAmountGiven, setEditAmountGiven] = useState('');
+  const [editTransferAmount, setEditTransferAmount] = useState('');
+  const [editPaymentMode, setEditPaymentMode] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [combinedSitePurposeOptions, setCombinedSitePurposeOptions] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [overallLoan, setOverallLoan] = useState(0);
-  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
   const scrollRef = useRef(null);
@@ -34,7 +45,6 @@ const LoanTableview = ({ username, userRoles = [] }) => {
   const velocity = useRef({ x: 0, y: 0 });
   const animationFrame = useRef(null);
   const lastMove = useRef({ time: 0, x: 0, y: 0 });
-  // Drag functionality for table scrolling
   const handleMouseDown = (e) => {
     if (!scrollRef.current) return;
     isDragging.current = true;
@@ -102,10 +112,15 @@ const LoanTableview = ({ username, userRoles = [] }) => {
     };
     animationFrame.current = requestAnimationFrame(step);
   };
-  // Helper functions
   const formatWithCommas = (value) => {
     if (!value) return "";
     return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  };
+  const handleEditTransferAmountChange = (e) => {
+    const rawValue = e.target.value.replace(/,/g, "");
+    if (!isNaN(rawValue)) {
+      setEditTransferAmount(rawValue);
+    }
   };
   const formatDateOnly = (dateString) => {
     const date = new Date(dateString);
@@ -114,23 +129,50 @@ const LoanTableview = ({ username, userRoles = [] }) => {
     const year = date.getFullYear();
     return `${day}-${month}-${year}`;
   };
+  const purposeOptions = useMemo(() => [
+    { value: 'Machine Loan', label: 'Machine Loan', id: 1, type: 'Purpose' },
+    { value: 'Material Loan', label: 'Material Loan', id: 2, type: 'Purpose' },
+    { value: 'Equipment Loan', label: 'Equipment Loan', id: 3, type: 'Purpose' },
+    { value: 'Working Capital', label: 'Working Capital', id: 4, type: 'Purpose' },
+    { value: 'Other', label: 'Other', id: 5, type: 'Purpose' }
+  ], []);
+  const paymentModeOptions = useMemo(() => [
+    { id: 1, value: 'Cash', label: 'Cash' },
+    { id: 2, value: 'GPay', label: 'GPay' },
+    { id: 3, value: 'Net Banking', label: 'Net Banking' },
+    { id: 4, value: 'Cheque', label: 'Cheque' },
+    { id: 5, value: 'Advance Transfer', label: 'Advance Transfer' }
+  ], []);
+  const customStyles = useMemo(() => ({
+    control: (provided, state) => ({
+      ...provided,
+      borderWidth: '2px',
+      borderRadius: '8px',
+      borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'rgba(191, 152, 83, 0.2)',
+      boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
+      '&:hover': {
+        borderColor: 'rgba(191, 152, 83, 0.2)',
+      }
+    }),
+  }), []);
   const getVendorName = (id) =>
     vendorOptions.find(v => v.id === id)?.value || "";
   const getContractorName = (id) =>
     contractorOptions.find(c => c.id === id)?.value || "";
   const getSiteName = (id) =>
     siteOptions.find(s => String(s.id) === String(id))?.value || "";
-  // Calculate totals for loan data
-  const totalLoanAmount = loanData.reduce(
-    (sum, entry) => sum + (Number(entry.loan_amount) || 0),
-    0
-  );
-  const totalPaidAmount = loanData.reduce(
-    (sum, entry) => sum + (Number(entry.paid_amount) || 0),
-    0
-  );
+  const totalLoanAmount = loanData
+    .filter(entry => entry.type === "Loan")
+    .reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
+  const totalTransferAmount = loanData
+    .filter(entry => entry.type === "Transfer")
+    .reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
+  const totalRefundAmount = loanData
+    .filter(entry => entry.type === "Refund")
+    .reduce((sum, entry) => sum + (Number(entry.loan_refund_amount) || 0), 0);
+  const totalPaidAmount = loanData
+    .reduce((sum, entry) => sum + (Number(entry.paid_amount) || 0), 0);
   const totalRemainingAmount = totalLoanAmount - totalPaidAmount;
-  // Data fetching and filtering logic
   useEffect(() => {
     return () => cancelMomentum();
   }, []);
@@ -188,9 +230,12 @@ const LoanTableview = ({ username, userRoles = [] }) => {
     };
     fetchContractorNames();
   }, []);
-  useEffect(() => { 
-    setCombinedOptions([...vendorOptions, ...contractorOptions]); 
+  useEffect(() => {
+    setCombinedOptions([...vendorOptions, ...contractorOptions]);
   }, [vendorOptions, contractorOptions]);
+  useEffect(() => {
+    setCombinedSitePurposeOptions([...siteOptions, ...purposeOptions]);
+  }, [siteOptions, purposeOptions]);
   useEffect(() => {
     const fetchSites = async () => {
       try {
@@ -209,7 +254,8 @@ const LoanTableview = ({ username, userRoles = [] }) => {
           value: item.siteName,
           label: item.siteName,
           id: item.id,
-          sNo: item.siteNo
+          sNo: item.siteNo,
+          type: 'Site',
         }));
         setSiteOptions(formattedData);
       } catch (error) {
@@ -233,9 +279,7 @@ const LoanTableview = ({ username, userRoles = [] }) => {
     };
     fetchData();
   }, []);
-  // Filtered data based on selected filters
   const filteredData = loanData.filter((entry) => {
-    // Date filter
     if (selectDate) {
       const [year, month, day] = selectDate.split("-");
       const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
@@ -243,7 +287,6 @@ const LoanTableview = ({ username, userRoles = [] }) => {
       const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
       if (formattedEntryDate !== formattedSelectDate) return false;
     }
-    // Contractor/Vendor filter
     if (selectContractororVendorName) {
       const name =
         entry.vendor_id
@@ -252,23 +295,19 @@ const LoanTableview = ({ username, userRoles = [] }) => {
       if (name.toLowerCase() !== selectContractororVendorName.toLowerCase())
         return false;
     }
-    // Project Name filter
     if (selectProjectName) {
       const projectName = getSiteName(entry.project_id) || "";
       if (projectName.toLowerCase() !== selectProjectName.toLowerCase())
         return false;
     }
-    // Type filter
     if (selectType) {
       if (entry.loan_type?.toLowerCase() !== selectType.toLowerCase()) return false;
     }
-    // Mode filter
     if (selectMode) {
       if (entry.payment_mode?.toLowerCase() !== selectMode.toLowerCase()) return false;
     }
     return true;
   });
-  // Sorting functionality
   const handleSort = (key) => {
     setSortConfig((prev) => {
       if (prev.key === key) {
@@ -311,7 +350,6 @@ const LoanTableview = ({ username, userRoles = [] }) => {
         return 0;
       });
     } else {
-      // Default sorting: Most recent entries first
       sortableData.sort((a, b) => {
         const dateA = new Date(a.date);
         const dateB = new Date(b.date);
@@ -320,16 +358,13 @@ const LoanTableview = ({ username, userRoles = [] }) => {
     }
     return sortableData;
   }, [filteredData, sortConfig]);
-  // Pagination logic
   const totalPages = Math.ceil(sortedData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentData = sortedData.slice(startIndex, endIndex);
-  // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [selectDate, selectContractororVendorName, selectProjectName, selectType, selectMode]);
-  // Pagination handlers
   const goToPage = (page) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   };
@@ -348,9 +383,8 @@ const LoanTableview = ({ username, userRoles = [] }) => {
     setItemsPerPage(newItemsPerPage);
     setCurrentPage(1);
   };
-  // Export functionality
   const exportPDF = () => {
-    const doc = new jsPDF("l", "pt", "a4"); 
+    const doc = new jsPDF("l", "pt", "a4");
     const headers = [
       [
         "S.No",
@@ -365,7 +399,7 @@ const LoanTableview = ({ username, userRoles = [] }) => {
         "Payment Mode",
         "E.No"
       ]
-    ];    
+    ];
     const rows = sortedData.map((entry, index) => [
       index + 1,
       formatDateOnly(entry.date),
@@ -384,7 +418,7 @@ const LoanTableview = ({ username, userRoles = [] }) => {
       entry.description,
       entry.payment_mode,
       entry.entry_no
-    ]);    
+    ]);
     doc.setFontSize(12);
     doc.text("Loan Data Table", 40, 30);
     doc.autoTable({
@@ -407,7 +441,7 @@ const LoanTableview = ({ username, userRoles = [] }) => {
         lineColor: [0, 0, 0]
       },
       alternateRowStyles: {
-        fillColor: null       
+        fillColor: null
       }
     });
     doc.save("LoanData.pdf");
@@ -461,6 +495,69 @@ const LoanTableview = ({ username, userRoles = [] }) => {
     link.click();
     document.body.removeChild(link);
   };
+  const handleUpdate = async () => {
+    try {
+
+      const payload = {
+        loanPortalId: editingId,
+        type: editSelectedType,
+        date: editFormData.date,
+        amount: (editSelectedType === "Loan" || editSelectedType === "Transfer")
+          ? parseFloat(editFormData.loan_amount || 0)
+          : 0,
+        loan_refund_amount: editSelectedType === "Refund"
+          ? parseFloat(editFormData.loan_refund_amount || 0)
+          : 0,
+        loan_payment_mode: editPaymentMode || "",
+        from_purpose_id: editPurpose || 0,
+        to_purpose_id: (editSelectedType === "Transfer" && editTransferSelection.type === "Purpose")
+          ? (editTransferSelection?.id || 0)
+          : 0,
+        vendor_id: editSelectedOption?.type === "Vendor" ? editSelectedOption.id : 0,
+        contractor_id: editSelectedOption?.type === "Contractor" ? editSelectedOption.id : 0,
+        project_id: editFormData.project_id || 0,
+        transfer_Project_id: (editSelectedType === "Transfer" && editTransferSelection.type === "Site")
+          ? (editTransferSelection?.id || 0)
+          : 0,
+        entry_no: editFormData.entry_no || 0,
+        description: editDescription || "",
+
+      };
+      const res = await fetch(
+        `http://localhost:8082/api/loans/${editingId}?editedBy=${username}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      );
+      window.location.reload();
+      if (!res.ok) throw new Error('Failed to update');
+      const updatedDataArray = await res.json();
+      setLoanData(prev => {
+        const newData = [...prev];
+        updatedDataArray.forEach(entry => {
+          const idx = newData.findIndex(item => item.loanPortalId === entry.loanPortalId);
+          if (idx === -1) newData.push(entry);
+          else newData[idx] = entry;
+        });
+        return newData;
+      });
+      setIsEditModalOpen(false);
+      toast.success("Entry updated successfully!", {
+        position: "top-center",
+        autoClose: 3000,
+        theme: "colored",
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error(error.message || "Failed to update entry!", {
+        position: "top-center",
+        autoClose: 3000,
+        theme: "colored",
+      });
+    }
+  };
   return (
     <body>
       <div className='w-[1750px] h-[150px] bg-white ml-10 text-left flex gap-5'>
@@ -476,7 +573,7 @@ const LoanTableview = ({ username, userRoles = [] }) => {
           <label className='block mb-2 font-semibold'>Transfer Amount</label>
           <input
             className='w-[183px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
-            value={`₹${totalPaidAmount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
+            value={`₹${totalTransferAmount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
             readOnly
           />
         </div>
@@ -484,7 +581,7 @@ const LoanTableview = ({ username, userRoles = [] }) => {
           <label className='block mb-2 font-semibold'>Refund Amount</label>
           <input
             className='w-[220px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
-            value={`₹${totalRemainingAmount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
+            value={`₹${totalRefundAmount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
             readOnly
           />
         </div>
@@ -552,33 +649,23 @@ const LoanTableview = ({ username, userRoles = [] }) => {
             <table className="w-[1955px] border-collapse">
               <thead className="sticky top-0 z-10 bg-white ">
                 <tr className="bg-[#FAF6ED]">
-                  <th className="pt-2 pl-3 w-44 font-bold text-left cursor-pointer hover:bg-gray-200"
-                    onClick={() => handleSort('date')}
-                  >
+                  <th className="pt-2 pl-3 w-44 font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('date')}>
                     Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200"
-                    onClick={() => handleSort('vendor')}
-                  >
+                  <th className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('vendor')}>
                     Associate {sortConfig.key === 'vendor' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="px-2 w-[300px] font-bold text-left cursor-pointer hover:bg-gray-200"
-                    onClick={() => handleSort('project')}
-                  >
+                  <th className="px-2 w-[300px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('project')}>
                     Purpose {sortConfig.key === 'project' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
                   <th className="px-2 w-[120px] font-bold text-left">Transfer To</th>
                   <th className="px-2 w-[170px] font-bold text-left">Loan</th>
                   <th className="px-2 w-[120px] font-bold text-left">Refund</th>
-                  <th className="px-2 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200"
-                    onClick={() => handleSort('type')}
-                  >
+                  <th className="px-2 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('type')}>
                     Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
                   <th className="px-2 w-[120px] font-bold text-left">Description</th>
-                  <th className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 pl-3"
-                    onClick={() => handleSort('mode')}
-                  >
+                  <th className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 pl-3" onClick={() => handleSort('mode')}>
                     Mode {sortConfig.key === 'mode' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
                   <th className="px-2 w-[80px] font-bold text-left">E.No</th>
@@ -732,38 +819,52 @@ const LoanTableview = ({ username, userRoles = [] }) => {
               <tbody>
                 {currentData.length > 0 ? (
                   currentData.map((entry) => (
-                    <tr key={entry.id} className="odd:bg-white even:bg-[#FAF6ED]">
+                    <tr key={entry.loanPortalId || entry.id} className="odd:bg-white even:bg-[#FAF6ED]">
                       <td className="text-sm text-left p-2 w-44 font-semibold">{formatDateOnly(entry.date)}</td>
                       <td className="text-sm text-left w-[250px] font-semibold">
-                        {entry.vendor_id? getVendorName(entry.vendor_id) : getContractorName(entry.contractor_id)}
+                        {entry.vendor_id ? getVendorName(entry.vendor_id) : getContractorName(entry.contractor_id)}
                       </td>
                       <td className="text-sm text-left w-[420px] font-semibold">
-                        {(entry.from_purpose_id)}
+                        {purposeOptions.find(p => p.id === entry.from_purpose_id)?.value || entry.from_purpose_id}
                       </td>
                       <td className="text-sm text-left w-[140px] font-semibold">
-                        {entry.transfer_Project_id}
+                        {entry.type === "Transfer" ? (
+                          entry.to_purpose_id
+                            ? purposeOptions.find(purpose => purpose.id === entry.to_purpose_id)?.value || ""
+                            : siteOptions.find(site => site.id === entry.transfer_Project_id)?.value || ""
+                        ) : (
+                          ""
+                        )}
                       </td>
                       <td className="text-sm text-left pl-2 w-[140px] font-semibold">
-                        {entry.amount != null && entry.amount !== ""
+                        {(entry.type === "Loan" || entry.type === "Transfer") && entry.amount
                           ? Number(entry.amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
                           : ""}
+                        {entry.type === "Refund" ? "-" : ""}
                       </td>
                       <td className="text-sm text-left pl-2 font-semibold w-[150px]">
-                        {(Number(entry.loan_refund_amount)).toLocaleString("en-US", { maximumFractionDigits: 0 })}
-                      </td>                      
+                        {entry.type === "Refund" && entry.loan_refund_amount
+                          ? Number(entry.loan_refund_amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
+                          : ""}
+                      </td>
                       <td className="text-sm text-left font-semibold w-[200px]">{entry.type}</td>
                       <td className="text-sm text-left font-semibold w-[140px]">{entry.description}</td>
-                      <td className="text-sm text-left font-semibold w-[300px] pl-3">{entry.loan_payment_mode}</td>
+                      <td className="text-sm text-left pl-3 font-semibold w-[90px]">
+                        {paymentModeOptions.find(opt => opt.value === entry.loan_payment_mode)?.label || entry.loan_payment_mode || ''}
+                      </td>
                       <td className="text-sm text-left pl-3 font-semibold w-[90px]">{entry.entry_no}</td>
                       <td className="flex py-2 w-[150px]">
                         <button className="rounded-full transition duration-200 ml-2 mr-3">
                           <img
                             src={edit}
+                            alt="Edit"
+                            className="w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200"
                             onClick={() => {
                               setEditingId(entry.loanPortalId || entry.id);
                               setEditFormData({
                                 date: entry.date?.split('T')[0] || '',
-                                loan_amount: entry.loan_amount || '',
+                                loan_amount: entry.amount || '',
+                                loan_refund_amount: entry.loan_refund_amount || '',
                                 paid_amount: entry.paid_amount || '',
                                 project_id: entry.project_id || '',
                                 vendor_id: entry.vendor_id || '',
@@ -771,12 +872,31 @@ const LoanTableview = ({ username, userRoles = [] }) => {
                                 entry_no: entry.entry_no || '',
                                 description: entry.description || '',
                                 loan_type: entry.loan_type || '',
-                                payment_mode: entry.payment_mode || ''
+                                payment_mode: entry.loan_payment_mode || ''
                               });
+                              setEditSelectedType(entry.type || 'Loan');
+                              setEditSelectedOption(
+                                entry.vendor_id
+                                  ? vendorOptions.find(v => v.id === entry.vendor_id)
+                                  : entry.contractor_id
+                                    ? contractorOptions.find(c => c.id === entry.contractor_id)
+                                    : null
+                              );
+                              setEditSelectedSite(siteOptions.find(s => s.id === entry.project_id) || null);
+                              setEditPurpose(entry.from_purpose_id || '');
+                              const transferOption = entry.to_purpose_id
+                                ? purposeOptions.find(p => p.id === entry.to_purpose_id)
+                                : entry.transfer_Project_id
+                                  ? siteOptions.find(s => s.id === entry.transfer_Project_id)
+                                  : null;
+
+                              setEditTransferSelection(transferOption || null);
+                              setEditAmountGiven(entry.amount || '');
+                              setEditTransferAmount(entry.amount || '');
+                              setEditPaymentMode(entry.loan_payment_mode || '');
+                              setEditDescription(entry.description || '');
                               setIsEditModalOpen(true);
                             }}
-                            alt="Edit"
-                            className=" w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200 "
                           />
                         </button>
                       </td>
@@ -784,7 +904,7 @@ const LoanTableview = ({ username, userRoles = [] }) => {
                   ))
                 ) : (
                   <tr>
-                    <td className="p-2 text-center text-sm text-gray-400" colSpan={11}>
+                    <td className="p-2 text-center text-sm text-gray-400" colSpan={12}>
                       No data available
                     </td>
                   </tr>
@@ -862,126 +982,143 @@ const LoanTableview = ({ username, userRoles = [] }) => {
           </div>
         )}
         {isEditModalOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-            <div className="bg-white p-6 rounded-lg w-[700px]">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
+            <div className="bg-white p-4 sm:p-6 rounded-lg w-full max-w-[800px] max-h-[90vh] overflow-y-auto">
               <h2 className="text-lg font-bold mb-4">Edit Loan Entry</h2>
-              <div className='grid grid-cols-2 gap-4 text-left ml-5'>
-                <div className='flex items-center gap-3'>
-                  <label className='font-semibold text-[#E4572E]'>Date</label>
-                  <input type='date' placeholder='dd-mm-yyyy' value={editFormData.date}
-                    onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
-                    className='w-[144px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
-                  />
+              <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 text-left'>
+                <div className='space-y-2'>
+                  <label className='font-semibold text-[#E4572E] text-sm sm:text-base'>Select Type</label>
+                  <select value={editSelectedType} onChange={(e) => setEditSelectedType(e.target.value)}
+                    className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
+                  >
+                    <option value='Loan'>Loan</option>
+                    <option value='Refund'>Refund</option>
+                    <option value='Transfer'>Transfer</option>
+                  </select>
                 </div>
-                <div className=''>
-                  <div className='flex'>
-                    <label className='font-semibold block'>Contractor/Vendor</label>
-                  </div>
-                  <Select options={combinedOptions} value={selectedOption} onChange={(opt) => setSelectedOption(opt)}
-                    className='w-[263px] h-[45px] rounded-lg focus:outline-none'
-                    isClearable
-                    styles={{
-                      control: (provided, state) => ({
-                        ...provided,
-                        borderWidth: '2px',
-                        borderRadius: '8px',
-                        borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'rgba(191, 152, 83, 0.2)',
-                        boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
-                        '&:hover': {
-                          borderColor: 'rgba(191, 152, 83, 0.2)',
-                        }
-                      }),
-                    }}
-                  />
-                </div>
-                <div>
-                  <label className='font-semibold block'>Project Name</label>
-                  <Select options={siteOptions || []} placeholder="Select a site..." isSearchable={true}
-                    value={siteOptions.find(site => site.id === editFormData.project_id) || null}
-                    onChange={(selected) => setEditFormData({ ...editFormData, project_id: selected?.id || '' })}
-                    styles={{
-                      control: (provided, state) => ({
-                        ...provided,
-                        borderWidth: '2px',
-                        borderRadius: '8px',
-                        borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'rgba(191, 152, 83, 0.2)',
-                        boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
-                        '&:hover': {
-                          borderColor: 'rgba(191, 152, 83, 0.2)',
-                        }
-                      }),
-                    }}
-                    isClearable
-                    className='w-[263px] h-[45px] focus:outline-none' />
-                </div>
-                <div>
-                  <label className='font-semibold block'>Loan Amount</label>
+                <div className='space-y-2'>
+                  <label className='font-semibold text-[#E4572E] text-sm sm:text-base'>Date</label>
                   <input
-                    value={formatWithCommas(editFormData.loan_amount)}
-                    onChange={(e) => {
-                      const rawValue = e.target.value.replace(/,/g, "");
-                      if (!isNaN(rawValue)) {
-                        setEditFormData({ ...editFormData, loan_amount: rawValue });
-                      }
-                    }}
-                    className='w-[263px] h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
+                    type='date'
+                    value={editFormData.date}
+                    onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
+                    className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
                   />
                 </div>
-                <div>
-                  <label className='font-semibold block'>Paid Amount</label>
-                  <input value={formatWithCommas(editFormData.paid_amount)}
-                    onChange={(e) => {
-                      const rawValue = e.target.value.replace(/,/g, "");
-                      if (!isNaN(rawValue)) {
-                        setEditFormData({ ...editFormData, paid_amount: rawValue });
-                      }
-                    }}
-                    className='w-[263px] h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
+                <div className='space-y-2'>
+                  <label className='font-semibold block text-sm sm:text-base'>Associate</label>
+                  <Select
+                    options={combinedOptions}
+                    value={editSelectedOption}
+                    onChange={setEditSelectedOption}
+                    className='w-full rounded-lg focus:outline-none'
+                    isClearable
+                    styles={customStyles}
                   />
                 </div>
-                <div>
-                  <label className='font-semibold block'>Loan Type</label>
-                  <select value={editFormData.loan_type}
-                    onChange={(e) => setEditFormData({ ...editFormData, loan_type: e.target.value })}
-                    className='w-[263px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'>
-                    <option value=''>Select Type...</option>
-                    <option value='Personal Loan'>Personal Loan</option>
-                    <option value='Business Loan'>Business Loan</option>
-                    <option value='Home Loan'>Home Loan</option>
-                    <option value='Vehicle Loan'>Vehicle Loan</option>
+                <div className='space-y-2'>
+                  <label className='font-semibold block text-sm sm:text-base'>Purpose</label>
+                  <select
+                    value={editPurpose}
+                    onChange={(e) => setEditPurpose(e.target.value)}
+                    className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
+                  >
+                    <option value=''>Select Purpose</option>
+                    {purposeOptions.map(option => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
-                <div>
-                  <label className='font-semibold block'>Payment Mode</label>
-                  <select value={editFormData.payment_mode}
-                    onChange={(e) => setEditFormData({ ...editFormData, payment_mode: e.target.value })}
-                    className='w-[263px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'>
-                    <option value=''>Select</option>
-                    <option value='Cash'>Cash</option>
-                    <option value='GPay'>GPay</option>
-                    <option value='Net Banking'>Net Banking</option>
-                  </select>
+                <div className='space-y-2'>
+                  <label className='font-semibold block text-sm sm:text-base'>
+                    {editSelectedType === 'Transfer' ? 'Transfer To' :
+                      editSelectedType === 'Refund' ? 'Amount' : 'Amount Given'}
+                  </label>
+                  {editSelectedType === 'Transfer' ? (
+                    <Select
+                      options={combinedSitePurposeOptions}
+                      value={editTransferSelection}
+                      onChange={(selected) => setEditTransferSelection(selected || null)}
+                      className='w-full rounded-lg focus:outline-none'
+                      isClearable
+                      styles={customStyles}
+                      placeholder="Select Transfer To"
+                    />
+                  ) : editSelectedType === 'Refund' ? (
+                    <input
+                      value={formatWithCommas(editFormData.loan_refund_amount || '')}
+                      onChange={(e) => {
+                        const rawValue = e.target.value.replace(/,/g, '');
+                        if (!isNaN(rawValue)) {
+                          setEditFormData(prev => ({ ...prev, loan_refund_amount: rawValue }));
+                        }
+                      }}
+                      placeholder="Enter Refund Amount"
+                      className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
+                    />
+                  ) : (
+                    <input
+                      value={formatWithCommas(editFormData.loan_amount || '')}
+                      onChange={(e) => {
+                        const rawValue = e.target.value.replace(/,/g, '');
+                        if (!isNaN(rawValue)) {
+                          setEditFormData(prev => ({ ...prev, loan_amount: rawValue }));
+                        }
+                      }}
+                      placeholder="Enter Amount"
+                      className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
+                    />
+                  )}
                 </div>
-                <div className='col-span-2'>
-                  <label className='font-semibold block'>Description</label>
-                  <textarea rows={2} value={editFormData.description}
-                    onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
-                    className='w-[590px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'>
-                  </textarea>
+                <div className='space-y-2'>
+                  <label className='font-semibold block text-sm sm:text-base'>
+                    {editSelectedType === 'Transfer' ? 'Transfer Amount' : 'Payment Mode'}
+                  </label>
+                  {editSelectedType === 'Transfer' ? (
+                    <input
+                      value={formatWithCommas(editTransferAmount)}
+                      onChange={handleEditTransferAmountChange}
+                      placeholder="Enter Amount"
+                      className='w-full h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
+                    />
+                  ) : (
+                    <Select
+                      options={paymentModeOptions}
+                      value={paymentModeOptions.find(option => option.value === editPaymentMode) || null}
+                      onChange={(selected) => setEditPaymentMode(selected ? selected.value : '')}
+                      classNamePrefix="react-select"
+                      placeholder="Select"
+                      isClearable
+                    />
+                  )}
+                </div>
+                <div className='col-span-1 sm:col-span-2 space-y-2'>
+                  <label className='font-semibold block text-sm sm:text-base'>Description</label>
+                  <textarea
+                    rows={2}
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    placeholder="Type your text here..."
+                    className='w-full border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
+                  />
                 </div>
               </div>
-              <div className="flex justify-end gap-3 mt-4">
-                <button onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 border border-[#BF9853] w-[100px] h-[45px] rounded" >
+              <div className="flex justify-center sm:justify-end gap-3 mt-4">
+                <button onClick={() => setIsEditModalOpen(false)} className="w-[100px] h-[45px] border border-[#BF9853] rounded text-sm">
                   Cancel
                 </button>
-                <button onClick={() => {/* handleUpdate() */}} className="px-4 py-2 bg-[#BF9853] w-[100px] h-[45px] text-white rounded" >
+                <button onClick={handleUpdate} className="w-[100px] h-[45px] bg-[#BF9853] text-white rounded text-sm">
                   Save
                 </button>
+
               </div>
             </div>
           </div>
         )}
-    </div>
+      </div>
+      <ToastContainer position="top-center" autoClose={3000} theme="colored" />
     </body>
   )
 }

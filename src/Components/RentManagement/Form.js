@@ -13,15 +13,15 @@ const Form = () => {
     const [startingDate, setStartingDate] = useState('');
     const [calculatedRent, setCalculatedRent] = useState('');
     const [properties, setProperties] = useState([]);
-    const [tenantName, setTenantName] = useState('');
-    const [shopNo, setShopNo] = useState('');
+    const [formTenantName, setFormTenantName] = useState('');
+    const [formShopNo, setFormShopNo] = useState('');
     const [tenantOptions, setTenantOptions] = useState([]);
     const [tenantShopData, setTenantShopData] = useState([]);
     const [selectedTenantId, setSelectedTenantId] = useState('');
     const [shopNoOptions, setShopNoOptions] = useState([]);
     const [selectedMonth, setSelectedMonth] = useState(getPreviousMonth());
     const [amount, setAmount] = useState("");
-    const [paymentMode, setPaymentMode] = useState("");
+    const [formPaymentMode, setFormPaymentMode] = useState("");
     const [file, setFile] = useState(null);
     const [uploadStatus, setUploadStatus] = useState('');
     const [filteredShopNoOptions, setFilteredShopNoOptions] = useState(shopNoOptions);
@@ -38,22 +38,30 @@ const Form = () => {
     const fileInputRef = useRef(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [paymentModeOptions, setPaymentModeOptions] = useState([]);
+    const [advanceAmount, setAdvanceAmount] = useState(0);
+    const [rentalFormsData, setRentalFormsData] = useState([]);
+    const [amountError, setAmountError] = useState('');
+    const [closureDate, setClosureDate] = useState('');
     useEffect(() => {
         const savedSelectedType = sessionStorage.getItem('selectedType');
-        const savedShopNo = sessionStorage.getItem('shopNo')
+        const savedFormShopNo = sessionStorage.getItem('formShopNo')
         const savedSelectedMonth = sessionStorage.getItem('selectedMonth');
-        const savedTenantName = sessionStorage.getItem('tenantName');
+        const savedFormTenantName = sessionStorage.getItem('formTenantName');
         const savedAmount = sessionStorage.getItem('amount');
         const savedPaidOnDate = sessionStorage.getItem('paidOnDate');
-        const savedPaymentMode = sessionStorage.getItem('paymentMode')
+        const savedFormPaymentMode = sessionStorage.getItem('formPaymentMode');
+        const savedCalculatedRent = sessionStorage.getItem('calculatedRent');
+        const savedClosureDate = sessionStorage.getItem('closureDate');
         try {
             if (savedSelectedType) setSelectedType(JSON.parse(savedSelectedType));
             if (savedSelectedMonth) setSelectedMonth(JSON.parse(savedSelectedMonth));
-            if (savedShopNo) setShopNo(JSON.parse(savedShopNo));
-            if (savedTenantName) setTenantName(JSON.parse(savedTenantName));
+            if (savedFormShopNo) setFormShopNo(JSON.parse(savedFormShopNo));
+            if (savedFormTenantName) setFormTenantName(JSON.parse(savedFormTenantName));
             if (savedAmount) setAmount(JSON.parse(savedAmount));
-            if (savedPaymentMode) setPaymentMode(JSON.parse(savedPaymentMode));
+            if (savedFormPaymentMode) setFormPaymentMode(JSON.parse(savedFormPaymentMode));
             if (savedPaidOnDate) setPaidOnDate(JSON.parse(savedPaidOnDate));
+            if (savedCalculatedRent) setCalculatedRent(JSON.parse(savedCalculatedRent));
+            if (savedClosureDate) setClosureDate(JSON.parse(savedClosureDate));
         } catch (error) {
             console.error("Error parsing sessionStorage data:", error);
         }
@@ -64,22 +72,26 @@ const Form = () => {
     }, []);
     const handleBeforeUnload = () => {
         sessionStorage.removeItem('selectedType');
-        sessionStorage.removeItem('shopNo');
+        sessionStorage.removeItem('formShopNo');
         sessionStorage.removeItem('selectedMonth');
-        sessionStorage.removeItem('tenantName');
+        sessionStorage.removeItem('formTenantName');
         sessionStorage.removeItem('amount');
         sessionStorage.removeItem('paidOnDate');
-        sessionStorage.removeItem('paymentMode')
+        sessionStorage.removeItem('formPaymentMode');
+        sessionStorage.removeItem('calculatedRent');
+        sessionStorage.removeItem('closureDate');
     };
     useEffect(() => {
         if (selectedType) sessionStorage.setItem('selectedType', JSON.stringify(selectedType));
-        if (shopNo) sessionStorage.setItem('shopNo', JSON.stringify(shopNo));
+        if (formShopNo) sessionStorage.setItem('formShopNo', JSON.stringify(formShopNo));
         if (selectedMonth) sessionStorage.setItem('selectedMonth', JSON.stringify(selectedMonth));
-        if (tenantName) sessionStorage.setItem('tenantName', JSON.stringify(tenantName));
+        if (formTenantName) sessionStorage.setItem('formTenantName', JSON.stringify(formTenantName));
         if (amount) sessionStorage.setItem('amount', JSON.stringify(amount));
         if (paidOnDate) sessionStorage.setItem('paidOnDate', JSON.stringify(paidOnDate));
-        if (paymentMode) sessionStorage.setItem('paymentMode', JSON.stringify(paymentMode));
-    }, [selectedType, shopNo, selectedMonth, tenantName, amount, paidOnDate, paymentMode]);
+        if (formPaymentMode) sessionStorage.setItem('formPaymentMode', JSON.stringify(formPaymentMode));
+        if (calculatedRent) sessionStorage.setItem('calculatedRent', JSON.stringify(calculatedRent));
+        if (closureDate) sessionStorage.setItem('closureDate', JSON.stringify(closureDate));
+    }, [selectedType, formShopNo, selectedMonth, formTenantName, amount, paidOnDate, formPaymentMode, calculatedRent, closureDate]);
     const [message, setMessage] = useState('');
     const [eno, setEno] = useState(null);
     const handleFileChange = (e) => {
@@ -95,7 +107,7 @@ const Form = () => {
     }, []);
     const fetchProperties = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/properties/all');
+            const response = await fetch('http://localhost:8082/api/properties/all');
             if (response.ok) {
                 const data = await response.json();
                 setProperties(data);
@@ -108,37 +120,65 @@ const Form = () => {
     };
     useEffect(() => {
         fetchTenants();
-    }, []);
+    }, [selectedType]);
     const fetchTenants = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/tenantShop/getAll');
+            const response = await fetch('http://localhost:8082/api/tenantShop/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setTenantShopData(data);
-                // Filter active tenants only
-                const activeTenants = data.filter(t =>
-                    t.property?.some(p =>
-                        p.shops?.some(shop => shop.active)
-                    )
-                );
-                // Step 2: Map all active tenant-shop combinations
-                const options = activeTenants.flatMap(t =>
-                    t.property.flatMap(p =>
-                        p.shops
-                            .filter(shop => shop.active)
-                            .map(shop => ({
+
+                // For regular types, filter active tenants only
+                if (selectedType !== "Pending Rent") {
+                    const activeTenants = data.filter(t =>
+                        t.property?.some(p =>
+                            p.shops?.some(shop => shop.active)
+                        )
+                    );
+                    // Step 2: Map all active tenant-shop combinations
+                    const options = activeTenants.flatMap(t =>
+                        t.property.flatMap(p =>
+                            p.shops
+                                .filter(shop => shop.active)
+                                .map(shop => ({
+                                    label: t.tenantName,
+                                    value: t.tenantName,
+                                    tenantId: t.id,
+                                    shopNo: shop.shopNo
+                                }))
+                        )
+                    );
+                    const tenantOptionsUnique = options.filter(
+                        (t, i, arr) => t.label && arr.findIndex(x => x.value === t.value) === i
+                    );
+                    setTenantOptions(tenantOptionsUnique);
+                } else {
+                    // For Pending Rent, include all tenants (active and vacated)
+                    const allTenants = data.filter(t => t.tenantName); // Filter out any invalid entries
+                    const options = allTenants.flatMap(t =>
+                        t.property?.flatMap(p =>
+                            p.shops?.map(shop => ({
                                 label: t.tenantName,
                                 value: t.tenantName,
                                 tenantId: t.id,
-                                shopNo: shop.shopNo
-                            }))
-                    )
+                                shopNo: shop.shopNo,
+                                isActive: shop.active
+                            })) || []
+                        ) || []
+                    );
+                    const tenantOptionsUnique = options.filter(
+                        (t, i, arr) => t.label && arr.findIndex(x => x.value === t.value) === i
+                    );
+                    setTenantOptions(tenantOptionsUnique);
+                }
+
+                // Create shop options from all shops (active and inactive)
+                const allShops = data.flatMap(t =>
+                    t.property?.flatMap(p =>
+                        p.shops?.map(shop => shop.shopNo) || []
+                    ) || []
                 );
-                const tenantOptionsUnique = options.filter(
-                    (t, i, arr) => t.label && arr.findIndex(x => x.value === t.value) === i
-                );
-                setTenantOptions(tenantOptionsUnique);
-                const uniqueShopNos = [...new Set(options.map(o => o.shopNo).filter(Boolean))];
+                const uniqueShopNos = [...new Set(allShops.filter(Boolean))];
                 const shopOptions = uniqueShopNos.map(no => ({ label: no, value: no }));
                 setShopNoOptions(shopOptions);
             } else {
@@ -149,22 +189,26 @@ const Form = () => {
             setMessage('Error fetching properties.');
         }
     };
-    const shopInfoMap = {};
-    tenantShopData.forEach(tenant => {
-        tenant.property?.forEach(property => {
-            property.shops?.forEach(shop => {
-                if (shop.shopNo) {
-                    shopInfoMap[shop.shopNo] = {
-                        doorNo: shop.doorNo || '',
-                        propertyName: property.propertyName || '',
-                        advanceAmount: shop.advanceAmount || '',
-                        monthlyRent: shop.monthlyRent || '',
-                        startingDate: shop.startingDate
-                    };
-                }
+    const [shopInfoMap, setShopInfoMap] = useState({});
+    useEffect(() => {
+        const newShopInfoMap = {};
+        tenantShopData.forEach(tenant => {
+            tenant.property?.forEach(property => {
+                property.shops?.forEach(shop => {
+                    if (shop.shopNo) {
+                        newShopInfoMap[shop.shopNo] = {
+                            doorNo: shop.doorNo || '',
+                            propertyName: property.propertyName || '',
+                            advanceAmount: shop.advanceAmount || '',
+                            monthlyRent: shop.monthlyRent || '',
+                            startingDate: shop.startingDate
+                        };
+                    }
+                });
             });
         });
-    });
+        setShopInfoMap(newShopInfoMap);
+    }, [tenantShopData]);
     const formatINR = (value) => {
         const numericValue = value.replace(/[^0-9]/g, '');
         if (!numericValue) return '';
@@ -176,7 +220,7 @@ const Form = () => {
     };
     const fetchLatestEno = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/rental_forms/getAll');
+            const response = await fetch('http://localhost:8082/api/rental_forms/getAll');
             if (!response.ok) {
                 throw new Error('Failed to fetch ENo');
             }
@@ -197,10 +241,11 @@ const Form = () => {
     }, []);
     useEffect(() => {
         fetchPaymentModes();
+        fetchRentalForms();
     }, []);
     const fetchPaymentModes = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/payment_mode/getAll');
+            const response = await fetch('http://localhost:8082/api/payment_mode/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setPaymentModeOptions(data);
@@ -212,13 +257,189 @@ const Form = () => {
             setMessage('Error fetching tile area names.');
         }
     };
+
+    const fetchRentalForms = async () => {
+        try {
+            const response = await fetch('http://localhost:8082/api/rental_forms/getAll');
+            if (response.ok) {
+                const data = await response.json();
+                setRentalFormsData(data);
+                console.log('Rental forms data loaded:', data.length, 'records');
+            } else {
+                console.error('Error fetching rental forms data');
+            }
+        } catch (error) {
+            console.error('Error fetching rental forms:', error);
+        }
+    };
+
+    const calculateAdvanceAmount = (tenantName, shopNo) => {
+
+        if (!tenantName || !shopNo || rentalFormsData.length === 0) {
+            setAdvanceAmount(0);
+            return;
+        }
+        let totalAdvance = 0;
+        const relevantForms = rentalFormsData.filter(form =>
+            form.tenantName === tenantName && form.shopNo === shopNo
+        );
+        relevantForms.forEach(form => {
+            if (form.formType === 'Advance' && form.amount) {
+                const advanceAmount = parseFloat(form.amount) || 0;
+                totalAdvance += advanceAmount;
+            } else if (
+                form.paymentMode &&
+                form.paymentMode.trim() === 'Advance Adjustment' &&
+                form.amount != null
+            ) {
+                const adjustmentAmount = parseFloat(form.amount) || 0;
+                totalAdvance -= adjustmentAmount;
+            } else if (form.formType === 'Shop Closure' && form.refundAmount) {
+                const refundAmount = parseFloat(form.refundAmount) || 0;
+                totalAdvance -= refundAmount;
+            }
+        });
+
+        setAdvanceAmount(totalAdvance);
+    };
+
+    // Calculate pending rent up to a specific date
+    const calculatePendingRentUpToDate = (endDate) => {
+        if (!formTenantName || !formShopNo || !startingDate || !endDate) {
+            return 0;
+        }
+        const start = new Date(startingDate);
+        const end = new Date(endDate);
+        const monthlyRent = parseFloat(shopInfoMap[formShopNo]?.monthlyRent || 0);        
+        if (monthlyRent === 0) return 0;
+        let totalPendingRent = 0;
+        let currentDate = new Date(start.getFullYear(), start.getMonth(), 1);        
+        // Calculate rent for each month from start to end date
+        while (currentDate <= end) {
+            const currentMonth = currentDate.toISOString().slice(0, 7); // YYYY-MM format            
+            // Get all rent-related payments for this month from rentalFormsData
+            const allRentPayments = rentalFormsData.filter(form =>
+                form.tenantName === formTenantName &&
+                form.shopNo === formShopNo &&
+                form.forTheMonthOf === currentMonth &&
+                (
+                    (form.formType === "Rent") || 
+                    (form.paymentMode && form.paymentMode.trim() === "Advance Adjustment")
+                )
+            );            
+            const totalPaidForMonth = allRentPayments.reduce((sum, form) => {
+                return sum + parseFloat(form.amount || 0);
+            }, 0);            
+             // Calculate the actual rent amount that was due for this specific month
+             // We need to determine what the rent amount was at the time of this month
+             let monthlyRentDue = monthlyRent;             
+             // Check if there are any rent forms for this month to determine historical rent amount
+             const rentFormsForMonth = rentalFormsData.filter(form =>
+                 form.tenantName === formTenantName &&
+                 form.shopNo === formShopNo &&
+                 form.forTheMonthOf === currentMonth &&
+                 form.formType === "Rent"
+             );             
+             // If there are rent forms for this month, try to determine the actual rent amount
+             if (rentFormsForMonth.length > 0) {
+                 // Find the largest payment for this month - this likely represents the full rent amount
+                 const maxPayment = Math.max(...rentFormsForMonth.map(form => parseFloat(form.amount || 0)));
+                 
+                 // If the max payment is close to current monthly rent, use current rent
+                 // If it's significantly different, use the max payment as the rent amount for that period
+                 if (maxPayment >= monthlyRent * 0.9) {
+                     monthlyRentDue = monthlyRent; // Use current rent if payments are close to current rent
+                 } else {
+                     // Use the max payment amount as the rent amount for that historical period
+                     monthlyRentDue = maxPayment;
+                 }
+             }            
+            // If it's the first month, calculate pro-rated rent
+            if (currentDate.getFullYear() === start.getFullYear() && currentDate.getMonth() === start.getMonth()) {
+                const totalDays = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+                const startDay = start.getDate();
+                const rentPerDay = monthlyRent / totalDays;
+                const proRatedDays = totalDays - startDay + 1;
+                monthlyRentDue = Math.floor((rentPerDay * proRatedDays) / 10) * 10;
+            }
+            // If it's the last month and end date is not the last day of the month
+            else if (currentDate.getFullYear() === end.getFullYear() && currentDate.getMonth() === end.getMonth()) {
+                const totalDays = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+                const endDay = end.getDate();
+                const rentPerDay = monthlyRent / totalDays;
+                monthlyRentDue = Math.floor((rentPerDay * endDay) / 10) * 10;
+            }            
+            // Calculate pending rent for this month (rent due - payments made)
+            const pendingForMonth = monthlyRentDue - totalPaidForMonth;
+            if (pendingForMonth > 0) {
+                totalPendingRent += pendingForMonth;
+            }            
+            // Move to next month
+            currentDate.setMonth(currentDate.getMonth() + 1);
+        }        
+        return totalPendingRent;
+    };
+
+    // Handle payment mode change and auto-fill advance amount
+    const handlePaymentModeChange = (e) => {
+        const newPaymentMode = e.target.value;
+        setFormPaymentMode(newPaymentMode);
+        setAmountError(''); 
+        // Auto-fill advance amount when Advance Adjustment is selected for Rent type
+        if (selectedType === "Rent" && newPaymentMode && newPaymentMode.trim() === "Advance Adjustment" && advanceAmount > 0) {
+            setAmount(advanceAmount.toString());
+        }
+    };
+
+     // Validate amount input for Advance Adjustment and Shop Closure
+     const validateAmount = (inputAmount) => {
+         // Validation for Rent type with Advance Adjustment payment mode
+         if (selectedType === "Rent" && formPaymentMode && formPaymentMode.trim() === "Advance Adjustment") {
+             const numericAmount = parseFloat(inputAmount.replace(/[^0-9.]/g, ""));
+             if (numericAmount > advanceAmount) {
+                 const errorMsg = `Amount cannot exceed remaining advance amount of ₹ ${advanceAmount.toLocaleString('en-IN')}`;
+                 setAmountError(errorMsg);
+                 return false;
+             } else {
+                 setAmountError('');
+                 return true;
+             }
+         }
+         
+         // Validation for Shop Closure type - refund amount cannot exceed remaining advance
+         if (selectedType === "Shop Closure") {
+             const numericAmount = parseFloat(inputAmount.replace(/[^0-9.]/g, ""));
+             if (numericAmount > advanceAmount) {
+                 const errorMsg = `Refund amount cannot exceed remaining advance amount of ₹ ${advanceAmount.toLocaleString('en-IN')}`;
+                 setAmountError(errorMsg);
+                 return false;
+             } else {
+                 setAmountError('');
+                 return true;
+             }
+         }
+         
+         setAmountError('');
+         return true;
+     };
     const handleSubmit = async () => {
         // ✅ Check if payment mode is selected
-        if (!paymentMode) {
+        if (!formPaymentMode) {
             Swal.fire({
                 icon: 'warning',
                 title: 'Missing Payment Mode',
                 text: 'Please select a Payment Mode before submitting.',
+                confirmButtonColor: '#bf9853'
+            });
+            return;
+        }
+
+        // ✅ Validate amount for Advance Adjustment
+        if (!validateAmount(amount)) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Invalid Amount',
+                text: amountError,
                 confirmButtonColor: '#bf9853'
             });
             return;
@@ -237,7 +458,7 @@ const Form = () => {
         const date = `${month} ${getOrdinal(day)} ${year}`;
 
         try {
-            const rentFormsRes = await fetch("https://backendaab.in/aabuildersDash/api/rental_forms/getAll");
+            const rentFormsRes = await fetch("http://localhost:8082/api/rental_forms/getAll");
             if (!rentFormsRes.ok) throw new Error("Failed to fetch existing rent forms");
             const rentForms = await rentFormsRes.json();
 
@@ -246,7 +467,7 @@ const Form = () => {
                 const formData = new FormData();
                 formData.append('pdf', selectedRentFile);
                 formData.append('filename', `${date} `);
-                const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/rentForm/googleUploader/uploadToGoogleDrive", {
+                const uploadResponse = await fetch("http://localhost:8082/rentForm/googleUploader/uploadToGoogleDrive", {
                     method: "POST",
                     body: formData,
                 });
@@ -255,7 +476,7 @@ const Form = () => {
                 pdfUrl = uploadResult.url;
             }
 
-            const tenantInfo = shopInfoMap[shopNo];
+            const tenantInfo = shopInfoMap[formShopNo];
             const baseMonthlyRent = parseFloat(calculatedRent || 0);
             const isStartingMonth = (dateObj) => {
                 const start = new Date(startingDate);
@@ -276,7 +497,7 @@ const Form = () => {
                 while (remainingAmount > 0) {
                     const currentMonthStr = currentDate.toISOString().slice(0, 7);
                     const existingEntries = rentForms.filter(
-                        r => r.formType === "Rent" && r.shopNo === shopNo && r.forTheMonthOf === currentMonthStr
+                        r => r.formType === "Rent" && r.shopNo === formShopNo && r.forTheMonthOf === currentMonthStr
                     );
                     const alreadyPaid = existingEntries.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
 
@@ -301,15 +522,16 @@ const Form = () => {
 
                     const rentalForm = {
                         formType: "Rent",
-                        shopNo,
+                        shopNo: formShopNo,
                         eno,
-                        tenantName,
+                        tenantName: formTenantName,
                         amount: amountToPay,
                         refundAmount: "",
-                        paymentMode,
+                        paymentMode: formPaymentMode,    
                         paidOnDate,
                         forTheMonthOf: currentMonthStr,
                         attachedFile: pdfUrl,
+                        shopClosureDate: closureDate || "",
                     };
 
                     submissions.push(rentalForm);
@@ -321,21 +543,22 @@ const Form = () => {
                 const isClosure = selectedType === "Shop Closure";
                 const form = {
                     formType: selectedType,
-                    shopNo,
+                    shopNo: formShopNo,
                     eno,
-                    tenantName,
+                    tenantName: formTenantName,
                     amount: isClosure ? "" : cleanedAmount,
                     refundAmount: isClosure ? cleanedAmount : "",
-                    paymentMode,
+                    paymentMode: formPaymentMode,
                     paidOnDate,
                     forTheMonthOf: selectedType === "Rent" ? selectedMonth : "",
                     attachedFile: pdfUrl,
+                    shopClosureDate: closureDate || "",
                 };
                 submissions.push(form);
             }
 
             for (const form of submissions) {
-                const response = await fetch("https://backendaab.in/aabuildersDash/api/rental_forms/save", {
+                const response = await fetch("http://localhost:8082/api/rental_forms/save", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(form),
@@ -348,22 +571,48 @@ const Form = () => {
                 }
             }
 
+            console.log("closureDate", closureDate);
+            console.log("formTenantName", formTenantName);
+            console.log("formShopNo", formShopNo);
+            // Call updateClosureDate API if closure date is provided
+            if (closureDate && formTenantName && formShopNo) {
+                try {
+                    const updateClosureResponse = await fetch(`http://localhost:8082/api/tenantShop/updateClosureDate/${encodeURIComponent(formTenantName)}/${encodeURIComponent(formShopNo)}`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ shopClosureDate: closureDate }),
+                    });
+                    if (!updateClosureResponse.ok) {
+                        console.error("❌ Update closure date failed");
+                        // Don't throw error here as the main form submission was successful
+                    } else {
+                        console.log("✅ Closure date updated successfully");
+                    }
+                } catch (error) {
+                    console.error("❌ Error updating closure date:", error);
+                    // Don't throw error here as the main form submission was successful
+                }
+            }
+
             if (selectedType === "Shop Closure") {
                 try {
-                    await vacateShop(selectedTenantId, shopNo);
+                    await vacateShop(selectedTenantId, formShopNo);
                 } catch (err) {
                     console.error("❌ VacateShop failed", err);
                 }
             }
 
             setIsSubmitting(false);
-            setShopNo('');
-            setTenantName('');
+            setFormShopNo('');
+            setFormTenantName('');
             setSelectedTenantId('');
             setAmount('');
-            setPaymentMode('');
+            setFormPaymentMode('');
             setPaidOnDate('');
             window.location.reload();
+            // Refresh rental forms data to get updated advance calculations
+            await fetchRentalForms();
+
         } catch (error) {
             console.error("❌ Error submitting form:", error);
             alert("Unexpected error occurred.");
@@ -373,7 +622,7 @@ const Form = () => {
 
     const vacateShop = async (tenantId, shopNo) => {
         try {
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/tenantShop/vacateShop/${tenantId}/${shopNo}`, {
+            const response = await fetch(`http://localhost:8082/api/tenantShop/vacateShop/${tenantId}/${shopNo}`, {
                 method: 'PUT',
             });
             if (!response.ok) {
@@ -381,17 +630,49 @@ const Form = () => {
             }
             const result = await response.text();
             alert(result);
-            window.location.reload(); // optional: reload to fetch updated data
+            window.location.reload(); 
         } catch (error) {
             console.error('Vacate error:', error);
             alert('Failed to vacate shop');
         }
     };
     useEffect(() => {
-        if (!startingDate || !selectedMonth || selectedType !== "Rent") return;
+        if (!startingDate || !selectedMonth || (selectedType !== "Rent" && selectedType !== "Pending Rent")) return;
+
+        // Check if tenant is vacated (shop is not active)
+        const isTenantVacated = tenantShopData.some(tenant =>
+            tenant.tenantName === formTenantName &&
+            tenant.property?.some(p =>
+                p.shops?.some(shop => shop.shopNo === formShopNo && !shop.active)
+            )
+        );
+
+        if (isTenantVacated) {
+            setCalculatedRent("0");
+            return;
+        }
+
+        // Check if rent is already paid for this month
+        const currentMonthStr = selectedMonth;
+        const existingPayments = rentalFormsData.filter(form =>
+            form.tenantName === formTenantName &&
+            form.shopNo === formShopNo &&
+            form.formType === "Rent" &&
+            form.forTheMonthOf === currentMonthStr
+        );
+
+        const totalPaid = existingPayments.reduce((sum, form) => sum + parseFloat(form.amount || 0), 0);
+        const monthlyRent = parseFloat(shopInfoMap[formShopNo]?.monthlyRent || 0);
+
+        if (totalPaid >= monthlyRent) {
+            setCalculatedRent("0");
+            return;
+        }
+
         const start = new Date(startingDate);
         const [year, month] = selectedMonth.split('-').map(Number);
         const selected = new Date(year, month - 1); // month is 0-indexed
+
         // If selected month is before the starting month, rent is 0
         if (
             selected.getFullYear() < start.getFullYear() ||
@@ -400,26 +681,65 @@ const Form = () => {
             setCalculatedRent("0");
             return;
         }
+
         // If selected month is the same as starting month, calculate pro-rated rent
         if (start.getFullYear() === selected.getFullYear() && start.getMonth() === selected.getMonth()) {
             const totalDays = new Date(year, month, 0).getDate();
             const startDay = start.getDate();
-            const rentPerDay = parseFloat(shopInfoMap[shopNo]?.monthlyRent || 0) / totalDays;
+            const rentPerDay = monthlyRent / totalDays;
             const proRatedDays = totalDays - startDay + 1;
             const rawRent = rentPerDay * proRatedDays;
             const proRatedRent = Math.floor(rawRent / 10) * 10; // round down to nearest 10
             setCalculatedRent(proRatedRent.toString());
         } else {
-            // For later months, show full rent
-            setCalculatedRent(shopInfoMap[shopNo]?.monthlyRent || '');
+            // For later months, show remaining rent (full rent minus already paid)
+            const remainingRent = monthlyRent - totalPaid;
+            setCalculatedRent(remainingRent > 0 ? remainingRent.toString() : "0");
         }
-    }, [selectedMonth, startingDate, selectedType, shopNo]);
+    }, [selectedMonth, startingDate, selectedType, formShopNo, formTenantName, tenantShopData, rentalFormsData, shopInfoMap]);
 
     useEffect(() => {
-        if (selectedType === "Rent" && calculatedRent) {
+        if ((selectedType === "Rent" || selectedType === "Pending Rent") && calculatedRent) {
             setAmount(calculatedRent.toString());
         }
     }, [selectedType, calculatedRent]);
+
+    // Calculate advance amount when tenant name, shop number, or rental forms data changes
+    useEffect(() => {
+        if (formTenantName && formShopNo && rentalFormsData.length > 0) {
+            calculateAdvanceAmount(formTenantName, formShopNo);
+        } else {
+            setAdvanceAmount(0);
+        }
+    }, [formTenantName, formShopNo, rentalFormsData]);
+
+    // Clear amount error when payment mode changes away from Advance Adjustment
+    useEffect(() => {
+        if (!formPaymentMode || formPaymentMode.trim() !== "Advance Adjustment") {
+            setAmountError('');
+        }
+    }, [formPaymentMode]);
+
+    // Clear amount error when type changes away from Shop Closure
+    useEffect(() => {
+        if (selectedType !== "Shop Closure") {
+            setAmountError('');
+        }
+    }, [selectedType]);
+
+    // Re-validate amount when advance amount changes 
+    useEffect(() => {
+        if (amount) {
+            // Re-validate for Rent with Advance Adjustment
+            if (selectedType === "Rent" && formPaymentMode && formPaymentMode.trim() === "Advance Adjustment") {
+                validateAmount(amount);
+            }
+            // Re-validate for Shop Closure
+            else if (selectedType === "Shop Closure") {
+                validateAmount(amount);
+            }
+        }
+    }, [advanceAmount]);
     const handleSubmitOldData = async (e) => {
         e.preventDefault();
 
@@ -427,12 +747,10 @@ const Form = () => {
             setUploadStatus('Please select a CSV file to upload.');
             return;
         }
-
         const formData = new FormData();
         formData.append('file', file);
-
         try {
-            const response = await axios.post('https://backendaab.in/aabuildersDash/api/rental_forms/upload_old_data', formData, {
+            const response = await axios.post('http://localhost:8082/api/rental_forms/upload_old_data', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },
@@ -445,9 +763,17 @@ const Form = () => {
         }
     };
     useEffect(() => {
-        if (tenantName) {
-            const tenant = tenantShopData.find(t => t.tenantName === tenantName);
-            const shops = tenant?.property?.flatMap(p => p.shops)?.filter(shop => shop.active) || [];
+        if (formTenantName) {
+            const tenant = tenantShopData.find(t => t.tenantName === formTenantName);
+            let shops;
+            
+            if (selectedType !== "Pending Rent") {
+                // For Rent, Advance, Shop Closure - only show active shops
+                shops = tenant?.property?.flatMap(p => p.shops)?.filter(shop => shop.active) || [];
+            } else {
+                // For Pending Rent - show all shops (active and inactive)
+                shops = tenant?.property?.flatMap(p => p.shops) || [];
+            }
 
             const filtered = shops.map(shop => ({
                 label: shop.shopNo,
@@ -458,9 +784,7 @@ const Form = () => {
         } else {
             setFilteredShopNoOptions(shopNoOptions);
         }
-    }, [tenantName, tenantShopData, shopNoOptions]); // ✅ Added shopNoOptions
-
-
+    }, [formTenantName, tenantShopData, shopNoOptions, selectedType]);
     return (
         <div className="p-6 bg-[#FFFFFF] lg:w-[1800px] w-[400px] ml-12 text-left pl-8">
             <div className="flex">
@@ -481,11 +805,11 @@ const Form = () => {
                     <label className="block font-semibold mb-2">Shop No</label>
                     <Select
                         name="shopNo"
-                        value={filteredShopNoOptions.find(option => option.value === shopNo)}
+                        value={filteredShopNoOptions.find(option => option.value === formShopNo)}
                         onChange={(selectedOption) => {
                             if (selectedOption) {
                                 const selectedShopNo = selectedOption.value;
-                                setShopNo(selectedShopNo);
+                                setFormShopNo(selectedShopNo);
                                 if (selectedType !== "Pending Rent") {
                                     const matchingTenant = [...tenantShopData].reverse().find(t =>
                                         t.property?.some(p =>
@@ -493,25 +817,38 @@ const Form = () => {
                                         )
                                     );
                                     if (matchingTenant) {
-                                        setTenantName(matchingTenant.tenantName);
+                                        setFormTenantName(matchingTenant.tenantName);
                                         setSelectedTenantId(matchingTenant.id);
                                         const shopData = shopInfoMap[selectedShopNo];
                                         if (shopData) {
                                             setStartingDate(shopData.startingDate);
                                         }
                                     } else {
-                                        setTenantName('');
+                                        setFormTenantName('');
                                         setSelectedTenantId('');
                                     }
                                 } else {
-                                    // If type is Pending Rent, skip auto-matching
-                                    setTenantName('');
+                                    const tenantsForShop = tenantShopData.filter(t =>
+                                        t.property?.some(p =>
+                                            p.shops?.some(shop => shop.shopNo === selectedShopNo)
+                                        )
+                                    );
+                                    const shopTenantOptions = tenantsForShop.map(t => ({
+                                        label: t.tenantName,
+                                        value: t.tenantName,
+                                        tenantId: t.id
+                                    }));
+                                    setTenantOptions(shopTenantOptions);
+                                    setFormTenantName('');
                                     setSelectedTenantId('');
                                 }
                             } else {
-                                setShopNo('');
-                                setTenantName('');
+                                setFormShopNo('');
+                                setFormTenantName('');
                                 setSelectedTenantId('');
+                                if (selectedType === "Pending Rent") {
+                                    fetchTenants();
+                                }
                             }
                         }}
                         options={filteredShopNoOptions}
@@ -548,59 +885,91 @@ const Form = () => {
                     />
                 </div>
                 <div className="mt-4">
-                    {selectedType === "Rent" && selectedMonth && calculatedRent && (
-                        <div className="text-sm text-gray-700 -mt-5">
-                            Rent To Be Paid For {selectedMonth
-                                ? new Date(`${selectedMonth}-01`).toLocaleString('default', {
-                                    month: 'long',
-                                    year: 'numeric',
-                                })
-                                : ''}: ₹ {calculatedRent}
-                        </div>
-                    )}
+                    <div className="space-y-2">
+                        {formTenantName && formShopNo && (
+                            <div className={`text-sm text-gray-700 mb-3 flex items-center gap-2 ${
+                                (selectedType === "Rent" || selectedType === "Pending Rent" || selectedType === "Shop Closure") 
+                                    ? "-mt-[53px]" 
+                                    : " -mt-[34px]"
+                            }`}>
+                                <span>Advance Amount: ₹ {advanceAmount.toLocaleString('en-IN')}</span>
+                            </div>
+                        )}
+                        {(selectedType === "Rent" || selectedType === "Pending Rent") && selectedMonth && calculatedRent && (
+                            <div className="text-sm text-gray-700 ">
+                                Rent To Be Paid For {selectedMonth
+                                    ? new Date(`${selectedMonth}-01`).toLocaleString('default', {
+                                        month: 'long',
+                                        year: 'numeric',
+                                    })
+                                    : ''}: ₹ {calculatedRent}
+                            </div>
+                        )}
+                        {selectedType === "Shop Closure" && formTenantName && formShopNo && startingDate && (
+                            <div className="text-sm text-gray-700 ">
+                                {closureDate ? (
+                                    <>Pending Rent (Up to {new Date(closureDate).toLocaleDateString('en-IN', {
+                                        day: '2-digit',
+                                        month: 'short',
+                                        year: 'numeric'
+                                    })}): ₹ {calculatePendingRentUpToDate(closureDate).toLocaleString('en-IN')}</>
+                                ) : (
+                                    <>Pending Rent (Up to Today): ₹ {calculatePendingRentUpToDate(new Date().toISOString().split('T')[0]).toLocaleString('en-IN')}</>
+                                )}
+                            </div>
+                        )}
+                    </div>
                     <label className="block font-semibold mb-2">Tenant Name</label>
                     <Select
                         name="tenantName"
-                        value={tenantOptions.find(option => option.value === tenantName)}
+                        value={tenantOptions.find(option => option.value === formTenantName)}
                         onChange={(selectedOption) => {
                             if (selectedOption) {
-                                setTenantName(selectedOption.value);
+                                setFormTenantName(selectedOption.value);
                                 setSelectedTenantId(selectedOption.tenantId);
-
                                 if (selectedType !== "Pending Rent") {
                                     const tenantMatch = tenantShopData.find(t => t.tenantName === selectedOption.value);
                                     const tenantShops = tenantMatch?.property?.flatMap(p => p.shops)?.filter(shop => shop.active) || [];
-
-                                    // Update shop options to only show this tenant's shops
                                     const newShopOptions = tenantShops.map(shop => ({
                                         value: shop.shopNo,
                                         label: shop.shopNo
                                     }));
                                     setFilteredShopNoOptions(newShopOptions);
-
-                                    // Optionally auto-select the first shop
                                     if (tenantShops.length > 0) {
                                         const activeShop = tenantShops[0];
-                                        setShopNo(activeShop.shopNo);
-
+                                        setFormShopNo(activeShop.shopNo);
                                         const shopData = shopInfoMap[activeShop.shopNo];
                                         if (shopData) {
                                             setStartingDate(shopData.startingDate);
                                         }
                                     } else {
-                                        setShopNo('');
+                                        setFormShopNo('');
                                     }
                                 } else {
-                                    setFilteredShopNoOptions(shopNoOptions); // Reset to all if Pending Rent
-                                    setShopNo('');
+                                    const tenantMatch = tenantShopData.find(t => t.tenantName === selectedOption.value);
+                                    const tenantShops = tenantMatch?.property?.flatMap(p => p.shops) || [];
+                                    const newShopOptions = tenantShops.map(shop => ({
+                                        value: shop.shopNo,
+                                        label: shop.shopNo
+                                    }));
+                                    setFilteredShopNoOptions(newShopOptions);
+                                    if (tenantShops.length > 0) {
+                                        const firstShop = tenantShops[0];
+                                        setFormShopNo(firstShop.shopNo);
+                                        const shopData = shopInfoMap[firstShop.shopNo];
+                                        if (shopData) {
+                                            setStartingDate(shopData.startingDate);
+                                        }
+                                    } else {
+                                        setFormShopNo('');
+                                    }
                                 }
                             } else {
-                                setTenantName('');
+                                setFormTenantName('');
                                 setSelectedTenantId('');
                                 setFilteredShopNoOptions(shopNoOptions);
-                                setShopNo('');
+                                setFormShopNo('');
                             }
-
                         }}
                         options={tenantOptions}
                         placeholder="Choose Tenant"
@@ -638,30 +1007,43 @@ const Form = () => {
             </div>
             <div className="mt-2 lg:flex gap-8">
                 <div className="mt-4">
-
                     <label className="block font-semibold mb-2">
                         {selectedType === "Shop Closure" ? "Refund Amount" : "Amount"}
                     </label>
                     <input
-                        className="border-2 border-opacity-[0.18] focus:outline-none border-[#BF9853] rounded-lg p-2 w-[170px] h-[45px]"
+                        className={`border-2 border-opacity-[0.18] focus:outline-none rounded-lg p-2 w-[170px] h-[45px] ${
+                            amountError ? 'border-red-500' : 'border-[#BF9853]'
+                        }`}
                         type="text"
                         value={formatINR(amount)}
-                        onChange={(e) => setAmount(e.target.value)}
+                        onChange={(e) => {
+                            setAmount(e.target.value);
+                            validateAmount(e.target.value);
+                        }}
                     />
                 </div>
                 <div className="mt-4">
                     <label className="block font-semibold mb-2">Payment Mode</label>
                     <select
-                        value={paymentMode}
-                        onChange={(e) => setPaymentMode(e.target.value)}
+                        value={formPaymentMode}
+                        onChange={handlePaymentModeChange}
                         className="border-2 border-opacity-[0.18] focus:outline-none border-[#BF9853] rounded-lg p-2 w-[290px] h-[45px]"
                     >
                         <option value="">Choose Method</option>
-                        {paymentModeOptions.map((mode) => (
-                            <option key={mode.id} value={mode.modeOfPayment}>
-                                {mode.modeOfPayment}
-                            </option>
-                        ))}
+                        {paymentModeOptions
+                            .filter(mode => {
+                                if (selectedType === "Advance" && 
+                                    (mode.modeOfPayment === "Advance Adjustment" || 
+                                     mode.modeOfPayment?.toLowerCase().includes("advance adjustment"))) {
+                                    return false;
+                                }
+                                return true;
+                            })
+                            .map((mode) => (
+                                <option key={mode.id} value={mode.modeOfPayment}>
+                                    {mode.modeOfPayment}
+                                </option>
+                            ))}
                     </select>
                 </div>
             </div>
@@ -675,6 +1057,17 @@ const Form = () => {
                         className="border-2 border-opacity-[0.18] focus:outline-none border-[#BF9853] rounded-lg p-2 w-[170px] h-[45px]"
                     />
                 </div>
+                {selectedType === "Shop Closure" && (
+                    <div className="mt-4">
+                        <label className="block font-semibold mb-2">Closure Date</label>
+                        <input
+                            type="date"
+                            value={closureDate}
+                            onChange={(e) => setClosureDate(e.target.value)}
+                            className="border-2 border-opacity-[0.18] focus:outline-none border-[#BF9853] rounded-lg p-2 w-[170px] h-[45px]"
+                        />
+                    </div>
+                )}
                 {(selectedType === "Rent" || selectedType === "Pending Rent") && (
                     <div className="mt-4">
                         <label className="block font-semibold mb-2">For The Month of</label>
@@ -686,7 +1079,6 @@ const Form = () => {
                         />
                     </div>
                 )}
-
             </div>
             <div className="mt-4 sm:flex">
                 <div className='flex'>

@@ -406,6 +406,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
       to_purpose_id: transferSelection?.type === "Purpose" ? transferSelection.id : 0,
       vendor_id: selectedOption?.type === "Vendor" ? selectedOption.id : 0,
       contractor_id: selectedOption?.type === "Contractor" ? selectedOption.id : 0,
+      project_id: 0,
       description,
       file_url: ""
     };
@@ -454,7 +455,10 @@ const LoanPortal = ({ username, userRoles = [] }) => {
             : selectedOption?.type === 'Contractor'
               ? entry.contractor_id === selectedOption.id
               : false;
-        return isMatchingVendor;
+        const isMatchingPurpose = purpose
+          ? entry.purpose_id === purpose.id
+          : true;
+        return isMatchingVendor && isMatchingPurpose;
       })
       .sort((a, b) => {
         const timeA = new Date(a.date || a.timestamp).getTime() || 0;
@@ -799,7 +803,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                         </thead>
                         <tbody>
                           {filteredLoanData.map((entry, index) => {
-                            const { date, amount, transfer_refund, mode } = entry;
+                            const { date, amount, transfer_refund, loan_payment_mode } = entry;
                             return (
                               <tr key={index} className="border-t">
                                 <td className="px-2 py-2 text-xs sm:text-sm font-semibold">
@@ -812,7 +816,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                                   {transfer_refund || ''}
                                 </td>
                                 <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold">
-                                  {mode || ''}
+                                  {loan_payment_mode || ''}
                                 </td>
                                 <td className="px-2 py-2">
                                   <button className="rounded-full transition duration-200">

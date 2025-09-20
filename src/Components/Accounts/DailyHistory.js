@@ -46,21 +46,19 @@ const DailyHistory = () => {
     const currentWeek = weeks.find((w) => w.number === Number(selectedWeek));
     const startYear = 2000;
     const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i);
-    // Function to get start and end date of a week
     function getStartAndEndDateOfWeek(weekNumber, year) {
         const simple = new Date(year, 0, 1 + (weekNumber - 1) * 7);
         const dayOfWeek = simple.getDay();
         const ISOWeekStart = new Date(simple);
-        ISOWeekStart.setDate(simple.getDate() - ((dayOfWeek + 7) % 9)); // Monday
+        ISOWeekStart.setDate(simple.getDate() - ((dayOfWeek + 7) % 9)); 
         const ISOWeekEnd = new Date(ISOWeekStart);
-        ISOWeekEnd.setDate(ISOWeekStart.getDate() + 6); // Saturday (not Sunday)
+        ISOWeekEnd.setDate(ISOWeekStart.getDate() + 6); 
         return {
             number: weekNumber,
             start: ISOWeekStart.toISOString().split("T")[0],
             end: ISOWeekEnd.toISOString().split("T")[0],
         };
     }
-    // Fetch weeks data
     useEffect(() => {
         const fetchWeeks = async () => {
             try {
@@ -76,13 +74,11 @@ const DailyHistory = () => {
         };
         fetchWeeks();
     }, []);
-    // Set default selected week
     useEffect(() => {
         if (weeks.length > 0) {
-            setSelectedWeek(weeks[weeks.length - 1].number); // default last week
+            setSelectedWeek(weeks[weeks.length - 1].number); 
         }
-    }, [weeks]);
-    // Fetch weekly data when week changes
+        }, [weeks]);
     useEffect(() => {
         const fetchWeekData = async () => {
             if (!selectedWeek) return;
@@ -102,7 +98,6 @@ const DailyHistory = () => {
         };
         fetchWeekData();
     }, [selectedWeek]);
-    // Fetch options data
     useEffect(() => {
         fetchLaboursList();
         fetchSites();
@@ -112,7 +107,6 @@ const DailyHistory = () => {
         fetchWeeklyTypes();
         fetchExpensesCategory();
     }, []);
-    // Combine options
     useEffect(() => {
         setCombinedOptions([...vendorOptions, ...contractorOptions, ...employeeOptions]);
     }, [vendorOptions, contractorOptions, employeeOptions]);
@@ -319,7 +313,6 @@ const DailyHistory = () => {
             console.error("Fetch error: ", error);
         }
     };
-    // Generate 7 days for selected week
     const getWeekDays = () => {
         const days = [];
         if (currentWeek) {
@@ -333,7 +326,6 @@ const DailyHistory = () => {
         return days;
     };
     const weekDays = getWeekDays();
-    // Auto select today's date when component mounts or week changes
     useEffect(() => {
         if (weekDays.length > 0) {
             const todayStr = new Date().toISOString().split("T")[0];
@@ -346,14 +338,12 @@ const DailyHistory = () => {
             setSelectedDate(defaultDate);
         }
     }, [currentWeek]);
-    // Format helper
     const formatDate = (date) =>
         date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
     const handleDateClick = async (dateStr) => {
         setSelectedDate(dateStr);
         setNewDailyExpense((prev) => ({ ...prev, date: dateStr }));
         try {
-            // Fetch daily expenses and refund payments for the selected date
             const [dailyRes, refundRes] = await Promise.all([
                 axios.get(`https://backendaab.in/aabuildersDash/api/daily-payments/date/${dateStr}`),
                 axios.get(`https://backendaab.in/aabuildersDash/api/refund_received/date/${dateStr}`)
@@ -368,7 +358,6 @@ const DailyHistory = () => {
             setRefundPayments([]);
         }
     };
-    // Custom styles for Select component
     const customStyles = {
         control: (provided, state) => ({
             ...provided,
@@ -381,7 +370,6 @@ const DailyHistory = () => {
             }
         }),
     };
-    // Calculate totals
     const totalAmount = dailyExpenses
         .filter(row => row.date === selectedDate)
         .reduce((sum, row) => sum + (Number(row.amount || 0) + Number(row.extra_amount || 0)), 0);
@@ -391,13 +379,11 @@ const DailyHistory = () => {
     const overAllTotalPayments = (totalPayments + totalRefund);
     const balance = overAllTotalPayments - expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
     const netAmount = totalAmount - totalRefund;
-    // Get name by ID helper function
     const getNameById = (id, options) => {
         if (!id && id !== 0) return "-";
         const found = options.find(opt => String(opt.id) === String(id));
         return found ? found.label : id;
     };
-    // Sorting function
     const handleSort = (key) => {
         let direction = 'asc';
         if (sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -405,15 +391,12 @@ const DailyHistory = () => {
         }
         setSortConfig({ key, direction });
     };
-    // Input change handler
     const handleInputChange = (e) => {
         setNewDailyExpense((prev) => ({ ...prev, [e.target.name]: e.target.value }));
     };
-    // Change button click handler
     const handleChangeButtonClick = () => {
         setIsChangeButtonActive(prev => !prev);
     };
-    // Refund handlers
     const handleNewPaymentChange = (e) => {
         const { name, value } = e.target;
         setNewRefundReceived(prev => ({ ...prev, [name]: value }));
@@ -441,10 +424,8 @@ const DailyHistory = () => {
                 payload
             );
             if (response.status === 200) {
-                // Refresh refund data
                 const refundRes = await axios.get(`https://backendaab.in/aabuildersDash/api/refund_received/date/${selectedDate}`);
                 setRefundPayments(refundRes.data);
-                // Reset form after save
                 setNewRefundReceived({
                     labour_id: "",
                     amount: "",
@@ -461,7 +442,6 @@ const DailyHistory = () => {
             handleRefundSubmit();
         }
     };
-    // Add expense handler
     const handleAddExpense = async () => {
         try {
             const hasAnyId =
@@ -492,14 +472,12 @@ const DailyHistory = () => {
                 'https://backendaab.in/aabuildersDash/api/daily-payments',
                 expenseData
             );
-            // Refresh data
             const [dailyRes, refundRes] = await Promise.all([
                 axios.get(`https://backendaab.in/aabuildersDash/api/daily-payments/date/${selectedDate}`),
                 axios.get(`https://backendaab.in/aabuildersDash/api/refund_received/date/${selectedDate}`)
             ]);
             setDailyExpenses(dailyRes.data);
             setRefundPayments(refundRes.data);
-            // Reset form
             setNewDailyExpense({
                 labour_id: "",
                 vendor_id: "",
@@ -519,69 +497,68 @@ const DailyHistory = () => {
         }
     };
     const sortedDailyExpenses = React.useMemo(() => {
-            let sortableData = [...dailyExpenses];
-            if (sortConfig.key) {
-                sortableData.sort((a, b) => {
-                    let aValue, bValue;
-                    switch (sortConfig.key) {
-                        case 'date':
-                            aValue = new Date(a.date);
-                            bValue = new Date(b.date);
-                            break;
-                        case 'labour_name':
-                            if (isChangeButtonActive) {
-                                const getAValue = () => {
-                                    const employee = employeeOptions.find(opt => opt.id === Number(a.employee_id));
-                                    const vendor = vendorOptions.find(opt => opt.id === Number(a.vendor_id));
-                                    const contractor = contractorOptions.find(opt => opt.id === Number(a.contractor_id));
-                                    return employee?.label || vendor?.label || contractor?.label || "";
-                                };
-                                const getBValue = () => {
-                                    const employee = employeeOptions.find(opt => opt.id === Number(b.employee_id));
-                                    const vendor = vendorOptions.find(opt => opt.id === Number(b.vendor_id));
-                                    const contractor = contractorOptions.find(opt => opt.id === Number(b.contractor_id));
-                                    return employee?.label || vendor?.label || contractor?.label || "";
-                                };
-                                aValue = getAValue();
-                                bValue = getBValue();
-                            } else {
-                                aValue = laboursList.find(opt => opt.id === Number(a.labour_id))?.label || "";
-                                bValue = laboursList.find(opt => opt.id === Number(b.labour_id))?.label || "";
-                            }
-                            break;
-                        case 'project_name':
-                            aValue = siteOptions.find(opt => opt.id === Number(a.project_id))?.label || "";
-                            bValue = siteOptions.find(opt => opt.id === Number(b.project_id))?.label || "";
-                            break;
-                        case 'type':
-                            aValue = a.type || "";
-                            bValue = b.type || "";
-                            break;
-                        case 'amount':
-                            aValue = Number(a.amount || 0) + Number(a.extra_amount || 0);
-                            bValue = Number(b.amount || 0) + Number(b.extra_amount || 0);
-                            break;
-                        default:
-                            return 0;
-                    }
-                    if (aValue < bValue) {
-                        return sortConfig.direction === 'asc' ? -1 : 1;
-                    }
-                    if (aValue > bValue) {
-                        return sortConfig.direction === 'asc' ? 1 : -1;
-                    }
-                    return 0;
-                });
-            } else {
-                // Default sorting: Most recent entries first (by date descending)
-                sortableData.sort((a, b) => {
-                    const dateA = new Date(a.date);
-                    const dateB = new Date(b.date);
-                    return dateB - dateA; // Descending order (newest first)
-                });
-            }
-            return sortableData;
-        }, [dailyExpenses, sortConfig, laboursList, siteOptions, isChangeButtonActive, combinedOptions, employeeOptions, vendorOptions, contractorOptions]);
+        let sortableData = [...dailyExpenses];
+        if (sortConfig.key) {
+            sortableData.sort((a, b) => {
+                let aValue, bValue;
+                switch (sortConfig.key) {
+                    case 'date':
+                        aValue = new Date(a.date);
+                        bValue = new Date(b.date);
+                        break;
+                    case 'labour_name':
+                        if (isChangeButtonActive) {
+                            const getAValue = () => {
+                                const employee = employeeOptions.find(opt => opt.id === Number(a.employee_id));
+                                const vendor = vendorOptions.find(opt => opt.id === Number(a.vendor_id));
+                                const contractor = contractorOptions.find(opt => opt.id === Number(a.contractor_id));
+                                return employee?.label || vendor?.label || contractor?.label || "";
+                            };
+                            const getBValue = () => {
+                                const employee = employeeOptions.find(opt => opt.id === Number(b.employee_id));
+                                const vendor = vendorOptions.find(opt => opt.id === Number(b.vendor_id));
+                                const contractor = contractorOptions.find(opt => opt.id === Number(b.contractor_id));
+                                return employee?.label || vendor?.label || contractor?.label || "";
+                            };
+                            aValue = getAValue();
+                            bValue = getBValue();
+                        } else {
+                            aValue = laboursList.find(opt => opt.id === Number(a.labour_id))?.label || "";
+                            bValue = laboursList.find(opt => opt.id === Number(b.labour_id))?.label || "";
+                        }
+                        break;
+                    case 'project_name':
+                        aValue = siteOptions.find(opt => opt.id === Number(a.project_id))?.label || "";
+                        bValue = siteOptions.find(opt => opt.id === Number(b.project_id))?.label || "";
+                        break;
+                    case 'type':
+                        aValue = a.type || "";
+                        bValue = b.type || "";
+                        break;
+                    case 'amount':
+                        aValue = Number(a.amount || 0) + Number(a.extra_amount || 0);
+                        bValue = Number(b.amount || 0) + Number(b.extra_amount || 0);
+                        break;
+                    default:
+                        return 0;
+                }
+                if (aValue < bValue) {
+                    return sortConfig.direction === 'asc' ? -1 : 1;
+                }
+                if (aValue > bValue) {
+                    return sortConfig.direction === 'asc' ? 1 : -1;
+                }
+                return 0;
+            });
+        } else {
+            sortableData.sort((a, b) => {
+                const dateA = new Date(a.date);
+                const dateB = new Date(b.date);
+                return dateB - dateA; 
+            });
+        }
+        return sortableData;
+    }, [dailyExpenses, sortConfig, laboursList, siteOptions, isChangeButtonActive, combinedOptions, employeeOptions, vendorOptions, contractorOptions]);
     const formatDateOnly = (dateString) => {
         const date = new Date(dateString);
         const day = String(date.getDate()).padStart(2, '0');
@@ -590,219 +567,195 @@ const DailyHistory = () => {
         return `${day}-${month}-${year}`;
     };
     const generateExpensesPDF = () => {
-            if (!selectedDate || dailyExpenses.length === 0) {
-                alert("No data available to generate PDF");
-                return;
+        if (!selectedDate || dailyExpenses.length === 0) {
+            alert("No data available to generate PDF");
+            return;
+        }
+        const doc = new jsPDF();
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'bold');
+        const dateObj = new Date(selectedDate);
+        const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+        const pageWidth = doc.internal.pageSize.width;
+        const headerText = `PS: ${selectedWeek}`;
+        const headerText1 = "DAILY PAYMENT STATEMENT";
+        const headerText2 = `${formatDateOnly(selectedDate)}`;
+        const headerWidth = doc.getTextWidth(headerText);
+        const headerX = (pageWidth - headerWidth) / 2;
+        doc.text(headerText1, 60, 24);
+        doc.text(headerText2, 170, 20);
+        doc.text(headerText, 14, 20);
+        doc.setFontSize(10);
+        const dayText = dayName;
+        const dayWidth = doc.getTextWidth(dayText);
+        doc.text(dayText, 170, 27);
+        doc.setLineWidth(0.5);
+        doc.line(14, 15, pageWidth - 14, 15); 
+        doc.line(14, 30, pageWidth - 14, 30); 
+        doc.setFont(undefined, 'normal');
+        const filteredExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate);
+        const totalAmount = filteredExpenses.reduce(
+            (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
+            0
+        );
+        const totalRefundAmount = refundPayments.reduce(
+            (sum, row) => sum + Number(row.amount || 0),
+            0
+        );
+        doc.setTextColor(0, 0, 0);
+        const expensesTableColumn = [
+            "SNO", "PROJECT NAME", "NAME", "QTY", "TYPE", "AMOUNT", "DESCRIPTION"
+        ];
+        const expensesTableRows = filteredExpenses
+            .map((row, index) => {
+                const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
+                const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
+                const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
+                const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
+                const name = [employee?.label, vendor?.label, contractor?.label, labour?.label]
+                    .filter(Boolean).join(" | ") || "";
+                const projectName = siteOptions.find(opt => opt.id === Number(row.project_id))?.label || "";
+                const amount = (row.amount || 0) + (row.extra_amount || 0);
+                const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
+                const quantity = row.quantity || "";
+                const type = row.type || "";
+                const description = row.description || "";
+                return {
+                    sno: index + 1,
+                    projectName,
+                    name,
+                    quantity,
+                    type,
+                    amount: formattedAmount,
+                    description
+                };
+            })
+            .sort((a, b) => {
+                const projectCompare = a.projectName.localeCompare(b.projectName);
+                if (projectCompare !== 0) return projectCompare;
+                return b.type.localeCompare(a.type); 
+            })
+            .map((row, idx) => [
+                (idx + 1).toString(),
+                row.projectName,
+                row.name,
+                row.quantity.toString(),
+                row.type,
+                row.amount,
+                row.description
+            ]);
+        expensesTableRows.push([
+            "",
+            "TOTAL",
+            "",
+            "",
+            "",
+            `${totalAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`,
+            ""
+        ]);
+        const netBalance = totalAmount - totalRefundAmount;
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(`NET BALANCE: ${netBalance.toLocaleString('en-IN')}`, 155, 38);
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text('WAGE EXPENSES', 14, 48);
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text('EXPENDITURE PAYMENTS', 14, 38);
+        doc.autoTable({
+            startY: 50,
+            head: [expensesTableColumn],
+            body: expensesTableRows,
+            styles: {
+                fontSize: 9,
+                cellPadding: 2,
+                halign: 'left',
+                valign: 'middle',
+                textColor: [80, 80, 80],
+            },
+            headStyles: {
+                fillColor: [255, 248, 220], 
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+                lineColor: [200, 200, 200],
+                lineWidth: 0.1,
+            },
+            columnStyles: {
+                0: { cellWidth: 13, halign: 'center', fillColor: [255, 255, 255] },    
+                1: { cellWidth: 47, halign: 'left' },      // Project Name
+                2: { cellWidth: 34, halign: 'left' },      // Name
+                3: { cellWidth: 12, halign: 'center' },    // Qty
+                4: { cellWidth: 22, halign: 'left' },      // Type
+                5: { cellWidth: 18, halign: 'right' },     // Amount
+                6: { cellWidth: 35, halign: 'left' }       // Description
+            },
+            bodyStyles: {
+                lineWidth: 0.1,
+            },
+            alternateRowStyles: {
+                fillColor: false,
             }
-            const doc = new jsPDF();
-            // Add header with PS number, title, date and day
-            doc.setFontSize(14);
-            doc.setFont(undefined, 'bold');
-            // Get day name
-            const dateObj = new Date(selectedDate);
-            const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
-            // Calculate center position for the header
-            const pageWidth = doc.internal.pageSize.width;
-            const headerText = `PS: ${selectedWeek}`;
-            const headerText1 = "DAILY PAYMENT STATEMENT";
-            const headerText2 = `${formatDateOnly(selectedDate)}`;
-            const headerWidth = doc.getTextWidth(headerText);
-            const headerX = (pageWidth - headerWidth) / 2;
-            doc.text(headerText1, 60, 24);
-            doc.text(headerText2, 170, 20);
-            doc.text(headerText, 14, 20);
-            // Add day name below
-            doc.setFontSize(10);
-            const dayText = dayName;
-            const dayWidth = doc.getTextWidth(dayText);
-            doc.text(dayText, 170, 27);
-            // Add lines above and below
-            doc.setLineWidth(0.5);
-            doc.line(14, 15, pageWidth - 14, 15); // Line above
-            doc.line(14, 30, pageWidth - 14, 30); // Line below
-            // Reset font
-            doc.setFont(undefined, 'normal');
-            // Calculate total amount for selected date
-            const filteredExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate);
-            const totalAmount = filteredExpenses.reduce(
-                (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
-                0
-            );
-            // Calculate total refund amount for selected date
-            const totalRefundAmount = refundPayments.reduce(
-                (sum, row) => sum + Number(row.amount || 0),
-                0
-            );
-            // Reset color for table
-            doc.setTextColor(0, 0, 0);
-            // Expenses table columns (removed Date column)
-            const expensesTableColumn = [
-                "SNO", "PROJECT NAME", "NAME", "QTY", "TYPE", "AMOUNT", "DESCRIPTION"
-            ];
-            // Prepare expenses with projectName and type for sorting
-            const expensesTableRows = filteredExpenses
-                .map((row, index) => {
-                    const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
-                    const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
-                    const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
-                    const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
-                    const name = [employee?.label, vendor?.label, contractor?.label, labour?.label]
-                        .filter(Boolean).join(" | ") || "";
-                    const projectName = siteOptions.find(opt => opt.id === Number(row.project_id))?.label || "";
-                    const amount = (row.amount || 0) + (row.extra_amount || 0);
-                    const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
-                    const quantity = row.quantity || "";
-                    const type = row.type || "";
-                    const description = row.description || "";
-                    return {
-                        sno: index + 1,
-                        projectName,
-                        name,
-                        quantity,
-                        type,
-                        amount: formattedAmount,
-                        description
-                    };
-                })
-                // Sort by projectName ASC, then by type DESC
-                .sort((a, b) => {
-                    const projectCompare = a.projectName.localeCompare(b.projectName);
-                    if (projectCompare !== 0) return projectCompare;
-                    return b.type.localeCompare(a.type); // type DESC
-                })
-                // Map to array format for autoTable
-                .map((row, idx) => [
-                    (idx + 1).toString(),
-                    row.projectName,
-                    row.name,
-                    row.quantity.toString(),
-                    row.type,
-                    row.amount,
-                    row.description
-                ]);
-            // Add total row for expenses
-            expensesTableRows.push([
-                "",
-                "TOTAL",
-                "",
-                "",
-                "",
-                `${totalAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`,
-                ""
-            ]);
-            const netBalance = totalAmount - totalRefundAmount;
-            // Add Expenses table heading
-            doc.setFontSize(10);
-            doc.setFont("helvetica", "normal");
-            doc.text(`NET BALANCE: ${netBalance.toLocaleString('en-IN')}`, 155, 38);
-            doc.setFontSize(12);
-            doc.setFont(undefined, 'bold');
-            doc.text('WAGE EXPENSES', 14, 48);
-            doc.setFontSize(12);
-            doc.setFont(undefined, 'bold');
-            doc.text('EXPENDITURE PAYMENTS', 14, 38);
-            // Start expenses table
-            doc.autoTable({
-                startY: 50,
-                head: [expensesTableColumn],
-                body: expensesTableRows,
-                styles: {
-                    fontSize: 9,
-                    cellPadding: 2,
-                    halign: 'left',
-                    valign: 'middle',
-                    textColor: [80, 80, 80],
-                },
-                headStyles: {
-                    fillColor: [255, 248, 220], // Light orange color
-                    textColor: [0, 0, 0],
-                    fontStyle: 'bold',
-                    lineColor: [200, 200, 200],
-                    lineWidth: 0.1,
-                },
-                columnStyles: {
-                    0: { cellWidth: 13, halign: 'center', fillColor: [255, 255, 255] },    // SNO - white background
-                    1: { cellWidth: 47, halign: 'left' },      // Project Name
-                    2: { cellWidth: 34, halign: 'left' },      // Name
-                    3: { cellWidth: 12, halign: 'center' },    // Qty
-                    4: { cellWidth: 22, halign: 'left' },      // Type
-                    5: { cellWidth: 18, halign: 'right' },     // Amount
-                    6: { cellWidth: 35, halign: 'left' }       // Description
-                },
-                bodyStyles: {
-                    lineWidth: 0.1,
-                },
-                alternateRowStyles: {
-                    fillColor: false,
-                }
+        });
+        const firstTableEndY = doc.lastAutoTable.finalY;
+        const spaceBetweenTables = 10;
+        const refundTableColumn = [
+            "SNO", "NAME", "AMOUNT"
+        ];
+        const refundTableRows = refundPayments
+            .reverse()
+            .map((row, index) => {
+                const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
+                const name = labour?.label || "";
+                const amount = Number(row.amount || 0);
+                const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
+                return [
+                    (index + 1).toString(),
+                    name,
+                    formattedAmount
+                ];
             });
-            // Get the end position of the first table
-            const firstTableEndY = doc.lastAutoTable.finalY;
-            // Add some space between tables
-            const spaceBetweenTables = 10;
-            // Refund Received table columns
-            const refundTableColumn = [
-                "SNO", "NAME", "AMOUNT"
-            ];
-            const refundTableRows = refundPayments
-                .reverse()
-                .map((row, index) => {
-                    const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
-                    const name = labour?.label || "";
-                    const amount = Number(row.amount || 0);
-                    const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
-                    return [
-                        (index + 1).toString(),
-                        name,
-                        formattedAmount
-                    ];
-                });
-            // Add total row for refunds
-            refundTableRows.push([
-                "",
-                "TOTAL",
-                `${totalRefundAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
-            ]);
-            
-            
-            // Add Refund Received table heading
-            doc.setFontSize(12);
-            doc.setFont(undefined, 'bold');
-            doc.text('WAGE REFUND', 14, firstTableEndY + spaceBetweenTables - 2);
-            // Add Refund Received table
-            doc.autoTable({
-                startY: firstTableEndY + spaceBetweenTables,
-                head: [refundTableColumn],
-                body: refundTableRows,
-                styles: {
-                    fontSize: 9,
-                    cellPadding: 2,
-                    halign: 'left',
-                    valign: 'middle',
-                    textColor: [80, 80, 80],
-                },
-                headStyles: {
-                    fillColor: [255, 248, 220], // Light orange color
-                    textColor: [0, 0, 0],
-                    fontStyle: 'bold',
-                    lineColor: [200, 200, 200],
-                    lineWidth: 0.1,
-                },
-                bodyStyles: {
-                    lineWidth: 0.1,
-                },
-                alternateRowStyles: {
-                    fillColor: false,
-                },
-                columnStyles: {
-                    0: { cellWidth: 15, halign: 'center', fillColor: [255, 255, 255] },    // SNS - white background
-                    1: { cellWidth: 50, halign: 'left' },      // Name
-                    2: { cellWidth: 25, halign: 'right' }      // Amount
-                }
-            });
-            const fileName = `PS ${selectedWeek} - Daily Payment Statement ${formatDateOnly(selectedDate)}.pdf`;
-            doc.save(fileName);
-        };
+        refundTableRows.push([
+            "",
+            "TOTAL",
+            `${totalRefundAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
+        ]);
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text('WAGE REFUND', 14, firstTableEndY + spaceBetweenTables - 2);
+        doc.autoTable({
+            startY: firstTableEndY + spaceBetweenTables,
+            head: [refundTableColumn],
+            body: refundTableRows,
+            styles: {
+                fontSize: 9,
+                cellPadding: 2,
+                halign: 'left',
+                valign: 'middle',
+                textColor: [80, 80, 80],
+            },
+            headStyles: {
+                fillColor: [255, 248, 220], 
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+                lineColor: [200, 200, 200],
+                lineWidth: 0.1,
+            },
+            bodyStyles: {
+                lineWidth: 0.1,
+            },
+            alternateRowStyles: {
+                fillColor: false,
+            },
+            columnStyles: {
+                0: { cellWidth: 15, halign: 'center', fillColor: [255, 255, 255] }, 
+                1: { cellWidth: 50, halign: 'left' }, 
+                2: { cellWidth: 25, halign: 'right' } 
+            }
+        });
+        const fileName = `PS ${selectedWeek} - Daily Payment Statement ${formatDateOnly(selectedDate)}.pdf`;
+        doc.save(fileName);
+    };
     return (
         <body>
             <h1 className="font-bold text-xl flex justify-end mr-20 -mt-7">
@@ -857,11 +810,9 @@ const DailyHistory = () => {
                                     const dateStr = day.toISOString().split("T")[0];
                                     return (
                                         <div key={idx} className="flex flex-col items-left w-20 mx-auto">
-                                            {/* Day Name */}
                                             <div className="font-semibold text-[#E4572E]">
                                                 {day.toLocaleDateString("en-US", { weekday: "short" })}
                                             </div>
-                                            {/* Date Button */}
                                             <button
                                                 onClick={() => handleDateClick(dateStr)}
                                                 className={`p- rounded-lg border text-center w-20 h-[37px] mt-1 ${selectedDate === dateStr
@@ -890,54 +841,39 @@ const DailyHistory = () => {
                 </h1>
             </div>
             <div className="w-full max-w-[1800px] h-auto p-4 lg:p-6 border-collapse bg-[#FFFFFF] ml-10 mr-6 rounded-md">
-                <div className="flex flex-col sm:flex-row sm:justify-between mb-4 w-full">
-                    <h1 className="font-bold text-xl">
-                        PS: <span style={{ color: "#E4572E" }}>{selectedWeek}</span>
-                    </h1>
-                    <h1 className="font-bold text-base">
-                        Expenses: <span style={{ color: "#E4572E" }}>
-                            {Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                    </h1>
-                </div>
-                {/* DATA TABLE */}
                 <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
                     <div className="flex-1 lg:flex-[3] min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:justify-between mb-4 w-full">
+                            <h1 className="font-bold text-xl">
+                                PS: <span style={{ color: "#E4572E" }}>{selectedWeek}</span>
+                            </h1>
+                            <h1 className="font-bold text-base">
+                                Expenses: <span style={{ color: "#E4572E" }}>
+                                    {Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                            </h1>
+                        </div>
                         <div className="w-full h-[500px] rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden">
-                            {/* Single Table with Scrollable Container */}
                             <div className="overflow-auto max-h-[500px] w-full">
                                 <table className="w-full min-w-[1200px] lg:min-w-[1450px] border-collapse text-left">
                                     <thead className="sticky top-0 z-10 bg-white">
                                         <tr className="bg-[#FAF6ED] h-12">
                                             <th className="py-2 px-1 text-left w-[60px]">S.No</th>
-                                            <th
-                                                className="py-2 px-1 text-left w-[200px] cursor-pointer hover:bg-gray-200"
-                                                onClick={() => handleSort('labour_name')}
-                                            >
+                                            <th className="py-2 px-1 text-left w-[200px] cursor-pointer hover:bg-gray-200" onClick={() => handleSort('labour_name')}>
                                                 Name {sortConfig.key === 'labour_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                             </th>
-                                            <th
-                                                className="py-2 px-1 text-left w-[220px] cursor-pointer hover:bg-gray-200"
-                                                onClick={() => handleSort('project_name')}
-                                            >
+                                            <th className="py-2 px-1 text-left w-[220px] cursor-pointer hover:bg-gray-200" onClick={() => handleSort('project_name')}>
                                                 Project Name {sortConfig.key === 'project_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                             </th>
-                                            <th
-                                                className="py-2 px-1 text-left w-[120px] cursor-pointer hover:bg-gray-200"
-                                                onClick={() => handleSort('amount')}
-                                            >
+                                            <th className="py-2 px-1 text-left w-[120px] cursor-pointer hover:bg-gray-200" onClick={() => handleSort('amount')}>
                                                 Amount {sortConfig.key === 'amount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                             </th>
                                             <th className="py-2 px-1 text-left w-[60px]">Qty</th>
-                                            <th
-                                                className="py-2 px-1 text-left w-[120px] cursor-pointer hover:bg-gray-200"
-                                                onClick={() => handleSort('type')}
-                                            >
+                                            <th className="py-2 px-1 text-left w-[120px] cursor-pointer hover:bg-gray-200" onClick={() => handleSort('type')}>
                                                 Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                             </th>
                                             <th className="py-2 px-1 text-left w-[80px]">Activity</th>
                                         </tr>
-                                        {/* Input Row */}
                                         <tr className="bg-white border-b border-gray-200">
                                             <td className="px-1 py-2 font-bold">{dailyExpenses.filter(row => row.date === selectedDate).length + 1}.</td>
                                             <td className="flex items-center gap-2 py-2">
@@ -1028,15 +964,10 @@ const DailyHistory = () => {
                                                     />
                                                 </div>
                                                 <div>
-                                                    <button
-                                                        className="font-semibold text-[25px]"
-                                                        onClick={() => setShowExtraAmount(prev => !prev)}
-                                                        type="button"
-                                                    >
+                                                    <button className="font-semibold text-[25px]" onClick={() => setShowExtraAmount(prev => !prev)} type="button">
                                                         +
                                                     </button>
                                                 </div>
-                                                {/* Conditionally render extra input */}
                                                 {showExtraAmount && (
                                                     <div>
                                                         <input
@@ -1090,7 +1021,6 @@ const DailyHistory = () => {
                                                 </select>
                                             </td>
                                             <td className="px-1 py-2">
-
                                             </td>
                                         </tr>
                                     </thead>
@@ -1122,7 +1052,6 @@ const DailyHistory = () => {
                                                                 <span>
                                                                     {Number((row.amount || 0) + (row.extra_amount || 0)).toLocaleString("en-IN")}
                                                                 </span>
-                                                                {/* Tooltip on hover */}
                                                                 <div className="absolute left-0 top-full mt-1 hidden group-hover:block bg-black text-white text-xs rounded p-2 z-50 shadow-lg whitespace-nowrap">
                                                                     Amount: {Number(row.amount || 0).toLocaleString('en-IN')} <br />
                                                                     Extra Amount: {Number(row.extra_amount || 0).toLocaleString('en-IN')}
@@ -1142,7 +1071,6 @@ const DailyHistory = () => {
                                                     </td>
                                                     <td className="px-1 py-2">
                                                         <div className="w-[80px] h-[40px] flex items-center">
-                                                           
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -1185,7 +1113,6 @@ const DailyHistory = () => {
                                                 </td>
                                             </tr>
                                         ))}
-                                        {/* Refund Input Row */}
                                         <tr>
                                             <td className="py-2 text-left">
                                                 <Select
@@ -1216,7 +1143,6 @@ const DailyHistory = () => {
                                                 />
                                             </td>
                                             <td className="py-2">
-                                                {/* Empty cell for Activity column */}
                                             </td>
                                         </tr>
                                     </tbody>

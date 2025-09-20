@@ -71,7 +71,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
         {activeMenu === 'billing' && (
           <div className="ml-6">
             <Link
-              to={hasAccessToModel('Bill Payments Tracker') ? 'database_retrieves' : '#'}
+              to={hasAccessToModel('Bill Payments Tracker') ? '/tracker/pendingbill' : '#'}
               className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Bill Payments Tracker' ? 'text-red-500' : ''}`}
               onClick={(e) => {
                 if (!hasAccessToModel('Bill Payments Tracker')) {

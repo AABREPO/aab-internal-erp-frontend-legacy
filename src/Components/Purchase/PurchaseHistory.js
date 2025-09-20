@@ -50,7 +50,6 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
     date: '',
     eno: '',
   });
-
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     date.setMinutes(date.getMinutes());
@@ -68,20 +67,17 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
     if (!dateStr) return "N/A";
     const date = new Date(dateStr);
     const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0"); // Months are zero-based
+    const month = String(date.getMonth() + 1).padStart(2, "0");
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
   };
-
   const groupedAudits = auditHistory.reduce((acc, audit) => {
     const date = formatDate(audit.edited_at);
     const timeKey = date;
     if (!acc[timeKey]) acc[timeKey] = [];
     acc[timeKey].push(audit);
-
     return acc;
   }, {});
-
   const groupedAuditKeys = Object.keys(groupedAudits);
   useEffect(() => {
     fetchPoOrder();
@@ -331,13 +327,13 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
     setPoNos('');
     setSiteInchargeName('');
     setSelectedPoDate('');
-    setPoNosOption([]); // Clear options dependent on vendor
+    setPoNosOption([]);
     setPurchaseOrders(allPurchaseOrders);
   };
   useEffect(() => {
     if (resetFilters) {
       setPurchaseOrders(allPurchaseOrders);
-      setResetFilters(false); // clear flag
+      setResetFilters(false);
     }
   }, [resetFilters, allPurchaseOrders]);
   const customStyles = {
@@ -351,7 +347,7 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
         : 'rgba(191, 152, 83, 0.35)',
       boxShadow: state.isFocused ? '0 0 0 1px #FAF6ED' : 'none',
       '&:hover': {
-        borderColor: 'rgba(191, 152, 83, 0.5)', // 50% on hover
+        borderColor: 'rgba(191, 152, 83, 0.5)',
       }
     }),
   };
@@ -376,7 +372,6 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
     });
     setIsHeaderEditable(true);
   };
-
   const handleHeaderSave = async () => {
     try {
       const payload = {
@@ -385,11 +380,10 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
         date: editableHeader.date,
         eno: editableHeader.eno,
       };
-      // Check if anything has changed
       const hasChanges = Object.keys(payload).some(key => payload[key] !== selectedOrder[key]);
       if (!hasChanges) {
         setIsHeaderEditable(false);
-        return; // silently return if no changes
+        return;
       }
       const response = await fetch(
         `https://backendaab.in/aabuildersDash/api/purchase_orders/${selectedOrder.id}/edit?editedBy=${username}`,
@@ -416,7 +410,6 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
       fetchHeaderAudit(selectedOrderId);
     }
   }, [selectedOrderId]);
-
   useEffect(() => {
     setIsHeaderEditable(false);
     setEditableHeader({
@@ -428,7 +421,6 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
   }, [selectedOrder]);
   const handleHeaderChange = async (field, value) => {
     setEditableHeader((prev) => ({ ...prev, [field]: value }));
-
     if (field === 'vendorId') {
       try {
         const countResponse = await fetch(
@@ -445,15 +437,12 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
       }
     }
   };
-
   const generatePDF = (selectedOrder) => {
     const doc = new jsPDF();
-    // Helper to find label from ID
     const findNameById = (options, id, key) => {
       const match = options.find(opt => opt.id == id);
       return match ? match[key] : '';
     };
-
     const vendorName = findNameById(vendorOptions, selectedOrder.vendor_id, "label");
     const clientName = findNameById(clientNameOptions, selectedOrder.client_id, "label");
     const siteInchargeName = findNameById(siteEngineerOptions, selectedOrder.site_incharge_id, "label");
@@ -501,21 +490,17 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
       item.quantity || "",
       item.amount || ""
     ]);
-    // Pad to 24 rows before totals
     while (tableBody.length < 24) {
       tableBody.push(["", "", "", "", "", "", "", ""]);
     }
-    // Totals
     const totalQty = selectedOrder.purchaseTable.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
     const totalAmount = selectedOrder.purchaseTable.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    // Final row with totals under QTY and RATE
     tableBody.push([
       "", "", "", "", "",
       { content: `TOTAL `, styles: { fontStyle: "bold", halign: "center" } },
       { content: `${totalQty}`, styles: { fontStyle: "bold", halign: "center" } },
       { content: ` ${totalAmount}`, styles: { fontStyle: "bold", halign: "center" } }
     ]);
-    // 🧾 Table rendering
     doc.autoTable({
       startY: 52,
       margin: { left: 10, right: 10 },
@@ -539,7 +524,7 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
       didDrawPage: function (data) {
         const pageHeight = doc.internal.pageSize.height;
         const pageWidth = doc.internal.pageSize.width;
-        doc.setFontSize(5); // small footer font
+        doc.setFontSize(5);
         doc.text(`Created By: ${selectedOrder.created_by}`, 14, pageHeight - 10);
         doc.text(`Date: ${formatDate(selectedOrder.created_date_time)}`, pageWidth - 60, pageHeight - 10);
       },
@@ -556,15 +541,13 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
         7: { cellWidth: 17 }
       }
     });
-    // 💾 Save the PDF
     doc.save(`# ${selectedOrder.eno} - ${formatDateOnly(selectedOrder.date)}-${clientName}.pdf`);
   };
   const handleEditClick = (order) => {
     setSelectedOrderForEdit(order);
-    setEditedTitle(order?.poNotes?.poNotes || ""); // Set current note if exists
+    setEditedTitle(order?.poNotes?.poNotes || "");
     setIsEditModalOpen(true);
   };
-
   const handleSubmitEditTitle = async () => {
     if (!selectedOrderForEdit) return;
     try {
@@ -580,7 +563,6 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
       );
       if (!response.ok) throw new Error("Failed to update notes");
       const updatedOrder = await response.json();
-      // Update local state (assuming you use state to store purchaseOrders)
       setPurchaseOrders((prevOrders) =>
         prevOrders.map((order) =>
           order.id === updatedOrder.id ? updatedOrder : order
@@ -592,13 +574,10 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
       console.error("Error updating PO notes:", err);
     }
   };
-
   const handleEditSubmits = async () => {
     const updatedTable = selectedOrder.purchaseTable.map((row) =>
       row.id === editRowData.id ? editRowData : row
     );
-
-    // Optional: clean data before sending (remove labels if backend doesn't need them)
     const cleanedTable = updatedTable.map((row) => ({
       id: row.id,
       category_id: row.category_id,
@@ -610,7 +589,6 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
       amount: row.amount,
       totalAmount: row.totalAmount,
     }));
-
     try {
       const response = await fetch(
         `https://backendaab.in/aabuildersDash/api/purchase_orders/editPurchaseTable/full/${selectedOrder.id}?editedBy=${username}`,
@@ -633,52 +611,41 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
       alert("Error updating purchase table.");
     }
   };
-
   const fetchAudit = async () => {
     try {
       const res = await fetch(`https://backendaab.in/aabuildersDash/api/purchase_orders/audit/${selectedOrder.id}`);
-
       if (!res.ok) {
         console.error("Fetch failed with status:", res.status);
         return;
       }
-
-      const text = await res.text(); // get raw text first
-
+      const text = await res.text();
       if (!text) {
         console.warn("Audit response is empty");
-        setAuditHistory([]); // or null, based on your needs
+        setAuditHistory([]);
         return;
       }
-
-      const data = JSON.parse(text); // safely parse if non-empty
+      const data = JSON.parse(text);
       setAuditHistory(data);
-
     } catch (error) {
       console.error("Error fetching audit data:", error);
     }
   };
-
   useEffect(() => {
     if (selectedOrder) {
       fetchAudit();
     }
   }, [selectedOrder]);
-
   const fetchHeaderAudit = async (poId) => {
     try {
       const response = await fetch(`https://backendaab.in/aabuildersDash/api/purchase_orders/${selectedOrder.id}/audit`);
-
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-
       const text = await response.text();
       if (!text) {
         setPoAuditHistory([]);
         return;
       }
-
       const data = JSON.parse(text);
       console.log(data);
       setPoAuditHistory(data);
@@ -687,27 +654,21 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
       setPoAuditHistory([]);
     }
   };
-
   useEffect(() => {
     if (selectedOrder) {
       fetchHeaderAudit();
     }
   }, [selectedOrder]);
-
   useEffect(() => {
     if (auditPopupOpen) fetchAudit();
   }, [auditPopupOpen]);
-
   const toggleDeleteStatus = async (order) => {
     const newStatus = !order.delete_status;
-
     const confirmMessage = newStatus
       ? 'Are you sure you want to delete this order?'
       : 'Are you sure you want to undo delete for this order?';
-
     const confirmed = window.confirm(confirmMessage);
     if (!confirmed) return;
-
     try {
       const response = await fetch(`https://backendaab.in/aabuildersDash/api/purchase_orders/markDeleted/${order.id}?deleteStatus=${newStatus}`, {
         method: 'PUT',
@@ -722,7 +683,6 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
       console.error("Failed to toggle deleted status", error);
     }
   };
-
   useEffect(() => {
     if (editRowData?.category) {
       const filteredItems = poItemName.filter(
@@ -730,43 +690,35 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
           item.category &&
           item.category.toLowerCase() === editRowData.category.toLowerCase()
       );
-
       const itemNameOpts = filteredItems.map(item => ({
         value: item.itemName,
         label: item.itemName,
         id: item.id,
       }));
-
       setItemNameOptions(itemNameOpts);
     } else {
       setItemNameOptions([]);
     }
   }, [editRowData?.category, poItemName]);
-
   useEffect(() => {
     if (editModalOpen && editRowData?.category_id && categoryOptions.length > 0) {
       const selectedCategory = categoryOptions.find(cat => cat.id === editRowData.category_id);
       const categoryName = selectedCategory?.value;
-
       if (categoryName) {
         const filteredItems = poItemName.filter(
           item =>
             item.category &&
             item.category.toLowerCase() === categoryName.toLowerCase()
         );
-
         const itemNameOpts = filteredItems.map(item => ({
           id: item.id,
           value: item.itemName,
           label: item.itemName
         }));
-
         setItemNameOptions(itemNameOpts);
       }
     }
   }, [editModalOpen, editRowData?.category_id, categoryOptions, poItemName]);
-
-
   return (
     <div className="gap-6 [@media(min-width:1450)]w-[1900px] pl-10 bg-[#FFFCF6]">
       <div className="bg-white p-4">
@@ -829,7 +781,6 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
           />
         </div>
         <div className='[@media(min-width:1300px)]:flex gap-8'>
-          {/* LEFT - List of Orders */}
           <div className="bg-white p-2 lg:w-[720px]">
             <div className="flex justify-between items-center font-semibold text-base mb-3 border-b pb-2 px-1">
               <div className="w-[50px]">S.No</div>
@@ -1035,7 +986,6 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
                     </>
                   )}
                 </div>
-                {/* Add Edit or Save button here */}
                 <div className='rounded-lg border-l-8 border-l-[#BF9853] overflow-auto'>
                   <table className="w-full text-sm">
                     <thead className="bg-[#FAF6ED]">
@@ -1059,23 +1009,18 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
                           <td className="p-2 min-w-[140px] sm:min-w-[auto]">
                             {poItemName.find(opt => opt.id === item.item_id)?.itemName || ''}
                           </td>
-
                           <td className="p-2">
                             {categoryOptions.find(opt => opt.id === item.category_id)?.label || ''}
                           </td>
-
                           <td className="p-2 min-w-[100px] sm:min-w-[auto]">
                             {modelOptions.find(opt => opt.id === item.model_id)?.label || ''}
                           </td>
-
                           <td className="p-2">
                             {brandOptions.find(opt => opt.id === item.brand_id)?.label || ''}
                           </td>
-
                           <td className="p-2">
                             {typeOptions.find(opt => opt.id === item.type_id)?.label || ''}
                           </td>
-
                           <td className="p-2">{item.quantity}</td>
                           <td className="p-2">{item.amount}</td>
                           <td className="p-2">{item.totalAmount}</td>
@@ -1125,7 +1070,6 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
               disabled={!editRowData || JSON.stringify(editRowData) === JSON.stringify(originalRowData)}>
               Update
             </button>
-
             <div className="mt-4 flex justify-between">
               <div>
                 {groupedAuditKeys.map((timeKey) => (
@@ -1222,7 +1166,6 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
                   ].map((field, index) => {
                     const hasChanged =
                       field.old !== field.new && field.new !== "" && field.new !== null;
-
                     return (
                       <td key={index} className="p-2 border">
                         <span
@@ -1251,7 +1194,6 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
           </div>
         </div>
       )}
-
       {isEditModalOpen && selectedOrderForEdit && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-white p-6 rounded shadow-lg w-[500px] relative">
@@ -1266,23 +1208,14 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
               className="border border-gray-300 p-2 rounded w-full mb-4"
             />
             <div className="flex justify-end space-x-2">
-              <button
-                className="px-4 py-2 bg-gray-200 text-black rounded"
-                onClick={() => setIsEditModalOpen(false)}
-              >
+              <button className="px-4 py-2 bg-gray-200 text-black rounded" onClick={() => setIsEditModalOpen(false)}>
                 Close
               </button>
-              <button
-                className="px-4 py-2 bg-[#BF9853] text-white rounded"
-                onClick={handleSubmitEditTitle}
-              >
+              <button className="px-4 py-2 bg-[#BF9853] text-white rounded" onClick={handleSubmitEditTitle}>
                 Submit
               </button>
             </div>
-            <button
-              className="absolute top-2 right-2 text-gray-600 hover:text-red-500 text-xl"
-              onClick={() => setIsEditModalOpen(false)}
-            >
+            <button className="absolute top-2 right-2 text-gray-600 hover:text-red-500 text-xl" onClick={() => setIsEditModalOpen(false)}>
               &times;
             </button>
           </div>
@@ -1294,7 +1227,6 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
             <h2 className="text-xl font-bold mb-4">Edit History</h2>
             <form onSubmit={(e) => { e.preventDefault(); handleEditSubmit(); }} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                {/* CATEGORY */}
                 <div>
                   <label>Category</label>
                   <Select
@@ -1307,8 +1239,6 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
                     onChange={(selectedOption) => {
                       const newCategoryId = selectedOption ? selectedOption.id : '';
                       const newCategoryName = selectedOption ? selectedOption.value : '';
-
-                      // Update state
                       setEditRowData(prev => ({
                         ...prev,
                         category_id: newCategoryId,
@@ -1316,21 +1246,17 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
                         item_id: '',
                         itemName: ''
                       }));
-
-                      // Update item name options
                       if (newCategoryName) {
                         const filteredItems = poItemName.filter(
                           item =>
                             item.category &&
                             item.category.toLowerCase() === newCategoryName.toLowerCase()
                         );
-
                         const itemNameOpts = filteredItems.map(item => ({
                           id: item.id,
                           value: item.itemName,
                           label: item.itemName
                         }));
-
                         setItemNameOptions(itemNameOpts);
                       } else {
                         setItemNameOptions([]);
@@ -1338,8 +1264,6 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
                     }}
                   />
                 </div>
-
-                {/* ITEM NAME */}
                 <div>
                   <label>Item Name</label>
                   <Select
@@ -1358,8 +1282,6 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
                     }
                   />
                 </div>
-
-                {/* MODEL */}
                 <div>
                   <label>Model</label>
                   <Select
@@ -1378,8 +1300,6 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
                     }
                   />
                 </div>
-
-                {/* BRAND */}
                 <div>
                   <label>Brand</label>
                   <Select
@@ -1398,8 +1318,6 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
                     }
                   />
                 </div>
-
-                {/* TYPE */}
                 <div>
                   <label>Type</label>
                   <Select
@@ -1418,8 +1336,6 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
                     }
                   />
                 </div>
-
-                {/* QUANTITY */}
                 <div>
                   <label>Quantity</label>
                   <input
@@ -1435,8 +1351,6 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
                     className="w-full border-2 border-[#BF9863] border-opacity-25 p-2 rounded"
                   />
                 </div>
-
-                {/* AMOUNT */}
                 <div>
                   <label>Amount</label>
                   <input
@@ -1453,14 +1367,8 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
                   />
                 </div>
               </div>
-
-              {/* ACTION BUTTONS */}
               <div className="flex justify-end gap-4 mt-4">
-                <button
-                  type="button"
-                  onClick={() => setEditModalOpen(false)}
-                  className="border border-[#BF9863] px-4 py-2 w-24 h-10 rounded"
-                >
+                <button type="button" onClick={() => setEditModalOpen(false)} className="border border-[#BF9863] px-4 py-2 w-24 h-10 rounded" >
                   Close
                 </button>
                 <button type="submit" className="bg-[#BF9853] text-white px-4 py-2 w-24 h-10 rounded">
@@ -1491,129 +1399,101 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
               </thead>
               <tbody>
                 {groupedAudits[auditPopupOpen]?.map((entry) => {
-                  // Lookup helpers
                   const getNameById = (options, id, key = "value") =>
                     options.find(opt => opt.id === id)?.[key] || "-";
-
                   const oldTotal = entry.old_quantity * entry.old_amount;
                   const newTotal = entry.new_quantity * entry.new_amount;
-
                   return (
                     <tr key={entry.id} className="border-b">
-                      {/* Edited By */}
                       <td className="p-2 border">{entry.edited_by}</td>
-
-                      {/* Item */}
                       {(() => {
                         const oldVal = getNameById(poItemName, entry.old_item_id);
                         const newVal = getNameById(poItemName, entry.new_item_id);
                         const changed = entry.old_item_id !== entry.new_item_id;
                         return (
-                          <td
-                            className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""}`}
+                          <td className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""}`}
                             title={changed ? `Previous: ${oldVal} → Current: ${newVal}` : ""}
                           >
                             {oldVal}
                           </td>
                         );
                       })()}
-
-                      {/* Category */}
                       {(() => {
                         const oldVal = getNameById(categoryOptions, entry.old_category_id);
                         const newVal = getNameById(categoryOptions, entry.new_category_id);
                         const changed = entry.old_category_id !== entry.new_category_id;
                         return (
-                          <td
-                            className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""}`}
+                          <td className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""}`}
                             title={changed ? `Previous: ${oldVal} → Current: ${newVal}` : ""}
                           >
                             {oldVal}
                           </td>
                         );
                       })()}
-
-                      {/* Model */}
                       {(() => {
                         const oldVal = getNameById(modelOptions, entry.old_model_id);
                         const newVal = getNameById(modelOptions, entry.new_model_id);
                         const changed = entry.old_model_id !== entry.new_model_id;
                         return (
-                          <td
-                            className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""}`}
+                          <td className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""}`}
                             title={changed ? `Previous: ${oldVal} → Current: ${newVal}` : ""}
                           >
                             {oldVal}
                           </td>
                         );
                       })()}
-
-                      {/* Brand */}
                       {(() => {
                         const oldVal = getNameById(brandOptions, entry.old_brand_id);
                         const newVal = getNameById(brandOptions, entry.new_brand_id);
                         const changed = entry.old_brand_id !== entry.new_brand_id;
                         return (
-                          <td
-                            className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""}`}
+                          <td className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""}`}
                             title={changed ? `Previous: ${oldVal} → Current: ${newVal}` : ""}
                           >
                             {oldVal}
                           </td>
                         );
                       })()}
-
-                      {/* Type */}
                       {(() => {
                         const oldVal = getNameById(typeOptions, entry.old_type_id);
                         const newVal = getNameById(typeOptions, entry.new_type_id);
                         const changed = entry.old_type_id !== entry.new_type_id;
                         return (
-                          <td
-                            className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""}`}
+                          <td className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""}`}
                             title={changed ? `Previous: ${oldVal} → Current: ${newVal}` : ""}
                           >
                             {oldVal}
                           </td>
                         );
                       })()}
-
-                      {/* Quantity */}
                       {(() => {
                         const oldVal = entry.old_quantity;
                         const newVal = entry.new_quantity;
                         const changed = oldVal !== newVal;
                         return (
-                          <td
-                            className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""}`}
+                          <td className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""}`}
                             title={changed ? `Previous: ${oldVal} → Current: ${newVal}` : ""}
                           >
                             {oldVal}
                           </td>
                         );
                       })()}
-
-                      {/* Amount */}
                       {(() => {
                         const oldVal = entry.old_amount;
                         const newVal = entry.new_amount;
                         const changed = oldVal !== newVal;
                         return (
-                          <td
-                            className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""}`}
+                          <td className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""}`}
                             title={changed ? `Previous: ${oldVal} → Current: ${newVal}` : ""}
                           >
                             {oldVal}
                           </td>
                         );
                       })()}
-
-                      {/* Total */}
                       {(() => {
                         const changed = oldTotal !== newTotal;
                         return (
-                          <td
-                            className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""}`}
+                          <td className={`p-2 border ${changed ? "bg-yellow-100 text-red-600 font-semibold" : ""}`}
                             title={changed ? `Previous: ${oldTotal} → Current: ${newTotal}` : ""}
                           >
                             {oldTotal}
@@ -1626,10 +1506,7 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
               </tbody>
             </table>
             <div className="flex justify-end mt-4">
-              <button
-                onClick={() => setAuditPopupOpen(null)}
-                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
-              >
+              <button onClick={() => setAuditPopupOpen(null)} className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">
                 Close
               </button>
             </div>
@@ -1640,21 +1517,16 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
   );
 };
 export default PurchaseHistory;
-
 function formatDateTime(dateString) {
   const date = new Date(dateString);
   if (isNaN(date)) return "Invalid Date";
-
   const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0'); // months are 0-based
+  const month = String(date.getMonth() + 1).padStart(2, '0');
   const year = date.getFullYear();
-
   let hours = date.getHours();
   const minutes = String(date.getMinutes()).padStart(2, '0');
   const ampm = hours >= 12 ? 'PM' : 'AM';
-
   hours = hours % 12;
-  hours = hours ? hours : 12; // the hour '0' should be '12'
-
+  hours = hours ? hours : 12;
   return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
 }

@@ -3,6 +3,7 @@ import axios from 'axios';
 import Edit from '../Images/Edit.svg';
 import Delete from '../Images/Delete.svg';
 import history from '../Images/History.svg';
+import Filter from '../Images/filter (3).png';
 import Select from 'react-select';
 import download from '../Images/file_download.png'
 import jsPDF from "jspdf";
@@ -35,6 +36,13 @@ const History = ({ username, userRoles = [] }) => {
     const currentYear = new Date().getFullYear();
     const startYear = 2000; // Change if needed
     const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i);
+
+    // Filter state variables
+    const [showFilters, setShowFilters] = useState(false);
+    const [selectDate, setSelectDate] = useState('');
+    const [selectContractororVendorName, setSelectContractororVendorName] = useState('');
+    const [selectProjectName, setSelectProjectName] = useState('');
+    const [selectType, setSelectType] = useState('');
 
     function getStartAndEndDateOfWeek(weekNumber, year) {
         const simple = new Date(year, 0, 1 + (weekNumber - 1) * 7);
@@ -310,9 +318,93 @@ const History = ({ username, userRoles = [] }) => {
         setNewExpense((prev) => ({ ...prev, [e.target.name]: e.target.value }));
     };
 
+    // Filter functions
+    const clearFilters = () => {
+        setSelectDate('');
+        setSelectContractororVendorName('');
+        setSelectProjectName('');
+        setSelectType('');
+    };
+
+    const getVendorName = (id) =>
+        vendorOptions.find(v => v.id === id)?.value || "";
+
+    const getContractorName = (id) =>
+        contractorOptions.find(c => c.id === id)?.value || "";
+
+    const getEmployeeName = (id) =>
+        employeeOptions.find(c => c.id === id)?.value || "";
+
+    const getSiteName = (id) =>
+        siteOptions.find(s => String(s.id) === String(id))?.value || "";
+
+    // Filtered data based on selected filters
+    const filteredExpenses = expenses.filter((entry) => {
+        // Date filter (exact match since it's type="date")
+        if (selectDate) {
+            // Convert selectDate (YYYY-MM-DD) → DD-M-YYYY
+            const [year, month, day] = selectDate.split("-");
+            const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
+            // Convert entry.date to DD-M-YYYY
+            const entryDateObj = new Date(entry.date);
+            const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
+            if (formattedEntryDate !== formattedSelectDate) return false;
+        }
+        // Contractor/Vendor filter
+        if (selectContractororVendorName) {
+            const name =
+                entry.vendor_id
+                    ? getVendorName(entry.vendor_id)
+                    : getContractorName(entry.contractor_id) || getEmployeeName(entry.employee_id);
+            if (name.toLowerCase() !== selectContractororVendorName.toLowerCase())
+                return false;
+        }
+        // Project Name filter
+        if (selectProjectName) {
+            const projectName = getSiteName(entry.project_id) || "";
+            if (projectName.toLowerCase() !== selectProjectName.toLowerCase())
+                return false;
+        }
+        // Type filter
+        if (selectType) {
+            if (entry.type?.toLowerCase() !== selectType.toLowerCase()) return false;
+        }
+        return true; // passes all filters
+    });
+
+    const contractorVendorFilterOptions = React.useMemo(() => {
+        const ids = new Set();
+        return filteredExpenses.map(exp => {
+            const option =
+                combinedOptions.find(
+                    opt =>
+                        (opt.type === "Contractor" && opt.id === Number(exp.contractor_id)) ||
+                        (opt.type === "Vendor" && opt.id === Number(exp.vendor_id)) ||
+                        (opt.type === "Employee" && opt.id === Number(exp.employee_id))
+                );
+            if (option && !ids.has(option.id)) {
+                ids.add(option.id);
+                return { value: option.label, label: option.label };
+            }
+            return null;
+        }).filter(Boolean);
+    }, [filteredExpenses, combinedOptions]);
+
+    const projectFilterOptions = React.useMemo(() => {
+        const ids = new Set();
+        return filteredExpenses.map(exp => {
+            const option = siteOptions.find(opt => opt.id === Number(exp.project_id));
+            if (option && !ids.has(option.id)) {
+                ids.add(option.id);
+                return { value: option.label, label: option.label };
+            }
+            return null;
+        }).filter(Boolean);
+    }, [filteredExpenses, siteOptions]);
+
     const balance = (
         payments.reduce((total, row) => total + Number(row.amount || 0), 0) -
-        expenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)
+        filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)
     ).toFixed(2);
 
     // For new expense input
@@ -485,7 +577,7 @@ const History = ({ username, userRoles = [] }) => {
             alert("Error: Data not loaded properly. Please refresh the page and try again.");
             return;
         }
-        const totalExpenses = expenses.reduce((t, e) => t + Number(e.amount || 0), 0);
+        const totalExpenses = filteredExpenses.reduce((t, e) => t + Number(e.amount || 0), 0);
         const totalPayments = payments.reduce((t, p) => t + Number(p.amount || 0), 0);
         const balance = totalPayments - totalExpenses;
         // ===== FUNCTION TO DRAW HEADER =====
@@ -536,8 +628,9 @@ const History = ({ username, userRoles = [] }) => {
         drawHeader(doc, "WEEKLY PAYMENT REPORT");
         // ===== EXPENSES TABLE =====
         const expensesHeaders = [["SNO", "Date", "Contractor/Vendor", "Site Name", "Type", "Amount", "AC", "C", ""]];
-        const filteredExpenses = expenses.filter(row => row.type !== "Project Advance" && row.type !== "Staff Advance" && row.type !== "Staff Salary" && row.type !== "Daily");
-        const expensesData = filteredExpenses.map((row, idx) => [
+        // Use the same filtered expenses as the UI, but exclude certain types for PDF
+        const pdfFilteredExpenses = filteredExpenses.filter(row => row.type !== "Project Advance" && row.type !== "Staff Advance" && row.type !== "Staff Salary" && row.type !== "Daily");
+        const expensesData = pdfFilteredExpenses.map((row, idx) => [
             String(idx + 1 || ""),
             String(row.date ? formatDateOnly(row.date) : ""),
             String(combinedOptions.find(opt =>
@@ -662,7 +755,7 @@ const History = ({ username, userRoles = [] }) => {
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         // Filter for Daily type expenses
-        const dailyExpenses = expenses.filter(expense => expense.type === "Daily");
+        const dailyExpenses = filteredExpenses.filter(expense => expense.type === "Daily");
         const dailyExpenseData = dailyExpenses.map(expense => [
             String(expense.date ? formatDateOnly(expense.date) : ""), // Date in first column
             String(Number(expense.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00") // Amount in second column
@@ -735,7 +828,7 @@ const History = ({ username, userRoles = [] }) => {
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.text("EXPENDITURE PAYMENTS", 300, baseY - 25);
-        const summaryMap = expenses
+        const summaryMap = filteredExpenses
             .filter(expense => Number(expense.amount) > 0)
             .reduce((acc, expense) => {
                 const type = expense.type;
@@ -817,7 +910,7 @@ const History = ({ username, userRoles = [] }) => {
         const newTableX = 520;  // Right of summary table
         let newTableY = baseY;
         // --- Calculate staff advance data ---
-        const staffAdvanceEntries = expenses.filter(e => e.type === "Staff Advance");
+        const staffAdvanceEntries = filteredExpenses.filter(e => e.type === "Staff Advance");
         const staffAdvanceCount = staffAdvanceEntries.length;
         const staffAdvanceTotal = staffAdvanceEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
         // First table (Staff Advance Summary)
@@ -863,7 +956,7 @@ const History = ({ username, userRoles = [] }) => {
         });
         newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
         // --- Calculate staff salary data ---
-        const staffSalaryEntries = expenses.filter(e => e.type === "Staff Salary");
+        const staffSalaryEntries = filteredExpenses.filter(e => e.type === "Staff Salary");
         const staffSalaryCount = staffSalaryEntries.length;
         const staffSalaryTotal = staffSalaryEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
         // Second table (Staff Salary Summary)
@@ -1051,6 +1144,7 @@ const History = ({ username, userRoles = [] }) => {
             console.log("Deletion cancelled.");
         }
     };
+
     return (
         <body>
             <div className='flex justify-end mt-[-28px] mr-6'>
@@ -1101,242 +1195,295 @@ const History = ({ username, userRoles = [] }) => {
                     Balance: <span style={{ color: "#E4572E" }}>
                         {(
                             payments.reduce((total, row) => total + Number(row.amount || 0), 0) -
-                            expenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)
+                            filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)
                         ).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}
                     </span>
                 </h1>
             </div>
-            <div className="mx-auto w-auto p-6 border-collapse bg-[#FFFFFF] ml-[30px] mr-6 rounded-md">
-                <div className="flex justify-between mb-4 w-[1300px]">
-                    <h1 className="font-bold text-xl">PS: <span style={{ color: "#E4572E" }}>{selectedWeek}</span> </h1>
-                    <h1 className="font-bold text-base">
-                        Expenses: <span style={{ color: "#E4572E" }}>
-                            {expenses.reduce((total, expense) => total + Number(expense.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}
-                        </span>
-                    </h1>
+            <div className="mx-auto w-auto p-3 sm:p-6 border-collapse bg-[#FFFFFF] ml-[15px] sm:ml-[30px] mr-3 sm:mr-6 rounded-md">
+                {/* Filter Button */}
+                <div className="text-left mb-4">
+                    <button onClick={() => setShowFilters(!showFilters)}>
+                        <img
+                            src={Filter}
+                            alt="Toggle Filter"
+                            className="w-7 h-7 border border-[#BF9853] rounded-md"
+                        />
+                    </button>
                 </div>
-                <div className="flex gap-6">
-                    <div className="flex-[3]">
-                        <div className="rounded-lg border-l-8 border-l-[#BF9853] w-full overflow-auto">
-                            <table className="w-full min-w-[900px] border-collapse">
-                                <thead>
-                                    <tr className="bg-[#FAF6ED] h-12">
-                                        <th className="px-4 py-2 text-left">Sl.No</th>
-                                        <th className="px-4 py-2 text-left">Date</th>
-                                        <th className="px-4 py-2 text-left">Contractor/Vendor</th>
-                                        <th className="px-4 py-2 text-left">Project Name</th>
-                                        <th className="px-4 py-2 text-left">Type</th>
-                                        <th className="px-4 py-2 text-left">Amount</th>
-                                        <th>Activity</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {Number(selectedWeek) === Number(lastWeekNumber) ? (
-                                        <tr className="">
-                                            <td className="px-4 py-2 font-bold">{expenses.length + 1}.</td>
-                                            <td className="px-4 py-2">
-                                                <input
-                                                    type="date"
-                                                    name="date"
-                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 rounded-lg w-[120px] h-[40px] focus:outline-none"
-                                                    value={newExpense.date}
-                                                    onChange={handleExpenseChange}
-                                                    onKeyDown={handleKeyDown}
-                                                />
-                                            </td>
-                                            <td className="px-4 py-2">
-                                                <Select
-                                                    name="contractor"
-                                                    className="w-[180px]"
-                                                    value={
-                                                        combinedOptions.find(
-                                                            opt =>
-                                                                (opt.type === "Contractor" && opt.id === Number(newExpense.contractor_id)) ||
-                                                                (opt.type === "Vendor" && opt.id === Number(newExpense.vendor_id)) ||
-                                                                (opt.type === "Employee" && opt.id === Number(newExpense.employee_id))
-                                                        ) || null
-                                                    }
-                                                    onChange={(selectedOption) => {
-                                                        if (!selectedOption) {
-                                                            setNewExpense(prev => ({
-                                                                ...prev,
-                                                                contractor_id: "",
-                                                                vendor_id: ""
-                                                            }));
-                                                            setContractorId("");
-                                                            setVendorId("");
-                                                        } else if (selectedOption.type === "Contractor") {
-                                                            setNewExpense(prev => ({
-                                                                ...prev,
-                                                                contractor_id: selectedOption.id,
-                                                                vendor_id: ""
-                                                            }));
-                                                            setContractorId(selectedOption.id);
-                                                            setVendorId("");
-                                                        } else if (selectedOption.type === "Vendor") {
-                                                            setNewExpense(prev => ({
-                                                                ...prev,
-                                                                vendor_id: selectedOption.id,
-                                                                contractor_id: ""
-                                                            }));
-                                                            setVendorId(selectedOption.id);
-                                                            setContractorId("");
-                                                        }
-                                                    }}
-                                                    options={combinedOptions}
-                                                    placeholder="Contractor/Vendor"
-                                                    isSearchable
-                                                    isClearable
-                                                    styles={customStyles}
-                                                />
-                                            </td>
-                                            <td className="px-2 py-2">
-                                                <Select
-                                                    name="project"
-                                                    className="w-[220px]"
-                                                    value={siteOptions.find(opt => opt.id === Number(newExpense.project_id)) || null}
-                                                    onChange={(selectedOption) => {
-                                                        setNewExpense(prev => ({
-                                                            ...prev,
-                                                            project_id: selectedOption ? selectedOption.id : ""
-                                                        }));
-                                                        setProjectId(selectedOption ? selectedOption.id : "");
-                                                    }}
-                                                    options={siteOptions}
-                                                    placeholder="Select Site"
-                                                    isSearchable
-                                                    isClearable
-                                                    styles={customStyles}
-                                                />
-                                            </td>
-                                            <td className="px-4 py-2 text-left">
-                                                <select
-                                                    name="type"
-                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[120px] h-[40px] rounded-lg focus:outline-none"
-                                                    value={newExpense.type}
-                                                    onChange={handleInputChange}
-                                                    onKeyDown={handleKeyDown}
-                                                >
-                                                    <option value="">Select</option>
-                                                    {weeklyTypes.map((type, index) => (
-                                                        <option key={index} value={type.type}>
-                                                            {type.type}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </td>
-                                            <td className="px-4 py-2 text-left">
-                                                <input
-                                                    type="number"
-                                                    name="amount"
-                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[90px] h-[40px] rounded-lg focus:outline-none"
-                                                    value={newExpense.amount}
-                                                    onChange={handleExpenseChange}
-                                                    onKeyDown={handleKeyDown}
-                                                    onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
-                                                    onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
-                                                />
-                                            </td>
+
+                <div className="flex flex-col xl:flex-row gap-6">
+                    <div className="w-full xl:flex-[4] xl:min-w-0">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
+                            <h1 className="font-bold text-xl">PS: <span style={{ color: "#E4572E" }}>{selectedWeek}</span> </h1>
+                            <h1 className="font-bold text-base">
+                                Expenses: <span style={{ color: "#E4572E" }}>
+                                    {filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}
+                                </span>
+                            </h1>
+                        </div>
+
+                        <div className="w-full">
+                            <div className="rounded-lg border-l-8 border-l-[#BF9853] w-full overflow-auto max-h-[500px]">
+                                <table className="w-full min-w-[900px] border-collapse">
+                                    <thead>
+                                        <tr className="bg-[#FAF6ED] h-12">
+                                            <th className="px-4 py-2 text-left">Sl.No</th>
+                                            <th className="px-4 py-2 text-left">Date</th>
+                                            <th className="px-4 py-2 text-left">Contractor/Vendor</th>
+                                            <th className="px-4 py-2 text-left">Project Name</th>
+                                            <th className="px-4 py-2 text-left">Type</th>
+                                            <th className="px-4 py-2 text-left">Amount</th>
+                                            <th>Activity</th>
                                         </tr>
-                                    ) : null}
-                                    {/* Editable Expense rows */}
-                                    {[...expenses].reverse().map((row, index) => (
-                                        <tr key={row.id} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
-                                            <td className="px-4 py-2 font-bold">{expenses.length - index}</td>
-                                            <td className="px-4 py-2">
-                                                {editingRowId === row.id ? (
+                                        {showFilters && (
+                                            <tr className="bg-white border-b border-gray-200">
+                                                <th className="pt-2 pb-2 w-[60px]"></th>
+                                                <th className="pt-2 pb-2 w-[120px] sm:w-[140px]">
+                                                    <input
+                                                        type="date"
+                                                        value={selectDate}
+                                                        onChange={(e) => setSelectDate(e.target.value)}
+                                                        className="p-1 rounded-md bg-transparent w-[120px] sm:w-[140px] border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
+                                                        placeholder="Search Date..."
+                                                    />
+                                                </th>
+                                                <th className="pt-2 pb-2 w-[160px] sm:w-[200px]">
+                                                    <Select
+                                                        options={contractorVendorFilterOptions}
+                                                        value={selectContractororVendorName ? { value: selectContractororVendorName, label: selectContractororVendorName } : null}
+                                                        onChange={(opt) => setSelectContractororVendorName(opt ? opt.value : "")}
+                                                        className="text-xs focus:outline-none"
+                                                        placeholder="Contractor/Ven..."
+                                                        isSearchable
+                                                        isClearable
+                                                        styles={{
+                                                            control: (provided, state) => ({
+                                                                ...provided,
+                                                                backgroundColor: 'transparent',
+                                                                borderWidth: '3px',
+                                                                borderColor: state.isFocused
+                                                                    ? 'rgba(191, 152, 83, 0.2)'
+                                                                    : 'rgba(191, 152, 83, 0.2)',
+                                                                borderRadius: '6px',
+                                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                                '&:hover': {
+                                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                                },
+                                                            }),
+                                                            placeholder: (provided) => ({
+                                                                ...provided,
+                                                                color: '#999',
+                                                                textAlign: 'left',
+                                                            }),
+                                                            menu: (provided) => ({
+                                                                ...provided,
+                                                                zIndex: 9,
+                                                            }),
+                                                            option: (provided, state) => ({
+                                                                ...provided,
+                                                                textAlign: 'left',
+                                                                fontWeight: 'normal',
+                                                                fontSize: '15px',
+                                                                backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                                color: 'black',
+                                                            }),
+                                                            singleValue: (provided) => ({
+                                                                ...provided,
+                                                                textAlign: 'left',
+                                                                fontWeight: 'normal',
+                                                                color: 'black',
+                                                            }),
+                                                            indicatorSeparator: () => ({
+                                                                display: 'none'
+                                                            }),
+                                                            indicatorsContainer: (provided) => ({
+                                                                ...provided,
+                                                                height: '40px',
+                                                                gap: '0px'
+                                                            }),
+                                                            clearIndicator: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px'
+                                                            }),
+                                                            dropdownIndicator: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px'
+                                                            })
+                                                        }}
+                                                    />
+                                                </th>
+                                                <th className="pt-2 pb-2 w-[180px] sm:w-[240px]">
+                                                    <Select
+                                                        options={projectFilterOptions}
+                                                        value={selectProjectName ? { value: selectProjectName, label: selectProjectName } : null}
+                                                        onChange={(opt) => setSelectProjectName(opt ? opt.value : "")}
+                                                        className="focus:outline-none text-xs"
+                                                        placeholder="Project Name..."
+                                                        isSearchable
+                                                        isClearable
+                                                        styles={{
+                                                            control: (provided, state) => ({
+                                                                ...provided,
+                                                                backgroundColor: 'transparent',
+                                                                borderWidth: '3px',
+                                                                borderColor: state.isFocused
+                                                                    ? 'rgba(191, 152, 83, 0.2)'
+                                                                    : 'rgba(191, 152, 83, 0.2)',
+                                                                borderRadius: '6px',
+                                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                                '&:hover': {
+                                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                                },
+                                                            }),
+                                                            placeholder: (provided) => ({
+                                                                ...provided,
+                                                                color: '#999',
+                                                                textAlign: 'left',
+                                                            }),
+                                                            menu: (provided) => ({
+                                                                ...provided,
+                                                                zIndex: 9,
+                                                            }),
+                                                            option: (provided, state) => ({
+                                                                ...provided,
+                                                                textAlign: 'left',
+                                                                fontWeight: 'normal',
+                                                                fontSize: '15px',
+                                                                backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                                color: 'black',
+                                                            }),
+                                                            singleValue: (provided) => ({
+                                                                ...provided,
+                                                                textAlign: 'left',
+                                                                fontWeight: 'normal',
+                                                                color: 'black',
+                                                            }),
+                                                            indicatorSeparator: () => ({
+                                                                display: 'none'
+                                                            }),
+                                                            indicatorsContainer: (provided) => ({
+                                                                ...provided,
+                                                                height: '40px',
+                                                                gap: '0px'
+                                                            }),
+                                                            clearIndicator: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px'
+                                                            }),
+                                                            dropdownIndicator: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px'
+                                                            })
+                                                        }}
+                                                    />
+                                                </th>
+                                                <th className="pt-2 pb-2 w-[80px] sm:w-[100px]">
+                                                    <select
+                                                        value={selectType}
+                                                        onChange={(e) => setSelectType(e.target.value)}
+                                                        className="p-1 rounded-md bg-transparent w-[100px] sm:w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                                                        placeholder="Type..."
+                                                    >
+                                                        <option value=''>Select Type...</option>
+                                                        {weeklyTypes.map((type, index) => (
+                                                            <option key={index} value={type.type}>
+                                                                {type.type}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </th>
+                                                <th className="pt-2 pb-2 w-[110px]"></th>
+                                                <th className="pt-2 pb-2 w-[120px]"></th>
+                                            </tr>
+                                        )}
+                                    </thead>
+                                    <tbody>
+                                        {Number(selectedWeek) === Number(lastWeekNumber) ? (
+                                            <tr className="">
+                                                <td className="px-4 py-2 font-bold">{filteredExpenses.length + 1}.</td>
+                                                <td className="px-4 py-2">
                                                     <input
                                                         type="date"
                                                         name="date"
-                                                        className="bg-transparent p-1 rounded w-[120px] h-[40px] focus:outline-none"
-                                                        value={row.date}
-                                                        onChange={(e) => handleEditExpense(row.id, 'date', e.target.value)}
-                                                        disabled={editingRowId !== row.id}
+                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 rounded-lg w-[100px] sm:w-[120px] h-[40px] focus:outline-none"
+                                                        value={newExpense.date}
+                                                        onChange={handleExpenseChange}
+                                                        onKeyDown={handleKeyDown}
                                                     />
-                                                ) : (
-                                                    <div className="w-[120px] h-[40px] flex items-center">
-                                                        {formatDateOnly(row.date) || ""}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            {/* Contractor / Vendor column */}
-                                            <td className="px-4 py-2">
-                                                {editingRowId === row.id ? (
+                                                </td>
+                                                <td className="px-4 py-2">
                                                     <Select
-                                                        name="party"
-                                                        className="w-[180px]"
+                                                        name="contractor"
+                                                        className="w-[150px] sm:w-[180px]"
                                                         value={
                                                             combinedOptions.find(
                                                                 opt =>
-                                                                    (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
-                                                                    (opt.type === "Vendor" && opt.id === Number(row.vendor_id)) ||
-                                                                    (opt.type === "Employee" && opt.id === Number(row.employee_id))
+                                                                    (opt.type === "Contractor" && opt.id === Number(newExpense.contractor_id)) ||
+                                                                    (opt.type === "Vendor" && opt.id === Number(newExpense.vendor_id)) ||
+                                                                    (opt.type === "Employee" && opt.id === Number(newExpense.employee_id))
                                                             ) || null
                                                         }
                                                         onChange={(selectedOption) => {
                                                             if (!selectedOption) {
-                                                                handleEditExpense(row.id, "contractor_id", "");
-                                                                handleEditExpense(row.id, "vendor_id", "");
+                                                                setNewExpense(prev => ({
+                                                                    ...prev,
+                                                                    contractor_id: "",
+                                                                    vendor_id: ""
+                                                                }));
+                                                                setContractorId("");
+                                                                setVendorId("");
                                                             } else if (selectedOption.type === "Contractor") {
-                                                                handleEditExpense(row.id, "contractor_id", selectedOption.id);
-                                                                handleEditExpense(row.id, "vendor_id", "");
+                                                                setNewExpense(prev => ({
+                                                                    ...prev,
+                                                                    contractor_id: selectedOption.id,
+                                                                    vendor_id: ""
+                                                                }));
+                                                                setContractorId(selectedOption.id);
+                                                                setVendorId("");
                                                             } else if (selectedOption.type === "Vendor") {
-                                                                handleEditExpense(row.id, "vendor_id", selectedOption.id);
-                                                                handleEditExpense(row.id, "contractor_id", "");
+                                                                setNewExpense(prev => ({
+                                                                    ...prev,
+                                                                    vendor_id: selectedOption.id,
+                                                                    contractor_id: ""
+                                                                }));
+                                                                setVendorId(selectedOption.id);
+                                                                setContractorId("");
                                                             }
                                                         }}
                                                         options={combinedOptions}
-                                                        placeholder="Select Contractor/Vendor"
+                                                        placeholder="Contractor/Vendor"
                                                         isSearchable
                                                         isClearable
                                                         styles={customStyles}
                                                     />
-                                                ) : (
-                                                    // Show label in view mode
-                                                    <div className="w-[180px] h-[40px] flex items-center">
-                                                        {combinedOptions.find(
-                                                            opt =>
-                                                                (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
-                                                                (opt.type === "Vendor" && opt.id === Number(row.vendor_id)) ||
-                                                                (opt.type === "Employee" && opt.id === Number(row.employee_id))
-                                                        )?.label || ""}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            {/* Project column */}
-                                            <td className="px-4 py-2">
-                                                {editingRowId === row.id ? (
+                                                </td>
+                                                <td className="px-2 py-2">
                                                     <Select
                                                         name="project"
-                                                        className="w-[220px]"
-                                                        value={siteOptions.find(opt => opt.id === Number(row.project_id)) || null}
-                                                        onChange={(selectedOption) =>
-                                                            handleEditExpense(
-                                                                row.id,
-                                                                "project_id",
-                                                                selectedOption ? selectedOption.id : ""
-                                                            )
-                                                        }
+                                                        className="w-[180px] sm:w-[220px]"
+                                                        value={siteOptions.find(opt => opt.id === Number(newExpense.project_id)) || null}
+                                                        onChange={(selectedOption) => {
+                                                            setNewExpense(prev => ({
+                                                                ...prev,
+                                                                project_id: selectedOption ? selectedOption.id : ""
+                                                            }));
+                                                            setProjectId(selectedOption ? selectedOption.id : "");
+                                                        }}
                                                         options={siteOptions}
-                                                        placeholder="Select Project"
+                                                        placeholder="Select Site"
                                                         isSearchable
                                                         isClearable
                                                         styles={customStyles}
                                                     />
-                                                ) : (
-                                                    // Show label in view mode
-                                                    <div className="w-[220px] h-[40px] flex items-center">
-                                                        {siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-2">
-                                                {editingRowId === row.id ? (
+                                                </td>
+                                                <td className="px-4 py-2 text-left">
                                                     <select
                                                         name="type"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[120px] text-left h-[40px] rounded-lg focus:outline-none"
-                                                        value={row.type}
-                                                        onChange={(e) => handleEditExpense(row.id, 'type', e.target.value)}
+                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[100px] sm:w-[120px] h-[40px] rounded-lg focus:outline-none"
+                                                        value={newExpense.type}
+                                                        onChange={handleInputChange}
+                                                        onKeyDown={handleKeyDown}
                                                     >
                                                         <option value="">Select</option>
                                                         {weeklyTypes.map((type, index) => (
@@ -1345,74 +1492,213 @@ const History = ({ username, userRoles = [] }) => {
                                                             </option>
                                                         ))}
                                                     </select>
-                                                ) : (
-                                                    <div className="w-[120px] h-[40px] flex items-center">
-                                                        {row.type}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-2">
-                                                {editingRowId === row.id ? (
+                                                </td>
+                                                <td className="px-4 py-2 text-left">
                                                     <input
                                                         type="number"
                                                         name="amount"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[90px] h-[40px] rounded-lg focus:outline-none"
-                                                        value={row.amount}
-                                                        onChange={(e) => handleEditExpense(row.id, 'amount', e.target.value)}
-                                                        disabled={editingRowId !== row.id}
-                                                        onWheel={(e) => e.preventDefault()}
+                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[80px] sm:w-[90px] h-[40px] rounded-lg focus:outline-none"
+                                                        value={newExpense.amount}
+                                                        onChange={handleExpenseChange}
+                                                        onKeyDown={handleKeyDown}
                                                         onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
                                                         onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
                                                     />
-                                                ) : (
-                                                    <div className="w-[90px] h-[40px] flex items-center">
-                                                        {Number(row.amount).toLocaleString('en-IN')}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="px-2 py-2 relative">
-                                                {Number(row.weekly_number) === Number(lastWeekNumber) && (
-                                                    <div className="flex gap-2"> {/* <-- Added flex container */}
-                                                        {editingRowId === row.id ? (
-                                                            <button
-                                                                className="text-green-600 font-bold text-lg relative z-10"
-                                                                onClick={() => saveEditedExpense(row)}
-                                                            >
-                                                                ✓
-                                                            </button>
-                                                        ) : (
-                                                            row.type === "Carry Forward" ? (
+                                                </td>
+                                            </tr>
+                                        ) : null}
+                                        {/* Editable Expense rows */}
+                                        {[...filteredExpenses].reverse().map((row, index) => (
+                                            <tr key={row.id} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
+                                                <td className="px-4 py-2 font-bold">{filteredExpenses.length - index}</td>
+                                                <td className="px-4 py-2">
+                                                    {editingRowId === row.id ? (
+                                                        <input
+                                                            type="date"
+                                                            name="date"
+                                                            className="bg-transparent p-1 rounded w-[120px] h-[40px] focus:outline-none"
+                                                            value={row.date}
+                                                            onChange={(e) => handleEditExpense(row.id, 'date', e.target.value)}
+                                                            disabled={editingRowId !== row.id}
+                                                        />
+                                                    ) : (
+                                                        <div className="w-[120px] h-[40px] flex items-center">
+                                                            {formatDateOnly(row.date) || ""}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                {/* Contractor / Vendor column */}
+                                                <td className="px-4 py-2">
+                                                    {editingRowId === row.id ? (
+                                                        <Select
+                                                            name="party"
+                                                            className="w-[180px]"
+                                                            value={
+                                                                combinedOptions.find(
+                                                                    opt =>
+                                                                        (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
+                                                                        (opt.type === "Vendor" && opt.id === Number(row.vendor_id)) ||
+                                                                        (opt.type === "Employee" && opt.id === Number(row.employee_id))
+                                                                ) || null
+                                                            }
+                                                            onChange={(selectedOption) => {
+                                                                if (!selectedOption) {
+                                                                    handleEditExpense(row.id, "contractor_id", "");
+                                                                    handleEditExpense(row.id, "vendor_id", "");
+                                                                } else if (selectedOption.type === "Contractor") {
+                                                                    handleEditExpense(row.id, "contractor_id", selectedOption.id);
+                                                                    handleEditExpense(row.id, "vendor_id", "");
+                                                                } else if (selectedOption.type === "Vendor") {
+                                                                    handleEditExpense(row.id, "vendor_id", selectedOption.id);
+                                                                    handleEditExpense(row.id, "contractor_id", "");
+                                                                }
+                                                            }}
+                                                            options={combinedOptions}
+                                                            placeholder="Select Contractor/Vendor"
+                                                            isSearchable
+                                                            isClearable
+                                                            styles={customStyles}
+                                                        />
+                                                    ) : (
+                                                        // Show label in view mode
+                                                        <div className="w-[180px] h-[40px] flex items-center">
+                                                            {combinedOptions.find(
+                                                                opt =>
+                                                                    (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
+                                                                    (opt.type === "Vendor" && opt.id === Number(row.vendor_id)) ||
+                                                                    (opt.type === "Employee" && opt.id === Number(row.employee_id))
+                                                            )?.label || ""}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                {/* Project column */}
+                                                <td className="px-4 py-2">
+                                                    {editingRowId === row.id ? (
+                                                        <Select
+                                                            name="project"
+                                                            className="w-[220px]"
+                                                            value={siteOptions.find(opt => opt.id === Number(row.project_id)) || null}
+                                                            onChange={(selectedOption) =>
+                                                                handleEditExpense(
+                                                                    row.id,
+                                                                    "project_id",
+                                                                    selectedOption ? selectedOption.id : ""
+                                                                )
+                                                            }
+                                                            options={siteOptions}
+                                                            placeholder="Select Project"
+                                                            isSearchable
+                                                            isClearable
+                                                            styles={customStyles}
+                                                        />
+                                                    ) : (
+                                                        // Show label in view mode
+                                                        <div className="w-[220px] h-[40px] flex items-center">
+                                                            {siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-2">
+                                                    {editingRowId === row.id ? (
+                                                        <select
+                                                            name="type"
+                                                            className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[120px] text-left h-[40px] rounded-lg focus:outline-none"
+                                                            value={row.type}
+                                                            onChange={(e) => handleEditExpense(row.id, 'type', e.target.value)}
+                                                        >
+                                                            <option value="">Select</option>
+                                                            {weeklyTypes.map((type, index) => (
+                                                                <option key={index} value={type.type}>
+                                                                    {type.type}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    ) : (
+                                                        <div className="w-[120px] h-[40px] flex items-center">
+                                                            {row.type}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-2">
+                                                    {editingRowId === row.id ? (
+                                                        <input
+                                                            type="number"
+                                                            name="amount"
+                                                            className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[90px] h-[40px] rounded-lg focus:outline-none"
+                                                            value={row.amount}
+                                                            onChange={(e) => handleEditExpense(row.id, 'amount', e.target.value)}
+                                                            disabled={editingRowId !== row.id}
+                                                            onWheel={(e) => e.preventDefault()}
+                                                            onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
+                                                            onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
+                                                        />
+                                                    ) : (
+                                                        <div className="w-[90px] h-[40px] flex items-center">
+                                                            {Number(row.amount).toLocaleString('en-IN')}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-2 py-2 relative">
+                                                    {Number(row.weekly_number) === Number(lastWeekNumber) && (
+                                                        <div className="flex gap-2"> {/* <-- Added flex container */}
+                                                            {editingRowId === row.id ? (
+                                                                <button
+                                                                    className="text-green-600 font-bold text-lg relative z-10"
+                                                                    onClick={() => saveEditedExpense(row)}
+                                                                >
+                                                                    ✓
+                                                                </button>
+                                                            ) : (
+                                                                row.type === "Daily" ? (
+                                                                    <img
+                                                                        className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                        src={Edit}
+                                                                        alt="Edit Disabled"
+                                                                    />
+                                                                ) : (
+                                                                    <button onClick={() => setEditingRowId(row.id)}>
+                                                                        <img className="w-5 h-4" src={Edit} alt="Edit" />
+                                                                    </button>
+                                                                )
+                                                            )}
+                                                            {/* Delete Button */}
+                                                            {row.type === "Daily" ? (
                                                                 <img
                                                                     className="w-5 h-4 opacity-40 cursor-not-allowed"
-                                                                    src={Edit}
-                                                                    alt="Edit Disabled"
+                                                                    src={Delete}
+                                                                    alt="Delete Disabled"
                                                                 />
                                                             ) : (
-                                                                <button onClick={() => setEditingRowId(row.id)}>
-                                                                    <img className="w-5 h-4" src={Edit} alt="Edit" />
+                                                                <button className="" onClick={() => handleWeeklyExpensesDelete(row.id)}>
+                                                                    <img src={Delete} className="w-5 h-4" alt="Delete" />
                                                                 </button>
-                                                            )
-                                                        )}
-                                                        {/* Delete Button */}
-                                                        <button className="" onClick={() => handleWeeklyExpensesDelete(row.id)}>
-                                                            <img src={Delete} className="w-5 h-4" alt="Delete" />
-                                                        </button>
-                                                        <button className="" onClick={() => fetchAuditDetailsForExpense(row.id)}>
-                                                            <img src={history} className="w-5 h-4" alt="Delete" />
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                                            )}
+                                                            {/* History Button */}
+                                                            {row.type === "Daily" ? (
+                                                                <img
+                                                                    className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                    src={history}
+                                                                    alt="History Disabled"
+                                                                />
+                                                            ) : (
+                                                                <button className="" onClick={() => fetchAuditDetailsForExpense(row.id)}>
+                                                                    <img src={history} className="w-5 h-4" alt="History" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                     {/* PAYMENTS RECEIVED TABLE */}
-                    <div className="flex-[1] min-w-0">
+                    <div className="w-full xl:flex-[2] xl:min-w-[300px]">
                         <div className="block">
-                            <div className="flex justify-between mb-4">
+                            <div className="flex flex-col sm:flex-row justify-between mb-4 gap-2">
                                 <h1 className="font-bold text-base">Payments Received</h1>
                                 <h1 className="font-bold text-base text-[#E4572E]">
                                     Total: <span style={{ color: "#E4572E" }}>
@@ -1505,7 +1791,7 @@ const History = ({ username, userRoles = [] }) => {
                                                                     ✓
                                                                 </button>
                                                             ) : (
-                                                                row.type === "Carry (CF)" ? (
+                                                                (row.type === "Carry (CF)" || row.type === "Wage Refund") ? (
                                                                     <img
                                                                         className="w-5 h-4 opacity-40 cursor-not-allowed"
                                                                         src={Edit}
@@ -1516,14 +1802,29 @@ const History = ({ username, userRoles = [] }) => {
                                                                         <img className="w-5 h-4" src={Edit} alt="Edit" />
                                                                     </button>
                                                                 )
-
                                                             )}
-                                                            <button className="" onClick={() => handleWeeklyReceivedDelete(row.id)}>
-                                                                <img src={Delete} className="w-5 h-4" alt="Delete" />
-                                                            </button>
-                                                            <button className="" onClick={() => fetchAuditDetailsForPaymentReceived(row.id)}>
-                                                                <img src={history} className="w-5 h-4" alt="Delete" />
-                                                            </button>
+                                                            {(row.type === "Carry (CF)" || row.type === "Wage Refund") ? (
+                                                                <img
+                                                                    className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                    src={Delete}
+                                                                    alt="Delete Disabled"
+                                                                />
+                                                            ) : (
+                                                                <button className="" onClick={() => handleWeeklyReceivedDelete(row.id)}>
+                                                                    <img src={Delete} className="w-5 h-4" alt="Delete" />
+                                                                </button>
+                                                            )}
+                                                            {(row.type === "Carry (CF)" || row.type === "Wage Refund") ? (
+                                                                <img
+                                                                    className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                    src={history}
+                                                                    alt="History Disabled"
+                                                                />
+                                                            ) : (
+                                                                <button className="" onClick={() => fetchAuditDetailsForPaymentReceived(row.id)}>
+                                                                    <img src={history} className="w-5 h-4" alt="History" />
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </td>
@@ -1582,7 +1883,7 @@ const History = ({ username, userRoles = [] }) => {
                                 <table className="w-full border-collapse">
                                     <tbody>
                                         {Object.entries(
-                                            expenses
+                                            filteredExpenses
                                                 .filter(expense => Number(expense.amount) > 0) // only positive amounts
                                                 .reduce((acc, expense) => {
                                                     const type = expense.type;

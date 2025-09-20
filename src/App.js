@@ -25,6 +25,8 @@ import AdvanceHeading from './Components/Advance Portal/AdvanceHeading';
 import ClaimPaymentHeading from './Components/ClaimPayments/ClaimPaymentHeading';
 import StaffHeading from './Components/StaffAdvance/StaffHeading';
 import LoanPoratlHeading from './Components/LoanPortal/LoanPoratlHeading';
+import BillPaymentsTrackerHeading from './Components/BillPaymentsTracker/BillPaymentsTrackerHeading';
+
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
@@ -76,7 +78,8 @@ function App() {
             <Route path='/portal/*' element={<AdvanceHeading username={user.username} userRoles={user?.userRoles || []} />} />
             <Route path='/Claim/*' element={<ClaimPaymentHeading username={user.username} userRoles={user?.userRoles || []}/>} />
             <Route path='/staffadvance/*' element={<StaffHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path='/loan/*' element={<LoanPoratlHeading userRoles={user?.userRoles || []}/>} />
+            <Route path='/loan/*' element={<LoanPoratlHeading username={user.username} userRoles={user?.userRoles || []}/>} />
+            <Route path='/tracker/*' element={<BillPaymentsTrackerHeading username={user.username} userRoles={user?.userRoles || []}/>} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </div>

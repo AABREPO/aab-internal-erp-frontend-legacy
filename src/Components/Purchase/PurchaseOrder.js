@@ -23,7 +23,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
     const [hasRestoredSession, setHasRestoredSession] = useState(false);
     const [date, setDate] = useState(() => {
         const today = new Date();
-        return today.toISOString().split("T")[0]; // "YYYY-MM-DD"
+        return today.toISOString().split("T")[0];
     });
     const [groupName, setGroupName] = useState('');
     const [poNo, setPoNo] = useState(0);
@@ -48,7 +48,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
     const brandRef = useRef(null);
     const typeRef = useRef(null);
     const quantityRef = useRef(null);
-
     useEffect(() => {
         const savedSelectedVendor = sessionStorage.getItem('selectedVendor');
         const savedSelectedSite = sessionStorage.getItem('selectedSite');
@@ -123,7 +122,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching model names.');
         }
     };
     useEffect(() => {
@@ -140,7 +138,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching Type names.');
         }
     };
     useEffect(() => {
@@ -157,7 +154,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching brand names.');
         }
     };
     const scrollRef = useRef(null);
@@ -231,7 +227,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
         };
         animationFrame.current = requestAnimationFrame(step);
     };
-
     useEffect(() => {
         fetchVendorNames();
     }, []);
@@ -252,7 +247,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching vendor names.');
         }
     };
     useEffect(() => {
@@ -275,7 +269,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                     sNo: item.siteNo,
                     id: item.id,
                 }));
-                console.log(formattedData);
                 setSiteOptions(formattedData);
             } catch (error) {
                 console.error("Fetch error: ", error);
@@ -303,7 +296,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching tile area names.');
         }
     };
     const handleChange = (selectedOption) => {
@@ -335,7 +327,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching tile area names.');
         }
     };
     useEffect(() => {
@@ -352,13 +343,11 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                     id: item.id,
                 }));
                 setMappedCategories(options);
-                console.log(options);
             } else {
                 console.log('Error fetching tile area names.');
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching tile area names.');
         }
     };
     useEffect(() => {
@@ -375,7 +364,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching tile area names.');
         }
     };
     const handleCategoryChange = (selectedOption) => {
@@ -383,19 +371,14 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             alert("Please select the Project Incharge first.");
             return;
         }
-
         const categoryValue = selectedOption?.value || '';
-
-        // Only clear state if category is changing
         if (selectedCategory?.value !== categoryValue) {
             setSelectedItemName(null);
             setSelectedModel(null);
             setSelectedBrand(null);
             setSelectedType(null);
         }
-
         setSelectedCategory(selectedOption);
-
         if (!categoryValue) {
             setItemNameOptions([]);
             setModelOptions([]);
@@ -403,7 +386,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             setTypeOptions([]);
             return;
         }
-
         const filteredItems = poItemName.filter(
             item => item.category.toLowerCase() === categoryValue.toLowerCase()
         );
@@ -413,7 +395,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             id: item.id,
         }));
         setItemNameOptions(itemNameOpts);
-
         const filteredModels = poModel
             .filter(item => item.category?.toLowerCase() === categoryValue.toLowerCase())
             .map(item => ({
@@ -424,7 +405,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             .filter(item => item.value);
         setModelOptions(filteredModels);
     };
-
     const ensureIdFromList = (value, list, key, categoryKey, categoryValue) => {
         const match = list.find(item =>
             item[key]?.trim().toLowerCase() === value?.trim().toLowerCase() &&
@@ -433,10 +413,9 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
         return {
             value,
             label: value,
-            id: match?.id || 0, // Fallback to 0 if not found
+            id: match?.id || 0,
         };
     };
-
     const handleItemNameChange = (option) => {
         if (!option) {
             setSelectedItemName(null);
@@ -444,8 +423,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             setSelectedBrand(null);
             setSelectedType(null);
             setGroupName('');
-
-            // Restore model options based on category
             const categoryValue = selectedCategory?.value || '';
             if (categoryValue) {
                 const categoryMatchedModels = poModel
@@ -460,36 +437,28 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             } else {
                 setModelOptions([]);
             }
-
             setBrandOptions([]);
             setTypeOptions([]);
             return;
         }
-
         const itemValue = option.value;
-
         if (selectedItemName?.value !== itemValue) {
             setSelectedModel(null);
             setSelectedBrand(null);
             setSelectedType(null);
         }
-
         setSelectedItemName(option);
-
         const selectedItem = poItemName.find(
             item =>
                 item.category.toLowerCase() === selectedCategory?.value.toLowerCase() &&
                 item.itemName === itemValue
         );
-
         if (selectedItem) {
             setGroupName(selectedItem.groupName || '');
         }
-
         const isUnmappedCategory = !mappedCategories.some(cat =>
             cat.label.toLowerCase() === selectedCategory?.value.toLowerCase()
         );
-
         if (isUnmappedCategory) {
             const categoryMatchedModels = poModel
                 .filter(item => item.category?.toLowerCase() === selectedCategory?.value.toLowerCase())
@@ -500,7 +469,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                 }))
                 .filter(item => item.value);
             setModelOptions(categoryMatchedModels);
-
             const categoryMatchedTypes = poType
                 .filter(item => item.category?.toLowerCase() === selectedCategory?.value.toLowerCase())
                 .map(item => ({
@@ -510,7 +478,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                 }))
                 .filter(item => item.value);
             setTypeOptions(categoryMatchedTypes);
-
             const categoryMatchedBrands = poBrand
                 .filter(item => {
                     const brandCategory = item.category?.toLowerCase() || "";
@@ -526,43 +493,34 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             setBrandOptions(categoryMatchedBrands);
             return;
         }
-
         if (selectedItem?.otherPOEntityList?.length > 0) {
             const models = [...new Set(selectedItem.otherPOEntityList.map(e => e.modelName?.trim()).filter(Boolean))];
-
             const modelOpts = models.map(modelName =>
                 ensureIdFromList(modelName, poModel, 'model', 'category', selectedCategory?.value)
             );
             setModelOptions(modelOpts);
-
             if (modelOpts.length === 1) {
                 const autoModel = ensureIdFromList(modelOpts[0].value, poModel, 'model', 'category', selectedCategory?.value);
                 setSelectedModel(autoModel);
-
                 const filteredByModel = selectedItem.otherPOEntityList.filter(
                     e => e.modelName?.trim() === autoModel.value
                 );
-
                 const brands = [...new Set(filteredByModel.map(e => e.brandName?.trim()).filter(Boolean))];
                 const brandOpts = brands.map(b =>
                     ensureIdFromList(b, poBrand, 'brand', 'category', selectedCategory?.value)
                 );
                 setBrandOptions(brandOpts);
-
                 if (brandOpts.length === 1) {
                     const autoBrand = brandOpts[0];
                     setSelectedBrand(autoBrand);
-
                     const filteredByBrand = filteredByModel.filter(
                         e => e.brandName?.trim() === autoBrand.value
                     );
-
                     const types = [...new Set(filteredByBrand.map(e => e.typeColor?.trim()).filter(Boolean))];
                     const typeOpts = types.map(t =>
                         ensureIdFromList(t, poType, 'typeColor', 'category', selectedCategory?.value)
                     );
                     setTypeOptions(typeOpts);
-
                     if (typeOpts.length === 1) {
                         setSelectedType(typeOpts[0]);
                     }
@@ -578,29 +536,22 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             setTypeOptions([]);
         }
     };
-
     const handleModelChange = (option) => {
-        const modelValue = option?.value?.trim() || '';
-
+        const modelValue = option?.value?.trim() || '';        
         if (selectedModel?.value !== modelValue) {
             setSelectedBrand(null);
             setSelectedType(null);
         }
-
         setSelectedModel(option);
         if (!option) return;
-
         const isUnmappedCategory = !mappedCategories.some(cat =>
             cat.label.toLowerCase() === selectedCategory?.value.toLowerCase()
         );
-
-        // Auto-select itemName if model is selected first
         if (!selectedItemName) {
             const matchedItem = poItemName.find(item =>
                 item.category?.toLowerCase() === selectedCategory?.value.toLowerCase() &&
                 item.otherPOEntityList?.some(e => e.modelName?.trim().toLowerCase() === modelValue.toLowerCase())
             );
-
             if (matchedItem) {
                 const itemOption = {
                     value: matchedItem.itemName,
@@ -611,20 +562,16 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                 setGroupName(matchedItem.groupName || '');
             }
         }
-
         if (!selectedItemName) return;
-
         const selectedItem = poItemName.find(
             item =>
                 item.category?.toLowerCase() === selectedCategory?.value.toLowerCase() &&
                 item.itemName === selectedItemName.value
         );
         if (!selectedItem) return;
-
         const filtered = selectedItem.otherPOEntityList.filter(
             e => e.modelName?.trim().toLowerCase() === modelValue.toLowerCase()
         );
-
         if (isUnmappedCategory) {
             const matchedBrands = poBrand
                 .filter(b => (!b.category || b.category.toLowerCase() === selectedCategory?.value.toLowerCase()))
@@ -635,7 +582,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                 }))
                 .filter(b => b.value);
             setBrandOptions(matchedBrands);
-
             const matchedTypes = poType
                 .filter(t => t.category?.toLowerCase() === selectedCategory?.value.toLowerCase())
                 .map(item => ({
@@ -647,7 +593,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             setTypeOptions(matchedTypes);
             return;
         }
-
         const brands = [...new Set(filtered.map(e => e.brandName?.trim()).filter(Boolean))];
         const brandOpts = brands.map(val => {
             const matched = poBrand.find(
@@ -662,7 +607,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             };
         });
         setBrandOptions(brandOpts);
-
         if (brandOpts.length === 1) {
             const autoBrand = brandOpts[0];
             if (!autoBrand.id) {
@@ -673,14 +617,12 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                 autoBrand.id = fallback?.id || null;
             }
             setSelectedBrand(autoBrand);
-
             const types = [...new Set(
                 filtered
                     .filter(e => e.brandName?.trim() === autoBrand.value?.trim())
                     .map(e => e.typeColor?.trim())
                     .filter(Boolean)
             )];
-
             const typeOpts = types.map(val => {
                 const matched = poType.find(
                     t =>
@@ -693,9 +635,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                     id: matched?.id || null
                 };
             });
-
             setTypeOptions(typeOpts);
-
             if (typeOpts.length === 1) {
                 const autoType = typeOpts[0];
                 if (!autoType.id) {
@@ -713,32 +653,25 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
     };
     const handleBrandChange = (option) => {
         const brandValue = option?.value?.trim() || '';
-
         if (selectedBrand?.value !== brandValue) {
             setSelectedType(null);
         }
-
         setSelectedBrand(option);
-
         if (!selectedItemName || !selectedModel || !option) return;
-
         const selectedItem = poItemName.find(
             item =>
                 item.category?.toLowerCase() === selectedCategory?.value.toLowerCase() &&
                 item.itemName === selectedItemName.value
         );
         if (!selectedItem) return;
-
         const isUnmappedCategory = !mappedCategories.some(cat =>
             cat.label.toLowerCase() === selectedCategory?.value.toLowerCase()
         );
         if (isUnmappedCategory) return;
-
         const filtered = selectedItem.otherPOEntityList.filter(
             e => e.modelName?.trim() === selectedModel.value?.trim() &&
                 e.brandName?.trim() === brandValue
         );
-
         const types = [...new Set(filtered.map(e => e.typeColor?.trim()).filter(Boolean))];
         const typeOpts = types.map(val => {
             const matched = poType.find(
@@ -753,7 +686,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             };
         });
         setTypeOptions(typeOpts);
-
         if (typeOpts.length === 1) {
             const autoType = typeOpts[0];
             if (!autoType.id) {
@@ -766,7 +698,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             setSelectedType(autoType);
         }
     };
-
     const customStyles = {
         control: (provided, state) => ({
             ...provided,
@@ -790,22 +721,16 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             quantity
         ) {
             const quantityNumber = Number(quantity);
-
             const itemLabel = selectedItemName.label;
             const itemId = selectedItemName.id ?? null;
-
             const categoryLabel = selectedCategory.value;
             const categoryId = selectedCategory.id ?? null;
-
             const modelLabel = selectedModel?.label || '';
             const modelId = selectedModel?.id ?? null;
-
             const brandLabel = selectedBrand?.label || '';
             const brandId = selectedBrand?.id ?? null;
-
             const typeLabel = selectedType.label;
             const typeId = selectedType.id ?? null;
-
             const existingIndex = items.findIndex(
                 item =>
                     item.itemName === itemLabel &&
@@ -814,7 +739,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                     item.brand === brandLabel &&
                     item.type === typeLabel
             );
-
             if (existingIndex !== -1) {
                 const updatedItems = [...items];
                 const existingItem = updatedItems[existingIndex];
@@ -843,36 +767,17 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                     },
                 ]);
             }
-
-            console.log('Added item:', {
-                itemName: itemLabel,
-                itemId,
-                category: categoryLabel,
-                categoryId,
-                model: modelLabel,
-                modelId,
-                brand: brandLabel,
-                brandId,
-                type: typeLabel,
-                typeId,
-                quantity,
-            });
-
             sessionStorage.removeItem('selectedItemName');
             sessionStorage.removeItem('selectedModel');
             sessionStorage.removeItem('selectedBrand');
             sessionStorage.removeItem('selectedType');
             sessionStorage.removeItem('quantity');
-
-            // Reset inputs
             setSelectedItemName(null);
             setSelectedModel(null);
             setSelectedBrand(null);
             setSelectedType(null);
             setQuantity('');
             setGroupName('');
-
-            // ✅ Restore model options based on category
             const categoryValue = selectedCategory?.value || '';
             if (categoryValue) {
                 const categoryMatchedModels = poModel
@@ -889,23 +794,19 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             }
         }
     };
-
-
     const generatePO = async () => {
         try {
-            // Ensure we re-fetch the latest count at generation time
             const countResponse = await fetch(`https://backendaab.in/aabuildersDash/api/purchase_orders/countByVendor?vendorId=${selectedVendor?.id}`);
             if (!countResponse.ok) throw new Error("Failed to fetch vendor count");
             const vendorCount = await countResponse.json();
             const currentPoNo = vendorCount + 1;
-            console.log("Current PO No:", currentPoNo);
             const payload = {
                 vendor_id: selectedVendor?.id,
                 client_id: selectedSite?.id,
                 date: date,
                 site_incharge_id: selectedIncharge?.id,
                 site_incharge_mobile_number: selectedIncharge?.mobileNumber || "",
-                eno: currentPoNo, // use local variable, not poNo state
+                eno: currentPoNo,
                 created_by: username,
                 purchaseTable: items.map(item => ({
                     item_id: item.itemId,
@@ -917,7 +818,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                     amount: item.amount,
                 }))
             };
-            console.log("Final Data: ", payload);
             const response = await fetch("https://backendaab.in/aabuildersDash/api/purchase_orders/save", {
                 method: "POST",
                 headers: {
@@ -928,7 +828,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             if (response.ok) {
                 const result = await response.json();
                 generatePDF(payload);
-                console.log(result);
                 window.location.reload();
                 alert("Purchase Order Generated!");
             } else {
@@ -952,7 +851,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             }
         }
     }, [selectedCategory, poItemName]);
-
     useEffect(() => {
         if (
             hasRestoredSession &&
@@ -966,16 +864,13 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
     }, [hasRestoredSession, selectedCategory, itemNameOptions, selectedItemName, poItemName]);
     const generatePDF = (payload) => {
         const doc = new jsPDF();
-        // Helper to find label from ID
         const findNameById = (options, id, key) => {
             const match = options.find(opt => opt.id == id);
             return match ? match[key] : '';
         };
-        // Resolve names
         const vendorName = findNameById(vendorNameOptions, payload.vendor_id, "label");
         const clientName = findNameById(siteOptions, payload.client_id, "label");
         const siteInchargeName = findNameById(siteInchargeOptions, payload.site_incharge_id, "label");
-        // Header
         doc.setDrawColor(0);
         doc.setLineWidth(0.5);
         doc.rect(10, 10, 190, 41.8);
@@ -989,33 +884,27 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
         doc.setFont("helvetica", "normal");
         doc.text("181 Madurai Road, Srivilliputtur - 626 125", 105, 28, { align: "center" });
         doc.line(10, 30, 200, 30);
-
         doc.setFont("helvetica", "bold");
         doc.text(`VENDOR:`, 12, 37);
         doc.setFont("helvetica", "normal");
         doc.text(`# ${payload.eno}`, 35, 28);
         doc.text(vendorName || "", 35, 37);
-
         doc.setFont("helvetica", "bold");
         doc.text(`DATE:`, 12, 43);
         doc.setFont("helvetica", "normal");
         doc.text(formatDateOnly(payload.date) || "", 35, 43);
-
         doc.setFont("helvetica", "bold");
         doc.text("SITE NAME:", 107, 37);
         doc.text("Site Incharge:", 104, 43);
         doc.setFont("helvetica", "normal");
         doc.text(clientName || "", 130, 37);
         doc.text(siteInchargeName || "", 130, 43);
-
         if (payload.site_incharge_mobile_number) {
             doc.setFont("helvetica", "bold");
             doc.text("Phone:", 115, 49);
             doc.setFont("helvetica", "normal");
             doc.text(`+91 ${payload.site_incharge_mobile_number}`, 130, 49);
         }
-
-        // Table content
         const tableBody = payload.purchaseTable.map((item, index) => [
             index + 1,
             findNameById(poItemName, item.item_id, "itemName"),
@@ -1026,24 +915,17 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             item.quantity || "",
             item.amount || ""
         ]);
-
-
-        // Padding empty rows
         while (tableBody.length < 24) {
             tableBody.push(["", "", "", "", "", "", "", ""]);
         }
-
         const totalQty = payload.purchaseTable.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
         const totalAmount = payload.purchaseTable.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-
         tableBody.push([
             "", "", "", "", "",
             { content: `TOTAL`, styles: { fontStyle: "bold", halign: "center" } },
             { content: `${totalQty}`, styles: { fontStyle: "bold", halign: "center" } },
             { content: `${totalAmount}`, styles: { fontStyle: "bold", halign: "center" } }
         ]);
-
-        // Table rendering
         doc.autoTable({
             startY: 52,
             margin: { left: 10, right: 10 },
@@ -1079,7 +961,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                 const pageWidth = doc.internal.pageSize.width;
                 doc.setFontSize(5);
                 doc.text(`Created By: ${payload.created_by || ''}`, 14, pageHeight - 10);
-
                 const now = new Date();
                 const day = String(now.getDate()).padStart(2, '0');
                 const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -1092,12 +973,8 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                 doc.text(`Date: ${formattedDateTime}`, pageWidth - 60, pageHeight - 10);
             }
         });
-
-        // Save PDF
         doc.save(`# ${payload.eno} - ${formatDateOnly(payload.date)}-${clientName}.pdf`);
     };
-
-
     useEffect(() => {
         if (
             hasRestoredSession &&
@@ -1109,7 +986,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             handleModelChange(selectedModel);
         }
     }, [hasRestoredSession, selectedModel, modelOptions, selectedItemName, poItemName]);
-
     useEffect(() => {
         if (
             hasRestoredSession &&
@@ -1122,8 +998,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             handleBrandChange(selectedBrand);
         }
     }, [hasRestoredSession, selectedBrand, brandOptions, selectedModel, selectedItemName, poItemName]);
-
-
     return (
         <div>
             <div className="p-6 border-collapse bg-[#FFFFFF] rounded-md mx-auto ml-4 mr-2 w-full sm:w-[100%] md:w-[95%] lg:w-[95%] xl:w-[95%] 2xl:max-w-[1870px]">
@@ -1141,10 +1015,10 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                         const countResponse = await fetch(`https://backendaab.in/aabuildersDash/api/purchase_orders/countByVendor?vendorId=${value}`);
                                         if (!countResponse.ok) throw new Error("Failed to fetch PO count");
                                         const vendorCount = await countResponse.json();
-                                        setPoNo(vendorCount + 1); // this will update the visible PO.No field
+                                        setPoNo(vendorCount + 1); 
                                     } catch (err) {
                                         console.error("Failed to fetch PO count", err);
-                                        setPoNo(0); // fallback
+                                        setPoNo(0);
                                     }
                                 } else {
                                     setPoNo(0);
@@ -1316,7 +1190,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                     className="[@media(min-width:1500px)]:w-[330px] w-[300px] h-[45px]"
                                 />
                             </div>
-
                             <div>
                                 <label className="block font-semibold [@media(min-width:1300px)]:mb-2">Type</label>
                                 <Select
@@ -1351,12 +1224,11 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                         if (e.key === 'Enter') {
                                             e.preventDefault();
                                             handleAddItem();
-
                                             setTimeout(() => {
                                                 if (categoryRef.current) {
                                                     categoryRef.current.focus();
                                                 }
-                                            }, 0); // Delay to allow render to complete
+                                            }, 0);
                                         }
                                     }}
                                     placeholder="Enter Qty"
@@ -1367,7 +1239,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                 Add
                             </button>
                         </div>
-                        {/* Table */}
                         <div className='mt-3 overflow-auto no-scrollbar'>
                             <div className="text-sm font-bold mb-2 text-right">Export PDF</div>
                             <div
@@ -1404,7 +1275,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                 onChange={(option) => {
                                                                     const selectedItemName = option?.value || "";
                                                                     const itemCategoryLower = item.category?.toLowerCase() || "";
-
                                                                     let updated = {
                                                                         ...editedItem,
                                                                         itemName: selectedItemName,
@@ -1412,12 +1282,10 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                         brand: "",
                                                                         type: "",
                                                                     };
-
                                                                     const selectedItem = poItemName.find(
                                                                         p => (p.category?.toLowerCase() || "") === itemCategoryLower &&
                                                                             p.itemName === selectedItemName
                                                                     );
-
                                                                     if (!selectedItem) {
                                                                         setModelOptions([]);
                                                                         setBrandOptions([]);
@@ -1425,11 +1293,9 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                         setEditedItem(updated);
                                                                         return;
                                                                     }
-
                                                                     const isUnmappedCategory = !mappedCategories.some(cat =>
                                                                         cat.label.toLowerCase() === itemCategoryLower
                                                                     );
-
                                                                     if (isUnmappedCategory) {
                                                                         const models = poModel
                                                                             .filter(m => m.category?.toLowerCase() === itemCategoryLower)
@@ -1439,9 +1305,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                                 id: m.id
                                                                             }))
                                                                             .filter(m => m.value);
-
                                                                         setModelOptions(models);
-
                                                                         const brands = poBrand
                                                                             .filter(b => !b.category || b.category.toLowerCase() === itemCategoryLower)
                                                                             .map(b => ({
@@ -1451,7 +1315,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                             }))
                                                                             .filter(b => b.value);
                                                                         setBrandOptions(brands);
-
                                                                         const types = poType
                                                                             .filter(t => t.category?.toLowerCase() === itemCategoryLower)
                                                                             .map(t => ({
@@ -1461,14 +1324,11 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                             }))
                                                                             .filter(t => t.value);
                                                                         setTypeOptions(types);
-
                                                                         setEditedItem(updated);
                                                                         return;
                                                                     }
-
                                                                     const otherList = selectedItem.otherPOEntityList || [];
                                                                     const models = [...new Set(otherList.map(e => e.modelName?.trim()).filter(Boolean))];
-
                                                                     const modelOpts = models.map(modelName => {
                                                                         const match = poModel.find(m =>
                                                                             m.model?.trim().toLowerCase() === modelName.toLowerCase() &&
@@ -1480,15 +1340,11 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                             id: match?.id || null
                                                                         };
                                                                     });
-
                                                                     setModelOptions(modelOpts);
-
                                                                     if (models.length === 1) {
                                                                         updated.model = models[0];
-
                                                                         const filteredModel = otherList.filter(e => e.modelName === updated.model);
                                                                         const brands = [...new Set(filteredModel.map(e => e.brandName?.trim()).filter(Boolean))];
-
                                                                         const brandOpts = brands.map(brand => {
                                                                             const brandMatch = poBrand.find(b =>
                                                                                 b.brand?.trim().toLowerCase() === brand.toLowerCase() &&
@@ -1500,15 +1356,11 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                                 id: brandMatch?.id || null
                                                                             };
                                                                         });
-
                                                                         setBrandOptions(brandOpts);
-
                                                                         if (brands.length === 1) {
                                                                             updated.brand = brands[0];
-
                                                                             const filteredBrand = filteredModel.filter(e => e.brandName === updated.brand);
                                                                             const types = [...new Set(filteredBrand.map(e => e.typeColor?.trim()).filter(Boolean))];
-
                                                                             const typeOpts = types.map(type => {
                                                                                 const typeMatch = poType.find(
                                                                                     t =>
@@ -1521,9 +1373,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                                     id: typeMatch?.id || null
                                                                                 };
                                                                             });
-
                                                                             setTypeOptions(typeOpts);
-
                                                                             if (types.length === 1) {
                                                                                 updated.type = types[0];
                                                                             }
@@ -1534,7 +1384,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                         setBrandOptions([]);
                                                                         setTypeOptions([]);
                                                                     }
-
                                                                     setEditedItem(updated);
                                                                 }}
                                                                 options={poItemName
@@ -1552,7 +1401,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                         )}
                                                     </td>
                                                     <td className="py-2 px-3 font-semibold">{item.category}</td>
-                                                    {/* Model Select */}
                                                     <td className="py-2 px-3 font-semibold">
                                                         {editIndex === index ? (
                                                             <Select
@@ -1560,19 +1408,15 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                 onChange={(option) => {
                                                                     const selectedModel = option?.value?.trim() || "";
                                                                     const itemCategoryLower = item.category?.toLowerCase() || "";
-
                                                                     let updated = {
                                                                         ...editedItem,
                                                                         model: selectedModel,
                                                                         brand: "",
                                                                         type: ""
                                                                     };
-
                                                                     const isUnmappedCategory = !mappedCategories.some(cat =>
                                                                         cat.label.toLowerCase() === itemCategoryLower
                                                                     );
-
-                                                                    // 🔍 Infer itemName from model (if not set)
                                                                     if (!editedItem.itemName) {
                                                                         const matchedItem = poItemName.find(p =>
                                                                             p.category?.toLowerCase() === itemCategoryLower &&
@@ -1580,29 +1424,24 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                                 e.modelName?.trim().toLowerCase() === selectedModel.toLowerCase()
                                                                             )
                                                                         );
-
                                                                         if (matchedItem) {
                                                                             updated.itemName = matchedItem.itemName;
                                                                         }
                                                                     }
-
                                                                     const selectedItem = poItemName.find(
                                                                         p =>
                                                                             p.category?.toLowerCase() === itemCategoryLower &&
                                                                             p.itemName === updated.itemName
                                                                     );
-
                                                                     if (!selectedItem) {
                                                                         setBrandOptions([]);
                                                                         setTypeOptions([]);
                                                                         setEditedItem(updated);
                                                                         return;
                                                                     }
-
                                                                     const filtered = selectedItem.otherPOEntityList?.filter(
                                                                         e => e.modelName?.trim().toLowerCase() === selectedModel.toLowerCase()
                                                                     ) || [];
-
                                                                     if (isUnmappedCategory) {
                                                                         const brands = poBrand
                                                                             .filter(b => !b.category || b.category.toLowerCase() === itemCategoryLower)
@@ -1613,7 +1452,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                             }))
                                                                             .filter(b => b.value);
                                                                         setBrandOptions(brands);
-
                                                                         const types = poType
                                                                             .filter(t => t.category?.toLowerCase() === itemCategoryLower)
                                                                             .map(t => ({
@@ -1623,11 +1461,9 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                             }))
                                                                             .filter(t => t.value);
                                                                         setTypeOptions(types);
-
                                                                         setEditedItem(updated);
                                                                         return;
                                                                     }
-
                                                                     const brands = [...new Set(filtered.map(e => e.brandName?.trim()).filter(Boolean))];
                                                                     const brandOpts = brands.map(b => {
                                                                         const brandMatch = poBrand.find(br =>
@@ -1640,16 +1476,12 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                             id: brandMatch?.id || null
                                                                         };
                                                                     });
-
                                                                     setBrandOptions(brandOpts);
-
                                                                     if (brands.length === 1) {
                                                                         const selectedBrand = brands[0];
                                                                         updated.brand = selectedBrand;
-
                                                                         const filteredBrand = filtered.filter(e => e.brandName?.trim() === selectedBrand);
                                                                         const types = [...new Set(filteredBrand.map(e => e.typeColor?.trim()).filter(Boolean))];
-
                                                                         const typeOpts = types.map(t => {
                                                                             const match = poType.find(tp =>
                                                                                 tp.typeColor?.trim().toLowerCase() === t.toLowerCase() &&
@@ -1661,16 +1493,13 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                                 id: match?.id || null
                                                                             };
                                                                         });
-
                                                                         setTypeOptions(typeOpts);
-
                                                                         if (types.length === 1) {
                                                                             updated.type = types[0];
                                                                         }
                                                                     } else {
                                                                         setTypeOptions([]);
                                                                     }
-
                                                                     setEditedItem(updated);
                                                                 }}
                                                                 options={modelOptions}
@@ -1684,7 +1513,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                             item.model
                                                         )}
                                                     </td>
-                                                    {/* Brand Select */}
                                                     <td className="py-2 px-3 font-semibold">
                                                         {editIndex === index ? (
                                                             <Select
@@ -1718,13 +1546,11 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                     );
                                                                     if (isUnmappedCategory) {
                                                                         const mappedTypes = new Set();
-
                                                                         poItemName.forEach(item => {
                                                                             item.otherPOEntityList?.forEach(entry => {
                                                                                 if (entry.typeColor?.trim()) mappedTypes.add(entry.typeColor.trim().toLowerCase());
                                                                             });
                                                                         });
-
                                                                         const matchedTypes = poType
                                                                             .filter(t => (t.category?.toLowerCase() || "") === itemCategoryLower)
                                                                             .map(item => ({
@@ -1733,18 +1559,14 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                                 id: item.id
                                                                             }))
                                                                             .filter(item => item.value);
-
                                                                         const typeOpts = matchedTypes.map(val => ({ value: val, label: val }));
                                                                         setTypeOptions(matchedTypes);
-
                                                                         if (typeOpts.length === 1) {
                                                                             updated.type = typeOpts[0].value;
                                                                         }
-
                                                                         setEditedItem(updated);
                                                                         return;
                                                                     }
-                                                                    // ✅ For mapped category
                                                                     const selectedItem = poItemName.find(
                                                                         p =>
                                                                             p.category?.toLowerCase() === itemCategoryLower &&
@@ -1785,7 +1607,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                             item.brand
                                                         )}
                                                     </td>
-                                                    {/* Type Select */}
                                                     <td className="py-2 px-3 font-semibold">
                                                         {editIndex === index ? (
                                                             <Select
@@ -1804,7 +1625,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                             item.type
                                                         )}
                                                     </td>
-                                                    {/* Quantity Input */}
                                                     <td className="py-2 px-3 font-semibold">
                                                         {editIndex === index ? (
                                                             <input
@@ -1819,7 +1639,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                             item.quantity
                                                         )}
                                                     </td>
-                                                    {/* Amount Input */}
                                                     <td className="py-2 px-3 font-semibold">
                                                         {editIndex === index ? (
                                                             <input
@@ -1834,13 +1653,11 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                             item.amount
                                                         )}
                                                     </td>
-                                                    {/* Total Amount */}
                                                     <td className="py-2 px-3 font-semibold">
                                                         {editIndex === index
                                                             ? (Number(editedItem.quantity) * Number(editedItem.amount)).toString()
                                                             : item.totalAmount}
                                                     </td>
-                                                    {/* Actions */}
                                                     <td className="py-2 px-3">
                                                         <div className="flex space-x-3">
                                                             {editIndex === index ? (
@@ -1851,11 +1668,9 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                             const quantity = Number(editedItem.quantity);
                                                                             const amount = Number(editedItem.amount);
                                                                             const totalAmount = (quantity * amount).toString();
-
                                                                             const selectedModel = modelOptions.find(opt => opt.value === editedItem.model);
                                                                             const selectedBrand = brandOptions.find(opt => opt.value === editedItem.brand);
                                                                             const selectedType = typeOptions.find(opt => opt.value === editedItem.type);
-
                                                                             updatedItems[editIndex] = {
                                                                                 ...editedItem,
                                                                                 modelId: selectedModel?.id || null,
@@ -1865,16 +1680,12 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                             };
                                                                             setItems(updatedItems);
                                                                             setEditIndex(null);
-
                                                                         }}
                                                                         className="text-green-600 text-sm"
                                                                     >
                                                                         Save
                                                                     </button>
-                                                                    <button
-                                                                        onClick={() => setEditIndex(null)}
-                                                                        className="text-red-600 text-sm"
-                                                                    >
+                                                                    <button onClick={() => setEditIndex(null)} className="text-red-600 text-sm">
                                                                         Cancel
                                                                     </button>
                                                                 </>
@@ -1884,13 +1695,10 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                         onClick={() => {
                                                                             setEditIndex(index);
                                                                             setEditedItem({ ...item });
-
                                                                             const itemCategoryLower = item.category?.toLowerCase() || "";
                                                                             const selectedItemName = item.itemName;
                                                                             const selectedModel = item.model;
                                                                             const selectedBrand = item.brand;
-
-                                                                            // Model options
                                                                             const modelOpts = poModel
                                                                                 .filter(m => (m.category?.toLowerCase() || "") === itemCategoryLower)
                                                                                 .map(m => ({
@@ -1900,22 +1708,18 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                                 }))
                                                                                 .filter(m => m.value);
                                                                             setModelOptions(modelOpts);
-
                                                                             const selectedItem = poItemName.find(p =>
                                                                                 (p.category?.toLowerCase() || "") === itemCategoryLower &&
                                                                                 p.itemName === selectedItemName
                                                                             );
-
                                                                             if (!selectedItem) {
                                                                                 setBrandOptions([]);
                                                                                 setTypeOptions([]);
                                                                                 return;
                                                                             }
-
                                                                             const isUnmappedCategory = !mappedCategories.some(cat =>
                                                                                 cat.label.toLowerCase() === itemCategoryLower
                                                                             );
-
                                                                             if (isUnmappedCategory) {
                                                                                 const matchedBrands = poBrand
                                                                                     .filter(p => !p.category || p.category.toLowerCase() === itemCategoryLower)
@@ -1926,7 +1730,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                                     }))
                                                                                     .filter(b => b.value);
                                                                                 setBrandOptions(matchedBrands);
-
                                                                                 const matchedTypes = poType
                                                                                     .filter(t => t.category?.toLowerCase() === itemCategoryLower)
                                                                                     .map(t => ({
@@ -1936,15 +1739,11 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                                     }))
                                                                                     .filter(t => t.value);
                                                                                 setTypeOptions(matchedTypes);
-
                                                                                 return;
                                                                             }
-
-                                                                            // For mapped categories
                                                                             const filteredModelItems = selectedItem.otherPOEntityList?.filter(e =>
                                                                                 e.modelName?.trim().toLowerCase() === selectedModel?.toLowerCase()
                                                                             ) || [];
-
                                                                             const brands = [...new Set(filteredModelItems.map(e => e.brandName?.trim()).filter(Boolean))];
                                                                             const brandOpts = brands.map(brandName => {
                                                                                 const brandMatch = poBrand.find(
@@ -1958,11 +1757,9 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                                                 };
                                                                             });
                                                                             setBrandOptions(brandOpts);
-
                                                                             const filteredBrandItems = filteredModelItems.filter(e =>
                                                                                 e.brandName?.trim().toLowerCase() === selectedBrand?.toLowerCase()
                                                                             );
-
                                                                             const types = [...new Set(filteredBrandItems.map(e => e.typeColor?.trim()).filter(Boolean))];
                                                                             const typeOpts = types.map(typeColor => {
                                                                                 const typeMatch = poType.find(
@@ -1989,7 +1786,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                                                     </td>
                                                 </tr>
                                             ))}
-                                            {/* Total Row */}
                                             <tr className="bg-white font-bold border border-r-[#BF9853] border-t-[#BF9853] border-b-[#BF9853] border-opacity-15">
                                                 <td className="py-2 font-semibold text-base pl-8 border-[#BF9853] border-r" colSpan="6">Total</td>
                                                 <td className="py-2 font-semibold text-base pl-3 border-[#BF9853] border-r">{totalQuantity}</td>

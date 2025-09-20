@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import Select from 'react-select';
@@ -7,7 +7,7 @@ import Reload from '../Images/rotate-right.png'
 import edit from '../Images/Edit.svg';
 
 
-const StaffDatabase = () => {
+const StaffDatabase = ({ username, userRoles = [] }) => {
   const [records, setRecords] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [purposes, setPurposes] = useState([]);
@@ -50,7 +50,7 @@ const StaffDatabase = () => {
         // Fetch staff advance records
         let recData = [];
         try {
-          const recRes = await fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all');
+          const recRes = await fetch('http://localhost:8082/api/staff-advance/all');
           if (recRes.ok) {
             recData = await recRes.json();
           } else {
@@ -257,57 +257,62 @@ const StaffDatabase = () => {
   }, [records, selectDate, selectEmployeeName, selectPurpose, selectTransferTo, selectType, selectMode]);
 
   // Sorting logic
-  const sortedData = useMemo(() => {
-    let sortableData = [...filteredRecords];
 
-    if (sortConfig.key) {
-      sortableData.sort((a, b) => {
-        let aValue, bValue;
+// Sorting logic
+const sortedData = useMemo(() => {
+  let sortableData = [...filteredRecords];
 
-        switch (sortConfig.key) {
-          case 'date':
-            aValue = new Date(a.date);
-            bValue = new Date(b.date);
-            break;
-          case 'employee':
-            aValue = getEmployeeName(a.employee_id);
-            bValue = getEmployeeName(b.employee_id);
-            break;
-          case 'purpose':
-            aValue = getPurposeName(a.from_purpose_id);
-            bValue = getPurposeName(b.from_purpose_id);
-            break;
-          case 'transfer':
-            aValue = getPurposeName(a.to_purpose_id);
-            bValue = getPurposeName(b.to_purpose_id);
-            break;
-          case 'type':
-            aValue = a.type || '';
-            bValue = b.type || '';
-            break;
-          case 'mode':
-            aValue = a.staff_payment_mode || '';
-            bValue = b.staff_payment_mode || '';
-            break;
-          default:
-            return 0;
-        }
+  if (sortConfig.key) {
+    sortableData.sort((a, b) => {
+      let aValue, bValue;
 
-        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
-      });
-    } else {
-      // Default sorting: Most recent entries first (by date descending)
-      sortableData.sort((a, b) => {
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
-        return dateB - dateA; // Descending order (newest first)
-      });
-    }
+      switch (sortConfig.key) {
+        case 'date':
+          aValue = new Date(a.date);
+          bValue = new Date(b.date);
+          break;
+        case 'employee':
+          aValue = getEmployeeName(a.employee_id);
+          bValue = getEmployeeName(b.employee_id);
+          break;
+        case 'purpose':
+          aValue = getPurposeName(a.from_purpose_id);
+          bValue = getPurposeName(b.from_purpose_id);
+          break;
+        case 'transfer':
+          aValue = getPurposeName(a.to_purpose_id);
+          bValue = getPurposeName(b.to_purpose_id);
+          break;
+        case 'type':
+          aValue = a.type || '';
+          bValue = b.type || '';
+          break;
+        case 'mode':
+          aValue = a.staff_payment_mode || '';
+          bValue = b.staff_payment_mode || '';
+          break;
+        case 'entry_no':
+          aValue = Number(a.entry_no) || 0;
+          bValue = Number(b.entry_no) || 0;
+          break;
+        default:
+          return 0;
+      }
 
-    return sortableData;
-  }, [filteredRecords, sortConfig]);
+      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  } else {
+    // Default sorting: latest entry_no first (descending order)
+    sortableData.sort((a, b) => Number(b.entry_no) - Number(a.entry_no));
+    console.log("Default sorting by entry_no desc applied:", sortableData.map(item => item.entry_no));
+  }
+
+  return sortableData;
+}, [filteredRecords, sortConfig]);
+
+
 
   // Pagination logic
   const totalPages = Math.ceil(sortedData.length / itemsPerPage);
@@ -387,7 +392,7 @@ const StaffDatabase = () => {
       entry.type,
       entry.staff_payment_mode,
       entry.description,
-      entry.entryNo
+      entry.entry_no
     ]);
     doc.setFontSize(12);
     doc.text("Staff Advance Data Table", 40, 30);
@@ -432,7 +437,6 @@ const StaffDatabase = () => {
       "Attached file",
       "E.No"
     ];
-
     const csvRows = sortedData.map((entry, index) => [
       index + 1,
       formatDateOnly(entry.date),
@@ -448,8 +452,8 @@ const StaffDatabase = () => {
       entry.type,
       entry.staff_payment_mode,
       entry.description,
-      "", // Attached file col
-      entry.entryNo
+      "",
+      entry.entry_no
     ]);
 
     const csvString = [
@@ -460,7 +464,6 @@ const StaffDatabase = () => {
           .join(",")
       )
     ].join("\n");
-
     const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -478,7 +481,7 @@ const StaffDatabase = () => {
       employee_id: entry.employee_id || '',
       from_purpose_id: entry.from_purpose_id || '',
       to_purpose_id: entry.to_purpose_id || '',
-      entryNo: entry.entryNo || '',
+      entryNo: entry.entry_no || '',
       description: entry.description || '',
       type: entry.type || '',
       staff_payment_mode: entry.staff_payment_mode || '',
@@ -487,16 +490,75 @@ const StaffDatabase = () => {
     setIsEditModalOpen(true);
   };
 
-  const handleUpdate = async () => {
+  const handleUpdate = useCallback(async () => {
     try {
-      // Add your update logic here
-      console.log('Updating record:', editFormData);
-      // You can implement the actual update API call here
+      const url = `http://localhost:8082/api/staff-advance/${editingId}?editedBy=${username}`;
+      const payload = {
+        type: editFormData.type || '',
+        date: editFormData.date || '',
+        employee_id: editFormData.employee_id || '',
+        from_purpose_id: editFormData.from_purpose_id || null,
+        to_purpose_id: editFormData.to_purpose_id || null,
+        staff_payment_mode: editFormData.staff_payment_mode || '',
+        amount: editFormData.type === "Refund" ? 0 : Number(editFormData.amount || 0),
+        staff_refund_amount: editFormData.type === "Refund" ? Number(editFormData.staff_refund_amount || 0) : 0,
+        entry_no: editFormData.entryNo ?? null,
+        description: editFormData.description || '',
+        file_url: editFormData.file_url || ''
+      };
+
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Update failed: ${response.statusText}`);
+      }
+      const updatedRecords = await response.json();
+      window.location.reload();
       setIsEditModalOpen(false);
-    } catch (err) {
-      console.error('Update error:', err);
+      setRecords(prevRecords => {
+        const updatedEntryNos = new Set(updatedRecords.map(r => r.entry_no));
+        const filteredRecords = prevRecords.filter(record =>
+          !updatedEntryNos.has(record.entry_no) ||
+          updatedRecords.some(u => u.staffAdvancePortalId === record.staffAdvancePortalId)
+        );
+        return [...filteredRecords, ...updatedRecords];
+      });
+    } catch (error) {
+      console.error('Update error:', error);
+      alert(error.message || 'Failed to update record. Please try again.');
     }
-  };
+  }, [editFormData, editingId, username]);
+
+  const fieldConfig = useMemo(() => {
+    switch (editFormData.type) {
+      case 'Refund':
+        return {
+          purposeLabel: 'Purpose',
+          amountGivenLabel: 'Refund Amount',
+          paymentModeLabel: 'Payment Mode',
+          showTransferAmount: false
+        };
+      case 'Transfer':
+        return {
+          purposeLabel: 'Purpose From',
+          amountGivenLabel: 'Purpose To',
+          paymentModeLabel: 'Transfer Amount',
+          showTransferAmount: true
+        };
+      default:
+        return {
+          purposeLabel: 'Purpose',
+          amountGivenLabel: 'Amount Given',
+          paymentModeLabel: 'Payment Mode',
+          showTransferAmount: false
+        };
+    }
+  }, [editFormData.type]);
 
   useEffect(() => {
     return () => cancelMomentum();
@@ -683,7 +745,12 @@ const StaffDatabase = () => {
                     <span className="hidden sm:inline">Attached file</span>
                     <span className="sm:hidden">File</span>
                   </th>
-                  <th className="px-1 sm:px-2 min-w-[50px] sm:min-w-[60px] font-bold text-left text-xs sm:text-sm">E.No</th>
+                  <th 
+                    className="px-1 sm:px-2 min-w-[50px] sm:min-w-[60px] font-bold text-left cursor-pointer hover:bg-gray-200 text-xs sm:text-sm"
+                    onClick={() => handleSort('entry_no')}
+                  >
+                    E.No {sortConfig.key === 'entry_no' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </th>
                   <th className="px-1 sm:px-2 min-w-[60px] sm:min-w-[80px] font-bold text-left text-xs sm:text-sm">Activity</th>
                 </tr>
                 {showFilters && (
@@ -1118,12 +1185,20 @@ const StaffDatabase = () => {
                         ...provided,
                         fontSize: '14px',
                       }),
+                      option: (provided, state) => ({
+                        ...provided,
+                        backgroundColor: state.isSelected ? 'transparent' : state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'transparent',
+                        color: 'black',
+                        '&:hover': {
+                          backgroundColor: 'rgba(191, 152, 83, 0.1)',
+                        },
+                      }),
                     }}
                   />
                 </div>
                 {/* Purpose */}
                 <div className='sm:col-span-1'>
-                  <label className='font-semibold block text-sm sm:text-base'>Purpose</label>
+                  <label className='font-semibold block text-sm sm:text-base'>{fieldConfig.purposeLabel}</label>
                   <Select
                     options={purposes}
                     value={purposes.find(purp => purp.id === editFormData.from_purpose_id) || null}
@@ -1149,42 +1224,103 @@ const StaffDatabase = () => {
                         ...provided,
                         fontSize: '14px',
                       }),
+                      option: (provided, state) => ({
+                        ...provided,
+                        backgroundColor: state.isSelected ? 'transparent' : state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'transparent',
+                        color: 'black',
+                        '&:hover': {
+                          backgroundColor: 'rgba(191, 152, 83, 0.1)',
+                        },
+                      }),
                     }}
                     isClearable
                     className='w-full sm:w-[263px] h-[40px] sm:h-[45px] focus:outline-none' />
                 </div>
                 {/* Amount */}
                 <div className='sm:col-span-1'>
-                  <label className='font-semibold block text-sm sm:text-base'>
-                    {editFormData.type === 'Refund' ? 'Refund Amount' : 'Amount Given'}
-                  </label>
-                  <input
-                    value={editFormData.type === 'Refund' ? formatWithCommas(editFormData.staff_refund_amount) : formatWithCommas(editFormData.amount)}
-                    onChange={(e) => {
-                      const rawValue = e.target.value.replace(/,/g, "");
-                      if (!isNaN(rawValue)) {
-                        if (editFormData.type === "Refund") {
-                          setEditFormData({ ...editFormData, staff_refund_amount: rawValue, amount: '' });
-                        } else {
-                          setEditFormData({ ...editFormData, amount: rawValue, staff_refund_amount: '' });
+                  <label className='font-semibold block text-sm sm:text-base'>{fieldConfig.amountGivenLabel}</label>
+                  {editFormData.type === 'Transfer' ? (
+                    <Select
+                      options={purposes}
+                      value={purposes.find(purp => purp.id === editFormData.to_purpose_id) || null}
+                      onChange={(selected) => setEditFormData({ ...editFormData, to_purpose_id: selected?.id || '' })}
+                      styles={{
+                        control: (provided, state) => ({
+                          ...provided,
+                          borderWidth: '2px',
+                          borderRadius: '8px',
+                          borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'rgba(191, 152, 83, 0.2)',
+                          boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
+                          '&:hover': {
+                            borderColor: 'rgba(191, 152, 83, 0.2)',
+                          },
+                          minHeight: '40px',
+                          fontSize: '14px',
+                        }),
+                        placeholder: (provided) => ({
+                          ...provided,
+                          fontSize: '14px',
+                        }),
+                        singleValue: (provided) => ({
+                          ...provided,
+                          fontSize: '14px',
+                        }),
+                        option: (provided, state) => ({
+                          ...provided,
+                          backgroundColor: state.isSelected ? 'transparent' : state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'transparent',
+                          color: 'black',
+                          '&:hover': {
+                            backgroundColor: 'rgba(191, 152, 83, 0.1)',
+                          },
+                        }),
+                      }}
+                      isClearable
+                      className='w-full sm:w-[263px] h-[40px] sm:h-[45px] focus:outline-none'
+                      placeholder="Select purpose to..."
+                    />
+                  ) : (
+                    <input
+                      value={editFormData.type === 'Refund' ? formatWithCommas(editFormData.staff_refund_amount) : formatWithCommas(editFormData.amount)}
+                      onChange={(e) => {
+                        const rawValue = e.target.value.replace(/,/g, "");
+                        if (!isNaN(rawValue)) {
+                          if (editFormData.type === "Refund") {
+                            setEditFormData({ ...editFormData, staff_refund_amount: rawValue, amount: '' });
+                          } else {
+                            setEditFormData({ ...editFormData, amount: rawValue, staff_refund_amount: '' });
+                          }
                         }
-                      }
-                    }}
-                    className='w-full sm:w-[263px] h-[40px] sm:h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
-                  />
+                      }}
+                      className='w-full sm:w-[263px] h-[40px] sm:h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
+                    />
+                  )}
                 </div>
                 {/* Payment Mode */}
                 <div className='sm:col-span-1'>
-                  <label className='font-semibold block text-sm sm:text-base'>Payment Mode</label>
-                  <select
-                    value={editFormData.staff_payment_mode}
-                    onChange={(e) => setEditFormData({ ...editFormData, staff_payment_mode: e.target.value })}
-                    className='w-full sm:w-[263px] h-[40px] sm:h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'>
-                    <option value=''>Select</option>
-                    <option value='Cash'>Cash</option>
-                    <option value='GPay'>GPay</option>
-                    <option value='Net Banking'>Net Banking</option>
-                  </select>
+                  <label className='font-semibold block text-sm sm:text-base'>{fieldConfig.paymentModeLabel}</label>
+                  {editFormData.type === 'Transfer' ? (
+                    <input
+                      value={formatWithCommas(editFormData.amount)}
+                      onChange={(e) => {
+                        const rawValue = e.target.value.replace(/,/g, "");
+                        if (!isNaN(rawValue)) {
+                          setEditFormData({ ...editFormData, amount: rawValue });
+                        }
+                      }}
+                      className='w-full sm:w-[263px] h-[40px] sm:h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
+                      placeholder="Enter transfer amount"
+                    />
+                  ) : (
+                    <select
+                      value={editFormData.staff_payment_mode}
+                      onChange={(e) => setEditFormData({ ...editFormData, staff_payment_mode: e.target.value })}
+                      className='w-full sm:w-[263px] h-[40px] sm:h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'>
+                      <option value=''>Select</option>
+                      <option value='Cash'>Cash</option>
+                      <option value='GPay'>GPay</option>
+                      <option value='Net Banking'>Net Banking</option>
+                    </select>
+                  )}
                 </div>
                 {/* Description */}
                 <div className='col-span-1 sm:col-span-2'>

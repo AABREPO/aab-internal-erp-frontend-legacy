@@ -765,22 +765,17 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         setCarryForwardBalance(balance.toFixed(2));
         setShowPopup(true);
     };
-    // Account Closure handler
     const handleAccountClosure = async (type, discountAmount = 0) => {
         try {
-            // Determine if carry forward applies to both continue and handover
             const carryForwardParam = (type === "Carry (CF)" || type === "Handover") ? "true" : "false";
             const carryAmountParam = carryForwardParam === "true" && balance > 0 ? balance : 0;
-            // Construct URL and params
             const url = new URL("https://backendaab.in/aabuildersDash/api/payments-received/account-closure");
             url.searchParams.append("closureType", type);
             url.searchParams.append("carryForward", carryForwardParam);
             url.searchParams.append("carryAmount", carryAmountParam - discountAmount);
             url.searchParams.append("discountAmount", discountAmount);
-            // API call
             const res = await fetch(url.toString(), { method: "POST" });
             const newWeekNumber = await res.json();
-            // Update state, reset forms
             setCurrentWeekNumber(newWeekNumber);
             setNewExpense({ date: "", contractor: "", project: "", type: "", amount: "" });
             setNewPayment({ date: "", amount: "", type: "Weekly" });
@@ -788,7 +783,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             alert("Failed to complete account closure: " + error.message);
         }
     };
-    // Group expenses for summary
     const groupedExpenses = expenses.reduce((acc, expense) => {
         if (!acc[expense.type]) acc[expense.type] = 0;
         acc[expense.type] += Number(expense.amount) || 0;
@@ -797,25 +791,18 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     const mergedExpenses = Object.entries(groupedExpenses).map(([type, amount]) => ({ type, amount }));
     const saveEditedExpense = async (row) => {
         try {
-
-            // 🔍 Normalize values for comparison
             const normalize = (val) =>
                 val === null || val === undefined ? "" : String(val).trim();
-
-            // Find what fields actually changed
             const changedFields = Object.keys(editFormData).filter(
                 (key) => normalize(editFormData[key]) !== normalize(row[key])
             );
-
             if (changedFields.length === 0) {
                 console.log("⚡ No changes detected → skipping update.");
                 setEditingRowId(null);
                 return;
             }
-
             const onlyDescriptionChanged =
                 changedFields.length === 1 && changedFields[0] === "description";
-            // ✅ Case 1: Project Advance → Other (clear advance_portal row)
             if (
                 row.type === "Project Advance" &&
                 editFormData.type !== "Project Advance" &&
@@ -836,7 +823,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     week_no: null,
                     entry_no: null,
                 };
-
                 const res = await fetch(
                     `https://backendaab.in/aabuildersDash/api/advance_portal/edit/${row.advance_portal_id}?editedBy=${username}`,
                     {
@@ -845,11 +831,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                         body: JSON.stringify(clearedData),
                     }
                 );
-
                 const data = await res.json().catch(() => null);
             }
-
-            // ✅ Case 2: Other → Project Advance OR update Project Advance
             if (
                 (row.type !== "Project Advance" &&
                     editFormData.type === "Project Advance") ||
@@ -870,9 +853,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     description: editFormData.description || "", // 🔥 from popup
                     file_url: editFormData.file_url || "",
                 };
-
                 if (row.advance_portal_id) {
-                    // 🔄 update existing advance row
                     await fetch(
                         `https://backendaab.in/aabuildersDash/api/advance_portal/edit/${row.advance_portal_id}?editedBy=${username}`,
                         {
@@ -883,7 +864,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     );
                     editFormData.advance_portal_id = row.advance_portal_id;
                 } else {
-                    // 🔹 Generate entry_no like in handleKeyDownExpense
                     const resAll = await fetch(
                         "https://backendaab.in/aabuildersDash/api/advance_portal/getAll"
                     );
@@ -895,7 +875,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                             : 0;
                     const nextEntryNo = maxEntryNo + 1;
                     advancePayload.entry_no = nextEntryNo;
-
                     const saveAdvance = await fetch(
                         "https://backendaab.in/aabuildersDash/api/advance_portal/save",
                         {
@@ -906,13 +885,10 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     );
                     if (!saveAdvance.ok) throw new Error("Failed to save advance");
                     const savedAdvance = await saveAdvance.json();
-
-                    // attach advance_portal_id into editFormData
                     editFormData.advance_portal_id = savedAdvance.advancePortalId;
                 }
             }
             if (!onlyDescriptionChanged) {
-                // ✅ Always update weekly_expenses
                 const response = await fetch(
                     `https://backendaab.in/aabuildersDash/api/weekly-expenses/edit/${row.id}?username=${encodeURIComponent(
                         username
@@ -923,13 +899,10 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                         body: JSON.stringify(editFormData),
                     }
                 );
-
                 if (!response.ok) throw new Error("Failed to update expense");
                 const updatedExpense = await response.json();
-
                 setExpenses((prevExpenses) => {
                     const newExpenses = prevExpenses.map((exp) => (exp.id === row.id ? updatedExpense : exp));
-                    // Fetch descriptions for the updated Project Advance rows
                     fetchPortalDescriptions(newExpenses);
                     return newExpenses;
                 });
@@ -940,51 +913,33 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             console.error("❌ Error updating expense:", error);
         }
     };
-
-    const customStyles = {
-        control: (provided, state) => ({
-            ...provided,
-            borderWidth: '2px',
-            borderRadius: '8px',
-            borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'rgba(191, 152, 83, 0.2)',
-            boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
-            '&:hover': {
-                borderColor: 'rgba(191, 152, 83, 0.2)',
-            }
-        }),
-    };
     const saveEditedPaymentReceived = async (row) => {
         try {
-            // 🔍 Normalize row & form data for fair comparison
             const normalize = (val) =>
                 val === null || val === undefined ? "" : String(val).trim();
-
             const hasChanges = Object.keys(editPaymentData).some((key) => {
                 return normalize(editPaymentData[key]) !== normalize(row[key]);
             });
-
             if (!hasChanges) {
                 console.log("⚡ No changes detected → skipping update.");
                 setEditingPaymentId(null);
                 return;
             }
             const response = await fetch(`https://backendaab.in/aabuildersDash/api/payments-received/edit/${row.id} ?username=${encodeURIComponent(username)}`, {
-                method: "PUT", // assuming backend uses PUT
+                method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify(editPaymentData), // send edited data
+                body: JSON.stringify(editPaymentData),
             });
             if (!response.ok) {
                 throw new Error("Failed to update payment");
             }
             const updatedPayment = await response.json();
             window.location.reload();
-            // ✅ Update local state so UI refreshes with new values
             setPayments((prev) =>
                 prev.map((p) => (p.id === row.id ? updatedPayment : p))
             );
-            // ✅ Clear edit mode
             setEditingPaymentId(null);
         } catch (error) {
             console.error("Error updating payment:", error);
@@ -1034,39 +989,28 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             console.log("Deletion cancelled.");
         }
     };
-
-    // Filter functions
     const clearFilters = () => {
         setSelectDate('');
         setSelectContractororVendorName('');
         setSelectProjectName('');
         setSelectType('');
     };
-
     const getVendorName = (id) =>
         vendorOptions.find(v => v.id === id)?.value || "";
-
     const getContractorName = (id) =>
         contractorOptions.find(c => c.id === id)?.value || "";
     const getEmployeeName = (id) =>
         employeeOptions.find(c => c.id === id)?.value || "";
-
     const getSiteName = (id) =>
         siteOptions.find(s => String(s.id) === String(id))?.value || "";
-
-    // Filtered data based on selected filters
     const filteredExpenses = expenses.filter((entry) => {
-        // Date filter (exact match since it's type="date")
         if (selectDate) {
-            // Convert selectDate (YYYY-MM-DD) → DD-M-YYYY
             const [year, month, day] = selectDate.split("-");
             const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
-            // Convert entry.date to DD-M-YYYY
             const entryDateObj = new Date(entry.date);
             const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
             if (formattedEntryDate !== formattedSelectDate) return false;
         }
-        // Contractor/Vendor filter
         if (selectContractororVendorName) {
             const name =
                 entry.vendor_id
@@ -1075,20 +1019,16 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             if (name.toLowerCase() !== selectContractororVendorName.toLowerCase())
                 return false;
         }
-        // Project Name filter
         if (selectProjectName) {
             const projectName = getSiteName(entry.project_id) || "";
             if (projectName.toLowerCase() !== selectProjectName.toLowerCase())
                 return false;
         }
-        // Type filter
         if (selectType) {
             if (entry.type?.toLowerCase() !== selectType.toLowerCase()) return false;
         }
-        return true; // passes all filters
+        return true;
     });
-
-    // Sorting functions
     const handleSort = (key) => {
         let direction = 'asc';
         if (sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -1096,7 +1036,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         }
         setSortConfig({ key, direction });
     };
-
     const sortedExpenses = React.useMemo(() => {
         let sortableData = [...filteredExpenses].reverse();
         if (sortConfig.key) {
@@ -1139,14 +1078,12 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 return 0;
             });
         } else {
-            // Default sorting: Most recent entries first (by date descending)
             sortableData.sort((a, b) => {
                 const dateA = new Date(a.date);
                 const dateB = new Date(b.date);
-                return dateB - dateA; // Descending order (newest first)
+                return dateB - dateA; 
             });
         }
-
         return sortableData;
     }, [filteredExpenses, sortConfig, combinedOptions, siteOptions]);
     const contractorVendorFilterOptions = React.useMemo(() => {
@@ -1166,7 +1103,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             return null;
         }).filter(Boolean);
     }, [filteredExpenses, combinedOptions]);
-
     const projectFilterOptions = React.useMemo(() => {
         const ids = new Set();
         return filteredExpenses.map(exp => {
@@ -1185,21 +1121,16 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ description }), // send JSON
+                body: JSON.stringify({ description }), 
             });
-
             if (!res.ok) {
                 throw new Error("Failed to update description");
             }
-
             const data = await res.json();
-
-            // Update state locally after success
             setEditFormData((prev) => ({
                 ...prev,
                 description: data.description,
             }));
-
             return data;
         } catch (error) {
             console.error("❌ Error updating description:", error);
@@ -1208,7 +1139,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     };
     return (
         <div>
-            {/* Balance display */}
             <div className="mt-[-28px] flex justify-end mr-5">
                 <h1 className="font-bold text-xl">
                     Balance: <span style={{ color: "#E4572E" }}>
@@ -1217,7 +1147,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 </h1>
             </div>
             <div className="mx-auto w-auto p-6 bg-white ml-[30px] mr-6 rounded-md border border-transparent">
-                {/* Header */}
                 <div className="text-left">
                     <button onClick={() => setShowFilters(!showFilters)}>
                         <img
@@ -1237,14 +1166,11 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                 </span>
                             </h1>
                         </div>
-
-                        {/* Filter Section */}
                         <div className={`text-left flex ${selectDate || selectContractororVendorName || selectProjectName || selectType
                             ? 'flex-col sm:flex-row sm:justify-between'
                             : 'flex-row justify-between items-center'
                             } mb-3 gap-2`}>
                             <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3">
-
                                 {(selectDate || selectContractororVendorName || selectProjectName || selectType) && (
                                     <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
                                         {selectDate && (
@@ -1279,41 +1205,31 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                 )}
                             </div>
                         </div>
-                        {/* Expenses Table */}
                         <div className="w-full h-[600px] rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden">
-                            {/* Single Table with Scrollable Container */}
-                            <div
-                                ref={scrollRef}
-                                className="overflow-auto max-h-[600px] thin-scrollbar"
-                                onMouseDown={handleMouseDown}
-                                onMouseMove={handleMouseMove}
-                                onMouseUp={handleMouseUp}
-                                onMouseLeave={handleMouseUp}
+                            <div ref={scrollRef} className="overflow-auto max-h-[600px] thin-scrollbar"
+                                onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
+                                onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
                             >
                                 <table className="w-[1320px] border-collapse text-left">
                                     <thead className="sticky top-0 z-10 bg-white">
                                         <tr className="bg-[#FAF6ED]">
                                             <th className="pt-2 pl-2 w-[60px] font-bold text-left">Sl.No</th>
-                                            <th
-                                                className="pt-2 w-[135px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                                            <th className="pt-2 w-[135px] font-bold text-left cursor-pointer hover:bg-gray-200"
                                                 onClick={() => handleSort('date')}
                                             >
                                                 Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                             </th>
-                                            <th
-                                                className="px-1 w-[200px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                                            <th className="px-1 w-[200px] font-bold text-left cursor-pointer hover:bg-gray-200"
                                                 onClick={() => handleSort('contractor_vendor')}
                                             >
                                                 Contractor/Vendor {sortConfig.key === 'contractor_vendor' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                             </th>
-                                            <th
-                                                className="px-1 w-[240px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                                            <th className="px-1 w-[240px] font-bold text-left cursor-pointer hover:bg-gray-200"
                                                 onClick={() => handleSort('project_name')}
                                             >
                                                 Project Name {sortConfig.key === 'project_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                             </th>
-                                            <th
-                                                className="px-1 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                                            <th className="px-1 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200"
                                                 onClick={() => handleSort('type')}
                                             >
                                                 Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
@@ -1322,7 +1238,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                             <th className="px-1 w-[120px] font-bold text-left">Activity</th>
                                         </tr>
                                         {showFilters && (
-                                            <tr className="bg-white border-b border-gray-200">
+                                            <tr className="bg-[#FAF6ED] border-b border-gray-200">
                                                 <th className="pt-2 pb-2 w-[60px]"></th>
                                                 <th className="pt-2 pb-2 w-[140px]">
                                                     <input
@@ -1482,7 +1398,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                 <th className="pt-2 pb-2 w-[120px]"></th>
                                             </tr>
                                         )}
-                                        {/* Input Row */}
                                         <tr className="bg-white border-b border-gray-200">
                                             <td className="pt-2 pb-2 w-[60px] font-bold">{expenses.length + 1}.</td>
                                             <td className="pt-2 pb-2 w-[135px]">
@@ -1680,12 +1595,10 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {/* Existing Expenses */}
                                         {sortedExpenses.length > 0 ? (
                                             sortedExpenses.map((row, index) => (
                                                 <tr key={row.id} className="odd:bg-white even:bg-[#FAF6ED]">
                                                     <td className="text-sm text-left p-2 w-[60px] font-semibold">{expenses.length - index}</td>
-                                                    {/* Date column */}
                                                     <td className="text-sm text-left p-2 w-[140px] font-semibold">
                                                         {editingRowId === row.id ? (
                                                             <input
@@ -1699,7 +1612,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             formatDateOnly(row.date) || ""
                                                         )}
                                                     </td>
-                                                    {/* Contractor column */}
                                                     <td className="text-sm text-left w-[200px] font-semibold">
                                                         {editingRowId === row.id ? (
                                                             <Select
@@ -1791,7 +1703,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             )?.label || ""
                                                         )}
                                                     </td>
-                                                    {/* Project column */}
                                                     <td className="text-sm text-left w-[240px] font-semibold">
                                                         {editingRowId === row.id ? (
                                                             <Select
@@ -1864,7 +1775,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""
                                                         )}
                                                     </td>
-                                                    {/* Type column */}
                                                     <td className="text-sm text-left w-[100px] font-semibold">
                                                         {editingRowId === row.id ? (
                                                             <select name="type"
@@ -1882,7 +1792,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             row.type
                                                         )}
                                                     </td>
-                                                    {/* Amount column */}
                                                     <td className="text-sm text-left pl-2 w-[110px] font-semibold">
                                                         <div className="flex items-center justify-between">
                                                             <div>
@@ -1913,7 +1822,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                                     if (!res.ok) throw new Error("Failed to fetch advance portal data");
                                                                                     const data = await res.json();
                                                                                     description = (data.description || "").trim();
-                                                                                    // ✅ Only store if non-empty
                                                                                     setPortalDescriptions((prev) => ({
                                                                                         ...prev,
                                                                                         [row.advance_portal_id]: description !== "" ? description : undefined,
@@ -1922,10 +1830,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                                     console.error("Error fetching advance portal data:", error);
                                                                                 }
                                                                             }
-                                                                            setEditFormData((prev) => ({
-                                                                                ...prev,
-                                                                                description,
-                                                                            }));
+                                                                            setEditFormData((prev) => ({...prev, description, }));
                                                                             setCurrentRow(row);
                                                                             setShowPopups(true);
                                                                         }}
@@ -1950,10 +1855,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             </div>
                                                         </div>
                                                     </td>
-                                                    {/* Edit/Save action column */}
                                                     <td className="flex py-2 w-[120px]">
                                                         {row.contractor_id === 117 && row.project_id === 8 && row.type === "Daily" ? (
-                                                            // 🔒 Restricted row → show nothing or a lock
                                                             <>                                                                
                                                                 <img
                                                                     className="w-5 h-4 opacity-40 cursor-not-allowed"
@@ -1972,8 +1875,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                 />
                                                             </>
                                                         ) : (
-                                                            <>
-                                                               
+                                                            <>                                   
                                                                 {editingRowId === row.id ? (
                                                                     <button
                                                                         onClick={() => saveEditedExpense(row)}
@@ -2024,7 +1926,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                             </div>
                         </div>
                     </div>
-                    {/* Payments + Account Closure + Summary */}
                     <div className="flex-[1] min-w-0">
                         <div className="flex justify-between flex-wrap mb-4">
                             <h1 className="font-bold text-base">Payments Received</h1>
@@ -2155,8 +2056,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                 onChange={handlePaymentChange}
                                                 onKeyDown={handleKeyDownPayment}
                                             />
-                                        </td>
-                                        
+                                        </td>                                        
                                         <td className="px-2 py-2">
                                             <select
                                                 name="type"
@@ -2222,8 +2122,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                 </td>
                                             </tr>
                                         ))}
-
-                                        {/* Total Row */}
                                         <tr className="bg-[#E5E5E5] font-bold">
                                             <td className="py-1.5 pl-2 text-left">Total</td>
                                             <td className="py-1.5 px-4 text-right text-[#E4572E]">
@@ -2249,7 +2147,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                         <button
                             className="px-4 py-2 bg-[#BF9853] w-[90px] text-white rounded-lg"
                             onClick={() => {
-                                // Ignore → keep date
                                 if (popup.type === "expense") {
                                     setNewExpense((prev) => ({ ...prev, date: popup.dateStr }));
                                 } else {
@@ -2263,7 +2160,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                         <button
                             className="px-4 py-2 border border-[#BF9853] w-[90px] rounded-lg"
                             onClick={() => {
-                                // OK → clear date
                                 if (popup.type === "expense") {
                                     setNewExpense((prev) => ({ ...prev, date: "" }));
                                 } else {
@@ -2289,15 +2185,11 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                 className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
                                 value={editFormData.description || ""}
                                 onChange={handleEditChange}
-                                readOnly={Boolean(currentRow?.description)} // ✅ only read-only if DB already had description
+                                readOnly={Boolean(currentRow?.description)}
                             />
                         </label>
-
                         <div className="flex justify-end gap-3 mt-4">
-                            <button
-                                onClick={() => setShowPopups(false)}
-                                className="px-4 py-2 bg-gray-200 rounded-lg"
-                            >
+                            <button onClick={() => setShowPopups(false)} className="px-4 py-2 bg-gray-200 rounded-lg">
                                 Close
                             </button>
                             {!portalDescriptions[currentRow?.advance_portal_id] && (
@@ -2315,7 +2207,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
             )}
-
             <AuditModal show={showWeeklyPaymentExpensesModal} onClose={() => setShowWeeklyPaymentExpensesModal(false)} audits={weeklyPaymentExpensesAudits} vendorOptions={vendorOptions} contractorOptions={contractorOptions}
                 siteOptions={siteOptions} />
             <AuditModalWeeklyPaymentsReceived show={showWeeklyPaymentReceivedModal} onClose={() => setShowWeeklyPaymentReceivedModal(false)}
@@ -2330,10 +2221,7 @@ const AccountClosurePopup = ({ onClose, carryForwardBalance, onConfirm }) => {
     const [handoverDiscount, setHandoverDiscount] = useState("");
     const handleYesClick = () => setStep(2);
     const handleConfirm = () => {
-        const discountValue =
-            closureType === "Carry (CF)"
-                ? parseFloat(continueDiscount) || 0
-                : parseFloat(handoverDiscount) || 0;
+        const discountValue = closureType === "Carry (CF)" ? parseFloat(continueDiscount) || 0 : parseFloat(handoverDiscount) || 0;
         onConfirm(closureType, discountValue);
     };
     const adjustedContinueBalance = Math.max(
@@ -2347,10 +2235,7 @@ const AccountClosurePopup = ({ onClose, carryForwardBalance, onConfirm }) => {
     return (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
             <div className="bg-white p-4 rounded-md w-[480px] relative">
-                <button
-                    onClick={onClose}
-                    className="absolute top-2 right-2 text-red-500 font-bold text-xl"
-                >
+                <button onClick={onClose} className="absolute top-2 right-2 text-red-500 font-bold text-xl" >
                     ✖
                 </button>
                 {step === 1 ? (
@@ -2467,23 +2352,14 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
         return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
     };
     const formatDisplayValue = (value, field) => {
-        // If vendor or transfer site is 0, show "-"
         if (
             (field.oldKey?.includes("vendor_id") || field.oldKey?.includes("transfer_site_id") ||
                 field.newKey?.includes("vendor_id") || field.newKey?.includes("transfer_site_id")) &&
             String(value) === "0"
-        ) {
-            return "-";
-        }
-        if (field.lookup) {
-            return getNameById(value, field.lookup);
-        }
-        if (field.label.includes("Amount")) {
-            return value ? Number(value).toLocaleString("en-IN") : "-";
-        }
-        if (field.label === "Date") {
-            return value ? new Date(value).toLocaleDateString("en-GB") : "-";
-        }
+        ) { return "-"; }
+        if (field.lookup) { return getNameById(value, field.lookup); }
+        if (field.label.includes("Amount")) { return value ? Number(value).toLocaleString("en-IN") : "-"; }
+        if (field.label === "Date") { return value ? new Date(value).toLocaleDateString("en-GB") : "-"; }
         return value ?? "-";
     };
     return (
@@ -2495,7 +2371,6 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
                         <h2 className="text-xl text-red-500 -mt-10 font-bold">x</h2>
                     </button>
                 </div>
-                {/* Scroll container for both vertical and horizontal overflow */}
                 <div className="overflow-auto mt-2 max-h-80 border border-l-8 border-l-[#BF9853] rounded-lg ml-7">
                     <table className="table-fixed min-w-full bg-white">
                         <thead className="bg-[#FAF6ED]">
@@ -2503,9 +2378,7 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
                                 <th style={{ width: "130px" }}>Time Stamp</th>
                                 <th style={{ width: "120px" }}>Edited By</th>
                                 {fields.map((f) => (
-                                    <th key={f.label} style={{ width: f.width }}
-                                        className="border-b py-2 px-2 text-center font-bold whitespace-nowrap overflow-hidden text-ellipsis"
-                                    >
+                                    <th key={f.label} style={{ width: f.width }} className="border-b py-2 px-2 text-center font-bold whitespace-nowrap overflow-hidden text-ellipsis" >
                                         {f.label}
                                     </th>
                                 ))}
@@ -2567,23 +2440,14 @@ const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits }) => {
         return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
     };
     const formatDisplayValue = (value, field) => {
-        // If vendor or transfer site is 0, show "-"
         if (
             (field.oldKey?.includes("vendor_id") || field.oldKey?.includes("transfer_site_id") ||
                 field.newKey?.includes("vendor_id") || field.newKey?.includes("transfer_site_id")) &&
             String(value) === "0"
-        ) {
-            return "-";
-        }
-        if (field.lookup) {
-            return getNameById(value, field.lookup);
-        }
-        if (field.label.includes("Amount")) {
-            return value ? Number(value).toLocaleString("en-IN") : "-";
-        }
-        if (field.label === "Date") {
-            return value ? new Date(value).toLocaleDateString("en-GB") : "-";
-        }
+        ) { return "-"; }
+        if (field.lookup) { return getNameById(value, field.lookup); }
+        if (field.label.includes("Amount")) { return value ? Number(value).toLocaleString("en-IN") : "-"; }
+        if (field.label === "Date") { return value ? new Date(value).toLocaleDateString("en-GB") : "-"; }
         return value ?? "-";
     };
     return (
@@ -2595,7 +2459,6 @@ const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits }) => {
                         <h2 className="text-xl text-red-500 -mt-10 font-bold">x</h2>
                     </button>
                 </div>
-                {/* Scroll container for both vertical and horizontal overflow */}
                 <div className="overflow-auto mt-2 max-h-80 border border-l-8 border-l-[#BF9853] rounded-lg ml-7">
                     <table className="table-fixed min-w-full bg-white">
                         <thead className="bg-[#FAF6ED]">
@@ -2604,8 +2467,7 @@ const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits }) => {
                                 <th style={{ width: "120px" }}>Edited By</th>
                                 {fields.map((f) => (
                                     <th key={f.label} style={{ width: f.width }}
-                                        className="border-b py-2 px-2 text-center font-bold whitespace-nowrap overflow-hidden text-ellipsis"
-                                    >
+                                        className="border-b py-2 px-2 text-center font-bold whitespace-nowrap overflow-hidden text-ellipsis">
                                         {f.label}
                                     </th>
                                 ))}

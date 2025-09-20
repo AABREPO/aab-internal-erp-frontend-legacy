@@ -752,15 +752,13 @@ const AdvanceSummary = () => {
                       sortData(siteDetails, siteSortConfig).map((d, idx) => (
                         <tr key={idx} className={idx % 2 === 0 ? "bg-white text-left" : "bg-[#FAF6ED] text-left"}>
                           <td className="p-2">{d.name}</td>
-                          <td
-                            className="p-2 cursor-help relative"
+                          <td className="p-2 cursor-help relative"
                             onMouseEnter={(e) => handleMouseEnterAdvance(e, selectedAdvanceSite?.id, d.entityId, d.entityType)}
                             onMouseLeave={handleMouseLeave}
                           >
                             {d.pendingAdvance.toLocaleString("en-IN")}
                           </td>
-                          <td
-                            className="p-2 cursor-help relative"
+                          <td className="p-2 cursor-help relative"
                             onMouseEnter={(e) => handleMouseEnter(e, selectedAdvanceSite?.id, d.entityId, d.entityType)}
                             onMouseLeave={handleMouseLeave}
                           >

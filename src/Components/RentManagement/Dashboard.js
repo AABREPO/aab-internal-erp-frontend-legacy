@@ -243,6 +243,7 @@ const Dashboard = () => {
         // 5. Advance map and history
         const advanceMap = {};
         const advanceDetailsMap = {};
+        const advanceAdjustmentDetailsMap = {};
         rentForms.forEach(entry => {
             if (entry.formType === 'Advance' && entry.shopNo) {
                 const amount = parseFloat(entry.amount || 0);
@@ -251,9 +252,18 @@ const Dashboard = () => {
                 if (!advanceMap[shopKey]) {
                     advanceMap[shopKey] = 0;
                     advanceDetailsMap[shopKey] = [];
+                    advanceAdjustmentDetailsMap[shopKey] = [];
                 }
                 advanceMap[shopKey] += amount;
                 advanceDetailsMap[shopKey].push(`${paidOn} - ₹${amount.toLocaleString()}`);
+            } else if (entry.formType === 'Rent' && entry.paymentMode?.trim() === 'Advance Adjustment' && entry.shopNo) {
+                const amount = parseFloat(entry.amount || 0);
+                const paidOn = formatDateOnly(entry.paidOnDate) || '';
+                const shopKey = entry.shopNo;
+                if (!advanceAdjustmentDetailsMap[shopKey]) {
+                    advanceAdjustmentDetailsMap[shopKey] = [];
+                }
+                advanceAdjustmentDetailsMap[shopKey].push(`${paidOn} - ₹${amount.toLocaleString()}`);
             }
         });
         // 6. Final table data
@@ -263,15 +273,16 @@ const Dashboard = () => {
             const rentDetails = rentHistoryMap[shop.shopNo] || Array(12).fill([]);
             const advanceAmount = advanceMap[shop.shopNo] || 0;
             const advanceDetails = advanceDetailsMap[shop.shopNo] || [];
+            const advanceAdjustmentDetails = advanceAdjustmentDetailsMap[shop.shopNo] || [];
             const totalRentPaid = rentForms
                 .filter(entry =>
                     entry.shopNo === shop.shopNo &&
                     (entry.formType === 'Rent' || entry.formType === 'Pending Rent') &&
-                    entry.paymentMode === 'Advance Adjustment' &&
-                    new Date(entry.forTheMonthOf).getFullYear() === parseInt(selectedYear)
+                    entry.paymentMode?.trim() === 'Advance Adjustment'
                 )
                 .reduce((sum, entry) => sum + parseFloat(entry.amount || 0), 0);
-            const remainingAdvance = advanceAmount - totalRentPaid;
+            const remainingAdvance = Math.max(0, advanceAmount - totalRentPaid);
+
             const wasActiveThisYear = months.some(monthArr => monthArr.length > 0);
             const row = {
                 shNo: finalTableData.length + 1,
@@ -280,6 +291,7 @@ const Dashboard = () => {
                 doorNo: shop.doorNo,
                 advance: shop.active ? remainingAdvance : null,
                 advanceDetails: shop.active ? advanceDetails : [],
+                advanceAdjustmentDetails: shop.active ? advanceAdjustmentDetails : [],
                 months,
                 rentDetails,
                 propertyName: shop.propertyName,
@@ -503,7 +515,7 @@ const Dashboard = () => {
                 overflow: 'linebreak',
                 lineColor: [0, 0, 0],
                 lineWidth: 0.1,
-                textColor: [0, 0, 0], 
+                textColor: [0, 0, 0],
             },
             headStyles: {
                 fillColor: false,
@@ -933,7 +945,24 @@ const Dashboard = () => {
                                         <td className="pr-2 pl-4 py-2">
                                             {shop.doorNo || '-'}
                                         </td>
-                                        <td className="px-4 py-2" title={(shop.advanceDetails || []).join('\n')}>
+                                        <td className="px-4 py-2" title={(() => {
+                                            const advanceDetails = shop.advanceDetails || [];
+                                            const adjustmentDetails = shop.advanceAdjustmentDetails || [];
+                                            
+                                            let tooltip = [];
+                                            
+                                            // Add advance payments
+                                            advanceDetails.forEach(detail => {
+                                                tooltip.push(detail);
+                                            });
+                                            
+                                            // Add advance adjustments with clear labeling
+                                            adjustmentDetails.forEach(detail => {
+                                                tooltip.push(detail + ' (Advance Adjustment)');
+                                            });
+                                            
+                                            return tooltip.join('\n');
+                                        })()}>
                                             {shop.advance != null && shop.shouldCollectAdvance !== false
                                                 ? Number(shop.advance).toLocaleString("en-IN", {
                                                     style: "currency",

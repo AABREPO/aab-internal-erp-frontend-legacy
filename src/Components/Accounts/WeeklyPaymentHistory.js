@@ -769,7 +769,7 @@ const History = ({ username, userRoles = [] }) => {
         autoTable(doc, {
             head: [["DAILY WAGE", "AMOUNT"]],
             body: dailyExpenseData,
-            startY: baseY + 140,
+            startY: baseY + 210,
             margin: { left: 300 },
             tableWidth: 200,
             theme: "grid",
@@ -828,21 +828,55 @@ const History = ({ username, userRoles = [] }) => {
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.text("EXPENDITURE PAYMENTS", 300, baseY - 25);
-        const summaryMap = filteredExpenses
+        
+        // Initialize summaryMap with all weeklyTypes (with 0 count and 0 total)
+        const summaryMap = weeklyTypes.reduce((acc, typeObj) => {
+            acc[typeObj.type] = { count: 0, total: 0 };
+            return acc;
+        }, {});
+        
+        // Populate summaryMap with actual expense data (including expenses with amount > 0)
+        filteredExpenses
             .filter(expense => Number(expense.amount) > 0)
-            .reduce((acc, expense) => {
+            .forEach(expense => {
                 const type = expense.type;
                 const amount = Number(expense.amount);
-                if (!acc[type]) acc[type] = { count: 0, total: 0 };
-                acc[type].count += 1;
-                acc[type].total += amount;
-                return acc;
-            }, {});
-        const summaryData = Object.entries(summaryMap).map(([type, { count, total }]) => [
-            String(type || ""),
-            String(Number(total || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
-            count
-        ]);
+                if (summaryMap[type]) {
+                    summaryMap[type].count += 1;
+                    summaryMap[type].total += amount;
+                }
+            });
+        const summaryData = Object.entries(summaryMap)
+            .map(([type, { count, total }]) => [
+                String(type || ""),
+                String(Number(total || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
+                count,
+                total // Keep original total for sorting
+            ])
+            .sort((a, b) => {
+                // Sort by total amount: non-zero amounts first, then zero amounts
+                const totalA = Number(a[3]);
+                const totalB = Number(b[3]);
+                
+                if (totalA === 0 && totalB === 0) {
+                    // Both are zero, sort alphabetically by type name
+                    return a[0].localeCompare(b[0]);
+                } else if (totalA === 0) {
+                    // A is zero, B is not - put A after B
+                    return 1;
+                } else if (totalB === 0) {
+                    // B is zero, A is not - put B after A
+                    return -1;
+                } else {
+                    // Both are non-zero, sort by amount descending
+                    return totalB - totalA;
+                }
+            })
+            .map(([type, formattedTotal, count, originalTotal]) => [
+                type,
+                formattedTotal,
+                count
+            ]); // Remove the original total from final array
         autoTable(doc, {
             head: [["SUMMARY", "TOTAL"]],
             body: summaryData.map(r => [String(r[0] || ""), String(r[1] || "0")]),
@@ -865,11 +899,11 @@ const History = ({ username, userRoles = [] }) => {
                     const rowData = summaryData[data.row.index];
                     if (rowData && rowData[2] !== undefined) {
                         const count = rowData[2];  // third element = count
-                        if (count > 0 && data.cell && typeof data.cell.x === 'number' && typeof data.cell.y === 'number' && typeof data.cell.height === 'number') {
+                        if (data.cell && typeof data.cell.x === 'number' && typeof data.cell.y === 'number' && typeof data.cell.height === 'number') {
                             const textX = data.cell.x - 3; // 10pt to the left of table
                             const textY = data.cell.y + data.cell.height / 2 + 2; // vertical centering
                             doc.setFontSize(9);
-                            doc.text(String(count || ""), textX, textY, { align: 'right' });
+                            doc.text(String(count || "0"), textX, textY, { align: 'right' });
                         }
                     }
                 }

@@ -16,6 +16,7 @@ const Dashboard = () => {
     const [tenantShopData, setTenantShopData] = useState([]);
     const [editAdvance, setEditAdvance] = useState('');
     const [editRent, setEditRent] = useState('');
+    const [editStartingMonth, setEditStartingMonth] = useState('');
     const [tableData, setTableData] = useState([]);
     const [selectedShop, setSelectedShop] = useState(null);
     const [showConfirm, setShowConfirm] = useState(false);
@@ -256,7 +257,7 @@ const Dashboard = () => {
                 }
                 advanceMap[shopKey] += amount;
                 advanceDetailsMap[shopKey].push(`${paidOn} - ₹${amount.toLocaleString()}`);
-            } else if (entry.formType === 'Rent' && entry.paymentMode?.trim() === 'Advance Adjustment' && entry.shopNo) {
+            } else if ((entry.formType === 'Rent' || entry.formType === 'Pending Rent') && entry.paymentMode?.trim() === 'Advance Adjustment' && entry.shopNo) {
                 const amount = parseFloat(entry.amount || 0);
                 const paidOn = formatDateOnly(entry.paidOnDate) || '';
                 const shopKey = entry.shopNo;
@@ -338,7 +339,8 @@ const Dashboard = () => {
     const handleSaveRentAdvance = async () => {
         const { tenantId, shopId } = selectedShop;
         try {
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/tenantShop/update/${tenantId}/shop/${shopId}`, {
+            // First, update the tenant shop data
+            const updateResponse = await fetch(`https://backendaab.in/aabuildersDash/api/tenantShop/update/${tenantId}/shop/${shopId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
@@ -348,15 +350,43 @@ const Dashboard = () => {
                     advanceAmount: editAdvance || null
                 })
             });
-            if (response.ok) {
+            
+            if (updateResponse.ok) {
+                // If rent amount and starting month are provided, save rent history
+                if (editRent && editStartingMonth) {
+                    const rentHistoryData = {
+                        tenantWithShopNoId: shopId,
+                        rentAmount: editRent,
+                        startingMonthForThisRent: editStartingMonth
+                    };
+                    
+                    const historyResponse = await fetch('https://backendaab.in/aabuildersDash/api/rent-history/save', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(rentHistoryData)
+                    });
+                    
+                    if (!historyResponse.ok) {
+                        console.error('Failed to save rent history');
+                        alert('Rent/Advance updated but failed to save rent history');
+                    }
+                }
+                
                 await fetchTenants();  // Refresh data
                 setShowEditPopup(false);
                 setSelectedShop(null);
+                setEditRent('');
+                setEditAdvance('');
+                setEditStartingMonth('');
             } else {
                 console.error('Failed to update rent/advance');
+                alert('Failed to update rent/advance');
             }
         } catch (error) {
             console.error('Error:', error);
+            alert('An error occurred while saving data');
         }
     };
     const filteredTableData = useMemo(() => {
@@ -1058,6 +1088,7 @@ const Dashboard = () => {
                                     const info = shopInfoMap[selectedShop.shopNo] || {};
                                     setEditAdvance(info.advanceAmount || '');
                                     setEditRent(info.monthlyRent || '');
+                                    setEditStartingMonth('');
                                     setSelectedShop(prev => ({
                                         ...prev,
                                         tenantId: info.tenantId,
@@ -1099,9 +1130,18 @@ const Dashboard = () => {
                                     className="w-full border px-3 py-2 rounded-md focus:outline-none"
                                 />
                             </div>
+                            <div className=" mt-3">
+                                <label className="font-semibold block">Starting Month for This Rent</label>
+                                <input
+                                    type="month"
+                                    value={editStartingMonth}
+                                    onChange={(e) => setEditStartingMonth(e.target.value)}
+                                    className="w-full border px-3 py-2 rounded-md focus:outline-none"
+                                />
+                            </div>
                         </div>
                         <div className="flex justify-end mt-6 gap-4">
-                            <button className="bg-gray-300 px-4 py-2 rounded-md" onClick={() => { setShowEditPopup(false); setSelectedShop(null); }}>
+                            <button className="bg-gray-300 px-4 py-2 rounded-md" onClick={() => { setShowEditPopup(false); setSelectedShop(null); setEditRent(''); setEditAdvance(''); setEditStartingMonth(''); }}>
                                 Close
                             </button>
                             <button className="bg-[#BF9853] text-white px-4 py-2 rounded-md" onClick={handleSaveRentAdvance}>

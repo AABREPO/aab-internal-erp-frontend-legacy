@@ -9,7 +9,7 @@ import edit from '../Images/Edit.svg';
 import axios from 'axios';
 
 const LoanPortal = ({ username, userRoles = [] }) => {
-  const [selectedType, setSelectedType] = useState('Loan')
+  const [selectedLoanType, setSelectedLoanType] = useState('Loan')
   const [selectedOption, setSelectedOption] = useState(null);
   const [combinedOptions, setCombinedOptions] = useState([]);
   const [vendorOptions, setVendorOptions] = useState([]);
@@ -61,7 +61,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
   ], []);
 
   useEffect(() => {
-    const savedselectedType = sessionStorage.getItem('selectedType');
+    const savedselectedLoanType = sessionStorage.getItem('selectedLoanType');
     const savedContractorVendor = sessionStorage.getItem('selectedOption');
     const savedProjectName = sessionStorage.getItem('selectedSite');
     const savedoverallLoan = sessionStorage.getItem('overallLoan');
@@ -74,7 +74,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
     const savedpurpose = sessionStorage.getItem('purpose');
 
     try {
-      if (savedselectedType) setSelectedType(JSON.parse(savedselectedType));
+      if (savedselectedLoanType) setSelectedLoanType(JSON.parse(savedselectedLoanType));
       if (savedContractorVendor) setSelectedOption(JSON.parse(savedContractorVendor));
       if (savedProjectName) setSelectedSite(JSON.parse(savedProjectName));
       if (savedoverallLoan) setOverallLoan(JSON.parse(savedoverallLoan));
@@ -96,7 +96,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
   }, []);
 
   const handleBeforeUnload = () => {
-    sessionStorage.removeItem('selectedType');
+    sessionStorage.removeItem('selectedLoanType');
     sessionStorage.removeItem('selectedOption');
     sessionStorage.removeItem('selectedSite');
     sessionStorage.removeItem('overallLoan');
@@ -110,7 +110,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
   };
 
   useEffect(() => {
-    if (selectedType) sessionStorage.setItem('selectedType', JSON.stringify(selectedType));
+    if (selectedLoanType) sessionStorage.setItem('selectedLoanType', JSON.stringify(selectedLoanType));
     if (selectedOption) sessionStorage.setItem('selectedOption', JSON.stringify(selectedOption));
     if (selectedSite) sessionStorage.setItem('selectedSite', JSON.stringify(selectedSite));
     if (overallLoan) sessionStorage.setItem('overallLoan', JSON.stringify(overallLoan));
@@ -121,7 +121,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
     if (paymentMode) sessionStorage.setItem('paymentMode', JSON.stringify(paymentMode));
     if (description) sessionStorage.setItem('description', JSON.stringify(description));
     if (purpose) sessionStorage.setItem('purpose', JSON.stringify(purpose));
-  }, [selectedType, selectedOption, selectedSite, overallLoan, loanAmount, amountGiven, transferTo, transferAmount, paymentMode, description, purpose]);
+  }, [selectedLoanType, selectedOption, selectedSite, overallLoan, loanAmount, amountGiven, transferTo, transferAmount, paymentMode, description, purpose]);
 
   // Memoized utility functions
   const formatWithCommas = useCallback((value) => {
@@ -280,7 +280,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('http://localhost:8082/api/loans/all');
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/loans/all');
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
@@ -338,7 +338,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
     }
 
     try {
-      const response = await fetch('http://localhost:8082/api/loans/all');
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/loans/all');
       if (!response.ok) {
         throw new Error('Failed to fetch data');
       }
@@ -391,16 +391,16 @@ const LoanPortal = ({ username, userRoles = [] }) => {
   // Optimized handleSubmit with useCallback
   const handleSubmit = async () => {
     const payload = {
-      type: selectedType,
+      type: selectedLoanType,
       date: dateValue,
       amount:
-        selectedType === "Loan"
+        selectedLoanType === "Loan"
           ? parseFloat(amountGiven) || 0
-          : selectedType === "Transfer"
+          : selectedLoanType === "Transfer"
             ? parseFloat(transferAmount) || 0
             : 0,
       loan_payment_mode: paymentMode,
-      loan_refund_amount: selectedType === "Refund" ? parseFloat(amountGiven) || 0 : 0,
+      loan_refund_amount: selectedLoanType === "Refund" ? parseFloat(amountGiven) || 0 : 0,
       from_purpose_id: purpose || 0,
       transfer_Project_id: transferSelection?.type === "Site" ? transferSelection.id : 0,
       to_purpose_id: transferSelection?.type === "Purpose" ? transferSelection.id : 0,
@@ -413,7 +413,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
 
     console.log("🚀 Payload ready to send:", payload);
     try {
-      const response = await fetch("http://localhost:8082/api/loans/save", {
+      const response = await fetch("https://backendaab.in/aabuildersDash/api/loans/save", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -533,14 +533,14 @@ const LoanPortal = ({ username, userRoles = [] }) => {
   }, []);
   const handleUpdate = useCallback(async () => {
     try {
-      const res = await fetch(`http://localhost:8082/api/loans/${editingId}`, {
+      const res = await fetch(`https://backendaab.in/aabuildersDash/api/loans/${editingId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editFormData)
       });
       if (!res.ok) throw new Error('Failed to update');
       // Refresh data instead of reloading the page
-      const response = await fetch('http://localhost:8082/api/loans/all');
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/loans/all');
       if (response.ok) {
         const data = await response.json();
         setLoanData(data);
@@ -631,7 +631,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                 <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 text-left'>
                   <div className='space-y-2'>
                     <label className='font-semibold text-[#E4572E] text-sm sm:text-base'>Select Type</label>
-                    <select value={selectedType} onChange={(e) => setSelectedType(e.target.value)}
+                    <select value={selectedLoanType} onChange={(e) => setSelectedLoanType(e.target.value)}
                       className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
                     >
                       <option value='Loan'>Loan</option>
@@ -690,10 +690,10 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                   </div>
                   <div className='space-y-2'>
                     <label className='font-semibold block text-sm sm:text-base'>
-                      {selectedType === 'Transfer' ? 'Transfer To' :
-                        selectedType === 'Refund' ? 'Amount' : 'Amount Given'}
+                      {selectedLoanType === 'Transfer' ? 'Transfer To' :
+                        selectedLoanType === 'Refund' ? 'Amount' : 'Amount Given'}
                     </label>
-                    {selectedType === 'Transfer' ? (
+                    {selectedLoanType === 'Transfer' ? (
                       <Select
                         options={combinedSitePurposeOptions}
                         value={transferSelection}
@@ -705,7 +705,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                       />
                     ) : (
                       <input
-                        value={selectedType === 'Refund' ? formatWithCommas(amountGiven) : formatWithCommas(amountGiven)}
+                        value={selectedLoanType === 'Refund' ? formatWithCommas(amountGiven) : formatWithCommas(amountGiven)}
                         onChange={handleAmountChange}
                         placeholder="Enter Amount"
                         className='w-full h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
@@ -714,9 +714,9 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                   </div>
                   <div className='space-y-2'>
                     <label className='font-semibold block text-sm sm:text-base'>
-                      {selectedType === 'Transfer' ? 'Transfer Amount' : 'Payment Mode'}
+                      {selectedLoanType === 'Transfer' ? 'Transfer Amount' : 'Payment Mode'}
                     </label>
-                    {selectedType === 'Transfer' ? (
+                    {selectedLoanType === 'Transfer' ? (
                       <input
                         value={formatWithCommas(transferAmount)}
                         onChange={handleTransferAmountChange}
@@ -760,7 +760,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                     <button className='bg-[#c7934c] text-white w-full sm:w-[120px] h-[33px] rounded flex items-center justify-center text-sm'
                       onClick={handleSubmit} disabled={isSubmitting}
                     >
-                      {isSubmitting ? 'Saving...' : selectedType}
+                      {isSubmitting ? 'Saving...' : selectedLoanType}
                     </button>
                     <ToastContainer
                       position="top-right"

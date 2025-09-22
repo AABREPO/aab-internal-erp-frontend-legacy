@@ -50,7 +50,7 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
         // Fetch staff advance records
         let recData = [];
         try {
-          const recRes = await fetch('http://localhost:8082/api/staff-advance/all');
+          const recRes = await fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all');
           if (recRes.ok) {
             recData = await recRes.json();
           } else {
@@ -492,7 +492,7 @@ const sortedData = useMemo(() => {
 
   const handleUpdate = useCallback(async () => {
     try {
-      const url = `http://localhost:8082/api/staff-advance/${editingId}?editedBy=${username}`;
+      const url = `https://backendaab.in/aabuildersDash/api/staff-advance/${editingId}?editedBy=${username}`;
       const payload = {
         type: editFormData.type || '',
         date: editFormData.date || '',

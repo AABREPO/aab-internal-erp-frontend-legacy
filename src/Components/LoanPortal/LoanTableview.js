@@ -267,7 +267,7 @@ const LoanTableview = ({ username, userRoles = [] }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('http://localhost:8082/api/loans/all');
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/loans/all');
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
@@ -502,9 +502,12 @@ const LoanTableview = ({ username, userRoles = [] }) => {
         loanPortalId: editingId,
         type: editSelectedType,
         date: editFormData.date,
-        amount: (editSelectedType === "Loan" || editSelectedType === "Transfer")
-          ? parseFloat(editFormData.loan_amount || 0)
-          : 0,
+        amount:
+          editSelectedType === "Loan"
+            ? Number(editFormData.loan_amount || 0)
+            : editSelectedType === "Transfer"
+              ? Number(editTransferAmount || 0)
+              : 0,
         loan_refund_amount: editSelectedType === "Refund"
           ? parseFloat(editFormData.loan_refund_amount || 0)
           : 0,
@@ -521,17 +524,16 @@ const LoanTableview = ({ username, userRoles = [] }) => {
           : 0,
         entry_no: editFormData.entry_no || 0,
         description: editDescription || "",
-
       };
+      console.log(payload);
       const res = await fetch(
-        `http://localhost:8082/api/loans/${editingId}?editedBy=${username}`,
+        `https://backendaab.in/aabuildersDash/api/loans/${editingId}?editedBy=${username}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         }
       );
-      window.location.reload();
       if (!res.ok) throw new Error('Failed to update');
       const updatedDataArray = await res.json();
       setLoanData(prev => {
@@ -543,6 +545,7 @@ const LoanTableview = ({ username, userRoles = [] }) => {
         });
         return newData;
       });
+      window.location.reload();
       setIsEditModalOpen(false);
       toast.success("Entry updated successfully!", {
         position: "top-center",
@@ -1063,11 +1066,12 @@ const LoanTableview = ({ username, userRoles = [] }) => {
                       value={formatWithCommas(editFormData.loan_amount || '')}
                       onChange={(e) => {
                         const rawValue = e.target.value.replace(/,/g, '');
-                        if (!isNaN(rawValue)) {
-                          setEditFormData(prev => ({ ...prev, loan_amount: rawValue }));
+                        if (!isNaN(rawValue) && rawValue !== "") {
+                          setEditFormData(prev => ({ ...prev, loan_amount: Number(rawValue) }));
+                        } else {
+                          setEditFormData(prev => ({ ...prev, loan_amount: "" }));
                         }
                       }}
-                      placeholder="Enter Amount"
                       className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
                     />
                   )}

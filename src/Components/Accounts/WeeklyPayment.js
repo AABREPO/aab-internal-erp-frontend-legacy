@@ -256,6 +256,14 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         amount: "",
         type: ""
     });
+    
+    // Payment popup states for Project Advance
+    const [showPaymentPopup, setShowPaymentPopup] = useState(false);
+    const [paymentPopupData, setPaymentPopupData] = useState({
+        paymentMode: "",
+        amount: ""
+    });
+    const [currentProjectAdvanceRow, setCurrentProjectAdvanceRow] = useState(null);
     const handleEditPaymentClick = (row) => {
         setEditingPaymentId(row.id || null);
         setEditPaymentData({
@@ -1789,7 +1797,22 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                 ))}
                                                             </select>
                                                         ) : (
-                                                            row.type
+                                                            <div className="flex items-center gap-2">
+                                                                <span>{row.type}</span>
+                                                                {row.type === "Project Advance" && (
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setCurrentProjectAdvanceRow(row);
+                                                                            setPaymentPopupData({ paymentMode: "", amount: "" });
+                                                                            setShowPaymentPopup(true);
+                                                                        }}
+                                                                        className="bg-green-500 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-green-600 transition-colors text-xs"
+                                                                        title="Add Payment"
+                                                                    >
+                                                                        +
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                         )}
                                                     </td>
                                                     <td className="text-sm text-left pl-2 w-[110px] font-semibold">
@@ -2207,6 +2230,56 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
             )}
+            {showPaymentPopup && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                    <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
+                        <h3 className="text-lg font-semibold mb-4 text-center">Add Payment</h3>                        
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>
+                            <select
+                                value={paymentPopupData.paymentMode}
+                                onChange={(e) => setPaymentPopupData(prev => ({ ...prev, paymentMode: e.target.value }))}
+                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                            >
+                                <option value="">Select Payment Mode</option>
+                                <option value="Gpay">Gpay</option>
+                                <option value="PhonePe">PhonePe</option>
+                                <option value="Net Banking">Net Banking</option>
+                                <option value="Cheque">Cheque</option>
+                            </select>
+                        </div>                        
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                            <input
+                                type="number"
+                                value={paymentPopupData.amount}
+                                onChange={(e) => setPaymentPopupData(prev => ({ ...prev, amount: e.target.value }))}
+                                placeholder="Enter amount"
+                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none no-spinner"
+                            />
+                        </div>                        
+                        <div className="flex justify-end gap-3 mt-4">
+                            <button 
+                                onClick={() => setShowPaymentPopup(false)} 
+                                className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    setShowPaymentPopup(false);
+                                    setPaymentPopupData({ paymentMode: "", amount: "" });
+                                    setCurrentProjectAdvanceRow(null);
+                                }}
+                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                                disabled={!paymentPopupData.paymentMode || !paymentPopupData.amount}
+                            >
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}            
             <AuditModal show={showWeeklyPaymentExpensesModal} onClose={() => setShowWeeklyPaymentExpensesModal(false)} audits={weeklyPaymentExpensesAudits} vendorOptions={vendorOptions} contractorOptions={contractorOptions}
                 siteOptions={siteOptions} />
             <AuditModalWeeklyPaymentsReceived show={showWeeklyPaymentReceivedModal} onClose={() => setShowWeeklyPaymentReceivedModal(false)}

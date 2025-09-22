@@ -326,10 +326,10 @@ const TableView = ({ username, userRoles = [] }) => {
         // Parallel API calls for better performance
         const [recRes, empRes, purRes] = await Promise.allSettled([
           fetch('http://localhost:8082/api/staff-advance/all'),
-          fetch('https://backendaab.in/aabuildersDash/api/employee_details/getAll', {
+          fetch('http://localhost:8082/api/employee_details/getAll', {
             credentials: 'include',
           }),
-          fetch('https://backendaab.in/aabuildersDash/api/purposes/getAll')
+          fetch('http://localhost:8082/api/purposes/getAll')
         ]);
 
         // Process staff advance data

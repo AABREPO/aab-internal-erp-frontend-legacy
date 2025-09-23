@@ -325,11 +325,11 @@ const TableView = ({ username, userRoles = [] }) => {
       try {
         // Parallel API calls for better performance
         const [recRes, empRes, purRes] = await Promise.allSettled([
-          fetch('http://localhost:8082/api/staff-advance/all'),
-          fetch('http://localhost:8082/api/employee_details/getAll', {
+          fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all'),
+          fetch('https://backendaab.in/aabuildersDash/api/employee_details/getAll', {
             credentials: 'include',
           }),
-          fetch('http://localhost:8082/api/purposes/getAll')
+          fetch('https://backendaab.in/aabuildersDash/api/purposes/getAll')
         ]);
 
         // Process staff advance data
@@ -655,7 +655,7 @@ const TableView = ({ username, userRoles = [] }) => {
 
   const handleUpdate = useCallback(async () => {
     try {
-      const url = `http://localhost:8082/api/staff-advance/${editingId}?editedBy=${username}`;
+      const url = `https://backendaab.in/aabuildersDash/api/staff-advance/${editingId}?editedBy=${username}`;
       const payload = {
         type: editFormData.type || '',
         date: editFormData.date || '',

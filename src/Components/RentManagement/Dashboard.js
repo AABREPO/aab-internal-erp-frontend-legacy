@@ -567,8 +567,9 @@ const Dashboard = () => {
     };
     const handleExportVacantPDF = () => {
         const doc = new jsPDF();
-        const tableColumn = ["Shop No", "Door No", "Property Name"];
-        const tableRows = filteredVacantShops.map(shop => [
+        const tableColumn = ["S.No", "Shop No", "Door No", "Property Name"];
+        const tableRows = filteredVacantShops.map((shop, index) => [
+            index + 1,
             shop.shopNo,
             shop.doorNo || 'N/A',
             shop.propertyName || 'N/A'
@@ -603,12 +604,23 @@ const Dashboard = () => {
         doc.save("Vacant-Shops.pdf");
     };
     const filteredVacantShops = useMemo(() => {
-        return filteredTableData.filter(shop => {
+        const vacantShops = filteredTableData.filter(shop => {
             const shopInfo = shopInfoMap[shop.shopNo];
             const isVacant = shop.tenantName === "Vacant" || !shop.advance;
             const shouldInclude = !shopInfo || shopInfo.shouldCollectAdvance !== false;
             return isVacant && shouldInclude;
         });
+        
+        // Remove duplicates based on shopNo
+        const uniqueVacantShops = vacantShops.reduce((acc, current) => {
+            const existingShop = acc.find(shop => shop.shopNo === current.shopNo);
+            if (!existingShop) {
+                acc.push(current);
+            }
+            return acc;
+        }, []);
+        
+        return uniqueVacantShops;
     }, [filteredTableData]);
     const occupiedCount = sortedTableData.length - filteredVacantShops.length;
 
@@ -1171,14 +1183,16 @@ const Dashboard = () => {
                             <table className="w-full  text-sm ">
                                 <thead className="bg-[#FAF6ED]">
                                     <tr>
+                                        <th className="px-2 py-1 ">S.No</th>
                                         <th className="px-2 py-1 ">Shop No</th>
                                         <th className="px-2 py-1 ">Door No</th>
                                         <th className="px-2 py-1 ">Property Name</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filteredVacantShops.map((shop) => (
+                                    {filteredVacantShops.map((shop, index) => (
                                         <tr key={shop.shopNo}>
+                                            <td className="px-2 py-1 ">{index + 1}</td>
                                             <td className="px-2 py-1 ">{shop.shopNo}</td>
                                             <td className="px-2 py-1 ">{shop.doorNo || 'N/A'}</td>
                                             <td className="px-2 py-1 ">{shop.propertyName || 'N/A'}</td>

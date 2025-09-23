@@ -39,7 +39,7 @@ const StaffAdvance = () => {
     // Fetch employee details
     const fetchEmployeeDetails = async () => {
       try {
-        const response = await fetch("http://localhost:8082/api/employee_details/getAll", {
+        const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -69,7 +69,7 @@ const StaffAdvance = () => {
   useEffect(() => {
     const fetchPurposeOptions = async () => {
       try {
-        const response = await fetch("http://localhost:8082/api/purposes/getAll", {
+        const response = await fetch("https://backendaab.in/aabuildersDash/api/purposes/getAll", {
           method: "GET",
           headers: { "Content-Type": "application/json" }
         });
@@ -155,7 +155,7 @@ const StaffAdvance = () => {
   // Fetch all records and update table data state
   const fetchRecords = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:8082/api/staff-advance/all');
+      const res = await fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all');
       if (!res.ok) {
         console.warn('Staff advance API not available, using empty data');
         setTableData([]);
@@ -399,7 +399,7 @@ const StaffAdvance = () => {
     }
     setIsSubmitting(true);
     try {
-      const resAll = await fetch('http://localhost:8082/api/staff-advance/all');
+      const resAll = await fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all');
       let allData = [];
       if (resAll.ok) {
         allData = await resAll.json();
@@ -428,7 +428,7 @@ const StaffAdvance = () => {
         payload.to_purpose_id = null;
         payload.amount = formData.selectedType === 'Advance' ? parseFloat(formData.amountGivenInput) || 0 : 0;
       }
-      const saveRes = await fetch('http://localhost:8082/api/staff-advance/save', {
+      const saveRes = await fetch('https://backendaab.in/aabuildersDash/api/staff-advance/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

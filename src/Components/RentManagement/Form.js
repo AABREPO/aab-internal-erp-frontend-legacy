@@ -4,7 +4,7 @@ import Select from 'react-select';
 import Swal from 'sweetalert2';
 import axios from 'axios';
 const Form = () => {
-    const [selectedType, setSelectedType] = useState("Rent");
+    const [selectedRentType, setSelectedRentType] = useState("Rent");
     const getPreviousMonth = () => {
         const now = new Date();
         now.setMonth(now.getMonth() - 1); // go to previous month
@@ -44,7 +44,7 @@ const Form = () => {
     const [closureDate, setClosureDate] = useState('');
     const [rentHistoryData, setRentHistoryData] = useState([]);
     useEffect(() => {
-        const savedSelectedType = sessionStorage.getItem('selectedType');
+        const savedSelectedRentType = sessionStorage.getItem('selectedRentType');
         const savedFormShopNo = sessionStorage.getItem('formShopNo')
         const savedSelectedMonth = sessionStorage.getItem('selectedMonth');
         const savedFormTenantName = sessionStorage.getItem('formTenantName');
@@ -54,7 +54,7 @@ const Form = () => {
         const savedCalculatedRent = sessionStorage.getItem('calculatedRent');
         const savedClosureDate = sessionStorage.getItem('closureDate');
         try {
-            if (savedSelectedType) setSelectedType(JSON.parse(savedSelectedType));
+            if (savedSelectedRentType) setSelectedRentType(JSON.parse(savedSelectedRentType));
             if (savedSelectedMonth) setSelectedMonth(JSON.parse(savedSelectedMonth));
             if (savedFormShopNo) setFormShopNo(JSON.parse(savedFormShopNo));
             if (savedFormTenantName) setFormTenantName(JSON.parse(savedFormTenantName));
@@ -72,7 +72,7 @@ const Form = () => {
         };
     }, []);
     const handleBeforeUnload = () => {
-        sessionStorage.removeItem('selectedType');
+        sessionStorage.removeItem('selectedRentType');
         sessionStorage.removeItem('formShopNo');
         sessionStorage.removeItem('selectedMonth');
         sessionStorage.removeItem('formTenantName');
@@ -83,7 +83,7 @@ const Form = () => {
         sessionStorage.removeItem('closureDate');
     };
     useEffect(() => {
-        if (selectedType) sessionStorage.setItem('selectedType', JSON.stringify(selectedType));
+        if (selectedRentType) sessionStorage.setItem('selectedRentType', JSON.stringify(selectedRentType));
         if (formShopNo) sessionStorage.setItem('formShopNo', JSON.stringify(formShopNo));
         if (selectedMonth) sessionStorage.setItem('selectedMonth', JSON.stringify(selectedMonth));
         if (formTenantName) sessionStorage.setItem('formTenantName', JSON.stringify(formTenantName));
@@ -92,7 +92,7 @@ const Form = () => {
         if (formPaymentMode) sessionStorage.setItem('formPaymentMode', JSON.stringify(formPaymentMode));
         if (calculatedRent) sessionStorage.setItem('calculatedRent', JSON.stringify(calculatedRent));
         if (closureDate) sessionStorage.setItem('closureDate', JSON.stringify(closureDate));
-    }, [selectedType, formShopNo, selectedMonth, formTenantName, amount, paidOnDate, formPaymentMode, calculatedRent, closureDate]);
+    }, [selectedRentType, formShopNo, selectedMonth, formTenantName, amount, paidOnDate, formPaymentMode, calculatedRent, closureDate]);
     const [message, setMessage] = useState('');
     const [eno, setEno] = useState(null);
     const handleFileChange = (e) => {
@@ -121,7 +121,7 @@ const Form = () => {
     };
     useEffect(() => {
         fetchTenants();
-    }, [selectedType]);
+    }, [selectedRentType]);
     const fetchTenants = async () => {
         try {
             const response = await fetch('https://backendaab.in/aabuildersDash/api/tenantShop/getAll');
@@ -130,7 +130,7 @@ const Form = () => {
                 setTenantShopData(data);
 
                 // For regular types, filter active tenants only
-                if (selectedType !== "Pending Rent") {
+                if (selectedRentType !== "Pending Rent") {
                     const activeTenants = data.filter(t =>
                         t.property?.some(p =>
                             p.shops?.some(shop => shop.active)
@@ -363,9 +363,13 @@ const Form = () => {
         const end = new Date(calculationEndDate);
         let totalPendingRent = 0;
         let currentDate = new Date(start.getFullYear(), start.getMonth(), 1);
+        
         while (currentDate <= end) {
-            const currentMonth = currentDate.toISOString().slice(0, 7); 
+            const year = currentDate.getFullYear();
+            const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+            const currentMonth = `${year}-${month}`;
             let monthlyRentDue = 0;
+            
             for (let i = 0; i < sortedRentHistory.length; i++) {
                 const historyEntry = sortedRentHistory[i];
                 const historyStartDate = new Date(historyEntry.startingMonthForThisRent);     
@@ -410,15 +414,19 @@ const Form = () => {
                 const endDay = end.getDate();
                 const rentPerDay = monthlyRentDue / totalDays;
                 monthlyRentDue = Math.floor((rentPerDay * endDay) / 10) * 10;
-            }            
+            }
+            // For full months (not first or last), use the full rent amount
+            else {
+                console.log(`  → Full month rent: ₹${monthlyRentDue}`);
+            }
             // Calculate pending rent for this month (rent due - payments made)
             const pendingForMonth = monthlyRentDue - totalPaidForMonth;
             if (pendingForMonth > 0) {
                 totalPendingRent += pendingForMonth;
-            }            
+            }
             // Move to next month
             currentDate.setMonth(currentDate.getMonth() + 1);
-        }        
+        }
         return totalPendingRent;
     };
     // Calculate pending rent for "Pending Rent" type using rent history
@@ -545,14 +553,14 @@ const Form = () => {
         setFormPaymentMode(newPaymentMode);
         setAmountError(''); 
         // Auto-fill advance amount when Advance Adjustment is selected for Rent type
-        if ((selectedType === "Rent" || selectedType === "Pending Rent") && newPaymentMode && newPaymentMode.trim() === "Advance Adjustment" && advanceAmount > 0) {
+        if ((selectedRentType === "Rent" || selectedRentType === "Pending Rent") && newPaymentMode && newPaymentMode.trim() === "Advance Adjustment" && advanceAmount > 0) {
             setAmount(advanceAmount.toString());
         }
     };
      // Validate amount input for Advance Adjustment and Shop Closure
      const validateAmount = (inputAmount) => {
          // Validation for Rent type with Advance Adjustment payment mode
-         if ((selectedType === "Rent" || selectedType === "Pending Rent") && formPaymentMode && formPaymentMode.trim() === "Advance Adjustment") {
+         if ((selectedRentType === "Rent" || selectedRentType === "Pending Rent") && formPaymentMode && formPaymentMode.trim() === "Advance Adjustment") {
              const numericAmount = parseFloat(inputAmount.replace(/[^0-9.]/g, ""));
              if (numericAmount > advanceAmount) {
                  const errorMsg = `Amount cannot exceed remaining advance amount of ₹ ${advanceAmount.toLocaleString('en-IN')}`;
@@ -564,7 +572,7 @@ const Form = () => {
              }
          }         
          // Validation for Shop Closure type - refund amount cannot exceed remaining advance
-         if (selectedType === "Shop Closure") {
+         if (selectedRentType === "Shop Closure") {
              const numericAmount = parseFloat(inputAmount.replace(/[^0-9.]/g, ""));
              if (numericAmount > advanceAmount) {
                  const errorMsg = `Refund amount cannot exceed remaining advance amount of ₹ ${advanceAmount.toLocaleString('en-IN')}`;
@@ -581,7 +589,7 @@ const Form = () => {
     const handleSubmit = async () => {
         // ✅ Check if payment mode is selected (required for Shop Closure only when refundAmount > 0)
         const cleanedAmount = parseFloat((amount || "").replace(/[^0-9.]/g, ""));
-        const isShopClosureWithNoRefund = selectedType === "Shop Closure" && (isNaN(cleanedAmount) || cleanedAmount === 0);
+        const isShopClosureWithNoRefund = selectedRentType === "Shop Closure" && (isNaN(cleanedAmount) || cleanedAmount === 0);
         if (!formPaymentMode && !isShopClosureWithNoRefund) {
             Swal.fire({
                 icon: 'warning',
@@ -630,8 +638,7 @@ const Form = () => {
                 pdfUrl = uploadResult.url;
             }
             const tenantInfo = shopInfoMap[formShopNo];
-            const baseMonthlyRent = parseFloat(tenantInfo?.monthlyRent || 0);
-            
+            const baseMonthlyRent = parseFloat(tenantInfo?.monthlyRent || 0);            
             const isStartingMonth = (dateObj) => {
                 const start = new Date(startingDate);
                 return (
@@ -641,32 +648,23 @@ const Form = () => {
             };
             const cleanedAmount = parseFloat((amount || "").replace(/[^0-9.]/g, ""));
             let remainingAmount = isNaN(cleanedAmount) ? 0 : cleanedAmount;
-            const submissions = [];
-            
-            if ((selectedType === "Rent" || selectedType === "Pending Rent") && baseMonthlyRent > 0) {
+            const submissions = [];            
+            if ((selectedRentType === "Rent" || selectedRentType === "Pending Rent") && baseMonthlyRent > 0) {
                 let currentDate = new Date(selectedMonth);
-            
-                // ✅ Always check selected month for both Rent & Pending Rent
                 const selectedMonthStr = currentDate.toISOString().slice(0, 7);
                  const existingEntriesForSelectedMonth = rentForms.filter(r => {
-                     // For both Rent and Pending Rent, check both form types to avoid double payments
                      return (r.formType === "Rent" || r.formType === "Pending Rent") &&
                             r.shopNo === formShopNo &&
                             r.forTheMonthOf === selectedMonthStr;
-                 });
-                
+                 });                
                  const alreadyPaidForSelectedMonth = existingEntriesForSelectedMonth.reduce(
                      (sum, r) => sum + parseFloat(r.amount || 0),
                      0
                  );
-             
-                 // Rent logic: use baseMonthlyRent for both Rent & Pending Rent
                  const applicableRentForSelectedMonth = isStartingMonth(currentDate)
                      ? parseFloat(calculatedRent || 0)
-                     : baseMonthlyRent;
-             
-                 const dueForSelectedMonth = applicableRentForSelectedMonth - alreadyPaidForSelectedMonth;
-            
+                     : baseMonthlyRent;             
+                 const dueForSelectedMonth = applicableRentForSelectedMonth - alreadyPaidForSelectedMonth;            
                 if (dueForSelectedMonth <= 0) {
                     Swal.fire({
                         icon: 'info',
@@ -677,9 +675,7 @@ const Form = () => {
                     setIsSubmitting(false);
                     return;
                 }
-                
-                // For Pending Rent, check if payment amount exceeds the calculated pending rent
-                if (selectedType === "Pending Rent") {
+                if (selectedRentType === "Pending Rent") {
                     const calculatedPendingRent = calculatePendingRentForPendingType();
                     if (cleanedAmount > calculatedPendingRent) {
                         Swal.fire({
@@ -692,34 +688,24 @@ const Form = () => {
                         return;
                     }
                 }
-            
-                // ✅ Loop to allocate payments across months
                 while (remainingAmount > 0) {
-                    const currentMonthStr = currentDate.toISOString().slice(0, 7);
-            
+                    const currentMonthStr = currentDate.toISOString().slice(0, 7);            
                     const existingEntries = rentForms.filter(r => {
-                        if (selectedType === "Pending Rent") {
-                            // Pending Rent: consider both Rent + Pending Rent payments
+                        if (selectedRentType === "Pending Rent") {
                             return (r.formType === "Rent" || r.formType === "Pending Rent") &&
                                    r.shopNo === formShopNo &&
                                    r.forTheMonthOf === currentMonthStr;
                         } else {
-                            // Normal Rent: only consider Rent
                             return r.formType === "Rent" &&
                                    r.shopNo === formShopNo &&
                                    r.forTheMonthOf === currentMonthStr;
                         }
-                    });
-                    
-            
-                    const alreadyPaid = existingEntries.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
-            
+                    });                         
+                    const alreadyPaid = existingEntries.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);            
                     const applicableRent = isStartingMonth(currentDate)
                         ? parseFloat(calculatedRent || 0)
-                        : baseMonthlyRent;
-            
-                    const dueThisMonth = applicableRent - alreadyPaid;
-            
+                        : baseMonthlyRent;            
+                    const dueThisMonth = applicableRent - alreadyPaid;            
                     if (dueThisMonth <= 0) {
                         Swal.fire({
                             icon: 'info',
@@ -729,12 +715,10 @@ const Form = () => {
                         });
                         setIsSubmitting(false);
                         return;
-                    }
-            
-                    const amountToPay = Math.min(remainingAmount, dueThisMonth);
-            
+                    }            
+                    const amountToPay = Math.min(remainingAmount, dueThisMonth);            
                     const rentalForm = {
-                        formType: selectedType,
+                        formType: selectedRentType,
                         shopNo: formShopNo,
                         eno,
                         tenantName: formTenantName,
@@ -753,9 +737,9 @@ const Form = () => {
                 }
             }
              else {
-                const isClosure = selectedType === "Shop Closure";
+                const isClosure = selectedRentType === "Shop Closure";
                 const form = {
-                    formType: selectedType,
+                    formType: selectedRentType,
                     shopNo: formShopNo,
                     eno,
                     tenantName: formTenantName,
@@ -763,7 +747,7 @@ const Form = () => {
                     refundAmount: isClosure ? cleanedAmount : "",
                     paymentMode: formPaymentMode,
                     paidOnDate,
-                    forTheMonthOf: selectedType === "Rent" || selectedType === "Pending Rent" ? selectedMonth : "",
+                    forTheMonthOf: selectedRentType === "Rent" || selectedRentType === "Pending Rent" ? selectedMonth : "",
                     attachedFile: pdfUrl,
                     shopClosureDate: closureDate || "",
                 };
@@ -782,7 +766,6 @@ const Form = () => {
                     console.log("✅ Form submitted:", form);
                 }
             }
-            // Call updateClosureDate API if closure date is provided
             if (closureDate && formTenantName && formShopNo) {
                 try {
                     const updateClosureResponse = await fetch(`https://backendaab.in/aabuildersDash/api/tenantShop/updateClosureDate/${encodeURIComponent(formTenantName)}/${encodeURIComponent(formShopNo)}`, {
@@ -799,13 +782,14 @@ const Form = () => {
                     console.error("❌ Error updating closure date:", error);
                 }
             }
-            if (selectedType === "Shop Closure") {
+            if (selectedRentType === "Shop Closure") {
                 try {
                     await vacateShop(selectedTenantId, formShopNo);
                 } catch (err) {
                     console.error("❌ VacateShop failed", err);
                 }
             }
+            window.location.reload();
             setIsSubmitting(false);
             setFormShopNo('');
             setFormTenantName('');
@@ -837,7 +821,7 @@ const Form = () => {
         }
     };
     useEffect(() => {
-        if (!startingDate || !selectedMonth || (selectedType !== "Rent" && selectedType !== "Pending Rent")) return;
+        if (!startingDate || !selectedMonth || (selectedRentType !== "Rent" && selectedRentType !== "Pending Rent")) return;
         const isTenantVacated = tenantShopData.some(tenant =>
             tenant.tenantName === formTenantName &&
             tenant.property?.some(p =>
@@ -857,16 +841,7 @@ const Form = () => {
         );
         const totalPaid = existingPayments.reduce((sum, form) => sum + parseFloat(form.amount || 0), 0);
         const monthlyRent = parseFloat(shopInfoMap[formShopNo]?.monthlyRent || 0);
-        
-        console.log("=== RENT DISPLAY CALCULATION ===");
-        console.log("Month:", currentMonthStr);
-        console.log("Monthly Rent:", monthlyRent);
-        console.log("Existing Payments:", existingPayments);
-        console.log("Total Paid:", totalPaid);
-        console.log("Remaining:", monthlyRent - totalPaid);
-        
         if (totalPaid >= monthlyRent) {
-            console.log("Month is fully paid - setting calculatedRent to 0");
             setCalculatedRent("0");
             return;
         }
@@ -892,12 +867,12 @@ const Form = () => {
             const remainingRent = monthlyRent - totalPaid;
             setCalculatedRent(remainingRent > 0 ? remainingRent.toString() : "0");
         }
-    }, [selectedMonth, startingDate, selectedType, formShopNo, formTenantName, tenantShopData, rentalFormsData, shopInfoMap]);
+    }, [selectedMonth, startingDate, selectedRentType, formShopNo, formTenantName, tenantShopData, rentalFormsData, shopInfoMap]);
     useEffect(() => {
-        if ((selectedType === "Rent" || selectedType === "Pending Rent") && calculatedRent) {
+        if ((selectedRentType === "Rent" || selectedRentType === "Pending Rent") && calculatedRent) {
             setAmount(calculatedRent.toString());
         }
-    }, [selectedType, calculatedRent]);
+    }, [selectedRentType, calculatedRent]);
     useEffect(() => {
         if (formTenantName && formShopNo && rentalFormsData.length > 0) {
             calculateAdvanceAmount(formTenantName, formShopNo);
@@ -911,22 +886,22 @@ const Form = () => {
         }
     }, [formPaymentMode]);
     useEffect(() => {
-        if (selectedType !== "Shop Closure") {
+        if (selectedRentType !== "Shop Closure") {
             setAmountError('');
         }
-    }, [selectedType]);
+    }, [selectedRentType]);
     useEffect(() => {
         if (amount) {
-            if (selectedType === "Rent" && formPaymentMode && formPaymentMode.trim() === "Advance Adjustment") {
+            if (selectedRentType === "Rent" && formPaymentMode && formPaymentMode.trim() === "Advance Adjustment") {
                 validateAmount(amount);
             }
-            else if (selectedType === "Shop Closure") {
+            else if (selectedRentType === "Shop Closure") {
                 validateAmount(amount);
             }
         }
     }, [advanceAmount]);
     useEffect(() => {
-        if (selectedType === "Pending Rent" && formTenantName && formShopNo && rentHistoryData.length > 0 && tenantShopData.length > 0) {
+        if (selectedRentType === "Pending Rent" && formTenantName && formShopNo && rentHistoryData.length > 0 && tenantShopData.length > 0) {
             const tenantShopMapping = {};
             tenantShopData.forEach(tenant => {
                 tenant.property?.forEach(property => {
@@ -952,7 +927,7 @@ const Form = () => {
                 matchingTenantShopIds.includes(history.tenantWithShopNoId.toString())
             );
         }
-    }, [selectedType, formTenantName, formShopNo, rentHistoryData, tenantShopData]);
+    }, [selectedRentType, formTenantName, formShopNo, rentHistoryData, tenantShopData]);
     const handleSubmitOldData = async (e) => {
         e.preventDefault();
         if (!file) {
@@ -977,7 +952,7 @@ const Form = () => {
         if (formTenantName) {
             const tenant = tenantShopData.find(t => t.tenantName === formTenantName);
             let shops;            
-            if (selectedType !== "Pending Rent") {
+            if (selectedRentType !== "Pending Rent") {
                 shops = tenant?.property?.flatMap(p => p.shops)?.filter(shop => shop.active) || [];
             } else {
                 shops = tenant?.property?.flatMap(p => p.shops) || [];
@@ -990,14 +965,14 @@ const Form = () => {
         } else {
             setFilteredShopNoOptions(shopNoOptions);
         }
-    }, [formTenantName, tenantShopData, shopNoOptions, selectedType]);
+    }, [formTenantName, tenantShopData, shopNoOptions, selectedRentType]);
     return (
         <div className="p-6 bg-[#FFFFFF] lg:w-[1800px] w-[400px] ml-12 text-left pl-8">
             <div className="flex">
                 <div>
                     <h2 className="text-[#E4572E] font-bold mb-2 text-base">Select Type</h2>
                     <select className="border-2 border-opacity-[0.18] focus:outline-none border-[#BF9853] rounded-lg p-2 mt-1 w-[170px] h-[45px]"
-                        value={selectedType} onChange={(e) => setSelectedType(e.target.value)} >
+                        value={selectedRentType} onChange={(e) => setSelectedRentType(e.target.value)} >
                         <option value="Rent">Rent</option>
                         <option value="Advance">Advance</option>
                         <option value="Shop Closure">Shop Closure</option>
@@ -1016,7 +991,7 @@ const Form = () => {
                             if (selectedOption) {
                                 const selectedShopNo = selectedOption.value;
                                 setFormShopNo(selectedShopNo);
-                                if (selectedType !== "Pending Rent") {
+                                if (selectedRentType !== "Pending Rent") {
                                     const matchingTenant = [...tenantShopData].reverse().find(t =>
                                         t.property?.some(p =>
                                             p.shops?.some(shop => shop.shopNo === selectedShopNo && shop.active)
@@ -1052,7 +1027,7 @@ const Form = () => {
                                 setFormShopNo('');
                                 setFormTenantName('');
                                 setSelectedTenantId('');
-                                if (selectedType === "Pending Rent") {
+                                if (selectedRentType === "Pending Rent") {
                                     fetchTenants();
                                 }
                             }
@@ -1094,14 +1069,14 @@ const Form = () => {
                     <div className="space-y-2">
                         {formTenantName && formShopNo && (
                             <div className={`text-sm text-gray-700 mb-3 flex items-center gap-2 ${
-                                (selectedType === "Rent" || selectedType === "Pending Rent" || selectedType === "Shop Closure") 
+                                (selectedRentType === "Rent" || selectedRentType === "Pending Rent" || selectedRentType === "Shop Closure") 
                                     ? "-mt-[53px]" 
                                     : " -mt-[34px]"
                             }`}>
                                 <span>Advance Amount: ₹ {advanceAmount.toLocaleString('en-IN')}</span>
                             </div>
                         )}
-                        {selectedType === "Rent" && selectedMonth && calculatedRent && (
+                        {selectedRentType === "Rent" && selectedMonth && calculatedRent && (
                             <div className="text-sm text-gray-700 ">
                                 Rent To Be Paid For {selectedMonth
                                     ? new Date(`${selectedMonth}-01`).toLocaleString('default', {
@@ -1111,7 +1086,7 @@ const Form = () => {
                                     : ''}: ₹ {calculatedRent}
                             </div>
                         )}
-                        {selectedType === "Pending Rent" && formTenantName && formShopNo && startingDate && (() => {
+                        {selectedRentType === "Pending Rent" && formTenantName && formShopNo && startingDate && (() => {
                             let shopClosureDate = null;
                             const matchingTenant = tenantShopData.find(tenant => tenant.tenantName === formTenantName);
                             if (matchingTenant) {
@@ -1137,19 +1112,21 @@ const Form = () => {
                                 </div>
                             );
                         })()}
-                        {selectedType === "Shop Closure" && formTenantName && formShopNo && startingDate && (
-                            <div className="text-sm text-gray-700 ">
-                                {closureDate ? (
-                                    <>Pending Rent (Up to {new Date(closureDate).toLocaleDateString('en-IN', {
-                                        day: '2-digit',
-                                        month: 'short',
-                                        year: 'numeric'
-                                    })}): ₹ {calculatePendingRentUpToDate(closureDate).toLocaleString('en-IN')}</>
-                                ) : (
-                                    <>Pending Rent (Up to Today): ₹ {calculatePendingRentUpToDate(new Date().toISOString().split('T')[0]).toLocaleString('en-IN')}</>
-                                )}
-                            </div>
-                        )}
+                        {selectedRentType === "Shop Closure" && formTenantName && formShopNo && startingDate && (() => {
+                            return (
+                                <div className="text-sm text-gray-700 ">
+                                    {closureDate ? (
+                                        <>Total Pending Rent (Up to {new Date(closureDate).toLocaleDateString('en-IN', {
+                                            day: '2-digit',
+                                            month: 'short',
+                                            year: 'numeric'
+                                        })}): ₹ {calculatePendingRentUpToDate(closureDate).toLocaleString('en-IN')}</>
+                                    ) : (
+                                        <>Total Pending Rent (Up to Today): ₹ {calculatePendingRentUpToDate(new Date().toISOString().split('T')[0]).toLocaleString('en-IN')}</>
+                                    )}
+                                </div>
+                            );
+                        })()}
                     </div>
                     <label className="block font-semibold mb-2">Tenant Name</label>
                     <Select
@@ -1159,7 +1136,7 @@ const Form = () => {
                             if (selectedOption) {
                                 setFormTenantName(selectedOption.value);
                                 setSelectedTenantId(selectedOption.tenantId);
-                                if (selectedType !== "Pending Rent") {
+                                if (selectedRentType !== "Pending Rent") {
                                     const tenantMatch = tenantShopData.find(t => t.tenantName === selectedOption.value);
                                     const tenantShops = tenantMatch?.property?.flatMap(p => p.shops)?.filter(shop => shop.active) || [];
                                     const newShopOptions = tenantShops.map(shop => ({
@@ -1240,7 +1217,7 @@ const Form = () => {
             <div className="mt-2 lg:flex gap-8">
                 <div className="mt-4">
                     <label className="block font-semibold mb-2">
-                        {selectedType === "Shop Closure" ? "Refund Amount" : "Amount"}
+                        {selectedRentType === "Shop Closure" ? "Refund Amount" : "Amount"}
                     </label>
                     <input
                         className={`border-2 border-opacity-[0.18] focus:outline-none rounded-lg p-2 w-[170px] h-[45px] ${
@@ -1264,7 +1241,7 @@ const Form = () => {
                         <option value="">Choose Method</option>
                         {paymentModeOptions
                             .filter(mode => {
-                                if (selectedType === "Advance" && 
+                                if (selectedRentType === "Advance" && 
                                     (mode.modeOfPayment === "Advance Adjustment" || 
                                      mode.modeOfPayment?.toLowerCase().includes("advance adjustment"))) {
                                     return false;
@@ -1289,7 +1266,7 @@ const Form = () => {
                         className="border-2 border-opacity-[0.18] focus:outline-none border-[#BF9853] rounded-lg p-2 w-[170px] h-[45px]"
                     />
                 </div>
-                {selectedType === "Shop Closure" && (
+                {selectedRentType === "Shop Closure" && (
                     <div className="mt-4">
                         <label className="block font-semibold mb-2">Closure Date</label>
                         <input
@@ -1300,7 +1277,7 @@ const Form = () => {
                         />
                     </div>
                 )}
-                {(selectedType === "Rent" || selectedType === "Pending Rent") && (
+                {(selectedRentType === "Rent" || selectedRentType === "Pending Rent") && (
                     <div className="mt-4">
                         <label className="block font-semibold mb-2">For The Month of</label>
                         <input

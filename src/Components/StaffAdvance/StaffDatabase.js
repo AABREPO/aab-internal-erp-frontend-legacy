@@ -6,7 +6,6 @@ import Filter from '../Images/filter (3).png'
 import Reload from '../Images/rotate-right.png'
 import edit from '../Images/Edit.svg';
 
-
 const StaffDatabase = ({ username, userRoles = [] }) => {
   const [records, setRecords] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -14,7 +13,8 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
   const [filterType, setFilterType] = useState(''); // "" means all types
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-
+  const [laboursList, setLaboursList] = useState([]);
+  const [staffAdvanceCombinedOptions, setStaffAdvanceCombinedOptions] = useState([]);
   // New state variables for advanced functionality
   const [selectDate, setSelectDate] = useState('');
   const [selectEmployeeName, setSelectEmployeeName] = useState('');
@@ -27,11 +27,9 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
   const [editFormData, setEditFormData] = useState({});
   const [editingId, setEditingId] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
-
   const scrollRef = useRef(null);
   const isDragging = useRef(false);
   const start = useRef({ x: 0, y: 0 });
@@ -45,7 +43,6 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
-
       try {
         // Fetch staff advance records
         let recData = [];
@@ -89,7 +86,7 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
         }
 
         setRecords(recData);
-        setEmployees(empData.map(e => ({ id: e.id, label: e.employee_name })));
+        setEmployees(empData.map(e => ({ id: e.id, label: e.employee_name, type: "Employee" })));
         setPurposes(purData.map(p => ({ id: p.id, label: p.purpose })));
       } catch (error) {
         console.error('Error in fetchData:', error);
@@ -104,6 +101,34 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
     };
     fetchData();
   }, []);
+
+  useEffect(() => {
+    fetchLaboursList();
+  }, []);
+  const fetchLaboursList = async () => {
+    try {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
+      if (response.ok) {
+        const data = await response.json();
+        const formattedData = data.map(item => ({
+          value: item.labour_name,
+          label: item.labour_name,
+          id: item.id,
+          type: "Labour",
+          salary: item.labour_salary,
+          extra: item.extra_amount
+        }));
+        setLaboursList(formattedData);
+      } else {
+        console.log('Error fetching Labour names.');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      console.log('Error fetching Labour names.');
+    }
+  };
+
+  useEffect(() => { setStaffAdvanceCombinedOptions([...employees, ...laboursList]); }, [employees, laboursList]);
 
   // Mouse drag functionality for table scrolling
   const handleMouseDown = (e) => {
@@ -210,6 +235,7 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
   };
 
   const getEmployeeName = (id) => employees.find(e => e.id === id)?.label || id;
+  const getLabourName = (id) => laboursList.find(l => l.id === id)?.label || id;
   const getPurposeName = (id) => purposes.find(p => p.id === id)?.label || id;
 
   // Advanced filtering logic
@@ -226,7 +252,7 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
 
       // Employee filter
       if (selectEmployeeName) {
-        const employeeName = getEmployeeName(entry.employee_id) || "";
+        const employeeName = getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || "";
         if (employeeName.toLowerCase() !== selectEmployeeName.toLowerCase()) return false;
       }
 
@@ -258,59 +284,58 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
 
   // Sorting logic
 
-// Sorting logic
-const sortedData = useMemo(() => {
-  let sortableData = [...filteredRecords];
+  // Sorting logic
+  const sortedData = useMemo(() => {
+    let sortableData = [...filteredRecords];
 
-  if (sortConfig.key) {
-    sortableData.sort((a, b) => {
-      let aValue, bValue;
+    if (sortConfig.key) {
+      sortableData.sort((a, b) => {
+        let aValue, bValue;
 
-      switch (sortConfig.key) {
-        case 'date':
-          aValue = new Date(a.date);
-          bValue = new Date(b.date);
-          break;
-        case 'employee':
-          aValue = getEmployeeName(a.employee_id);
-          bValue = getEmployeeName(b.employee_id);
-          break;
-        case 'purpose':
-          aValue = getPurposeName(a.from_purpose_id);
-          bValue = getPurposeName(b.from_purpose_id);
-          break;
-        case 'transfer':
-          aValue = getPurposeName(a.to_purpose_id);
-          bValue = getPurposeName(b.to_purpose_id);
-          break;
-        case 'type':
-          aValue = a.type || '';
-          bValue = b.type || '';
-          break;
-        case 'mode':
-          aValue = a.staff_payment_mode || '';
-          bValue = b.staff_payment_mode || '';
-          break;
-        case 'entry_no':
-          aValue = Number(a.entry_no) || 0;
-          bValue = Number(b.entry_no) || 0;
-          break;
-        default:
-          return 0;
-      }
+        switch (sortConfig.key) {
+          case 'date':
+            aValue = new Date(a.date);
+            bValue = new Date(b.date);
+            break;
+          case 'employee':
+            aValue = getEmployeeName(a.employee_id) || getLabourName(a.labour_id);
+            bValue = getEmployeeName(b.employee_id) || getLabourName(b.labour_id);
+            break;
+          case 'purpose':
+            aValue = getPurposeName(a.from_purpose_id);
+            bValue = getPurposeName(b.from_purpose_id);
+            break;
+          case 'transfer':
+            aValue = getPurposeName(a.to_purpose_id);
+            bValue = getPurposeName(b.to_purpose_id);
+            break;
+          case 'type':
+            aValue = a.type || '';
+            bValue = b.type || '';
+            break;
+          case 'mode':
+            aValue = a.staff_payment_mode || '';
+            bValue = b.staff_payment_mode || '';
+            break;
+          case 'entry_no':
+            aValue = Number(a.entry_no) || 0;
+            bValue = Number(b.entry_no) || 0;
+            break;
+          default:
+            return 0;
+        }
+        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    } else {
+      // Default sorting: latest entry_no first (descending order)
+      sortableData.sort((a, b) => Number(b.entry_no) - Number(a.entry_no));
+      console.log("Default sorting by entry_no desc applied:", sortableData.map(item => item.entry_no));
+    }
 
-      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-      return 0;
-    });
-  } else {
-    // Default sorting: latest entry_no first (descending order)
-    sortableData.sort((a, b) => Number(b.entry_no) - Number(a.entry_no));
-    console.log("Default sorting by entry_no desc applied:", sortableData.map(item => item.entry_no));
-  }
-
-  return sortableData;
-}, [filteredRecords, sortConfig]);
+    return sortableData;
+  }, [filteredRecords, sortConfig]);
 
 
 
@@ -380,7 +405,7 @@ const sortedData = useMemo(() => {
     const rows = sortedData.map((entry, index) => [
       index + 1,
       formatDateOnly(entry.date),
-      getEmployeeName(entry.employee_id),
+      getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id),
       getPurposeName(entry.from_purpose_id),
       getPurposeName(entry.to_purpose_id),
       entry.amount != null && entry.amount !== ""
@@ -440,7 +465,7 @@ const sortedData = useMemo(() => {
     const csvRows = sortedData.map((entry, index) => [
       index + 1,
       formatDateOnly(entry.date),
-      getEmployeeName(entry.employee_id),
+      getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id),
       getPurposeName(entry.from_purpose_id),
       getPurposeName(entry.to_purpose_id),
       entry.amount != null && entry.amount !== ""
@@ -479,6 +504,7 @@ const sortedData = useMemo(() => {
       date: entry.date?.split('T')[0] || '',
       amount: entry.amount || '',
       employee_id: entry.employee_id || '',
+      labour_id: entry.labour_id || '',
       from_purpose_id: entry.from_purpose_id || '',
       to_purpose_id: entry.to_purpose_id || '',
       entryNo: entry.entry_no || '',
@@ -497,6 +523,7 @@ const sortedData = useMemo(() => {
         type: editFormData.type || '',
         date: editFormData.date || '',
         employee_id: editFormData.employee_id || '',
+        labour_id: editFormData.labour_id || '',
         from_purpose_id: editFormData.from_purpose_id || null,
         to_purpose_id: editFormData.to_purpose_id || null,
         staff_payment_mode: editFormData.staff_payment_mode || '',
@@ -745,7 +772,7 @@ const sortedData = useMemo(() => {
                     <span className="hidden sm:inline">Attached file</span>
                     <span className="sm:hidden">File</span>
                   </th>
-                  <th 
+                  <th
                     className="px-1 sm:px-2 min-w-[50px] sm:min-w-[60px] font-bold text-left cursor-pointer hover:bg-gray-200 text-xs sm:text-sm"
                     onClick={() => handleSort('entry_no')}
                   >
@@ -975,8 +1002,8 @@ const sortedData = useMemo(() => {
                       <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[80px] sm:min-w-[100px] font-semibold">{formatDateOnly(entry.date)}</td>
                       {/* Employee Name */}
                       <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[120px] sm:min-w-[150px] font-semibold">
-                        <span className="truncate block max-w-[120px] sm:max-w-[150px]" title={getEmployeeName(entry.employee_id)}>
-                          {getEmployeeName(entry.employee_id)}
+                        <span className="truncate block max-w-[120px] sm:max-w-[150px]" title={getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id)}>
+                          {getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id)}
                         </span>
                       </td>
                       {/* Purpose */}
@@ -1159,9 +1186,26 @@ const sortedData = useMemo(() => {
                     <label className='font-semibold block text-sm sm:text-base'>Employee</label>
                   </div>
                   <Select
-                    options={employees}
-                    value={employees.find(emp => emp.id === editFormData.employee_id) || null}
-                    onChange={(selected) => setEditFormData({ ...editFormData, employee_id: selected?.id || '' })}
+                    options={staffAdvanceCombinedOptions}
+                    value={
+                      staffAdvanceCombinedOptions.find(
+                        opt =>
+                          (opt.type === "Employee" && opt.id === editFormData.employee_id) ||
+                          (opt.type === "Labour" && opt.id === editFormData.labour_id)
+                      ) || null
+                    }
+                    onChange={(selected) => {
+                      if (!selected) {
+                        setEditFormData({ ...editFormData, employee_id: '', labour_id: '' });
+                        return;
+                      }
+
+                      if (selected.type === "Employee") {
+                        setEditFormData({ ...editFormData, employee_id: selected.id, labour_id: null });
+                      } else {
+                        setEditFormData({ ...editFormData, labour_id: selected.id, employee_id: null });
+                      }
+                    }}
                     className='w-full sm:w-[263px] h-[40px] sm:h-[45px] rounded-lg focus:outline-none'
                     isClearable
                     styles={{

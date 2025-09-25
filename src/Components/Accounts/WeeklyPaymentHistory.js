@@ -6,6 +6,8 @@ import history from '../Images/History.svg';
 import Filter from '../Images/filter (3).png';
 import Select from 'react-select';
 import download from '../Images/file_download.png'
+import NotesStart from '../Images/notes _start.png';
+import NotesEnd from '../Images/notes_end.png';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -36,6 +38,115 @@ const History = ({ username, userRoles = [] }) => {
     const currentYear = new Date().getFullYear();
     const startYear = 2000; // Change if needed
     const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i);
+
+    // Payment popup states for Project Advance and Staff Advance
+    const [showPaymentPopup, setShowPaymentPopup] = useState(false);
+    const [paymentPopupData, setPaymentPopupData] = useState({
+        paymentMode: "",
+        amount: ""
+    });
+    const [currentProjectAdvanceRow, setCurrentProjectAdvanceRow] = useState(null);
+    const [weeklyPaymentBills, setWeeklyPaymentBills] = useState([]);
+
+    // Description functionality
+    const [showPopups, setShowPopups] = useState(false);
+    const [currentRow, setCurrentRow] = useState(null);
+    const [portalDescriptions, setPortalDescriptions] = useState({});
+    const [editFormData, setEditFormData] = useState({
+        date: "",
+        contractor_id: "",
+        vendor_id: "",
+        employee_id: "",
+        project_id: "",
+        type: "",
+        amount: "",
+        advance_portal_id: "",
+        staff_advance_portal_id: "",
+        description: "",
+    });
+
+    // Click and drag scrolling functionality
+    const scrollRef = useRef(null);
+    const paymentsScrollRef = useRef(null);
+    const isDragging = useRef(false);
+    const start = useRef({ x: 0, y: 0 });
+    const scroll = useRef({ left: 0, top: 0 });
+    const velocity = useRef({ x: 0, y: 0 });
+    const animationFrame = useRef(null);
+    const lastMove = useRef({ time: 0, x: 0, y: 0 });
+
+    const handleMouseDown = (e, ref) => {
+        if (!ref.current) return;
+        isDragging.current = true;
+        start.current = { x: e.clientX, y: e.clientY };
+        scroll.current = {
+            left: ref.current.scrollLeft,
+            top: ref.current.scrollTop,
+        };
+        lastMove.current = {
+            time: Date.now(),
+            x: e.clientX,
+            y: e.clientY,
+        };
+        ref.current.style.cursor = 'grabbing';
+        ref.current.style.userSelect = 'none';
+        cancelMomentum();
+    };
+
+    const handleMouseMove = (e, ref) => {
+        if (!isDragging.current || !ref.current) return;
+        const dx = e.clientX - start.current.x;
+        const dy = e.clientY - start.current.y;
+        const now = Date.now();
+        const dt = now - lastMove.current.time || 16;
+        velocity.current = {
+            x: (e.clientX - lastMove.current.x) / dt,
+            y: (e.clientY - lastMove.current.y) / dt,
+        };
+        ref.current.scrollLeft = scroll.current.left - dx;
+        ref.current.scrollTop = scroll.current.top - dy;
+        lastMove.current = {
+            time: now,
+            x: e.clientX,
+            y: e.clientY,
+        };
+    };
+
+    const handleMouseUp = (ref) => {
+        if (!isDragging.current || !ref.current) return;
+        isDragging.current = false;
+        ref.current.style.cursor = '';
+        ref.current.style.userSelect = '';
+        applyMomentum();
+    };
+
+    const cancelMomentum = () => {
+        if (animationFrame.current) {
+            cancelAnimationFrame(animationFrame.current);
+            animationFrame.current = null;
+        }
+    };
+
+    const applyMomentum = () => {
+        if (!scrollRef.current && !paymentsScrollRef.current) return;
+        const friction = 0.95;
+        const minVelocity = 0.1;
+        const step = () => {
+            const { x, y } = velocity.current;
+            const activeRef = scrollRef.current || paymentsScrollRef.current;
+            if (!activeRef) return;
+            if (Math.abs(x) > minVelocity || Math.abs(y) > minVelocity) {
+                activeRef.scrollLeft -= x * 20;
+                activeRef.scrollTop -= y * 20;
+                velocity.current.x *= friction;
+                velocity.current.y *= friction;
+                animationFrame.current = requestAnimationFrame(step);
+            } else {
+                cancelMomentum();
+            }
+        };
+        animationFrame.current = requestAnimationFrame(step);
+    };
 
     // Filter state variables
     const [showFilters, setShowFilters] = useState(false);
@@ -307,6 +418,25 @@ const History = ({ username, userRoles = [] }) => {
                     (payment) => payment.type !== "Handover"
                 );
                 setPayments(filteredPayments);
+
+                // Fetch descriptions for Project Advance rows
+                const projectAdvanceRows = expensesRes.data.filter(row => row.type === "Project Advance" && row.advance_portal_id);
+                const newDescriptions = { ...portalDescriptions };
+                for (const row of projectAdvanceRows) {
+                    try {
+                        const res = await fetch(
+                            `https://backendaab.in/aabuildersDash/api/advance_portal/get/${row.advance_portal_id}`
+                        );
+                        if (res.ok) {
+                            const data = await res.json();
+                            const description = (data.description || "").trim();
+                            newDescriptions[row.advance_portal_id] = description !== "" ? description : undefined;
+                        }
+                    } catch (error) {
+                        console.error("Error fetching advance portal data:", error);
+                    }
+                }
+                setPortalDescriptions(newDescriptions);
             } catch (error) {
                 console.error("Error fetching weekly data:", error);
             }
@@ -828,13 +958,13 @@ const History = ({ username, userRoles = [] }) => {
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.text("EXPENDITURE PAYMENTS", 300, baseY - 25);
-        
+
         // Initialize summaryMap with all weeklyTypes (with 0 count and 0 total)
         const summaryMap = weeklyTypes.reduce((acc, typeObj) => {
             acc[typeObj.type] = { count: 0, total: 0 };
             return acc;
         }, {});
-        
+
         // Populate summaryMap with actual expense data (including expenses with amount > 0)
         filteredExpenses
             .filter(expense => Number(expense.amount) > 0)
@@ -857,7 +987,7 @@ const History = ({ username, userRoles = [] }) => {
                 // Sort by total amount: non-zero amounts first, then zero amounts
                 const totalA = Number(a[3]);
                 const totalB = Number(b[3]);
-                
+
                 if (totalA === 0 && totalB === 0) {
                     // Both are zero, sort alphabetically by type name
                     return a[0].localeCompare(b[0]);
@@ -922,41 +1052,33 @@ const History = ({ username, userRoles = [] }) => {
                 }
             });
         }
-        // ===== SUMMARY TOTAL BOX =====
         const summaryTotal = summaryData.reduce((acc, row) => acc + Number(String(row[1] || "0").replace(/,/g, "")), 0);
         const summaryBoxY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 15 : baseY + 100;
         doc.setFontSize(10);
         doc.setFont("helvetica", "bold");
-        // Draw outer rectangle
         doc.rect(300, summaryBoxY - 12, 200, 20);
-        // Draw vertical line to separate label and amount (choose split point)
         const splitX = 420;
-        doc.line(splitX, summaryBoxY - 12, splitX, summaryBoxY + 8); // vertical divider inside the box
-        // Add label and amount inside the box
+        doc.line(splitX, summaryBoxY - 12, splitX, summaryBoxY + 8); 
         doc.text("TOTAL", 310, summaryBoxY + 3);
         doc.text(
             String(summaryTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
-            490, // keep inside box with some right padding
+            490,
             summaryBoxY + 3,
             { align: "right" }
         );
-        // ===== ADD THREE NEW TABLES WITH FOUR COLUMNS BELOW SUMMARY =====
-        const newTableX = 520;  // Right of summary table
+        const newTableX = 520; 
         let newTableY = baseY;
-        // --- Calculate staff advance data ---
         const staffAdvanceEntries = filteredExpenses.filter(e => e.type === "Staff Advance");
         const staffAdvanceCount = staffAdvanceEntries.length;
         const staffAdvanceTotal = staffAdvanceEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-        // First table (Staff Advance Summary)
         const staffAdvanceHead = [[
-            String(staffAdvanceCount || "0"),       // count
-            "STAFF ADVANCE",                 // static heading
-            "PROJECT NAME",                  // static heading
-            String(staffAdvanceTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00") // total amount
+            String(staffAdvanceCount || "0"),
+            "STAFF ADVANCE",
+            "PROJECT NAME",
+            String(staffAdvanceTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
         ]];
-        // Each row will have blank in first column, label in second, project name in third, amount in fourth
         const staffAdvanceBody = staffAdvanceEntries.map(e => [
-            String(e.date ? formatDateOnly(e.date) : ""), // show date in first column
+            String(e.date ? formatDateOnly(e.date) : ""),
             String(combinedOptions.find(opt =>
                 (opt.type === "Contractor" && opt.id === Number(e.contractor_id)) ||
                 (opt.type === "Vendor" && opt.id === Number(e.vendor_id)) ||
@@ -976,10 +1098,9 @@ const History = ({ username, userRoles = [] }) => {
             headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
             bodyStyles: { fontStyle: 'bold' },
             columnStyles: {
-                3: { halign: 'right' } // Amount column
+                3: { halign: 'right' }
             },
             didParseCell: (data) => {
-                // 🔹 Only right-align the header for column index 2
                 if (data.section === 'head' && data.column.index === 3) {
                     data.cell.styles.halign = 'right';
                 }
@@ -989,20 +1110,17 @@ const History = ({ username, userRoles = [] }) => {
             }
         });
         newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
-        // --- Calculate staff salary data ---
         const staffSalaryEntries = filteredExpenses.filter(e => e.type === "Staff Salary");
         const staffSalaryCount = staffSalaryEntries.length;
         const staffSalaryTotal = staffSalaryEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-        // Second table (Staff Salary Summary)
         const staffSalaryHead = [[
-            String(staffSalaryCount || "0"),      // count of Staff Salary entries
-            "STAFF SALARY",                // static heading
-            "PROJECT NAME",                // static heading
-            String(staffSalaryTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00") // total amount
+            String(staffSalaryCount || "0"),
+            "STAFF SALARY", 
+            "PROJECT NAME", 
+            String(staffSalaryTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00") 
         ]];
-        // Each row: blank first cell, contractor/vendor label second cell, project name third cell, amount fourth cell
         const staffSalaryBody = staffSalaryEntries.map(e => [
-            String(e.date ? formatDateOnly(e.date) : ""), // show date in first column
+            String(e.date ? formatDateOnly(e.date) : ""),
             String(combinedOptions.find(opt =>
                 (opt.type === "Contractor" && opt.id === Number(e.contractor_id)) ||
                 (opt.type === "Vendor" && opt.id === Number(e.vendor_id)) ||
@@ -1022,14 +1140,13 @@ const History = ({ username, userRoles = [] }) => {
             headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
             bodyStyles: { fontStyle: 'bold' },
             columnStyles: {
-                1: { halign: 'right' } // Amount column
+                1: { halign: 'right' }
             },
             didDrawPage: () => {
                 drawHeader(doc);
             }
         });
         newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
-        // Third table (unchanged - sample data)
         autoTable(doc, {
             head: [["Col1", "Col2", "Col3", "Col4"]],
             body: [
@@ -1044,24 +1161,62 @@ const History = ({ username, userRoles = [] }) => {
             headStyles: { textColor: [0, 0, 0], fillColor: [255, 255, 255], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
             bodyStyles: { fontStyle: 'bold' },
             columnStyles: {
-                1: { halign: 'right' } // Amount column
+                1: { halign: 'right' }
             },
             didDrawPage: () => {
                 drawHeader(doc);
             }
         });
         const lastPeriodEndDate = expenses
-            .map(exp => exp.period_end_date) // extract just the dates
-            .filter(Boolean)                 // keep only truthy values
+            .map(exp => exp.period_end_date)
+            .filter(Boolean)
             .pop();
         newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
         doc.save(`PR ${selectedWeek || ""} - Weekly Payment Report ${formatDateOnly(lastPeriodEndDate)}.pdf`);
     };
     const lastWeekNumber = Math.max(...weeks.map(week => week.number));
+    const getPaymentsByExpenseId = (expenseId) => {
+        if (!weeklyPaymentBills || weeklyPaymentBills.length === 0) {
+            return [];
+        }
+        const payments = weeklyPaymentBills.filter(bill => bill.weekly_payment_expense_id === expenseId);
+        return payments;
+    };
+    const updateDescription = async (id, description) => {
+        try {
+            const res = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/update/${id}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ description }),
+            });
+            if (!res.ok) {
+                throw new Error("Failed to update description");
+            }
+            const data = await res.json();
+            setEditFormData((prev) => ({
+                ...prev,
+                description: data.description,
+            }));
+            return data;
+        } catch (error) {
+            console.error("❌ Error updating description:", error);
+            alert("Failed to update description");
+        }
+    };
+    const handleEditChange = (e) => {
+        const { name, value } = e.target;
+        if (name === "description") {
+            setEditFormData((prev) => ({ ...prev, description: value }));
+        } else {
+            setEditFormData((prev) => ({ ...prev, [name]: value }));
+        }
+    };
     const saveEditedExpense = async (row) => {
         try {
             const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/update/${row.id}?username=${encodeURIComponent(username)} `, {
-                method: "PUT", // or "POST", based on your API
+                method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
                 },
@@ -1072,7 +1227,6 @@ const History = ({ username, userRoles = [] }) => {
             }
             window.location.reload();
             if (row.type === "Carry Forward") return;
-            // Optionally show success toast / refresh list
             setEditingRowId(null);
         } catch (error) {
             console.error("Error updating expense:", error);
@@ -1093,7 +1247,7 @@ const History = ({ username, userRoles = [] }) => {
     const saveEditedPaymentReceived = async (row) => {
         try {
             const response = await fetch(`https://backendaab.in/aabuildersDash/api/payments-received/update/${row.id}?username=${encodeURIComponent(username)}`, {
-                method: "PUT", // or "POST", based on your API
+                method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
                 },
@@ -1103,7 +1257,6 @@ const History = ({ username, userRoles = [] }) => {
                 throw new Error("Failed to update expense");
             }
             window.location.reload();
-            // Optionally show success toast / refresh list
             setEditingPaymentId(null);
         } catch (error) {
             console.error("Error updating expense:", error);
@@ -1111,7 +1264,7 @@ const History = ({ username, userRoles = [] }) => {
     };
     useEffect(() => {
         if (weeks.length > 0) {
-            setSelectedWeek(weeks[weeks.length - 1].number); // last week's number
+            setSelectedWeek(weeks[weeks.length - 1].number);
         }
     }, [weeks]);
     const fetchAuditDetailsForExpense = async (expensesId) => {
@@ -1178,14 +1331,10 @@ const History = ({ username, userRoles = [] }) => {
             console.log("Deletion cancelled.");
         }
     };
-
     return (
         <body>
             <div className='flex justify-end mt-[-28px] mr-6'>
-                <button
-                    className="font-semibold text-lg cursor-pointer flex items-center gap-2"
-                    onClick={generatePDF}
-                >
+                <button className="font-semibold text-lg cursor-pointer flex items-center gap-2" onClick={generatePDF}>
                     Report
                     <img className='w-6 h-5' src={download} alt="Download" />
                 </button>
@@ -1235,7 +1384,6 @@ const History = ({ username, userRoles = [] }) => {
                 </h1>
             </div>
             <div className="mx-auto w-auto p-3 sm:p-6 border-collapse bg-[#FFFFFF] ml-[15px] sm:ml-[30px] mr-3 sm:mr-6 rounded-md">
-                {/* Filter Button */}
                 <div className="text-left mb-4">
                     <button onClick={() => setShowFilters(!showFilters)}>
                         <img
@@ -1245,9 +1393,8 @@ const History = ({ username, userRoles = [] }) => {
                         />
                     </button>
                 </div>
-
                 <div className="flex flex-col xl:flex-row gap-6">
-                    <div className="w-full xl:flex-[4] xl:min-w-0">
+                    <div className="w-full xl:flex-[6] xl:min-w-0">
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
                             <h1 className="font-bold text-xl">PS: <span style={{ color: "#E4572E" }}>{selectedWeek}</span> </h1>
                             <h1 className="font-bold text-base">
@@ -1256,19 +1403,21 @@ const History = ({ username, userRoles = [] }) => {
                                 </span>
                             </h1>
                         </div>
-
-                        <div className="w-full">
-                            <div className="rounded-lg border-l-8 border-l-[#BF9853] w-full overflow-auto max-h-[500px]">
-                                <table className="w-full min-w-[900px] border-collapse">
-                                    <thead>
-                                        <tr className="bg-[#FAF6ED] h-12">
-                                            <th className="px-4 py-2 text-left">Sl.No</th>
-                                            <th className="px-4 py-2 text-left">Date</th>
-                                            <th className="px-4 py-2 text-left">Contractor/Vendor</th>
-                                            <th className="px-4 py-2 text-left">Project Name</th>
-                                            <th className="px-4 py-2 text-left">Type</th>
-                                            <th className="px-4 py-2 text-left">Amount</th>
-                                            <th>Activity</th>
+                        <div className="w-full h-[600px] rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden">
+                            <div ref={scrollRef} className="overflow-auto max-h-[600px] thin-scrollbar"
+                                onMouseDown={(e) => handleMouseDown(e, scrollRef)} onMouseMove={(e) => handleMouseMove(e, scrollRef)}
+                                onMouseUp={() => handleMouseUp(scrollRef)} onMouseLeave={() => handleMouseUp(scrollRef)}
+                            >
+                                <table className="w-[1320px] border-collapse text-left">
+                                    <thead className="sticky top-0 z-10 bg-white">
+                                        <tr className="bg-[#FAF6ED]">
+                                            <th className="pt-2 pl-2 w-[60px] font-bold text-left">Sl.No</th>
+                                            <th className="pt-2 w-[135px] font-bold text-left">Date</th>
+                                            <th className="pt-2 w-[200px] font-bold text-left">Contractor/Vendor</th>
+                                            <th className="pt-2 w-[200px] font-bold text-left">Project Name</th>
+                                            <th className="pt-2 w-[100px] font-bold text-left">Type</th>
+                                            <th className="pt-2 w-[110px] font-bold text-left">Amount</th>
+                                            <th className="pt-2 w-[120px] font-bold text-left">Activity</th>
                                         </tr>
                                         {showFilters && (
                                             <tr className="bg-white border-b border-gray-200">
@@ -1541,11 +1690,10 @@ const History = ({ username, userRoles = [] }) => {
                                                 </td>
                                             </tr>
                                         ) : null}
-                                        {/* Editable Expense rows */}
                                         {[...filteredExpenses].reverse().map((row, index) => (
                                             <tr key={row.id} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
-                                                <td className="px-4 py-2 font-bold">{filteredExpenses.length - index}</td>
-                                                <td className="px-4 py-2">
+                                                <td className="text-sm text-left pl-2 w-[60px] font-semibold">{filteredExpenses.length - index}.</td>
+                                                <td className="text-sm text-left w-[135px] font-semibold">
                                                     {editingRowId === row.id ? (
                                                         <input
                                                             type="date"
@@ -1561,8 +1709,7 @@ const History = ({ username, userRoles = [] }) => {
                                                         </div>
                                                     )}
                                                 </td>
-                                                {/* Contractor / Vendor column */}
-                                                <td className="px-4 py-2">
+                                                <td className="text-sm text-left w-[200px] font-semibold">
                                                     {editingRowId === row.id ? (
                                                         <Select
                                                             name="party"
@@ -1594,7 +1741,6 @@ const History = ({ username, userRoles = [] }) => {
                                                             styles={customStyles}
                                                         />
                                                     ) : (
-                                                        // Show label in view mode
                                                         <div className="w-[180px] h-[40px] flex items-center">
                                                             {combinedOptions.find(
                                                                 opt =>
@@ -1605,8 +1751,7 @@ const History = ({ username, userRoles = [] }) => {
                                                         </div>
                                                     )}
                                                 </td>
-                                                {/* Project column */}
-                                                <td className="px-4 py-2">
+                                                <td className="text-sm text-left w-[200px] font-semibold">
                                                     {editingRowId === row.id ? (
                                                         <Select
                                                             name="project"
@@ -1626,17 +1771,16 @@ const History = ({ username, userRoles = [] }) => {
                                                             styles={customStyles}
                                                         />
                                                     ) : (
-                                                        // Show label in view mode
                                                         <div className="w-[220px] h-[40px] flex items-center">
                                                             {siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""}
                                                         </div>
                                                     )}
                                                 </td>
-                                                <td className="px-4 py-2">
+                                                <td className="text-sm text-left w-[100px] font-semibold">
                                                     {editingRowId === row.id ? (
                                                         <select
                                                             name="type"
-                                                            className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[120px] text-left h-[40px] rounded-lg focus:outline-none"
+                                                            className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[90px] h-[40px] rounded-lg focus:outline-none"
                                                             value={row.type}
                                                             onChange={(e) => handleEditExpense(row.id, 'type', e.target.value)}
                                                         >
@@ -1648,31 +1792,109 @@ const History = ({ username, userRoles = [] }) => {
                                                             ))}
                                                         </select>
                                                     ) : (
-                                                        <div className="w-[120px] h-[40px] flex items-center">
-                                                            {row.type}
+                                                        <div className="flex flex-col gap-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span>{row.type}</span>
+                                                                {row.type !== "Daily" && Number(row.weekly_number) === Number(lastWeekNumber) && (
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setCurrentProjectAdvanceRow(row);
+                                                                            setPaymentPopupData({ paymentMode: "", amount: "" });
+                                                                            setShowPaymentPopup(true);
+                                                                        }}
+                                                                        className="bg-green-500 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-green-600 transition-colors text-xs"
+                                                                        title="Add Payment"
+                                                                    >
+                                                                        +
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                            {(() => {
+                                                                const payments = getPaymentsByExpenseId(row.id);
+                                                                const paymentModes = [...new Set(payments.map(p => p.bill_payment_mode).filter(mode => mode !== null && mode !== undefined))];
+                                                                if (paymentModes.length === 0) return null;
+                                                                const hoverContent = payments.map(payment =>
+                                                                    `${payment.bill_payment_mode}: ₹${payment.amount.toLocaleString('en-IN')}`
+                                                                ).join('\n');
+                                                                return (
+                                                                    <div className="flex flex-wrap gap-1 mt-1">
+                                                                        {paymentModes.length === 1 ? (
+                                                                            <span
+                                                                                className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full cursor-pointer hover:bg-blue-200 transition-colors"
+                                                                                title={hoverContent}
+                                                                            >
+                                                                                {paymentModes[0]}
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span
+                                                                                className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full cursor-pointer hover:bg-green-200 transition-colors"
+                                                                                title={hoverContent}
+                                                                            >
+                                                                                Online
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                         </div>
                                                     )}
                                                 </td>
-                                                <td className="px-4 py-2">
-                                                    {editingRowId === row.id ? (
-                                                        <input
-                                                            type="number"
-                                                            name="amount"
-                                                            className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[90px] h-[40px] rounded-lg focus:outline-none"
-                                                            value={row.amount}
-                                                            onChange={(e) => handleEditExpense(row.id, 'amount', e.target.value)}
-                                                            disabled={editingRowId !== row.id}
-                                                            onWheel={(e) => e.preventDefault()}
-                                                            onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
-                                                            onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
-                                                        />
-                                                    ) : (
-                                                        <div className="w-[90px] h-[40px] flex items-center">
-                                                            {Number(row.amount).toLocaleString('en-IN')}
+                                                <td className="text-sm text-left pl-2 w-[110px] font-semibold">
+                                                    <div className="flex items-center ">
+                                                        <div>
+                                                            {editingRowId === row.id ? (
+                                                                <input
+                                                                    type="number"
+                                                                    name="amount"
+                                                                    className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[90px] h-[40px] rounded-lg focus:outline-none"
+                                                                    value={row.amount}
+                                                                    onChange={(e) => handleEditExpense(row.id, 'amount', e.target.value)}
+                                                                    disabled={editingRowId !== row.id}
+                                                                    onWheel={(e) => e.preventDefault()}
+                                                                    onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
+                                                                    onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
+                                                                />
+                                                            ) : (
+                                                                <div className="w-[90px] h-[40px] flex items-center">
+                                                                    {Number(row.amount).toLocaleString('en-IN')}
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                    )}
+                                                        <div>
+                                                            {row.type === "Project Advance" && row.advance_portal_id && (
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        let description = "";
+                                                                        if (row.advance_portal_id) {
+                                                                            try {
+                                                                                const res = await fetch(
+                                                                                    `https://backendaab.in/aabuildersDash/api/advance_portal/get/${row.advance_portal_id}`
+                                                                                );
+                                                                                if (!res.ok) throw new Error("Failed to fetch advance portal data");
+                                                                                const data = await res.json();
+                                                                                description = data.description || "";
+                                                                            } catch (error) {
+                                                                                console.error("Error fetching advance portal data:", error);
+                                                                            }
+                                                                        }
+                                                                        setEditFormData((prev) => ({ ...prev, description }));
+                                                                        setCurrentRow(row);
+                                                                        setShowPopups(true);
+                                                                    }}
+                                                                >
+                                                                    <img
+                                                                        src={
+                                                                            portalDescriptions[row.advance_portal_id] ? NotesEnd : NotesStart
+                                                                        }
+                                                                        alt="Notes"
+                                                                        className="w-4 h-4"
+                                                                    />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 </td>
-                                                <td className="px-2 py-2 relative">
+                                                <td className="text-sm text-left pl-2 w-[120px] font-semibold">
                                                     {Number(row.weekly_number) === Number(lastWeekNumber) && (
                                                         <div className="flex gap-2"> {/* <-- Added flex container */}
                                                             {editingRowId === row.id ? (
@@ -1719,6 +1941,7 @@ const History = ({ username, userRoles = [] }) => {
                                                                     <img src={history} className="w-5 h-4" alt="History" />
                                                                 </button>
                                                             )}
+
                                                         </div>
                                                     )}
                                                 </td>
@@ -1740,7 +1963,12 @@ const History = ({ username, userRoles = [] }) => {
                                     </span>
                                 </h1>
                             </div>
-                            <div className="rounded-lg border-l-8 border-l-[#BF9853] w-full overflow-y-auto max-h-[300px]">
+                            <div ref={paymentsScrollRef} className="rounded-lg border-l-8 border-l-[#BF9853] w-full overflow-y-auto max-h-[300px] thin-scrollbar"
+                                onMouseDown={(e) => handleMouseDown(e, paymentsScrollRef)}
+                                onMouseMove={(e) => handleMouseMove(e, paymentsScrollRef)}
+                                onMouseUp={() => handleMouseUp(paymentsScrollRef)}
+                                onMouseLeave={() => handleMouseUp(paymentsScrollRef)}
+                            >
                                 <table className="w-full border-collapse">
                                     <thead className="bg-[#FAF6ED] h-12">
                                         <tr>
@@ -1950,6 +2178,256 @@ const History = ({ username, userRoles = [] }) => {
                 <AuditModalWeeklyPaymentsReceived show={showWeeklyPaymentReceivedModal} onClose={() => setShowWeeklyPaymentReceivedModal(false)}
                     audits={weeklyPaymentReceivedAudits} />
             </div>
+
+            {/* Payment Popup */}
+            {showPaymentPopup && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                    <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
+                        <h3 className="text-lg font-semibold mb-4 text-center">Add Payment</h3>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>
+                            <select
+                                value={paymentPopupData.paymentMode}
+                                onChange={(e) => setPaymentPopupData(prev => ({ ...prev, paymentMode: e.target.value }))}
+                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                            >
+                                <option value="">Select Payment Mode</option>
+                                <option value="Cash">Cash</option>
+                                <option value="GPay">GPay</option>
+                                <option value="Net Banking">Net Banking</option>
+                                <option value="Cheque">Cheque</option>
+                            </select>
+                        </div>
+                        <div className="mb-6">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                            <input
+                                type="number"
+                                value={paymentPopupData.amount}
+                                onChange={(e) => setPaymentPopupData(prev => ({ ...prev, amount: e.target.value }))}
+                                placeholder="Enter amount"
+                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none no-spinner"
+                            />
+                        </div>
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={() => {
+                                    setShowPaymentPopup(false);
+                                    setPaymentPopupData({ paymentMode: "", amount: "" });
+                                    setCurrentProjectAdvanceRow(null);
+                                }}
+                                className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        if (currentProjectAdvanceRow && paymentPopupData.paymentMode && paymentPopupData.amount) {
+                                            const paymentData = {
+                                                date: new Date().toISOString().split('T')[0],
+                                                created_at: new Date().toISOString(),
+                                                contractor_id: currentProjectAdvanceRow.contractor_id || null,
+                                                vendor_id: currentProjectAdvanceRow.vendor_id || null,
+                                                employee_id: currentProjectAdvanceRow.employee_id || null,
+                                                project_id: currentProjectAdvanceRow.project_id || null,
+                                                type: currentProjectAdvanceRow.type || null,
+                                                bill_payment_mode: paymentPopupData.paymentMode,
+                                                amount: parseFloat(paymentPopupData.amount),
+                                                status: true,
+                                                weekly_number: Number(selectedWeek),
+                                                weekly_payment_expense_id: currentProjectAdvanceRow.id
+                                            };
+
+                                            // Save weekly payment bill
+                                            const response = await fetch("https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save", {
+                                                method: "POST",
+                                                headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify(paymentData)
+                                            });
+
+                                            if (!response.ok) {
+                                                throw new Error("Failed to save payment");
+                                            }
+
+                                            // Handle Project Advance type
+                                            if (currentProjectAdvanceRow.type === "Project Advance" && currentProjectAdvanceRow.advance_portal_id) {
+                                                try {
+                                                    // Get the last entry number from all advance portal records and add 1
+                                                    const res = await fetch("https://backendaab.in/aabuildersDash/api/advance_portal/getAll");
+                                                    if (!res.ok) throw new Error("Failed to fetch entry numbers");
+                                                    const allData = await res.json();
+                                                    const maxEntryNo =
+                                                        allData.length > 0
+                                                            ? Math.max(...allData.map((item) => item.entry_no || 0))
+                                                            : 0;
+                                                    const nextEntryNo = maxEntryNo + 1;
+                                                    // Get week number
+                                                    const getWeekNumber = () => {
+                                                        const now = new Date();
+                                                        const start = new Date(now.getFullYear(), 0, 1);
+                                                        const diff =
+                                                            now - start + (start.getTimezoneOffset() - now.getTimezoneOffset()) * 60000;
+                                                        const oneWeek = 604800000; // ms in a week
+                                                        return Math.floor(diff / oneWeek) + 1;
+                                                    };
+                                                    // Get description from portalDescriptions state (if available)
+                                                    const description = ""; // You may need to add portalDescriptions state if needed
+                                                    const advanceUpdateData = {
+                                                        type: "Advance",
+                                                        date: new Date().toISOString().split('T')[0],
+                                                        description: description,
+                                                        bill_amount: 0,
+                                                        amount: parseFloat(paymentPopupData.amount),
+                                                        project_id: currentProjectAdvanceRow.project_id,
+                                                        vendor_id: currentProjectAdvanceRow.vendor_id,
+                                                        contractor_id: currentProjectAdvanceRow.contractor_id,
+                                                        entry_no: nextEntryNo,
+                                                        week_no: getWeekNumber(),
+                                                        file_url: "",
+                                                        transfer_site_id: 0,
+                                                        refund_amount: 0,
+                                                        payment_mode: paymentPopupData.paymentMode
+                                                    };
+                                                    const advanceResponse = await fetch(
+                                                        "https://backendaab.in/aabuildersDash/api/advance_portal/save",
+                                                        {
+                                                            method: "POST",
+                                                            headers: { "Content-Type": "application/json" },
+                                                            body: JSON.stringify(advanceUpdateData)
+                                                        }
+                                                    );
+                                                    if (!advanceResponse.ok) {
+                                                        console.error("Failed to update advance portal payment mode");
+                                                    } else {
+                                                        console.log("Advance portal payment mode updated successfully");
+                                                    }
+                                                } catch (error) {
+                                                    console.error("Error updating advance portal payment mode:", error);
+                                                }
+                                            }
+
+                                            // Handle Staff Advance type
+                                            if (currentProjectAdvanceRow.type === "Staff Advance") {
+                                                try {
+                                                    // Get the last entry number from staff-advance/all endpoint
+                                                    const staffAdvanceRes = await fetch("https://backendaab.in/aabuildersDash/api/staff-advance/all");
+                                                    if (!staffAdvanceRes.ok) throw new Error("Failed to fetch staff advance entry numbers");
+                                                    const staffAdvanceData = await staffAdvanceRes.json();
+                                                    const maxEntryNo =
+                                                        staffAdvanceData.length > 0
+                                                            ? Math.max(...staffAdvanceData.map((item) => item.entry_no || 0))
+                                                            : 0;
+                                                    const nextEntryNo = maxEntryNo + 1;
+
+                                                    // Get week number
+                                                    const getWeekNumber = () => {
+                                                        const now = new Date();
+                                                        const start = new Date(now.getFullYear(), 0, 1);
+                                                        const diff =
+                                                            now - start + (start.getTimezoneOffset() - now.getTimezoneOffset()) * 60000;
+                                                        const oneWeek = 604800000; // ms in a week
+                                                        return Math.floor(diff / oneWeek) + 1;
+                                                    };
+
+                                                    const staffAdvanceSaveData = {
+                                                        date: new Date(),
+                                                        employee_id: currentProjectAdvanceRow.employee_id,
+                                                        project_id: currentProjectAdvanceRow.project_id,
+                                                        type: "Advance",
+                                                        from_purpose_id: 4,
+                                                        staff_payment_mode: paymentPopupData.paymentMode,
+                                                        entry_no: nextEntryNo,
+                                                        week_no: getWeekNumber(),
+                                                        amount: parseFloat(paymentPopupData.amount),
+                                                        staff_refund_amount: 0.0,
+                                                        description: "",
+                                                        file_url: null,
+                                                        labour_id: 0
+                                                    };
+
+                                                    const staffAdvanceResponse = await fetch(
+                                                        "https://backendaab.in/aabuildersDash/api/staff-advance/save",
+                                                        {
+                                                            method: "POST",
+                                                            headers: { "Content-Type": "application/json" },
+                                                            body: JSON.stringify(staffAdvanceSaveData)
+                                                        }
+                                                    );
+
+                                                    if (!staffAdvanceResponse.ok) {
+                                                        console.error("Failed to save staff advance");
+                                                    } else {
+                                                        console.log("Staff advance saved successfully");
+                                                    }
+                                                } catch (error) {
+                                                    console.error("Error saving staff advance:", error);
+                                                }
+                                            }
+
+                                            // Refresh the data
+                                            const [expensesRes, paymentsRes] = await Promise.all([
+                                                axios.get(`https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${selectedWeek}`),
+                                                axios.get(`https://backendaab.in/aabuildersDash/api/payments-received/week/${selectedWeek}`)
+                                            ]);
+
+                                            setExpenses(expensesRes.data);
+                                            const filteredPayments = paymentsRes.data.filter(
+                                                (payment) => payment.type !== "Handover"
+                                            );
+                                            setPayments(filteredPayments);
+                                        }
+                                    } catch (error) {
+                                        console.error("Error saving payment:", error);
+                                    }
+
+                                    setShowPaymentPopup(false);
+                                    setPaymentPopupData({ paymentMode: "", amount: "" });
+                                    setCurrentProjectAdvanceRow(null);
+                                }}
+                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                                disabled={!paymentPopupData.paymentMode || !paymentPopupData.amount}
+                            >
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Description Popup */}
+            {showPopups && (currentRow?.type === "Project Advance" || currentRow?.type === "Bill") && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                    <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
+                        <label className="block mb-3 text-left">
+                            <span className="font-semibold">Description</span>
+                            <input
+                                type="text"
+                                name="description"
+                                value={editFormData.description}
+                                className="w-full p-2 border border-gray-300 rounded-lg mt-1"
+                                onChange={handleEditChange}
+                                readOnly={Boolean(currentRow?.description)}
+                            />
+                        </label>
+                        <div className="flex justify-end gap-3 mt-4">
+                            <button onClick={() => setShowPopups(false)} className="px-4 py-2 bg-gray-200 rounded-lg">
+                                Close
+                            </button>
+                            {!portalDescriptions[currentRow?.advance_portal_id] && (
+                                <button
+                                    onClick={async () => {
+                                        await updateDescription(currentRow.advance_portal_id, editFormData.description);
+                                        setShowPopups(false);
+                                    }}
+                                    className="px-4 py-2 bg-green-600 text-white rounded-lg"
+                                >
+                                    Save
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </body >
     )
 }

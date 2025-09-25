@@ -100,7 +100,6 @@ const Form = () => {
         if (file) {
             setSelectedRentFile(file);
         }
-        // This ensures the input is cleared even if the same file is selected again next time
         e.target.value = '';
     };
     useEffect(() => {
@@ -128,15 +127,12 @@ const Form = () => {
             if (response.ok) {
                 const data = await response.json();
                 setTenantShopData(data);
-
-                // For regular types, filter active tenants only
                 if (selectedRentType !== "Pending Rent") {
                     const activeTenants = data.filter(t =>
                         t.property?.some(p =>
                             p.shops?.some(shop => shop.active)
                         )
                     );
-                    // Step 2: Map all active tenant-shop combinations
                     const options = activeTenants.flatMap(t =>
                         t.property.flatMap(p =>
                             p.shops
@@ -154,8 +150,7 @@ const Form = () => {
                     );
                     setTenantOptions(tenantOptionsUnique);
                 } else {
-                    // For Pending Rent, include all tenants (active and vacated)
-                    const allTenants = data.filter(t => t.tenantName); // Filter out any invalid entries
+                    const allTenants = data.filter(t => t.tenantName);
                     const options = allTenants.flatMap(t =>
                         t.property?.flatMap(p =>
                             p.shops?.map(shop => ({
@@ -172,7 +167,6 @@ const Form = () => {
                     );
                     setTenantOptions(tenantOptionsUnique);
                 }
-                // Create shop options from all shops (active and inactive)
                 const allShops = data.flatMap(t =>
                     t.property?.flatMap(p =>
                         p.shops?.map(shop => shop.shopNo) || []
@@ -258,7 +252,6 @@ const Form = () => {
             setMessage('Error fetching tile area names.');
         }
     };
-
     const fetchRentalForms = async () => {
         try {
             const response = await fetch('https://backendaab.in/aabuildersDash/api/rental_forms/getAll');
@@ -272,7 +265,6 @@ const Form = () => {
             console.error('Error fetching rental forms:', error);
         }
     };
-
     const fetchRentHistory = async () => {
         try {
             const response = await fetch('https://backendaab.in/aabuildersDash/api/rent-history/getAll');
@@ -286,9 +278,7 @@ const Form = () => {
             console.error('Error fetching rent history:', error);
         }
     };
-
     const calculateAdvanceAmount = (tenantName, shopNo) => {
-
         if (!tenantName || !shopNo || rentalFormsData.length === 0) {
             setAdvanceAmount(0);
             return;
@@ -313,17 +303,13 @@ const Form = () => {
                 totalAdvance -= refundAmount;
             }
         });
-
         setAdvanceAmount(totalAdvance);
     };
-    // Calculate pending rent up to a specific date using rent history data
     const calculatePendingRentUpToDate = (endDate) => {
         if (!formTenantName || !formShopNo || !startingDate || rentHistoryData.length === 0) {
             return 0;
         }
-        // Use closure date if provided, otherwise use the passed endDate
         const calculationEndDate = closureDate || endDate;
-        // Create a mapping from tenantWithShopNoId to shopNo
         const tenantShopMapping = {};
         tenantShopData.forEach(tenant => {
             tenant.property?.forEach(property => {
@@ -341,35 +327,30 @@ const Form = () => {
         rentHistoryData.forEach(history => {
             const shopDetails = tenantShopMapping[history.tenantWithShopNoId];
             console.log(shopDetails);
-        });        
-        // Filter rent history data for the specific shopNo by first finding matching tenantWithShopNoIds
+        });
         const matchingTenantShopIds = Object.keys(tenantShopMapping).filter(id => 
             tenantShopMapping[id].shopNo === formShopNo && 
             tenantShopMapping[id].tenantName === formTenantName
         );        
         if (matchingTenantShopIds.length === 0) {
             return 0;
-        }        
-        // Get rent history for the matching tenantWithShopNoIds
+        }
         const shopRentHistory = rentHistoryData.filter(history => 
             matchingTenantShopIds.includes(history.tenantWithShopNoId.toString())
         );        
         if (shopRentHistory.length === 0) {
             return 0;
-        }        
-        // Sort rent history by starting date to get chronological order
+        }
         const sortedRentHistory = shopRentHistory.sort((a, b) => new Date(a.startingMonthForThisRent) - new Date(b.startingMonthForThisRent));
         const start = new Date(startingDate);
         const end = new Date(calculationEndDate);
         let totalPendingRent = 0;
-        let currentDate = new Date(start.getFullYear(), start.getMonth(), 1);
-        
+        let currentDate = new Date(start.getFullYear(), start.getMonth(), 1);        
         while (currentDate <= end) {
             const year = currentDate.getFullYear();
             const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
             const currentMonth = `${year}-${month}`;
-            let monthlyRentDue = 0;
-            
+            let monthlyRentDue = 0;            
             for (let i = 0; i < sortedRentHistory.length; i++) {
                 const historyEntry = sortedRentHistory[i];
                 const historyStartDate = new Date(historyEntry.startingMonthForThisRent);     
@@ -382,11 +363,9 @@ const Form = () => {
                 }
             }
             if (monthlyRentDue === 0) {
-                // Move to next month if no rent amount found
                 currentDate.setMonth(currentDate.getMonth() + 1);
                 continue;
-            }            
-            // Get all rent-related payments for this month from rentalFormsData
+            }
             const allRentPayments = rentalFormsData.filter(form =>
                 form.tenantName === formTenantName &&
                 form.shopNo === formShopNo &&
@@ -399,8 +378,7 @@ const Form = () => {
             );            
             const totalPaidForMonth = allRentPayments.reduce((sum, form) => {
                 return sum + parseFloat(form.amount || 0);
-            }, 0);            
-            // If it's the first month, calculate pro-rated rent
+            }, 0);
             if (currentDate.getFullYear() === start.getFullYear() && currentDate.getMonth() === start.getMonth()) {
                 const totalDays = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
                 const startDay = start.getDate();
@@ -408,33 +386,27 @@ const Form = () => {
                 const proRatedDays = totalDays - startDay + 1;
                 monthlyRentDue = Math.floor((rentPerDay * proRatedDays) / 10) * 10;
             }
-            // If it's the last month and end date is not the last day of the month
             else if (currentDate.getFullYear() === end.getFullYear() && currentDate.getMonth() === end.getMonth()) {
                 const totalDays = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
                 const endDay = end.getDate();
                 const rentPerDay = monthlyRentDue / totalDays;
                 monthlyRentDue = Math.floor((rentPerDay * endDay) / 10) * 10;
             }
-            // For full months (not first or last), use the full rent amount
             else {
                 console.log(`  → Full month rent: ₹${monthlyRentDue}`);
             }
-            // Calculate pending rent for this month (rent due - payments made)
             const pendingForMonth = monthlyRentDue - totalPaidForMonth;
             if (pendingForMonth > 0) {
                 totalPendingRent += pendingForMonth;
             }
-            // Move to next month
             currentDate.setMonth(currentDate.getMonth() + 1);
         }
         return totalPendingRent;
     };
-    // Calculate pending rent for "Pending Rent" type using rent history
     const calculatePendingRentForPendingType = () => {
         if (!formTenantName || !formShopNo || !startingDate || rentHistoryData.length === 0 || tenantShopData.length === 0) {
             return 0;
         }
-        // Find the tenant and shop to get the shop closure date
         let shopClosureDate = null;
         const matchingTenant = tenantShopData.find(tenant => tenant.tenantName === formTenantName);
         if (matchingTenant) {
@@ -446,7 +418,6 @@ const Form = () => {
                 });
             });
         }
-        // Create a mapping from tenantWithShopNoId to shopNo
         const tenantShopMapping = {};
         tenantShopData.forEach(tenant => {
             tenant.property?.forEach(property => {
@@ -462,7 +433,6 @@ const Form = () => {
                 });
             });
         });
-        // Filter rent history data for the specific shopNo
         const matchingTenantShopIds = Object.keys(tenantShopMapping).filter(id => 
             tenantShopMapping[id].shopNo === formShopNo && 
             tenantShopMapping[id].tenantName === formTenantName
@@ -476,16 +446,13 @@ const Form = () => {
         if (shopRentHistory.length === 0) {
             return 0;
         }
-        // Sort rent history by starting date to get chronological order
         const sortedRentHistory = shopRentHistory.sort((a, b) => new Date(a.startingMonthForThisRent) - new Date(b.startingMonthForThisRent));
-        // Use shop closure date from tenant data, or current date if no closure date
         const endDate = shopClosureDate || new Date().toISOString().split('T')[0];
         const start = new Date(startingDate);
         const end = new Date(endDate);
         let totalPendingRent = 0;
         let currentDate = new Date(start.getFullYear(), start.getMonth(), 1);
         while (currentDate <= end) {
-            // Get current month in YYYY-MM format more reliably
             const year = currentDate.getFullYear();
             const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
             const currentMonth = `${year}-${month}`;
@@ -493,9 +460,7 @@ const Form = () => {
             for (let i = 0; i < sortedRentHistory.length; i++) {
                 const historyEntry = sortedRentHistory[i];
                 const historyStartDate = new Date(historyEntry.startingMonthForThisRent);
-                // Check if this rent history entry applies to the current month
                 if (historyStartDate <= currentDate) {
-                    // If this is the last entry, or if the next entry starts after current month
                     if (i === sortedRentHistory.length - 1 || 
                         new Date(sortedRentHistory[i + 1].startingMonthForThisRent) > currentDate) {
                         monthlyRentDue = parseFloat(historyEntry.rentAmount || 0);
@@ -504,11 +469,9 @@ const Form = () => {
                 }
             }
             if (monthlyRentDue === 0) {
-                // Move to next month if no rent amount found
                 currentDate.setMonth(currentDate.getMonth() + 1);
                 continue;
             }
-            // Get all rent-related payments for this month from rentalFormsData
             const allRentPayments = rentalFormsData.filter(form =>
                 form.tenantName === formTenantName &&
                 form.shopNo === formShopNo &&
@@ -522,7 +485,6 @@ const Form = () => {
             const totalPaidForMonth = allRentPayments.reduce((sum, form) => {
                 return sum + parseFloat(form.amount || 0);
             }, 0);
-            // If it's the first month, calculate pro-rated rent
             if (currentDate.getFullYear() === start.getFullYear() && currentDate.getMonth() === start.getMonth()) {
                 const totalDays = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
                 const startDay = start.getDate();
@@ -547,15 +509,11 @@ const Form = () => {
         }
         return totalPendingRent;
     };
-    // Handle payment mode change and auto-fill advance amount
+    // Handle payment mode change
     const handlePaymentModeChange = (e) => {
         const newPaymentMode = e.target.value;
         setFormPaymentMode(newPaymentMode);
         setAmountError(''); 
-        // Auto-fill advance amount when Advance Adjustment is selected for Rent type
-        if ((selectedRentType === "Rent" || selectedRentType === "Pending Rent") && newPaymentMode && newPaymentMode.trim() === "Advance Adjustment" && advanceAmount > 0) {
-            setAmount(advanceAmount.toString());
-        }
     };
      // Validate amount input for Advance Adjustment and Shop Closure
      const validateAmount = (inputAmount) => {
@@ -587,7 +545,6 @@ const Form = () => {
          return true;
      };
     const handleSubmit = async () => {
-        // ✅ Check if payment mode is selected (required for Shop Closure only when refundAmount > 0)
         const cleanedAmount = parseFloat((amount || "").replace(/[^0-9.]/g, ""));
         const isShopClosureWithNoRefund = selectedRentType === "Shop Closure" && (isNaN(cleanedAmount) || cleanedAmount === 0);
         if (!formPaymentMode && !isShopClosureWithNoRefund) {
@@ -599,7 +556,6 @@ const Form = () => {
             });
             return;
         }
-        // ✅ Validate amount for Advance Adjustment
         if (!validateAmount(amount)) {
             Swal.fire({
                 icon: 'warning',
@@ -766,7 +722,7 @@ const Form = () => {
                     console.log("✅ Form submitted:", form);
                 }
             }
-            if (closureDate && formTenantName && formShopNo) {
+            if (selectedRentType === "Shop Closure" && closureDate && formTenantName && formShopNo) {
                 try {
                     const updateClosureResponse = await fetch(`https://backendaab.in/aabuildersDash/api/tenantShop/updateClosureDate/${encodeURIComponent(formTenantName)}/${encodeURIComponent(formShopNo)}`, {
                         method: "POST",
@@ -781,8 +737,7 @@ const Form = () => {
                 } catch (error) {
                     console.error("❌ Error updating closure date:", error);
                 }
-            }
-            if (selectedRentType === "Shop Closure") {
+                
                 try {
                     await vacateShop(selectedTenantId, formShopNo);
                 } catch (err) {
@@ -928,6 +883,20 @@ const Form = () => {
             );
         }
     }, [selectedRentType, formTenantName, formShopNo, rentHistoryData, tenantShopData]);
+
+    // Auto-fill amount with Total Pending Rent when closure date is selected for Rent type
+    useEffect(() => {
+        if (selectedRentType === "Rent" && formTenantName && formShopNo && startingDate && closureDate) {
+            const totalPendingRent = calculatePendingRentUpToDate(closureDate);
+            if (totalPendingRent > 0) {
+                setAmount(totalPendingRent.toString());
+            }
+        } else if (selectedRentType === "Rent" && !closureDate && calculatedRent) {
+            // Reset to calculated rent when closure date is cleared
+            setAmount(calculatedRent.toString());
+        }
+    }, [selectedRentType, formTenantName, formShopNo, startingDate, closureDate, calculatedRent]);
+
     const handleSubmitOldData = async (e) => {
         e.preventDefault();
         if (!file) {
@@ -1069,22 +1038,39 @@ const Form = () => {
                     <div className="space-y-2">
                         {formTenantName && formShopNo && (
                             <div className={`text-sm text-gray-700 mb-3 flex items-center gap-2 ${
-                                (selectedRentType === "Rent" || selectedRentType === "Pending Rent" || selectedRentType === "Shop Closure") 
-                                    ? "-mt-[53px]" 
-                                    : " -mt-[34px]"
+                                selectedRentType === "Rent" 
+                                    ? "-mt-[76px]"  // More margin for Rent type (3 lines: Advance + Rent To Be Paid + Total Pending)
+                                    : selectedRentType === "Pending Rent" || selectedRentType === "Shop Closure"
+                                        ? "-mt-[53px]"  // Medium margin for Pending Rent/Shop Closure (2 lines: Advance + Total Pending)
+                                        : "-mt-[34px]"  // Less margin for other types (1 line: Advance only)
                             }`}>
                                 <span>Advance Amount: ₹ {advanceAmount.toLocaleString('en-IN')}</span>
                             </div>
                         )}
                         {selectedRentType === "Rent" && selectedMonth && calculatedRent && (
-                            <div className="text-sm text-gray-700 ">
-                                Rent To Be Paid For {selectedMonth
-                                    ? new Date(`${selectedMonth}-01`).toLocaleString('default', {
-                                        month: 'long',
-                                        year: 'numeric',
-                                    })
-                                    : ''}: ₹ {calculatedRent}
-                            </div>
+                            <>
+                                <div className="text-sm text-gray-700 ">
+                                    Rent To Be Paid For {selectedMonth
+                                        ? new Date(`${selectedMonth}-01`).toLocaleString('default', {
+                                            month: 'long',
+                                            year: 'numeric',
+                                        })
+                                        : ''}: ₹ {calculatedRent}
+                                </div>
+                                {formTenantName && formShopNo && startingDate && (
+                                    <div className="text-sm text-gray-700 ">
+                                        {closureDate ? (
+                                            <>Total Pending Rent (Up to {new Date(closureDate).toLocaleDateString('en-IN', {
+                                                day: '2-digit',
+                                                month: 'short',
+                                                year: 'numeric'
+                                            })}): ₹ {calculatePendingRentUpToDate(closureDate).toLocaleString('en-IN')}</>
+                                        ) : (
+                                            <>Total Pending Rent (Up to Today): ₹ {calculatePendingRentUpToDate(new Date().toISOString().split('T')[0]).toLocaleString('en-IN')}</>
+                                        )}
+                                    </div>
+                                )}
+                            </>
                         )}
                         {selectedRentType === "Pending Rent" && formTenantName && formShopNo && startingDate && (() => {
                             let shopClosureDate = null;

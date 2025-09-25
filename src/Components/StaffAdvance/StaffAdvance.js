@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Select from 'react-select';
 import Attach from '../Images/Attachfile.svg';
+import edit from '../Images/Edit.svg';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 const StaffAdvance = () => {
   // Form state management
   const [formData, setFormData] = useState({
@@ -9,14 +14,15 @@ const StaffAdvance = () => {
     amountGiven: '',
     paymentMode: '',
     selectedType: '',
-    date: '',
+    date: new Date().toISOString().split('T')[0], // Set to today's date
     empName: null,
     overallAdvance: '',
     purpose: null,
     advanceAmount: '',
     amountGivenInput: '',
     transferAmount: '',
-    description: ''
+    description: '',
+    labourName: null
   });
   const [staffFromDate, setStaffFromDate] = useState('');
   const [staffToDate, setStaffToDate] = useState('');
@@ -28,12 +34,16 @@ const StaffAdvance = () => {
   const [tableData, setTableData] = useState([]);
   // Filtered table data state - only shows when both EMP Name and Purpose are selected
   const [filteredTableData, setFilteredTableData] = useState([]);
-  // Success message state
-  const [successMessage, setSuccessMessage] = useState('');
   // Loading state
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Edit modal state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editFormData, setEditFormData] = useState({});
+  const [editingId, setEditingId] = useState(null);
   // Employee options state
   const [employeeOptions, setEmployeeOptions] = useState([]);
+  const [laboursList, setLaboursList] = useState([]);
+  const [staffAdvanceCombinedOptions, setStaffAdvanceCombinedOptions] = useState([]);
   // Fetch employee details on component mount
   useEffect(() => {
     // Fetch employee details
@@ -64,6 +74,34 @@ const StaffAdvance = () => {
     // Call employee fetch function
     fetchEmployeeDetails();
   }, []);
+  useEffect(() => {
+    fetchLaboursList();
+  }, []);
+  const fetchLaboursList = async () => {
+    try {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
+      if (response.ok) {
+        const data = await response.json();
+        const formattedData = data.map(item => ({
+          value: item.labour_name,
+          label: item.labour_name,
+          id: item.id,
+          type: "Labour",
+          salary: item.labour_salary,
+          extra: item.extra_amount
+        }));
+        setLaboursList(formattedData);
+      } else {
+        console.log('Error fetching Labour names.');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      console.log('Error fetching Labour names.');
+    }
+  };
+
+  useEffect(() => { setStaffAdvanceCombinedOptions([...employeeOptions, ...laboursList]); }, [employeeOptions, laboursList]);
+
   const [purposeOptions, setPurposeOptions] = useState([]);
   // Fetch purpose options from backend on component mount
   useEffect(() => {
@@ -169,29 +207,20 @@ const StaffAdvance = () => {
     }
   }, []);
 
-  // Filter table data based on selected employee and purpose
   const filterTableData = useCallback(() => {
     if (!formData.empName || !formData.purpose) {
-      // If either EMP Name or Purpose is not selected, show empty table
       setFilteredTableData([]);
       return;
     }
-
-    // Filter data based on selected employee and purpose
     const filtered = tableData.filter(record => {
-      // Check for employee match - try different possible field names
       const matchesEmployee = record.employee_name === formData.empName.value ||
         record.employee_id === formData.empName.id ||
-        record.emp_name === formData.empName.value;
-
-      // Check for purpose match - try different possible field names
+        record.labour_id === formData.empName.id;
       const matchesPurpose = record.purpose === formData.purpose.value ||
         record.purpose_id === formData.purpose.id ||
         record.from_purpose_id === formData.purpose.id;
-
       return matchesEmployee && matchesPurpose;
     });
-
     setFilteredTableData(filtered);
   }, [tableData, formData.empName, formData.purpose]);
   useEffect(() => {
@@ -213,6 +242,7 @@ const StaffAdvance = () => {
       // Check for employee match - try different possible field names
       return record.employee_name === formData.empName.value ||
         record.employee_id === formData.empName.id ||
+        record.labour_id === formData.empName.id ||
         record.emp_name === formData.empName.value;
     });
 
@@ -248,6 +278,7 @@ const StaffAdvance = () => {
       // Check for employee match first
       const employeeMatch = record.employee_name === formData.empName.value ||
         record.employee_id === employeeId ||
+        record.labour_id === employeeId ||
         record.emp_name === formData.empName.value;
       if (!employeeMatch) return false;
       // Check if purpose matches (only from_purpose_id for all record types)
@@ -298,16 +329,14 @@ const StaffAdvance = () => {
     });
     // Filter by payment mode (additional filter - optional)
     if (staffPaymentMode) {
-      filteredRecords = filteredRecords.filter(record => 
+      filteredRecords = filteredRecords.filter(record =>
         record.staff_payment_mode === staffPaymentMode
       );
     }
-    // Calculate net amount given (Advance amount minus Refund amount)
+    // Calculate total amount given (only Advance amounts, no subtraction of refunds)
     const totalAmount = filteredRecords.reduce((total, record) => {
       if (record.type === 'Advance') {
         return total + (parseFloat(record.amount) || 0);
-      } else if (record.type === 'Refund') {
-        return total - (parseFloat(record.staff_refund_amount) || 0);
       }
       return total;
     }, 0);
@@ -320,9 +349,9 @@ const StaffAdvance = () => {
     if (!staffFromDate || !staffToDate) {
       setStaffAdmountGiven("0.00");
     } else {
-      setStaffAdmountGiven(totalAmount.toLocaleString('en-IN', { 
-        minimumFractionDigits: 2, 
-        maximumFractionDigits: 2 
+      setStaffAdmountGiven(totalAmount.toLocaleString('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
       }));
     }
   }, [calculateTotalAmountGiven, staffFromDate, staffToDate, staffPaymentMode]);
@@ -340,8 +369,6 @@ const StaffAdvance = () => {
     const todayAmount = todayRecords.reduce((total, record) => {
       if (record.type === 'Advance') {
         return total + (parseFloat(record.amount) || 0);
-      } else if (record.type === 'Refund') {
-        return total - (parseFloat(record.staff_refund_amount) || 0);
       }
       return total;
     }, 0);
@@ -367,18 +394,18 @@ const StaffAdvance = () => {
   // Update today amount when table data changes
   useEffect(() => {
     const todayAmount = calculateTodayAmount();
-    setTodayAmount(todayAmount.toLocaleString('en-IN', { 
-      minimumFractionDigits: 2, 
-      maximumFractionDigits: 2 
+    setTodayAmount(todayAmount.toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
     }));
   }, [calculateTodayAmount]);
 
   // Update total outstanding when table data changes
   useEffect(() => {
     const totalOutstanding = calculateTotalOutstanding();
-    setStaffTotalOutstanding(totalOutstanding.toLocaleString('en-IN', { 
-      minimumFractionDigits: 2, 
-      maximumFractionDigits: 2 
+    setStaffTotalOutstanding(totalOutstanding.toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
     }));
   }, [calculateTotalOutstanding]);
   const handleSubmit = useCallback(async (e) => {
@@ -411,13 +438,17 @@ const StaffAdvance = () => {
       const payload = {
         type: formData.selectedType,
         date: formData.date,
-        employee_id: formData.empName.id,
+        employee_id: formData.empName?.type === "Employee" ? formData.empName.id : null,
+        labour_id: formData.empName?.type === "Labour" ? formData.empName.id : null,
         staff_payment_mode: formData.paymentMode,
-        staff_refund_amount: formData.selectedType === 'Refund' ? parseFloat(formData.amountGivenInput) || 0 : 0,
+        staff_refund_amount:
+          formData.selectedType === "Refund"
+            ? parseFloat(formData.amountGivenInput) || 0
+            : 0,
         description: formData.description,
         file_url: formData.fileUrl || null,
         entryNo: nextEntryNo,
-        weekNo: 0
+        weekNo: 0,
       };
       if (formData.selectedType === 'Transfer') {
         payload.from_purpose_id = formData.purpose.id;
@@ -435,11 +466,19 @@ const StaffAdvance = () => {
       });
       if (!saveRes.ok) {
         console.warn('Save API not available, simulating success');
-        setSuccessMessage('Record would be saved (API not available)');
+        toast.success('Record would be saved (API not available)', {
+          position: "top-center",
+          autoClose: 3000,
+          theme: "colored"
+        });
         resetForm();
         return;
       }
-      setSuccessMessage('Record saved successfully!');
+      toast.success('Record saved successfully!', {
+        position: "top-center",
+        autoClose: 3000,
+        theme: "colored"
+      });
       resetForm();
       await fetchRecords();
     } catch (error) {
@@ -463,21 +502,21 @@ const StaffAdvance = () => {
   }, []);
   // Reset form
   const resetForm = useCallback(() => {
-    setFormData({
+    setFormData(prev => ({
       fromDate: '',
       toDate: '',
       amountGiven: '',
       paymentMode: '',
-      selectedType: '',
-      date: '',
-      empName: null,
+      selectedType: prev.selectedType, // Preserve selected type
+      date: new Date().toISOString().split('T')[0], // Set to today's date
+      empName: prev.empName, // Preserve selected employee
       overallAdvance: '',
-      purpose: null,
+      purpose: prev.purpose, // Preserve selected purpose
       advanceAmount: '',
       amountGivenInput: '',
       transferAmount: '',
       description: ''
-    });
+    }));
   }, []);
   // Delete table row
   const deleteRow = useCallback((id) => {
@@ -490,23 +529,367 @@ const StaffAdvance = () => {
       // Remove only the filtered records from the main table data
       const filteredIds = filteredTableData.map(record => record.id);
       setTableData(prev => prev.filter(record => !filteredIds.includes(record.id)));
-      setSuccessMessage('Filtered records cleared!');
-      setTimeout(() => setSuccessMessage(''), 3000);
+      toast.success('Filtered records cleared!', {
+        position: "top-center",
+        autoClose: 3000,
+        theme: "colored"
+      });
     }
   }, [filteredTableData.length, filteredTableData]);
   // Export functions
   const exportToPDF = useCallback(() => {
-    console.log('Exporting to PDF...');
-    // Add PDF export logic
-  }, []);
+    try {
+      // Create new PDF document
+      const doc = new jsPDF();
+
+      // Add title
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Staff Advance Report', 20, 20);
+
+      // Add date range if available
+      if (staffFromDate && staffToDate) {
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Date Range: ${staffFromDate} to ${staffToDate}`, 20, 30);
+      }
+
+      // Add employee and purpose info if selected
+      if (formData.empName && formData.purpose) {
+        doc.setFontSize(10);
+        doc.text(`Employee: ${formData.empName.label}`, 20, 40);
+        doc.text(`Purpose: ${formData.purpose.label}`, 20, 47);
+      }
+
+      // Prepare table data
+      const tableData = filteredTableData.length > 0 ? filteredTableData : [];
+
+      if (tableData.length === 0) {
+        doc.setFontSize(12);
+        doc.text('No data available for export', 20, 60);
+        doc.save('staff-advance-report.pdf');
+        return;
+      }
+
+      // Prepare table columns and rows
+      const columns = [
+        { title: 'Date', dataKey: 'date' },
+        { title: 'Advance', dataKey: 'advance' },
+        { title: 'Transfer/Refund', dataKey: 'transferRefund' },
+        { title: 'Mode', dataKey: 'mode' },
+        { title: 'Type', dataKey: 'type' }
+      ];
+
+      const rows = tableData.map(record => {
+        const advanceAmount = record.type === "Refund"
+          ? -Math.abs(record.staff_refund_amount || 0)
+          : record.amount;
+
+        const transferRefund = record.type === "Refund"
+          ? "Refund"
+          : record.type === "Transfer"
+            ? (() => {
+              const amount = parseFloat(record.amount) || 0;
+              if (amount < 0) {
+                const toPurposeId = record.to_purpose_id;
+                const toPurpose = purposeOptions.find(p => p.id === toPurposeId);
+                return `Transfer To ${toPurpose?.label || 'Unknown Purpose'}`;
+              } else {
+                const fromPurposeId = record.to_purpose_id;
+                const fromPurpose = purposeOptions.find(p => p.id === fromPurposeId);
+                return `Transfer From ${fromPurpose?.label || 'Unknown Purpose'}`;
+              }
+            })()
+            : record.staff_refund_amount;
+
+        return {
+          date: record.date,
+          advance: advanceAmount,
+          transferRefund: transferRefund,
+          mode: record.staff_payment_mode || '',
+          type: record.type
+        };
+      });
+
+      // Add table to PDF
+      doc.autoTable({
+        columns: columns,
+        body: rows,
+        startY: 60,
+        styles: {
+          fontSize: 8,
+          cellPadding: 3,
+          textColor: [0, 0, 0], // Black text
+          lineColor: [0, 0, 0], // Black borders
+          lineWidth: 0.1, // Border width
+        },
+        headStyles: {
+          fillColor: [255, 255, 255], // White background
+          textColor: [0, 0, 0], // Black text
+          fontStyle: 'bold',
+          lineColor: [0, 0, 0], // Black borders
+          lineWidth: 0.1, // Border width
+        },
+        alternateRowStyles: {
+          fillColor: [255, 255, 255], // White background for all rows
+          lineColor: [0, 0, 0], // Black borders
+          lineWidth: 0.1, // Border width
+        },
+        columnStyles: {
+          advance: {
+            halign: 'right',
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1
+          },
+          transferRefund: {
+            halign: 'center',
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1
+          },
+          mode: {
+            halign: 'center',
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1
+          },
+          type: {
+            halign: 'center',
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1
+          }
+        },
+        tableLineColor: [0, 0, 0], // Table border color
+        tableLineWidth: 0.1, // Table border width
+      });
+
+      // Add summary information at the bottom
+      const finalY = doc.lastAutoTable.finalY + 10;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+
+      if (formData.empName && formData.purpose) {
+        doc.text(`Total Advance Amount: ${formData.advanceAmount}`, 20, finalY);
+      }
+
+      if (staffFromDate && staffToDate) {
+        doc.text(`Total Amount Given (${staffFromDate} to ${staffToDate}): ${staffAmountGiven}`, 20, finalY + 10);
+      }
+
+      doc.text(`Today's Amount: ${staffTodayAmount}`, 20, finalY + 20);
+      doc.text(`Total Outstanding: ${staffTotalOutstanding}`, 20, finalY + 30);
+
+      // Add footer
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
+        doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, doc.internal.pageSize.height - 10);
+      }
+
+      // Save the PDF
+      const fileName = `staff-advance-report-${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(fileName);
+
+      toast.success('PDF exported successfully!', {
+        position: "top-center",
+        autoClose: 3000,
+        theme: "colored"
+      });
+
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Error generating PDF. Please try again.');
+    }
+  }, [filteredTableData, formData, staffFromDate, staffToDate, staffAmountGiven, staffTodayAmount, staffTotalOutstanding, purposeOptions]);
   const exportToExcel = useCallback(() => {
-    console.log('Exporting to Excel...');
-    // Add Excel export logic
-  }, []);
+    try {
+      // Prepare table data
+      const tableData = filteredTableData.length > 0 ? filteredTableData : [];
+
+      if (tableData.length === 0) {
+        alert('No data available for export');
+        return;
+      }
+
+      // Create CSV content starting with title (like PDF)
+      const csvRows = [];
+
+      // Add title (like PDF)
+      csvRows.push(['Staff Advance Report']);
+      csvRows.push(['']); // Empty row
+
+      // Add date range if available (like PDF)
+      if (staffFromDate && staffToDate) {
+        csvRows.push([`Date Range: ${staffFromDate} to ${staffToDate}`]);
+      }
+
+      // Add employee and purpose info if selected (like PDF)
+      if (formData.empName && formData.purpose) {
+        csvRows.push([`Employee: ${formData.empName.label}`]);
+        csvRows.push([`Purpose: ${formData.purpose.label}`]);
+      }
+
+      csvRows.push(['']); // Empty row before table
+
+      // Create table headers (same as PDF)
+      const headers = ['Date', 'Advance', 'Transfer/Refund', 'Mode', 'Type'];
+      csvRows.push(headers);
+
+      // Create table data rows (same logic as PDF)
+      const dataRows = tableData.map(record => {
+        const advanceAmount = record.type === "Refund"
+          ? -Math.abs(record.staff_refund_amount || 0)
+          : record.amount;
+
+        const transferRefund = record.type === "Refund"
+          ? "Refund"
+          : record.type === "Transfer"
+            ? (() => {
+              const amount = parseFloat(record.amount) || 0;
+              if (amount < 0) {
+                const toPurposeId = record.to_purpose_id;
+                const toPurpose = purposeOptions.find(p => p.id === toPurposeId);
+                return `Transfer To ${toPurpose?.label || 'Unknown Purpose'}`;
+              } else {
+                const fromPurposeId = record.to_purpose_id;
+                const fromPurpose = purposeOptions.find(p => p.id === fromPurposeId);
+                return `Transfer From ${fromPurpose?.label || 'Unknown Purpose'}`;
+              }
+            })()
+            : record.staff_refund_amount;
+
+        return [
+          record.date,
+          advanceAmount,
+          transferRefund,
+          record.staff_payment_mode || '',
+          record.type
+        ];
+      });
+
+      // Add data rows
+      csvRows.push(...dataRows);
+
+      // Add empty row before summary (like PDF)
+      csvRows.push(['']);
+
+      // Add summary information (same as PDF)
+      if (formData.empName && formData.purpose) {
+        csvRows.push([`Total Advance Amount: ${formData.advanceAmount}`]);
+      }
+
+      if (staffFromDate && staffToDate) {
+        csvRows.push([`Total Amount Given (${staffFromDate} to ${staffToDate}): ${staffAmountGiven}`]);
+      }
+
+      csvRows.push([`Today's Amount: ${staffTodayAmount}`]);
+      csvRows.push([`Total Outstanding: ${staffTotalOutstanding}`]);
+
+      // Add empty row
+      csvRows.push(['']);
+
+      // Add footer (like PDF)
+      csvRows.push([`Generated on: ${new Date().toLocaleDateString()}`]);
+
+      // Convert to CSV format
+      const csvContent = csvRows.map(row =>
+        row.map(field => {
+          // Escape fields that contain commas, quotes, or newlines
+          if (typeof field === 'string' && (field.includes(',') || field.includes('"') || field.includes('\n'))) {
+            return `"${field.replace(/"/g, '""')}"`;
+          }
+          return field;
+        }).join(',')
+      ).join('\n');
+
+      // Create and download CSV file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+
+      const fileName = `staff-advance-report-${new Date().toISOString().split('T')[0]}.csv`;
+      link.setAttribute('download', fileName);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.success('CSV exported successfully!', {
+        position: "top-center",
+        autoClose: 3000,
+        theme: "colored"
+      });
+
+    } catch (error) {
+      console.error('Error generating CSV:', error);
+      alert('Error generating CSV. Please try again.');
+    }
+  }, [filteredTableData, formData, staffFromDate, staffToDate, staffAmountGiven, staffTodayAmount, staffTotalOutstanding, purposeOptions]);
   const printData = useCallback(() => {
     console.log('Printing...');
     // Add print logic
   }, []);
+
+  // Edit functionality
+  const handleEditClick = useCallback((record) => {
+    setEditingId(record.id);
+    setEditFormData({
+      selectedType: record.type || '',
+      date: record.date?.split('T')[0] || '',
+      empName:
+        employeeOptions.find(emp => emp.id === record.employee_id) ||
+        laboursList.find(labour => labour.id === record.labour_id) ||
+        null,
+      purpose: purposeOptions.find(purpose => purpose.id === record.from_purpose_id) || null,
+      amountGivenInput: record.amount || '',
+      paymentMode: record.staff_payment_mode || '',
+      transferPurpose: purposeOptions.find(purpose => purpose.id === record.to_purpose_id) || null,
+      transferAmount: record.type === 'Transfer' ? record.amount : '',
+      overallAdvance: '',
+      advanceAmount: ''
+    });
+    setIsEditModalOpen(true);
+  }, [employeeOptions, laboursList, purposeOptions]);
+
+  const handleUpdate = useCallback(async () => {
+    try {
+      const updatePayload = {
+        type: editFormData.selectedType,
+        date: editFormData.date,
+        employee_id: editFormData.empName?.type === "Employee" ? editFormData.empName.id : null,
+        labour_id: editFormData.empName?.type === "Labour" ? editFormData.empName.id : null,
+        from_purpose_id: editFormData.purpose?.id,
+        amount: editFormData.amountGivenInput,
+        staff_payment_mode: editFormData.paymentMode
+      };
+
+      // Add transfer-specific fields if it's a transfer type
+      if (editFormData.selectedType === 'Transfer') {
+        updatePayload.to_purpose_id = editFormData.transferPurpose?.id;
+        updatePayload.amount = editFormData.transferAmount;
+      }
+
+      const res = await fetch(`https://backendaab.in/aabuildersDash/api/staff-advance/edit/${editingId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatePayload)
+      });
+
+      if (!res.ok) throw new Error('Failed to update');
+
+      toast.success('Record updated successfully!', {
+        position: "top-center",
+        autoClose: 3000,
+        theme: "colored"
+      });
+      setIsEditModalOpen(false);
+      await fetchRecords();
+    } catch (err) {
+      console.error('Error updating record:', err);
+      alert('Error updating record');
+    }
+  }, [editingId, editFormData, fetchRecords]);
   return (
     <div className=" bg-[#FAF6ED]">
       <div className='bg-white max-w-[1768px] h-auto text-left shadow-sm rounded ml-10 mr-5'>
@@ -575,12 +958,6 @@ const StaffAdvance = () => {
         </div>
       </div>
       <div className='p-4 max-w-[1800px] ml-6'>
-        {/* Success Message */}
-        {successMessage && (
-          <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg shadow-sm">
-            {successMessage}
-          </div>
-        )}
         {/* Form */}
         <form onSubmit={handleSubmit} onKeyPress={handleKeyPress} className='bg-white w-full p-6 h-auto rounded shadow-sm'>
           <div className='flex flex-col xl:flex-row '>
@@ -626,7 +1003,7 @@ const StaffAdvance = () => {
                 <Select
                   value={formData.empName}
                   onChange={(value) => handleInputChange('empName', value)}
-                  options={employeeOptions}
+                  options={staffAdvanceCombinedOptions}
                   className='w-[263px] h-[45px] rounded-lg focus:outline-none'
                   isClearable
                   styles={customStyles}
@@ -821,13 +1198,13 @@ const StaffAdvance = () => {
                       <th className="px-4 py-3 font-semibold text-gray-700">Advance</th>
                       <th className="px-4 py-3 font-semibold text-gray-700">Transfer/Refund</th>
                       <th className="px-4 py-3 font-semibold text-gray-700">Mode</th>
-                      <th className=" py-3 font-semibold text-gray-700">Activity</th>
+                      <th className="px-4 py-3 font-semibold text-gray-700">Activity</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredTableData.length === 0 ? (
                       <tr>
-                        <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
+                        <td colSpan="6" className=" py-8 text-center text-gray-500">
                           <div className="flex flex-col items-center gap-2">
                             <span>No data available</span>
                             <span className="text-sm">
@@ -842,20 +1219,53 @@ const StaffAdvance = () => {
                     ) : (
                       filteredTableData.map((record) => (
                         <tr key={record.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-3">{record.date}</td>
+                          <td className=" py-3">{record.date}</td>
                           <td
-                            className="px-4 py-3 font-medium"
+                            className=" py-3 font-medium"
                             style={{ color: record.type === "Refund" ? '#dc2626' : '#059669' }}
                           >
                             {record.type === "Refund"
                               ? -Math.abs(record.staff_refund_amount || 0)
                               : record.amount}
                           </td>
-                          <td className="px-4 py-3">
-                            {record.type === "Refund" ? "Refund" : record.staff_refund_amount}
+                          <td className=" py-3">
+                            {record.type === "Refund"
+                              ? "Refund"
+                              : record.type === "Transfer"
+                                ? (() => {
+                                  // For transfer records, determine direction based on amount sign
+                                  const amount = parseFloat(record.amount) || 0;
+                                  if (amount < 0) {
+                                    // Negative amount means money going out from this purpose
+                                    // Find the "to" purpose name from the transfer record
+                                    const toPurposeId = record.to_purpose_id;
+                                    const toPurpose = purposeOptions.find(p => p.id === toPurposeId);
+                                    return `Transfer To ${toPurpose?.label || 'Unknown Purpose'}`;
+                                  } else {
+                                    // Positive amount means money coming in to this purpose
+                                    // Find the "from" purpose name from the transfer record
+                                    const fromPurposeId = record.to_purpose_id;
+                                    const fromPurpose = purposeOptions.find(p => p.id === fromPurposeId);
+                                    return `Transfer From ${fromPurpose?.label || 'Unknown Purpose'}`;
+                                  }
+                                })()
+                                : record.staff_refund_amount
+                            }
                           </td>
-                          <td className="px-4 py-3">{record.staff_payment_mode}</td>
-                          <td className=" py-3">{record.activity}</td>
+                          <td className=" py-3">{record.staff_payment_mode}</td>
+                          <td className=" py-3">
+                            <button
+                              type="button"
+                              className="rounded-full transition duration-200 ml-2 mr-3"
+                              onClick={() => handleEditClick(record)}
+                            >
+                              <img
+                                src={edit}
+                                alt="Edit"
+                                className=" w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200 cursor-pointer"
+                              />
+                            </button>
+                          </td>
                         </tr>
                       ))
                     )}
@@ -866,6 +1276,172 @@ const StaffAdvance = () => {
           </div>
         </form>
       </div>
+
+      {/* Edit Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 overflow-y-auto">
+          <div className="bg-white p-6 rounded-lg w-[800px] max-h-[90vh] overflow-y-auto">
+            <h2 className="text-lg font-bold mb-4">Edit Staff Advance Entry</h2>
+            <div className='text-left'>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Select Type */}
+                <div className='space-y-2'>
+                  <label className='font-semibold text-[#E4572E] block'>
+                    Select Type <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={editFormData.selectedType}
+                    onChange={(e) => setEditFormData({ ...editFormData, selectedType: e.target.value })}
+                    className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors'
+                  >
+                    <option value=''>Select Type...</option>
+                    {selectTypeOptions.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Date */}
+                <div className='space-y-2'>
+                  <label className='font-semibold text-[#E4572E] block'>
+                    Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type='date'
+                    value={editFormData.date}
+                    onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
+                    className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors'
+                  />
+                </div>
+
+                {/* EMP Name */}
+                <div className='space-y-2'>
+                  <label className='font-semibold block'>
+                    EMP Name <span className="text-red-500">*</span>
+                  </label>
+                  <Select
+                    value={editFormData.empName}
+                    onChange={(value) => setEditFormData({ ...editFormData, empName: value })}
+                    options={staffAdvanceCombinedOptions}
+                    className='w-full h-[45px] rounded-lg focus:outline-none'
+                    isClearable
+                    styles={customStyles}
+                    placeholder="Select employee..."
+                    isSearchable={true}
+                  />
+                </div>
+
+                {/* Overall Advance */}
+                <div className='space-y-2'>
+                  <label className='font-semibold block'>Overall Advance</label>
+                  <input
+                    value={editFormData.overallAdvance}
+                    readOnly
+                    className='w-full h-[45px] px-2 py-1 rounded-lg bg-[#F2F2F2] focus:outline-none cursor-not-allowed'
+                    placeholder="0.00"
+                  />
+                </div>
+
+                {/* Purpose */}
+                <div className='space-y-2'>
+                  <label className='font-semibold block'>Purpose</label>
+                  <Select
+                    value={editFormData.purpose}
+                    onChange={(value) => setEditFormData({ ...editFormData, purpose: value })}
+                    options={purposeOptions}
+                    placeholder="Select a purpose..."
+                    isSearchable={true}
+                    styles={customStyles}
+                    isClearable
+                    className='w-full h-[45px] focus:outline-none'
+                  />
+                </div>
+
+                {/* Advance Amount */}
+                <div className='space-y-2'>
+                  <label className='font-semibold block'>Advance Amount</label>
+                  <input
+                    value={editFormData.advanceAmount}
+                    readOnly
+                    className='w-full h-[45px] px-2 py-1 rounded-lg bg-[#F2F2F2] focus:outline-none cursor-not-allowed'
+                    placeholder="0.00"
+                  />
+                </div>
+
+                {/* Amount Given / Purpose To */}
+                <div className='space-y-2'>
+                  <label className='font-semibold block'>
+                    {editFormData.selectedType === 'Transfer' ? 'Purpose To' : 'Amount Given'}
+                  </label>
+                  {editFormData.selectedType === 'Transfer' ? (
+                    <Select
+                      value={editFormData.transferPurpose}
+                      onChange={(value) => setEditFormData({ ...editFormData, transferPurpose: value })}
+                      options={purposeOptions}
+                      placeholder="Select purpose to..."
+                      styles={customStyles}
+                      className='w-full h-[45px] rounded-lg focus:outline-none'
+                      isClearable
+                    />
+                  ) : (
+                    <input
+                      value={editFormData.amountGivenInput}
+                      onChange={(e) => setEditFormData({ ...editFormData, amountGivenInput: e.target.value })}
+                      className='w-full h-[45px] px-2 py-1 rounded-lg border-2 border-[#BF9853] border-opacity-30 focus:outline-none focus:border-[#BF9853] transition-colors'
+                      placeholder="Enter amount given"
+                    />
+                  )}
+                </div>
+
+                {/* Payment Mode/Transfer Amount */}
+                <div className='space-y-2'>
+                  <label className='font-semibold block'>
+                    {editFormData.selectedType === 'Transfer' ? 'Transfer Amount' : 'Payment Mode'}
+                  </label>
+                  {editFormData.selectedType === 'Transfer' ? (
+                    <input
+                      value={editFormData.transferAmount}
+                      onChange={(e) => setEditFormData({ ...editFormData, transferAmount: e.target.value })}
+                      className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors'
+                      placeholder="Enter transfer amount"
+                    />
+                  ) : (
+                    <select
+                      value={editFormData.paymentMode}
+                      onChange={(e) => setEditFormData({ ...editFormData, paymentMode: e.target.value })}
+                      className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors'
+                    >
+                      <option value=''>Select</option>
+                      {paymentModeOptions.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                className="w-[100px] h-[45px] border border-[#BF9853] rounded hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdate}
+                className="w-[100px] h-[45px] bg-[#BF9853] text-white rounded hover:bg-[#a67c3a] transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <ToastContainer />
     </div>
   );
 };

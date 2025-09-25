@@ -313,9 +313,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
           const amount = parseFloat(curr.amount) || 0;
           const billAmount = parseFloat(curr.bill_amount) || 0;
           const refundAmount = parseFloat(curr.refund_amount) || 0;
-
-          // ✅ Add amount (negative values subtract automatically)
-          // ✅ Subtract bill and refund amounts
           return sum + amount - billAmount - refundAmount;
         }, 0);
 

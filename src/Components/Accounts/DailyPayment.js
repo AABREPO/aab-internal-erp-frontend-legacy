@@ -49,7 +49,8 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         amount: "",
         extra_amount: "",
         description: "",
-        file_url: ""
+        file_url: "",
+        staff_advance_portal_id: ""
     });
     const [weeks, setWeeks] = useState([]);
     const [allRefundAmount, setAllRefundAmount] = useState([]);
@@ -295,7 +296,8 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             amount: row.amount,
             extra_amount: row.extra_amount,
             description: row.description || "",
-            file_url: row.file_url || ""
+            file_url: row.file_url || "",
+            staff_advance_portal_id: row.staff_advance_portal_id || ""
         });
     };
     const handleDescriptionClick = (row) => {
@@ -432,6 +434,11 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             const response = await fetch('https://backendaab.in/aabuildersDash/api/weekly_types/getAll');
             if (response.ok) {
                 const data = await response.json();
+                // Add Staff Advance to the types if it doesn't exist
+                const hasStaffAdvance = data.some(type => type.type === "Staff Advance");
+                if (!hasStaffAdvance) {
+                    data.push({ type: "Staff Advance" });
+                }
                 setWeeklyTypes(data);
             } else {
                 console.log('Error fetching tile area names.');
@@ -630,19 +637,59 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             labour_id: selected ? selected.id : ""
         }));
     };
+    // Function to get the last entry number from staff-advance API
+    const getLastEntryNumber = async () => {
+        try {
+            const response = await axios.get("https://backendaab.in/aabuildersDash/api/staff-advance/all");
+            if (response.data && response.data.length > 0) {
+                // Get the last entry_no and increment by 1
+                const lastEntry = response.data[response.data.length - 1];
+                return (lastEntry.entry_no || 0) + 1;
+            }
+            return 1; // If no entries exist, start with 1
+        } catch (error) {
+            console.error("Error fetching last entry number:", error);
+            return 1; // Default to 1 if API call fails
+        }
+    };
+
     const handleRefundSubmit = async () => {
         try {
-            const payload = {
+            const entryNo = await getLastEntryNumber();            
+            // Always send to staff-advance API
+            const staffAdvancePayload = {
+                date: selectedDate,
+                type: "Refund",
+                labour_id: Number(newRefundReceived.labour_id) || null,
+                staff_refund_amount: Number(newRefundReceived.amount),
+                week_no: Number(currentWeekNumber),
+                staff_payment_mode: "Cash",
+                from_purpose_id: 5,
+                entry_no: entryNo
+            };
+            const staffAdvanceResponse = await axios.post(
+                "https://backendaab.in/aabuildersDash/api/staff-advance/save",
+                staffAdvancePayload,
+                { headers: { "Content-Type": "application/json" } }
+            );
+
+            // Get the staffAdvancePortalId from the response
+            const staffAdvancePortalId = staffAdvanceResponse.data?.staffAdvancePortalId;
+
+            // Always send to refund_received API with staff_advance_portal_id
+            const refundPayload = {
                 date: selectedDate,
                 labour_id: newRefundReceived.labour_id,
                 amount: Number(newRefundReceived.amount),
                 weekly_number: Number(currentWeekNumber),
+                staff_advance_portal_id: staffAdvancePortalId
             };
-            const response = await axios.post(
+            await axios.post(
                 "https://backendaab.in/aabuildersDash/api/refund_received/save",
-                payload,
+                refundPayload,
                 { headers: { "Content-Type": "application/json" } }
             );
+
             window.location.reload();
             // Reset form after save
             setNewRefundReceived({
@@ -688,7 +735,87 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 extra_amount: Number(editDailyExpenseData.extra_amount || 0),
                 description: editDailyExpenseData.description || "",
                 file_url: editDailyExpenseData.file_url || null,  // 🔹 send url here
+                staff_advance_portal_id: editDailyExpenseData.staff_advance_portal_id || null,
             };
+
+            // Check if type changed from Staff Advance to another type
+            const wasStaffAdvance = row.type === "Staff Advance";
+            const isNowStaffAdvance = editDailyExpenseData.type === "Staff Advance";
+            const typeChangedFromStaffAdvance = wasStaffAdvance && !isNowStaffAdvance;
+            const typeChangedToStaffAdvance = !wasStaffAdvance && isNowStaffAdvance;
+            const amountChanged = Number(row.amount) !== Number(editDailyExpenseData.amount);
+
+            // If type changed from Staff Advance to another type, delete staff advance portal record
+            if (typeChangedFromStaffAdvance) {
+                payload.staff_advance_portal_id = null;
+                
+                // Delete the staff advance portal record
+                if (row.staff_advance_portal_id) {
+                    try {
+                        await axios.delete(
+                            `https://backendaab.in/aabuildersDash/api/staff-advance/${row.staff_advance_portal_id}`,
+                            { headers: { "Content-Type": "application/json" } }
+                        );
+                    } catch (error) {
+                        console.error("Error deleting staff advance portal:", error);
+                    }
+                }
+            }
+
+            // If type changed to Staff Advance, create new staff advance portal record
+            if (typeChangedToStaffAdvance) {
+                try {
+                    const entryNo = await getLastEntryNumber();
+                    const staffAdvancePayload = {
+                        date: editDailyExpenseData.date,
+                        type: "Advance",
+                        labour_id: Number(editDailyExpenseData.labour_id) || null,
+                        amount: Number(editDailyExpenseData.amount),
+                        week_no: Number(currentWeekNumber),
+                        staff_payment_mode: "Cash",
+                        from_purpose_id: 5,
+                        entry_no: entryNo
+                    };
+                    const staffAdvanceResponse = await axios.post(
+                        "https://backendaab.in/aabuildersDash/api/staff-advance/save",
+                        staffAdvancePayload,
+                        { headers: { "Content-Type": "application/json" } }
+                    );
+                    
+                    // Get the staffAdvancePortalId from the response
+                    const staffAdvancePortalId = staffAdvanceResponse.data?.staffAdvancePortalId;
+                    payload.staff_advance_portal_id = staffAdvancePortalId;
+                } catch (error) {
+                    console.error("Error creating staff advance portal:", error);
+                }
+            }
+
+            // If amount changed and it's still Staff Advance, update staff advance portal
+            if (amountChanged && isNowStaffAdvance && row.staff_advance_portal_id) {
+                try {
+                    const staffAdvanceUpdatePayload = {
+                        type: "Advance",
+                        date: editDailyExpenseData.date,
+                        labour_id: Number(editDailyExpenseData.labour_id) || null,
+                        from_purpose_id: 5,
+                        to_purpose_id: null,
+                        staff_payment_mode: "Cash",
+                        amount: Number(editDailyExpenseData.amount),
+                        staff_refund_amount: 0,
+                        description: editDailyExpenseData.description || "",
+                        file_url: editDailyExpenseData.file_url || null
+                    };
+                    
+                    await axios.put(
+                        `https://backendaab.in/aabuildersDash/api/staff-advance/${row.staff_advance_portal_id}?editedBy=${encodeURIComponent(username)}`,
+                        staffAdvanceUpdatePayload,
+                        { headers: { "Content-Type": "application/json" } }
+                    );
+                } catch (error) {
+                    console.error("Error updating staff advance portal amount:", error);
+                }
+            }
+
             const isChanged = Object.keys(payload).some(
                 (key) => String(payload[key]) !== String(row[key] ?? "")
             );
@@ -741,6 +868,35 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     };
     const saveEditedRefundPayment = async (id) => {
         try {
+            // Find the refund payment data to check for staff_advance_portal_id
+            const refundData = refundPayments.find(refund => refund.id === id);
+            
+            // If it has a staff_advance_portal_id, update that record first
+            if (refundData && refundData.staff_advance_portal_id) {
+                try {
+                    const staffAdvanceUpdatePayload = {
+                        type: "Refund",
+                        date: refundData.date,
+                        labour_id: Number(editRefundPaymentData.labour_id) || null,
+                        from_purpose_id: 5,
+                        to_purpose_id: null,
+                        staff_payment_mode: "Cash",
+                        amount: 0,
+                        staff_refund_amount: Number(editRefundPaymentData.amount),
+                        description: "",
+                        file_url: null
+                    };
+                    
+                    await axios.put(
+                        `https://backendaab.in/aabuildersDash/api/staff-advance/${refundData.staff_advance_portal_id}?editedBy=${encodeURIComponent(username)}`,
+                        staffAdvanceUpdatePayload,
+                        { headers: { "Content-Type": "application/json" } }
+                    );
+                } catch (error) {
+                    console.error("Error updating staff advance portal for refund:", error);
+                }
+            }
+
             await axios.put(
                 `https://backendaab.in/aabuildersDash/api/refund_received/edit/${id}?username=${encodeURIComponent(username)}`,
                 editRefundPaymentData
@@ -781,6 +937,22 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         const confirmed = window.confirm("Are you sure you want to delete This Daily Expense Data?");
         if (confirmed) {
             try {
+                // Find the expense data from the current state to get staff_advance_portal_id
+                const expenseData = dailyExpenses.find(expense => expense.id === id);
+                
+                // If it has a staff_advance_portal_id, delete that record first
+                if (expenseData && expenseData.staff_advance_portal_id) {
+                    try {
+                        await axios.delete(
+                            `https://backendaab.in/aabuildersDash/api/staff-advance/${expenseData.staff_advance_portal_id}`,
+                            { headers: { "Content-Type": "application/json" } }
+                        );
+                    } catch (error) {
+                        console.error("Error deleting staff advance portal:", error);
+                    }
+                }
+
+                // Then delete the daily expense
                 const response = await fetch(`https://backendaab.in/aabuildersDash/api/daily-payments/delete/${id}`, {
                     method: 'DELETE',
                 });
@@ -793,7 +965,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 }
             } catch (error) {
                 console.error("Error:", error);
-                alert("An error occurred while deleting the Contractor Name.");
+                alert("An error occurred while deleting the Daily Expenses.");
             }
         } else {
             console.log("Deletion cancelled.");
@@ -803,6 +975,21 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         const confirmed = window.confirm("Are you sure you want to delete This Refund Received Data?");
         if (confirmed) {
             try {
+                // Find the refund payment data to check for staff_advance_portal_id
+                const refundData = refundPayments.find(refund => refund.id === id);
+                
+                // If it has a staff_advance_portal_id, delete that record first
+                if (refundData && refundData.staff_advance_portal_id) {
+                    try {
+                        await axios.delete(
+                            `https://backendaab.in/aabuildersDash/api/staff-advance/${refundData.staff_advance_portal_id}`,
+                            { headers: { "Content-Type": "application/json" } }
+                        );
+                    } catch (error) {
+                        console.error("Error deleting staff advance portal for refund:", error);
+                    }
+                }
+
                 const response = await fetch(`https://backendaab.in/aabuildersDash/api/refund_received/delete/${id}`, {
                     method: 'DELETE',
                 });
@@ -832,42 +1019,107 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 alert("Please select all requried details.");
                 return;
             }
-            // ✅ Save Daily Entry
-            const payload = {
-                date: selectedDate,
-                created_at: new Date().toISOString(),
-                labour_id: Number(newDailyExpense.labour_id) || null,
-                vendor_id: Number(newDailyExpense.vendor_id) || null,
-                contractor_id: Number(newDailyExpense.contractor_id) || null,
-                employee_id: Number(newDailyExpense.employee_id) || null,
-                project_id: Number(newDailyExpense.project_id),
-                quantity: Number(newDailyExpense.quantity) || 0,
-                type: newDailyExpense.type,
-                amount: Number(newDailyExpense.amount),
-                extra_amount: newDailyExpense.extra_amount ? Number(newDailyExpense.extra_amount) : 0,
-                weekly_number: Number(currentWeekNumber),
-            };
-            await axios.post(
-                "https://backendaab.in/aabuildersDash/api/daily-payments/save",
-                payload,
-                { headers: { "Content-Type": "application/json" } }
-            );
-            // ✅ Save Weekly Expense "meta row" (amount will be recalculated in backend)
-            const expenseForBackend = {
-                date: selectedDate,
-                contractor_id: contractorOptions.find(opt => opt.label === "Company Labour")?.id || null,
-                vendor_id: null,
-                project_id: siteOptions.find(opt => opt.label === "Daily Wage")?.id || null,
-                type: "Daily",
-                amount: 0, // 🔹 always 0 → backend will recalc sum
-                weekly_number: currentWeekNumber,
-                status: false,
-            };
-            await axios.post(
-                "https://backendaab.in/aabuildersDash/api/weekly-expenses/save-daily",
-                expenseForBackend,
-                { headers: { "Content-Type": "application/json" } }
-            );
+            // Check if this is a Staff Advance type
+            if (newDailyExpense.type === "Staff Advance") {
+                const entryNo = await getLastEntryNumber();
+                
+                // Send to staff-advance API
+                const staffAdvancePayload = {
+                    date: selectedDate,
+                    type: "Advance",
+                    labour_id: Number(newDailyExpense.labour_id) || null,
+                    amount: Number(newDailyExpense.amount),
+                    week_no: Number(currentWeekNumber),
+                    staff_payment_mode: "Cash",
+                    from_purpose_id: 5,
+                    entry_no: entryNo
+                };
+                
+                const staffAdvanceResponse = await axios.post(
+                    "https://backendaab.in/aabuildersDash/api/staff-advance/save",
+                    staffAdvancePayload,
+                    { headers: { "Content-Type": "application/json" } }
+                );
+
+                // Get the staffAdvancePortalId from the response
+                const staffAdvancePortalId = staffAdvanceResponse.data?.staffAdvancePortalId;
+
+                // Also send to daily-payments API with staff_advance_portal_id
+                const dailyPaymentPayload = {
+                    date: selectedDate,
+                    created_at: new Date().toISOString(),
+                    labour_id: Number(newDailyExpense.labour_id) || null,
+                    vendor_id: Number(newDailyExpense.vendor_id) || null,
+                    contractor_id: Number(newDailyExpense.contractor_id) || null,
+                    employee_id: Number(newDailyExpense.employee_id) || null,
+                    project_id: Number(newDailyExpense.project_id),
+                    quantity: Number(newDailyExpense.quantity) || 0,
+                    type: newDailyExpense.type,
+                    amount: Number(newDailyExpense.amount),
+                    extra_amount: newDailyExpense.extra_amount ? Number(newDailyExpense.extra_amount) : 0,
+                    weekly_number: Number(currentWeekNumber),
+                    staff_advance_portal_id: staffAdvancePortalId
+                };
+                await axios.post(
+                    "https://backendaab.in/aabuildersDash/api/daily-payments/save",
+                    dailyPaymentPayload,
+                    { headers: { "Content-Type": "application/json" } }
+                );
+
+                // Save Weekly Expense "meta row" (amount will be recalculated in backend)
+                const expenseForBackend = {
+                    date: selectedDate,
+                    contractor_id: contractorOptions.find(opt => opt.label === "Company Labour")?.id || null,
+                    vendor_id: null,
+                    project_id: siteOptions.find(opt => opt.label === "Daily Wage")?.id || null,
+                    type: "Daily",
+                    amount: 0, // 🔹 always 0 → backend will recalc sum
+                    weekly_number: currentWeekNumber,
+                    status: false,
+                };
+                await axios.post(
+                    "https://backendaab.in/aabuildersDash/api/weekly-expenses/save-daily",
+                    expenseForBackend,
+                    { headers: { "Content-Type": "application/json" } }
+                );
+            } else {
+                // ✅ Save Daily Entry (original logic for non-Staff Advance)
+                const payload = {
+                    date: selectedDate,
+                    created_at: new Date().toISOString(),
+                    labour_id: Number(newDailyExpense.labour_id) || null,
+                    vendor_id: Number(newDailyExpense.vendor_id) || null,
+                    contractor_id: Number(newDailyExpense.contractor_id) || null,
+                    employee_id: Number(newDailyExpense.employee_id) || null,
+                    project_id: Number(newDailyExpense.project_id),
+                    quantity: Number(newDailyExpense.quantity) || 0,
+                    type: newDailyExpense.type,
+                    amount: Number(newDailyExpense.amount),
+                    extra_amount: newDailyExpense.extra_amount ? Number(newDailyExpense.extra_amount) : 0,
+                    weekly_number: Number(currentWeekNumber),
+                };
+                await axios.post(
+                    "https://backendaab.in/aabuildersDash/api/daily-payments/save",
+                    payload,
+                    { headers: { "Content-Type": "application/json" } }
+                );
+                // ✅ Save Weekly Expense "meta row" (amount will be recalculated in backend)
+                const expenseForBackend = {
+                    date: selectedDate,
+                    contractor_id: contractorOptions.find(opt => opt.label === "Company Labour")?.id || null,
+                    vendor_id: null,
+                    project_id: siteOptions.find(opt => opt.label === "Daily Wage")?.id || null,
+                    type: "Daily",
+                    amount: 0, // 🔹 always 0 → backend will recalc sum
+                    weekly_number: currentWeekNumber,
+                    status: false,
+                };
+                await axios.post(
+                    "https://backendaab.in/aabuildersDash/api/weekly-expenses/save-daily",
+                    expenseForBackend,
+                    { headers: { "Content-Type": "application/json" } }
+                );
+            }
             // ✅ Refresh UI
             await handleDateClick(selectedDate);
             window.location.reload();
@@ -1227,7 +1479,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 }
             );
             alert("Description updated successfully!");
-            // Update the local state to reflect the change
             setDailyExpenses(prev =>
                 prev.map(exp =>
                     exp.id === entryId
@@ -1261,8 +1512,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         if (!selectedFileForPopup || !currentFileRow) return;
         try {
             const project = siteOptions.find(opt => opt.id === Number(currentFileRow.project_id));
-            const siteNo = project?.siteNo || ""; // use siteNo if available, fallback to label
-            // Find matching name from whichever id exists
+            const siteNo = project?.siteNo || "";
             const name =
                 laboursList.find(opt => opt.id === Number(currentFileRow.labour_id))?.label ||
                 vendorOptions.find(opt => opt.id === Number(currentFileRow.vendor_id))?.label ||
@@ -1285,7 +1535,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             }
             const uploadResult = await uploadResponse.json();
             const pdfUrl = uploadResult.url;
-            // Update the row with the new file URL while preserving all existing data
             const payload = {
                 date: currentFileRow.date,
                 labour_id: Number(currentFileRow.labour_id) || null,
@@ -1305,11 +1554,9 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 payload,
                 { headers: { "Content-Type": "application/json" } }
             );
-            // Update UI without reload
             setDailyExpenses((prev) =>
                 prev.map((exp) => (exp.id === currentFileRow.id ? { ...exp, file_url: pdfUrl } : exp))
             );
-            // Close popup and reset state
             setFileUploadPopup(false);
             setCurrentFileRow(null);
             setSelectedFileForPopup(null);
@@ -1616,14 +1863,12 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                         ) : null}
                                     </thead>
                                     <tbody>
-                                        {/* Editable Expense rows */}
                                         {sortedDailyExpenses
-                                            .filter(row => row.date === selectedDate) // only rows for selected date
+                                            .filter(row => row.date === selectedDate)
                                             .reverse()
                                             .map((row, index) => (
                                                 <tr key={row.id} className="even:bg-[#FFFFFF] odd:bg-[#FAF6ED] text-left">
                                                     <td className="py-2 font-bold text-left">{dailyExpenses.length - index}</td>
-                                                    {/* Contractor / Vendor column */}
                                                     <td className="py-2">
                                                         {editingDailyExpenseRowId === row.id ? (
                                                             <Select
@@ -1665,21 +1910,18 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                                 }}
                                                             />
                                                         ) : (
-                                                            // Show label in view mode
                                                             <div className="w-[180px] h-[40px] flex items-center">
                                                                 {(() => {
                                                                     const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
                                                                     const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
                                                                     const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
                                                                     const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
-                                                                    // Collect all non-empty labels
                                                                     const labels = [employee?.label, vendor?.label, contractor?.label, labour?.label].filter(Boolean);
                                                                     return labels.length > 0 ? labels.join(" | ") : "";
                                                                 })()}
                                                             </div>
                                                         )}
                                                     </td>
-                                                    {/* Project column */}
                                                     <td className="py-2">
                                                         {editingDailyExpenseRowId === row.id ? (
                                                             <Select
@@ -1699,7 +1941,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                                 }
                                                             />
                                                         ) : (
-                                                            // Show label in view mode
                                                             <div className="w-[260px] h-[40px] flex items-center">
                                                                 {siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""}
                                                             </div>
@@ -1737,7 +1978,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                                         <span>
                                                                             {Number((row.amount || 0) + (row.extra_amount || 0)).toLocaleString("en-IN")}
                                                                         </span>
-                                                                        {/* Tooltip on hover */}
                                                                         <div className="absolute left-0 top-full mt-1 hidden group-hover:block bg-black text-white text-xs rounded p-2 z-50 shadow-lg whitespace-nowrap">
                                                                             Amount: {Number(row.amount || 0).toLocaleString('en-IN')} <br />
                                                                             Extra Amount: {Number(row.extra_amount || 0).toLocaleString('en-IN')}

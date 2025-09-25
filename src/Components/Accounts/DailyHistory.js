@@ -2,9 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import Select from 'react-select';
 import Change from '../Images/dropdownchange.png';
+import fileUpload from '../Images/file_upload.png';
+import file from '../Images/file.png';
+import NotesStart from '../Images/notes _start.png';
+import NotesEnd from '../Images/notes_end.png';
+import Edit from '../Images/Edit.svg';
+import Delete from '../Images/Delete.svg';
+import history from '../Images/History.svg';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-const DailyHistory = () => {
+const DailyHistory = ({ username, userRoles = [] }) => {
     const [selectedWeek, setSelectedWeek] = useState("");
     const [weeks, setWeeks] = useState([]);
     const [selectedDate, setSelectedDate] = useState(null);
@@ -42,10 +49,128 @@ const DailyHistory = () => {
         labour_id: "",
         amount: ""
     });
+    const [showPopups, setShowPopups] = useState(false);
+    const [description, setDescription] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [entryId, setEntryId] = useState(null);
+    const [fileUploadPopup, setFileUploadPopup] = useState(false);
+    const [currentFileRow, setCurrentFileRow] = useState(null);
+    const [selectedFileForPopup, setSelectedFileForPopup] = useState(null);
+    const [editingDailyExpenseRowId, setEditingDailyExpenseRowId] = useState('');
+    const [editingPaymentId, setEditingPaymentId] = useState('');
+    const [editDailyExpenseData, setEditDailyExpenseData] = useState({
+        date: "",
+        labour_id: "",
+        vendor_id: "",
+        contractor_id: "",
+        employee_id: "",
+        project_id: "",
+        quantity: "",
+        type: "",
+        amount: "",
+        extra_amount: "",
+        description: "",
+        file_url: ""
+    });
+    const [editRefundPaymentData, setEditRefundPaymentData] = useState({
+        labour_id: "",
+        amount: "",
+    });
+    const [showWeeklyPaymentExpensesModal, setShowWeeklyPaymentExpensesModal] = useState(false);
+    const [weeklyPaymentExpensesAudits, setWeeklyPaymentExpensesAudits] = useState([]);
+    const [showWeeklyPaymentReceivedModal, setShowWeeklyPaymentReceivedModal] = useState(false);
+    const [weeklyPaymentReceivedAudits, setWeeklyPaymentReceivedAudits] = useState([]);
+    
+    // Click and drag scrolling functionality
+    const scrollRef = useRef(null);
+    const refundScrollRef = useRef(null);
+    const isDragging = useRef(false);
+    const start = useRef({ x: 0, y: 0 });
+    const scroll = useRef({ left: 0, top: 0 });
+    const velocity = useRef({ x: 0, y: 0 });
+    const animationFrame = useRef(null);
+    const lastMove = useRef({ time: 0, x: 0, y: 0 });
+    
     const currentYear = new Date().getFullYear();
     const currentWeek = weeks.find((w) => w.number === Number(selectedWeek));
     const startYear = 2000;
     const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i);
+    const lastWeekNumber = weeks.length > 0 ? Math.max(...weeks.map(week => week.number)) : 0;
+    
+    // Drag and scroll handler functions
+    const handleMouseDown = (e, ref) => {
+        if (!ref.current) return;
+        isDragging.current = true;
+        start.current = { x: e.clientX, y: e.clientY };
+        scroll.current = {
+            left: ref.current.scrollLeft,
+            top: ref.current.scrollTop,
+        };
+        lastMove.current = {
+            time: Date.now(),
+            x: e.clientX,
+            y: e.clientY,
+        };
+        ref.current.style.cursor = 'grabbing';
+        ref.current.style.userSelect = 'none';
+        cancelMomentum();
+    };
+
+    const handleMouseMove = (e, ref) => {
+        if (!isDragging.current || !ref.current) return;
+        const dx = e.clientX - start.current.x;
+        const dy = e.clientY - start.current.y;
+        const now = Date.now();
+        const dt = now - lastMove.current.time || 16;
+        velocity.current = {
+            x: (e.clientX - lastMove.current.x) / dt,
+            y: (e.clientY - lastMove.current.y) / dt,
+        };
+        ref.current.scrollLeft = scroll.current.left - dx;
+        ref.current.scrollTop = scroll.current.top - dy;
+        lastMove.current = {
+            time: now,
+            x: e.clientX,
+            y: e.clientY,
+        };
+    };
+
+    const handleMouseUp = (ref) => {
+        if (!isDragging.current || !ref.current) return;
+        isDragging.current = false;
+        ref.current.style.cursor = '';
+        ref.current.style.userSelect = '';
+        applyMomentum();
+    };
+
+    const cancelMomentum = () => {
+        if (animationFrame.current) {
+            cancelAnimationFrame(animationFrame.current);
+            animationFrame.current = null;
+        }
+    };
+
+    const applyMomentum = () => {
+        if (!scrollRef.current && !refundScrollRef.current) return;
+        const friction = 0.95;
+        const minVelocity = 0.1;
+        const step = () => {
+            const { x, y } = velocity.current;
+            const activeRef = scrollRef.current || refundScrollRef.current;
+            if (!activeRef) return;
+            if (Math.abs(x) > minVelocity || Math.abs(y) > minVelocity) {
+                activeRef.scrollLeft -= x * 20;
+                activeRef.scrollTop -= y * 20;
+                velocity.current.x *= friction;
+                velocity.current.y *= friction;
+                animationFrame.current = requestAnimationFrame(step);
+            } else {
+                cancelMomentum();
+            }
+        };
+        animationFrame.current = requestAnimationFrame(step);
+    };
+    
     function getStartAndEndDateOfWeek(weekNumber, year) {
         const simple = new Date(year, 0, 1 + (weekNumber - 1) * 7);
         const dayOfWeek = simple.getDay();
@@ -110,6 +235,13 @@ const DailyHistory = () => {
     useEffect(() => {
         setCombinedOptions([...vendorOptions, ...contractorOptions, ...employeeOptions]);
     }, [vendorOptions, contractorOptions, employeeOptions]);
+    
+    // Cleanup effect for drag and scroll
+    useEffect(() => {
+        return () => {
+            cancelMomentum();
+        };
+    }, []);
     const fetchLaboursList = async () => {
         try {
             const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
@@ -119,6 +251,7 @@ const DailyHistory = () => {
                     value: item.labour_name,
                     label: item.labour_name,
                     id: item.id,
+                    type: "Labour",
                     salary: item.labour_salary,
                 }));
                 setLaboursList(formattedData);
@@ -279,7 +412,7 @@ const DailyHistory = () => {
     };
     const fetchWeeklyTypes = async () => {
         try {
-            const response = await fetch("https://backendaab.in/aabuildersDash/api/weekly-types/getAll", {
+            const response = await fetch("https://backendaab.in/aabuildersDash/api/weekly_types/getAll", {
                 method: "GET",
                 credentials: "include",
                 headers: {
@@ -297,7 +430,7 @@ const DailyHistory = () => {
     };
     const fetchExpensesCategory = async () => {
         try {
-            const response = await fetch("https://backendaab.in/aabuildersDash/api/expenses-category/getAll", {
+            const response = await fetch("https://backendaab.in/aabuilderDash/api/expenses_categories/getAll", {
                 method: "GET",
                 credentials: "include",
                 headers: {
@@ -328,14 +461,27 @@ const DailyHistory = () => {
     const weekDays = getWeekDays();
     useEffect(() => {
         if (weekDays.length > 0) {
-            const todayStr = new Date().toISOString().split("T")[0];
-            const matchedDay = weekDays.find(
-                (d) => d.toISOString().split("T")[0] === todayStr
-            );
-            const defaultDate = matchedDay
-                ? matchedDay.toISOString().split("T")[0]
-                : weekDays[0].toISOString().split("T")[0];
+            // Always set the first day of the selected week as default
+            const defaultDate = weekDays[0].toISOString().split("T")[0];
             setSelectedDate(defaultDate);
+            
+            // Fetch data for the first day of the week
+            const fetchDataForDate = async (dateStr) => {
+                try {
+                    const [dailyRes, refundRes] = await Promise.all([
+                        axios.get(`https://backendaab.in/aabuildersDash/api/daily-payments/date/${dateStr}`),
+                        axios.get(`https://backendaab.in/aabuildersDash/api/refund_received/date/${dateStr}`)
+                    ]);
+                    setDailyExpenses(dailyRes.data);
+                    setRefundPayments(refundRes.data);
+                } catch (error) {
+                    console.error("Error fetching data:", error);
+                    setDailyExpenses([]);
+                    setRefundPayments([]);
+                }
+            };
+            
+            fetchDataForDate(defaultDate);
         }
     }, [currentWeek]);
     const formatDate = (date) =>
@@ -348,8 +494,6 @@ const DailyHistory = () => {
                 axios.get(`https://backendaab.in/aabuildersDash/api/daily-payments/date/${dateStr}`),
                 axios.get(`https://backendaab.in/aabuildersDash/api/refund_received/date/${dateStr}`)
             ]);
-            console.log("Daily Expenses:", dailyRes.data);
-            console.log("Refund Payments:", refundRes.data);
             setDailyExpenses(dailyRes.data);
             setRefundPayments(refundRes.data);
         } catch (error) {
@@ -756,6 +900,315 @@ const DailyHistory = () => {
         const fileName = `PS ${selectedWeek} - Daily Payment Statement ${formatDateOnly(selectedDate)}.pdf`;
         doc.save(fileName);
     };
+
+    // Handler functions for file upload and description (exactly like DailyPayment)
+    const handleDescriptionClick = (row) => {
+        if (row.description) {
+            // If description exists, show it in a read-only modal
+            setDescription(row.description);
+            setEntryId(null); // No editing allowed
+            setShowPopups(true);
+        } else {
+            // If no description, allow editing
+            setEntryId(row.id);
+            setDescription("");
+            setShowPopups(true);
+        }
+    };
+
+    const handleFileUploadClick = (row) => {
+        setCurrentFileRow(row);
+        setSelectedFileForPopup(null);
+        setFileUploadPopup(true);
+    };
+
+    const handleFileSelectInPopup = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setSelectedFileForPopup(file);
+        }
+        e.target.value = '';
+    };
+
+    const handleSaveFileFromPopup = async () => {
+        if (!selectedFileForPopup || !currentFileRow) return;
+        try {
+            const project = siteOptions.find(opt => opt.id === Number(currentFileRow.project_id));
+            const siteNo = project?.siteNo || ""; // use siteNo if available, fallback to label
+            // Find matching name from whichever id exists
+            const name =
+                laboursList.find(opt => opt.id === Number(currentFileRow.labour_id))?.label ||
+                vendorOptions.find(opt => opt.id === Number(currentFileRow.vendor_id))?.label ||
+                contractorOptions.find(opt => opt.id === Number(currentFileRow.contractor_id))?.label ||
+                employeeOptions.find(opt => opt.id === Number(currentFileRow.employee_id))?.label ||
+                "";
+            const formData = new FormData();
+            const finalName = `${formatDateOnly(currentFileRow.date)}-${siteNo}-${name}`;
+            formData.append("file", selectedFileForPopup);
+            formData.append("file_name", finalName);
+            const uploadResponse = await fetch(
+                "https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive",
+                {
+                    method: "POST",
+                    body: formData,
+                }
+            );
+            if (!uploadResponse.ok) {
+                throw new Error("File upload failed");
+            }
+            const uploadResult = await uploadResponse.json();
+            const pdfUrl = uploadResult.url;
+            // Update the row with the new file URL while preserving all existing data
+            const payload = {
+                date: currentFileRow.date,
+                labour_id: Number(currentFileRow.labour_id) || null,
+                vendor_id: Number(currentFileRow.vendor_id) || null,
+                contractor_id: Number(currentFileRow.contractor_id) || null,
+                employee_id: Number(currentFileRow.employee_id) || null,
+                project_id: Number(currentFileRow.project_id),
+                quantity: Number(currentFileRow.quantity) || 0,
+                type: currentFileRow.type,
+                amount: Number(currentFileRow.amount),
+                extra_amount: Number(currentFileRow.extra_amount || 0),
+                description: currentFileRow.description || "",
+                file_url: pdfUrl
+            };
+            const response = await axios.put(
+                `https://backendaab.in/aabuildersDash/api/daily-payments/edit/${currentFileRow.id}?username=${encodeURIComponent(username)}`,
+                payload,
+                { headers: { "Content-Type": "application/json" } }
+            );
+            // Update UI without reload
+            setDailyExpenses((prev) =>
+                prev.map((exp) => (exp.id === currentFileRow.id ? { ...exp, file_url: pdfUrl } : exp))
+            );
+            // Close popup and reset state
+            setFileUploadPopup(false);
+            setCurrentFileRow(null);
+            setSelectedFileForPopup(null);
+        } catch (error) {
+            console.error("Error uploading file:", error);
+            alert("Error during file upload. Please try again.");
+        }
+    };
+
+    const handleUpdate = async () => {
+        if (!description.trim()) {
+            alert("Please enter a description");
+            return;
+        }
+        setLoading(true);
+        try {
+            // Find the current expense data to preserve all existing fields
+            const currentExpense = dailyExpenses.find(exp => exp.id === entryId);
+            if (!currentExpense) {
+                throw new Error("Expense not found");
+            }
+            // Create payload with all existing data plus the new description
+            const payload = {
+                date: currentExpense.date,
+                labour_id: Number(currentExpense.labour_id) || null,
+                vendor_id: Number(currentExpense.vendor_id) || null,
+                contractor_id: Number(currentExpense.contractor_id) || null,
+                employee_id: Number(currentExpense.employee_id) || null,
+                project_id: Number(currentExpense.project_id),
+                quantity: Number(currentExpense.quantity) || 0,
+                type: currentExpense.type,
+                amount: Number(currentExpense.amount),
+                extra_amount: Number(currentExpense.extra_amount || 0),
+                description: description.trim(),
+                file_url: currentExpense.file_url || null,
+            };
+            // Use the same API endpoint as saveEditedExpense
+            await axios.put(
+                `https://backendaab.in/aabuildersDash/api/daily-payments/edits/${entryId}?username=${encodeURIComponent(username)}`,
+                payload,
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                }
+            );
+            alert("Description updated successfully!");
+            // Update the local state to reflect the change
+            setDailyExpenses(prev =>
+                prev.map(exp =>
+                    exp.id === entryId
+                        ? { ...exp, description: description.trim() }
+                        : exp
+                )
+            );
+            setShowPopups(false);
+            setEntryId(null);
+            setDescription("");
+        } catch (err) {
+            console.error(err);
+            alert("Failed to update description. Please try again.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Edit functions for daily expenses
+    const handleEditClick = (row) => {
+        setEditingDailyExpenseRowId(row.id);
+        setEditDailyExpenseData({
+            date: row.date,
+            labour_id: row.labour_id || "",
+            vendor_id: row.vendor_id || "",
+            contractor_id: row.contractor_id || "",
+            employee_id: row.employee_id || "",
+            project_id: row.project_id || "",
+            quantity: row.quantity || "",
+            type: row.type || "",
+            amount: row.amount || "",
+            extra_amount: row.extra_amount || "",
+            description: row.description || "",
+            file_url: row.file_url || ""
+        });
+    };
+
+    const saveEditedExpense = async (row) => {
+        try {
+            const payload = {
+                date: editDailyExpenseData.date,
+                labour_id: Number(editDailyExpenseData.labour_id) || null,
+                vendor_id: Number(editDailyExpenseData.vendor_id) || null,
+                contractor_id: Number(editDailyExpenseData.contractor_id) || null,
+                employee_id: Number(editDailyExpenseData.employee_id) || null,
+                project_id: Number(editDailyExpenseData.project_id),
+                quantity: Number(editDailyExpenseData.quantity) || 0,
+                type: editDailyExpenseData.type,
+                amount: Number(editDailyExpenseData.amount),
+                extra_amount: Number(editDailyExpenseData.extra_amount || 0),
+                description: editDailyExpenseData.description || "",
+                file_url: editDailyExpenseData.file_url || null,
+            };
+
+            const response = await axios.put(
+                `https://backendaab.in/aabuildersDash/api/daily-payments/edit/${row.id}?username=${encodeURIComponent(username)}`,
+                payload,
+                { headers: { "Content-Type": "application/json" } }
+            );
+
+            // Update UI immediately
+            setDailyExpenses((prev) =>
+                prev.map((exp) => (exp.id === row.id ? { ...exp, ...payload } : exp))
+            );
+            setEditingDailyExpenseRowId(null); // exit edit mode
+        } catch (error) {
+            console.error("Error updating expense:", error);
+            alert("Error updating expense. Please try again.");
+        }
+    };
+
+    // Edit functions for refund payments
+    const handleEditRefundClick = (row) => {
+        setEditingPaymentId(row.id);
+        setEditRefundPaymentData({
+            labour_id: row.labour_id,
+            amount: row.amount,
+        });
+    };
+
+    const handleEditRefundChange = (e) => {
+        const { name, value } = e.target;
+        setEditRefundPaymentData((prev) => ({
+            ...prev,
+            [name]: value,
+        }));
+    };
+
+    const handleEditRefundLabourChange = (selected) => {
+        setEditRefundPaymentData((prev) => ({
+            ...prev,
+            labour_id: selected ? selected.id : "",
+        }));
+    };
+
+    const saveEditedRefundPayment = async (id) => {
+        try {
+            await axios.put(
+                `https://backendaab.in/aabuildersDash/api/refund_received/edit/${id}?username=${encodeURIComponent(username)}`,
+                editRefundPaymentData
+            );
+            // Update UI immediately
+            setRefundPayments((prev) =>
+                prev.map((row) =>
+                    row.id === id ? { ...row, ...editRefundPaymentData } : row
+                )
+            );
+            setEditingPaymentId(null); // exit edit mode
+            console.log("Refund payment updated successfully");
+        } catch (error) {
+            console.error("Error updating refund payment:", error);
+            alert("Error updating refund payment. Please try again.");
+        }
+    };
+
+    // Delete functions
+    const handleDailyExpensesDelete = async (id) => {
+        const confirmed = window.confirm("Are you sure you want to delete This Daily Expense Data?");
+        if (confirmed) {
+            try {
+                await axios.delete(
+                    `https://backendaab.in/aabuildersDash/api/daily-payments/delete/${id}?username=${encodeURIComponent(username)}`,
+                    { headers: { "Content-Type": "application/json" } }
+                );
+                // Update UI immediately
+                setDailyExpenses((prev) => prev.filter((expense) => expense.id !== id));
+                console.log("Daily expense deleted successfully");
+            } catch (error) {
+                console.error("Error deleting daily expense:", error);
+                alert("Error deleting daily expense. Please try again.");
+            }
+        } else {
+            console.log("Deletion cancelled.");
+        }
+    };
+
+    const handleRefundPaymentsDelete = async (id) => {
+        const confirmed = window.confirm("Are you sure you want to delete This Refund Received Data?");
+        if (confirmed) {
+            try {
+                await axios.delete(
+                    `https://backendaab.in/aabuildersDash/api/refund_received/delete/${id}?username=${encodeURIComponent(username)}`,
+                    { headers: { "Content-Type": "application/json" } }
+                );
+                // Update UI immediately
+                setRefundPayments((prev) => prev.filter((refund) => refund.id !== id));
+                console.log("Refund payment deleted successfully");
+            } catch (error) {
+                console.error("Error deleting refund payment:", error);
+                alert("Error deleting refund payment. Please try again.");
+            }
+        } else {
+            console.log("Deletion cancelled.");
+        }
+    };
+
+    // History functions
+    const fetchAuditDetailsForDailyExpense = async (expensesId) => {
+        try {
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/daily_entry_audit/daily_expense/${expensesId}`);
+            const data = await response.json();
+            setWeeklyPaymentExpensesAudits(data);
+            setShowWeeklyPaymentExpensesModal(true);
+        } catch (error) {
+            console.error("Error fetching audit details:", error);
+        }
+    };
+
+    const fetchAuditDetailsForRefundPaymentReceived = async (receivedId) => {
+        try {
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/daily_entry_audit/refund/${receivedId}`);
+            const data = await response.json();
+            setWeeklyPaymentReceivedAudits(data);
+            setShowWeeklyPaymentReceivedModal(true);
+        } catch (error) {
+            console.error("Error fetching audit details:", error);
+        }
+    };
     return (
         <body>
             <h1 className="font-bold text-xl flex justify-end mr-20 -mt-7">
@@ -854,26 +1307,32 @@ const DailyHistory = () => {
                             </h1>
                         </div>
                         <div className="w-full h-[500px] rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden">
-                            <div className="overflow-auto max-h-[500px] w-full">
+                            <div ref={scrollRef} className="overflow-auto max-h-[500px] w-full thin-scrollbar"
+                                onMouseDown={(e) => handleMouseDown(e, scrollRef)}
+                                onMouseMove={(e) => handleMouseMove(e, scrollRef)}
+                                onMouseUp={() => handleMouseUp(scrollRef)}
+                                onMouseLeave={() => handleMouseUp(scrollRef)}
+                            >
                                 <table className="w-full min-w-[1200px] lg:min-w-[1450px] border-collapse text-left">
                                     <thead className="sticky top-0 z-10 bg-white">
                                         <tr className="bg-[#FAF6ED] h-12">
                                             <th className="py-2 px-1 text-left w-[60px]">S.No</th>
-                                            <th className="py-2 px-1 text-left w-[200px] cursor-pointer hover:bg-gray-200" onClick={() => handleSort('labour_name')}>
+                                            <th className="py-2 px-1 text-left w-[140px] cursor-pointer hover:bg-gray-200" onClick={() => handleSort('labour_name')}>
                                                 Name {sortConfig.key === 'labour_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                             </th>
-                                            <th className="py-2 px-1 text-left w-[220px] cursor-pointer hover:bg-gray-200" onClick={() => handleSort('project_name')}>
+                                            <th className="py-2 px-1 text-left w-[170px] cursor-pointer hover:bg-gray-200" onClick={() => handleSort('project_name')}>
                                                 Project Name {sortConfig.key === 'project_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                             </th>
                                             <th className="py-2 px-1 text-left w-[120px] cursor-pointer hover:bg-gray-200" onClick={() => handleSort('amount')}>
                                                 Amount {sortConfig.key === 'amount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="py-2 px-1 text-left w-[60px]">Qty</th>
+                                            </th>                                            
                                             <th className="py-2 px-1 text-left w-[120px] cursor-pointer hover:bg-gray-200" onClick={() => handleSort('type')}>
                                                 Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                             </th>
+                                            <th className="py-2 px-1 text-left w-[60px]">Qty</th>
                                             <th className="py-2 px-1 text-left w-[80px]">Activity</th>
                                         </tr>
+                                        {Number(selectedWeek) === Number(lastWeekNumber) && (
                                         <tr className="bg-white border-b border-gray-200">
                                             <td className="px-1 py-2 font-bold">{dailyExpenses.filter(row => row.date === selectedDate).length + 1}.</td>
                                             <td className="flex items-center gap-2 py-2">
@@ -906,7 +1365,7 @@ const DailyHistory = () => {
                                                                     contractor_id: type === "Contractor" ? id : "",
                                                                     employee_id: type === "Employee" ? id : "",
                                                                     labour_name: label,
-                                                                    amount: salary || ""
+                                                                    amount: type === "Labour" ? salary : ""
                                                                 }));
                                                             } else {
                                                                 setNewDailyExpense(prev => ({
@@ -924,7 +1383,7 @@ const DailyHistory = () => {
                                                 </div>
                                                 <div>
                                                     <button onClick={handleChangeButtonClick}>
-                                                        <img src={Change} className={`w-4 h-4 ${isChangeButtonActive ? 'opacity-70' : ''}`} />
+                                                        <img src={Change} className={`w-4 h-4 ${isChangeButtonActive ? 'opacity-10' : ''}`} />
                                                     </button>
                                                 </div>
                                             </td>
@@ -989,22 +1448,7 @@ const DailyHistory = () => {
                                                         />
                                                     </div>
                                                 )}
-                                            </td>
-                                            <td className="px-1 py-2">
-                                                <input
-                                                    type="number"
-                                                    name="quantity"
-                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[60px] h-[40px] rounded-lg focus:outline-none no-spinner"
-                                                    value={newDailyExpense.quantity || ""}
-                                                    onChange={(e) => setNewDailyExpense(prev => ({ ...prev, quantity: e.target.value }))}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === "Enter") {
-                                                            e.preventDefault();
-                                                            handleAddExpense();
-                                                        }
-                                                    }}
-                                                />
-                                            </td>
+                                            </td>                                            
                                             <td className="px-1 py-2 text-left">
                                                 <select
                                                     name="type"
@@ -1021,8 +1465,24 @@ const DailyHistory = () => {
                                                 </select>
                                             </td>
                                             <td className="px-1 py-2">
+                                                <input
+                                                    type="number"
+                                                    name="quantity"
+                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[60px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                    value={newDailyExpense.quantity || ""}
+                                                    onChange={(e) => setNewDailyExpense(prev => ({ ...prev, quantity: e.target.value }))}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === "Enter") {
+                                                            e.preventDefault();
+                                                            handleAddExpense();
+                                                        }
+                                                    }}
+                                                />
+                                            </td>
+                                            <td className="px-1 py-2">
                                             </td>
                                         </tr>
+                                        )}
                                     </thead>
                                     <tbody>
                                         {dailyExpenses
@@ -1032,22 +1492,108 @@ const DailyHistory = () => {
                                                     <td className="px-1 py-2 font-bold">{index + 1}</td>
                                                     <td className="px-1 py-2">
                                                         <div className="w-[200px] h-[40px] flex items-center">
-                                                            {(() => {
+                                                            {editingDailyExpenseRowId === row.id && Number(selectedWeek) === Number(lastWeekNumber) ? (
+                                                                <Select
+                                                                    name="labour_id"
+                                                                    className="w-[200px]"
+                                                                    placeholder={isChangeButtonActive ? "Vendor/Contractor" : "Labour Name"}
+                                                                    isSearchable
+                                                                    isClearable
+                                                                    options={isChangeButtonActive ? combinedOptions : laboursList}
+                                                                    styles={customStyles}
+                                                                    menuPortalTarget={document.body}
+                                                                    value={
+                                                                        isChangeButtonActive
+                                                                            ? combinedOptions.find(opt =>
+                                                                                (opt.type === "Employee" && opt.id === Number(editDailyExpenseData.employee_id)) ||
+                                                                                (opt.type === "Vendor" && opt.id === Number(editDailyExpenseData.vendor_id)) ||
+                                                                                (opt.type === "Contractor" && opt.id === Number(editDailyExpenseData.contractor_id))
+                                                                            ) || null
+                                                                            : laboursList.find(opt => opt.id === Number(editDailyExpenseData.labour_id)) || null
+                                                                    }
+                                                                    onChange={(selectedOption) => {
+                                                                        if (selectedOption) {
+                                                                            const { type, id, label, salary } = selectedOption;
+                                                                            setEditDailyExpenseData(prev => ({
+                                                                                ...prev,
+                                                                                labour_id: type === "Labour" ? id : "",
+                                                                                vendor_id: type === "Vendor" ? id : "",
+                                                                                contractor_id: type === "Contractor" ? id : "",
+                                                                                employee_id: type === "Employee" ? id : "",
+                                                                                labour_name: label,
+                                                                                amount: type === "Labour" ? salary : prev.amount
+                                                                            }));
+                                                                        } else {
+                                                                            setEditDailyExpenseData(prev => ({
+                                                                                ...prev,
+                                                                                labour_id: "",
+                                                                                vendor_id: "",
+                                                                                contractor_id: "",
+                                                                                employee_id: "",
+                                                                                labour_name: "",
+                                                                                amount: ""
+                                                                            }));
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            ) : (
+                                                                (() => {
                                                                 const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
                                                                 const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
                                                                 const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
                                                                 const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
                                                                 return employee?.label || vendor?.label || contractor?.label || labour?.label || "";
-                                                            })()}
+                                                                })()
+                                                            )}
                                                         </div>
                                                     </td>
                                                     <td className="px-1 py-2">
                                                         <div className="w-[220px] h-[40px] flex items-center">
-                                                            {siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""}
+                                                            {editingDailyExpenseRowId === row.id && Number(selectedWeek) === Number(lastWeekNumber) ? (
+                                                                <Select
+                                                                    name="project"
+                                                                    value={siteOptions.find(opt => opt.id === Number(editDailyExpenseData.project_id)) || null}
+                                                                    onChange={(selectedOption) => {
+                                                                        setEditDailyExpenseData(prev => ({
+                                                                            ...prev,
+                                                                            project_id: selectedOption ? selectedOption.id : ""
+                                                                        }));
+                                                                    }}
+                                                                    options={siteOptions}
+                                                                    menuPortalTarget={document.body}
+                                                                    className="w-[220px]"
+                                                                    placeholder="Select Site"
+                                                                    isSearchable
+                                                                    isClearable
+                                                                    styles={customStyles}
+                                                                />
+                                                            ) : (
+                                                                siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""
+                                                            )}
                                                         </div>
                                                     </td>
                                                     <td className="px-1 py-2 relative group flex">
                                                         <div className="flex items-center">
+                                                            {editingDailyExpenseRowId === row.id && Number(selectedWeek) === Number(lastWeekNumber) ? (
+                                                                <div className="flex items-center gap-2">
+                                                                    <input
+                                                                        type="number"
+                                                                        name="amount"
+                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[90px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                                        value={editDailyExpenseData.amount || ""}
+                                                                        onChange={(e) => setEditDailyExpenseData(prev => ({ ...prev, amount: e.target.value }))}
+                                                                    />
+                                                                    <input
+                                                                        type="number"
+                                                                        name="extra_amount"
+                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[90px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                                        placeholder="Extra"
+                                                                        value={editDailyExpenseData.extra_amount || ""}
+                                                                        onChange={(e) => setEditDailyExpenseData(prev => ({ ...prev, extra_amount: e.target.value }))}
+                                                                    />
+                                                                </div>
+                                                            ) : (
+                                                                <>
                                                             <div className="w-[120px] h-[40px] flex flex-col justify-center leading-tight cursor-default">
                                                                 <span>
                                                                     {Number((row.amount || 0) + (row.extra_amount || 0)).toLocaleString("en-IN")}
@@ -1057,21 +1603,117 @@ const DailyHistory = () => {
                                                                     Extra Amount: {Number(row.extra_amount || 0).toLocaleString('en-IN')}
                                                                 </div>
                                                             </div>
+                                                            <div className="w-[80px] h-[40px] flex items-center gap-2">
+                                                            <div className="flex items-center gap-1">
+                                                                {row.description ? (
+                                                                    <div className="flex items-center justify-center w-full">
+                                                                        <img
+                                                                            src={NotesEnd}
+                                                                            alt="View Description"
+                                                                            className="w-4 h-4 cursor-pointer opacity-60 hover:opacity-100 flex-shrink-0"
+                                                                            onClick={() => handleDescriptionClick(row)}
+                                                                        />
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="flex items-center justify-center w-full">
+                                                                        <img
+                                                                            src={NotesStart}
+                                                                            alt="Add Description"
+                                                                            className="w-4 h-4 cursor-pointer opacity-60 hover:opacity-100"
+                                                                            onClick={() => handleDescriptionClick(row)}
+                                                                        />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div className="ml-3 flex items-center gap-1">
+                                                                {row.file_url ? (
+                                                                    <a
+                                                                        href={row.file_url}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="cursor-pointer"
+                                                                        title="View File"
+                                                                    >
+                                                                        <img src={file} className="w-4 h-4" alt="Open File" />
+                                                                    </a>
+                                                                ) : (
+                                                                    <button
+                                                                        onClick={() => handleFileUploadClick(row)}
+                                                                        className="cursor-pointer"
+                                                                        title="Upload File"
+                                                                    >
+                                                                        <img
+                                                                            src={fileUpload}
+                                                                            className="w-4 h-4 opacity-70 hover:opacity-100"
+                                                                            alt="Upload File"
+                                                                        />
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                    </td>
-                                                    <td className="px-1 py-2">
-                                                        <div className="w-[60px] h-[40px] flex items-center">
-                                                            {row.quantity || "-"}
+                                                                </>
+                                                            )}
                                                         </div>
                                                     </td>
                                                     <td className="px-1 py-2">
                                                         <div className="w-[120px] h-[40px] flex items-center">
-                                                            {row.type}
+                                                            {editingDailyExpenseRowId === row.id && Number(selectedWeek) === Number(lastWeekNumber) ? (
+                                                                <select
+                                                                    name="type"
+                                                                    value={editDailyExpenseData.type}
+                                                                    onChange={(e) => setEditDailyExpenseData(prev => ({ ...prev, type: e.target.value }))}
+                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[120px] h-[40px] rounded-lg focus:outline-none"
+                                                                >
+                                                                    <option value="">Select</option>
+                                                                    {(isChangeButtonActive ? expensesCategory : weeklyTypes).map((type, index) => (
+                                                                        <option key={index} value={isChangeButtonActive ? type.category : type.type}>
+                                                                            {isChangeButtonActive ? type.category : type.type}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                            ) : (
+                                                                row.type
+                                                            )}
                                                         </div>
                                                     </td>
                                                     <td className="px-1 py-2">
-                                                        <div className="w-[80px] h-[40px] flex items-center">
+                                                        <div className="w-[60px] h-[40px] flex items-center">
+                                                            {editingDailyExpenseRowId === row.id && Number(selectedWeek) === Number(lastWeekNumber) ? (
+                                                                <input
+                                                                    type="number"
+                                                                    name="quantity"
+                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[60px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                                    value={editDailyExpenseData.quantity || ""}
+                                                                    onChange={(e) => setEditDailyExpenseData(prev => ({ ...prev, quantity: e.target.value }))}
+                                                                />
+                                                            ) : (
+                                                                row.quantity || "-"
+                                                            )}
                                                         </div>
+                                                    </td>                                                    
+                                                    <td className="px-1 py-2 relative">
+                                                        {Number(selectedWeek) === Number(lastWeekNumber) && (
+                                                            <div className="flex gap-2 w-[80px]">
+                                                                {/* Edit Button */}
+                                                                {editingDailyExpenseRowId === row.id ? (
+                                                                    <button className="text-green-600 font-bold text-lg relative z-10" onClick={() => saveEditedExpense(row)}>
+                                                                        ✓
+                                                                    </button>
+                                                                ) : (
+                                                                    <button onClick={() => handleEditClick(row)}>
+                                                                        <img className="w-5 h-4" src={Edit} alt="Edit" />
+                                                                    </button>
+                                                                )}
+                                                                {/* Delete Button */}
+                                                                <button onClick={() => handleDailyExpensesDelete(row.id)}>
+                                                                    <img src={Delete} className="w-5 h-4" alt="Delete" />
+                                                                </button>
+                                                                {/* History Button */}
+                                                                <button onClick={() => fetchAuditDetailsForDailyExpense(row.id)}>
+                                                                    <img src={history} className="w-5 h-4" alt="History" />
+                                                                </button>
+                                                            </div>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             ))}
@@ -1090,7 +1732,12 @@ const DailyHistory = () => {
                             </h1>
                         </div>
                         <div>
-                            <div className="w-full rounded-lg border-l-8 border-l-[#BF9853] overflow-x-auto" style={{ maxHeight: "400px" }}>
+                            <div ref={refundScrollRef} className="w-full rounded-lg border-l-8 border-l-[#BF9853] overflow-x-auto thin-scrollbar" style={{ maxHeight: "400px" }}
+                                onMouseDown={(e) => handleMouseDown(e, refundScrollRef)}
+                                onMouseMove={(e) => handleMouseMove(e, refundScrollRef)}
+                                onMouseUp={() => handleMouseUp(refundScrollRef)}
+                                onMouseLeave={() => handleMouseUp(refundScrollRef)}
+                            >
                                 <table className="w-full min-w-[350px] lg:min-w-[380px] border-collapse">
                                     <thead className="bg-[#FAF6ED] h-12">
                                         <tr>
@@ -1103,16 +1750,63 @@ const DailyHistory = () => {
                                         {refundPayments.map((row, index) => (
                                             <tr key={row.id || index} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
                                                 <td className="py-2">
-                                                    {laboursList.find(opt => opt.id === Number(row.labour_id))?.label || ""}
+                                                    {editingPaymentId === row.id && Number(selectedWeek) === Number(lastWeekNumber) ? (
+                                                        <Select
+                                                            name="labour_id"
+                                                            className="w-[180px]"
+                                                            placeholder="Labour Name"
+                                                            isSearchable
+                                                            isClearable
+                                                            value={laboursList.find(opt => opt.id === editRefundPaymentData.labour_id) || null}
+                                                            onChange={handleEditRefundLabourChange}
+                                                            options={laboursList}
+                                                            menuPortalTarget={document.body}
+                                                            styles={customStyles}
+                                                        />
+                                                    ) : (
+                                                        laboursList.find(opt => opt.id === Number(row.labour_id))?.label || ""
+                                                    )}
                                                 </td>
                                                 <td className="py-2">
-                                                    {Number(row.amount).toLocaleString("en-IN")}
+                                                    {editingPaymentId === row.id && Number(selectedWeek) === Number(lastWeekNumber) ? (
+                                                        <input
+                                                            type="number"
+                                                            name="amount"
+                                                            value={editRefundPaymentData.amount}
+                                                            onChange={handleEditRefundChange}
+                                                            className="border-2 border-[#BF9853] border-opacity-25 rounded-lg w-[90px] h-[40px] focus:outline-none no-spinner"
+                                                            min="0"
+                                                            step="any"
+                                                            onWheel={(e) => e.preventDefault()}
+                                                        />
+                                                    ) : (
+                                                        Number(row.amount).toLocaleString("en-IN")
+                                                    )}
                                                 </td>
                                                 <td className="py-2">
-                                                    {row.description || "-"}
+                                                    {Number(selectedWeek) === Number(lastWeekNumber) && (
+                                                        <div className="flex">
+                                                            {editingPaymentId === row.id ? (
+                                                                <button className="text-green-600 font-bold text-lg" onClick={() => saveEditedRefundPayment(row.id)}>
+                                                                    ✓
+                                                                </button>
+                                                            ) : (
+                                                                <button onClick={() => handleEditRefundClick(row)}>
+                                                                    <img className="w-5 h-4" src={Edit} alt="Edit" />
+                                                                </button>
+                                                            )}
+                                                            <button className="pl-3" onClick={() => handleRefundPaymentsDelete(row.id)}>
+                                                                <img src={Delete} className="w-5 h-4" alt="Delete" />
+                                                            </button>
+                                                            <button onClick={() => fetchAuditDetailsForRefundPaymentReceived(row.id)} className="pl-3">
+                                                                <img src={history} className="w-5 h-4" alt="History" />
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </td>
                                             </tr>
                                         ))}
+                                        {Number(selectedWeek) === Number(lastWeekNumber) && (
                                         <tr>
                                             <td className="py-2 text-left">
                                                 <Select
@@ -1145,6 +1839,7 @@ const DailyHistory = () => {
                                             <td className="py-2">
                                             </td>
                                         </tr>
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
@@ -1152,6 +1847,243 @@ const DailyHistory = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Description Popup Modal */}
+            {showPopups && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+                    onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                            setShowPopups(false);
+                            setEntryId(null);
+                            setDescription("");
+                        }
+                        if (e.key === 'Enter' && entryId && description.trim()) {
+                            handleUpdate();
+                        }
+                    }}
+                    tabIndex={0}
+                >
+                    <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
+                        <label className="block mb-3 text-left">
+                            <span className="font-semibold">Description</span>
+                            {entryId ? (
+                                <div>
+                                    <input
+                                        type="text"
+                                        name="description"
+                                        placeholder="Enter description"
+                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                        value={description}
+                                        onChange={(e) => setDescription(e.target.value)}
+                                        maxLength={200}
+                                    />
+                                    <div className="text-xs text-gray-500 mt-1 text-right">
+                                        {description.length}/200 characters
+                                    </div>
+                                </div>
+                            ) : (
+                                <div>
+                                    <textarea
+                                        name="description"
+                                        placeholder="Description"
+                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none h-24 resize-none"
+                                        value={description}
+                                        readOnly
+                                    />
+                                </div>
+                            )}
+                        </label>
+                        <div className="flex justify-end gap-2">
+                            <button
+                                onClick={() => {
+                                    setShowPopups(false);
+                                    setEntryId(null);
+                                    setDescription("");
+                                }}
+                                className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                            >
+                                Cancel
+                            </button>
+                            {entryId && (
+                                <button
+                                    onClick={handleUpdate}
+                                    disabled={loading || !description.trim()}
+                                    className="px-4 py-2 bg-[#BF9853] text-white rounded-lg hover:bg-[#A68A4A] disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {loading ? 'Saving...' : 'Save'}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* File Upload Popup Modal */}
+            {fileUploadPopup && (
+                <div
+                    className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+                    onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                            setFileUploadPopup(false);
+                            setCurrentFileRow(null);
+                            setSelectedFileForPopup(null);
+                        }
+                    }}
+                    tabIndex={0}
+                >
+                    <div className="bg-white rounded-xl shadow-lg p-6 w-[500px]">
+                        <h3 className="text-lg font-semibold mb-4 text-center">
+                            {currentFileRow?.file_url ? 'Change File' : 'Upload File'}
+                        </h3>
+                        {currentFileRow?.file_url && (
+                            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                                <p className="text-sm text-gray-600 mb-2">Current file:</p>
+                                <a href={currentFileRow.file_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:text-blue-800 underline"
+                                >
+                                    View Current File
+                                </a>
+                            </div>
+                        )}
+                        <div className="mb-4">
+                            <label className="block mb-2 text-sm font-medium">
+                                Select PDF File
+                            </label>
+                            <input
+                                type="file"
+                                accept=".pdf"
+                                onChange={handleFileSelectInPopup}
+                                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#BF9853] file:text-white hover:file:bg-[#A68A4A]"
+                            />
+                            {selectedFileForPopup && (
+                                <p className="mt-2 text-sm text-green-600">
+                                    Selected: {selectedFileForPopup.name}
+                                </p>
+                            )}
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <button
+                                onClick={() => {
+                                    setFileUploadPopup(false);
+                                    setCurrentFileRow(null);
+                                    setSelectedFileForPopup(null);
+                                }}
+                                className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleSaveFileFromPopup}
+                                disabled={!selectedFileForPopup}
+                                className={`px-4 py-2 rounded-lg ${!selectedFileForPopup
+                                    ? 'bg-gray-400 cursor-not-allowed'
+                                    : 'bg-green-600 hover:bg-green-700'
+                                    } text-white`}
+                            >
+                                {currentFileRow?.file_url ? 'Update File' : 'Upload File'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* History Modal for Daily Expenses */}
+            {showWeeklyPaymentExpensesModal && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                    <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1800px] mx-4 p-2">
+                        <div className="flex justify-between items-center mt-4 ml-7 mr-7">
+                            <h2 className="text-xl font-bold">History</h2>
+                            <button onClick={() => setShowWeeklyPaymentExpensesModal(false)}>
+                                <h2 className="text-xl text-red-500 -mt-10 font-bold">x</h2>
+                            </button>
+                        </div>
+                        <div className="overflow-auto max-h-[600px] w-full">
+                            <table className="w-full border-collapse text-left">
+                                <thead className="sticky top-0 z-10 bg-white">
+                                    <tr className="bg-[#FAF6ED] h-12">
+                                        <th className="py-2 px-4 text-left">S.No</th>
+                                        <th className="py-2 px-4 text-left">Date</th>
+                                        <th className="py-2 px-4 text-left">Action</th>
+                                        <th className="py-2 px-4 text-left">Changed By</th>
+                                        <th className="py-2 px-4 text-left">Old Values</th>
+                                        <th className="py-2 px-4 text-left">New Values</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {weeklyPaymentExpensesAudits.map((audit, index) => (
+                                        <tr key={audit.id || index} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
+                                            <td className="px-4 py-2">{index + 1}</td>
+                                            <td className="px-4 py-2">{audit.created_at ? new Date(audit.created_at).toLocaleString() : '-'}</td>
+                                            <td className="px-4 py-2">{audit.action || '-'}</td>
+                                            <td className="px-4 py-2">{audit.changed_by || '-'}</td>
+                                            <td className="px-4 py-2">
+                                                <div className="max-w-xs overflow-auto">
+                                                    {audit.old_values ? JSON.stringify(audit.old_values, null, 2) : '-'}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-2">
+                                                <div className="max-w-xs overflow-auto">
+                                                    {audit.new_values ? JSON.stringify(audit.new_values, null, 2) : '-'}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* History Modal for Refund Payments */}
+            {showWeeklyPaymentReceivedModal && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                    <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1800px] mx-4 p-2">
+                        <div className="flex justify-between items-center mt-4 ml-7 mr-7">
+                            <h2 className="text-xl font-bold">History</h2>
+                            <button onClick={() => setShowWeeklyPaymentReceivedModal(false)}>
+                                <h2 className="text-xl text-red-500 -mt-10 font-bold">x</h2>
+                            </button>
+                        </div>
+                        <div className="overflow-auto max-h-[600px] w-full">
+                            <table className="w-full border-collapse text-left">
+                                <thead className="sticky top-0 z-10 bg-white">
+                                    <tr className="bg-[#FAF6ED] h-12">
+                                        <th className="py-2 px-4 text-left">S.No</th>
+                                        <th className="py-2 px-4 text-left">Date</th>
+                                        <th className="py-2 px-4 text-left">Action</th>
+                                        <th className="py-2 px-4 text-left">Changed By</th>
+                                        <th className="py-2 px-4 text-left">Old Values</th>
+                                        <th className="py-2 px-4 text-left">New Values</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {weeklyPaymentReceivedAudits.map((audit, index) => (
+                                        <tr key={audit.id || index} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
+                                            <td className="px-4 py-2">{index + 1}</td>
+                                            <td className="px-4 py-2">{audit.created_at ? new Date(audit.created_at).toLocaleString() : '-'}</td>
+                                            <td className="px-4 py-2">{audit.action || '-'}</td>
+                                            <td className="px-4 py-2">{audit.changed_by || '-'}</td>
+                                            <td className="px-4 py-2">
+                                                <div className="max-w-xs overflow-auto">
+                                                    {audit.old_values ? JSON.stringify(audit.old_values, null, 2) : '-'}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-2">
+                                                <div className="max-w-xs overflow-auto">
+                                                    {audit.new_values ? JSON.stringify(audit.new_values, null, 2) : '-'}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
         </body>
     );
 };

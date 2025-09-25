@@ -8,11 +8,11 @@ import edit from '../Images/Edit.svg';
 // EditModal is now inline - no need for lazy loading
 
 // Memoized components for better performance
-const TableRow = memo(({ entry, index, onEditClick, getEmployeeName, getPurposeName, formatDateOnly }) => (
+const TableRow = memo(({ entry, index, onEditClick, getEmployeeName, getLabourName, getPurposeName, formatDateOnly }) => (
   <tr key={entry.id} className="odd:bg-white even:bg-[#FAF6ED]">
     <td className="text-sm text-left p-2 w-40 font-semibold">{formatDateOnly(entry.date)}</td>
     <td className="text-sm text-left w-[150px] font-semibold">
-      {getEmployeeName(entry.employee_id)}
+      {getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || "N/A"}
     </td>
     <td className="text-sm text-left w-[250px] font-semibold">
       {getPurposeName(entry.from_purpose_id)}
@@ -53,7 +53,9 @@ const EditModal = memo(({
   isOpen,
   editFormData,
   setEditFormData,
+  staffAdvanceCombinedOptions,
   employees,
+  laboursList,
   purposes,
   onClose,
   onUpdate,
@@ -136,9 +138,23 @@ const EditModal = memo(({
               <label className='font-semibold block'>Employee</label>
             </div>
             <Select
-              options={employees}
-              value={employees.find(emp => emp.id === editFormData.employee_id) || null}
-              onChange={(selected) => handleInputChange('employee_id', selected?.id || '')}
+              options={staffAdvanceCombinedOptions}
+              value={staffAdvanceCombinedOptions.find(
+                opt =>
+                  (opt.type === "Employee" && opt.id === editFormData.employee_id) ||
+                  (opt.type === "Labour" && opt.id === editFormData.labour_id)
+              ) || null}
+              onChange={(selected) => {
+                if (!selected) {
+                  setEditFormData(prev => ({ ...prev, employee_id: '', labour_id: '' }));
+                  return;
+                }
+                if (selected.type === "Employee") {
+                  setEditFormData(prev => ({ ...prev, employee_id: selected.id, labour_id: null }));
+                } else {
+                  setEditFormData(prev => ({ ...prev, labour_id: selected.id, employee_id: null }));
+                }
+              }}
               className='w-[263px] h-[45px] rounded-lg focus:outline-none'
               isClearable
               styles={{
@@ -292,6 +308,7 @@ const TableView = ({ username, userRoles = [] }) => {
   const [employees, setEmployees] = useState([]);
   const [purposes, setPurposes] = useState([]);
   const [filterType, setFilterType] = useState('');
+  const [laboursList, setLaboursList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectDate, setSelectDate] = useState('');
@@ -309,6 +326,7 @@ const TableView = ({ username, userRoles = [] }) => {
   const [itemsPerPage, setItemsPerPage] = useState(50);
   const scrollRef = useRef(null);
   const [virtualScroll, setVirtualScroll] = useState(false);
+  const [staffAdvanceCombinedOptions, setStaffAdvanceCombinedOptions] = useState([]);
   const [visibleRange, setVisibleRange] = useState({ start: 0, end: 50 });
   const isDragging = useRef(false);
   const start = useRef({ x: 0, y: 0 });
@@ -321,7 +339,6 @@ const TableView = ({ username, userRoles = [] }) => {
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
-
       try {
         // Parallel API calls for better performance
         const [recRes, empRes, purRes] = await Promise.allSettled([
@@ -331,32 +348,26 @@ const TableView = ({ username, userRoles = [] }) => {
           }),
           fetch('https://backendaab.in/aabuildersDash/api/purposes/getAll')
         ]);
-
         // Process staff advance data
         const recData = recRes.status === 'fulfilled' && recRes.value.ok
           ? await recRes.value.json()
           : [];
-
         // Process employee data
         const empData = empRes.status === 'fulfilled' && empRes.value.ok
           ? await empRes.value.json()
           : [];
-
         // Process purposes data
         const purData = purRes.status === 'fulfilled' && purRes.value.ok
           ? await purRes.value.json()
           : [];
-
         setRecords(recData);
-        setEmployees(empData.map(e => ({ id: e.id, label: e.employee_name })));
+        setEmployees(empData.map(e => ({ id: e.id, label: e.employee_name, type: "Employee" })));
         setPurposes(purData.map(p => ({ id: p.id, label: p.purpose })));
-
         // Set warning if any API failed
         const failedAPIs = [];
         if (recRes.status === 'rejected' || !recRes.value?.ok) failedAPIs.push('Staff Advance');
         if (empRes.status === 'rejected' || !empRes.value?.ok) failedAPIs.push('Employee Details');
         if (purRes.status === 'rejected' || !purRes.value?.ok) failedAPIs.push('Purposes');
-
         if (failedAPIs.length > 0) {
           setError(`Warning: Some data may not be available (${failedAPIs.join(', ')})`);
         }
@@ -370,9 +381,33 @@ const TableView = ({ username, userRoles = [] }) => {
         setIsLoading(false);
       }
     };
-
     fetchData();
   }, []);
+  useEffect(() => {
+    fetchLaboursList();
+  }, []);
+  const fetchLaboursList = async () => {
+    try {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
+      if (response.ok) {
+        const data = await response.json();
+        const formattedData = data.map(item => ({
+          value: item.labour_name,
+          label: item.labour_name,
+          id: item.id,
+          type: "Labour",
+          salary: item.labour_salary,
+          extra: item.extra_amount
+        }));
+        setLaboursList(formattedData);
+      } else {
+        console.log('Error fetching Labour names.');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+  useEffect(() => { setStaffAdvanceCombinedOptions([...employees, ...laboursList]); }, [employees, laboursList]);
   const handleMouseDown = (e) => {
     if (!scrollRef.current) return;
     isDragging.current = true;
@@ -455,6 +490,7 @@ const TableView = ({ username, userRoles = [] }) => {
   }, []);
 
   const getEmployeeName = useCallback((id) => employees.find(e => e.id === id)?.label || id, [employees]);
+  const getLabourName = useCallback((id) => laboursList.find(l => l.id === id)?.label || id, [laboursList]);
   const getPurposeName = useCallback((id) => purposes.find(p => p.id === id)?.label || id, [purposes]);
 
   const handleSort = useCallback((key) => {
@@ -642,6 +678,7 @@ const TableView = ({ username, userRoles = [] }) => {
       date: entry.date?.split('T')[0] || '',
       amount: entry.amount || '',
       employee_id: entry.employee_id || '',
+      labour_id: entry.labour_id || '',
       from_purpose_id: entry.from_purpose_id || '',
       to_purpose_id: entry.to_purpose_id || '',
       entryNo: entry.entryNo || '',
@@ -660,6 +697,7 @@ const TableView = ({ username, userRoles = [] }) => {
         type: editFormData.type || '',
         date: editFormData.date || '',
         employee_id: editFormData.employee_id || '',
+        labour_id: editFormData.labour_id || '',
         from_purpose_id: editFormData.from_purpose_id || null,
         to_purpose_id: editFormData.to_purpose_id || null,
         staff_payment_mode: editFormData.staff_payment_mode || '',
@@ -731,7 +769,7 @@ const TableView = ({ username, userRoles = [] }) => {
         if (formattedEntryDate !== formattedSelectDate) return false;
       }
       if (debouncedFilters.selectEmployeeName) {
-        const employeeName = getEmployeeName(entry.employee_id) || "";
+        const employeeName = getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || "";
         if (employeeName.toLowerCase() !== debouncedFilters.selectEmployeeName.toLowerCase()) return false;
       }
       if (debouncedFilters.selectPurpose) {
@@ -750,7 +788,7 @@ const TableView = ({ username, userRoles = [] }) => {
       }
       return true;
     });
-  }, [records, debouncedFilters, getEmployeeName, getPurposeName]);
+  }, [records, debouncedFilters, getEmployeeName, getLabourName, getPurposeName]);
 
   // Calculate totals from filtered records
   const advanceTotal = filteredRecords
@@ -776,7 +814,7 @@ const TableView = ({ username, userRoles = [] }) => {
             break;
           case 'employee':
             aValue = getEmployeeName(a.employee_id);
-            bValue = getEmployeeName(b.employee_id);
+            bValue = getEmployeeName(b.employee_id) || getLabourName(b.labour_id);
             break;
           case 'purpose':
             aValue = getPurposeName(a.from_purpose_id);
@@ -1356,6 +1394,7 @@ const TableView = ({ username, userRoles = [] }) => {
                       onEditClick={handleEditClick}
                       getEmployeeName={getEmployeeName}
                       getPurposeName={getPurposeName}
+                      getLabourName={getLabourName}
                       formatDateOnly={formatDateOnly}
                     />
                   ))
@@ -1448,6 +1487,8 @@ const TableView = ({ username, userRoles = [] }) => {
             editFormData={editFormData}
             setEditFormData={setEditFormData}
             employees={employees}
+            laboursList={laboursList}
+            staffAdvanceCombinedOptions={staffAdvanceCombinedOptions}
             purposes={purposes}
             onClose={() => setIsEditModalOpen(false)}
             onUpdate={handleUpdate}

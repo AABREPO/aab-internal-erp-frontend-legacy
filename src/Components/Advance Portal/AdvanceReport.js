@@ -320,7 +320,7 @@ const AdvanceReport = () => {
 
     // Apply Payment Mode filter
     if (paymentModeFilter) {
-      filtered = filtered.filter((item) => item.payment_mode === paymentModeFilter);
+      filtered = filtered.filter((item) => (item.payment_mode || "").toString().toLowerCase() === paymentModeFilter.toLowerCase());
     }
 
     // Apply Type filter
@@ -378,7 +378,6 @@ const AdvanceReport = () => {
     if (key === "sno") {
       return direction === "asc" ? data : data.reverse();
     }
-
     const compare = (a, b) => {
       let va = "";
       let vb = "";
@@ -418,7 +417,6 @@ const AdvanceReport = () => {
       }
       return va.localeCompare(vb);
     };
-
     data.sort((a, b) => {
       const c = compare(a, b);
       return direction === "asc" ? c : -c;

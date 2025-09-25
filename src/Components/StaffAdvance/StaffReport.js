@@ -13,9 +13,8 @@ Date.prototype.getWeekNumber = function () {
 const StaffReport = () => {
   const [week, setWeek] = useState("");
   const [year, setYear] = useState(new Date().getFullYear().toString());
-  const [vendorOptions, setVendorOptions] = useState([]);
-  const [contractorOptions, setContractorOptions] = useState([]);
   const [siteOptions, setSiteOptions] = useState([]);
+  const [purposeOptions, setPurposeOptions] = useState([]);
   const [advanceData, setAdvanceData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [startDate, setStartDate] = useState("");
@@ -25,7 +24,9 @@ const StaffReport = () => {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(50); // Pagination for better performance
-
+  const [employees, setEmployees] = useState([]);
+  const [laboursList, setLaboursList] = useState([]);
+  const [staffAdvanceCombinedOptions, setStaffAdvanceCombinedOptions] = useState([]);
   const scrollRef = useRef(null);
   const tableRef = useRef(null);
 
@@ -120,8 +121,8 @@ const StaffReport = () => {
         });
         if (!res.ok) throw new Error('Failed to fetch employees');
         const data = await res.json();
-        setVendorOptions(
-          data.map((item) => ({ value: item.employee_name, label: item.employee_name, id: item.id }))
+        setEmployees(
+          data.map((item) => ({ value: item.employee_name, label: item.employee_name, id: item.id, type: "Employee" }))
         );
       } catch (error) {
         console.error(error);
@@ -129,6 +130,34 @@ const StaffReport = () => {
     };
     fetchEmployeeNames();
   }, []);
+
+  useEffect(() => {
+    fetchLaboursList();
+  }, []);
+  const fetchLaboursList = async () => {
+    try {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
+      if (response.ok) {
+        const data = await response.json();
+        const formattedData = data.map(item => ({
+          value: item.labour_name,
+          label: item.labour_name,
+          id: item.id,
+          type: "Labour",
+          salary: item.labour_salary,
+          extra: item.extra_amount
+        }));
+        setLaboursList(formattedData);
+      } else {
+        console.log('Error fetching Labour names.');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      console.log('Error fetching Labour names.');
+    }
+  };
+
+  useEffect(() => { setStaffAdvanceCombinedOptions([...employees, ...laboursList]); }, [employees, laboursList]);
 
   // Fetch Purpose Names (for Project Name column)
   useEffect(() => {
@@ -139,7 +168,7 @@ const StaffReport = () => {
         });
         if (!res.ok) throw new Error('Failed to fetch purposes');
         const data = await res.json();
-        setSiteOptions(
+        setPurposeOptions(
           data.map((item) => ({ value: item.purpose, label: item.purpose, id: item.id }))
         );
       } catch (error) {
@@ -244,12 +273,27 @@ const StaffReport = () => {
   const dateKey = (val) => {
     if (!val) return -Infinity;
     const s = String(val).trim();
+    
+    // Handle DD/MM/YYYY format
     const m1 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
     if (m1) {
       return new Date(+m1[3], +m1[2] - 1, +m1[1]).getTime();
     }
-    const t = Date.parse(s);
-    return isNaN(t) ? -Infinity : new Date(new Date(t).toDateString()).getTime();
+    
+    // Handle ISO date format (YYYY-MM-DD)
+    const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) {
+      return new Date(+isoMatch[1], +isoMatch[2] - 1, +isoMatch[3]).getTime();
+    }
+    
+    // Try direct Date parsing for other formats
+    const parsedDate = new Date(s);
+    if (!isNaN(parsedDate.getTime())) {
+      // Normalize to start of day to avoid time component issues
+      return new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate()).getTime();
+    }
+    
+    return -Infinity;
   };
 
   const getLabelById = (options, id) => options.find((o) => String(o.id) === String(id))?.label || "";
@@ -277,20 +321,23 @@ const StaffReport = () => {
       let vb = "";
       switch (key) {
         case "date":
-          return dateKey(a.date) - dateKey(b.date);
+          // Use timestamp for proper chronological sorting
+          const timestampA = dateKey(a.date);
+          const timestampB = dateKey(b.date);
+          return timestampA - timestampB;
         case "cv": {
-          va = getLabelById(vendorOptions, a.employee_id);
-          vb = getLabelById(vendorOptions, b.employee_id);
+          va = getLabelById(employees, a.employee_id);
+          vb = getLabelById(employees, b.employee_id);
           break;
         }
         case "project": {
-          va = getLabelById(siteOptions, a.from_purpose_id);
-          vb = getLabelById(siteOptions, b.from_purpose_id);
+          va = getLabelById(purposeOptions, a.from_purpose_id);
+          vb = getLabelById(purposeOptions, b.from_purpose_id);
           break;
         }
         case "transfer": {
-          va = getLabelById(siteOptions, a.to_purpose_id);
-          vb = getLabelById(siteOptions, b.to_purpose_id);
+          va = getLabelById(purposeOptions, a.to_purpose_id);
+          vb = getLabelById(purposeOptions, b.to_purpose_id);
           break;
         }
         case "type":
@@ -317,7 +364,7 @@ const StaffReport = () => {
       return direction === "asc" ? c : -c;
     });
     return data;
-  }, [filteredData, sortConfig, contractorOptions, vendorOptions, siteOptions]);
+    }, [filteredData, sortConfig, employees, purposeOptions]);
 
   // Pagination logic
   const totalPages = Math.ceil(sortedData.length / itemsPerPage);
@@ -364,12 +411,27 @@ const StaffReport = () => {
     function dateKey(val) {
       if (!val) return -Infinity;
       const s = String(val).trim();
+      
+      // Handle DD/MM/YYYY format
       const m1 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
       if (m1) {
         return new Date(+m1[3], +m1[2] - 1, +m1[1]).getTime();
       }
-      const t = Date.parse(s);
-      return isNaN(t) ? -Infinity : new Date(new Date(t).toDateString()).getTime();
+      
+      // Handle ISO date format (YYYY-MM-DD)
+      const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (isoMatch) {
+        return new Date(+isoMatch[1], +isoMatch[2] - 1, +isoMatch[3]).getTime();
+      }
+      
+      // Try direct Date parsing for other formats
+      const parsedDate = new Date(s);
+      if (!isNaN(parsedDate.getTime())) {
+        // Normalize to start of day to avoid time component issues
+        return new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate()).getTime();
+      }
+      
+      return -Infinity;
     }
 
     const sortedData = [...filteredData].sort((a, b) => {
@@ -391,8 +453,8 @@ const StaffReport = () => {
       return {
         sno: index + 1,
         date: isNaN(d) ? "" : d.toLocaleDateString("en-GB"),
-        cv: vendorOptions.find(v => v.id === row.employee_id)?.label || "",
-        project: siteOptions.find(s => s.id === row.from_purpose_id)?.label || "",
+        cv: employees.find(v => v.id === row.employee_id)?.label || "",
+        project: purposeOptions.find(s => s.id === row.from_purpose_id)?.label || "",
         advance: row.amount?.toLocaleString("en-IN") || "0",
         refund: row.staff_refund_amount?.toLocaleString("en-IN") || "0",
         transfer: siteOptions.find(s => s.id === row.to_purpose_id)?.label || "",
@@ -484,13 +546,27 @@ const StaffReport = () => {
     const dateKey = (val) => {
       if (!val) return -Infinity;
       const s = String(val).trim();
-      const parts = s.split("/");
-      if (parts.length === 3) {
-        const [dd, mm, yyyy] = parts;
-        return new Date(`${yyyy}-${mm}-${dd}`).getTime();
+      
+      // Handle DD/MM/YYYY format
+      const m1 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (m1) {
+        return new Date(+m1[3], +m1[2] - 1, +m1[1]).getTime();
       }
-      const d = new Date(val);
-      return isNaN(d) ? -Infinity : new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      
+      // Handle ISO date format (YYYY-MM-DD)
+      const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (isoMatch) {
+        return new Date(+isoMatch[1], +isoMatch[2] - 1, +isoMatch[3]).getTime();
+      }
+      
+      // Try direct Date parsing for other formats
+      const parsedDate = new Date(s);
+      if (!isNaN(parsedDate.getTime())) {
+        // Normalize to start of day to avoid time component issues
+        return new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate()).getTime();
+      }
+      
+      return -Infinity;
     };
 
     const sortedData = [...filteredData].sort((a, b) => {
@@ -528,9 +604,9 @@ const StaffReport = () => {
     ];
 
     const rows = sortedData.map((row, idx) => {
-      const employee = vendorOptions.find((v) => v.id === row.employee_id)?.label;
-      const purpose = siteOptions.find((s) => s.id === row.from_purpose_id)?.label;
-      const transferPurpose = siteOptions.find((s) => s.id === row.to_purpose_id)?.label;
+      const employee = employees.find((v) => v.id === row.employee_id)?.label;
+      const purpose = purposeOptions.find((s) => s.id === row.from_purpose_id)?.label;
+      const transferPurpose = purposeOptions.find((s) => s.id === row.to_purpose_id)?.label;
 
       return [
         idx + 1,
@@ -897,11 +973,11 @@ const StaffReport = () => {
                     <td className="text-xs lg:text-sm text-left p-2 lg:p-3 font-semibold">
                       {new Date(row.date).toLocaleDateString("en-GB")}
                     </td>
-                    <td className="text-xs lg:text-sm text-left p-2 lg:p-3 font-semibold truncate" title={vendorOptions.find(v => v.id === row.employee_id)?.label || "-"}>
-                      {vendorOptions.find(v => v.id === row.employee_id)?.label || "-"}
+                    <td className="text-xs lg:text-sm text-left p-2 lg:p-3 font-semibold truncate" title={employees.find(v => v.id === row.employee_id)?.label || laboursList.find(v => v.id === row.labour_id)?.label || "-"}>
+                      {employees.find(v => v.id === row.employee_id)?.label || laboursList.find(v => v.id === row.labour_id)?.label || "-"}
                     </td>
-                    <td className="text-xs lg:text-sm text-left p-2 lg:p-3 font-semibold truncate" title={siteOptions.find(s => String(s.id) === String(row.from_purpose_id))?.label || "-"}>
-                      {siteOptions.find(s => String(s.id) === String(row.from_purpose_id))?.label || "-"}
+                    <td className="text-xs lg:text-sm text-left p-2 lg:p-3 font-semibold truncate" title={purposeOptions.find(s => String(s.id) === String(row.from_purpose_id))?.label || "-"}>
+                      {purposeOptions.find(s => String(s.id) === String(row.from_purpose_id))?.label || "-"}
                     </td>
                     <td className="text-xs lg:text-sm text-left p-2 lg:p-3 font-semibold">
                       {row.amount?.toLocaleString("en-IN") || "0"}

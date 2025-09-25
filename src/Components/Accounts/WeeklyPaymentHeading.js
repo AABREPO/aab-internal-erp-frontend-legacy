@@ -5,6 +5,7 @@ import HandoverPaymentsPage from './WeeklyPaymentHandover';
 import DailyPayment from './DailyPayment';
 import WeeklyPaymentAddInput from './WeeklyPaymentAddInput';
 import DailyHistory from './DailyHistory';
+import BillPayment from './BillPayment';
 const WHeading = ({ username, userRoles = [] }) => {
     const [activeTab, setActiveTab] = useState(
         localStorage.getItem('activePaintTab') || 'claimpaymentsummary'
@@ -29,6 +30,8 @@ const WHeading = ({ username, userRoles = [] }) => {
                 return <HandoverPaymentsPage username={username} userRoles={userRoles} />;
             case 'weeklypaymentaddinput':
                 return <WeeklyPaymentAddInput username={username} userRoles={userRoles} />;
+            case 'billpayment':
+                return <BillPayment username={username} userRoles={userRoles} />;
             default:
                 return <WeeklyPayment />;
         }
@@ -71,6 +74,12 @@ const WHeading = ({ username, userRoles = [] }) => {
                     onClick={() => setActiveTab('weeklypaymentaddinput')}
                 >
                     Add Input
+                </h2>
+                <h2
+                    className={`link ${activeTab === 'billpayment' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('billpayment')}
+                >
+                    Bill Payment
                 </h2>
             </div>
             <div className="content">

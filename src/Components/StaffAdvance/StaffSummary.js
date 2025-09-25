@@ -5,6 +5,8 @@ import "jspdf-autotable";
 
 const StaffSummary = () => {
   const [empOptions, setEmpOptions] = useState([]);
+  const [laboursList, setLaboursList] = useState([]);
+  const [staffAdvanceCombinedOptions, setStaffAdvanceCombinedOptions] = useState([]);
   const [purposeOptions, setPurposeOptions] = useState([]);
   const [staffData, setStaffData] = useState([]);
   const [selectedEmpOption, setSelectedEmpOption] = useState('');
@@ -64,7 +66,8 @@ const StaffSummary = () => {
         setEmpOptions(data.map(item => ({
           value: item.employee_name,
           label: item.employee_name,
-          id: item.id
+          id: item.id,
+          type: "Employee"
         })));
       } catch (err) {
         console.error(err);
@@ -72,6 +75,28 @@ const StaffSummary = () => {
     };
     fetchEmpNames();
   }, []);
+  useEffect(() => {
+    fetchLaboursList();
+  }, []);
+  const fetchLaboursList = async () => {
+    try {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
+      if (response.ok) {
+        const data = await response.json();
+        const formattedData = data.map(item => ({
+          value: item.labour_name,
+          label: item.labour_name,
+          id: item.id,
+          type: "Labour"
+        }));
+        setLaboursList(formattedData);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      console.log('Error fetching Labour names.');
+    }
+  };
+  useEffect(() => { setStaffAdvanceCombinedOptions([...empOptions, ...laboursList]); }, [empOptions, laboursList]);
   // Fetch Purpose Options
   useEffect(() => {
     const fetchPurposeOptions = async () => {
@@ -134,10 +159,24 @@ const StaffSummary = () => {
   useEffect(() => {
     if (selectedEmpOption) {
       const filtered = staffData.filter(item => {
-        // Check for employee match - try different possible field names like in StaffAdvance
-        return item.employee_name === selectedEmpOption.value ||
-               item.employee_id === selectedEmpOption.id ||
-               item.emp_name === selectedEmpOption.value;
+        // Check based on the type of selected option (Employee or Labour)
+        if (selectedEmpOption.type === "Employee") {
+          // Only check employee-related fields when an employee is selected
+          return item.employee_name === selectedEmpOption.value ||
+                 item.employee_id === selectedEmpOption.id ||
+                 item.emp_name === selectedEmpOption.value;
+        } else if (selectedEmpOption.type === "Labour") {
+          // Only check labour-related fields when a labour is selected
+          return item.labour_name === selectedEmpOption.value ||
+                 item.labour_id === selectedEmpOption.id;
+        } else {
+          // Fallback to original logic if type is not specified
+          return item.employee_name === selectedEmpOption.value ||
+                 item.employee_id === selectedEmpOption.id ||
+                 item.emp_name === selectedEmpOption.value ||
+                 item.labour_name === selectedEmpOption.value ||
+                 item.labour_id === selectedEmpOption.id;
+        }
       });
       const grouped = {};
       let totalPendingAll = 0;
@@ -264,10 +303,18 @@ const StaffSummary = () => {
     });
   };
   // Get refund details for tooltip
-  const getRefundDetails = (purposeId, empId) => {
+  const getRefundDetails = (purposeId, empId, empType) => {
     if (!staffData.length) return [];
     return staffData.filter(item => {
-      const matchesEmp = item.employee_id === empId;
+      let matchesEmp = false;
+      if (empType === "Employee") {
+        matchesEmp = item.employee_id === empId;
+      } else if (empType === "Labour") {
+        matchesEmp = item.labour_id === empId;
+      } else {
+        // Fallback to original logic
+        matchesEmp = item.employee_id === empId || item.labour_id === empId;
+      }
       if (!matchesEmp) return false;
       // Handle regular refunds
       if (item.type === 'Refund' && item.from_purpose_id === purposeId && item.staff_refund_amount > 0) {
@@ -285,10 +332,18 @@ const StaffSummary = () => {
     }));
   };
   // Get advance details for tooltip
-  const getAdvanceDetails = (purposeId, empId) => {
+  const getAdvanceDetails = (purposeId, empId, empType) => {
     if (!staffData.length) return [];
     return staffData.filter(item => {
-      const matchesEmp = item.employee_id === empId;
+      let matchesEmp = false;
+      if (empType === "Employee") {
+        matchesEmp = item.employee_id === empId;
+      } else if (empType === "Labour") {
+        matchesEmp = item.labour_id === empId;
+      } else {
+        // Fallback to original logic
+        matchesEmp = item.employee_id === empId || item.labour_id === empId;
+      }
       if (!matchesEmp) return false;
       // Handle regular advances
       if (item.type === 'Advance' && item.from_purpose_id === purposeId && item.amount > 0) {
@@ -306,8 +361,8 @@ const StaffSummary = () => {
     }));
   };
   // Tooltip handlers
-  const handleMouseEnter = (event, purposeId, empId) => {
-    const refundDetails = getRefundDetails(purposeId, empId);
+  const handleMouseEnter = (event, purposeId, empId, empType) => {
+    const refundDetails = getRefundDetails(purposeId, empId, empType);
     if (refundDetails.length > 0) {
       setTooltipTitle('Refund Details');
       setTooltipData(refundDetails);
@@ -318,8 +373,8 @@ const StaffSummary = () => {
     setTooltipData(null);
     setTooltipTitle("");
   };
-  const handleMouseEnterAdvance = (event, purposeId, empId) => {
-    const advanceDetails = getAdvanceDetails(purposeId, empId);
+  const handleMouseEnterAdvance = (event, purposeId, empId, empType) => {
+    const advanceDetails = getAdvanceDetails(purposeId, empId, empType);
     if (advanceDetails.length > 0) {
       setTooltipTitle('Advance Details');
       setTooltipData(advanceDetails);
@@ -341,16 +396,30 @@ const StaffSummary = () => {
       filtered.forEach(curr => {
         const {
           employee_id,
+          labour_id,
           from_purpose_id,
           to_purpose_id,
           amount = 0,
           staff_refund_amount = 0
         } = curr;
-        const empName = empOptions.find(e => e.id === employee_id)?.label || "-";
-        if (!grouped[employee_id]) {
-          grouped[employee_id] = {
-            name: empName,
-            empId: employee_id,
+        
+        // Determine the ID and name based on whether it's an employee or labour
+        let personId, personName;
+        if (employee_id) {
+          personId = employee_id;
+          personName = empOptions.find(e => e.id === employee_id)?.label || "-";
+        } else if (labour_id) {
+          personId = labour_id;
+          personName = laboursList.find(l => l.id === labour_id)?.label || "-";
+        } else {
+          return; // Skip if neither employee_id nor labour_id is present
+        }
+        
+        if (!grouped[personId]) {
+          grouped[personId] = {
+            name: personName,
+            empId: personId,
+            empType: employee_id ? "Employee" : "Labour",
             totalAdvance: 0,
             totalRefund: 0
           };
@@ -360,17 +429,17 @@ const StaffSummary = () => {
           // For transfer records, check if this purpose is the from_purpose_id
           // The amount field already contains the correct sign
           if (from_purpose_id === purposeId) {
-            grouped[employee_id].totalAdvance += parseFloat(amount) || 0; // Amount already has correct sign
+            grouped[personId].totalAdvance += parseFloat(amount) || 0; // Amount already has correct sign
           }
         } else {
           // Handle non-transfer transactions (Advance and Refund)
           // For advance entries, amount is positive
           if (curr.type === 'Advance') {
-            grouped[employee_id].totalAdvance += parseFloat(amount) || 0;
+            grouped[personId].totalAdvance += parseFloat(amount) || 0;
           }
           // For refund entries, subtract the refund amount
           if (curr.type === 'Refund') {
-            grouped[employee_id].totalRefund += parseFloat(staff_refund_amount) || 0;
+            grouped[personId].totalRefund += parseFloat(staff_refund_amount) || 0;
           }
         }
       });
@@ -381,6 +450,7 @@ const StaffSummary = () => {
         return {
           name: d.name,
           empId: d.empId,
+          empType: d.empType,
           pendingAdvance: pending,
           billAmount: d.totalRefund // Show refund amount
         };
@@ -550,7 +620,7 @@ const StaffSummary = () => {
                 <div className="flex-1 min-w-0">
                   <label className="block font-semibold mb-2 text-gray-700 text-sm sm:text-base">Employee Name</label>
                   <Select
-                    options={empOptions}
+                    options={staffAdvanceCombinedOptions}
                     value={selectedEmpOption}
                     onChange={(selectedOption) => {
                       setSelectedEmpOption(selectedOption);
@@ -572,14 +642,12 @@ const StaffSummary = () => {
                     {totalBillAmount !== 0 ? totalBillAmount.toLocaleString("en-IN") : "0"}
                   </span>
                 </div>
-              </div>
-              
+              </div>              
               <div className="flex flex-wrap gap-1 sm:gap-2 text-xs sm:text-sm justify-end mb-4">
                 <button onClick={exportPDF} className="flex items-center font-bold hover:underline gap-1 text-[#E4572E] px-2 sm:px-3 py-1 rounded hover:bg-orange-50 text-xs sm:text-sm">Export PDF</button>
                 <button onClick={exportCSV} className="flex items-center font-bold hover:underline gap-1 text-[#007233] px-2 sm:px-3 py-1 rounded hover:bg-green-50 text-xs sm:text-sm">Export XL</button>
                 <button className="flex items-center font-bold hover:underline gap-1 text-[#BF9853] px-2 sm:px-3 py-1 rounded hover:bg-yellow-50 text-xs sm:text-sm">Print</button>
-              </div>
-              
+              </div>              
               <div className="border-l-8 border-l-[#BF9853] rounded-lg overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse min-w-[500px] sm:min-w-[600px] lg:min-w-[700px]">
@@ -630,14 +698,14 @@ const StaffSummary = () => {
                             <td className="py-2 px-2 sm:py-3 sm:px-3 text-left font-medium text-xs sm:text-sm">{purpose.purposeName}</td>
                             <td
                               className="py-2 px-2 sm:py-3 sm:px-3 cursor-help relative font-mono text-xs sm:text-sm"
-                              onMouseEnter={(e) => handleMouseEnterAdvance(e, purpose.purposeId, selectedEmpOption?.id)}
+                              onMouseEnter={(e) => handleMouseEnterAdvance(e, purpose.purposeId, selectedEmpOption?.id, selectedEmpOption?.type)}
                               onMouseLeave={handleMouseLeave}
                             >
                               {purpose.pendingAdvance.toLocaleString("en-IN")}
                             </td>
                             <td
                               className="py-2 px-2 sm:py-3 sm:px-3 cursor-help relative font-mono text-xs sm:text-sm"
-                              onMouseEnter={(e) => handleMouseEnter(e, purpose.purposeId, selectedEmpOption?.id)}
+                              onMouseEnter={(e) => handleMouseEnter(e, purpose.purposeId, selectedEmpOption?.id, selectedEmpOption?.type)}
                               onMouseLeave={handleMouseLeave}
                             >
                               {purpose.billAmount.toLocaleString("en-IN")}
@@ -746,14 +814,14 @@ const StaffSummary = () => {
                             <td className="py-2 px-2 sm:py-3 sm:px-3 font-medium text-xs sm:text-sm">{d.name}</td>
                             <td
                               className="py-2 px-2 sm:py-3 sm:px-3 cursor-help relative font-mono text-xs sm:text-sm"
-                              onMouseEnter={(e) => handleMouseEnterAdvance(e, selectedPurposeOption?.id, d.empId)}
+                              onMouseEnter={(e) => handleMouseEnterAdvance(e, selectedPurposeOption?.id, d.empId, d.empType)}
                               onMouseLeave={handleMouseLeave}
                             >
                               {d.pendingAdvance.toLocaleString("en-IN")}
                             </td>
                             <td
                               className="py-2 px-2 sm:py-3 sm:px-3 cursor-help relative font-mono text-xs sm:text-sm"
-                              onMouseEnter={(e) => handleMouseEnter(e, selectedPurposeOption?.id, d.empId)}
+                              onMouseEnter={(e) => handleMouseEnter(e, selectedPurposeOption?.id, d.empId, d.empType)}
                               onMouseLeave={handleMouseLeave}
                             >
                               {d.billAmount.toLocaleString("en-IN")}

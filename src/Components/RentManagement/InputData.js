@@ -112,6 +112,7 @@ const InputData = ({ username, userRoles = [] }) => {
             advance: '',
             startingDate: '',
             shouldCollectAdvance: true,
+            shopClosureDate: '',
           }
         ]
       }
@@ -1710,7 +1711,6 @@ const InputData = ({ username, userRoles = [] }) => {
                               value: selectedShopNo,
                             },
                           });
-
                           handleShopChange(pIndex, sIndex, {
                             target: {
                               name: 'doorNo',
@@ -2033,7 +2033,7 @@ const InputData = ({ username, userRoles = [] }) => {
                     />
                   </div>
                   {property.shops.map((shop, sIndex) => (
-                    <div key={sIndex} className="grid grid-cols-7 mb-5 ">
+                    <div key={sIndex} className="grid grid-cols-8 mb-5 ">
                       <Select
                         name="propertyType"
                         value={propertyTypeEditOptions.find(option => option.value === shop.propertyType)}
@@ -2328,6 +2328,22 @@ const InputData = ({ username, userRoles = [] }) => {
                           </button>
                         )}
                       </div>
+                      <input
+                        type="date"
+                        name="shopClosureDate"
+                        value={shop.shopClosureDate || ''}
+                        onChange={(e) => {
+                          const rawValue = e.target.value;
+                          handleShopeditChange(pIndex, sIndex, {
+                            target: {
+                              name: 'shopClosureDate',
+                              value: rawValue,
+                            },
+                          });
+                        }}
+                        className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
+                        placeholder="Closure Date"
+                      />
                     </div>
                   ))}
                   <button

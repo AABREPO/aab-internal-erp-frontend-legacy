@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import axios from 'axios';
 import Edit from '../Images/Edit.svg'
 import Select from 'react-select';
@@ -31,6 +31,14 @@ const Dashboard = () => {
     const [paymentStatus, setPaymentStatus] = useState('');
     const [selectedProperty, setSelectedProperty] = useState(null);
     const [selectedMonthYear, setSelectedMonthYear] = useState(getCurrentMonth());
+    const [tableHeight, setTableHeight] = useState(400); // Default height in pixels
+    const scrollRef = useRef(null);
+    const isDragging = useRef(false);
+    const start = useRef({ x: 0, y: 0 });
+    const scroll = useRef({ left: 0, top: 0 });
+    const velocity = useRef({ x: 0, y: 0 });
+    const animationFrame = useRef(null);
+    const lastMove = useRef({ time: 0, x: 0, y: 0 });
     const selectedYear = selectedMonthYear ? parseInt(selectedMonthYear.split('-')[0]) : '';
     const selectedMonth = selectedMonthYear ? parseInt(selectedMonthYear.split('-')[1]) - 1 : '';
     useEffect(() => {
@@ -76,6 +84,76 @@ const Dashboard = () => {
             setSortField(field);
             setSortOrder('asc');
         }
+    };
+
+    // Advanced drag and scroll functionality
+    const handleMouseDown = (e) => {
+        isDragging.current = true;
+        start.current = { x: e.clientX, y: e.clientY };
+        scroll.current = {
+            left: scrollRef.current.scrollLeft,
+            top: scrollRef.current.scrollTop,
+        };
+        lastMove.current = {
+            time: Date.now(),
+            x: e.clientX,
+            y: e.clientY,
+        };
+        scrollRef.current.style.cursor = 'grabbing';
+        scrollRef.current.style.userSelect = 'none';
+        cancelMomentum();
+    };
+
+    const handleMouseMove = (e) => {
+        if (!isDragging.current) return;
+        const dx = e.clientX - start.current.x;
+        const dy = e.clientY - start.current.y;
+        const now = Date.now();
+        const dt = now - lastMove.current.time || 16;
+        velocity.current = {
+            x: (e.clientX - lastMove.current.x) / dt,
+            y: (e.clientY - lastMove.current.y) / dt,
+        };
+        scrollRef.current.scrollLeft = scroll.current.left - dx;
+        scrollRef.current.scrollTop = scroll.current.top - dy;
+        lastMove.current = {
+            time: now,
+            x: e.clientX,
+            y: e.clientY,
+        };
+    };
+
+    const handleMouseUp = () => {
+        if (!isDragging.current) return;
+        isDragging.current = false;
+        scrollRef.current.style.cursor = '';
+        scrollRef.current.style.userSelect = '';
+        applyMomentum();
+    };
+
+    const cancelMomentum = () => {
+        if (animationFrame.current) {
+            cancelAnimationFrame(animationFrame.current);
+            animationFrame.current = null;
+        }
+    };
+
+    const applyMomentum = () => {
+        const friction = 0.95;
+        const minVelocity = 0.1;
+        const step = () => {
+            const { x, y } = velocity.current;
+            if (Math.abs(x) > minVelocity || Math.abs(y) > minVelocity) {
+                scrollRef.current.scrollLeft -= x * 20;
+                scrollRef.current.scrollTop -= y * 20;
+                velocity.current.x *= friction;
+                velocity.current.y *= friction;
+                animationFrame.current = requestAnimationFrame(step);
+            } else {
+                cancelMomentum();
+            }
+        };
+        animationFrame.current = requestAnimationFrame(step);
     };
     [...tableData].sort((a, b) => {
         let valA = a[sortField]?.toString().toLowerCase() || '';
@@ -245,6 +323,7 @@ const Dashboard = () => {
         const advanceMap = {};
         const advanceDetailsMap = {};
         const advanceAdjustmentDetailsMap = {};
+        const shopClosureDetailsMap = {};
         rentForms.forEach(entry => {
             if (entry.formType === 'Advance' && entry.shopNo) {
                 const amount = parseFloat(entry.amount || 0);
@@ -254,6 +333,7 @@ const Dashboard = () => {
                     advanceMap[shopKey] = 0;
                     advanceDetailsMap[shopKey] = [];
                     advanceAdjustmentDetailsMap[shopKey] = [];
+                    shopClosureDetailsMap[shopKey] = [];
                 }
                 advanceMap[shopKey] += amount;
                 advanceDetailsMap[shopKey].push(`${paidOn} - ₹${amount.toLocaleString()}`);
@@ -265,6 +345,14 @@ const Dashboard = () => {
                     advanceAdjustmentDetailsMap[shopKey] = [];
                 }
                 advanceAdjustmentDetailsMap[shopKey].push(`${paidOn} - ₹${amount.toLocaleString()}`);
+            } else if (entry.formType === 'Shop Closure' && entry.shopNo) {
+                const amount = parseFloat(entry.amount || 0);
+                const paidOn = formatDateOnly(entry.paidOnDate) || '';
+                const shopKey = entry.shopNo;
+                if (!shopClosureDetailsMap[shopKey]) {
+                    shopClosureDetailsMap[shopKey] = [];
+                }
+                shopClosureDetailsMap[shopKey].push(`${paidOn} - ₹${amount.toLocaleString()}`);
             }
         });
         // 6. Final table data
@@ -275,6 +363,7 @@ const Dashboard = () => {
             const advanceAmount = advanceMap[shop.shopNo] || 0;
             const advanceDetails = advanceDetailsMap[shop.shopNo] || [];
             const advanceAdjustmentDetails = advanceAdjustmentDetailsMap[shop.shopNo] || [];
+            const shopClosureDetails = shopClosureDetailsMap[shop.shopNo] || [];
             const totalRentPaid = rentForms
                 .filter(entry =>
                     entry.shopNo === shop.shopNo &&
@@ -282,7 +371,17 @@ const Dashboard = () => {
                     entry.paymentMode?.trim() === 'Advance Adjustment'
                 )
                 .reduce((sum, entry) => sum + parseFloat(entry.amount || 0), 0);
-            const remainingAdvance = Math.max(0, advanceAmount - totalRentPaid);
+            
+            // Calculate Shop Closure payments that should be subtracted from advance
+            const totalShopClosurePaid = rentForms
+                .filter(entry =>
+                    entry.shopNo === shop.shopNo &&
+                    entry.formType === 'Shop Closure'
+                )
+                .reduce((sum, entry) => sum + parseFloat(entry.refundAmount || 0), 0);
+            console.log("Shop Closure:",totalShopClosurePaid);
+            
+            const remainingAdvance = Math.max(0, advanceAmount - totalRentPaid - totalShopClosurePaid);
 
             const wasActiveThisYear = months.some(monthArr => monthArr.length > 0);
             const row = {
@@ -293,6 +392,7 @@ const Dashboard = () => {
                 advance: shop.active ? remainingAdvance : null,
                 advanceDetails: shop.active ? advanceDetails : [],
                 advanceAdjustmentDetails: shop.active ? advanceAdjustmentDetails : [],
+                shopClosureDetails: shop.active ? shopClosureDetails : [],
                 months,
                 rentDetails,
                 propertyName: shop.propertyName,
@@ -304,10 +404,12 @@ const Dashboard = () => {
                 const hasAnotherActiveTenant = allShops.some(
                     s => s.shopNo === shop.shopNo && s.active
                 );
+                // For vacated tenant, show the remaining advance amount
                 finalTableData.push({
                     ...row,
                     tenantName: shop.tenantName || 'Vacated',
-                    vacated: true
+                    vacated: true,
+                    advance: remainingAdvance // Show remaining advance for vacated tenant
                 });
                 if (!hasAnotherActiveTenant) {
                     finalTableData.push({
@@ -675,263 +777,271 @@ const Dashboard = () => {
     }, [filteredTableData, selectedMonth, selectedYear]);
 
     return (
-        <div>
-            <div className='mx-auto lg:w-[1750px] p-4 lg:pl-8 bg-white lg:ml-12 lg:mr-6 rounded-md text-left flex'>
-                <div>
-                    <h1 className='font-semibold mb-3'>Select Year</h1>
-                    <input
-                        type="month"
-                        value={selectedMonthYear}
-                        onChange={(e) => setSelectedMonthYear(e.target.value)}
-                        className="border-2 border-[#BF9853] rounded-lg p-2 w-[180px] h-[45px] focus:outline-none"
-                    />
-                </div>
-                <div className="flex gap-4 mt-9 ml-3.5 w-full flex-wrap">
-                    <div className="min-w-[200px]">
-                        <Select
-                            options={shopOptions}
-                            isClearable
-                            placeholder="Select Shop No"
-                            value={shopOptions.find(o => o.value === selectedShopNo) || null}
-                            onChange={(option) => {
-                                const value = option?.value || '';
-                                setSelectedShopNo(value);
-                                setSelectedTenantName('');
-                                setSelectedDoorNo('');
-                                if (value) {
-                                    sessionStorage.setItem('selectedShopNo', JSON.stringify(value));
-                                } else {
-                                    sessionStorage.removeItem('selectedShopNo');
-                                }
-                                sessionStorage.removeItem('selectedTenantName');
-                                sessionStorage.removeItem('selectedDoorNo');
-                            }}
-                            styles={{
-                                control: (provided, state) => ({
-                                    ...provided,
-                                    height: '45px',
-                                    minHeight: '45px',
-                                    backgroundColor: 'transparent',
-                                    borderWidth: '2px',
-                                    borderColor: state.isFocused
-                                        ? 'rgba(191, 152, 83, 1)'
-                                        : 'rgba(191, 152, 83, 1)',
-                                    borderRadius: '8px',
-                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 1)' : 'none',
-                                    '&:hover': {
-                                        borderColor: 'rgba(191, 152, 83, 1)',
-                                    },
-                                }),
-                                placeholder: (provided) => ({
-                                    ...provided,
-                                    color: '#999',
-                                }),
-                                singleValue: (provided) => ({
-                                    ...provided,
-                                    color: 'black',
-                                }),
-                            }}
+        <div className="w-full overflow-x-auto">
+            <div className='mx-auto lg:w-[1750px] p-4 lg:pl-8 bg-white lg:ml-12 lg:mr-6 rounded-md text-left'>
+                <div className="flex flex-col lg:flex-row lg:items-end gap-4 lg:gap-6">
+                    <div className="flex-shrink-0">
+                        <h1 className='font-semibold mb-3'>Select Year</h1>
+                        <input
+                            type="month"
+                            value={selectedMonthYear}
+                            onChange={(e) => setSelectedMonthYear(e.target.value)}
+                            className="border-2 border-[#BF9853] rounded-lg p-2 w-full lg:w-[180px] h-[45px] focus:outline-none"
                         />
                     </div>
-                    <div className="min-w-[200px]">
-                        <Select
-                            options={tenantOptions}
-                            isClearable
-                            placeholder="Select Tenant Name"
-                            value={tenantOptions.find(o => o.value === selectedTenantName) || null}
-                            onChange={(option) => {
-                                const value = option?.value || '';
-                                setSelectedTenantName(value);
-                                if (value) {
-                                    sessionStorage.setItem('selectedTenantName', JSON.stringify(value));
-                                } else {
+                    <div className="flex flex-col sm:flex-row gap-4 mt-0 lg:mt-9 lg:ml-3.5 w-full flex-wrap">
+                        <div className="w-full sm:w-auto sm:min-w-[200px]">
+                            <Select
+                                options={shopOptions}
+                                isClearable
+                                placeholder="Select Shop No"
+                                value={shopOptions.find(o => o.value === selectedShopNo) || null}
+                                onChange={(option) => {
+                                    const value = option?.value || '';
+                                    setSelectedShopNo(value);
+                                    setSelectedTenantName('');
+                                    setSelectedDoorNo('');
+                                    if (value) {
+                                        sessionStorage.setItem('selectedShopNo', JSON.stringify(value));
+                                    } else {
+                                        sessionStorage.removeItem('selectedShopNo');
+                                    }
                                     sessionStorage.removeItem('selectedTenantName');
-                                }
-                                setSelectedDoorNo('');
-                                sessionStorage.removeItem('selectedDoorNo');
-                            }}
-                            isDisabled={!filteredByShop.length}
-                            styles={{
-                                control: (provided, state) => ({
-                                    ...provided,
-                                    height: '45px',
-                                    minHeight: '45px',
-                                    backgroundColor: 'transparent',
-                                    borderWidth: '2px',
-                                    borderColor: state.isFocused
-                                        ? 'rgba(191, 152, 83, 1)'
-                                        : 'rgba(191, 152, 83, 1)',
-                                    borderRadius: '8px',
-                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 1)' : 'none',
-                                    '&:hover': {
-                                        borderColor: 'rgba(191, 152, 83, 1)',
-                                    },
-                                }),
-                                placeholder: (provided) => ({
-                                    ...provided,
-                                    color: '#999',
-                                }),
-                                singleValue: (provided) => ({
-                                    ...provided,
-                                    color: 'black',
-                                }),
-                            }}
-                        />
-                    </div>
-                    <div className="min-w-[200px]">
-                        <Select
-                            options={doorOptions}
-                            placeholder="Select Door No"
-                            isClearable
-                            value={doorOptions.find(o => o.value === selectedDoorNo) || null}
-                            onChange={(option) => {
-                                const value = option?.value || '';
-                                setSelectedDoorNo(value);
-
-                                if (value) {
-                                    sessionStorage.setItem('selectedDoorNo', JSON.stringify(value));
-                                } else {
                                     sessionStorage.removeItem('selectedDoorNo');
-                                }
-                            }}
-                            isDisabled={!filteredByTenant.length}
-                            styles={{
-                                control: (provided, state) => ({
-                                    ...provided,
-                                    height: '45px',
-                                    minHeight: '45px',
-                                    backgroundColor: 'transparent',
-                                    borderWidth: '2px',
-                                    borderColor: state.isFocused
-                                        ? 'rgba(191, 152, 83, 1)'
-                                        : 'rgba(191, 152, 83, 1)',
-                                    borderRadius: '8px',
-                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 1)' : 'none',
-                                    '&:hover': {
-                                        borderColor: 'rgba(191, 152, 83, 1)',
-                                    },
-                                }),
-                                placeholder: (provided) => ({
-                                    ...provided,
-                                    color: '#999',
-                                }),
-                                singleValue: (provided) => ({
-                                    ...provided,
-                                    color: 'black',
-                                }),
-                            }}
-                        />
-                    </div>
-                    <div className="min-w-[200px]">
-                        <select
-                            className='w-full h-[45px] border-2 border-[#BF9853] rounded-lg pl-3 focus:outline-none'
-                            value={paymentStatus}
-                            onChange={(e) => {
-                                const value = e.target.value;
-                                setPaymentStatus(value);
+                                }}
+                                styles={{
+                                    control: (provided, state) => ({
+                                        ...provided,
+                                        height: '45px',
+                                        minHeight: '45px',
+                                        backgroundColor: 'transparent',
+                                        borderWidth: '2px',
+                                        borderColor: state.isFocused
+                                            ? 'rgba(191, 152, 83, 1)'
+                                            : 'rgba(191, 152, 83, 1)',
+                                        borderRadius: '8px',
+                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 1)' : 'none',
+                                        '&:hover': {
+                                            borderColor: 'rgba(191, 152, 83, 1)',
+                                        },
+                                    }),
+                                    placeholder: (provided) => ({
+                                        ...provided,
+                                        color: '#999',
+                                    }),
+                                    singleValue: (provided) => ({
+                                        ...provided,
+                                        color: 'black',
+                                    }),
+                                }}
+                            />
+                        </div>
+                        <div className="w-full sm:w-auto sm:min-w-[200px]">
+                            <Select
+                                options={tenantOptions}
+                                isClearable
+                                placeholder="Select Tenant Name"
+                                value={tenantOptions.find(o => o.value === selectedTenantName) || null}
+                                onChange={(option) => {
+                                    const value = option?.value || '';
+                                    setSelectedTenantName(value);
+                                    if (value) {
+                                        sessionStorage.setItem('selectedTenantName', JSON.stringify(value));
+                                    } else {
+                                        sessionStorage.removeItem('selectedTenantName');
+                                    }
+                                    setSelectedDoorNo('');
+                                    sessionStorage.removeItem('selectedDoorNo');
+                                }}
+                                isDisabled={!filteredByShop.length}
+                                styles={{
+                                    control: (provided, state) => ({
+                                        ...provided,
+                                        height: '45px',
+                                        minHeight: '45px',
+                                        backgroundColor: 'transparent',
+                                        borderWidth: '2px',
+                                        borderColor: state.isFocused
+                                            ? 'rgba(191, 152, 83, 1)'
+                                            : 'rgba(191, 152, 83, 1)',
+                                        borderRadius: '8px',
+                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 1)' : 'none',
+                                        '&:hover': {
+                                            borderColor: 'rgba(191, 152, 83, 1)',
+                                        },
+                                    }),
+                                    placeholder: (provided) => ({
+                                        ...provided,
+                                        color: '#999',
+                                    }),
+                                    singleValue: (provided) => ({
+                                        ...provided,
+                                        color: 'black',
+                                    }),
+                                }}
+                            />
+                        </div>
+                        <div className="w-full sm:w-auto sm:min-w-[200px]">
+                            <Select
+                                options={doorOptions}
+                                placeholder="Select Door No"
+                                isClearable
+                                value={doorOptions.find(o => o.value === selectedDoorNo) || null}
+                                onChange={(option) => {
+                                    const value = option?.value || '';
+                                    setSelectedDoorNo(value);
 
-                                if (value) {
-                                    sessionStorage.setItem('paymentStatus', JSON.stringify(value));
-                                } else {
-                                    sessionStorage.removeItem('paymentStatus');
-                                }
-                            }}
-                        >
-                            <option value="">Select Status</option>
-                            <option value="paid">Paid</option>
-                            <option value="unpaid">Unpaid</option>
-                        </select>
-                    </div>
-                    <div className="min-w-[200px]">
-                        <Select
-                            className="w-[300px]"
-                            options={options}
-                            value={selectedProperty}
-                            isClearable
-                            onChange={(option) => {
-                                setSelectedProperty(option);
-                                if (option) {
-                                    sessionStorage.setItem('selectedProperty', JSON.stringify(option));
-                                } else {
-                                    sessionStorage.removeItem('selectedProperty');
-                                }
-                            }}
-                            placeholder="Select"
-                            isSearchable
-                            styles={{
-                                control: (provided, state) => ({
-                                    ...provided,
-                                    height: '45px',
-                                    minHeight: '45px',
-                                    backgroundColor: 'transparent',
-                                    borderWidth: '2px',
-                                    borderColor: state.isFocused
-                                        ? 'rgba(191, 152, 83, 1)'
-                                        : 'rgba(191, 152, 83, 1)',
-                                    borderRadius: '8px',
-                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 1)' : 'none',
-                                    '&:hover': {
-                                        borderColor: 'rgba(191, 152, 83, 1)',
-                                    },
-                                }),
-                                placeholder: (provided) => ({
-                                    ...provided,
-                                    color: '#999',
-                                }),
-                                singleValue: (provided) => ({
-                                    ...provided,
-                                    color: 'black',
-                                }),
-                            }}
-                        />
-                    </div>
+                                    if (value) {
+                                        sessionStorage.setItem('selectedDoorNo', JSON.stringify(value));
+                                    } else {
+                                        sessionStorage.removeItem('selectedDoorNo');
+                                    }
+                                }}
+                                isDisabled={!filteredByTenant.length}
+                                styles={{
+                                    control: (provided, state) => ({
+                                        ...provided,
+                                        height: '45px',
+                                        minHeight: '45px',
+                                        backgroundColor: 'transparent',
+                                        borderWidth: '2px',
+                                        borderColor: state.isFocused
+                                            ? 'rgba(191, 152, 83, 1)'
+                                            : 'rgba(191, 152, 83, 1)',
+                                        borderRadius: '8px',
+                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 1)' : 'none',
+                                        '&:hover': {
+                                            borderColor: 'rgba(191, 152, 83, 1)',
+                                        },
+                                    }),
+                                    placeholder: (provided) => ({
+                                        ...provided,
+                                        color: '#999',
+                                    }),
+                                    singleValue: (provided) => ({
+                                        ...provided,
+                                        color: 'black',
+                                    }),
+                                }}
+                            />
+                        </div>
+                        <div className="w-full sm:w-auto sm:min-w-[200px]">
+                            <select
+                                className='w-full h-[45px] border-2 border-[#BF9853] rounded-lg pl-3 focus:outline-none'
+                                value={paymentStatus}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    setPaymentStatus(value);
 
+                                    if (value) {
+                                        sessionStorage.setItem('paymentStatus', JSON.stringify(value));
+                                    } else {
+                                        sessionStorage.removeItem('paymentStatus');
+                                    }
+                                }}
+                            >
+                                <option value="">Select Status</option>
+                                <option value="paid">Paid</option>
+                                <option value="unpaid">Unpaid</option>
+                            </select>
+                        </div>
+                        <div className="w-full sm:w-auto sm:min-w-[200px]">
+                            <Select
+                                options={options}
+                                value={selectedProperty}
+                                isClearable
+                                onChange={(option) => {
+                                    setSelectedProperty(option);
+                                    if (option) {
+                                        sessionStorage.setItem('selectedProperty', JSON.stringify(option));
+                                    } else {
+                                        sessionStorage.removeItem('selectedProperty');
+                                    }
+                                }}
+                                placeholder="Select Property"
+                                isSearchable
+                                styles={{
+                                    control: (provided, state) => ({
+                                        ...provided,
+                                        height: '45px',
+                                        minHeight: '45px',
+                                        backgroundColor: 'transparent',
+                                        borderWidth: '2px',
+                                        borderColor: state.isFocused
+                                            ? 'rgba(191, 152, 83, 1)'
+                                            : 'rgba(191, 152, 83, 1)',
+                                        borderRadius: '8px',
+                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 1)' : 'none',
+                                        '&:hover': {
+                                            borderColor: 'rgba(191, 152, 83, 1)',
+                                        },
+                                    }),
+                                    placeholder: (provided) => ({
+                                        ...provided,
+                                        color: '#999',
+                                    }),
+                                    singleValue: (provided) => ({
+                                        ...provided,
+                                        color: 'black',
+                                    }),
+                                }}
+                            />
+                        </div>
+                    </div>
                 </div>
             </div>
             {/* Rent Table */}
             <div className='mx-auto lg:w-[1750px] p-4 lg:pl-8 mt-6 bg-white lg:ml-12 mr-6 rounded-md'>
-                <div className='flex justify-end gap-10 items-center mb-3'>
-                    <div className=" font-semibold flex gap-2">
-                        <h1>Total Monthly Rent:</h1>
-                        <h1 className='font-bold cursor-pointer text-[#E4572E]'> ₹{totalMonthlyRents.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</h1>
+                <div className='flex flex-col lg:flex-row lg:justify-end gap-4 lg:gap-10 items-start lg:items-center mb-3'>
+                    <div className="font-semibold flex flex-col sm:flex-row gap-1 sm:gap-2">
+                        <span>Total Monthly Rent:</span>
+                        <span className='font-bold cursor-pointer text-[#E4572E]'>₹{totalMonthlyRents.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span>
                     </div>
-                    <div className="text-right font-semibold text-base">
-                        Total Collected for {monthNames[selectedMonth]} {selectedYear}:&nbsp;
-                        <span className="text-green-600">
+                    <div className="font-semibold text-sm sm:text-base">
+                        <span className="block sm:inline">Total Collected for {monthNames[selectedMonth]} {selectedYear}:</span>
+                        <span className="text-green-600 ml-0 sm:ml-1">
                             ₹{totalForSelectedMonth.toLocaleString("en-IN")}
                         </span>
                     </div>
-                    <div className="text-right font-semibold text-base">
-                        Balance Rent to Collect for {monthNames[selectedMonth]} {selectedYear}:&nbsp;
-                        <span className="text-red-600">
+                    <div className="font-semibold text-sm sm:text-base">
+                        <span className="block sm:inline">Balance Rent to Collect for {monthNames[selectedMonth]} {selectedYear}:</span>
+                        <span className="text-red-600 ml-0 sm:ml-1">
                             ₹{(totalMonthlyRents - totalForSelectedMonth).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
                         </span>
                     </div>
                     <div className="font-semibold flex gap-2">
-                        <h1>Total Occupied Shops:</h1>
-                        <h1 className='font-bold cursor-pointer text-[#E4572E]'>
+                        <span>Total Occupied Shops:</span>
+                        <span className='font-bold cursor-pointer text-[#E4572E]'>
                             {occupiedCount}
-                        </h1>
+                        </span>
                     </div>
                     <div className="font-semibold flex gap-2">
-                        <h1>Total Shop Vacancy :</h1>
-                        <h1
+                        <span>Total Shop Vacancy:</span>
+                        <span
                             className='font-bold cursor-pointer text-[#E4572E]'
                             onClick={() => setShowVacantPopup(true)}
                         >
                             {filteredVacantShops.length}
-                        </h1>
+                        </span>
                     </div>
-                    <h1
-                        className='font-bold text-sm text-[#E4572E] cursor-pointer hover:underline'
+                    <button
+                        className='font-bold text-sm text-[#E4572E] cursor-pointer hover:underline text-left lg:text-right'
                         onClick={handleExportPDF}
                     >
                         Export PDF
-                    </h1>
+                    </button>
                 </div>
-                <div className="rounded-lg border-l-8 border-[#BF9853] overflow-x-auto no-scrollbar">
-                    <table className="border-collapse w-full text-left">
-                        <thead>
+                <div
+                    ref={scrollRef}
+                    className="rounded-lg border-l-8 border-[#BF9853] overflow-scroll select-none"
+                    style={{ height: `${550}px` }}
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseUp}
+                >
+                    <table className="border-collapse w-full text-left min-w-[1165px]">
+                        <thead className="sticky top-0 z-20">
                             <tr className="bg-[#FAF6ED]">
                                 <th className="px-2 py-2 font-semibold cursor-pointer">S.No</th>
                                 <th
@@ -990,6 +1100,7 @@ const Dashboard = () => {
                                         <td className="px-4 py-2" title={(() => {
                                             const advanceDetails = shop.advanceDetails || [];
                                             const adjustmentDetails = shop.advanceAdjustmentDetails || [];
+                                            const shopClosureDetails = shop.shopClosureDetails || [];
                                             
                                             let tooltip = [];
                                             
@@ -1002,6 +1113,16 @@ const Dashboard = () => {
                                             adjustmentDetails.forEach(detail => {
                                                 tooltip.push(detail + ' (Advance Adjustment)');
                                             });
+                                            
+                                            // Add shop closure payments with clear labeling
+                                            shopClosureDetails.forEach(detail => {
+                                                tooltip.push(detail + ' (Shop Closure)');
+                                            });
+                                            
+                                            // Add note for vacated shops
+                                            if (shop.vacated && shop.advance > 0) {
+                                                tooltip.push('Balance to be returned to tenant');
+                                            }
                                             
                                             return tooltip.join('\n');
                                         })()}>
@@ -1082,20 +1203,23 @@ const Dashboard = () => {
                 </div>
             </div>
             {showConfirm && selectedShop && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-                    <div className="bg-white p-6 rounded-lg shadow-lg w-[480px] h-[200px]">
-                        <p className="text-[22px] font-semibold mb-2 text-center">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 p-4">
+                    <div className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-md">
+                        <p className="text-lg sm:text-xl font-semibold mb-2 text-center">
                             Are you sure you want to edit
                         </p>
-                        <div className="text-[22px] font-semibold mb-4 text-center">
-                            <span className="text-[#BF9853] ">{selectedShop.tenantName}</span>?
+                        <div className="text-lg sm:text-xl font-semibold mb-6 text-center">
+                            <span className="text-[#BF9853]">{selectedShop.tenantName}</span>?
                         </div>
-                        <div className="flex justify-end gap-4">
-                            <button className="bg-gray-300 px-4 py-2 rounded-md mt-8" onClick={() => { setShowConfirm(false); setSelectedShop(null); }}>
+                        <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
+                            <button 
+                                className="bg-gray-300 px-4 py-2 rounded-md text-sm sm:text-base" 
+                                onClick={() => { setShowConfirm(false); setSelectedShop(null); }}
+                            >
                                 Cancel
                             </button>
                             <button
-                                className="bg-[#BF9853] text-white px-4 py-2 rounded-md mt-8"
+                                className="bg-[#BF9853] text-white px-4 py-2 rounded-md text-sm sm:text-base"
                                 onClick={() => {
                                     const info = shopInfoMap[selectedShop.shopNo] || {};
                                     setEditAdvance(info.advanceAmount || '');
@@ -1116,47 +1240,53 @@ const Dashboard = () => {
                 </div>
             )}
             {showEditPopup && selectedShop && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-                    <div className="bg-white p-6 rounded-lg shadow-lg w-[500px] relative">
-                        <div className="text-left left-2 text-lg text-[#E4572E] font-bold">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 p-4">
+                    <div className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-md relative max-h-[90vh] overflow-y-auto">
+                        <div className="text-left text-base sm:text-lg text-[#E4572E] font-bold mb-4">
                             {selectedShop.tenantName} - {shopInfoMap[selectedShop.shopNo]?.doorNo || ''}
                         </div>
-                        <div className="mt-5 text-left">
+                        <div className="text-left space-y-4">
                             <div>
-                                <label className="font-semibold block">Rent</label>
+                                <label className="font-semibold block text-sm sm:text-base mb-1">Rent</label>
                                 <input
                                     type="text"
                                     placeholder="Rent"
                                     value={formatINR(editRent)}
                                     onChange={(e) => setEditRent(e.target.value.replace(/[^0-9]/g, ''))}
-                                    className="w-full border px-3 py-2 rounded-md focus:outline-none"
+                                    className="w-full border px-3 py-2 rounded-md focus:outline-none text-sm sm:text-base"
                                 />
                             </div>
-                            <div className=" mt-3">
-                                <label className="font-semibold block">Advance</label>
+                            <div>
+                                <label className="font-semibold block text-sm sm:text-base mb-1">Advance</label>
                                 <input
                                     type="text"
                                     placeholder="Advance"
                                     value={formatINR(editAdvance)}
                                     onChange={(e) => setEditAdvance(e.target.value.replace(/[^0-9]/g, ''))}
-                                    className="w-full border px-3 py-2 rounded-md focus:outline-none"
+                                    className="w-full border px-3 py-2 rounded-md focus:outline-none text-sm sm:text-base"
                                 />
                             </div>
-                            <div className=" mt-3">
-                                <label className="font-semibold block">Starting Month for This Rent</label>
+                            <div>
+                                <label className="font-semibold block text-sm sm:text-base mb-1">Starting Month for This Rent</label>
                                 <input
                                     type="month"
                                     value={editStartingMonth}
                                     onChange={(e) => setEditStartingMonth(e.target.value)}
-                                    className="w-full border px-3 py-2 rounded-md focus:outline-none"
+                                    className="w-full border px-3 py-2 rounded-md focus:outline-none text-sm sm:text-base"
                                 />
                             </div>
                         </div>
-                        <div className="flex justify-end mt-6 gap-4">
-                            <button className="bg-gray-300 px-4 py-2 rounded-md" onClick={() => { setShowEditPopup(false); setSelectedShop(null); setEditRent(''); setEditAdvance(''); setEditStartingMonth(''); }}>
+                        <div className="flex flex-col sm:flex-row justify-end mt-6 gap-3 sm:gap-4">
+                            <button 
+                                className="bg-gray-300 px-4 py-2 rounded-md text-sm sm:text-base" 
+                                onClick={() => { setShowEditPopup(false); setSelectedShop(null); setEditRent(''); setEditAdvance(''); setEditStartingMonth(''); }}
+                            >
                                 Close
                             </button>
-                            <button className="bg-[#BF9853] text-white px-4 py-2 rounded-md" onClick={handleSaveRentAdvance}>
+                            <button 
+                                className="bg-[#BF9853] text-white px-4 py-2 rounded-md text-sm sm:text-base" 
+                                onClick={handleSaveRentAdvance}
+                            >
                                 Save
                             </button>
                         </div>
@@ -1164,42 +1294,50 @@ const Dashboard = () => {
                 </div>
             )}
             {showVacantPopup && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-auto">
-                    <div className="bg-white rounded-xl p-6 w-full h-[350px] max-w-lg shadow-xl">
-                        <div className="flex justify-between items-center mb-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-auto p-4">
+                    <div className="bg-white rounded-xl p-4 sm:p-6 w-full max-w-4xl max-h-[90vh] shadow-xl">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
                             <div>
-                                <h2 className="text-lg font-semibold">Vacant Shop Details</h2>
+                                <h2 className="text-lg sm:text-xl font-semibold">Vacant Shop Details</h2>
                             </div>
-                            <div className="flex items-center gap-7">
-                                <h2 className="text-[#E4572E] font-semibold text-sm cursor-pointer" onClick={handleExportVacantPDF}>
+                            <div className="flex items-center gap-4 sm:gap-7">
+                                <button 
+                                    className="text-[#E4572E] font-semibold text-sm cursor-pointer hover:underline" 
+                                    onClick={handleExportVacantPDF}
+                                >
                                     Export PDF
-                                </h2>
-                                <button onClick={() => setShowVacantPopup(false)} className="text-gray-500 hover:text-black">
+                                </button>
+                                <button 
+                                    onClick={() => setShowVacantPopup(false)} 
+                                    className="text-gray-500 hover:text-black text-lg sm:text-xl"
+                                >
                                     ✕
                                 </button>
                             </div>
                         </div>
-                        <div className="border-l-8 border-[#BF9853] rounded-lg h-[250px] overflow-y-auto">
-                            <table className="w-full  text-sm ">
-                                <thead className="bg-[#FAF6ED]">
-                                    <tr>
-                                        <th className="px-2 py-1 ">S.No</th>
-                                        <th className="px-2 py-1 ">Shop No</th>
-                                        <th className="px-2 py-1 ">Door No</th>
-                                        <th className="px-2 py-1 ">Property Name</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredVacantShops.map((shop, index) => (
-                                        <tr key={shop.shopNo}>
-                                            <td className="px-2 py-1 ">{index + 1}</td>
-                                            <td className="px-2 py-1 ">{shop.shopNo}</td>
-                                            <td className="px-2 py-1 ">{shop.doorNo || 'N/A'}</td>
-                                            <td className="px-2 py-1 ">{shop.propertyName || 'N/A'}</td>
+                        <div className="border-l-8 border-[#BF9853] rounded-lg max-h-[60vh] overflow-y-auto">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-xs sm:text-sm min-w-[400px]">
+                                    <thead className="bg-[#FAF6ED] sticky top-0">
+                                        <tr>
+                                            <th className="px-2 py-2 text-left">S.No</th>
+                                            <th className="px-2 py-2 text-left">Shop No</th>
+                                            <th className="px-2 py-2 text-left">Door No</th>
+                                            <th className="px-2 py-2 text-left">Property Name</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {filteredVacantShops.map((shop, index) => (
+                                            <tr key={shop.shopNo} className="border-b border-gray-200">
+                                                <td className="px-2 py-2">{index + 1}</td>
+                                                <td className="px-2 py-2 font-medium">{shop.shopNo}</td>
+                                                <td className="px-2 py-2">{shop.doorNo || 'N/A'}</td>
+                                                <td className="px-2 py-2">{shop.propertyName || 'N/A'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>

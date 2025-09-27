@@ -5,6 +5,8 @@ import Select from 'react-select';
 import Filter from '../Images/filter (3).png'
 import Reload from '../Images/rotate-right.png'
 import edit from '../Images/Edit.svg';
+import history from '../Images/History.svg';
+import remove from '../Images/Delete.svg';
 
 const StaffDatabase = ({ username, userRoles = [] }) => {
   const [records, setRecords] = useState([]);
@@ -26,6 +28,8 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editFormData, setEditFormData] = useState({});
   const [editingId, setEditingId] = useState(null);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [staffAdvanceAudits, setStaffAdvanceAudits] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -516,6 +520,17 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
     setIsEditModalOpen(true);
   };
 
+  const fetchAuditDetails = async (staffAdvancePortalId) => {
+    try {
+      const response = await fetch(`https://backendaab.in/aabuildersDash/api/staff-advance/audit/history/${staffAdvancePortalId}`);
+      const data = await response.json();
+      setStaffAdvanceAudits(data);
+      setShowHistoryModal(true);
+    } catch (error) {
+      console.error("Error fetching audit details:", error);
+    }
+  };
+
   const handleUpdate = useCallback(async () => {
     try {
       const url = `https://backendaab.in/aabuildersDash/api/staff-advance/${editingId}?editedBy=${username}`;
@@ -560,6 +575,51 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
       alert(error.message || 'Failed to update record. Please try again.');
     }
   }, [editFormData, editingId, username]);
+
+  const handleDelete = async (idToDelete) => {
+    const confirmDelete = window.confirm("Are you sure you want to delete this record?");
+    if (!confirmDelete) return;
+
+    try {
+      const record = records.find(r => r.staffAdvancePortalId === idToDelete || r.id === idToDelete);
+      if (!record) {
+        console.warn('Record not found for ID:', idToDelete);
+        return;
+      }
+
+      const entryNo = record.entry_no;
+
+      const clearedData = {
+        entry_no: entryNo, // Preserve entry_no
+        date: record.date,
+        amount: '',
+        employee_id: '',
+        labour_id: '',
+        from_purpose_id: '',
+        to_purpose_id: '',
+        staff_payment_mode: '',
+        type: '',
+        description: '',
+        staff_refund_amount: ''
+      };
+
+      const res = await fetch(`https://backendaab.in/aabuildersDash/api/staff-advance/${idToDelete}?editedBy=${username}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(clearedData)
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to clear record');
+      }
+
+      console.log(`Cleared record with ID ${idToDelete}`);
+      window.location.reload(); // Refresh to reflect changes
+    } catch (error) {
+      console.error('Delete error:', error);
+    }
+  };
 
   const fieldConfig = useMemo(() => {
     switch (editFormData.type) {
@@ -1040,14 +1100,40 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
                       <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[60px] sm:min-w-[80px]"></td>
                       <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[50px] sm:min-w-[60px] font-semibold">{entry.entry_no}</td>
                       <td className="text-xs sm:text-sm text-left p-1 sm:p-2 min-w-[60px] sm:min-w-[80px]">
-                        <button className="rounded-full transition duration-200 ml-1 sm:ml-2 mr-1 sm:mr-3">
-                          <img
-                            src={edit}
-                            onClick={() => handleEditClick(entry)}
-                            alt="Edit"
-                            className="w-3 h-4 sm:w-4 sm:h-6 transform hover:scale-110 hover:brightness-110 transition duration-200"
-                          />
-                        </button>
+                        <div className="flex justify-between items-center">
+                          <button
+                            className={`rounded-full transition duration-200 ml-2 mr-3 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={entry.not_allow_to_edit}
+                          >
+                            <img
+                              src={edit}
+                              onClick={entry.not_allow_to_edit ? undefined : () => handleEditClick(entry)}
+                              alt="Edit"
+                              className={`w-4 h-6 transition duration-200 ${entry.not_allow_to_edit ? '' : 'transform hover:scale-110 hover:brightness-110'}`}
+                            />
+                          </button>
+                          <button 
+                            className={`-ml-5 -mr-2 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={entry.not_allow_to_edit}
+                          >
+                            <img
+                              src={remove}
+                              alt='delete'
+                              onClick={entry.not_allow_to_edit ? undefined : () => handleDelete(entry.staffAdvancePortalId || entry.id)}
+                              className={`w-4 h-4 transition duration-200 ${entry.not_allow_to_edit ? '' : 'transform hover:scale-110 hover:brightness-110'}`} />
+                          </button>
+                          <button 
+                            onClick={entry.not_allow_to_edit ? undefined : () => fetchAuditDetails(entry.staffAdvancePortalId || entry.id)} 
+                            className={`rounded-full transition duration-200 -mr-1 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={entry.not_allow_to_edit}
+                          >
+                            <img
+                              src={history}
+                              alt="history"
+                              className={`w-4 h-5 transition duration-200 ${entry.not_allow_to_edit ? '' : 'transform hover:scale-110 hover:brightness-110'}`}
+                            />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -1394,6 +1480,14 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
             </div>
           </div>
         )}
+        <StaffAdvanceAuditModal 
+          show={showHistoryModal} 
+          onClose={() => setShowHistoryModal(false)} 
+          audits={staffAdvanceAudits} 
+          employees={employees}
+          laboursList={laboursList}
+          purposes={purposes} 
+        />
       </div>
     </body>
   );
@@ -1412,4 +1506,134 @@ const formatDate = (dateString) => {
   hours = hours % 12;
   hours = hours ? String(hours).padStart(2, '0') : '12';
   return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+};
+
+const StaffAdvanceAuditModal = ({ show, onClose, audits, employees, laboursList, purposes }) => {
+  if (!show) return null;
+  
+  const getNameById = (id, options) => {
+    if (!id && id !== 0) return "-";
+    const found = options.find(opt => String(opt.id) === String(id));
+    return found ? found.label : id;
+  };
+
+  const getEmployeeName = (id) => employees.find(e => e.id === id)?.label || id;
+  const getLabourName = (id) => laboursList.find(l => l.id === id)?.label || id;
+  const getPurposeName = (id) => purposes.find(p => p.id === id)?.label || id;
+
+  const fields = [
+    { oldKey: "old_date", newKey: "new_date", label: "Date", width: "120px" },
+    { oldKey: "old_type", newKey: "new_type", label: "Type", width: "100px" },
+    { oldKey: "old_employee_id", newKey: "new_employee_id", label: "Employee", width: "150px" },
+    { oldKey: "old_labour_id", newKey: "new_labour_id", label: "Labour", width: "150px" },
+    { oldKey: "old_from_purpose_id", newKey: "new_from_purpose_id", label: "Purpose", width: "150px" },
+    { oldKey: "old_to_purpose_id", newKey: "new_to_purpose_id", label: "Transfer To", width: "150px" },
+    { oldKey: "old_staff_payment_mode", newKey: "new_staff_payment_mode", label: "Mode", width: "100px" },
+    { oldKey: "old_description", newKey: "new_description", label: "Description", width: "200px" },
+    { oldKey: "old_amount", newKey: "new_amount", label: "Amount", width: "100px" },
+    { oldKey: "old_staff_refund_amount", newKey: "new_staff_refund_amount", label: "Refund", width: "100px" },
+  ];
+
+  const formatDateTime = (dateString) => {
+    if (!dateString) return "-";
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    let hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12 || 12;
+    hours = String(hours).padStart(2, "0");
+    return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+  };
+
+  const formatDisplayValue = (value, field) => {
+    if (field.oldKey?.includes("employee_id") || field.newKey?.includes("employee_id")) {
+      return value ? getEmployeeName(value) : "-";
+    }
+    if (field.oldKey?.includes("labour_id") || field.newKey?.includes("labour_id")) {
+      return value ? getLabourName(value) : "-";
+    }
+    if (field.oldKey?.includes("purpose_id") || field.newKey?.includes("purpose_id")) {
+      return value ? getPurposeName(value) : "-";
+    }
+    if (field.label.includes("Amount") || field.label.includes("Refund")) {
+      return value ? Number(value).toLocaleString("en-IN") : "-";
+    }
+    if (field.label === "Date") {
+      return value ? new Date(value).toLocaleDateString("en-GB") : "-";
+    }
+    return value ?? "-";
+  };
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+      <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1800px] mx-4 p-2">
+        <div className="flex justify-between items-center mt-4 ml-7 mr-7">
+          <h2 className="text-xl font-bold">History</h2>
+          <button onClick={onClose}>
+            <h2 className="text-xl text-red-500 -mt-10 font-bold">x</h2>
+          </button>
+        </div>
+        {/* Scroll container for both vertical and horizontal overflow */}
+        <div className="overflow-auto mt-2 max-h-80 border border-l-8 border-l-[#BF9853] rounded-lg ml-7">
+          <table className="table-fixed min-w-full bg-white">
+            <thead className="bg-[#FAF6ED]">
+              <tr>
+                <th style={{ width: "130px" }}>Time Stamp</th>
+                <th style={{ width: "120px" }}>Edited By</th>
+                {fields.map((f) => (
+                  <th
+                    key={f.label}
+                    style={{ width: f.width }}
+                    className="border-b py-2 px-2 text-center font-bold whitespace-nowrap overflow-hidden text-ellipsis"
+                  >
+                    {f.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {audits.map((audit, index) => (
+                <tr
+                  key={index}
+                  className="odd:bg-white even:bg-[#FAF6ED]"
+                >
+                  <td
+                    className="whitespace-nowrap overflow-hidden text-ellipsis"
+                    style={{ width: "130px" }}
+                  >
+                    {formatDateTime(audit.edited_date)}
+                  </td>
+                  <td
+                    className="whitespace-nowrap overflow-hidden text-ellipsis"
+                    style={{ width: "120px" }}
+                  >
+                    {audit.edited_by}
+                  </td>
+                  {fields.map((f) => {
+                    const oldDisplay = formatDisplayValue(audit[f.oldKey], f);
+                    const newDisplay = formatDisplayValue(audit[f.newKey], f);
+                    const changed = oldDisplay !== newDisplay;
+                    return (
+                      <td
+                        key={f.label}
+                        style={{ width: f.width }}
+                        title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
+                        className={`whitespace-nowrap overflow-hidden text-ellipsis px-2 ${changed ? "bg-[#BF9853] font-bold" : ""
+                          }`}
+                      >
+                        {oldDisplay}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
 };

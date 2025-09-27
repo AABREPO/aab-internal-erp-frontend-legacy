@@ -1461,26 +1461,36 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                       <td></td>
                       <td className="text-sm text-left pl-3 font-semibold">{entry.entry_no}</td>
                       <td className=" flex w-[100px] justify-between py-2">
-                        <button className="rounded-full transition duration-200 ml-2 mr-3">
+                        <button 
+                          className={`rounded-full transition duration-200 ml-2 mr-3 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          disabled={entry.not_allow_to_edit}
+                        >
                           <img
                             src={edit}
-                            onClick={() => handleEditClick(entry)}
+                            onClick={entry.not_allow_to_edit ? undefined : () => handleEditClick(entry)}
                             alt="Edit"
-                            className=" w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200 "
+                            className={`w-4 h-6 transition duration-200 ${entry.not_allow_to_edit ? '' : 'transform hover:scale-110 hover:brightness-110'}`}
                           />
                         </button>
-                        <button className=" -ml-5 -mr-2">
+                        <button 
+                          className={`-ml-5 -mr-2 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          disabled={entry.not_allow_to_edit}
+                        >
                           <img
                             src={remove}
                             alt='delete'
-                            onClick={() => handleDelete(entry.advancePortalId)}
-                            className='  w-4 h-4 transform hover:scale-110 hover:brightness-110 transition duration-200 ' />
+                            onClick={entry.not_allow_to_edit ? undefined : () => handleDelete(entry.advancePortalId)}
+                            className={`w-4 h-4 transition duration-200 ${entry.not_allow_to_edit ? '' : 'transform hover:scale-110 hover:brightness-110'}`} />
                         </button>
-                        <button onClick={() => fetchAuditDetails(entry.advancePortalId)} className="rounded-full transition duration-200 -mr-1" >
+                        <button 
+                          onClick={entry.not_allow_to_edit ? undefined : () => fetchAuditDetails(entry.advancePortalId)} 
+                          className={`rounded-full transition duration-200 -mr-1 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          disabled={entry.not_allow_to_edit}
+                        >
                           <img
                             src={history}
                             alt="history"
-                            className=" w-4 h-5 transform hover:scale-110 hover:brightness-110 transition duration-200 "
+                            className={`w-4 h-5 transition duration-200 ${entry.not_allow_to_edit ? '' : 'transform hover:scale-110 hover:brightness-110'}`}
                           />
                         </button>
                       </td>

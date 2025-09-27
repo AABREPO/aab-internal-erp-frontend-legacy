@@ -491,17 +491,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
 
     fetchData();
   }, []);
-  const clearFilters = () => {
-    setSelectDate('');
-    setSelectContractororVendorName('');
-    setSelectProjectName('');
-    setSelectTransfer('');
-    setSelectType('');
-    setSelectMode('');
-  }
-  // Filtered data based on selected project name
-
-
   const formatDateOnly = (dateString) => {
     const date = new Date(dateString);
     const day = String(date.getDate()).padStart(2, '0');
@@ -511,24 +500,18 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
   };
   const getVendorName = (id) =>
     vendorOptions.find(v => v.id === id)?.value || "";
-
   const getContractorName = (id) =>
     contractorOptions.find(c => c.id === id)?.value || "";
-
   const getSiteName = (id) =>
     siteOptions.find(s => String(s.id) === String(id))?.value || "";
   const filteredData = advanceData.filter((entry) => {
-    // Date filter (exact match since it's type="date")
     if (selectDate) {
-      // Convert selectDate (YYYY-MM-DD) → DD-M-YYYY
       const [year, month, day] = selectDate.split("-");
       const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
-      // Convert entry.date to DD-M-YYYY
       const entryDateObj = new Date(entry.date);
       const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
       if (formattedEntryDate !== formattedSelectDate) return false;
     }
-    // Contractor/Vendor filter
     if (selectContractororVendorName) {
       const name =
         entry.vendor_id
@@ -537,36 +520,29 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
       if (name.toLowerCase() !== selectContractororVendorName.toLowerCase())
         return false;
     }
-    // Project Name filter
     if (selectProjectName) {
       const projectName = getSiteName(entry.project_id) || "";
       if (projectName.toLowerCase() !== selectProjectName.toLowerCase())
         return false;
     }
-    // Transfer Site filter
     if (selectTransfer) {
       const transferName = getSiteName(entry.transfer_site_id) || "";
       if (transferName.toLowerCase() !== selectTransfer.toLowerCase())
         return false;
     }
-    // Type filter
     if (selectType) {
       if (entry.type?.toLowerCase() !== selectType.toLowerCase()) return false;
     }
-    // Mode filter
     if (selectMode) {
       if (entry.payment_mode?.toLowerCase() !== selectMode.toLowerCase()) return false;
     }
-    return true; // passes all filters
+    return true;
   });
   const sortedData = React.useMemo(() => {
     let sortableData = [...filteredData];
-
     if (sortConfig.key) {
       sortableData.sort((a, b) => {
         let aValue, bValue;
-
-        // Map keys to actual values in your data
         switch (sortConfig.key) {
           case 'date':
             aValue = new Date(a.date);
@@ -595,68 +571,52 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
           default:
             return 0;
         }
-
         if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
         if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
       });
     } else {
-      // Default sorting: Most recent entries first (by date descending)
       sortableData.sort((a, b) => {
         const dateA = new Date(a.date);
         const dateB = new Date(b.date);
-        return dateB - dateA; // Descending order (newest first)
+        return dateB - dateA; 
       });
     }
-
     return sortableData;
   }, [filteredData, sortConfig]);
-
-  // Pagination logic
   const totalPages = Math.ceil(sortedData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentData = sortedData.slice(startIndex, endIndex);
-
-  // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [selectDate, selectContractororVendorName, selectProjectName, selectTransfer, selectType, selectMode]);
-
-  // Pagination handlers
   const goToPage = (page) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   };
-
   const goToNextPage = () => {
     if (currentPage < totalPages) {
       setCurrentPage(currentPage + 1);
     }
   };
-
   const goToPreviousPage = () => {
     if (currentPage > 1) {
       setCurrentPage(currentPage - 1);
     }
   };
-
   const handleItemsPerPageChange = (e) => {
     const newItemsPerPage = parseInt(e.target.value);
     setItemsPerPage(newItemsPerPage);
-    setCurrentPage(1); // Reset to first page when changing items per page
+    setCurrentPage(1);
   };
-
-  // Calculate totals
   const totalAdvance = advanceData.reduce(
     (sum, entry) => sum + (Number(entry.amount) || 0),
     0
   );
-
   const totalBill = advanceData.reduce(
     (sum, entry) => sum + (Number(entry.bill_amount) || 0),
     0
   );
-
   const totalRefund = advanceData.reduce(
     (sum, entry) => sum + (Number(entry.refund_amount) || 0),
     0
@@ -667,10 +627,8 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     }
     return sum;
   }, 0);
-
   const handleEditClick = (entry) => {
     setEditingId(entry.advancePortalId);
-    // Set main form data
     setEditFormData({
       date: entry.date?.split('T')[0] || '',
       amount: entry.amount || '',
@@ -687,7 +645,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
       payment_mode: entry.payment_mode || '',
       refund_amount: entry.refund_amount || ''
     });
-    // 🔹 Pre-select contractor/vendor option
     const preSelected = combinedOptions.find(opt =>
       entry.vendor_id ? opt.id === entry.vendor_id && opt.type === "Vendor"
         : entry.contractor_id ? opt.id === entry.contractor_id && opt.type === "Contractor"
@@ -715,12 +672,9 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     try {
       const originalRecord = advanceData.find(r => r.advancePortalId === editingId);
       const isTypeChanged = originalRecord?.type !== editFormData.type;
-
-      // Helper to create payload with correct fields based on type
       const createPayload = (overrides = {}, typeOverride) => {
         const base = { ...editFormData, ...overrides };
         const type = typeOverride || editFormData.type;
-
         switch (type) {
           case 'Advance':
             base.bill_amount = '';
@@ -738,28 +692,21 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
           default:
             break;
         }
-
         return base;
       };
-
       if (isTypeChanged) {
         if (editFormData.type === 'Transfer') {
           const amountValue = parseFloat(editFormData.amount) || 0;
-
           const firstPayload = createPayload({
             entry_no: editFormData.entry_no,
             amount: -Math.abs(amountValue)
           }, 'Transfer');
-
           const secondPayload = createPayload({
             entry_no: editFormData.entry_no,
             project_id: parseInt(editFormData.transfer_site_id),
             transfer_site_id: originalRecord?.project_id || 0,
             amount: Math.abs(amountValue)
           }, 'Transfer');
-
-          console.log('Creating new transfer records:', firstPayload, secondPayload);
-
           await Promise.all([
             fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
               method: 'POST',
@@ -775,21 +722,15 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
             })
           ]);
         } else {
-          // New Advance or Refund entry with new entry_no
           const payload = createPayload({ entry_no: editFormData.entry_no });
-          console.log('Creating new entry after type change:', payload);
-
           const saveRes = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify(payload)
           });
-
           if (!saveRes.ok) throw new Error('Failed to create new record after type change');
         }
-
-        // Clear the original entry
         const clearedData = {
           entry_no: editFormData.entry_no,
           date: editFormData.date,
@@ -805,39 +746,29 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
           payment_mode: '',
           refund_amount: ''
         };
-
         const clearRes = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${editingId}?editedBy=${username}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(clearedData)
         });
-
         if (!clearRes.ok) throw new Error('Failed to clear original record after type change');
-
       } else if (editFormData.type === 'Transfer') {
         const sameEntryRows = advanceData.filter(r => r.entry_no === editFormData.entry_no);
-
         if (sameEntryRows.length === 2) {
           const editedRecord = sameEntryRows.find(r => r.advancePortalId === editingId);
           const otherRecord = sameEntryRows.find(r => r.advancePortalId !== editingId);
-
           const editedAmount = parseFloat(editFormData.amount) || 0;
-
           const updatedEdited = createPayload({
             ...editFormData,
             transfer_site_id: parseInt(editFormData.transfer_site_id),
-            amount: editedAmount // 👈 Keep exactly what user entered
+            amount: editedAmount
           }, 'Transfer');
-
           const updatedOther = createPayload({
             ...otherRecord,
             project_id: parseInt(editFormData.transfer_site_id),
             transfer_site_id: editedRecord.project_id,
-            amount: -editedAmount // 👈 Opposite of what user entered
+            amount: -editedAmount 
           }, 'Transfer');
-
-          console.log('Updating Transfer records (fixed):', updatedEdited, updatedOther);
-
           await Promise.all([
             fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${editedRecord.advancePortalId}?editedBy=${username}`, {
               method: 'PUT',
@@ -855,11 +786,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
         }
       }
       else {
-        // Regular update
         const payload = createPayload();
-
-        console.log('Updating normal record:', payload);
-
         const res = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${editingId}?editedBy=${username}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -868,14 +795,12 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
 
         if (!res.ok) throw new Error('Failed to update');
       }
-
       window.location.reload();
       setIsEditModalOpen(false);
     } catch (err) {
       console.error('Update error:', err);
     }
   };
-
   // 👉 Compute totals
   const totals = currentData.reduce(
     (acc, entry) => {
@@ -990,7 +915,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
           </div>
         </div>
         <div className='border-l-8 border-l-[#BF9853] rounded-lg ml-5 mr-5'>
-          {/* Single Table with Scrollable Container */}
           <div
             ref={scrollRef}
             className='overflow-auto max-h-[600px] thin-scrollbar'
@@ -1284,12 +1208,15 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                       <td></td>
                       <td className="text-sm text-left pl-3 font-semibold">{entry.entry_no}</td>
                       <td className="flex py-2">
-                        <button className="rounded-full transition duration-200 ml-2 mr-3">
+                        <button 
+                          className={`rounded-full transition duration-200 ml-2 mr-3 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          disabled={entry.not_allow_to_edit}
+                        >
                           <img
                             src={edit}
-                            onClick={() => handleEditClick(entry)}
+                            onClick={entry.not_allow_to_edit ? undefined : () => handleEditClick(entry)}
                             alt="Edit"
-                            className=" w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200 "
+                            className={`w-4 h-6 transition duration-200 ${entry.not_allow_to_edit ? '' : 'transform hover:scale-110 hover:brightness-110'}`}
                           />
                         </button>
                       </td>

@@ -36,12 +36,15 @@ const TableRow = memo(({ entry, index, onEditClick, getEmployeeName, getLabourNa
     <td></td>
     <td className="text-sm text-left pl-3 font-semibold">{entry.entry_no}</td>
     <td className="flex py-2">
-      <button className="rounded-full transition duration-200 ml-2 mr-3">
+      <button
+        className={`rounded-full transition duration-200 ml-2 mr-3 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
+        disabled={entry.not_allow_to_edit}
+      >
         <img
           src={edit}
-          onClick={() => onEditClick(entry)}
+          onClick={entry.not_allow_to_edit ? undefined : () => onEditClick(entry)}
           alt="Edit"
-          className=" w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200 "
+          className={`w-4 h-6 transition duration-200 ${entry.not_allow_to_edit ? '' : 'transform hover:scale-110 hover:brightness-110'}`}
         />
       </button>
     </td>
@@ -360,6 +363,7 @@ const TableView = ({ username, userRoles = [] }) => {
         const purData = purRes.status === 'fulfilled' && purRes.value.ok
           ? await purRes.value.json()
           : [];
+        console.log('Records:', recData);
         setRecords(recData);
         setEmployees(empData.map(e => ({ id: e.id, label: e.employee_name, type: "Employee" })));
         setPurposes(purData.map(p => ({ id: p.id, label: p.purpose })));

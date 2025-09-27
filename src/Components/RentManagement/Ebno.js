@@ -509,7 +509,7 @@ const Ebno = () => {
     };
     return (
         <div>
-            <div className='mx-auto lg:w-[1750px] p-4 lg:pl-8 bg-white lg:ml-7 lg:mr-6 rounded-md text-left flex'>
+            <div className='lg:w-[1750px] p-4 lg:pl-8 bg-white lg:ml-10 lg:mr-10 rounded-md text-left lg:flex'>
                 <div>
                     <h1 className='font-semibold mb-3'>Select EB NO</h1>
                     <Select
@@ -695,7 +695,7 @@ const Ebno = () => {
 
                 </div>
             </div>
-            <div className='mx-auto lg:w-[1750px] p-4 lg:pl-8 mt-6 bg-white lg:ml-7 mr-6 rounded-md'>
+            <div className='lg:w-[1750px] p-4 lg:pl-8 mt-6 bg-white lg:ml-10 mr-10 rounded-md'>
                 <div className="flex justify-between">
                     <div></div>
                     <div className="flex items-center gap-3 cursor-pointer">

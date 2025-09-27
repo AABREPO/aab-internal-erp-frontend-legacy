@@ -283,10 +283,16 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     // Payment popup states for Project Advance
     const [showPaymentPopup, setShowPaymentPopup] = useState(false);
     const [paymentPopupData, setPaymentPopupData] = useState({
+        date: new Date().toISOString().split('T')[0],
+        amount: "",
         paymentMode: "",
-        amount: ""
+        chequeNo: "",
+        chequeDate: "",
+        transactionNumber: "",
+        accountNumber: ""
     });
     const [currentProjectAdvanceRow, setCurrentProjectAdvanceRow] = useState(null);
+    const [previousPayments, setPreviousPayments] = useState([]);
     // Weekly Payment Bill Data List states
 
     const [showPaymentDetailsPopup, setShowPaymentDetailsPopup] = useState(false);
@@ -316,7 +322,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             }
             const result = await response.json();
             return result;
-            
+
         } catch (error) {
             console.error("Error saving payment:", error);
             throw error;
@@ -535,9 +541,14 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                         label: "Daily Wage",
                         id: 8,
                         sNo: "8"
+                    },
+                    {
+                        value:"Rent Management Portal",
+                        label:"Rent Management Portal",
+                        id: 9,
+                        sNo: "9"
                     }
                 ];
-
                 // Combine backend data with predefined options
                 const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
                 setSiteOptions(combinedSiteOptions);
@@ -564,18 +575,15 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             console.log('Error fetching tile area names.');
         }
     };
-    // Fetch current week number from backend
     const fetchCurrentWeekNumber = useCallback(() => {
         fetch("https://backendaab.in/aabuildersDash/api/payments-received/current-week")
             .then((res) => res.json())
             .then(setCurrentWeekNumber)
             .catch(console.error);
     }, []);
-    // Fetch descriptions for Project Advance rows
     const fetchPortalDescriptions = useCallback(async (expensesData) => {
         const projectAdvanceRows = expensesData.filter(row => row.type === "Project Advance" && row.advance_portal_id);
         const newDescriptions = { ...portalDescriptions };
-
         for (const row of projectAdvanceRows) {
             if (!(row.advance_portal_id in newDescriptions)) {
                 try {
@@ -593,10 +601,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 }
             }
         }
-
         setPortalDescriptions(newDescriptions);
     }, [portalDescriptions]);
-
     // Fetch descriptions for Staff Advance rows
     const fetchStaffAdvanceDescriptions = useCallback(async (expensesData) => {
         const staffAdvanceRows = expensesData.filter(row => row.type === "Staff Advance" && row.staff_advance_portal_id);
@@ -619,10 +625,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 }
             }
         }
-
         setStaffAdvanceDescriptions(newDescriptions);
     }, [staffAdvanceDescriptions]);
-
     // Fetch expenses by currentWeekNumber
     const fetchExpenses = useCallback(() => {
         if (!currentWeekNumber) return;
@@ -809,7 +813,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                         ? Math.max(...allData.map((item) => item.entry_no || 0))
                         : 0;
                 const nextEntryNo = maxEntryNo + 1;
-
                 const staffAdvancePayload = {
                     date: newExpense.date,
                     type: "Advance",
@@ -820,7 +823,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     from_purpose_id: 4,
                     entry_no: nextEntryNo,
                 };
-
                 const saveStaffAdvance = await fetch("https://backendaab.in/aabuildersDash/api/staff-advance/save", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -828,7 +830,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 });
                 if (!saveStaffAdvance.ok) throw new Error("Failed to save staff advance");
                 const savedStaffAdvance = await saveStaffAdvance.json();
-
                 // ---------- Save to weekly-expenses ----------
                 expenseForBackend.staff_advance_portal_id = savedStaffAdvance.staffAdvancePortalId;
                 const saveWeekly = await fetch("https://backendaab.in/aabuildersDash/api/weekly-expenses/save", {
@@ -1238,12 +1239,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             console.log("Deletion cancelled.");
         }
     };
-    const clearFilters = () => {
-        setSelectDate('');
-        setSelectContractororVendorName('');
-        setSelectProjectName('');
-        setSelectType('');
-    };
+
     const getVendorName = (id) =>
         vendorOptions.find(v => v.id === id)?.value || "";
     const getContractorName = (id) =>
@@ -2045,7 +2041,18 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                         <button
                                                                             onClick={() => {
                                                                                 setCurrentProjectAdvanceRow(row);
-                                                                                setPaymentPopupData({ paymentMode: "", amount: "" });
+                                                                                setPaymentPopupData({
+                                                                                    date: new Date().toISOString().split('T')[0],
+                                                                                    amount: "",
+                                                                                    paymentMode: "",
+                                                                                    chequeNo: "",
+                                                                                    chequeDate: "",
+                                                                                    transactionNumber: "",
+                                                                                    accountNumber: ""
+                                                                                });
+                                                                                // Fetch previous payments for this expense
+                                                                                const previousPaymentsForExpense = getPaymentsByExpenseId(row.id);
+                                                                                setPreviousPayments(previousPaymentsForExpense);
                                                                                 setShowPaymentPopup(true);
                                                                             }}
                                                                             className="bg-green-500 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-green-600 transition-colors text-xs"
@@ -2507,36 +2514,247 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             )}
             {showPaymentPopup && (
                 <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-                    <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
+                    <div className="bg-white text-left rounded-xl  p-6 w-[700px] h-[720px] overflow-y-auto">
                         <h3 className="text-lg font-semibold mb-4 text-center">Add Payment</h3>
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>
-                            <select
-                                value={paymentPopupData.paymentMode}
-                                onChange={(e) => setPaymentPopupData(prev => ({ ...prev, paymentMode: e.target.value }))}
-                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                            >
-                                <option value="">Select Payment Mode</option>
-                                <option value="Gpay">Gpay</option>
-                                <option value="PhonePe">PhonePe</option>
-                                <option value="Net Banking">Net Banking</option>
-                                <option value="Cheque">Cheque</option>
-                            </select>
+
+                        {/* Previous Payments Section */}
+                        {previousPayments.length > 0 && (
+                            <div>
+                                <h4 className="text-md font-medium text-gray-700 mb-3 ml-20">Previous Payments</h4>
+                                <div className="mb-6 justify-items-center">
+                                    <div className="space-y-4 max-h-64 overflow-y-auto">
+                                        {previousPayments.map((payment, index) => (
+                                            <div key={index} className="">
+                                                {/* First Row: Date, Amount, Mode */}
+                                                <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-4 mb-4">
+                                                    <div className="grid grid-cols-3 gap-4">
+                                                        {/* Date */}
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                                                            <input
+                                                                type="text"
+                                                                value={new Date(payment.date).toLocaleDateString('en-GB')}
+                                                                readOnly
+                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                            />
+                                                        </div>
+
+                                                        {/* Amount */}
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                                                            <input
+                                                                type="text"
+                                                                value={payment.amount.toLocaleString('en-IN')}
+                                                                readOnly
+                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                            />
+                                                        </div>
+
+                                                        {/* Mode */}
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Mode</label>
+                                                            <input
+                                                                type="text"
+                                                                value={payment.bill_payment_mode}
+                                                                readOnly
+                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Second Row: Transaction Number, Account Number, Cheque Fields */}
+                                                <div className="border-2 border-[#BF9853] border-opacity-25 rounded-lg p-4">
+                                                    <div className="space-y-4">
+                                                        {/* Cheque Fields Row (if cheque payment) */}
+                                                        {payment.bill_payment_mode === "Cheque" && (
+                                                            <div className="grid grid-cols-2 gap-4">
+                                                                {/* Cheque No */}
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={payment.cheque_number || ""}
+                                                                        readOnly
+                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                    />
+                                                                </div>
+                                                                {/* Cheque Date */}
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={payment.cheque_date ? new Date(payment.cheque_date).toLocaleDateString('en-GB') : ""}
+                                                                        readOnly
+                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        {/* Transaction Number and Account Number Row */}
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            {/* Transaction Number */}
+                                                            <div>
+                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={payment.transaction_number || ""}
+                                                                    readOnly
+                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                />
+                                                            </div>
+                                                            {/* Account Number */}
+                                                            <div>
+                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={payment.account_number || ""}
+                                                                    readOnly
+                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Payment Form */}
+                        <div className="space-y-4 mb-4 justify-items-center">
+                            {/* First Row: Date, Amount, Mode - with border */}
+                            <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-4">
+                                <div className="grid grid-cols-3 gap-4">
+                                    {/* Date */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                                        <div className="relative">
+                                            <input
+                                                type="date"
+                                                value={paymentPopupData.date}
+                                                onChange={(e) => setPaymentPopupData(prev => ({ ...prev, date: e.target.value }))}
+                                                readOnly
+                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Amount */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                                        <input
+                                            type="number"
+                                            value={paymentPopupData.amount}
+                                            onChange={(e) => setPaymentPopupData(prev => ({ ...prev, amount: e.target.value }))}
+                                            placeholder="Enter amount"
+                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none no-spinner"
+                                        />
+                                    </div>
+
+                                    {/* Mode */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Mode</label>
+                                        <select
+                                            value={paymentPopupData.paymentMode}
+                                            onChange={(e) => setPaymentPopupData(prev => ({ ...prev, paymentMode: e.target.value }))}
+                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                        >
+                                            <option value="">---Select---</option>
+                                            <option value="Gpay">Gpay</option>
+                                            <option value="PhonePe">PhonePe</option>
+                                            <option value="Net Banking">Net Banking</option>
+                                            <option value="Cheque">Cheque</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Second Row: Transaction Number, Account Number, Cheque Fields - with border */}
+                            <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-4">
+                                <div className="space-y-4">
+                                    {/* Cheque Fields Row (only for Cheque mode) */}
+                                    {paymentPopupData.paymentMode === "Cheque" && (
+                                        <div className="grid grid-cols-2 gap-4">
+                                            {/* Cheque No */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No</label>
+                                                <input
+                                                    type="text"
+                                                    value={paymentPopupData.chequeNo}
+                                                    onChange={(e) => setPaymentPopupData(prev => ({ ...prev, chequeNo: e.target.value }))}
+                                                    placeholder="Enter cheque number"
+                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                />
+                                            </div>
+
+                                            {/* Cheque Date */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date</label>
+                                                <input
+                                                    type="date"
+                                                    value={paymentPopupData.chequeDate}
+                                                    onChange={(e) => setPaymentPopupData(prev => ({ ...prev, chequeDate: e.target.value }))}
+                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                    {/* Transaction Number and Account Number Row */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {/* Transaction Number */}
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
+                                            <input
+                                                type="text"
+                                                value={paymentPopupData.transactionNumber}
+                                                onChange={(e) => setPaymentPopupData(prev => ({ ...prev, transactionNumber: e.target.value }))}
+                                                placeholder="Enter transaction number"
+                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                            />
+                                        </div>
+
+                                        {/* Account Number */}
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
+                                            <select
+                                                value={paymentPopupData.accountNumber}
+                                                onChange={(e) => setPaymentPopupData(prev => ({ ...prev, accountNumber: e.target.value }))}
+                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                            >
+                                                <option value="">Select Account</option>
+                                                <option value="2027887700014">2027887700014</option>
+                                                <option value="2027887700015">2027887700015</option>
+                                                <option value="2027887700016">2027887700016</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+
+                                </div>
+                            </div>
                         </div>
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
-                            <input
-                                type="number"
-                                value={paymentPopupData.amount}
-                                onChange={(e) => setPaymentPopupData(prev => ({ ...prev, amount: e.target.value }))}
-                                placeholder="Enter amount"
-                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none no-spinner"
-                            />
-                        </div>
-                        <div className="flex justify-end gap-3 mt-4">
+
+                        {/* Action Buttons */}
+                        <div className="flex justify-end gap-3 mt-6">
                             <button
-                                onClick={() => setShowPaymentPopup(false)}
-                                className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+                                onClick={() => {
+                                    setShowPaymentPopup(false);
+                                    setPaymentPopupData({
+                                        date: new Date().toISOString().split('T')[0],
+                                        amount: "",
+                                        paymentMode: "",
+                                        chequeNo: "",
+                                        chequeDate: "",
+                                        transactionNumber: "",
+                                        accountNumber: ""
+                                    });
+                                    setPreviousPayments([]);
+                                    setCurrentProjectAdvanceRow(null);
+                                }}
+                                className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg"
                             >
                                 Cancel
                             </button>
@@ -2544,23 +2762,10 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                 onClick={async () => {
                                     try {
                                         if (currentProjectAdvanceRow && paymentPopupData.paymentMode && paymentPopupData.amount) {
-                                            const paymentData = {
-                                                date: new Date().toISOString().split('T')[0],
-                                                created_at: new Date().toISOString(),
-                                                contractor_id: currentProjectAdvanceRow.contractor_id || null,
-                                                vendor_id: currentProjectAdvanceRow.vendor_id || null,
-                                                employee_id: currentProjectAdvanceRow.employee_id || null,
-                                                project_id: currentProjectAdvanceRow.project_id || null,
-                                                type: currentProjectAdvanceRow.type || null,
-                                                bill_payment_mode: paymentPopupData.paymentMode,
-                                                amount: parseFloat(paymentPopupData.amount),
-                                                status: true,
-                                                weekly_number: currentWeekNumber,
-                                                weekly_payment_expense_id: currentProjectAdvanceRow.id
-                                            };
-                                            await saveWeeklyPaymentBill(paymentData);
+                                            let advancePortalId = null;
+                                            let staffAdvancePortalId = null;
 
-                                            // Also update advance_portal with payment mode if it's a Project Advance
+                                            // Handle Project Advance type first
                                             if (currentProjectAdvanceRow.type === "Project Advance" && currentProjectAdvanceRow.advance_portal_id) {
                                                 try {
                                                     // Get the last entry number from all advance portal records and add 1
@@ -2582,10 +2787,10 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                         return Math.floor(diff / oneWeek) + 1;
                                                     };
                                                     // Get description from portalDescriptions state
-                                                    const description = portalDescriptions[currentProjectAdvanceRow.advance_portal_id] || "";                                                    
+                                                    const description = portalDescriptions[currentProjectAdvanceRow.advance_portal_id] || "";
                                                     const advanceUpdateData = {
                                                         type: "Advance",
-                                                        date: new Date().toISOString().split('T')[0],
+                                                        date: paymentPopupData.date,
                                                         description: description,
                                                         bill_amount: 0,
                                                         amount: parseFloat(paymentPopupData.amount),
@@ -2597,7 +2802,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                         file_url: "",
                                                         transfer_site_id: 0,
                                                         refund_amount: 0,
-                                                        payment_mode: paymentPopupData.paymentMode
+                                                        payment_mode: paymentPopupData.paymentMode,
+                                                        not_allow_to_edit: true
                                                     };
                                                     const advanceResponse = await fetch(
                                                         "https://backendaab.in/aabuildersDash/api/advance_portal/save",
@@ -2610,7 +2816,9 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                     if (!advanceResponse.ok) {
                                                         console.error("Failed to update advance portal payment mode");
                                                     } else {
-                                                        console.log("Advance portal payment mode updated successfully");
+                                                        const advanceResponseData = await advanceResponse.json();
+                                                        advancePortalId = advanceResponseData.advancePortalId || advanceResponseData.advance_portal_id;
+                                                        console.log("Advance portal payment mode updated successfully, ID:", advancePortalId);
                                                     }
                                                 } catch (error) {
                                                     console.error("Error updating advance portal payment mode:", error);
@@ -2629,7 +2837,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             ? Math.max(...staffAdvanceData.map((item) => item.entry_no || 0))
                                                             : 0;
                                                     const nextEntryNo = maxEntryNo + 1;
-                                                    
+
                                                     // Get week number
                                                     const getWeekNumber = () => {
                                                         const now = new Date();
@@ -2639,9 +2847,9 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                         const oneWeek = 604800000; // ms in a week
                                                         return Math.floor(diff / oneWeek) + 1;
                                                     };
-                                                    
+
                                                     const staffAdvanceSaveData = {
-                                                        date: new Date(),
+                                                        date: paymentPopupData.date,
                                                         employee_id: currentProjectAdvanceRow.employee_id,
                                                         project_id: currentProjectAdvanceRow.project_id,
                                                         type: "Advance",
@@ -2653,9 +2861,10 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                         staff_refund_amount: 0.0,
                                                         description: "",
                                                         file_url: null,
-                                                        labour_id: 0
+                                                        labour_id: 0,
+                                                        not_allow_to_edit: true
                                                     };
-                                                    
+
                                                     const staffAdvanceResponse = await fetch(
                                                         "https://backendaab.in/aabuildersDash/api/staff-advance/save",
                                                         {
@@ -2664,34 +2873,65 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             body: JSON.stringify(staffAdvanceSaveData)
                                                         }
                                                     );
-                                                    
+
                                                     if (!staffAdvanceResponse.ok) {
                                                         console.error("Failed to save staff advance");
                                                     } else {
-                                                        console.log("Staff advance saved successfully");
+                                                        const staffAdvanceResponseData = await staffAdvanceResponse.json();
+                                                        staffAdvancePortalId = staffAdvanceResponseData.staffAdvancePortalId || staffAdvanceResponseData.staff_advance_portal_id;
+                                                        console.log("Staff advance saved successfully, ID:", staffAdvancePortalId);
                                                     }
                                                 } catch (error) {
                                                     console.error("Error saving staff advance:", error);
                                                 }
                                             }
 
+                                            // Now save the weekly payment bill with the portal IDs
+                                            const paymentData = {
+                                                date: paymentPopupData.date,
+                                                created_at: new Date().toISOString(),
+                                                contractor_id: currentProjectAdvanceRow.contractor_id || null,
+                                                vendor_id: currentProjectAdvanceRow.vendor_id || null,
+                                                employee_id: currentProjectAdvanceRow.employee_id || null,
+                                                project_id: currentProjectAdvanceRow.project_id || null,
+                                                type: currentProjectAdvanceRow.type || null,
+                                                bill_payment_mode: paymentPopupData.paymentMode,
+                                                amount: parseFloat(paymentPopupData.amount),
+                                                status: true,
+                                                weekly_number: currentWeekNumber,
+                                                weekly_payment_expense_id: currentProjectAdvanceRow.id,
+                                                advance_portal_id: advancePortalId,
+                                                staff_advance_portal_id: staffAdvancePortalId,
+                                                cheque_number: paymentPopupData.chequeNo || null,
+                                                cheque_date: paymentPopupData.chequeDate || null,
+                                                transaction_number: paymentPopupData.transactionNumber || null,
+                                                account_number: paymentPopupData.accountNumber || null
+                                            };                
+                                            console.log("Saving payment data:", paymentData);
+                                            await saveWeeklyPaymentBill(paymentData);
                                             await fetchWeeklyPaymentBills();
-                                            
-                                            // Refresh the page after all operations are completed
-                                            window.location.reload();
                                         }
                                     } catch (error) {
                                         console.error("Error saving payment:", error);
                                     }
-                                    
+
                                     setShowPaymentPopup(false);
-                                    setPaymentPopupData({ paymentMode: "", amount: "" });
+                                    setPaymentPopupData({
+                                        date: new Date().toISOString().split('T')[0],
+                                        amount: "",
+                                        paymentMode: "",
+                                        chequeNo: "",
+                                        chequeDate: "",
+                                        transactionNumber: "",
+                                        accountNumber: ""
+                                    });
+                                    setPreviousPayments([]);
                                     setCurrentProjectAdvanceRow(null);
                                 }}
-                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                                className="px-4 py-2 bg-[#BF9853] text-white rounded-lg"
                                 disabled={!paymentPopupData.paymentMode || !paymentPopupData.amount}
                             >
-                                Save
+                                Submit
                             </button>
                         </div>
                     </div>

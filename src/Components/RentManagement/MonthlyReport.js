@@ -123,7 +123,7 @@ const MonthlyReport = () => {
     }, []);
     return (
         <div>
-            <div className="flex flex-col lg:flex-row ml-9 gap-10 mt-5">
+            <div className="flex flex-col lg:flex-row ml-9 gap-10 ">
                 <div className="bg-white rounded-lg shadow p-4 lg:w-[693px] h-[610px] space-y-2 overflow-auto">
                     {monthlyReportUrl.length > 0 ? (
                         <table className="table-auto w-full border-collapse">

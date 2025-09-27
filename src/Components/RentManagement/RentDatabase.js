@@ -699,7 +699,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
     return (
         <body className="bg-[#FAF6ED] ">
             <div>
-                <div className='md:mt-[-35px] mb-3 text-left md:text-right md:items-center items-start cursor-default flex justify-between max-w-screen-2xl table-auto min-w-full overflow-auto w-screen'>
+                <div className='md:mt-[-35px] mb-3 text-left max-w-[1850px] md:text-right md:items-center items-start cursor-default flex flex-col sm:flex-row justify-between table-auto  overflow-auto  gap-2 sm:gap-0'>
                     <div></div>
                     <div>
                         <span
@@ -717,7 +717,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                         <span className=' text-[#BF9853] mr-4 font-semibold hover:underline'>Print</span>
                     </div>
                 </div>
-                <div className="w-full max-w-[1860px] mx-auto p-4 bg-white">
+                <div className="w-full max-w-[1850px] ml-10 mr-10 p-4 bg-white">
                     <div className="flex justify-between  sm:flex-row sm:items-center sm:space-x-3">
                         <div className='flex gap-4'>
                             <button className='pl-2' onClick={() => setDbShowFilters(!dbShowFilters)}>

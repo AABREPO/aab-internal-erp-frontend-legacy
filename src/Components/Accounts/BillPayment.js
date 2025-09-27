@@ -20,16 +20,28 @@ const BillPayment = ({ username, userRoles = [] }) => {
     const [selectedEmployee, setSelectedEmployee] = useState(null);
     const [popup, setPopup] = useState({ show: false, message: "", type: "", dateStr: "" });
     const [deleteConfirm, setDeleteConfirm] = useState({ show: false, id: null, item: null });
+    // Payment popup states
+    const [showEditPaymentPopup, setShowEditPaymentPopup] = useState(false);
+    const [paymentPopupData, setPaymentPopupData] = useState({
+        date: new Date().toISOString().split('T')[0],
+        amount: "",
+        paymentMode: "",
+        chequeNo: "",
+        chequeDate: "",
+        transactionNumber: "",
+        accountNumber: ""
+    });
+    const [currentBillPaymentRow, setCurrentBillPaymentRow] = useState(null);
     // Filter state variables
     const [showFilters, setShowFilters] = useState(false);
     const [selectDate, setSelectDate] = useState('');
     const [selectContractororVendorName, setSelectContractororVendorName] = useState('');
     const [selectProjectName, setSelectProjectName] = useState('');
     const [selectType, setSelectType] = useState('');
-    // Sorting state
+    // Sorting state - default to ID descending (newest first)
     const [sortConfig, setSortConfig] = useState({
-        key: null,
-        direction: 'asc'
+        key: 'id',
+        direction: 'desc'
     });
     // Click and drag scrolling functionality
     const scrollRef = useRef(null);
@@ -103,7 +115,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
     // Fetch bill payments data
     const fetchBillPayments = useCallback(async () => {
         try {
-            const response = await fetch("http://localhost:8082/api/weekly-payment-bills/all", {
+            const response = await fetch("https://backendaab.in/aabuildersDash/api/weekly-payment-bills/all", {
                 method: "GET",
                 credentials: "include",
                 headers: {
@@ -112,9 +124,9 @@ const BillPayment = ({ username, userRoles = [] }) => {
             });
             if (response.ok) {
                 const data = await response.json();
-                // Filter only Bill type entries
-                const billData = data.filter(item => item.type === "Bill");
-                setBillPayments(data);
+                // Sort all entries by ID (newest first) - ID represents creation order
+                const sortedData = data.sort((a, b) => (b.id || 0) - (a.id || 0));
+                setBillPayments(sortedData);
             } else {
                 console.error("Failed to fetch bill payments");
             }
@@ -171,7 +183,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
     // Fetch employee options
     const fetchEmployeeOptions = useCallback(async () => {
         try {
-            const response = await fetch("http://localhost:8082/api/employee_details/getAll", {
+            const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
                 method: "GET",
                 credentials: "include",
                 headers: {
@@ -203,29 +215,85 @@ const BillPayment = ({ username, userRoles = [] }) => {
             });
             if (response.ok) {
                 const data = await response.json();
-                const options = data.map(project => ({
-                    value: project.siteName,
-                    label: project.siteName,
-                    id: project.id,
+                const formattedData = data.map(item => ({
+                    value: item.siteName,
+                    label: item.siteName,
+                    id: item.id,
+                    sNo: item.siteNo
                 }));
-                setSiteOptions(options);
+                const predefinedSiteOptions = [
+                    {
+                        value: "Mason Advance",
+                        label: "Mason Advance",
+                        id: 1,
+                        sNo: "1"
+                    },
+                    {
+                        value: "Material Advance",
+                        label: "Material Advance",
+                        id: 2,
+                        sNo: "2"
+                    },
+                    {
+                        value: "Weekly Advance",
+                        label: "Weekly Advance",
+                        id: 3,
+                        sNo: "3"
+                    },
+                    {
+                        value: "Excess Advance",
+                        label: "Excess Advance",
+                        id: 4,
+                        sNo: "4"
+                    },
+                    {
+                        value: "Material Rent",
+                        label: "Material Rent",
+                        id: 5,
+                        sNo: "5"
+                    },
+                    {
+                        value: "Subhash Kumar - Kunnur",
+                        label: "Subhash Kumar - Kunnur",
+                        id: 6,
+                        sNo: "6"
+                    },
+                    {
+                        value: "Summary Bill",
+                        label: "Summary Bill",
+                        id: 7,
+                        sNo: "7"
+                    },
+                    {
+                        value: "Daily Wage",
+                        label: "Daily Wage",
+                        id: 8,
+                        sNo: "8"
+                    },
+                    {
+                        value:"Rent Management Portal",
+                        label:"Rent Management Portal",
+                        id: 9,
+                        sNo: "9"
+                    }
+                ];
+                // Combine backend data with predefined options
+                const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
+                setSiteOptions(combinedSiteOptions);
             }
         } catch (error) {
             console.error("Error fetching project options:", error);
         }
     }, []);
-
-    // Delete bill payment function
     const handleDeleteBillPayment = async (id) => {
         try {
-            const response = await fetch(`http://localhost:8082/api/weekly-payment-bills/delete/${id}`, {
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-payment-bills/delete/${id}`, {
                 method: "DELETE",
                 credentials: "include",
                 headers: {
                     "Content-Type": "application/json",
                 },
             });
-            
             if (response.ok) {
                 setPopup({
                     show: true,
@@ -233,7 +301,6 @@ const BillPayment = ({ username, userRoles = [] }) => {
                     type: "success",
                     dateStr: ""
                 });
-                // Refresh the data
                 fetchBillPayments();
             } else {
                 setPopup({
@@ -253,8 +320,6 @@ const BillPayment = ({ username, userRoles = [] }) => {
             });
         }
     };
-
-    // Show delete confirmation
     const showDeleteConfirmation = (item) => {
         setDeleteConfirm({
             show: true,
@@ -262,21 +327,28 @@ const BillPayment = ({ username, userRoles = [] }) => {
             item: item
         });
     };
-
-    // Confirm delete
     const confirmDelete = () => {
         if (deleteConfirm.id) {
             handleDeleteBillPayment(deleteConfirm.id);
             setDeleteConfirm({ show: false, id: null, item: null });
         }
     };
-
-    // Cancel delete
     const cancelDelete = () => {
         setDeleteConfirm({ show: false, id: null, item: null });
     };
-
-    // Combine vendor and contractor options
+    const showPaymentPopupHandler = (item) => {
+        setCurrentBillPaymentRow(item);
+        setPaymentPopupData({
+            date: new Date().toISOString().split('T')[0],
+            amount: item.amount || "",
+            paymentMode: item.bill_payment_mode || "",
+            chequeNo: item.cheque_number || "",
+            chequeDate: item.cheque_date ? new Date(item.cheque_date).toISOString().split('T')[0] : "",
+            transactionNumber: item.transaction_number || "",
+            accountNumber: item.account_number || ""
+        });
+        setShowEditPaymentPopup(true);
+    };
     useEffect(() => {
         const combined = [
             ...vendorOptions.map(option => ({ ...option, category: 'Vendor' })),
@@ -285,7 +357,6 @@ const BillPayment = ({ username, userRoles = [] }) => {
         ];
         setCombinedOptions(combined);
     }, [vendorOptions, contractorOptions, employeeOptions]);
-    // Load data on component mount
     useEffect(() => {
         fetchBillPayments();
         fetchVendorOptions();
@@ -293,28 +364,37 @@ const BillPayment = ({ username, userRoles = [] }) => {
         fetchEmployeeOptions();
         fetchProjectOptions();
     }, [fetchBillPayments, fetchVendorOptions, fetchContractorOptions, fetchEmployeeOptions, fetchProjectOptions]);
-    // Helper functions to get names from IDs
     const getProjectName = (projectId) => {
         const project = siteOptions.find(option => option.id === projectId);
         return project ? project.label : '-';
     };
-
     const getVendorName = (vendorId) => {
         const vendor = vendorOptions.find(option => option.id === vendorId);
         return vendor ? vendor.label : '-';
     };
-
     const getContractorName = (contractorId) => {
         const contractor = contractorOptions.find(option => option.id === contractorId);
         return contractor ? contractor.label : '-';
     };
-
     const getEmployeeName = (employeeId) => {
         const employee = employeeOptions.find(option => option.id === employeeId);
         return employee ? employee.label : '-';
     };
+    const getPartyNameAndType = (item) => {
+        const contractorName = getContractorName(item.contractor_id);
+        const vendorName = getVendorName(item.vendor_id);
+        const employeeName = getEmployeeName(item.employee_id);
 
-    // Sorting function
+        if (contractorName !== '-') {
+            return { name: contractorName, type: 'Contractor' };
+        } else if (vendorName !== '-') {
+            return { name: vendorName, type: 'Vendor' };
+        } else if (employeeName !== '-') {
+            return { name: employeeName, type: 'Employee' };
+        } else {
+            return { name: '-', type: '-' };
+        }
+    };
     const handleSort = (key) => {
         let direction = 'asc';
         if (sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -322,7 +402,6 @@ const BillPayment = ({ username, userRoles = [] }) => {
         }
         setSortConfig({ key, direction });
     };
-    // Filter function
     const getFilteredData = () => {
         let filtered = billPayments;
         if (selectDate) {
@@ -333,12 +412,8 @@ const BillPayment = ({ username, userRoles = [] }) => {
         }
         if (selectContractororVendorName) {
             filtered = filtered.filter(item => {
-                const contractorName = getContractorName(item.contractor_id);
-                const vendorName = getVendorName(item.vendor_id);
-                const employeeName = getEmployeeName(item.employee_id);
-                return contractorName === selectContractororVendorName ||
-                       vendorName === selectContractororVendorName ||
-                       employeeName === selectContractororVendorName;
+                const partyData = getPartyNameAndType(item);
+                return partyData.name === selectContractororVendorName;
             });
         }
         if (selectProjectName) {
@@ -350,16 +425,21 @@ const BillPayment = ({ username, userRoles = [] }) => {
         if (selectType) {
             filtered = filtered.filter(item => item.type === selectType);
         }
-        // Apply sorting
         if (sortConfig.key) {
             filtered.sort((a, b) => {
                 let aVal, bVal;
-                
-                // Handle ID-based fields by converting to names for sorting
                 switch (sortConfig.key) {
                     case 'project_name':
                         aVal = getProjectName(a.project_id);
                         bVal = getProjectName(b.project_id);
+                        break;
+                    case 'party_name':
+                        aVal = getPartyNameAndType(a).name;
+                        bVal = getPartyNameAndType(b).name;
+                        break;
+                    case 'party_type':
+                        aVal = getPartyNameAndType(a).type;
+                        bVal = getPartyNameAndType(b).type;
                         break;
                     case 'contractor_name':
                         aVal = getContractorName(a.contractor_id);
@@ -373,11 +453,18 @@ const BillPayment = ({ username, userRoles = [] }) => {
                         aVal = getEmployeeName(a.employee_id);
                         bVal = getEmployeeName(b.employee_id);
                         break;
+                    case 'date':
+                        aVal = new Date(a.date);
+                        bVal = new Date(b.date);
+                        break;
+                    case 'id':
+                        aVal = a.id || 0;
+                        bVal = b.id || 0;
+                        break;
                     default:
                         aVal = a[sortConfig.key];
                         bVal = b[sortConfig.key];
                 }
-                
                 if (aVal < bVal) {
                     return sortConfig.direction === 'asc' ? -1 : 1;
                 }
@@ -390,332 +477,502 @@ const BillPayment = ({ username, userRoles = [] }) => {
         return filtered;
     };
     const filteredData = getFilteredData();
-    
-    // Calculate totals
-    const totalAmount = filteredData.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-    const totalPaid = filteredData.reduce((sum, item) => sum + (parseFloat(item.paid_amount) || 0), 0);
-    const totalPending = totalAmount - totalPaid;
+    const calculatePaymentTotals = () => {
+        let upiTotal = 0;
+        let netBankingTotal = 0;
+        let chequeTotal = 0;
+        filteredData.forEach(item => {
+            const amount = parseFloat(item.amount) || 0;
+            const paymentMode = (item.bill_payment_mode || '').toLowerCase();
 
+            if (paymentMode.includes('upi') || paymentMode.includes('gpay') || paymentMode.includes('phonepe') || paymentMode.includes('google pay')) {
+                upiTotal += amount;
+            } else if (paymentMode.includes('netbanking') || paymentMode.includes('net banking') || paymentMode.includes('bank transfer')) {
+                netBankingTotal += amount;
+            } else if (paymentMode.includes('cheque') || paymentMode.includes('check')) {
+                chequeTotal += amount;
+            }
+        });
+        return { upiTotal, netBankingTotal, chequeTotal };
+    };
+    const { upiTotal, netBankingTotal, chequeTotal } = calculatePaymentTotals();
     return (
-        <div className="bg-[#FAF6ED] min-h-screen">
-            <div className="p-6">
-                {/* Header */}
-                <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-gray-800 mb-2">Bill Payments</h1>
-                    <p className="text-gray-600">Manage and track bill payments</p>
-                </div>
-                {/* Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                    <div className="bg-white rounded-lg shadow-md p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-gray-600">Total Amount</p>
-                                <p className="text-2xl font-bold text-blue-600">₹{totalAmount.toLocaleString()}</p>
+        <body className="bg-[#FAF6ED]">
+            <div className="bg-white ml-10 mr-10 min-h-screen">
+                <div className="p-6">
+                    <div className="mb-6">
+                        <h1 className="text-3xl font-bold text-gray-800 mb-2">Bank Records</h1>
+                        <p className="text-gray-600">Manage and track all Bank records</p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                        <div className="bg-white rounded-lg shadow-md p-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-600">Total UPI Amount</p>
+                                    <p className="text-2xl font-bold text-blue-600">₹{upiTotal.toLocaleString()}</p>
+                                </div>
+                                <div className="bg-blue-100 p-3 rounded-full">
+                                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                                    </svg>
+                                </div>
                             </div>
-                            <div className="bg-blue-100 p-3 rounded-full">
-                                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                                </svg>
+                        </div>
+                        <div className="bg-white rounded-lg shadow-md p-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-600">Total NetBanking Amount</p>
+                                    <p className="text-2xl font-bold text-green-600">₹{netBankingTotal.toLocaleString()}</p>
+                                </div>
+                                <div className="bg-green-100 p-3 rounded-full">
+                                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-white rounded-lg shadow-md p-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-600">Total Cheque Amount</p>
+                                    <p className="text-2xl font-bold text-orange-600">₹{chequeTotal.toLocaleString()}</p>
+                                </div>
+                                <div className="bg-orange-100 p-3 rounded-full">
+                                    <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
                             </div>
                         </div>
                     </div>
-                    <div className="bg-white rounded-lg shadow-md p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-gray-600">Total Paid</p>
-                                <p className="text-2xl font-bold text-green-600">₹{totalPaid.toLocaleString()}</p>
-                            </div>
-                            <div className="bg-green-100 p-3 rounded-full">
-                                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
+                    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-gray-800">Filters</h3>
+                            <button
+                                onClick={() => setShowFilters(!showFilters)}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                                <img src={Filter} alt="Filter" className="w-4 h-4" />
+                                {showFilters ? 'Hide Filters' : 'Show Filters'}
+                            </button>
                         </div>
+                        {showFilters && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                                    <input
+                                        type="date"
+                                        value={selectDate}
+                                        onChange={(e) => setSelectDate(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Contractor/Vendor/Employee</label>
+                                    <Select
+                                        value={selectContractororVendorName ? { value: selectContractororVendorName, label: selectContractororVendorName } : null}
+                                        onChange={(option) => setSelectContractororVendorName(option ? option.value : '')}
+                                        options={combinedOptions}
+                                        placeholder="Select..."
+                                        isClearable
+                                        className="basic-single"
+                                        classNamePrefix="select"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Project Name</label>
+                                    <Select
+                                        value={selectProjectName ? { value: selectProjectName, label: selectProjectName } : null}
+                                        onChange={(option) => setSelectProjectName(option ? option.value : '')}
+                                        options={siteOptions}
+                                        placeholder="Select..."
+                                        isClearable
+                                        className="basic-single"
+                                        classNamePrefix="select"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
+                                    <input
+                                        type="text"
+                                        value={selectType}
+                                        onChange={(e) => setSelectType(e.target.value)}
+                                        placeholder="Enter type..."
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                </div>
+                            </div>
+                        )}
                     </div>
-                    <div className="bg-white rounded-lg shadow-md p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-gray-600">Pending Amount</p>
-                                <p className="text-2xl font-bold text-orange-600">₹{totalPending.toLocaleString()}</p>
-                            </div>
-                            <div className="bg-orange-100 p-3 rounded-full">
-                                <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
+                    <div className="bg-white rounded-lg p-4 shadow-md overflow-hidden">
+                        <div className="p-6 border-b border-gray-200">
+                            <h3 className="text-lg font-semibold text-gray-800">Bank Records</h3>
+                            <p className="text-sm text-gray-600 mt-1">Showing {filteredData.length} records</p>
                         </div>
-                    </div>
-                </div>
-                {/* Filters */}
-                <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-gray-800">Filters</h3>
-                        <button
-                            onClick={() => setShowFilters(!showFilters)}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        <div
+                            ref={scrollRef}
+                            className="overflow-y-auto overflow-x-hidden max-h-96 cursor-grab active:cursor-grabbing"
+                            onMouseDown={handleMouseDown}
+                            onMouseMove={handleMouseMove}
+                            onMouseUp={handleMouseUp}
+                            onMouseLeave={handleMouseUp}
                         >
-                            <img src={Filter} alt="Filter" className="w-4 h-4" />
-                            {showFilters ? 'Hide Filters' : 'Show Filters'}
-                        </button>
+                            <table className="w-full">
+                                <thead className="bg-gray-50 sticky top-0">
+                                    <tr>
+                                        <th
+                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                        >
+                                            S.NO
+                                        </th>
+                                        <th
+                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                            onClick={() => handleSort('date')}
+                                        >
+                                            DATE {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th
+                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                            onClick={() => handleSort('project_name')}
+                                        >
+                                            PROJECT {sortConfig.key === 'project_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th
+                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                            onClick={() => handleSort('party_name')}
+                                        >
+                                            PARTY NAME {sortConfig.key === 'party_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th
+                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                            onClick={() => handleSort('party_type')}
+                                        >
+                                            PARTY TYPE {sortConfig.key === 'party_type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th
+                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                            onClick={() => handleSort('type')}
+                                        >
+                                            TYPE {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th
+                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                            onClick={() => handleSort('amount')}
+                                        >
+                                            AMOUNT {sortConfig.key === 'amount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th
+                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                            onClick={() => handleSort('bill_payment_mode')}
+                                        >
+                                            PAYMENT MODE {sortConfig.key === 'bill_payment_mode' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            ACCOUNT NO
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            CHEQUE NO
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            CHEQUE DATE
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            ACTIONS
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {filteredData.map((item, index) => (
+                                        <tr key={index} className="hover:bg-gray-50">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {index + 1}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {new Date(item.date).toLocaleDateString()}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {getProjectName(item.project_id)}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {getPartyNameAndType(item).name}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                                    {getPartyNameAndType(item).type}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                                    {item.type}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                ₹{parseFloat(item.amount || 0).toLocaleString()}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {item.bill_payment_mode || '-'}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {item.account_number || '-'}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {item.cheque_number || '-'}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {item.cheque_date ? new Date(item.cheque_date).toLocaleDateString() : '-'}
+                                            </td>
+                                            <td className="">
+                                                <div className="flex">
+                                                    <button
+                                                        onClick={() => showPaymentPopupHandler(item)}
+                                                        className="inline-flex items-center text-sm font-medium rounded-md text-white  focus:outline-none mr-4"
+                                                    >
+                                                        <img src={Edit} alt="Edit" className="w-4 h-4" />
+                                                        Edit
+                                                    </button>
+                                                    <button
+                                                        onClick={() => showDeleteConfirmation(item)}
+                                                        className="inline-flex items-centert text-sm  font-medium rounded-md text-white focus:outline-none"
+                                                    >
+                                                        <img src={Delete} alt="Delete" className="w-4 h-4" />
+                                                        Delete
+                                                    </button>
+                                                    <button
+                                                        className="inline-flex items-center text-sm  font-medium rounded-md text-white focus:outline-none"
+                                                    >
+                                                        <img src={history} alt="Delete" className="w-4 h-4" />
+                                                        History
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                    {showFilters && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-                                <input
-                                    type="date"
-                                    value={selectDate}
-                                    onChange={(e) => setSelectDate(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Contractor/Vendor/Employee</label>
-                                <Select
-                                    value={selectContractororVendorName ? { value: selectContractororVendorName, label: selectContractororVendorName } : null}
-                                    onChange={(option) => setSelectContractororVendorName(option ? option.value : '')}
-                                    options={combinedOptions}
-                                    placeholder="Select..."
-                                    isClearable
-                                    className="basic-single"
-                                    classNamePrefix="select"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Project Name</label>
-                                <Select
-                                    value={selectProjectName ? { value: selectProjectName, label: selectProjectName } : null}
-                                    onChange={(option) => setSelectProjectName(option ? option.value : '')}
-                                    options={siteOptions}
-                                    placeholder="Select..."
-                                    isClearable
-                                    className="basic-single"
-                                    classNamePrefix="select"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
-                                <input
-                                    type="text"
-                                    value={selectType}
-                                    onChange={(e) => setSelectType(e.target.value)}
-                                    placeholder="Enter type..."
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
+                    {popup.show && (
+                        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                            <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
+                                <div className="text-center">
+                                    <div className={`mx-auto flex items-center justify-center h-12 w-12 rounded-full mb-4 ${popup.type === 'success' ? 'bg-green-100' : 'bg-red-100'
+                                        }`}>
+                                        {popup.type === 'success' ? (
+                                            <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        ) : (
+                                            <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        )}
+                                    </div>
+                                    <h3 className={`text-lg font-medium mb-2 ${popup.type === 'success' ? 'text-green-800' : 'text-red-800'
+                                        }`}>
+                                        {popup.type === 'success' ? 'Success' : 'Error'}
+                                    </h3>
+                                    <p className="text-gray-600 mb-4">{popup.message}</p>
+                                    <button
+                                        onClick={() => setPopup({ show: false, message: "", type: "", dateStr: "" })}
+                                        className={`w-full px-4 py-2 rounded-lg font-medium ${popup.type === 'success'
+                                            ? 'bg-green-600 text-white hover:bg-green-700'
+                                            : 'bg-red-600 text-white hover:bg-red-700'
+                                            }`}
+                                    >
+                                        OK
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
-                </div>
-                {/* Data Table */}
-                <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                    <div className="p-6 border-b border-gray-200">
-                        <h3 className="text-lg font-semibold text-gray-800">Bill Payment Records</h3>
-                        <p className="text-sm text-gray-600 mt-1">Showing {filteredData.length} records</p>
-                    </div>
-                    <div 
-                        ref={scrollRef}
-                        className="overflow-auto max-h-96 cursor-grab active:cursor-grabbing"
-                        onMouseDown={handleMouseDown}
-                        onMouseMove={handleMouseMove}
-                        onMouseUp={handleMouseUp}
-                        onMouseLeave={handleMouseUp}
-                    >
-                        <table className="w-full">
-                            <thead className="bg-gray-50 sticky top-0">
-                                <tr>
-                                    <th 
-                                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                        onClick={() => handleSort('date')}
-                                    >
-                                        Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                    </th>
-                                    <th 
-                                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                        onClick={() => handleSort('project_name')}
-                                    >
-                                        Project {sortConfig.key === 'project_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                    </th>
-                                    <th 
-                                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                        onClick={() => handleSort('contractor_name')}
-                                    >
-                                        Contractor {sortConfig.key === 'contractor_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                    </th>
-                                    <th 
-                                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                        onClick={() => handleSort('vendor_name')}
-                                    >
-                                        Vendor {sortConfig.key === 'vendor_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                    </th>
-                                    <th 
-                                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                        onClick={() => handleSort('employee_name')}
-                                    >
-                                        Employee {sortConfig.key === 'employee_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                    </th>
-                                    <th 
-                                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                        onClick={() => handleSort('type')}
-                                    >
-                                        Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                    </th>
-                                    <th 
-                                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                        onClick={() => handleSort('amount')}
-                                    >
-                                        Amount {sortConfig.key === 'amount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                    </th>
-                                    <th 
-                                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                        onClick={() => handleSort('paid_amount')}
-                                    >
-                                        Paid Amount {sortConfig.key === 'paid_amount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                    </th>
-                                    <th 
-                                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                        onClick={() => handleSort('bill_payment_mode')}
-                                    >
-                                        Payment Mode {sortConfig.key === 'bill_payment_mode' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Actions
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                                {filteredData.map((item, index) => (
-                                    <tr key={index} className="hover:bg-gray-50">
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {new Date(item.date).toLocaleDateString()}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {getProjectName(item.project_id)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {getContractorName(item.contractor_id)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {getVendorName(item.vendor_id)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {getEmployeeName(item.employee_id)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                                                {item.type}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            ₹{parseFloat(item.amount || 0).toLocaleString()}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            ₹{parseFloat(item.paid_amount || 0).toLocaleString()}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {item.bill_payment_mode || '-'}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            <button
-                                                onClick={() => showDeleteConfirmation(item)}
-                                                className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
-                                            >
-                                                <img src={Delete} alt="Delete" className="w-4 h-4 mr-1" />
-                                                Delete
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                {/* Popup for messages */}
-                {popup.show && (
-                    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-                        <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
-                            <div className="text-center">
-                                <div className={`mx-auto flex items-center justify-center h-12 w-12 rounded-full mb-4 ${
-                                    popup.type === 'success' ? 'bg-green-100' : 'bg-red-100'
-                                }`}>
-                                    {popup.type === 'success' ? (
-                                        <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                        </svg>
-                                    ) : (
+                    {deleteConfirm.show && (
+                        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                            <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
+                                <div className="text-center">
+                                    <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full mb-4 bg-red-100">
                                         <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                         </svg>
+                                    </div>
+                                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                        Confirm Delete
+                                    </h3>
+                                    <p className="text-gray-600 mb-4">
+                                        Are you sure you want to delete this bill payment? This action cannot be undone.
+                                    </p>
+                                    {deleteConfirm.item && (
+                                        <div className="bg-gray-50 rounded-lg p-3 mb-4 text-left">
+                                            <p className="text-sm text-gray-700">
+                                                <strong>Date:</strong> {new Date(deleteConfirm.item.date).toLocaleDateString()}
+                                            </p>
+                                            <p className="text-sm text-gray-700">
+                                                <strong>Amount:</strong> ₹{parseFloat(deleteConfirm.item.amount || 0).toLocaleString()}
+                                            </p>
+                                            <p className="text-sm text-gray-700">
+                                                <strong>Type:</strong> {deleteConfirm.item.type}
+                                            </p>
+                                        </div>
                                     )}
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={cancelDelete}
+                                            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={confirmDelete}
+                                            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
                                 </div>
-                                <h3 className={`text-lg font-medium mb-2 ${
-                                    popup.type === 'success' ? 'text-green-800' : 'text-red-800'
-                                }`}>
-                                    {popup.type === 'success' ? 'Success' : 'Error'}
-                                </h3>
-                                <p className="text-gray-600 mb-4">{popup.message}</p>
-                                <button
-                                    onClick={() => setPopup({ show: false, message: "", type: "", dateStr: "" })}
-                                    className={`w-full px-4 py-2 rounded-lg font-medium ${
-                                        popup.type === 'success' 
-                                            ? 'bg-green-600 text-white hover:bg-green-700' 
-                                            : 'bg-red-600 text-white hover:bg-red-700'
-                                    }`}
-                                >
-                                    OK
-                                </button>
                             </div>
                         </div>
-                    </div>
-                )}
-                {/* Delete Confirmation Dialog */}
-                {deleteConfirm.show && (
-                    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-                        <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
-                            <div className="text-center">
-                                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full mb-4 bg-red-100">
-                                    <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                </div>
-                                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                                    Confirm Delete
-                                </h3>
-                                <p className="text-gray-600 mb-4">
-                                    Are you sure you want to delete this bill payment? This action cannot be undone.
-                                </p>
-                                {deleteConfirm.item && (
-                                    <div className="bg-gray-50 rounded-lg p-3 mb-4 text-left">
-                                        <p className="text-sm text-gray-700">
-                                            <strong>Date:</strong> {new Date(deleteConfirm.item.date).toLocaleDateString()}
-                                        </p>
-                                        <p className="text-sm text-gray-700">
-                                            <strong>Amount:</strong> ₹{parseFloat(deleteConfirm.item.amount || 0).toLocaleString()}
-                                        </p>
-                                        <p className="text-sm text-gray-700">
-                                            <strong>Type:</strong> {deleteConfirm.item.type}
-                                        </p>
+                    )}
+                    {showEditPaymentPopup && (
+                        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                            <div className="bg-white text-left rounded-xl p-6 w-[700px] h-[720px] overflow-y-auto">
+                                <h3 className="text-lg font-semibold mb-4 text-center">Edit Payment</h3>
+                                <div className="space-y-4 mb-4 justify-items-center">
+                                    <div className="border-2 border-[#BF9853] border-opacity-25 rounded-lg p-4">
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-3 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                                                    <input
+                                                        type="date"
+                                                        value={paymentPopupData.date}
+                                                        onChange={(e) => setPaymentPopupData(prev => ({ ...prev, date: e.target.value }))}
+                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                                                    <input
+                                                        type="number"
+                                                        value={paymentPopupData.amount}
+                                                        onChange={(e) => setPaymentPopupData(prev => ({ ...prev, amount: e.target.value }))}
+                                                        placeholder="Enter amount"
+                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>
+                                                    <select
+                                                        value={paymentPopupData.paymentMode}
+                                                        onChange={(e) => setPaymentPopupData(prev => ({ ...prev, paymentMode: e.target.value }))}
+                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                    >
+                                                        <option value="">Select Payment Mode</option>
+                                                        <option value="UPI">UPI</option>
+                                                        <option value="Net Banking">Net Banking</option>
+                                                        <option value="Cheque">Cheque</option>
+                                                        <option value="Cash">Cash</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            {paymentPopupData.paymentMode === "Cheque" && (
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No</label>
+                                                        <input
+                                                            type="text"
+                                                            value={paymentPopupData.chequeNo}
+                                                            onChange={(e) => setPaymentPopupData(prev => ({ ...prev, chequeNo: e.target.value }))}
+                                                            placeholder="Enter cheque number"
+                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date</label>
+                                                        <input
+                                                            type="date"
+                                                            value={paymentPopupData.chequeDate}
+                                                            onChange={(e) => setPaymentPopupData(prev => ({ ...prev, chequeDate: e.target.value }))}
+                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
+                                                    <input
+                                                        type="text"
+                                                        value={paymentPopupData.transactionNumber}
+                                                        onChange={(e) => setPaymentPopupData(prev => ({ ...prev, transactionNumber: e.target.value }))}
+                                                        placeholder="Enter transaction number"
+                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
+                                                    <select
+                                                        value={paymentPopupData.accountNumber}
+                                                        onChange={(e) => setPaymentPopupData(prev => ({ ...prev, accountNumber: e.target.value }))}
+                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                    >
+                                                        <option value="">Select Account</option>
+                                                        <option value="2027887700014">2027887700014</option>
+                                                        <option value="2027887700015">2027887700015</option>
+                                                        <option value="2027887700016">2027887700016</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                )}
-                                <div className="flex gap-3">
+                                </div>
+                                <div className="flex justify-end gap-3 mt-6">
                                     <button
-                                        onClick={cancelDelete}
-                                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
+                                        onClick={() => {
+                                            setShowEditPaymentPopup(false);
+                                            setPaymentPopupData({
+                                                date: new Date().toISOString().split('T')[0],
+                                                amount: "",
+                                                paymentMode: "",
+                                                chequeNo: "",
+                                                chequeDate: "",
+                                                transactionNumber: "",
+                                                accountNumber: ""
+                                            });
+                                            setCurrentBillPaymentRow(null);
+                                        }}
+                                        className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg"
                                     >
                                         Cancel
                                     </button>
                                     <button
-                                        onClick={confirmDelete}
-                                        className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                                        onClick={() => {
+                                            console.log("Payment data to save:", {
+                                                ...paymentPopupData,
+                                                currentRow: currentBillPaymentRow
+                                            });
+                                            setShowEditPaymentPopup(false);
+                                            setPaymentPopupData({
+                                                date: new Date().toISOString().split('T')[0],
+                                                amount: "",
+                                                paymentMode: "",
+                                                chequeNo: "",
+                                                chequeDate: "",
+                                                transactionNumber: "",
+                                                accountNumber: ""
+                                            });
+                                            setCurrentBillPaymentRow(null);
+                                        }}
+                                        className="px-4 py-2 bg-[#BF9853] text-white rounded-lg"
+                                        disabled={!paymentPopupData.paymentMode || !paymentPopupData.amount}
                                     >
-                                        Delete
+                                        Save
                                     </button>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
-        </div>
+        </body>
     );
 };
 export default BillPayment;

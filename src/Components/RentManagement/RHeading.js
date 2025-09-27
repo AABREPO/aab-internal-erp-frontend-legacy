@@ -48,7 +48,6 @@ const RHeading = ({ username, userRoles = [] }) => {
 
   return (
     <div className="bg-[#FAF6ED]">
-      {/* Top Navigation Tabs */}
       <div className="topbar-title w-[350px] sm:w-[580px] lg:w-[1470px] overflow-x-auto no-scrollbar py-3">
         <h2
           className={`link whitespace-nowrap ${activeTab === 'form' ? 'active' : ''}`}
@@ -111,7 +110,6 @@ const RHeading = ({ username, userRoles = [] }) => {
           EB No
         </h2>
       </div>
-      {/* Dynamic Content Area */}
       <div className="content">{renderContent()}</div>
     </div>
   );

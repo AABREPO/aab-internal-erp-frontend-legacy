@@ -646,7 +646,7 @@ const Summary = () => {
 
 
   return (
-    <div className="flex justify-start p-10 ml-12 bg-[#FFFFFF] min-h-screen">
+    <div className="flex justify-start p-10 ml-12 mr-12 bg-[#FFFFFF] min-h-screen">
       <div className="lg:flex gap-10 ml-3">
         {/* Transaction Overview */}
         <div>

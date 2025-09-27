@@ -112,7 +112,6 @@ const InputData = ({ username, userRoles = [] }) => {
             advance: '',
             startingDate: '',
             shouldCollectAdvance: true,
-            shopClosureDate: '',
           }
         ]
       }
@@ -1711,6 +1710,7 @@ const InputData = ({ username, userRoles = [] }) => {
                               value: selectedShopNo,
                             },
                           });
+
                           handleShopChange(pIndex, sIndex, {
                             target: {
                               name: 'doorNo',
@@ -1959,12 +1959,12 @@ const InputData = ({ username, userRoles = [] }) => {
               </div>
               <h2 className="text-2xl font-bold">Property Details</h2>
               {editformData.property.map((property, pIndex) => (
-                <div key={pIndex} className="bg-gray-50 p-4 rounded-lg shadow-md mb-6 text-left w-[1150px]">
+                <div key={pIndex} className="bg-gray-50 p-4 rounded-lg shadow-md ml-[-90px] mb-6 text-left w-[1200px]">
                   <div>
                     <button
                       type="button"
                       onClick={() => removePropertyEdit(pIndex)} // ← attach function here
-                      className="ml-[950px] text-red-500 font-bold"
+                      className="ml-[1100px] text-red-500 font-bold"
                     >
                       ✕
                     </button>
@@ -2274,7 +2274,7 @@ const InputData = ({ username, userRoles = [] }) => {
                               },
                             });
                           }}
-                          className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
+                          className="border-2 border-[#BF9853] w-32 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
                           placeholder="Rent"
                         />
                         <input
@@ -2301,7 +2301,6 @@ const InputData = ({ username, userRoles = [] }) => {
                         className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
                         placeholder="Advance"
                       />
-                      <div className="relative flex">
                         <input
                           type="date"
                           name="startingDate"
@@ -2318,6 +2317,23 @@ const InputData = ({ username, userRoles = [] }) => {
                           className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
                           placeholder="Advance"
                         />
+                      <div className="relative flex">
+                        <input
+                          type="date"
+                          name="shopClosureDate"
+                          value={shop.shopClosureDate || ''}
+                          onChange={(e) => {
+                            const rawValue = e.target.value;
+                            handleShopeditChange(pIndex, sIndex, {
+                              target: {
+                                name: 'shopClosureDate',
+                                value: rawValue,
+                              },
+                            });
+                          }}
+                          className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
+                          placeholder="Closure Date"
+                        />
                         {property.shops.length > 1 && (
                           <button
                             type="button"
@@ -2328,22 +2344,6 @@ const InputData = ({ username, userRoles = [] }) => {
                           </button>
                         )}
                       </div>
-                      <input
-                        type="date"
-                        name="shopClosureDate"
-                        value={shop.shopClosureDate || ''}
-                        onChange={(e) => {
-                          const rawValue = e.target.value;
-                          handleShopeditChange(pIndex, sIndex, {
-                            target: {
-                              name: 'shopClosureDate',
-                              value: rawValue,
-                            },
-                          });
-                        }}
-                        className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
-                        placeholder="Closure Date"
-                      />
                     </div>
                   ))}
                   <button

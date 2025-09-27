@@ -79,7 +79,7 @@ const WHeading = ({ username, userRoles = [] }) => {
                     className={`link ${activeTab === 'billpayment' ? 'active' : ''}`}
                     onClick={() => setActiveTab('billpayment')}
                 >
-                    Bill Payment
+                    Bank Payment
                 </h2>
             </div>
             <div className="content">

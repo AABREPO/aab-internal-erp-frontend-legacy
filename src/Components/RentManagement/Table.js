@@ -532,26 +532,26 @@ const Table = () => {
     return (
         <body className="bg-[#FAF6ED] ">
             <div>
-                <div className='md:mt-[-35px] mb-3 text-left md:text-right md:items-center items-start cursor-default flex justify-between max-w-screen-2xl table-auto min-w-full overflow-auto w-screen'>
+                <div className='md:mt-[-35px] mb-3 text-left max-w-[1850px] md:text-right md:items-center items-start cursor-default flex flex-col sm:flex-row justify-between table-auto  overflow-auto  gap-2 sm:gap-0'>
                     <div></div>
-                    <div>
+                    <div className='flex gap-2 sm:gap-4'>
                         <span
-                            className='text-[#E4572E] mr-4 font-semibold hover:underline cursor-pointer'
+                            className='text-[#E4572E] font-semibold hover:underline cursor-pointer text-sm sm:text-base'
                             onClick={handleExportPDF}
                         >
                             Export pdf
                         </span>
                         <span
-                            className='text-[#007233] mr-4 font-semibold hover:underline cursor-pointer'
+                            className='text-[#007233] font-semibold hover:underline cursor-pointer text-sm sm:text-base'
                             onClick={handleExportExcel} >
                             Export XL
                         </span>
-                        <span className=' text-[#BF9853] mr-4 font-semibold hover:underline'>Print</span>
+                        <span className='text-[#BF9853] font-semibold hover:underline text-sm sm:text-base'>Print</span>
                     </div>
                 </div>
-                <div className="w-full max-w-[1860px] mx-auto p-4 bg-white">
-                    <div className="flex justify-between  sm:flex-row sm:items-center sm:space-x-3">
-                        <div className='flex gap-4'>
+                <div className="w-full max-w-[1850px] ml-10 mr-10 p-2 sm:p-4 bg-white">
+                    <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 lg:gap-0">
+                        <div className='flex flex-col sm:flex-row gap-4'>
                             <button className='pl-2' onClick={() => setShowFilters(!showFilters)}>
                                 <img
                                     src={Filter}
@@ -616,79 +616,78 @@ const Table = () => {
                                 </div>
                             )}
                         </div>
-                        <div>
+                        <div className='flex justify-center lg:justify-end'>
                             <button
                                 onClick={resetFilters}
-                                className='w-36 h-9 border border-[#BF9853] rounded-md font-semibold text-sm text-[#BF9853] flex items-center justify-center gap-2'
+                                className='w-full sm:w-36 h-9 border border-[#BF9853] rounded-md font-semibold text-sm text-[#BF9853] flex items-center justify-center gap-2'
                             >
                                 <img className='w-4 h-4' src={Reload} alt="Reload" />
                                 Reset Table
                             </button>
                         </div>
                     </div>
-                    <div className="[@media(min-width:1484px)]:w-[1424px] [@media(min-width:1584px)]:w-[1524px] [@media(min-width:1684px)]:w-[1624px]
-                    [@media(min-width:1784px)]:w-[1764px] [@media(min-width:1884px)]:w-[1828px] w-[430px] py-5 flex justify-between">
+                    <div className="w-full py-5">
                         <div
                             ref={scrollRef}
-                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[760px] overflow-x-auto select-none no-scrollbar"
+                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[400px] sm:h-[600px] lg:h-[760px] overflow-x-auto select-none no-scrollbar"
                             onMouseDown={handleMouseDown}
                             onMouseMove={handleMouseMove}
                             onMouseUp={handleMouseUp}
                             onMouseLeave={handleMouseUp}
                         >
-                            <table className="table-auto min-w-[1165px] w-screen border-collapse">
+                            <table className="table-auto min-w-[1165px] w-full border-collapse">
                                 <thead>
                                     <tr className="bg-[#FAF6ED] text-left">
                                         <th
-                                            className="px-4 py-2 font-bold cursor-pointer"
+                                            className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm"
                                             onClick={() => handleSort('shopNo')}
                                         >
                                             Shop No {sortField === 'shopNo' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
                                         <th
-                                            className="px-4 py-2 font-bold"
+                                            className="px-2 sm:px-4 py-2 font-bold text-xs sm:text-sm"
                                             onClick={() => handleSort('tenantName')}>
                                             Tenant Name {sortField === 'tenantName' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
-                                        <th className="px-4 py-2 font-bold">Amount</th>
+                                        <th className="px-2 sm:px-4 py-2 font-bold text-xs sm:text-sm">Amount</th>
                                         <th
-                                            className="px-4 py-2 font-bold cursor-pointer"
+                                            className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm"
                                             onClick={() => handleSort('paidOnDate')}
                                         >
                                             Paid on {sortField === 'paidOnDate' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
                                         <th
-                                            className="px-4 py-2 font-bold cursor-pointer"
+                                            className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm"
                                             onClick={() => handleSort('eno')}
                                         >
                                             E No {sortField === 'eno' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
 
                                         <th
-                                            className="px-4 py-2 font-bold cursor-pointer"
+                                            className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm"
                                             onClick={() => handleSort('forTheMonthOf')}
                                         >
                                             For the month of {sortField === 'forTheMonthOf' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
                                         <th
-                                            className="px-4 py-2 font-bold"
+                                            className="px-2 sm:px-4 py-2 font-bold text-xs sm:text-sm"
                                             onClick={() => handleSort('paymentMode')}
                                         >
                                             Payment mode {sortField === 'paymentMode' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
                                         <th
-                                            className="px-4 py-2 font-bold cursor-pointer"
+                                            className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm"
                                             onClick={() => handleSort('formType')}
                                         >
                                             Type {sortField === 'formType' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
-                                        <th className="px-1 py-2 font-bold">Print</th>
+                                        <th className="px-1 sm:px-2 py-2 font-bold text-xs sm:text-sm">Print</th>
                                     </tr>
                                     {showFilters && (
                                         <tr>
-                                            <th className="px-2">
+                                            <th className="px-1 sm:px-2">
                                                 <Select
-                                                    className="w-40 mt-3 mb-3"
+                                                    className="w-32 sm:w-40 mt-3 mb-3"
                                                     options={shopNoOption.map(type => ({ value: type, label: type }))}
                                                     value={shopNo ? { value: shopNo, label: shopNo } : null}
                                                     onChange={(selectedOption) => {
@@ -744,9 +743,9 @@ const Table = () => {
                                                     }}
                                                 />
                                             </th>
-                                            <th className="px-2">
+                                            <th className="px-1 sm:px-2">
                                                 <Select
-                                                    className="w-48 mt-3 mb-3"
+                                                    className="w-36 sm:w-48 mt-3 mb-3"
                                                     options={tenantNameOption.map(type => ({ value: type, label: type }))}
                                                     value={tenantName ? { value: tenantName, label: tenantName } : null}
                                                     onChange={(selectedOption) => {
@@ -803,18 +802,18 @@ const Table = () => {
                                                 />
                                             </th>
                                             <th></th>
-                                            <th className="px-2">
+                                            <th className="px-1 sm:px-2">
                                                 <input
                                                     type="date"
                                                     value={selectedDate}
                                                     onChange={(e) => setSelectedDate(e.target.value)}
-                                                    className="p-1 -ml-3 mt-3 mb-3 rounded-md bg-transparent w-32 border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
+                                                    className="p-1 -ml-2 sm:-ml-3 mt-3 mb-3 rounded-md bg-transparent w-24 sm:w-32 border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs sm:text-sm"
                                                     placeholder="Search Date..."
                                                 />
                                             </th>
-                                            <th>
+                                            <th className="px-1 sm:px-2">
                                                 <Select
-                                                    className="w-34 h-10 mt-3 mb-3"
+                                                    className="w-24 sm:w-34 h-10 mt-3 mb-3"
                                                     options={enoOption.map(type => ({ value: type, label: type }))}
                                                     value={selectedENo ? { value: selectedENo, label: selectedENo } : null}
                                                     onChange={(selectedOption) => {
@@ -870,9 +869,9 @@ const Table = () => {
                                                     }}
                                                 />
                                             </th>
-                                            <th>
+                                            <th className="px-1 sm:px-2">
                                                 <Select
-                                                    className="w-48 mt-3 mb-3"
+                                                    className="w-36 sm:w-48 mt-3 mb-3"
                                                     options={monthOptions.map(type => ({ value: type, label: type }))}
                                                     value={selectedRentMonth ? { value: selectedRentMonth, label: selectedRentMonth } : null}
                                                     onChange={(selectedOption) => {
@@ -928,9 +927,9 @@ const Table = () => {
                                                     }}
                                                 />
                                             </th>
-                                            <th className="px-2">
+                                            <th className="px-1 sm:px-2">
                                                 <Select
-                                                    className="w-48 mt-3 mb-3"
+                                                    className="w-36 sm:w-48 mt-3 mb-3"
                                                     options={paymentModeOption.map(type => ({ value: type, label: type }))}
                                                     value={paymentMode ? { value: paymentMode, label: paymentMode } : null}
                                                     onChange={(selectedOption) => {
@@ -986,9 +985,9 @@ const Table = () => {
                                                     }}
                                                 />
                                             </th>
-                                            <th className="px-2">
+                                            <th className="px-1 sm:px-2">
                                                 <Select
-                                                    className="w-44 mt-3 mb-3"
+                                                    className="w-32 sm:w-44 mt-3 mb-3"
                                                     options={formTypeOptions.map(type => ({ value: type, label: type }))}
                                                     value={formType ? { value: formType, label: formType } : null}
                                                     onChange={(selectedOption) => {
@@ -1052,9 +1051,9 @@ const Table = () => {
                                 <tbody>
                                     {sortedItems.map((rent, index) => (
                                         <tr key={rent.id} className="odd:bg-white even:bg-[#FAF6ED]">
-                                            <td className=" text-sm pl-2 text-left py-2 font-semibold">{rent.shopNo}</td>
-                                            <td className=" text-sm text-left px-1 font-semibold">{rent.tenantName}</td>
-                                            <td className={`text-sm text-left px-4 font-semibold ${rent.refundAmount ? 'text-red-500' : 'text-black'}`}>
+                                            <td className="text-xs sm:text-sm pl-1 sm:pl-2 text-left py-2 font-semibold">{rent.shopNo}</td>
+                                            <td className="text-xs sm:text-sm text-left px-1 font-semibold">{rent.tenantName}</td>
+                                            <td className={`text-xs sm:text-sm text-left px-2 sm:px-4 font-semibold ${rent.refundAmount ? 'text-red-500' : 'text-black'}`}>
                                                 {Number(rent.refundAmount || rent.amount) === 0
                                                     ? 'NIL'
                                                     : `₹${Number(rent.refundAmount || rent.amount).toLocaleString('en-US', {
@@ -1062,11 +1061,11 @@ const Table = () => {
                                                         maximumFractionDigits: 2,
                                                     })}`}
                                             </td>
-                                            <td className="text-sm text-left px-4 font-semibold">
+                                            <td className="text-xs sm:text-sm text-left px-2 sm:px-4 font-semibold">
                                                 {Number(rent.refundAmount || rent.amount) === 0 ? 'NIL' : formatDateOnly(rent.paidOnDate)}
                                             </td>
-                                            <td className=" text-sm text-left  px-1 font-semibold">{rent.eno}</td>
-                                            <td className=" text-sm text-left px-1 font-semibold">
+                                            <td className="text-xs sm:text-sm text-left px-1 font-semibold">{rent.eno}</td>
+                                            <td className="text-xs sm:text-sm text-left px-1 font-semibold">
                                                 {rent.forTheMonthOf
                                                     ? new Date(`${rent.forTheMonthOf}-01`).toLocaleString('default', {
                                                         month: 'long',
@@ -1074,11 +1073,11 @@ const Table = () => {
                                                     })
                                                     : ''}
                                             </td>
-                                            <td className=" text-sm text-left px-2 font-semibold">{rent.paymentMode}</td>
-                                            <td className=" text-sm text-left px-2 font-semibold">{rent.formType}</td>
-                                            <td className="text-sm text-left px-2  py-2 font-semibold">
+                                            <td className="text-xs sm:text-sm text-left px-1 sm:px-2 font-semibold">{rent.paymentMode}</td>
+                                            <td className="text-xs sm:text-sm text-left px-1 sm:px-2 font-semibold">{rent.formType}</td>
+                                            <td className="text-xs sm:text-sm text-left px-1 sm:px-2 py-2 font-semibold">
                                                 <button
-                                                    className="text-blue-600 underline"
+                                                    className="text-blue-600 underline text-xs sm:text-sm"
                                                     onClick={() => handlePrint(rent)}
                                                 >
                                                     Print

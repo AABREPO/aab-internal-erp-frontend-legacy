@@ -271,8 +271,8 @@ const BillPayment = ({ username, userRoles = [] }) => {
                         sNo: "8"
                     },
                     {
-                        value:"Rent Management Portal",
-                        label:"Rent Management Portal",
+                        value: "Rent Management Portal",
+                        label: "Rent Management Portal",
                         id: 9,
                         sNo: "9"
                     }
@@ -285,36 +285,112 @@ const BillPayment = ({ username, userRoles = [] }) => {
             console.error("Error fetching project options:", error);
         }
     }, []);
-    const handleDeleteBillPayment = async (id) => {
+    const handleDeleteBillPayment = async (item) => {
         try {
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-payment-bills/delete/${id}`, {
+            let successMessage = "Bill payment deleted successfully!";
+            let errorMessage = "Failed to delete bill payment. Please try again.";
+            let allOperationsSuccessful = true;
+
+            // First, always delete the bill payment record
+            const deleteResponse = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-payment-bills/delete/${item.id}`, {
                 method: "DELETE",
                 credentials: "include",
                 headers: {
                     "Content-Type": "application/json",
                 },
             });
-            if (response.ok) {
+
+            if (!deleteResponse.ok) {
+                allOperationsSuccessful = false;
+                errorMessage = "Failed to delete bill payment. Please try again.";
+            }
+
+            // Then, if the item has advance_portal_id, also clear the advance portal data
+            if (item.advance_portal_id) {
+                const clearResponse = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${item.advance_portal_id}?editedBy=${username}`, {
+                    method: "PUT",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        // Clear all fields except entry_no and timestamp
+                        project_id: null,
+                        contractor_id: null,
+                        vendor_id: null,
+                        employee_id: null,
+                        type: null,
+                        amount: null,
+                        bill_payment_mode: null,
+                        date: null,
+                        // Keep entry_no and timestamp unchanged
+                        entry_no: item.entry_no,
+                        timestamp: item.timestamp
+                    })
+                });
+
+                if (!clearResponse.ok) {
+                    allOperationsSuccessful = false;
+                    errorMessage = "Bill payment deleted but failed to clear advance portal data.";
+                } else {
+                    successMessage = "Bill payment deleted and advance portal data cleared successfully!";
+                }
+            }
+            // If the item has staff_advance_portal_id, also clear the staff advance data
+            else if (item.staff_advance_portal_id) {
+                const clearResponse = await fetch(`https://backendaab.in/aabuildersDash/api/staff-advance/${item.staff_advance_portal_id}?editedBy=${username}`, {
+                    method: "PUT",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        // Clear all fields except entry_no and timestamp
+                        project_id: null,
+                        contractor_id: null,
+                        vendor_id: null,
+                        employee_id: null,
+                        type: null,
+                        amount: null,
+                        bill_payment_mode: null,
+                        date: null,
+                        // Keep entry_no and timestamp unchanged
+                        entry_no: item.entry_no,
+                        timestamp: item.timestamp
+                    })
+                });
+
+                if (!clearResponse.ok) {
+                    allOperationsSuccessful = false;
+                    errorMessage = "Bill payment deleted but failed to clear staff advance data.";
+                } else {
+                    successMessage = "Bill payment deleted and staff advance data cleared successfully!";
+                }
+            }
+            if (allOperationsSuccessful) {
                 setPopup({
                     show: true,
-                    message: "Bill payment deleted successfully!",
+                    message: successMessage,
                     type: "success",
                     dateStr: ""
                 });
+                // Refresh the data
                 fetchBillPayments();
             } else {
                 setPopup({
                     show: true,
-                    message: "Failed to delete bill payment. Please try again.",
+                    message: errorMessage,
                     type: "error",
                     dateStr: ""
                 });
+                // Still refresh the data even if some operations failed
+                fetchBillPayments();
             }
         } catch (error) {
-            console.error("Error deleting bill payment:", error);
+            console.error("Error processing bill payment:", error);
             setPopup({
                 show: true,
-                message: "An error occurred while deleting the bill payment.",
+                message: "An error occurred while processing the request.",
                 type: "error",
                 dateStr: ""
             });
@@ -328,8 +404,8 @@ const BillPayment = ({ username, userRoles = [] }) => {
         });
     };
     const confirmDelete = () => {
-        if (deleteConfirm.id) {
-            handleDeleteBillPayment(deleteConfirm.id);
+        if (deleteConfirm.item) {
+            handleDeleteBillPayment(deleteConfirm.item);
             setDeleteConfirm({ show: false, id: null, item: null });
         }
     };
@@ -611,93 +687,93 @@ const BillPayment = ({ username, userRoles = [] }) => {
                         </div>
                         <div
                             ref={scrollRef}
-                            className="overflow-y-auto overflow-x-hidden max-h-96 cursor-grab active:cursor-grabbing"
+                            className="overflow-y-auto overflow-x-auto max-h-96 rounded-lg border-l-8 border-l-[#BF9853] no-scrollbar"
                             onMouseDown={handleMouseDown}
                             onMouseMove={handleMouseMove}
                             onMouseUp={handleMouseUp}
                             onMouseLeave={handleMouseUp}
                         >
-                            <table className="w-full">
-                                <thead className="bg-gray-50 sticky top-0">
+                            <table className="w-full min-w-max">
+                                <thead className="bg-[#FAF6ED] sticky text-sm top-0">
                                     <tr>
                                         <th
-                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                            className="px-6 py-3 text-left font-semibold  uppercase tracking-wider whitespace-nowrap min-w-[80px]"
                                         >
                                             S.NO
                                         </th>
                                         <th
-                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                            className="px-6 py-3 text-left font-semibold uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap min-w-[100px]"
                                             onClick={() => handleSort('date')}
                                         >
                                             DATE {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                         </th>
                                         <th
-                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                            className="px-6 py-3 text-left font-semibold uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap min-w-[200px]"
                                             onClick={() => handleSort('project_name')}
                                         >
                                             PROJECT {sortConfig.key === 'project_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                         </th>
                                         <th
-                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                            className="px-6 py-3 text-left font-semibold uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap min-w-[150px]"
                                             onClick={() => handleSort('party_name')}
                                         >
                                             PARTY NAME {sortConfig.key === 'party_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                         </th>
                                         <th
-                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                            className="px-6 py-3 text-left font-semibold uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap min-w-[120px]"
                                             onClick={() => handleSort('party_type')}
                                         >
                                             PARTY TYPE {sortConfig.key === 'party_type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                         </th>
                                         <th
-                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                            className="px-6 py-3 text-left font-semibold uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap min-w-[100px]"
                                             onClick={() => handleSort('type')}
                                         >
                                             TYPE {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                         </th>
                                         <th
-                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                            className="px-6 py-3 text-left font-semibold uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap min-w-[120px]"
                                             onClick={() => handleSort('amount')}
                                         >
                                             AMOUNT {sortConfig.key === 'amount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                         </th>
                                         <th
-                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                            className="px-6 py-3 text-left font-semibold uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap min-w-[140px]"
                                             onClick={() => handleSort('bill_payment_mode')}
                                         >
                                             PAYMENT MODE {sortConfig.key === 'bill_payment_mode' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <th className="px-6 py-3 text-left font-semibold uppercase tracking-wider whitespace-nowrap min-w-[140px]">
                                             ACCOUNT NO
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <th className="px-6 py-3 text-left font-semibold uppercase tracking-wider whitespace-nowrap min-w-[120px]">
                                             CHEQUE NO
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <th className="px-6 py-3 text-left font-semibold uppercase tracking-wider whitespace-nowrap min-w-[120px]">
                                             CHEQUE DATE
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <th className="px-6 py-3 text-left font-semibold uppercase tracking-wider whitespace-nowrap min-w-[180px]">
                                             ACTIONS
                                         </th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
                                     {filteredData.map((item, index) => (
-                                        <tr key={index} className="hover:bg-gray-50">
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        <tr key={index} className="hover:bg-gray-50 odd:bg-white even:bg-[#FAF6ED]">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                 {index + 1}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                 {new Date(item.date).toLocaleDateString()}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                 {getProjectName(item.project_id)}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                 {getPartyNameAndType(item).name}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                                <span className="inline-flex px-2 py-1 text-xs rounded-full">
                                                     {getPartyNameAndType(item).type}
                                                 </span>
                                             </td>
@@ -706,19 +782,19 @@ const BillPayment = ({ username, userRoles = [] }) => {
                                                     {item.type}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm ">
                                                 ₹{parseFloat(item.amount || 0).toLocaleString()}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm ">
                                                 {item.bill_payment_mode || '-'}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                 {item.account_number || '-'}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                 {item.cheque_number || '-'}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                 {item.cheque_date ? new Date(item.cheque_date).toLocaleDateString() : '-'}
                                             </td>
                                             <td className="">
@@ -798,7 +874,9 @@ const BillPayment = ({ username, userRoles = [] }) => {
                                         Confirm Delete
                                     </h3>
                                     <p className="text-gray-600 mb-4">
-                                        Are you sure you want to delete this bill payment? This action cannot be undone.
+                                        {deleteConfirm.item && (deleteConfirm.item.advance_portal_id || deleteConfirm.item.staff_advance_portal_id)
+                                            ? 'Are you sure you want to delete this bill payment? This will delete the record and also clear the corresponding advance portal data (preserving entry number and timestamp). This action cannot be undone.'
+                                            : 'Are you sure you want to delete this bill payment? This action cannot be undone.'}
                                     </p>
                                     {deleteConfirm.item && (
                                         <div className="bg-gray-50 rounded-lg p-3 mb-4 text-left">

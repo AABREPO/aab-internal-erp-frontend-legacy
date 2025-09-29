@@ -1041,7 +1041,7 @@ const Dashboard = () => {
                     onMouseLeave={handleMouseUp}
                 >
                     <table className="border-collapse w-full text-left min-w-[1165px]">
-                        <thead className="sticky top-0 z-20">
+                        <thead className="sticky top-0">
                             <tr className="bg-[#FAF6ED]">
                                 <th className="px-2 py-2 font-semibold cursor-pointer">S.No</th>
                                 <th

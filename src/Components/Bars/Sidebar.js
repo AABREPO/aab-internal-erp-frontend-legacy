@@ -292,6 +292,13 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
               }}>
               <p className="text-sm cursor-pointer"><li>Expense Dashboard</li></p>
             </Link>
+            <Link
+              to="/bankreconciliation"
+              className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Bank Reconciliation' ? 'text-red-500' : ''}`}
+              onClick={() => handleSubmenuItemClick('Bank Reconciliation')}
+            >
+              <p className="text-sm cursor-pointer"><li>Bank Reconciliation</li></p>
+            </Link>
           </div>
         )}
         <div
@@ -440,22 +447,22 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
         </div>
         {activeMenu === 'hr' && (
           <div className="ml-6">
-            <Link to="billView" className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'onboarding' ? 'text-red-500' : ''}`} 
+            <Link to="billView" className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'onboarding' ? 'text-red-500' : ''}`}
               onClick={() => handleSubmenuItemClick('onboarding')}>
               <p className="text-sm cursor-pointer"><li>Onboarding</li></p>
             </Link>
-            <Link to="/attendance" className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Attendance' ? 'text-red-500' : ''}`} 
+            <Link to="/attendance" className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Attendance' ? 'text-red-500' : ''}`}
               onClick={() => handleSubmenuItemClick('Attendance')}>
               <p className="text-sm cursor-pointer"><li>Attendance</li></p>
             </Link>
-            <Link to="/staffadvance/staffAdvance" className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Staff Advance' ? 'text-red-500' : ''}`} 
+            <Link to="/staffadvance/staffAdvance" className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Staff Advance' ? 'text-red-500' : ''}`}
               onClick={() => handleSubmenuItemClick('Staff Advance')}>
               <p className="text-sm cursor-pointer"><li>Staff Advance</li></p>
             </Link>
             <Link to={hasAccessToModel('Manage User') ? 'user_manage' : '#'}
               className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Manage User' ? 'text-red-500' : ''}`}
               onClick={(e) => {
-                if(!hasAccessToModel('Manage User')){
+                if (!hasAccessToModel('Manage User')) {
                   e.preventDefault();
                   alert("No permissions for this page");
                   return;
@@ -463,6 +470,23 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                 handleSubmenuItemClick('Manage User');
               }}>
               <p className="text-sm cursor-pointer"><li>Manage User</li></p>
+            </Link>
+          </div>
+        )}
+        <div
+          className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'masterdata' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+          onClick={() => handleMenuClick('masterdata')}
+        >
+          <p className="text-[12px] leading-[15px] font-medium text-base">Master Data</p>
+        </div>
+        {activeMenu === 'masterdata' && (
+          <div className="ml-6">
+            <Link
+              to="/master-data"
+              className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Master Data' ? 'text-red-500' : ''}`}
+              onClick={() => handleSubmenuItemClick('Master Data')}
+            >
+              <p className="text-sm cursor-pointer"><li>Master Data</li></p>
             </Link>
           </div>
         )}

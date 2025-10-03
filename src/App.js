@@ -11,7 +11,7 @@ import PHeading from './Components/PaintCalculation/PHeading';
 import RcHeading from './Components/RccCalculation/RcHeading';
 import BHeading from './Components/Bathfixing/BHeading';
 import SHeading from './Components/SwitchMatrix/SHeading';
-import WeeklyPaymentHeading from './Components/Accounts/WeeklyPaymentHeading';
+import WeeklyPaymentHeading from './Components/Cash Register/WeeklyPaymentHeading';
 import RHeading from './Components/RentManagement/RHeading';
 import MHeading from './Components/MasonaryCalculater/MHeading';
 import CHeading from './Components/CarpentryCalculation/CHeading';
@@ -26,6 +26,8 @@ import ClaimPaymentHeading from './Components/ClaimPayments/ClaimPaymentHeading'
 import StaffHeading from './Components/StaffAdvance/StaffHeading';
 import LoanPoratlHeading from './Components/LoanPortal/LoanPoratlHeading';
 import BillPaymentsTrackerHeading from './Components/BillPaymentsTracker/BillPaymentsTrackerHeading';
+import MasterData from './Components/MasterData/MasterData';
+import BankReconciliation from './Components/Bank Reconciliation/BankReconciliation .js';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -80,6 +82,8 @@ function App() {
             <Route path='/staffadvance/*' element={<StaffHeading username={user.username} userRoles={user?.userRoles || []}/>} />
             <Route path='/loan/*' element={<LoanPoratlHeading username={user.username} userRoles={user?.userRoles || []}/>} />
             <Route path='/tracker/*' element={<BillPaymentsTrackerHeading username={user.username} userRoles={user?.userRoles || []}/>} />
+            <Route path='/master-data' element={<MasterData username={user.username} userRoles={user?.userRoles || []}/>} />
+            <Route path="/bankreconciliation" element={<BankReconciliation username={user.username} userRoles={user?.userRoles || []} />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </div>

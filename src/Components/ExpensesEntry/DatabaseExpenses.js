@@ -614,7 +614,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
             expense.vendor,
             expense.contractor,
             expense.quantity,
-            `${Number(expense.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            `${Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
             expense.comments,
             expense.category,
             expense.accountType,
@@ -998,7 +998,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                             </th>
                                             <th></th>
                                             <th className="text-base text-left pl-2 font-bold">
-                                                ₹{Number(totalAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                ₹{Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </th>
                                             <th></th>
                                             <th className="px-2">
@@ -1166,7 +1166,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                             <td className=" text-sm text-left ">{expense.contractor}</td>
                                             <td className=" text-sm text-left ">{expense.quantity}</td>
                                             <td className="text-sm text-left pl-2 ">
-                                                ₹{Number(expense.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                ₹{Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </td>
                                             <td className=" text-sm text-left ">{expense.comments}</td>
                                             <td className=" text-sm text-left ">{expense.category}</td>

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import CreatableSelect from 'react-select/creatable';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 import Select from 'react-select';
 import add from '../Images/Right.svg'
 import delt from '../Images/Worng.svg';
@@ -40,14 +42,27 @@ const projectTypes = [
   { value: 'Industrial', label: 'Industrial' },
 ];
 function InvoiceTable() {
-  const [inputValues, setInputValues] = useState({});
-  const [selectedUnit, setSelectedUnit] = useState({});
   const [items, setItems] = useState([
     {
       description: 'Masonry Works',
       workType: 'Structural',
       subItems: [
-        { description: 'Cement Flooring-First Floor' },
+        {
+          description: 'Cement Flooring-First Floor',
+          sizeInput: '',
+          qty: '',
+          rate: '',
+          unit: '',
+          amount: '',
+          // Separate data for main row
+          mainRow: {
+            sizeInput: '',
+            qty: '',
+            rate: '',
+            unit: '',
+            amount: ''
+          }
+        },
       ],
     },
   ]);
@@ -57,165 +72,69 @@ function InvoiceTable() {
     updatedItems[itemIndex].subItems.splice(subItemIndex, 1);
     setItems(updatedItems);
   };
-  const handleRateChange = (itemIndex, subItemIndex, rate) => {
-    setItems((prevItems) => {
-      const updatedItems = [...prevItems];
-      const subItem = updatedItems[itemIndex].subItems[subItemIndex];
-
-      subItem.rate = rate;
-
-      if (subItem.qty) {
-        const qtyValue = parseFloat(subItem.qty) || 0; // Extract numerical qty value
-        subItem.amount = (qtyValue * rate).toFixed(2);
+  const handleInputChangeForRow = (e, itemIndex, subItemIndex, isMainRow = false) => {
+    const { value } = e.target;
+    const updatedItems = [...items];
+    const subItem = updatedItems[itemIndex].subItems[subItemIndex];
+    // Helper function to safely parse quantity by removing unit suffixes
+    const parseQty = (qtyStr) => {
+      if (!qtyStr) return 0;
+      const numStr = qtyStr.toString().replace(/[^\d.-]/g, '');
+      return parseFloat(numStr) || 0;
+    };
+    if (isMainRow) {
+      subItem.mainRow.sizeInput = value;
+      const selectedUnit = subItem.mainRow.unit?.value || 'SQFT';
+      if (selectedUnit === "SQFT" || selectedUnit === "M²") {
+        const area = calculateArea(value, selectedUnit);
+        subItem.mainRow.qty = area === 'Invalid size input' ? area : `${area} ${selectedUnit === "SQFT" ? "Sqft" : "m²"}`;
+      } else if (selectedUnit === "CFT" || selectedUnit === "M³" || selectedUnit === "Volume") {
+        const volume = calculateVolume(value, selectedUnit);
+        subItem.mainRow.qty = volume === 'Invalid size input' ? volume : `${volume} ${selectedUnit === "CFT" ? "Cubic Feet" : (selectedUnit === "M³" ? "m³" : "Volume")}`;
+      } else if (selectedUnit === "L") {
+        const liters = calculateLiters(value);
+        subItem.mainRow.qty = liters === 'Invalid size input' ? liters : `${liters} L`;
+      } else if (selectedUnit === "NOS" || selectedUnit === "L.S") {
+        subItem.mainRow.qty = "";
       } else {
-        subItem.amount = '';
+        subItem.mainRow.qty = "";
       }
 
-      return updatedItems;
-    });
-  };
-
-
-  const handleSizeChange = (itemIndex, subItemIndex, sizeInput) => {
-    setItems((prevItems) => {
-      const updatedItems = [...prevItems];
-      const subItem = updatedItems[itemIndex].subItems[subItemIndex];
-
+      if (subItem.mainRow.qty && subItem.mainRow.rate) {
+        const qtyValue = parseQty(subItem.mainRow.qty);
+        subItem.mainRow.amount = (qtyValue * subItem.mainRow.rate).toFixed(2);
+      } else {
+        subItem.mainRow.amount = '';
+      }
+    } else {
+      subItem.sizeInput = value;
       const selectedUnit = subItem.unit?.value || 'SQFT';
-      const xCount = (sizeInput.match(/x/g) || []).length;
-
-      if (sizeInput) {
-        // Calculate quantity based on size input and selected unit
-        if (xCount === 1 && selectedUnit === 'SQFT') {
-          const area = calculateArea(sizeInput);
-          subItem.qty = area === 'Invalid size input' ? area : `${area} Sqft`;
-        } else if ((xCount === 2 && selectedUnit === 'CFT') || (selectedUnit === 'L')) {
-          const volume = selectedUnit === 'L'
-            ? calculateLiters(sizeInput)
-            : calculateVolume(sizeInput);
-          subItem.qty = volume === 'Invalid size input'
-            ? volume
-            : `${volume} ${selectedUnit === 'L' ? 'L' : 'Cubic Feet'}`;
-        } else {
-          alert('Please select the correct unit !!!');
-          subItem.qty = '';
-        }
+      if (selectedUnit === "SQFT" || selectedUnit === "M²") {
+        const area = calculateArea(value, selectedUnit);
+        subItem.qty = area === 'Invalid size input' ? area : `${area} ${selectedUnit === "SQFT" ? "Sqft" : "m²"}`;
+      } else if (selectedUnit === "CFT" || selectedUnit === "M³" || selectedUnit === "Volume") {
+        const volume = calculateVolume(value, selectedUnit);
+        subItem.qty = volume === 'Invalid size input' ? volume : `${volume} ${selectedUnit === "CFT" ? "Cubic Feet" : (selectedUnit === "M³" ? "m³" : "Volume")}`;
+      } else if (selectedUnit === "L") {
+        const liters = calculateLiters(value);
+        console.log(liters);
+        subItem.qty = liters === 'Invalid size input' ? liters : `${liters} L`;
+      } else if (selectedUnit === "NOS" || selectedUnit === "L.S") {
+        subItem.qty = "1";
       } else {
-        subItem.qty = 'Please enter a valid size input.';
+        subItem.qty = "";
       }
 
-      // Calculate amount if rate is available
       if (subItem.qty && subItem.rate) {
-        const qtyValue = parseFloat(subItem.qty) || 0; // Extract numerical qty value
+        const qtyValue = parseQty(subItem.qty);
         subItem.amount = (qtyValue * subItem.rate).toFixed(2);
       } else {
         subItem.amount = '';
       }
-
-      return updatedItems;
-    });
-  };
-
-
-
-
-  const getCalculatedQuantity = (itemIndex, subItemIndex) => {
-    const subItem = items[itemIndex].subItems[subItemIndex];
-    // Assuming quantity is a direct reflection of size, otherwise adapt this logic
-    if (subItem.unit === "SQFT") {
-      return parseFloat(subItem.sizeInput || 0) * parseFloat(subItem.rate || 1);
-    }
-    return subItem.sizeInput || ""; // Fallback if size doesn't need calculation
-  };
-
-  const getFinalCalculation = (itemIndex, subItemIndex) => {
-    const size = inputValues[`${itemIndex}-${subItemIndex}`]?.size || '';
-    const rate = inputValues[`${itemIndex}-${subItemIndex}`]?.rate || '';
-    return size && rate ? size * rate : '';  // Only multiply if both size and rate are present
-  };
-
-  const handleInputChanges = (itemIndex, subItemIndex, value) => {
-    setInputValues(prev => ({
-      ...prev,
-      [`${itemIndex}-${subItemIndex}`]: value
-    }));
-  };
-
-  // Handling unit change in the 5th column
-  const handleUnitChange = (itemIndex, subItemIndex, selectedOption) => {
-    setSelectedUnit(prev => ({
-      ...prev,
-      [`${itemIndex}-${subItemIndex}`]: selectedOption
-    }));
-  };
-  const handleInputChange = (e, itemIndex, subItemIndex) => {
-    const { value } = e.target;
-    const updatedItems = [...items];
-    const subItem = updatedItems[itemIndex].subItems[subItemIndex];
-    subItem.sizeInput = value;
-    if (subItem.unit === "SQFT") {
-      const dimensions = value.split('x').map(Number);
-      if (dimensions.length === 2 && dimensions.every(Number.isFinite)) {
-        subItem.qty = dimensions[0] * dimensions[1]; // Assuming `L x W`
-      } else {
-        subItem.qty = "";
-      }
-    } else if (subItem.unit === "Value" || subItem.unit === "L.S.") {
-      subItem.qty = 1;
-    } else {
-      subItem.qty = "";
-    }
-    setItems(updatedItems);
-  };
-  const handleInputChangeForRow = (e, itemIndex, subItemIndex) => {
-    const { value } = e.target;
-    const updatedItems = [...items];
-    updatedItems[itemIndex].subItems[subItemIndex].sizeInput = value;
-    const subItem = updatedItems[itemIndex].subItems[subItemIndex];
-
-    if (subItem.unit === "SQFT") {
-      // Split input by '+' and initialize total quantity
-      const dimensionGroups = value.split('+').map(dim => dim.trim());
-      let totalQty = 0;
-      let valid = true;
-
-      console.log("Dimension Groups:", dimensionGroups); // Logging groups
-
-      for (let group of dimensionGroups) {
-        // Split each group by 'x', remove quotes, and parse as numbers
-        const dimensions = group.split('x').map(num => parseFloat(num.replace("'", "").trim()));
-
-        console.log("Parsed Dimensions for group", group, ":", dimensions); // Logging each parsed group
-
-        if (dimensions.length === 2 && dimensions.every(Number.isFinite)) {
-          totalQty += dimensions[0] * dimensions[1];
-        } else {
-          valid = false;
-          break;
-        }
-      }
-
-      // Only set the quantity if the input is valid
-      if (valid) {
-        subItem.qty = totalQty;
-        console.log("Calculated Total Qty:", totalQty); // Logging the calculated total
-      } else {
-        subItem.qty = "";
-        console.log("Invalid input detected. Qty set to empty."); // Logging invalid input
-      }
-    } else if (subItem.unit === "Value" || subItem.unit === "L.S.") {
-      subItem.qty = 1;
-      console.log("Unit is 'Value' or 'L.S.', setting qty to 1"); // Logging default quantity
-    } else {
-      subItem.qty = "";
-      console.log("Unit is neither SQFT nor 'Value'/'L.S.', qty set to empty."); // Logging unhandled unit
     }
 
     setItems(updatedItems);
   };
-
-
-
   const [amountPaid, setAmountPaid] = useState("");
   const [clientName, setClientName] = useState("");
   const [projectType, setProjectType] = useState("");
@@ -229,30 +148,31 @@ function InvoiceTable() {
       const numericPart = parseInt(lastInvoiceNumber.replace('INV', ''), 10) + 1;
       const newInvoiceNumber = `INV${numericPart}`;
       localStorage.setItem('lastInvoiceNumber', newInvoiceNumber);
-      setInvoiceNumber(prevNumber => prevNumber + 1);
+      setInvoiceNumber(newInvoiceNumber);
     };
     generateInvoiceNumber();
   }, []);
-  const getCalculatedValue = (itemIndex, subItemIndex) => {
-    const input = inputValues[`${itemIndex}-${subItemIndex}`] || '';
-    const unit = selectedUnit[`${itemIndex}-${subItemIndex}`]?.value;
-
-    if (unit === 'Area') {
-      return calculateArea(input);
-    } else if (unit === 'Volume') {
-      return calculateVolume(input);
-    } else if (unit === 'Liters') {
-      return calculateLiters(input);
-    }
-    return '';
-  };
   const handleAddItem = () => {
     setItems([
       ...items,
       {
         description: '',
         workType: '',
-        subItems: [{ description: '', qty: '', rate: '', unit: '', amount: '' }],
+        subItems: [{
+          description: '',
+          sizeInput: '',
+          qty: '',
+          rate: '',
+          unit: '',
+          amount: '',
+          mainRow: {
+            sizeInput: '',
+            qty: '',
+            rate: '',
+            unit: '',
+            amount: ''
+          }
+        }],
       },
     ]);
   };
@@ -265,10 +185,16 @@ function InvoiceTable() {
       rate: '',
       unit: '',
       amount: '',
+      mainRow: {
+        sizeInput: '',
+        qty: '',
+        rate: '',
+        unit: '',
+        amount: ''
+      }
     });
     setItems(updatedItems);
   };
-
   const handleDeleteSubItem = (itemIndex, subItemIndex) => {
     const updatedItems = [...items];
     updatedItems[itemIndex].subItems = updatedItems[itemIndex].subItems.filter(
@@ -277,11 +203,14 @@ function InvoiceTable() {
     setItems(updatedItems);
   };
   const totalAmount = items.reduce(
-    (total, item) => total + item.subItems.reduce((subTotal, subItem) => subTotal + Number(subItem.amount || 0), 0),
+    (total, item) => total + item.subItems.reduce((subTotal, subItem) => {
+      const subRowAmount = Number(subItem.amount || 0);
+      const mainRowAmount = Number(subItem.mainRow?.amount || 0);
+      return subTotal + subRowAmount + mainRowAmount;
+    }, 0),
     0
   );
   const amountDue = totalAmount - amountPaid;
-
   const convertToFeet = (dim) => {
     let feet = 0;
     let inches = 0;
@@ -300,120 +229,220 @@ function InvoiceTable() {
     return parseFloat(dim.trim());
   };
   // Function to calculate area in SQFT
-const calculateArea = (input) => {
-  input = input.replace(/''/g, '"');
-  const dimensionGroups = input.split('+').map(dim => dim.trim()); // Split by '+'
-  let totalArea = 0;
+  const calculateArea = (input, unit) => {
+    input = input.replace(/''/g, '"');
+    const dimensionGroups = input.split('+').map(dim => dim.trim());
+    let totalArea = 0;
+    // Helper to convert feet-inches format to feet (decimal)
+    const convertToFeet = (dim) => {
+      let feet = 0;
+      let inches = 0;
+      if (dim.includes("'") && dim.includes('"')) {
+        const parts = dim.split("'");
+        feet = parseFloat(parts[0].trim());
+        inches = parseFloat(parts[1].replace('"', '').trim());
+        return feet + (inches / 12);
+      } else if (dim.includes("'")) {
+        feet = parseFloat(dim.replace("'", '').trim());
+        return feet;
+      } else if (dim.includes('"')) {
+        inches = parseFloat(dim.replace('"', '').trim());
+        return inches / 12;
+      }
+      return parseFloat(dim.trim());
+    };
 
-  // Convert dimension string to feet
-  const convertToFeet = (dim) => {
-    let feet = 0;
-    let inches = 0;
-    if (dim.includes("'") && dim.includes('"')) {
-      const parts = dim.split("'"); // Separate feet and inches
-      feet = parseFloat(parts[0].trim());
-      inches = parseFloat(parts[1].replace('"', '').trim());
-      return feet + (inches / 12); // Convert inches to feet and add to feet
-    } else if (dim.includes("'")) {
-      feet = parseFloat(dim.replace("'", '').trim());
-      return feet;
-    } else if (dim.includes('"')) {
-      inches = parseFloat(dim.replace('"', '').trim());
-      return inches / 12; // Convert inches to feet
-    }
-    return parseFloat(dim.trim());
+    dimensionGroups.forEach(group => {
+      const arr = group.split('x').map(part => part.trim());
+      if (arr.length === 2) {
+        let length, width;
+        if (unit === "M²") {
+          length = parseFloat(arr[0]);
+          width = parseFloat(arr[1]);
+        } else { // default to SQFT
+          length = convertToFeet(arr[0]);
+          width = convertToFeet(arr[1]);
+        }
+        if (!isNaN(length) && !isNaN(width)) {
+          totalArea += length * width;
+        }
+      }
+    });
+
+    return totalArea.toFixed(2);
+  };
+  // Function to calculate volume in cubic feet
+  const calculateVolume = (input) => {
+    input = input.replace(/''/g, '"');
+    const dimensionGroups = input.split('+').map(dim => dim.trim());
+    let totalVolume = 0;
+
+    dimensionGroups.forEach(group => {
+      const arr = group.split('x').map(part => part.trim());
+      if (arr.length === 3) {
+        const length = convertToFeet(arr[0]);
+        const width = convertToFeet(arr[1]);
+        const height = convertToFeet(arr[2]);
+        if (!isNaN(length) && !isNaN(width) && !isNaN(height)) {
+          totalVolume += length * width * height;
+        }
+      }
+    });
+
+    return totalVolume.toFixed(2);
   };
 
-  dimensionGroups.forEach(group => {
-    const arr = group.split('x').map(part => part.trim());
-    if (arr.length === 2) {
-      const length = convertToFeet(arr[0]);
-      const width = convertToFeet(arr[1]);
-      if (!isNaN(length) && !isNaN(width)) {
-        totalArea += length * width;
+  // Function to calculate volume in liters (converting cubic feet to liters)
+  const calculateLiters = (input) => {
+    const volumeInCubicFeet = parseFloat(calculateVolume(input));
+    const volumeInLiters = volumeInCubicFeet * 28; // Conversion factor from cubic feet to liters
+    return volumeInLiters.toFixed(2);
+  };
+
+  // The handleSubItemChange function
+  const handleSubItemChange = (itemIndex, subItemIndex, field, value, isMainRow = false) => {
+    const updatedItems = [...items]; // Clone the items array
+    const subItem = updatedItems[itemIndex].subItems[subItemIndex];
+
+    if (isMainRow) {
+      // Handle main row changes
+      if (field === 'unit') {
+        subItem.mainRow.unit = value;
+        // Recalculate quantity when unit changes
+        if (subItem.mainRow.sizeInput) {
+          const selectedUnit = value?.value || 'SQFT';
+
+          if (selectedUnit === 'SQFT' || selectedUnit === 'M²') {
+            const area = calculateArea(subItem.sizeInput, selectedUnit);
+            subItem.qty = area === 'Invalid size input' ? area : `${area} ${selectedUnit === 'SQFT' ? 'Sqft' : 'm²'}`;
+          } else if (selectedUnit === 'CFT' || selectedUnit === 'M³' || selectedUnit === 'Volume') {
+            const volume = calculateVolume(subItem.sizeInput, selectedUnit);
+            subItem.qty = volume === 'Invalid size input' ? volume : `${volume} ${selectedUnit === 'CFT' ? 'Cubic Feet' : (selectedUnit === 'M³' ? 'm³' : 'Volume')}`;
+          } else if (selectedUnit === 'L') {
+            const liters = calculateLiters(subItem.sizeInput);
+            subItem.qty = liters === 'Invalid size input' ? liters : `${liters} L`;
+          } else if (selectedUnit === 'NOS' || selectedUnit === 'L.S') {
+            subItem.qty = '1';
+          } else {
+            subItem.qty = '';
+          }
+
+        }
+      } else if (field === 'rate') {
+        subItem.mainRow.rate = parseFloat(value) || 0;
+      } else if (field === 'amount') {
+        subItem.mainRow.amount = parseFloat(value) || 0;
       }
-    }
-  });
 
-  return totalArea.toFixed(2); // Return total area rounded to two decimals
-};
-
-// Function to calculate volume in cubic feet
-const calculateVolume = (input) => {
-  input = input.replace(/''/g, '"');
-  const dimensionGroups = input.split('+').map(dim => dim.trim());
-  let totalVolume = 0;
-
-  dimensionGroups.forEach(group => {
-    const arr = group.split('x').map(part => part.trim());
-    if (arr.length === 3) {
-      const length = convertToFeet(arr[0]);
-      const width = convertToFeet(arr[1]);
-      const height = convertToFeet(arr[2]);
-      if (!isNaN(length) && !isNaN(width) && !isNaN(height)) {
-        totalVolume += length * width * height;
+      // Calculate amount for main row
+      if (subItem.mainRow.qty && subItem.mainRow.rate) {
+        const qtyValue = parseFloat(subItem.mainRow.qty) || 0;
+        subItem.mainRow.amount = (qtyValue * subItem.mainRow.rate).toFixed(2);
+      } else {
+        subItem.mainRow.amount = '';
       }
-    }
-  });
-
-  return totalVolume.toFixed(2);
-};
-
-// Function to calculate volume in liters (converting cubic feet to liters)
-const calculateLiters = (input) => {
-  const volumeInCubicFeet = parseFloat(calculateVolume(input));
-  const volumeInLiters = volumeInCubicFeet * 28.3168; // Conversion factor from cubic feet to liters
-  return volumeInLiters.toFixed(2);
-};
-
-// The handleSubItemChange function
-const handleSubItemChange = (itemIndex, subItemIndex, field, value) => {
-  const updatedItems = [...items]; // Clone the items array
-  const subItem = updatedItems[itemIndex].subItems[subItemIndex];
-  
-  if (field === 'unit') {
-    subItem.unit = value; // Update unit
-  } else if (field === 'rate') {
-    subItem.rate = parseFloat(value) || 0;
-  } else if (field === 'amount') {
-    subItem.amount = parseFloat(value) || 0;
-  }
-  
-  const sizeInput = subItem.sizeInput;
-  const selectedUnit = subItem.unit?.value || 'SQFT';
-  
-  if (sizeInput) {
-    const xCount = (sizeInput.match(/x/g) || []).length;
-
-    if (selectedUnit === 'SQFT') {
-      const area = calculateArea(sizeInput);
-      subItem.qty = area === 'Invalid size input' ? area : `${area} Sqft`;
-    } else if (selectedUnit === 'CFT') {
-      const volume = calculateVolume(sizeInput);
-      subItem.qty = volume === 'Invalid size input' ? volume : `${volume} Cubic Feet`;
-    } else if (selectedUnit === 'L') {
-      const liters = calculateLiters(sizeInput);
-      subItem.qty = liters === 'Invalid size input' ? liters : `${liters} L`;
     } else {
-      alert('Please select the correct unit!');
-      subItem.qty = '';
+      // Handle sub row changes
+      if (field === 'unit') {
+        subItem.unit = value;
+        // Recalculate quantity when unit changes
+        if (subItem.sizeInput) {
+          const selectedUnit = value?.value || 'SQFT';
+
+          if (selectedUnit === 'SQFT' || selectedUnit === 'M²') {
+            const area = calculateArea(subItem.sizeInput, selectedUnit);
+            subItem.qty = area === 'Invalid size input' ? area : `${area} ${selectedUnit === 'SQFT' ? 'Sqft' : 'm²'}`;
+          } else if (selectedUnit === 'CFT' || selectedUnit === 'M³' || selectedUnit === 'Volume') {
+            const volume = calculateVolume(subItem.sizeInput, selectedUnit);
+            subItem.qty = volume === 'Invalid size input' ? volume : `${volume} ${selectedUnit === 'CFT' ? 'Cubic Feet' : (selectedUnit === 'M³' ? 'm³' : 'Volume')}`;
+          } else if (selectedUnit === 'L') {
+            const liters = calculateLiters(subItem.sizeInput);
+            subItem.qty = liters === 'Invalid size input' ? liters : `${liters} L`;
+          } else if (selectedUnit === 'NOS' || selectedUnit === 'L.S') {
+            subItem.qty = '1';
+          } else {
+            subItem.qty = '';
+          }
+
+        }
+      } else if (field === 'rate') {
+        subItem.rate = parseFloat(value) || 0;
+      } else if (field === 'amount') {
+        subItem.amount = parseFloat(value) || 0;
+      }
+      // Calculate amount for sub row
+      if (subItem.qty && subItem.rate) {
+        const qtyValue = parseFloat(subItem.qty) || 0;
+        subItem.amount = (qtyValue * subItem.rate).toFixed(2);
+      } else {
+        subItem.amount = '';
+      }
     }
-  } else {
-    subItem.qty = 'Please enter a valid size input.';
-  }
-
-  if (subItem.qty && subItem.rate) {
-    const qtyValue = parseFloat(subItem.qty) || 0; // Extract numerical qty value
-    subItem.amount = (qtyValue * subItem.rate).toFixed(2); // Calculate amount
-  } else {
-    subItem.amount = '';
-  }
-
-  setItems(updatedItems);
-};
-
+    setItems(updatedItems);
+  };
   let displayIndex = 1;
+  const generatePDF = () => {
+    const doc = new jsPDF();
+    const columns = ['Description of Work', 'Size', 'Qty', 'Rate', 'Unit', 'Amount'];
+    const rows = [];
 
+    let mainIndex = 1;
+
+    items.forEach(item => {
+      const mainDesc = typeof item.description === 'object'
+        ? (item.description.label || item.description.value || '')
+        : item.description || '';
+
+      rows.push([`${mainIndex}. ${mainDesc}`, '', '', '', '', '']);
+      mainIndex++;
+      item.subItems.forEach(sub => {
+        const subDesc = typeof sub.description === 'object'
+          ? (sub.description.label || sub.description.value || '')
+          : sub.description || '';
+        rows.push([
+          '    ' + subDesc,
+          sub.sizeInput || '',
+          sub.qty || '',
+          sub.rate || '',
+          sub.unit?.value || '',
+          sub.amount || '',
+        ]);
+      });
+    });
+    doc.autoTable({
+      startY: 22,
+      head: [columns],
+      body: rows,
+      theme: 'grid',
+      styles: {
+        fontSize: 10,
+        cellPadding: 2,
+        textColor: [0, 0, 0],
+        lineColor: [0, 0, 0],
+        lineWidth: 0.5,
+      },
+      headStyles: {
+        fillColor: [255, 255, 255],
+        textColor: [0, 0, 0],
+        fontStyle: 'bold',
+        lineWidth: 0.5,
+        lineColor: [0, 0, 0],
+      },
+    });
+    const total = items.reduce((sum, item) =>
+      sum + item.subItems.reduce((subSum, sub) => subSum + (parseFloat(sub.amount) || 0), 0), 0);
+    const paid = parseFloat(amountPaid) || 0;
+    const amountDue = total - paid;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const rightMargin = 14;
+    let y = doc.lastAutoTable.finalY + 10;
+    doc.setFontSize(12);
+    doc.text(`Total: ${total.toLocaleString()}`, pageWidth - rightMargin, y, { align: 'right' });
+    doc.text(`Amount Paid: ${paid.toLocaleString()}`, pageWidth - rightMargin, y + 8, { align: 'right' });
+    doc.text(`Amount Due: ${amountDue >= 0 ? amountDue.toLocaleString() : '0'}`, pageWidth - rightMargin, y + 16, { align: 'right' });
+
+    doc.save('invoice.pdf');
+  };
   return (
     <body className='bg-[#FAF6ED]'>
       <div className="mx-auto p-4 " >
@@ -421,16 +450,16 @@ const handleSubItemChange = (itemIndex, subItemIndex, field, value) => {
           <div className="flex ml-32 bg-white rounded-xl">
             <div className=" mt-5 ml-14 pr-4" style={{ width: "1050px" }}>
               <div className="rounded-lg border-l-8 border-l-[#BF9853] -ml-8">
-                <table className="w-full max-w-screen-2xl overflow-x-scroll table-auto  min-w-full mb-4 ">
-                  <thead className='odd:bg-white even:bg-orange-100"' style={{ marginLeft: '-100px' }}>
-                    <tr className="bg-[#FAF6ED] ">
-                      <th className=" p-2" style={{ textAlign: 'left' }}>Description of Work</th>
-                      <th className=" p-2" style={{ textAlign: 'left' }}>Size</th>
-                      <th className=" p-2" style={{ textAlign: 'left' }}>Qty</th>
-                      <th className=" p-2" style={{ textAlign: 'left' }}>Rate</th>
-                      <th className=" p-2 w-3" style={{ textAlign: 'left' }}>Unit</th>
-                      <th className=" p-2" style={{ textAlign: 'left' }}>Amount</th>
-                      <th className=" p-2" style={{ textAlign: 'left' }}>Delete</th>
+                <table className="w-full table-auto mb-4 border-collapse">
+                  <thead>
+                    <tr className="bg-[#FAF6ED]">
+                      <th className="p-2 text-left border-b border-gray-300">Description of Work</th>
+                      <th className="p-2 text-left border-b border-gray-300">Size</th>
+                      <th className="p-2 text-left border-b border-gray-300">Qty</th>
+                      <th className="p-2 text-left border-b border-gray-300">Rate</th>
+                      <th className="p-2 text-left border-b border-gray-300">Unit</th>
+                      <th className="p-2 text-left border-b border-gray-300">Amount</th>
+                      <th className="p-2 text-left border-b border-gray-300">Delete</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -438,94 +467,97 @@ const handleSubItemChange = (itemIndex, subItemIndex, field, value) => {
                       <React.Fragment key={itemIndex}>
                         {item.subItems.map((subItem, subItemIndex) => (
                           <>
+                            {/* First Row - Main Item Row */}
                             {subItemIndex === 0 && (
-                              <tr className="odd:bg-white even:bg-[#FAF6ED]">
-                                <td className="border-none p-2">
-                                  <div className="flex flex-col">
-                                    <div className="flex items-center mb-2">
-                                      <span >{displayIndex++}.</span>
-                                      <CreatableSelect
-                                        options={descriptions}
-                                        value={item.description || ''}
-                                        onChange={(value) => {
-                                          const updatedItems = [...items];
-                                          updatedItems[itemIndex].description = value || '';
-                                          setItems(updatedItems);
-                                        }}
-                                        className="w-52 font-semibold text-left"
-                                        styles={{
-                                          control: (base, state) => ({
-                                            ...base,
-                                            backgroundColor: 'transparent',
-                                            border: state.isFocused ? '1px solid ' : '1px solid transparent',
-                                            boxShadow: state.isFocused ? '0 0 0 1px ' : 'none',
-                                            '&:hover': {
-                                              border: '1px solid ',
-                                            },
-                                          }),
-                                          indicatorSeparator: () => ({
-                                            display: 'none',
-                                          }),
-                                          placeholder: (base) => ({
-                                            ...base,
-                                            color: '#888',
-                                            textAlign: 'left',
-                                          }),
-                                          singleValue: (base) => ({
-                                            ...base,
-                                            color: '#000',
-                                            textAlign: 'left',
-                                          }),
-                                          input: (base) => ({
-                                            ...base,
-                                            textAlign: 'left',
-                                          }),
-                                        }}
-                                      />
-                                    </div>
+                              <tr key={`main-${itemIndex}-${subItemIndex}`} className="odd:bg-white even:bg-[#FAF6ED] hover:bg-gray-50">
+                                <td className="p-2 border-b border-gray-200">
+                                  <div className="flex items-center mb-2">
+                                    <span className="mr-2 font-semibold">{displayIndex++}.</span>
+                                    <CreatableSelect
+                                      options={descriptions}
+                                      value={item.description || ''}
+                                      onChange={(value) => {
+                                        const updatedItems = [...items];
+                                        updatedItems[itemIndex].description = value || '';
+                                        setItems(updatedItems);
+                                      }}
+                                      className="w-52 font-semibold text-left"
+                                      styles={{
+                                        control: (base, state) => ({
+                                          ...base,
+                                          backgroundColor: 'transparent',
+                                          border: state.isFocused ? '1px solid #BF9853' : '1px solid transparent',
+                                          boxShadow: state.isFocused ? '0 0 0 1px #BF9853' : 'none',
+                                          '&:hover': {
+                                            border: '1px solid #BF9853',
+                                          },
+                                        }),
+                                        indicatorSeparator: () => ({
+                                          display: 'none',
+                                        }),
+                                        placeholder: (base) => ({
+                                          ...base,
+                                          color: '#888',
+                                          textAlign: 'left',
+                                        }),
+                                        singleValue: (base) => ({
+                                          ...base,
+                                          color: '#000',
+                                          textAlign: 'left',
+                                        }),
+                                        input: (base) => ({
+                                          ...base,
+                                          textAlign: 'left',
+                                        }),
+                                      }}
+                                    />
                                   </div>
                                 </td>
-                                <td className="border-none mt-0">
+                                <td className="p-2 border-b border-gray-200">
                                   <input
                                     type="text"
-                                    value={subItem.sizeInput || ''}
-                                    onChange={(e) => handleInputChangeForRow(e, itemIndex, subItemIndex)}
-                                    className="w-full border-transparent hover:border hover:border-gray-400 -ml-3"
-                                    style={{ width: '80px', height: '40px' }}
+                                    value={subItem.mainRow.sizeInput || ''}
+                                    onChange={(e) => handleInputChangeForRow(e, itemIndex, subItemIndex, true)}
+                                    className="w-full p-2 border border-gray-300 rounded hover:border-gray-400 focus:border-[#BF9853] focus:outline-none"
+                                    placeholder="e.g., 10x12"
                                   />
                                 </td>
-                                <td className="border-none p-2">
+                                <td className="p-2 border-b border-gray-200">
                                   <input
                                     type="text"
-                                    value={subItem.qty}
+                                    value={subItem.mainRow.qty}
                                     readOnly
-                                    className="w-full p-2 border-transparent hover:border hover:border-gray-400 bg-transparent"
+                                    className="w-full p-2 border border-gray-200 rounded bg-gray-50"
                                   />
                                 </td>
-                                <td className="border-none p-2">
+                                <td className="p-2 border-b border-gray-200">
                                   <input
                                     type="number"
-                                    value={subItem.rate}
+                                    value={subItem.mainRow.rate}
                                     onChange={(e) =>
-                                      handleSubItemChange(itemIndex, subItemIndex, 'rate', e.target.value)
+                                      handleSubItemChange(itemIndex, subItemIndex, 'rate', e.target.value, true)
                                     }
-                                    className="w-full h-10 border-transparent hover:border hover:border-gray-400"
+                                    className="w-full p-2 border border-gray-300 rounded hover:border-gray-400 focus:border-[#BF9853] focus:outline-none"
+                                    placeholder="0.00"
                                   />
                                 </td>
-                                <td className="border-none p-2">
+                                <td className="p-2 border-b border-gray-200">
                                   <Select
                                     options={units}
-                                    value={subItem.unit}
+                                    value={subItem.mainRow.unit}
                                     onChange={(value) =>
-                                      handleSubItemChange(itemIndex, subItemIndex, 'unit', value)
+                                      handleSubItemChange(itemIndex, subItemIndex, 'unit', value, true)
                                     }
                                     className="w-full"
                                     styles={{
-                                      control: (base) => ({
+                                      control: (base, state) => ({
                                         ...base,
                                         backgroundColor: 'transparent',
-                                        border: '',
-                                        boxShadow: '',
+                                        border: state.isFocused ? '1px solid #BF9853' : '1px solid #d1d5db',
+                                        boxShadow: state.isFocused ? '0 0 0 1px #BF9853' : 'none',
+                                        '&:hover': {
+                                          border: '1px solid #BF9853',
+                                        },
                                       }),
                                       dropdownIndicator: (base) => ({
                                         ...base,
@@ -545,46 +577,52 @@ const handleSubItemChange = (itemIndex, subItemIndex, field, value) => {
                                       }),
                                       input: (base) => ({
                                         ...base,
-                                        textAlign: 'left', // Align input text to the left
+                                        textAlign: 'left',
                                       }),
                                     }}
                                   />
                                 </td>
-                                <td className="border-none p-2">
+                                <td className="p-2 border-b border-gray-200">
                                   <input
                                     type="text"
-                                    value={subItem.amount?.value || subItem.amount || ""}
-                                    onChange={(e) =>
-                                      handleSubItemChange(itemIndex, subItemIndex, 'amount', e.target.value)
-                                    }
-                                    className="w-full p-2 border-transparent hover:border hover:border-gray-400"
+                                    value={subItem.mainRow.amount || ""}
+                                    readOnly
+                                    className="w-full p-2 border border-gray-200 rounded bg-gray-50 font-semibold"
                                   />
                                 </td>
-                                <td className="border-gray-300 p-2">
+                                <td className="p-2 border-b border-gray-200">
                                   <button
-                                    className="text-white font-bold py-1 px-2 rounded"
+                                    className="text-red-600 hover:text-red-800 font-bold py-1 px-2 rounded hover:bg-red-50"
                                     onClick={() => handleDeleteSubItem(itemIndex, subItemIndex)}
+                                    title="Delete row"
                                   >
-                                    <img className="w-3" src={delet} alt="delete"></img>
+                                    <img className="w-4 h-4" src={delet} alt="delete"></img>
                                   </button>
                                 </td>
                               </tr>
                             )}
-                            <tr className="odd:bg-white even:bg-[#FAF6ED]">
-                              <td>
+
+                            {/* Second Row - Sub Item Row */}
+                            <tr key={`sub-${itemIndex}-${subItemIndex}`} className="odd:bg-white even:bg-[#FAF6ED] hover:bg-gray-50">
+                              <td className="p-2 border-b border-gray-200">
                                 <div className="flex items-center space-x-2 gap-0 group">
                                   <CreatableSelect
                                     options={subItems}
-                                    value={subItem.subItems}
+                                    value={subItem.description || ''}
+                                    onChange={(value) => {
+                                      const updatedItems = [...items];
+                                      updatedItems[itemIndex].subItems[subItemIndex].description = value || '';
+                                      setItems(updatedItems);
+                                    }}
                                     className="w-96 ml-8 font-medium text-left"
                                     styles={{
                                       control: (base, state) => ({
                                         ...base,
                                         backgroundColor: 'transparent',
-                                        border: state.isFocused ? '1px solid ' : '1px solid transparent',
-                                        boxShadow: state.isFocused ? '0 0 0 1px ' : 'none',
+                                        border: state.isFocused ? '1px solid #BF9853' : '1px solid transparent',
+                                        boxShadow: state.isFocused ? '0 0 0 1px #BF9853' : 'none',
                                         '&:hover': {
-                                          border: '1px solid ',
+                                          border: '1px solid #BF9853',
                                         },
                                       }),
                                       indicatorSeparator: () => ({
@@ -603,8 +641,9 @@ const handleSubItemChange = (itemIndex, subItemIndex, field, value) => {
                                   />
                                   <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                                     <button
-                                      className=" font-normal rounded-full"
+                                      className="font-normal rounded-full hover:bg-gray-200 p-1"
                                       onClick={() => handleAddSubItem(itemIndex)}
+                                      title="Add sub-item"
                                     >
                                       <img
                                         src={add}
@@ -613,8 +652,9 @@ const handleSubItemChange = (itemIndex, subItemIndex, field, value) => {
                                       />
                                     </button>
                                     <button
-                                      className=" font-normal py-1 px-2 rounded-full"
+                                      className="font-normal py-1 px-2 rounded-full hover:bg-gray-200"
                                       onClick={() => handleRemoveSubItem(itemIndex, subItemIndex)}
+                                      title="Remove sub-item"
                                     >
                                       <img
                                         src={delt}
@@ -624,46 +664,56 @@ const handleSubItemChange = (itemIndex, subItemIndex, field, value) => {
                                     </button>
                                   </div>
                                 </div>
-
                               </td>
-                              <td>
+                              <td className="p-2 border-b border-gray-200">
                                 <input
                                   type="text"
-                                  value={inputValues['0-0']?.size || ''}
-                                  onChange={(e) => handleSizeChange(0, 0, e.target.value)}
-                                  className="w-full  bg-transparent border-transparent hover:border hover:border-gray-400"
-                                  style={{ height: '40px' }}
+                                  value={subItem.sizeInput || ''}
+                                  onChange={(e) => handleInputChangeForRow(e, itemIndex, subItemIndex)}
+                                  className="w-full p-2 border border-gray-300 rounded hover:border-gray-400 focus:border-[#BF9853] focus:outline-none"
+                                  placeholder="e.g., 10x12"
                                 />
                               </td>
-                              <td className="border-none p-2">
+                              <td className="p-2 border-b border-gray-200">
                                 <input
                                   type="text"
                                   value={subItem.qty}
                                   readOnly
-                                  className="w-full p-2 border-transparent hover:border hover:border-gray-400 bg-transparent"
-                                  style={{ height: '40px' }}
+                                  className="w-full p-2 border border-gray-200 rounded bg-gray-50"
                                 />
                               </td>
-                              <td>
+                              <td className="p-2 border-b border-gray-200">
                                 <input
                                   type="number"
-                                  value={inputValues['0-0']?.rate || ''}
-                                  onChange={(e) => handleRateChange(0, 0, e.target.value)}
-                                  className="w-full border-transparent hover:border hover:border-gray-400 bg-transparent"
-                                  style={{ height: '40px' }}
+                                  value={subItem.rate}
+                                  onChange={(e) =>
+                                    handleSubItemChange(itemIndex, subItemIndex, 'rate', e.target.value)
+                                  }
+                                  className="w-full p-2 border border-gray-300 rounded hover:border-gray-400 focus:border-[#BF9853] focus:outline-none"
+                                  placeholder="0.00"
                                 />
                               </td>
-                              <td className="border-none p-2">
+                              <td className="p-2 border-b border-gray-200">
                                 <Select
                                   options={units}
+                                  value={subItem.unit}
+                                  onChange={(value) =>
+                                    handleSubItemChange(itemIndex, subItemIndex, 'unit', value)
+                                  }
                                   className="w-full"
-                                  onChange={(selectedOption) => handleUnitChange(itemIndex, subItemIndex, selectedOption)}
                                   styles={{
-                                    control: (base) => ({
+                                    control: (base, state) => ({
                                       ...base,
                                       backgroundColor: 'transparent',
-                                      border: '',
-                                      boxShadow: '',
+                                      border: state.isFocused ? '1px solid #BF9853' : '1px solid #d1d5db',
+                                      boxShadow: state.isFocused ? '0 0 0 1px #BF9853' : 'none',
+                                      '&:hover': {
+                                        border: '1px solid #BF9853',
+                                      },
+                                    }),
+                                    dropdownIndicator: (base) => ({
+                                      ...base,
+                                      color: '#000',
                                     }),
                                     indicatorSeparator: () => ({
                                       display: 'none',
@@ -671,27 +721,37 @@ const handleSubItemChange = (itemIndex, subItemIndex, field, value) => {
                                     placeholder: (base) => ({
                                       ...base,
                                       color: '#888',
-                                      textAlign: 'left',
                                     }),
                                     singleValue: (base) => ({
                                       ...base,
                                       color: '#000',
+                                      textAlign: 'left',
+                                    }),
+                                    input: (base) => ({
+                                      ...base,
+                                      textAlign: 'left',
                                     }),
                                   }}
                                 />
                               </td>
-                              <td>
+                              <td className="p-2 border-b border-gray-200">
                                 <input
                                   type="text"
-                                  value={getFinalCalculation(0, 0)}
+                                  value={subItem.amount || ""}
                                   readOnly
-                                  className="w-full border-transparent hover:border hover:border-gray-400 bg-transparent"
-                                  style={{ height: '40px' }}
+                                  className="w-full p-2 border border-gray-200 rounded bg-gray-50 font-semibold"
                                 />
                               </td>
-                              <td></td>
+                              <td className="p-2 border-b border-gray-200">
+                                <button
+                                  className="text-red-600 hover:text-red-800 font-bold py-1 px-2 rounded hover:bg-red-50"
+                                  onClick={() => handleDeleteSubItem(itemIndex, subItemIndex)}
+                                  title="Delete row"
+                                >
+                                  <img className="w-4 h-4" src={delet} alt="delete"></img>
+                                </button>
+                              </td>
                             </tr>
-
                           </>
                         ))}
                       </React.Fragment>
@@ -845,7 +905,6 @@ const handleSubItemChange = (itemIndex, subItemIndex, field, value) => {
                       }),
                     }}
                   />
-
                 </div>
               </div>
               <div className="mb-4">
@@ -863,17 +922,16 @@ const handleSubItemChange = (itemIndex, subItemIndex, field, value) => {
                 <span className='-ml-32 '>{clientPhone}</span>
               </div>
             </div>
-            <div className='-ml-10'>
-              <button className="bg-green-700  text-white font-bold py-2 px-4 rounded ml-16 mt-5 block">
+            <div className='-ml-10 flex flex-col space-y-5'>
+              <button className="bg-green-700 text-white font-bold py-2 px-4 rounded ml-16 mt-5 block">
                 Download / Print
               </button>
-              <button className="bg-[#BF9853] text-white font-bold py-2 px-5 rounded -ml-[6.9rem] mt-5">
-                Make a Copy
+              <button onClick={generatePDF} className="bg-[#BF9853] text-white py-2 px-4 rounded ml-16 block">
+                Make A Copy
               </button>
-              <button className="bg-[#E4572E] text-white font-bold py-2 px-4 rounded ml-16 block mt-5 mb-5">
+              <button className="bg-[#E4572E] text-white font-bold py-2 px-4 rounded ml-16 block">
                 Save Online
               </button>
-
             </div>
           </div>
         </div>

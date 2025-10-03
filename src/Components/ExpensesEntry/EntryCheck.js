@@ -412,7 +412,7 @@ const EntryChecking = () => {
                             <label className="font-bold text-left">Amount:</label>
                             <div className="w-full h-11 p-2 mt-3 rounded-lg border-[4px] border-[#FAF6ED] text-left">
                                 {isAnyFilterSelected
-                                    ? `₹${Number(totalAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}`
+                                    ? `₹${Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}`
                                     : ''}
                             </div>
                         </div>
@@ -451,7 +451,7 @@ const EntryChecking = () => {
                                             <td className="px-2 text-left font-semibold">{expense.accountType}</td>
                                             <td className="px-2 text-left font-semibold">{expense.quantity}</td>
                                             <td className="text-sm text-left pl-2 font-semibold">
-                                                ₹{Number(expense.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                ₹{Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </td>
                                             <td className="px-2 text-left font-semibold">{expense.comments}</td>
                                             <td className="px-2 text-left font-semibold">{expense.category}</td>

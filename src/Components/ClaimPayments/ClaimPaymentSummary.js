@@ -11,12 +11,25 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
   const [siteOption, setSiteOption] = useState([]);
   const [selectedSite, setSelectedSite] = useState(null);
   const [claimDataList, setClaimDataList] = useState([]);
+  const [vendorOptions, setVendorOptions] = useState([]);
+  const [contractorOptions, setContractorOptions] = useState([]);
+  const [employeeOptions, setEmployeeOptions] = useState([]);
   const [mainMode, setMainMode] = useState('');
   const [receivedAmounts, setReceivedAmounts] = useState({});
+  const [discountAmounts, setDiscountAmounts] = useState({});
   const [actualAmount, setActualAmount] = useState(0);
   const [collectedAmount, setCollectedAmount] = useState(0);
   const [claimPaymentsData, setClaimPaymentsData] = useState([]);
   const [remainingAmount, setRemainingAmount] = useState(0);
+  const [paymentPopupData, setPaymentPopupData] = useState({
+    date: new Date().toISOString().split('T')[0],
+    amount: "",
+    paymentMode: "",
+    chequeNo: "",
+    chequeDate: "",
+    transactionNumber: "",
+    accountNumber: ""
+  });
   const [sortColumn, setSortColumn] = useState('');
   const [sortDirection, setSortDirection] = useState('asc');
   const [showFilters, setShowFilters] = useState(false);
@@ -24,6 +37,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
   const [filterProjectName, setFilterProjectName] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [discount, setDiscount] = useState(0);
 
   // Drag and scroll functionality
   const scrollRef = useRef(null);
@@ -47,7 +61,6 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
       .then((data) => {
         // Filter only items with accountType = 'Claim'
         const filteredData = data.filter(item => item.accountType === 'Claim');
-        console.log("Filtered data:", filteredData);
         setClaimDataList(filteredData);
       })
       .catch((err) => {
@@ -72,7 +85,8 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
         const formattedData = data.map(item => ({
           value: item.siteName,
           label: item.siteName,
-          sNo: item.siteNo
+          sNo: item.siteNo,
+          id: item.id
         }));
         setSiteOption(formattedData);
       } catch (error) {
@@ -81,34 +95,124 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
     };
     fetchSites();
   }, []);
+
+  // Fetch vendor options
+  useEffect(() => {
+    const fetchVendorNames = async () => {
+      try {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+        if (!response.ok) {
+          throw new Error("Network response was not ok: " + response.statusText);
+        }
+        const data = await response.json();
+        const formattedData = data.map(item => ({
+          value: item.vendorName,
+          label: item.vendorName,
+          id: item.id,
+          type: "Vendor",
+        }));
+        setVendorOptions(formattedData);
+      } catch (error) {
+        console.error("Fetch vendor error: ", error);
+      }
+    };
+    fetchVendorNames();
+  }, []);
+
+  // Fetch contractor options
+  useEffect(() => {
+    const fetchContractorNames = async () => {
+      try {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+        if (!response.ok) {
+          throw new Error("Network response was not ok: " + response.statusText);
+        }
+        const data = await response.json();
+        const formattedData = data.map(item => ({
+          value: item.contractorName,
+          label: item.contractorName,
+          id: item.id,
+          type: "Contractor",
+        }));
+        setContractorOptions(formattedData);
+      } catch (error) {
+        console.error("Fetch contractor error: ", error);
+      }
+    };
+    fetchContractorNames();
+  }, []);
+
+  useEffect(() => {
+    // Fetch employee details
+    const fetchEmployeeDetails = async () => {
+      try {
+        const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+        if (!response.ok) {
+          throw new Error("Network response was not ok: " + response.statusText);
+        }
+        const data = await response.json();
+        const formattedData = data.map(item => ({
+          value: item.employee_name,
+          label: item.employee_name,
+          id: item.id,
+          type: "Employee",
+        }));
+        setEmployeeOptions(formattedData);
+      } catch (error) {
+        console.error("Fetch error: ", error);
+      }
+    };
+    // Call employee fetch function
+    fetchEmployeeDetails();
+  }, []);
   const filteredData = selectedSite
     ? claimDataList.filter(item => item.siteName === selectedSite.value)
     : claimDataList;
   useEffect(() => {
     const fetchReceivedAmounts = async () => {
       const amounts = {};
-
+      const discounts = {};
       for (const row of filteredData) {
         try {
           const res = await fetch(`https://backendaab.in/aabuildersDash/api/claim_payments/get/${row.id}`);
           const payments = await res.json();
 
           const totalReceived = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+          const totalDiscount = payments.reduce((sum, payment) => sum + (payment.discount_amount || 0), 0);
+          
           amounts[row.id] = totalReceived;
+          discounts[row.id] = totalDiscount;
         } catch (error) {
           console.error(`Error fetching payments for row ${row.id}`, error);
           amounts[row.id] = 0;
+          discounts[row.id] = 0;
         }
       }
-
       setReceivedAmounts(amounts);
+      setDiscountAmounts(discounts);
     };
-
     if (filteredData.length > 0) {
       fetchReceivedAmounts();
     }
   }, [filteredData]);
-
   const customStyles = {
     control: (provided, state) => ({
       ...provided,
@@ -123,107 +227,155 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
   };
   useEffect(() => {
     if (selectedRow) {
-      // Use mainInputAmount if it exists (updated amount), otherwise use original amount
       const baseAmount = selectedRow.mainInputAmount !== undefined ? selectedRow.mainInputAmount : selectedRow.amount;
       setPopupAmount(baseAmount || "");
     }
   }, [selectedRow]);
-
   const getToday = () => {
     const today = new Date();
-    return today.toISOString().split("T")[0];  // "YYYY-MM-DD"
+    return today.toISOString().split("T")[0];
   };
-
   const handleOpenModal = async (row) => {
     setMainDate(getToday());
     setActualAmount(row.amount);
     setSelectedRow(row);
-
     try {
       const response = await fetch(`https://backendaab.in/aabuildersDash/api/claim_payments/get/${row.id}`);
       const claimPayments = await response.json();
-
       const totalReceived = claimPayments.reduce(
         (sum, payment) => sum + Number(payment.amount),
         0
       );
-
       const remaining = row.amount - totalReceived;
-
       setRemainingAmount(remaining > 0 ? remaining : 0);
-      setPopupAmount(remaining > 0 ? remaining : 0); // Prefill but editable
+      setPopupAmount(remaining > 0 ? remaining : 0);
       setClaimPaymentsData(claimPayments);
-      setMainMode(""); // no default
+      setMainMode("");
+      
+      // Check if there's a discount amount in the last payment
+      const lastPayment = claimPayments[claimPayments.length - 1];
+      const existingDiscount = lastPayment && lastPayment.discount_amount ? lastPayment.discount_amount : 0;
+      setDiscount(existingDiscount);
+
+      // Initialize payment popup data
+      setPaymentPopupData({
+        date: getToday(),
+        amount: remaining > 0 ? remaining : 0,
+        paymentMode: "",
+        chequeNo: "",
+        chequeDate: "",
+        transactionNumber: "",
+        accountNumber: ""
+      });
+
       setShowModal(true);
     } catch (error) {
       console.error("Error fetching claim payments:", error);
     }
   };
   const handleSavePayment = async () => {
-    if (!mainMode) {
+    if (!paymentPopupData.paymentMode) {
       alert("Please select a payment mode.");
       return;
     }
+    if (!paymentPopupData.amount) {
+      alert("Please enter an amount.");
+      return;
+    }
+
+    // Check if payment amount + discount doesn't exceed remaining amount
+    const totalPaymentWithDiscount = Number(paymentPopupData.amount) + (discount || 0);
+    if (totalPaymentWithDiscount > remainingAmount) {
+      alert(`Payment amount (${paymentPopupData.amount}) + Discount (${discount || 0}) = ${totalPaymentWithDiscount} cannot exceed remaining amount (${remainingAmount})`);
+      return;
+    }
+
     const newPayment = {
-      entered_by: username, // or from login context
+      entered_by: username,
       expenses_claim_id: selectedRow.expenses_claim_id ?? selectedRow.id,
-      payment_mode: mainMode,
-      date: mainDate,
-      amount: popupAmount,
+      payment_mode: paymentPopupData.paymentMode,
+      date: paymentPopupData.date,
+      amount: paymentPopupData.amount,
       cash_register_status: false,
+      discount_amount: discount || 0,
+      ...(paymentPopupData.paymentMode === "Cheque" && {
+        cheque_number: paymentPopupData.chequeNo,
+        cheque_date: paymentPopupData.chequeDate
+      }),
+      transaction_number: paymentPopupData.transactionNumber,
+      account_number: paymentPopupData.accountNumber
     };
 
     try {
+      // First save to claim_payments
       const response = await fetch("https://backendaab.in/aabuildersDash/api/claim_payments/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newPayment),
       });
-
-      if (response.ok) {
-        alert("Payment saved successfully!");
-        window.location.reload();
-        setShowModal(false);
-        // Optionally refresh table or data
-      } else {
+      if (!response.ok) {
         alert("Failed to save payment.");
+        return;
       }
+      const claimPaymentResult = await response.json();
+      if (["Gpay", "PhonePe", "Net Banking", "Cheque"].includes(paymentPopupData.paymentMode)) {
+        const weeklyPaymentBillPayload = {
+          date: paymentPopupData.date,
+          created_at: new Date().toISOString(),
+          contractor_id: selectedRow.contractor_id || getContractorId(selectedRow.contractorName) || getContractorId(selectedRow.contractor) || null,
+          vendor_id: selectedRow.vendor_id || getVendorId(selectedRow.vendorName) || getVendorId(selectedRow.vendor) || null,
+          employee_id: selectedRow.employee_id || getEmployeeId(selectedRow.employeeName) || getEmployeeId(selectedRow.employee) || getEmployeeId(selectedRow.labour) || getEmployeeId(selectedRow.labourName) || null,
+          project_id: selectedRow.project_id || getProjectId(selectedRow.siteName) || null,
+          type: selectedRow.type || "Claim",
+          bill_payment_mode: paymentPopupData.paymentMode,
+          amount: parseFloat(paymentPopupData.amount),
+          discount_amount: discount || 0,
+          status: true,
+          weekly_number: "",
+          weekly_payment_expense_id: null,
+          advance_portal_id: null,
+          staff_advance_portal_id: null,
+          claim_payment_id: claimPaymentResult.id || claimPaymentResult.claimPaymentsId,
+          cheque_number: paymentPopupData.chequeNo || null,
+          cheque_date: paymentPopupData.chequeDate || null,
+          transaction_number: paymentPopupData.transactionNumber || null,
+          account_number: paymentPopupData.accountNumber || null
+        };
+        const weeklyPaymentBillResponse = await axios.post(
+          "https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save",
+          weeklyPaymentBillPayload,
+          { headers: { "Content-Type": "application/json" } }
+        );
+        window.location.reload();
+        alert("Payment saved successfully and added to Weekly Payment Bills!");
+      } else {
+        alert("Payment saved successfully!");
+      }
+      setShowModal(false);
     } catch (error) {
       console.error("Error saving payment:", error);
       alert("Error occurred while saving payment.");
     }
   };
-
-  // Show all data instead of just unclaimed data
   const allData = filteredData;
-
-  // Apply filters to the data
   const filteredDataWithFilters = allData.filter((row) => {
-    // Date filter
     if (filterDate) {
       const [year, month, day] = filterDate.split("-");
       const formattedFilterDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
       const rowDate = formatDateOnly(row.date);
       if (rowDate !== formattedFilterDate) return false;
     }
-
-    // Project Name filter
     if (filterProjectName && row.siteName !== filterProjectName) return false;
-
-    // Category filter
     if (filterCategory && row.category !== filterCategory) return false;
-
-    // Status filter
     if (filterStatus) {
       const received = receivedAmounts[row.id] || 0;
       const isClaimed = received >= row.amount;
       const statusText = isClaimed ? 'Claimed' : 'Not Claimed';
       if (statusText !== filterStatus) return false;
     }
-
     return true;
   });
-
+  console.log(filteredDataWithFilters);
   // Sorting function
   const handleSort = (column) => {
     if (sortColumn === column) {
@@ -233,16 +385,13 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
       setSortDirection('asc');
     }
   };
-
   // Sort the data
   const sortedData = [...filteredDataWithFilters].sort((a, b) => {
     if (!sortColumn) return 0;
-    
     let aValue, bValue;
-    
     switch (sortColumn) {
       case 'sno':
-        return sortDirection === 'asc' ? 0 : 0; // S.No doesn't need sorting
+        return sortDirection === 'asc' ? 0 : 0;
       case 'date':
         aValue = new Date(a.date);
         bValue = new Date(b.date);
@@ -276,18 +425,15 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
       default:
         return 0;
     }
-    
     if (typeof aValue === 'string' && typeof bValue === 'string') {
-      return sortDirection === 'asc' 
+      return sortDirection === 'asc'
         ? aValue.localeCompare(bValue)
         : bValue.localeCompare(aValue);
     }
-    
     if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
     if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
     return 0;
   });
-
   const sortedSiteOptions = siteOption.sort((a, b) =>
     a.label.localeCompare(b.label)
   );
@@ -298,10 +444,9 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
     const year = date.getFullYear();
     return `${day}-${month}-${year}`;
   };
-
   const formatIndianCurrency = (amount) => {
     if (!amount || isNaN(amount)) return '₹0';
-    
+
     const numAmount = parseFloat(amount);
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -311,13 +456,37 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
     }).format(numAmount);
   };
 
+  // Helper functions to get vendor/contractor IDs
+  const getVendorId = (vendorName) => {
+    if (!vendorName) return null;
+    const vendor = vendorOptions.find(v => v.value === vendorName);
+    return vendor ? vendor.id : null;
+  };
+
+  const getContractorId = (contractorName) => {
+    if (!contractorName) return null;
+    const contractor = contractorOptions.find(c => c.value === contractorName);
+    return contractor ? contractor.id : null;
+  };
+
+  const getProjectId = (siteName) => {
+    if (!siteName) return null;
+    const site = siteOption.find(s => s.value === siteName);
+    return site ? site.id : null;
+  };
+
+  const getEmployeeId = (employeeName) => {
+    if (!employeeName) return null;
+    const employee = employeeOptions.find(e => e.value === employeeName);
+    return employee ? employee.id : null;
+  };
+
   const clearAllFilters = () => {
     setFilterDate('');
     setFilterProjectName('');
     setFilterCategory('');
     setFilterStatus('');
   };
-
   // Drag and scroll event handlers
   const handleMouseDown = (e) => {
     if (!scrollRef.current) return;
@@ -336,7 +505,6 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
     scrollRef.current.style.userSelect = 'none';
     cancelMomentum();
   };
-
   const handleMouseMove = (e) => {
     if (!isDragging.current || !scrollRef.current) return;
     const dx = e.clientX - start.current.x;
@@ -355,7 +523,6 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
       y: e.clientY,
     };
   };
-
   const handleMouseUp = () => {
     if (!isDragging.current || !scrollRef.current) return;
     isDragging.current = false;
@@ -363,14 +530,12 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
     scrollRef.current.style.userSelect = '';
     applyMomentum();
   };
-
   const cancelMomentum = () => {
     if (animationFrame.current) {
       cancelAnimationFrame(animationFrame.current);
       animationFrame.current = null;
     }
   };
-
   const applyMomentum = () => {
     if (!scrollRef.current) return;
     const friction = 0.95;
@@ -401,7 +566,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
               placeholder="Select a site..."
               isSearchable={true}
               value={selectedSite}
-              onChange={setSelectedSite} // local only — won't affect Advance Page
+              onChange={setSelectedSite}
               styles={customStyles}
               isClearable
               className="w-[380px] h-[45px] focus:outline-none"
@@ -411,18 +576,17 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
         <div className='w-[1700px] bg-white mt-5 p-5 ml-10'>
           <div className="flex justify-between items-center mb-3">
             <div className="flex items-center gap-2">
-              <button 
-                className='pl-2' 
+              <button
+                className='pl-2'
                 onClick={() => setShowFilters(!showFilters)}
               >
                 <img
-                src={Filter}
-                alt="Toggle Filter"
-                className="w-7 h-7 border border-[#BF9853] rounded-md ml-3"
-              />
+                  src={Filter}
+                  alt="Toggle Filter"
+                  className="w-7 h-7 border border-[#BF9853] rounded-md ml-3"
+                />
               </button>
             </div>
-            {/* Filter Chips */}
             {(filterDate || filterProjectName || filterCategory || filterStatus) && (
               <div className="flex flex-wrap gap-2 items-center">
                 {filterDate && (
@@ -463,397 +627,657 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
             )}
           </div>
           <div className="rounded-lg border-l-8 border-l-[#BF9853]">
-            <div
-              ref={scrollRef}
-              className='overflow-auto max-h-[600px] thin-scrollbar'
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
+            <div ref={scrollRef} className='overflow-auto max-h-[600px] thin-scrollbar' onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
             >
               <table className="w-full border rounded-lg overflow-hidden">
-              <thead className="bg-[#FAF6ED]">
-                <tr>
-                  <th className="px-4 py-2">S.No</th>
-                  <th 
-                    className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
-                    onClick={() => handleSort('date')}
-                  >
-                    Date {sortColumn === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th 
-                    className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
-                    onClick={() => handleSort('siteName')}
-                  >
-                    Project Name {sortColumn === 'siteName' && (sortDirection === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th 
-                    className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
-                    onClick={() => handleSort('amount')}
-                  >
-                    Amount {sortColumn === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th 
-                    className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
-                    onClick={() => handleSort('category')}
-                  >
-                    Category {sortColumn === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th 
-                    className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
-                    onClick={() => handleSort('comments')}
-                  >
-                    Reason {sortColumn === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th 
-                    className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
-                    onClick={() => handleSort('status')}
-                  >
-                    Status {sortColumn === 'status' && (sortDirection === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th 
-                    className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
-                    onClick={() => handleSort('eno')}
-                  >
-                    E.No {sortColumn === 'eno' && (sortDirection === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th className="px-4 py-2">Activity</th>
-                </tr>
-                {showFilters && (
-                  <tr className="bg-white border-b border-gray-200">
-                    <th className="pt-2 pb-2"></th>
-                    <th className="pt-2 pb-2">
-                      <input
-                        type="date"
-                        value={filterDate}
-                        onChange={(e) => setFilterDate(e.target.value)}
-                        className="p-1 rounded-md bg-transparent -ml-6 w-32 border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
-                        placeholder="Search Date..."
-                      />
-                    </th>
-                    <th className="pt-2 pb-2">
-                      <Select
-                        options={[...new Set(allData.map(item => item.siteName))].map(siteName => ({
-                          value: siteName,
-                          label: siteName
-                        }))}
-                        value={filterProjectName ? { value: filterProjectName, label: filterProjectName } : null}
-                        onChange={(opt) => setFilterProjectName(opt ? opt.value : "")}
-                        className="focus:outline-none text-xs"
-                        placeholder="Project Name..."
-                        isSearchable
-                        isClearable
-                        styles={{
-                          control: (provided, state) => ({
-                            ...provided,
-                            backgroundColor: 'transparent',
-                            borderWidth: '3px',
-                            borderColor: state.isFocused
-                              ? 'rgba(191, 152, 83, 0.2)'
-                              : 'rgba(191, 152, 83, 0.2)',
-                            borderRadius: '6px',
-                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                            '&:hover': {
-                              borderColor: 'rgba(191, 152, 83, 0.2)',
-                            },
-                          }),
-                          placeholder: (provided) => ({
-                            ...provided,
-                            color: '#999',
-                            textAlign: 'left',
-                          }),
-                          menu: (provided) => ({
-                            ...provided,
-                            zIndex: 9,
-                          }),
-                          option: (provided, state) => ({
-                            ...provided,
-                            textAlign: 'left',
-                            fontWeight: 'normal',
-                            fontSize: '15px',
-                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                            color: 'black',
-                          }),
-                          singleValue: (provided) => ({
-                            ...provided,
-                            textAlign: 'left',
-                            fontWeight: 'normal',
-                            color: 'black',
-                          }),
-                        }}
-                      />
-                    </th>
-                    <th className="pt-2 pb-2"></th>
-                    <th className="pt-2 pb-2">
-                      <select
-                        value={filterCategory}
-                        onChange={(e) => setFilterCategory(e.target.value)}
-                        className="p-1 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
-                        placeholder="Category..."
-                      >
-                        <option value=''>Select Category...</option>
-                        {[...new Set(allData.map(item => item.category))].map(category => (
-                          <option key={category} value={category}>{category}</option>
-                        ))}
-                      </select>
-                    </th>
-                    <th className="pt-2 pb-2"></th>
-                    <th className="pt-2 pb-2">
-                      <select
-                        value={filterStatus}
-                        onChange={(e) => setFilterStatus(e.target.value)}
-                        className="p-1 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
-                        placeholder="Status..."
-                      >
-                        <option value=''>Select Status...</option>
-                        <option value='Claimed'>Claimed</option>
-                        <option value='Not Claimed'>Not Claimed</option>
-                      </select>
-                    </th>
-                    <th className="pt-2 pb-2"></th>
-                    <th className="pt-2 pb-2"></th>
-                  </tr>
-                )}
-              </thead>
-              <tbody>
-                {sortedData.map((row, index) => (
-                  <tr key={index} className={`even:bg-[#FAF6ED] odd:bg-[#FFFFFF] font-bold text-[14px]`}>
-                    <td className="px-4 py-2">{index + 1}</td>
-                    <td className="px-4 py-2">{formatDateOnly(row.date)}</td>
-                    <td className="px-4 py-2">{row.siteName}</td>
-                    <td className="px-4 py-2">{formatIndianCurrency(row.amount)}</td>
-                    <td className="px-4 py-2">{row.category}</td>
-                    <td className="px-4 py-2">{row.comments}</td>
-                    <td
-                      className={`px-4 py-2 font-semibold ${(receivedAmounts[row.id] || 0) >= row.amount
-                        ? "text-[#007233]"
-                        : "text-[#E4572E]"
-                        }`}
+                <thead className="bg-[#FAF6ED]">
+                  <tr>
+                    <th className="px-4 py-2">S.No</th>
+                    <th
+                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      onClick={() => handleSort('date')}
                     >
-                      {(receivedAmounts[row.id] || 0) >= row.amount ? "Claimed" : "Not Claimed"}
-                    </td>
-                    <td className="px-4 py-2">{row.eno}</td>
-                    <td className="px-4 py-2">
-                      {(() => {
-                        const actualAmount = row.amount;
-                        const received = receivedAmounts[row.id] || 0;
-
-                        if (received === 0) {
-                          return (
-                            <button
-                              onClick={() => handleOpenModal(row)}
-                              className="border px-3 py-1 rounded-full bg-white hover:bg-gray-100"
-                            >
-                              To Receive
-                            </button>
-                          );
-                        } else if (received > 0 && received < actualAmount) {
-                          return (
-                            <span
-                              onClick={() => handleOpenModal(row)}
-                              className="px-3 py-1 rounded-full bg-[#FFD39E] text-black cursor-pointer"
-                            >
-                              Received
-                            </span>
-                          );
-                        } else if (received >= actualAmount) {
-                          return (
-                            <span
-                              onClick={() => handleOpenModal(row)}
-                              className="px-3 py-1 rounded-full bg-[#E2F9E1] text-green-700 cursor-pointer"
-                            >
-                              ✓ Received
-                            </span>
-                          );
-                        }
-                      })()}
-                    </td>
-
+                      Date {sortColumn === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th
+                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      onClick={() => handleSort('siteName')}
+                    >
+                      Project Name {sortColumn === 'siteName' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th
+                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      onClick={() => handleSort('partyName')}
+                    >
+                      Party Name {sortColumn === 'partyName' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th
+                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      onClick={() => handleSort('amount')}
+                    >
+                      Amount {sortColumn === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th
+                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      onClick={() => handleSort('category')}
+                    >
+                      Category {sortColumn === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th
+                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      onClick={() => handleSort('comments')}
+                    >
+                      Reason {sortColumn === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th
+                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      onClick={() => handleSort('status')}
+                    >
+                      Status {sortColumn === 'status' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th
+                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      onClick={() => handleSort('eno')}
+                    >
+                      E.No {sortColumn === 'eno' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th className="px-4 py-2">Activity</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                  {showFilters && (
+                    <tr className="bg-white border-b border-gray-200">
+                      <th className="pt-2 pb-2"></th>
+                      <th className="pt-2 pb-2">
+                        <input
+                          type="date"
+                          value={filterDate}
+                          onChange={(e) => setFilterDate(e.target.value)}
+                          className="p-1 rounded-md bg-transparent -ml-6 w-32 border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
+                          placeholder="Search Date..."
+                        />
+                      </th>
+                      <th className="pt-2 pb-2">
+                        <Select
+                          options={[...new Set(allData.map(item => item.siteName))].map(siteName => ({
+                            value: siteName,
+                            label: siteName
+                          }))}
+                          value={filterProjectName ? { value: filterProjectName, label: filterProjectName } : null}
+                          onChange={(opt) => setFilterProjectName(opt ? opt.value : "")}
+                          className="focus:outline-none text-xs"
+                          placeholder="Project Name..."
+                          isSearchable
+                          isClearable
+                          styles={{
+                            control: (provided, state) => ({
+                              ...provided,
+                              backgroundColor: 'transparent',
+                              borderWidth: '3px',
+                              borderColor: state.isFocused
+                                ? 'rgba(191, 152, 83, 0.2)'
+                                : 'rgba(191, 152, 83, 0.2)',
+                              borderRadius: '6px',
+                              boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                              '&:hover': {
+                                borderColor: 'rgba(191, 152, 83, 0.2)',
+                              },
+                            }),
+                            placeholder: (provided) => ({
+                              ...provided,
+                              color: '#999',
+                              textAlign: 'left',
+                            }),
+                            menu: (provided) => ({
+                              ...provided,
+                              zIndex: 9,
+                            }),
+                            option: (provided, state) => ({
+                              ...provided,
+                              textAlign: 'left',
+                              fontWeight: 'normal',
+                              fontSize: '15px',
+                              backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                              color: 'black',
+                            }),
+                            singleValue: (provided) => ({
+                              ...provided,
+                              textAlign: 'left',
+                              fontWeight: 'normal',
+                              color: 'black',
+                            }),
+                          }}
+                        />
+                      </th>
+                      <th className="pt-2 pb-2"></th>
+                      <th className="pt-2 pb-2">
+                        <select
+                          value={filterCategory}
+                          onChange={(e) => setFilterCategory(e.target.value)}
+                          className="p-1 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                          placeholder="Category..."
+                        >
+                          <option value=''>Select Category...</option>
+                          {[...new Set(allData.map(item => item.category))].map(category => (
+                            <option key={category} value={category}>{category}</option>
+                          ))}
+                        </select>
+                      </th>
+                      <th className="pt-2 pb-2"></th>
+                      <th className="pt-2 pb-2">
+                        <select
+                          value={filterStatus}
+                          onChange={(e) => setFilterStatus(e.target.value)}
+                          className="p-1 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                          placeholder="Status..."
+                        >
+                          <option value=''>Select Status...</option>
+                          <option value='Claimed'>Claimed</option>
+                          <option value='Not Claimed'>Not Claimed</option>
+                        </select>
+                      </th>
+                      <th className="pt-2 pb-2"></th>
+                      <th className="pt-2 pb-2"></th>
+                    </tr>
+                  )}
+                </thead>
+                <tbody>
+                  {sortedData.map((row, index) => (
+                    <tr key={index} className={`even:bg-[#FAF6ED] odd:bg-[#FFFFFF] font-bold text-[14px]`}>
+                      <td className="px-4 py-2">{index + 1}</td>
+                      <td className="px-4 py-2">{formatDateOnly(row.date)}</td>
+                      <td className="px-4 py-2">{row.siteName}</td>
+                      <td className="px-4 py-2">{row.vendor || row.contractor}</td>
+                      <td className="px-4 py-2">{formatIndianCurrency(row.amount)}</td>
+                      <td className="px-4 py-2">{row.category}</td>
+                      <td className="px-4 py-2">{row.comments}</td>
+                      <td
+                        className={`px-4 py-2 font-semibold ${((receivedAmounts[row.id] || 0) + (discountAmounts[row.id] || 0)) >= row.amount
+                          ? "text-[#007233]"
+                          : "text-[#E4572E]"
+                          }`}
+                      >
+                        {((receivedAmounts[row.id] || 0) + (discountAmounts[row.id] || 0)) >= row.amount ? "Claimed" : "Not Claimed"}
+                      </td>
+                      <td className="px-4 py-2">{row.eno}</td>
+                      <td className="px-4 py-2">
+                        {(() => {
+                          const actualAmount = row.amount;
+                          const received = receivedAmounts[row.id] || 0;
+                          const discount = discountAmounts[row.id] || 0;
+                          
+                          // Calculate if payment is fully settled (including discount)
+                          const isFullyPaid = (received + discount) >= actualAmount;
+                          
+                          if (received === 0) {
+                            return (
+                              <button
+                                onClick={() => handleOpenModal(row)}
+                                className="border px-3 py-1 rounded-full bg-white hover:bg-gray-100"
+                              >
+                                To Receive
+                              </button>
+                            );
+                          } else if (received > 0 && !isFullyPaid) {
+                            return (
+                              <span
+                                onClick={() => handleOpenModal(row)}
+                                className="px-3 py-1 rounded-full bg-[#FFD39E] text-black cursor-pointer"
+                              >
+                                Received
+                              </span>
+                            );
+                          } else if (isFullyPaid) {
+                            return (
+                              <span
+                                onClick={() => handleOpenModal(row)}
+                                className="px-3 py-1 rounded-full bg-[#E2F9E1] text-green-700 cursor-pointer"
+                              >
+                                ✓ Received
+                              </span>
+                            );
+                          }
+                        })()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
-        {/* Modal */}
         {showModal && (
-          <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
-            <div className="bg-white rounded-2xl p-6 w-[700px] relative shadow-xl">
-              {/* Title */}
-              <h2 className="text-xl font-semibold mb-6 text-center">Entry Payment Details</h2>
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+            <div className="bg-white text-left rounded-xl p-6 w-[1000px] h-[740px] flex flex-col">
+              <h3 className="text-lg font-semibold mb-4 text-center">
+                {(remainingAmount - discount) <= 0 ? "Payment Status" : "Add Payment"}
+              </h3>
+              <div className="flex-1 overflow-hidden">
+                <div className="flex gap-10 h-full">
+                  <div className="flex-1 flex flex-col">
+                    <div className="flex-1 overflow-y-auto">
 
-              {/* Previous Payments */}
-              {claimPaymentsData.length > 0 ? (
-                claimPaymentsData.map((payment, idx) => (
-                  <div key={idx} className="flex gap-4 mb-4">
-                    {/* Date */}
-                    <div className="flex flex-col text-left w-[168px]">
-                      <label className="mb-1 font-bold">Date</label>
-                      <input
-                        type="text"
-                        value={formatDateOnly(payment.date)}
-                        readOnly
-                        className="border border-[#BF9853]/25 rounded-lg h-[45px] px-3 py-2 "
-                      />
-                    </div>
+                      {/* Payment Form - Only show if Net Payable is greater than 0 */}
+                      {(remainingAmount - discount) > 0 && (
+                        <div className="space-y-4 mb-4 justify-items-center overflow-y-auto">
+                          {/* First Row: Date, Amount, Mode - with border */}
+                          <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-4">
+                            <div className="grid grid-cols-3 gap-4">
+                              {/* Date */}
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                                <div className="relative">
+                                  <input
+                                    type="date"
+                                    value={paymentPopupData.date}
+                                    onChange={(e) => setPaymentPopupData(prev => ({ ...prev, date: e.target.value }))}
+                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                  />
+                                </div>
+                              </div>
 
-                    {/* Amount */}
-                    <div className="flex flex-col text-left w-[168px]">
-                      <label className="mb-1 font-bold">Amount</label>
-                      <input
-                        type="text"
-                        value={formatIndianCurrency(payment.amount)}
-                        readOnly
-                        className="border border-[#BF9853]/25 rounded-lg h-[45px] px-3 py-2 "
-                      />
-                    </div>
+                              {/* Amount */}
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                                <input
+                                  type="number"
+                                  value={paymentPopupData.amount}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === '' || (Number(val) >= 0 && Number(val) <= remainingAmount)) {
+                                      setPaymentPopupData(prev => ({ ...prev, amount: val }));
+                                    }
+                                  }}
+                                  placeholder="Enter amount"
+                                  className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none no-spinner"
+                                />
+                              </div>
 
-                    {/* Mode */}
-                    <div className="flex flex-col text-left w-[168px]">
-                      <label className="mb-1 font-bold">Mode</label>
-                      <input
-                        type="text"
-                        value={payment.payment_mode}
-                        readOnly
-                        className="border border-[#BF9853]/25 rounded-lg h-[45px] px-3 py-2 "
-                      />
-                    </div>
+                              {/* Mode */}
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Mode</label>
+                                <select
+                                  value={paymentPopupData.paymentMode}
+                                  onChange={(e) => setPaymentPopupData(prev => ({ ...prev, paymentMode: e.target.value }))}
+                                  className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                >
+                                  <option value="">---Select---</option>
+                                  <option value="Cash">Cash</option>
+                                  <option value="Gpay">Gpay</option>
+                                  <option value="PhonePe">PhonePe</option>
+                                  <option value="Net Banking">Net Banking</option>
+                                  <option value="Cheque">Cheque</option>
+                                </select>
+                              </div>
+                            </div>
+                            {/* Second Row: Transaction Number, Account Number, Cheque Fields - with border */}
+                            {/* Only show for Gpay, PhonePe, Net Banking, or Cheque */}
+                            {(paymentPopupData.paymentMode === "Gpay" || paymentPopupData.paymentMode === "PhonePe" ||
+                              paymentPopupData.paymentMode === "Net Banking" || paymentPopupData.paymentMode === "Cheque") && (
+                                <div className=" p-4">
+                                  <div className="space-y-4">
+                                    {/* Cheque Fields Row (only for Cheque mode) */}
+                                    {paymentPopupData.paymentMode === "Cheque" && (
+                                      <div className="grid grid-cols-2 gap-4">
+                                        {/* Cheque No */}
+                                        <div>
+                                          <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No</label>
+                                          <input
+                                            type="text"
+                                            value={paymentPopupData.chequeNo}
+                                            onChange={(e) => setPaymentPopupData(prev => ({ ...prev, chequeNo: e.target.value }))}
+                                            placeholder="Enter cheque number"
+                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                          />
+                                        </div>
 
-                    {/* CR Button (only for Cash mode) */}
-                    {payment.payment_mode === "Cash" && (
-                        <button
-                          className={`w-20 h-[45px] mr-1 rounded-lg text-white font-semibold 
-                              ${payment.cash_register_status ? "bg-gray-400 cursor-not-allowed" : "bg-[#BF9853]"}`}
-                          disabled={payment.cash_register_status}
-                          onClick={async () => {
-                            if (payment.cash_register_status) return;
-                            try {
-                              //Check if already exists in backend
-                              const res = await axios.get(
-                                `https://backendaab.in/aabuildersDash/api/cash-register/get/${payment.claimPaymentsId}`
-                              );
-                              if (res.data && res.data.length > 0) {
-                                alert("This payment is already in the cash register.");
-                                return;
-                              }
-                              //Save to Cash Register
-                              const cashRegisterPayload = {
-                                claim_payments_id: payment.claimPaymentsId,
-                                date: payment.date,
-                                payment_mode: payment.payment_mode,
-                                amount: payment.amount,
-                                cash_register_status: true,
-                              };
-                              await axios.post(
-                                "https://backendaab.in/aabuildersDash/api/cash-register/save",
-                                cashRegisterPayload,
-                                { headers: { "Content-Type": "application/json" } }
-                              );
-                              //Save to Payments Received
-                              const paymentsReceivedPayload = {
-                                date: payment.date,
-                                amount: Number(payment.amount),
-                                type: "Claim",
-                                weekly_number: "",
-                                status: false,
-                              };
-                              await axios.post(
-                                "https://backendaab.in/aabuildersDash/api/payments-received/save",
-                                paymentsReceivedPayload,
-                                { headers: { "Content-Type": "application/json" } }
-                              );
-                              //Update ClaimPayments.cashRegisterStatus → true
-                              await axios.put(
-                                `https://backendaab.in/aabuildersDash/api/claim_payments/update-status/${payment.claimPaymentsId}?status=true`
-                              );
-                              // Update UI immediately
-                              setClaimPaymentsData((prev) =>
-                                prev.map((p, i) =>
-                                  i === idx ? { ...p, cashRegisterStatus: true } : p
-                                )
-                              );
-                              alert("Added to Cash Register, Payments Received & updated ClaimPayments ✅");
-                            } catch (err) {
-                              console.error("Error adding payment:", err);
-                              alert("Failed to add payment.");
-                            }
-                          }}
-                        >
-                          CR
-                        </button>
+                                        {/* Cheque Date */}
+                                        <div>
+                                          <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date</label>
+                                          <input
+                                            type="date"
+                                            value={paymentPopupData.chequeDate}
+                                            onChange={(e) => setPaymentPopupData(prev => ({ ...prev, chequeDate: e.target.value }))}
+                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                          />
+                                        </div>
+                                      </div>
+                                    )}
+                                    {/* Transaction Number and Account Number Row */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                      {/* Transaction Number */}
+                                      <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
+                                        <input
+                                          type="text"
+                                          value={paymentPopupData.transactionNumber}
+                                          onChange={(e) => setPaymentPopupData(prev => ({ ...prev, transactionNumber: e.target.value }))}
+                                          placeholder="Enter transaction number"
+                                          className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                        />
+                                      </div>
+
+                                      {/* Account Number */}
+                                      <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
+                                        <select
+                                          value={paymentPopupData.accountNumber}
+                                          onChange={(e) => setPaymentPopupData(prev => ({ ...prev, accountNumber: e.target.value }))}
+                                          className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                        >
+                                          <option value="">Select Account</option>
+                                          <option value="2027887700014">2027887700014</option>
+                                          <option value="2027887700015">2027887700015</option>
+                                          <option value="2027887700016">2027887700016</option>
+                                        </select>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                          </div>
+
+                        </div>
                       )}
+                      {/* Previous Payments Section - Show under original fields when amount is not fully paid */}
+                      {claimPaymentsData.length > 0 && (
+                        <div>
+                          <h4 className="text-md font-medium text-gray-700 mb-3 pl-4">Previous Payments : {claimPaymentsData.length}</h4>
+                          <div className="mb-6 justify-items-center">
+                            <div className="space-y-4 max-h-[500px] overflow-y-auto no-scrollbar">
+                              {claimPaymentsData.map((payment, index) => (
+                                <div key={index} className="">
+                                  {/* First Row: Date, Amount, Mode */}
+                                  <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-4 mb-4 no-scrollbar">
+                                    <div className="grid grid-cols-3 gap-4">
+                                      {/* Date */}
+                                      <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                                        <input
+                                          type="text"
+                                          value={formatDateOnly(payment.date)}
+                                          readOnly
+                                          className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600"
+                                        />
+                                      </div>
+
+                                      {/* Amount */}
+                                      <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                                        <input
+                                          type="text"
+                                          value={formatIndianCurrency(payment.amount)}
+                                          readOnly
+                                          className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600"
+                                        />
+                                      </div>
+
+                                      {/* Mode */}
+                                      <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Mode</label>
+                                        <div className="flex items-end gap-2">
+                                          <input
+                                            type="text"
+                                            value={payment.payment_mode}
+                                            readOnly
+                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600"
+                                          />
+                                          {/* CR Button (only for Cash mode) */}
+                                          {payment.payment_mode === "Cash" && (
+                                            <button
+                                              className={`w-20 h-[45px] rounded-lg text-white font-semibold 
+                                                  ${payment.cash_register_status ? "bg-gray-400 cursor-not-allowed" : "bg-[#BF9853] hover:bg-[#a57f3f]"}`}
+                                              disabled={payment.cash_register_status}
+                                              onClick={async () => {
+                                                if (payment.cash_register_status) return;
+                                                try {
+                                                  //Check if already exists in backend
+                                                  const res = await axios.get(
+                                                    `https://backendaab.in/aabuildersDash/api/cash-register/get/${payment.claimPaymentsId}`
+                                                  );
+                                                  if (res.data && res.data.length > 0) {
+                                                    alert("This payment is already in the cash register.");
+                                                    return;
+                                                  }
+                                                  //Save to Cash Register
+                                                  const cashRegisterPayload = {
+                                                    claim_payments_id: payment.claimPaymentsId,
+                                                    date: payment.date,
+                                                    payment_mode: payment.payment_mode,
+                                                    amount: payment.amount,
+                                                    cash_register_status: true,
+                                                  };
+                                                  await axios.post(
+                                                    "https://backendaab.in/aabuildersDash/api/cash-register/save",
+                                                    cashRegisterPayload,
+                                                    { headers: { "Content-Type": "application/json" } }
+                                                  );
+                                                  //Save to Payments Received
+                                                  const paymentsReceivedPayload = {
+                                                    date: payment.date,
+                                                    amount: Number(payment.amount),
+                                                    type: "Claim",
+                                                    weekly_number: "",
+                                                    status: false,
+                                                  };
+                                                  await axios.post(
+                                                    "https://backendaab.in/aabuildersDash/api/payments-received/save",
+                                                    paymentsReceivedPayload,
+                                                    { headers: { "Content-Type": "application/json" } }
+                                                  );
+                                                  //Update ClaimPayments.cashRegisterStatus → true
+                                                  await axios.put(
+                                                    `https://backendaab.in/aabuildersDash/api/claim_payments/update-status/${payment.claimPaymentsId}?status=true`
+                                                  );
+                                                  // Update UI immediately
+                                                  setClaimPaymentsData((prev) =>
+                                                    prev.map((p, i) =>
+                                                      i === index ? { ...p, cashRegisterStatus: true } : p
+                                                    )
+                                                  );
+                                                  alert("Added to Cash Register, Payments Received & updated ClaimPayments ✅");
+                                                } catch (err) {
+                                                  console.error("Error adding payment:", err);
+                                                  alert("Failed to add payment.");
+                                                }
+                                              }}
+                                            >
+                                              CR
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    {/* Second Row: Transaction Number, Account Number, Cheque Fields */}
+                                    {/* Only show for Gpay, PhonePe, Net Banking, or Cheque */}
+                                    {(payment.payment_mode === "Gpay" || payment.payment_mode === "PhonePe" ||
+                                      payment.payment_mode === "Net Banking" || payment.payment_mode === "Cheque") && (
+                                        <div className="p-4">
+                                          <div className="space-y-4">
+                                            {/* Cheque Fields Row (if cheque payment) */}
+                                            {payment.payment_mode === "Cheque" && (
+                                              <div className="grid grid-cols-2 gap-4">
+                                                {/* Cheque No */}
+                                                <div>
+                                                  <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No</label>
+                                                  <input
+                                                    type="text"
+                                                    value={payment.cheque_number || ""}
+                                                    readOnly
+                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600"
+                                                  />
+                                                </div>
+                                                {/* Cheque Date */}
+                                                <div>
+                                                  <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date</label>
+                                                  <input
+                                                    type="text"
+                                                    value={payment.cheque_date ? formatDateOnly(payment.cheque_date) : ""}
+                                                    readOnly
+                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600"
+                                                  />
+                                                </div>
+                                              </div>
+                                            )}
+                                            {/* Transaction Number and Account Number Row */}
+                                            <div className="grid grid-cols-2 gap-4">
+                                              {/* Transaction Number */}
+                                              <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
+                                                <input
+                                                  type="text"
+                                                  value={payment.transaction_number || ""}
+                                                  readOnly
+                                                  className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600"
+                                                />
+                                              </div>
+                                              {/* Account Number */}
+                                              <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
+                                                <input
+                                                  type="text"
+                                                  value={payment.account_number || ""}
+                                                  readOnly
+                                                  className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600"
+                                                />
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                    </div>
                   </div>
-                ))
-              ) : (
-                <p className="text-sm text-gray-500 mb-4">No previous payments found.</p>
-              )}
-              {/* New Entry */}
-              <div className="flex gap-4 mb-6">
-                {/* Date */}
-                <div className="flex flex-col text-left w-[168px]">
-                  <label className="mb-1 font-bold">Date</label>
-                  <input
-                    type="date"
-                    value={mainDate}
-                    onChange={(e) => setMainDate(e.target.value)}
-                    className="border border-[#BF9853]/25 rounded-lg h-[45px] px-3 py-2"
-                  />
+                  {/* Summary Section */}
+                  <div className="w-80 flex flex-col">
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                      <div className="text-left">
+                        <h4 className="text-lg font-semibold mb-2">Summary</h4>
+                        <div className="space-y-3 shadow-lg rounded-lg p-4">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Total Payable:</span>
+                            <span className="font-semibold">{formatIndianCurrency(actualAmount)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Received Amount:</span>
+                            <span className="font-semibold">{formatIndianCurrency(actualAmount - remainingAmount)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Carry Forward:</span>
+                            <span className="font-semibold">0</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Total Amount:</span>
+                            <span className="font-semibold">{formatIndianCurrency(remainingAmount)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Discount:</span>
+                            <input
+                              type="number"
+                              value={discount === 0 ? '' : discount}
+                              onChange={(e) => {
+                                const newDiscount = Number(e.target.value) || 0;
+                                setDiscount(newDiscount);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Backspace' && discount === 0) {
+                                  setDiscount('');
+                                }
+                              }}
+                              className="w-16 h-6 px-2 text-xs border pl-4 border-gray-300 rounded focus:outline-none"
+                              placeholder="0"
+                            />
+                          </div>
+                          <hr className="border-gray-300" />
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Net Payable:</span>
+                            <span className={`font-bold ${(remainingAmount - discount) <= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {formatIndianCurrency(Math.max(0, remainingAmount - discount))}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-left">
+                        <h4 className="text-lg font-semibold mb-2">Claim Details</h4>
+                        <div className="space-y-3 shadow-lg rounded-lg p-4">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Date:</span>
+                            <span className="font-semibold">{selectedRow ? formatDateOnly(selectedRow.date) : '-'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Project:</span>
+                            <span className="font-semibold">{selectedRow ? selectedRow.siteName : '-'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Category:</span>
+                            <span className="font-semibold">{selectedRow ? selectedRow.category : '-'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">E.No:</span>
+                            <span className="font-semibold">{selectedRow ? selectedRow.eno : '-'}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-left">
+                        <h4 className="text-lg font-semibold mb-2">Payment Status</h4>
+                        <div className="space-y-3 shadow-lg rounded-lg p-4">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Status:</span>
+                            <span className={`font-semibold ${remainingAmount === 0 ? 'text-green-600' : 'text-orange-600'}`}>
+                              {remainingAmount === 0 ? 'Fully Paid' : 'Partially Paid'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Progress:</span>
+                            <span className="font-semibold">
+                              {actualAmount > 0 ? Math.round(((actualAmount - remainingAmount) / actualAmount) * 100) : 0}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-
-                {/* Amount */}
-                <div className="flex flex-col text-left w-[168px]">
-                  <label className="mb-1 font-bold">Amount</label>
-                  <input
-                    type="number"
-                    value={popupAmount}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      if (val >= 0 && val <= remainingAmount) {
-                        setPopupAmount(val);
-                      }
-                    }}
-                    placeholder="Enter amount"
-                    className="border border-[#BF9853]/25 rounded-lg h-[45px] px-3 py-2"
-                  />
-                </div>
-
-                {/* Mode */}
-                <div className="flex flex-col text-left w-[168px]">
-                  <label className="mb-1 font-bold">Mode</label>
-                  <select
-                    value={mainMode}
-                    onChange={(e) => setMainMode(e.target.value)}
-                    className="border border-[#BF9853]/25 rounded-lg h-[45px] px-3 py-2"
-                  >
-                    <option value="">Select Mode</option>
-                    <option value="Cash">Cash</option>
-                    <option value="G-pay">G-pay</option>
-                    <option value="Bank Transfer">Bank Transfer</option>
-                    <option value="UPI">UPI</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Save Buttons */}
-              <div className="flex gap-4 mt-4">
+              </div>        
+              <div className="flex justify-end gap-3 mt-4 p-4 bg-white border-t border-gray-200">
                 <button
-                  onClick={handleSavePayment}
-                  className="bg-[#BF9853] text-white w-[114px] h-[36px] rounded hover:bg-[#a57f3f]"
-                >
-                  Submit
-                </button>
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="border border-[#BF9853] text-[#BF9853] w-[114px] h-[36px] rounded hover:bg-[#f9f5ef]"
+                  onClick={() => {
+                    setShowModal(false);
+                    setDiscount(0);
+                    setPaymentPopupData({
+                      date: new Date().toISOString().split('T')[0],
+                      amount: "",
+                      paymentMode: "",
+                      chequeNo: "",
+                      chequeDate: "",
+                      transactionNumber: "",
+                      accountNumber: ""
+                    });
+                  }}
+                  className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg"
                 >
                   Cancel
                 </button>
+                {(remainingAmount - discount) > 0 && (
+                  <button
+                    onClick={handleSavePayment}
+                    className="px-4 py-2 bg-[#BF9853] text-white rounded-lg"
+                  >
+                    Submit
+                  </button>
+                )}
               </div>
-
-              {/* Close Button */}
               <button
-                onClick={() => setShowModal(false)}
+                onClick={() => {
+                  setShowModal(false);
+                  setDiscount(0);
+                }}
                 className="absolute top-3 right-4 text-xl font-bold text-gray-500 hover:text-black"
               >
                 ×
@@ -865,5 +1289,4 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
     </body>
   );
 }
-
 export default ClaimPaymentSummary

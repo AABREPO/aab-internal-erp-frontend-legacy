@@ -9,6 +9,7 @@ import NotesEnd from '../Images/notes_end.png';
 import Edit from '../Images/Edit.svg';
 import Delete from '../Images/Delete.svg';
 import history from '../Images/History.svg';
+import Filter from '../Images/filter (3).png';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 const DailyHistory = ({ username, userRoles = [] }) => {
@@ -80,6 +81,13 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     const [weeklyPaymentExpensesAudits, setWeeklyPaymentExpensesAudits] = useState([]);
     const [showWeeklyPaymentReceivedModal, setShowWeeklyPaymentReceivedModal] = useState(false);
     const [weeklyPaymentReceivedAudits, setWeeklyPaymentReceivedAudits] = useState([]);
+    
+    // Filter state variables
+    const [showFilters, setShowFilters] = useState(false);
+    const [selectDate, setSelectDate] = useState('');
+    const [selectContractororVendorName, setSelectContractororVendorName] = useState('');
+    const [selectProjectName, setSelectProjectName] = useState('');
+    const [selectType, setSelectType] = useState('');
     
     // Click and drag scrolling functionality
     const scrollRef = useRef(null);
@@ -640,8 +648,132 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             alert("Error adding expense. Please try again.");
         }
     };
+    const formatDateOnly = (dateString) => {
+        const date = new Date(dateString);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}-${month}-${year}`;
+    };
+
+    // Filter functions
+    const clearFilters = () => {
+        setSelectDate('');
+        setSelectContractororVendorName('');
+        setSelectProjectName('');
+        setSelectType('');
+    };
+
+    const getVendorName = (id) =>
+        vendorOptions.find(v => v.id === id)?.value || "";
+
+    const getContractorName = (id) =>
+        contractorOptions.find(c => c.id === id)?.value || "";
+
+    const getEmployeeName = (id) =>
+        employeeOptions.find(c => c.id === id)?.value || "";
+
+    const getSiteName = (id) =>
+        siteOptions.find(s => String(s.id) === String(id))?.value || "";
+
+    // Filtered data based on selected filters
+    const filteredExpenses = dailyExpenses.filter((entry) => {
+        // Date filter (exact match since it's type="date")
+        if (selectDate) {
+            // Convert selectDate (YYYY-MM-DD) → DD-M-YYYY
+            const [year, month, day] = selectDate.split("-");
+            const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
+            // Convert entry.date to DD-M-YYYY
+            const entryDateObj = new Date(entry.date);
+            const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
+            if (formattedEntryDate !== formattedSelectDate) return false;
+        }
+        // Contractor/Vendor/Labour filter
+        if (selectContractororVendorName) {
+            const name =
+                entry.vendor_id
+                    ? getVendorName(entry.vendor_id)
+                    : entry.contractor_id
+                    ? getContractorName(entry.contractor_id)
+                    : entry.employee_id
+                    ? getEmployeeName(entry.employee_id)
+                    : entry.labour_id
+                    ? laboursList.find(l => l.id === Number(entry.labour_id))?.label || ""
+                    : "";
+            if (name.toLowerCase() !== selectContractororVendorName.toLowerCase())
+                return false;
+        }
+        // Project Name filter
+        if (selectProjectName) {
+            const projectName = getSiteName(entry.project_id) || "";
+            if (projectName.toLowerCase() !== selectProjectName.toLowerCase())
+                return false;
+        }
+        // Type filter
+        if (selectType) {
+            if (entry.type?.toLowerCase() !== selectType.toLowerCase()) return false;
+        }
+        return true; // passes all filters
+    });
+
+    const contractorVendorFilterOptions = React.useMemo(() => {
+        const ids = new Set();
+        const options = [];
+        
+        // Add contractor/vendor/employee options
+        filteredExpenses.forEach(exp => {
+            const option =
+                combinedOptions.find(
+                    opt =>
+                        (opt.type === "Contractor" && opt.id === Number(exp.contractor_id)) ||
+                        (opt.type === "Vendor" && opt.id === Number(exp.vendor_id)) ||
+                        (opt.type === "Employee" && opt.id === Number(exp.employee_id))
+                );
+            if (option && !ids.has(option.id)) {
+                ids.add(option.id);
+                options.push({ value: option.label, label: option.label });
+            }
+        });
+        
+        // Add labour options
+        filteredExpenses.forEach(exp => {
+            const labourOption = laboursList.find(opt => opt.id === Number(exp.labour_id));
+            if (labourOption && !ids.has(labourOption.id)) {
+                ids.add(labourOption.id);
+                options.push({ value: labourOption.label, label: labourOption.label });
+            }
+        });
+        
+        return options;
+    }, [filteredExpenses, combinedOptions, laboursList]);
+
+    const projectFilterOptions = React.useMemo(() => {
+        const ids = new Set();
+        return filteredExpenses.map(exp => {
+            const option = siteOptions.find(opt => opt.id === Number(exp.project_id));
+            if (option && !ids.has(option.id)) {
+                ids.add(option.id);
+                return { value: option.label, label: option.label };
+            }
+            return null;
+        }).filter(Boolean);
+    }, [filteredExpenses, siteOptions]);
+
+    const typeFilterOptions = React.useMemo(() => {
+        const types = new Set();
+        filteredExpenses.forEach(exp => {
+            if (exp.type) {
+                types.add(exp.type);
+            }
+        });
+        return Array.from(types).map(type => ({
+            value: type,
+            label: type
+        }));
+    }, [filteredExpenses]);
+
     const sortedDailyExpenses = React.useMemo(() => {
-        let sortableData = [...dailyExpenses];
+        let sortableData = [...filteredExpenses];
         if (sortConfig.key) {
             sortableData.sort((a, b) => {
                 let aValue, bValue;
@@ -702,14 +834,8 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             });
         }
         return sortableData;
-    }, [dailyExpenses, sortConfig, laboursList, siteOptions, isChangeButtonActive, combinedOptions, employeeOptions, vendorOptions, contractorOptions]);
-    const formatDateOnly = (dateString) => {
-        const date = new Date(dateString);
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}-${month}-${year}`;
-    };
+    }, [filteredExpenses, sortConfig, laboursList, siteOptions, isChangeButtonActive, combinedOptions, employeeOptions, vendorOptions, contractorOptions]);
+
     const generateExpensesPDF = () => {
         if (!selectedDate || dailyExpenses.length === 0) {
             alert("No data available to generate PDF");
@@ -737,8 +863,8 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         doc.line(14, 15, pageWidth - 14, 15); 
         doc.line(14, 30, pageWidth - 14, 30); 
         doc.setFont(undefined, 'normal');
-        const filteredExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate);
-        const totalAmount = filteredExpenses.reduce(
+        const dateFilteredExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate);
+        const totalAmount = dateFilteredExpenses.reduce(
             (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
             0
         );
@@ -750,7 +876,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         const expensesTableColumn = [
             "SNO", "PROJECT NAME", "NAME", "QTY", "TYPE", "AMOUNT", "DESCRIPTION"
         ];
-        const expensesTableRows = filteredExpenses
+        const expensesTableRows = dateFilteredExpenses
             .map((row, index) => {
                 const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
                 const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
@@ -1302,9 +1428,18 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                             </h1>
                             <h1 className="font-bold text-base">
                                 Expenses: <span style={{ color: "#E4572E" }}>
-                                    {Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    {filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </span>
                             </h1>
+                        </div>
+                        <div className="text-left mb-4">
+                            <button onClick={() => setShowFilters(!showFilters)}>
+                                <img
+                                    src={Filter}
+                                    alt="Toggle Filter"
+                                    className="w-7 h-7 border border-[#BF9853] rounded-md"
+                                />
+                            </button>
                         </div>
                         <div className="w-full h-[500px] rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden">
                             <div ref={scrollRef} className="overflow-auto max-h-[500px] w-full thin-scrollbar"
@@ -1332,9 +1467,219 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                                             <th className="py-2 px-1 text-left w-[60px]">Qty</th>
                                             <th className="py-2 px-1 text-left w-[80px]">Activity</th>
                                         </tr>
+                                        {showFilters && (
+                                            <tr className="bg-white border-b border-gray-200">
+                                                <th className="pt-2 pb-2 w-[60px]"></th>
+                                                <th className="pt-2 pb-2 w-[120px] sm:w-[140px]">
+                                                    <Select
+                                                        options={contractorVendorFilterOptions}
+                                                        value={selectContractororVendorName ? { value: selectContractororVendorName, label: selectContractororVendorName } : null}
+                                                        onChange={(opt) => setSelectContractororVendorName(opt ? opt.value : "")}
+                                                        className="text-xs focus:outline-none"
+                                                        placeholder="Name..."
+                                                        isSearchable
+                                                        isClearable
+                                                        styles={{
+                                                            control: (provided, state) => ({
+                                                                ...provided,
+                                                                backgroundColor: 'transparent',
+                                                                borderWidth: '3px',
+                                                                borderColor: state.isFocused
+                                                                    ? 'rgba(191, 152, 83, 0.2)'
+                                                                    : 'rgba(191, 152, 83, 0.2)',
+                                                                borderRadius: '6px',
+                                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                                '&:hover': {
+                                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                                },
+                                                            }),
+                                                            placeholder: (provided) => ({
+                                                                ...provided,
+                                                                color: '#999',
+                                                                textAlign: 'left',
+                                                            }),
+                                                            menu: (provided) => ({
+                                                                ...provided,
+                                                                zIndex: 9,
+                                                            }),
+                                                            option: (provided, state) => ({
+                                                                ...provided,
+                                                                textAlign: 'left',
+                                                                fontWeight: 'normal',
+                                                                fontSize: '15px',
+                                                                backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                                color: 'black',
+                                                            }),
+                                                            singleValue: (provided) => ({
+                                                                ...provided,
+                                                                textAlign: 'left',
+                                                                fontWeight: 'normal',
+                                                                color: 'black',
+                                                            }),
+                                                            indicatorSeparator: () => ({
+                                                                display: 'none'
+                                                            }),
+                                                            indicatorsContainer: (provided) => ({
+                                                                ...provided,
+                                                                height: '40px',
+                                                                gap: '0px'
+                                                            }),
+                                                            clearIndicator: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px'
+                                                            }),
+                                                            dropdownIndicator: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px'
+                                                            })
+                                                        }}
+                                                    />
+                                                </th>
+                                                <th className="pt-2 pb-2 w-[160px] sm:w-[170px]">
+                                                    <Select
+                                                        options={projectFilterOptions}
+                                                        value={selectProjectName ? { value: selectProjectName, label: selectProjectName } : null}
+                                                        onChange={(opt) => setSelectProjectName(opt ? opt.value : "")}
+                                                        className="focus:outline-none text-xs"
+                                                        placeholder="Project..."
+                                                        isSearchable
+                                                        isClearable
+                                                        styles={{
+                                                            control: (provided, state) => ({
+                                                                ...provided,
+                                                                backgroundColor: 'transparent',
+                                                                borderWidth: '3px',
+                                                                borderColor: state.isFocused
+                                                                    ? 'rgba(191, 152, 83, 0.2)'
+                                                                    : 'rgba(191, 152, 83, 0.2)',
+                                                                borderRadius: '6px',
+                                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                                '&:hover': {
+                                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                                },
+                                                            }),
+                                                            placeholder: (provided) => ({
+                                                                ...provided,
+                                                                color: '#999',
+                                                                textAlign: 'left',
+                                                            }),
+                                                            menu: (provided) => ({
+                                                                ...provided,
+                                                                zIndex: 9,
+                                                            }),
+                                                            option: (provided, state) => ({
+                                                                ...provided,
+                                                                textAlign: 'left',
+                                                                fontWeight: 'normal',
+                                                                fontSize: '15px',
+                                                                backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                                color: 'black',
+                                                            }),
+                                                            singleValue: (provided) => ({
+                                                                ...provided,
+                                                                textAlign: 'left',
+                                                                fontWeight: 'normal',
+                                                                color: 'black',
+                                                            }),
+                                                            indicatorSeparator: () => ({
+                                                                display: 'none'
+                                                            }),
+                                                            indicatorsContainer: (provided) => ({
+                                                                ...provided,
+                                                                height: '40px',
+                                                                gap: '0px'
+                                                            }),
+                                                            clearIndicator: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px'
+                                                            }),
+                                                            dropdownIndicator: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px'
+                                                            })
+                                                        }}
+                                                    />
+                                                </th>
+                                                <th className="pt-2 pb-2 w-[100px] sm:w-[120px]"></th>
+                                                <th className="pt-2 pb-2 w-[100px] sm:w-[120px]">
+                                                    <Select
+                                                        options={typeFilterOptions}
+                                                        value={selectType ? { value: selectType, label: selectType } : null}
+                                                        onChange={(opt) => setSelectType(opt ? opt.value : "")}
+                                                        className="focus:outline-none text-xs"
+                                                        placeholder="Type..."
+                                                        isSearchable
+                                                        isClearable
+                                                        styles={{
+                                                            control: (provided, state) => ({
+                                                                ...provided,
+                                                                backgroundColor: 'transparent',
+                                                                borderWidth: '3px',
+                                                                borderColor: state.isFocused
+                                                                    ? 'rgba(191, 152, 83, 0.2)'
+                                                                    : 'rgba(191, 152, 83, 0.2)',
+                                                                borderRadius: '6px',
+                                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                                '&:hover': {
+                                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                                },
+                                                            }),
+                                                            placeholder: (provided) => ({
+                                                                ...provided,
+                                                                color: '#999',
+                                                                textAlign: 'left',
+                                                            }),
+                                                            menu: (provided) => ({
+                                                                ...provided,
+                                                                zIndex: 10,
+                                                            }),
+                                                            option: (provided, state) => ({
+                                                                ...provided,
+                                                                textAlign: 'left',
+                                                                fontWeight: 'normal',
+                                                                fontSize: '15px',
+                                                                backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                                color: 'black',
+                                                            }),
+                                                            singleValue: (provided) => ({
+                                                                ...provided,
+                                                                textAlign: 'left',
+                                                                fontWeight: 'normal',
+                                                                color: 'black',
+                                                            }),
+                                                            indicatorSeparator: () => ({
+                                                                display: 'none'
+                                                            }),
+                                                            indicatorsContainer: (provided) => ({
+                                                                ...provided,
+                                                                height: '40px',
+                                                                gap: '0px'
+                                                            }),
+                                                            clearIndicator: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px'
+                                                            }),
+                                                            dropdownIndicator: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px'
+                                                            })
+                                                        }}
+                                                    />
+                                                </th>
+                                                <th className="pt-2 pb-2 w-[50px] sm:w-[60px]"></th>
+                                                <th className="pt-2 pb-2 w-[70px] sm:w-[80px]">
+                                                    <button
+                                                        onClick={clearFilters}
+                                                        className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 focus:outline-none"
+                                                    >
+                                                        Clear
+                                                    </button>
+                                                </th>
+                                            </tr>
+                                        )}
                                         {Number(selectedWeek) === Number(lastWeekNumber) && (
                                         <tr className="bg-white border-b border-gray-200">
-                                            <td className="px-1 py-2 font-bold">{dailyExpenses.filter(row => row.date === selectedDate).length + 1}.</td>
+                                            <td className="px-1 py-2 font-bold">{sortedDailyExpenses.filter(row => row.date === selectedDate).length + 1}.</td>
                                             <td className="flex items-center gap-2 py-2">
                                                 <div>
                                                     <Select
@@ -1485,7 +1830,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                                         )}
                                     </thead>
                                     <tbody>
-                                        {dailyExpenses
+                                        {sortedDailyExpenses
                                             .filter(row => row.date === selectedDate)
                                             .map((row, index) => (
                                                 <tr key={row.id} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">

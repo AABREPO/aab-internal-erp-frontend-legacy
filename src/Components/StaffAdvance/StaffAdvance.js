@@ -6,6 +6,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import axios from 'axios';
 const StaffAdvance = () => {
   // Form state management
   const [formData, setFormData] = useState({
@@ -40,6 +41,18 @@ const StaffAdvance = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editFormData, setEditFormData] = useState({});
   const [editingId, setEditingId] = useState(null);
+  // Payment popup state
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentPopupData, setPaymentPopupData] = useState({
+    date: new Date().toISOString().split('T')[0],
+    amount: "",
+    paymentMode: "",
+    chequeNo: "",
+    chequeDate: "",
+    transactionNumber: "",
+    accountNumber: ""
+  });
+  const [pendingFormData, setPendingFormData] = useState(null);
   // Employee options state
   const [employeeOptions, setEmployeeOptions] = useState([]);
   const [laboursList, setLaboursList] = useState([]);
@@ -174,6 +187,7 @@ const StaffAdvance = () => {
   const paymentModeOptions = useMemo(() => [
     { value: 'Cash', label: 'Cash' },
     { value: 'GPay', label: 'GPay' },
+    { value: 'PhonePe', label: 'PhonePe' },
     { value: 'Net Banking', label: 'Net Banking' },
     { value: 'Cheque', label: 'Cheque' }
   ], []);
@@ -424,6 +438,26 @@ const StaffAdvance = () => {
       alert('Please fill all transfer details');
       return;
     }
+
+    // Check if payment mode requires popup
+    if ((formData.selectedType === 'Advance' || formData.selectedType === 'Refund') && 
+        ['GPay', 'PhonePe', 'Net Banking', 'Cheque'].includes(formData.paymentMode)) {
+      // Store form data and show payment popup
+      setPendingFormData({ ...formData });
+      setPaymentPopupData(prev => ({
+        ...prev,
+        amount: formData.amountGivenInput,
+        paymentMode: formData.paymentMode
+      }));
+      setShowPaymentModal(true);
+      return;
+    }
+
+    // For other payment modes, proceed with normal submission
+    await submitFormData(formData);
+  }, [formData]);
+
+  const submitFormData = useCallback(async (dataToSubmit, paymentDetails = null) => {
     setIsSubmitting(true);
     try {
       const resAll = await fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all');
@@ -436,28 +470,28 @@ const StaffAdvance = () => {
       const maxEntryNo = allData.length > 0 ? Math.max(...allData.map(item => item.entryNo || 0)) : 0;
       const nextEntryNo = maxEntryNo + 1;
       const payload = {
-        type: formData.selectedType,
-        date: formData.date,
-        employee_id: formData.empName?.type === "Employee" ? formData.empName.id : null,
-        labour_id: formData.empName?.type === "Labour" ? formData.empName.id : null,
-        staff_payment_mode: formData.paymentMode,
+        type: dataToSubmit.selectedType,
+        date: dataToSubmit.date,
+        employee_id: dataToSubmit.empName?.type === "Employee" ? dataToSubmit.empName.id : null,
+        labour_id: dataToSubmit.empName?.type === "Labour" ? dataToSubmit.empName.id : null,
+        staff_payment_mode: dataToSubmit.paymentMode,
         staff_refund_amount:
-          formData.selectedType === "Refund"
-            ? parseFloat(formData.amountGivenInput) || 0
+          dataToSubmit.selectedType === "Refund"
+            ? parseFloat(dataToSubmit.amountGivenInput) || 0
             : 0,
-        description: formData.description,
-        file_url: formData.fileUrl || null,
+        description: dataToSubmit.description,
+        file_url: dataToSubmit.fileUrl || null,
         entryNo: nextEntryNo,
         weekNo: 0,
       };
-      if (formData.selectedType === 'Transfer') {
-        payload.from_purpose_id = formData.purpose.id;
-        payload.to_purpose_id = formData.transferPurpose.id;
-        payload.amount = parseFloat(formData.transferAmount) || 0;
+      if (dataToSubmit.selectedType === 'Transfer') {
+        payload.from_purpose_id = dataToSubmit.purpose.id;
+        payload.to_purpose_id = dataToSubmit.transferPurpose.id;
+        payload.amount = parseFloat(dataToSubmit.transferAmount) || 0;
       } else {
-        payload.from_purpose_id = formData.purpose?.id || null;
+        payload.from_purpose_id = dataToSubmit.purpose?.id || null;
         payload.to_purpose_id = null;
-        payload.amount = formData.selectedType === 'Advance' ? parseFloat(formData.amountGivenInput) || 0 : 0;
+        payload.amount = dataToSubmit.selectedType === 'Advance' ? parseFloat(dataToSubmit.amountGivenInput) || 0 : 0;
       }
       const saveRes = await fetch('https://backendaab.in/aabuildersDash/api/staff-advance/save', {
         method: 'POST',
@@ -474,11 +508,57 @@ const StaffAdvance = () => {
         resetForm();
         return;
       }
-      toast.success('Record saved successfully!', {
-        position: "top-center",
-        autoClose: 3000,
-        theme: "colored"
-      });
+      const staffAdvanceResult = await saveRes.json();
+
+      // If payment details are provided and payment mode requires weekly payment bills
+      if (paymentDetails && ['GPay', 'PhonePe', 'Net Banking', 'Cheque'].includes(paymentDetails.paymentMode)) {
+        const weeklyPaymentBillPayload = {
+          date: paymentDetails.date,
+          created_at: new Date().toISOString(),
+          contractor_id: null,
+          vendor_id: null,
+          employee_id: dataToSubmit.empName?.type === "Employee" ? dataToSubmit.empName.id : null,
+          project_id: null,
+          type: "Staff Advance",
+          bill_payment_mode: paymentDetails.paymentMode,
+          amount: parseFloat(paymentDetails.amount),
+          status: true,
+          weekly_number: "",
+          weekly_payment_expense_id: null,
+          advance_portal_id: null,
+          staff_advance_portal_id: staffAdvanceResult.id || staffAdvanceResult.staffAdvancePortalId,
+          claim_payment_id: null,
+          cheque_number: paymentDetails.chequeNo || null,
+          cheque_date: paymentDetails.chequeDate || null,
+          transaction_number: paymentDetails.transactionNumber || null,
+          account_number: paymentDetails.accountNumber || null
+        };
+        try {
+          const weeklyPaymentBillResponse = await axios.post(
+            "https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save",
+            weeklyPaymentBillPayload,
+            { headers: { "Content-Type": "application/json" } }
+          );
+          toast.success('Record saved successfully and added to Weekly Payment Bills!', {
+            position: "top-center",
+            autoClose: 3000,
+            theme: "colored"
+          });
+        } catch (weeklyError) {
+          console.error('Error saving to weekly payment bills:', weeklyError);
+          toast.success('Record saved successfully! (Weekly Payment Bills failed)', {
+            position: "top-center",
+            autoClose: 3000,
+            theme: "colored"
+          });
+        }
+      } else {
+        toast.success('Record saved successfully!', {
+          position: "top-center",
+          autoClose: 3000,
+          theme: "colored"
+        });
+      }
       resetForm();
       await fetchRecords();
     } catch (error) {
@@ -487,7 +567,36 @@ const StaffAdvance = () => {
     } finally {
       setIsSubmitting(false);
     }
-  }, [formData]);
+  }, []);
+
+  // Handle payment popup submission
+  const handlePaymentSubmit = useCallback(async () => {
+    if (!paymentPopupData.paymentMode) {
+      alert("Please select a payment mode.");
+      return;
+    }
+    if (!paymentPopupData.amount) {
+      alert("Please enter an amount.");
+      return;
+    }
+
+    // Close the popup and submit with payment details
+    setShowPaymentModal(false);
+    await submitFormData(pendingFormData, paymentPopupData);
+    
+    // Reset payment popup data
+    setPaymentPopupData({
+      date: new Date().toISOString().split('T')[0],
+      amount: "",
+      paymentMode: "",
+      chequeNo: "",
+      chequeDate: "",
+      transactionNumber: "",
+      accountNumber: ""
+    });
+    setPendingFormData(null);
+  }, [paymentPopupData, pendingFormData, submitFormData]);
+
   // Handle keyboard enter key press
   const handleKeyPress = useCallback((e) => {
     if (e.key === 'Enter') {
@@ -541,36 +650,30 @@ const StaffAdvance = () => {
     try {
       // Create new PDF document
       const doc = new jsPDF();
-
       // Add title
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
       doc.text('Staff Advance Report', 20, 20);
-
       // Add date range if available
       if (staffFromDate && staffToDate) {
         doc.setFontSize(12);
         doc.setFont('helvetica', 'normal');
         doc.text(`Date Range: ${staffFromDate} to ${staffToDate}`, 20, 30);
       }
-
       // Add employee and purpose info if selected
       if (formData.empName && formData.purpose) {
         doc.setFontSize(10);
         doc.text(`Employee: ${formData.empName.label}`, 20, 40);
         doc.text(`Purpose: ${formData.purpose.label}`, 20, 47);
       }
-
       // Prepare table data
       const tableData = filteredTableData.length > 0 ? filteredTableData : [];
-
       if (tableData.length === 0) {
         doc.setFontSize(12);
         doc.text('No data available for export', 20, 60);
         doc.save('staff-advance-report.pdf');
         return;
       }
-
       // Prepare table columns and rows
       const columns = [
         { title: 'Date', dataKey: 'date' },
@@ -579,12 +682,10 @@ const StaffAdvance = () => {
         { title: 'Mode', dataKey: 'mode' },
         { title: 'Type', dataKey: 'type' }
       ];
-
       const rows = tableData.map(record => {
         const advanceAmount = record.type === "Refund"
           ? -Math.abs(record.staff_refund_amount || 0)
           : record.amount;
-
         const transferRefund = record.type === "Refund"
           ? "Refund"
           : record.type === "Transfer"
@@ -601,7 +702,6 @@ const StaffAdvance = () => {
               }
             })()
             : record.staff_refund_amount;
-
         return {
           date: record.date,
           advance: advanceAmount,
@@ -610,7 +710,6 @@ const StaffAdvance = () => {
           type: record.type
         };
       });
-
       // Add table to PDF
       doc.autoTable({
         columns: columns,
@@ -619,21 +718,21 @@ const StaffAdvance = () => {
         styles: {
           fontSize: 8,
           cellPadding: 3,
-          textColor: [0, 0, 0], // Black text
-          lineColor: [0, 0, 0], // Black borders
-          lineWidth: 0.1, // Border width
+          textColor: [0, 0, 0],
+          lineColor: [0, 0, 0],
+          lineWidth: 0.1,
         },
         headStyles: {
-          fillColor: [255, 255, 255], // White background
-          textColor: [0, 0, 0], // Black text
+          fillColor: [255, 255, 255],
+          textColor: [0, 0, 0],
           fontStyle: 'bold',
-          lineColor: [0, 0, 0], // Black borders
-          lineWidth: 0.1, // Border width
+          lineColor: [0, 0, 0],
+          lineWidth: 0.1,
         },
         alternateRowStyles: {
-          fillColor: [255, 255, 255], // White background for all rows
-          lineColor: [0, 0, 0], // Black borders
-          lineWidth: 0.1, // Border width
+          fillColor: [255, 255, 255],
+          lineColor: [0, 0, 0],
+          lineWidth: 0.1,
         },
         columnStyles: {
           advance: {
@@ -657,27 +756,20 @@ const StaffAdvance = () => {
             lineWidth: 0.1
           }
         },
-        tableLineColor: [0, 0, 0], // Table border color
-        tableLineWidth: 0.1, // Table border width
+        tableLineColor: [0, 0, 0],
+        tableLineWidth: 0.1,
       });
-
-      // Add summary information at the bottom
       const finalY = doc.lastAutoTable.finalY + 10;
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
-
       if (formData.empName && formData.purpose) {
         doc.text(`Total Advance Amount: ${formData.advanceAmount}`, 20, finalY);
       }
-
       if (staffFromDate && staffToDate) {
         doc.text(`Total Amount Given (${staffFromDate} to ${staffToDate}): ${staffAmountGiven}`, 20, finalY + 10);
       }
-
       doc.text(`Today's Amount: ${staffTodayAmount}`, 20, finalY + 20);
       doc.text(`Total Outstanding: ${staffTotalOutstanding}`, 20, finalY + 30);
-
-      // Add footer
       const pageCount = doc.internal.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
@@ -685,17 +777,13 @@ const StaffAdvance = () => {
         doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
         doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, doc.internal.pageSize.height - 10);
       }
-
-      // Save the PDF
       const fileName = `staff-advance-report-${new Date().toISOString().split('T')[0]}.pdf`;
       doc.save(fileName);
-
       toast.success('PDF exported successfully!', {
         position: "top-center",
         autoClose: 3000,
         theme: "colored"
       });
-
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Error generating PDF. Please try again.');
@@ -863,21 +951,16 @@ const StaffAdvance = () => {
         amount: editFormData.amountGivenInput,
         staff_payment_mode: editFormData.paymentMode
       };
-
-      // Add transfer-specific fields if it's a transfer type
       if (editFormData.selectedType === 'Transfer') {
         updatePayload.to_purpose_id = editFormData.transferPurpose?.id;
         updatePayload.amount = editFormData.transferAmount;
       }
-
       const res = await fetch(`https://backendaab.in/aabuildersDash/api/staff-advance/edit/${editingId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatePayload)
       });
-
       if (!res.ok) throw new Error('Failed to update');
-
       toast.success('Record updated successfully!', {
         position: "top-center",
         autoClose: 3000,
@@ -1441,6 +1524,156 @@ const StaffAdvance = () => {
           </div>
         </div>
       )}
+      {/* Payment Popup Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white text-left rounded-xl p-6 w-[800px] h-[600px] overflow-y-auto flex flex-col">
+            <h3 className="text-lg font-semibold mb-4 text-center">Payment Details</h3>
+            <div className="flex-1 overflow-hidden">
+              <div className="space-y-4">
+                <div className="border-2 border-[#BF9853] border-opacity-25 rounded-lg p-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                      <input
+                        type="date"
+                        value={paymentPopupData.date}
+                        onChange={(e) => setPaymentPopupData(prev => ({ ...prev, date: e.target.value }))}
+                        readOnly
+                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none bg-gray-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                      <input
+                        type="number"
+                        value={paymentPopupData.amount}
+                        readOnly
+                        placeholder="Enter amount"
+                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none bg-gray-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>
+                      <select
+                        value={paymentPopupData.paymentMode}
+                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none bg-gray-100"
+                      >
+                        <option value="">---Select---</option>
+                        <option value="GPay">GPay</option>
+                        <option value="PhonePe">PhonePe</option>
+                        <option value="Net Banking">Net Banking</option>
+                        <option value="Cheque">Cheque</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {(paymentPopupData.paymentMode === "GPay" || paymentPopupData.paymentMode === "PhonePe" ||
+                  paymentPopupData.paymentMode === "Net Banking" || paymentPopupData.paymentMode === "Cheque") && (
+                    <div className="border-2 border-[#BF9853] border-opacity-25 rounded-lg p-4">
+                      <div className="space-y-4">
+                        {paymentPopupData.paymentMode === "Cheque" && (
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No</label>
+                              <input
+                                type="text"
+                                value={paymentPopupData.chequeNo}
+                                onChange={(e) => setPaymentPopupData(prev => ({ ...prev, chequeNo: e.target.value }))}
+                                placeholder="Enter cheque number"
+                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date</label>
+                              <input
+                                type="date"
+                                value={paymentPopupData.chequeDate}
+                                onChange={(e) => setPaymentPopupData(prev => ({ ...prev, chequeDate: e.target.value }))}
+                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                        )}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
+                            <input
+                              type="text"
+                              value={paymentPopupData.transactionNumber}
+                              onChange={(e) => setPaymentPopupData(prev => ({ ...prev, transactionNumber: e.target.value }))}
+                              placeholder="Enter transaction number"
+                              className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
+                            <select
+                              value={paymentPopupData.accountNumber}
+                              onChange={(e) => setPaymentPopupData(prev => ({ ...prev, accountNumber: e.target.value }))}
+                              className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                            >
+                              <option value="">Select Account</option>
+                              <option value="2027887700014">2027887700014</option>
+                              <option value="2027887700015">2027887700015</option>
+                              <option value="2027887700016">2027887700016</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6 p-4 bg-white">
+              <button
+                onClick={() => {
+                  setShowPaymentModal(false);
+                  setPaymentPopupData({
+                    date: new Date().toISOString().split('T')[0],
+                    amount: "",
+                    paymentMode: "",
+                    chequeNo: "",
+                    chequeDate: "",
+                    transactionNumber: "",
+                    accountNumber: ""
+                  });
+                  setPendingFormData(null);
+                }}
+                className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePaymentSubmit}
+                className="px-4 py-2 bg-[#BF9853] text-white rounded-lg"
+              >
+                Submit
+              </button>
+            </div>
+            <button
+              onClick={() => {
+                setShowPaymentModal(false);
+                setPaymentPopupData({
+                  date: new Date().toISOString().split('T')[0],
+                  amount: "",
+                  paymentMode: "",
+                  chequeNo: "",
+                  chequeDate: "",
+                  transactionNumber: "",
+                  accountNumber: ""
+                });
+                setPendingFormData(null);
+              }}
+              className="absolute top-3 right-4 text-xl font-bold text-gray-500 hover:text-black"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       <ToastContainer />
     </div>
   );

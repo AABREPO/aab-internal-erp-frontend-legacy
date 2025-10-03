@@ -620,7 +620,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
             expense.vendor,
             expense.contractor,
             expense.quantity,
-            `${Number(expense.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            `${Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
             expense.comments,
             expense.category,
             expense.accountType,
@@ -958,7 +958,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                             </th>
                                             <th></th>
                                             <th className="text-base text-left pl-2 font-bold">
-                                                ₹{Number(totalAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                ₹{Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </th>
                                             <th></th>
                                             <th className="px-2">

@@ -257,7 +257,7 @@ const MonthlyReport = () => {
                                         <td className="px-2 text-left font-semibold">{rent.shopNo}</td>
                                         <td className="px-2 text-left font-semibold">{rent.tenantName}</td>
                                         <td className="text-sm text-left pl-2 font-semibold">
-                                            ₹{Number(rent.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            ₹{Number(rent.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
                                         <td className="px-2 text-left font-semibold">{rent.formType}</td>
                                         <td className="px-2 text-left font-semibold">{formatDateOnly(rent.paidOnDate)}</td>

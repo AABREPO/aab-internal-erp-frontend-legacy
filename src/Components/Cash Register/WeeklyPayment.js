@@ -6,6 +6,9 @@ import history from '../Images/History.svg';
 import Filter from '../Images/filter (3).png'
 import NotesStart from '../Images/notes _start.png';
 import NotesEnd from '../Images/notes_end.png';
+import fileUpload from '../Images/file_upload.png';
+import download from '../Images/file_download.png'
+import file from '../Images/file.png';
 // Helper function to get start and end date of ISO week
 function getStartAndEndDateOfISOWeek(weekNo, year) {
     const simple = new Date(year, 0, 1 + (weekNo - 1) * 7);
@@ -293,6 +296,10 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     });
     const [currentProjectAdvanceRow, setCurrentProjectAdvanceRow] = useState(null);
     const [previousPayments, setPreviousPayments] = useState([]);
+    const [fileUploadPopup, setFileUploadPopup] = useState(false);
+    const [currentFileRow, setCurrentFileRow] = useState(null);
+    const [selectedFileForPopup, setSelectedFileForPopup] = useState(null);
+    const [accountDetails, setAccountDetails] = useState([]);
     // Weekly Payment Bill Data List states
 
     const [showPaymentDetailsPopup, setShowPaymentDetailsPopup] = useState(false);
@@ -356,6 +363,93 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         }
         const payments = weeklyPaymentBills.filter(bill => bill.weekly_payment_expense_id === expenseId);
         return payments;
+    };
+
+    // File upload functions
+    const handleFileUploadClick = (row) => {
+        setCurrentFileRow(row);
+        setSelectedFileForPopup(null);
+        setFileUploadPopup(true);
+    };
+
+    const handleFileSelectInPopup = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setSelectedFileForPopup(file);
+        }
+        e.target.value = '';
+    };
+
+    const handleSaveFileFromPopup = async () => {
+        if (!selectedFileForPopup || !currentFileRow) return;
+        try {
+            const project = siteOptions.find(opt => opt.id === Number(currentFileRow.project_id));
+            const siteNo = project?.siteNo || "";
+            const name =
+                vendorOptions.find(opt => opt.id === Number(currentFileRow.vendor_id))?.label ||
+                contractorOptions.find(opt => opt.id === Number(currentFileRow.contractor_id))?.label ||
+                employeeOptions.find(opt => opt.id === Number(currentFileRow.employee_id))?.label ||
+                "";
+            
+            const formData = new FormData();
+            const finalName = `${currentFileRow.date}-${siteNo}-${name}`;
+            formData.append("file", selectedFileForPopup);
+            formData.append("file_name", finalName);
+            
+            const uploadResponse = await fetch(
+                "https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive",
+                {
+                    method: "POST",
+                    body: formData,
+                }
+            );
+            
+            if (!uploadResponse.ok) {
+                throw new Error("File upload failed");
+            }
+            
+            const uploadResult = await uploadResponse.json();
+            const pdfUrl = uploadResult.url;
+            
+            // Update the bill copy URL using the weekly expenses API
+            const updateResponse = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/${currentFileRow.id}/bill-copy-url`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(pdfUrl)
+            });
+            
+            if (!updateResponse.ok) {
+                throw new Error("Failed to update bill copy URL");
+            }
+            
+            // Update local state
+            setExpenses((prev) =>
+                prev.map((exp) => (exp.id === currentFileRow.id ? { ...exp, bill_copy_url: pdfUrl } : exp))
+            );
+            
+            setFileUploadPopup(false);
+            setCurrentFileRow(null);
+            setSelectedFileForPopup(null);
+            
+            // Show success message
+            setPopup({
+                show: true,
+                message: "File uploaded successfully!",
+                type: "success",
+                dateStr: new Date().toLocaleDateString('en-GB')
+            });
+            
+        } catch (error) {
+            console.error("Error uploading file:", error);
+            setPopup({
+                show: true,
+                message: "Error during file upload. Please try again.",
+                type: "error",
+                dateStr: new Date().toLocaleDateString('en-GB')
+            });
+        }
     };
 
     const getPaymentsByType = (expenseId, billPaymentMode) => {
@@ -543,8 +637,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                         sNo: "8"
                     },
                     {
-                        value:"Rent Management Portal",
-                        label:"Rent Management Portal",
+                        value: "Rent Management Portal",
+                        label: "Rent Management Portal",
                         id: 9,
                         sNo: "9"
                     }
@@ -561,6 +655,9 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     useEffect(() => {
         fetchWeeklyType();
     }, []);
+    useEffect(() => {
+        fetchAccountDetails();
+    }, []);
     const fetchWeeklyType = async () => {
         try {
             const response = await fetch('https://backendaab.in/aabuildersDash/api/weekly_types/getAll');
@@ -573,6 +670,20 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         } catch (error) {
             console.error('Error:', error);
             console.log('Error fetching tile area names.');
+        }
+    };
+
+    const fetchAccountDetails = async () => {
+        try {
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/getAll');
+            if (response.ok) {
+                const data = await response.json();
+                setAccountDetails(data);
+            } else {
+                console.error('Error fetching account details');
+            }
+        } catch (error) {
+            console.error('Error fetching account details:', error);
         }
     };
     const fetchCurrentWeekNumber = useCallback(() => {
@@ -2036,7 +2147,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                         ) : (
                                                             <div className="flex flex-col gap-1">
                                                                 <div className="flex items-center gap-2">
-                                                                    <span>{row.type}</span>
+                                                                    <span className={row.type === "Claim" && !row.send_to_expenses_entry ? "text-red-500" : ""}>{row.type}</span>
                                                                     {row.type !== "Daily" && (
                                                                         <button
                                                                             onClick={() => {
@@ -2114,7 +2225,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                     Number(row.amount).toLocaleString('en-IN')
                                                                 )}
                                                             </div>
-                                                            <div className="mr-6">
+                                                            <div className="mr-6 flex items-center gap-3">
                                                                 {row.type === "Project Advance" ? (
                                                                     <button
                                                                         onClick={async () => {
@@ -2157,11 +2268,37 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                         />
                                                                     </button>
                                                                 )}
+                                                                {row.bill_copy_url ? (
+                                                                    <a
+                                                                        href={row.bill_copy_url}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="cursor-pointer ml-3"
+                                                                        title="View File"
+                                                                    >
+                                                                        <img src={file} className="w-4 h-4" alt="Open File" />
+                                                                    </a>
+                                                                ) : (
+                                                                    <button
+                                                                        onClick={() => handleFileUploadClick(row)}
+                                                                        className="cursor-pointer ml-3"
+                                                                        title="Upload File"
+                                                                    >
+                                                                        <img
+                                                                            src={fileUpload}
+                                                                            className="w-4 h-4 opacity-70 hover:opacity-100"
+                                                                            alt="Upload File"
+                                                                        />
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </td>
                                                     <td className="flex py-2 w-[120px]">
-                                                        {row.contractor_id === 117 && row.project_id === 8 && row.type === "Daily" ? (
+                                                        {(
+                                                            (row.contractor_id === 117 && row.project_id === 8 && row.type === "Daily") ||
+                                                            (row.contractor_id === 258 && row.project_id === 9 && row.type === "Advance Refund")
+                                                        ) ? (
                                                             <>
                                                                 <img
                                                                     className="w-5 h-4 opacity-40 cursor-not-allowed"
@@ -2206,7 +2343,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                         alt="Delete"
                                                                     />
                                                                 </button>
-                                                                <button className="rounded-full transition duration-200">
+                                                                <button className="rounded-full transition duration-200 mr-3">
                                                                     <img
                                                                         src={history}
                                                                         className="w-4 h-4 transform hover:scale-110 hover:brightness-110 transition duration-200"
@@ -2308,12 +2445,12 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                         <button
                                                             onClick={() => saveEditedPaymentReceived(row)}
                                                             className="text-green-600 font-bold text-lg"
-                                                            disabled={row.type === "Carry (CF))" || row.type === "Wage Refund"}
+                                                            disabled={row.type === "Carry (CF))" || row.type === "Wage Refund" || row.type === "Claim"}
                                                         >
                                                             ✓
                                                         </button>
                                                     ) : (
-                                                        row.type === "Carry (CF)" || row.type === "Wage Refund" ? (
+                                                        row.type === "Carry (CF)" || row.type === "Wage Refund" || row.type === "Claim" ? (
                                                             <img
                                                                 className="w-5 h-4 opacity-40 cursor-not-allowed"
                                                                 src={Edit}
@@ -2325,7 +2462,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             </button>
                                                         )
                                                     )}
-                                                    {row.type === "Carry (CF)" || row.type === "Wage Refund" ? (
+                                                    {row.type === "Carry (CF)" || row.type === "Wage Refund" || row.type === "Claim" ? (
                                                         <img
                                                             className="w-5 h-4 opacity-40 cursor-not-allowed"
                                                             src={Delete}
@@ -2336,7 +2473,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             <img src={Delete} className="w-5 h-4" alt="Delete" onClick={() => handleWeeklyReceivedDelete(row.id)} />
                                                         </button>
                                                     )}
-                                                    {row.type === "Carry (CF)" || row.type === "Wage Refund" ? (
+                                                    {row.type === "Carry (CF)" || row.type === "Wage Refund" || row.type === "Claim" ? (
                                                         <img
                                                             className="w-5 h-4 opacity-40 cursor-not-allowed"
                                                             src={history}
@@ -2514,116 +2651,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             )}
             {showPaymentPopup && (
                 <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-                    <div className="bg-white text-left rounded-xl  p-6 w-[700px] h-[720px] overflow-y-auto">
+                    <div className="bg-white text-left rounded-xl  p-6 w-[800px] h-[770px] overflow-y-auto">
                         <h3 className="text-lg font-semibold mb-4 text-center">Add Payment</h3>
-
-                        {/* Previous Payments Section */}
-                        {previousPayments.length > 0 && (
-                            <div>
-                                <h4 className="text-md font-medium text-gray-700 mb-3 ml-20">Previous Payments</h4>
-                                <div className="mb-6 justify-items-center">
-                                    <div className="space-y-4 max-h-64 overflow-y-auto">
-                                        {previousPayments.map((payment, index) => (
-                                            <div key={index} className="">
-                                                {/* First Row: Date, Amount, Mode */}
-                                                <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-4 mb-4">
-                                                    <div className="grid grid-cols-3 gap-4">
-                                                        {/* Date */}
-                                                        <div>
-                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-                                                            <input
-                                                                type="text"
-                                                                value={new Date(payment.date).toLocaleDateString('en-GB')}
-                                                                readOnly
-                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
-                                                            />
-                                                        </div>
-
-                                                        {/* Amount */}
-                                                        <div>
-                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
-                                                            <input
-                                                                type="text"
-                                                                value={payment.amount.toLocaleString('en-IN')}
-                                                                readOnly
-                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
-                                                            />
-                                                        </div>
-
-                                                        {/* Mode */}
-                                                        <div>
-                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Mode</label>
-                                                            <input
-                                                                type="text"
-                                                                value={payment.bill_payment_mode}
-                                                                readOnly
-                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* Second Row: Transaction Number, Account Number, Cheque Fields */}
-                                                <div className="border-2 border-[#BF9853] border-opacity-25 rounded-lg p-4">
-                                                    <div className="space-y-4">
-                                                        {/* Cheque Fields Row (if cheque payment) */}
-                                                        {payment.bill_payment_mode === "Cheque" && (
-                                                            <div className="grid grid-cols-2 gap-4">
-                                                                {/* Cheque No */}
-                                                                <div>
-                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No</label>
-                                                                    <input
-                                                                        type="text"
-                                                                        value={payment.cheque_number || ""}
-                                                                        readOnly
-                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
-                                                                    />
-                                                                </div>
-                                                                {/* Cheque Date */}
-                                                                <div>
-                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date</label>
-                                                                    <input
-                                                                        type="text"
-                                                                        value={payment.cheque_date ? new Date(payment.cheque_date).toLocaleDateString('en-GB') : ""}
-                                                                        readOnly
-                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                        {/* Transaction Number and Account Number Row */}
-                                                        <div className="grid grid-cols-2 gap-4">
-                                                            {/* Transaction Number */}
-                                                            <div>
-                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
-                                                                <input
-                                                                    type="text"
-                                                                    value={payment.transaction_number || ""}
-                                                                    readOnly
-                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
-                                                                />
-                                                            </div>
-                                                            {/* Account Number */}
-                                                            <div>
-                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
-                                                                <input
-                                                                    type="text"
-                                                                    value={payment.account_number || ""}
-                                                                    readOnly
-                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Payment Form */}
                         <div className="space-y-4 mb-4 justify-items-center">
                             {/* First Row: Date, Amount, Mode - with border */}
                             <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-4">
@@ -2725,9 +2754,11 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                 className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
                                             >
                                                 <option value="">Select Account</option>
-                                                <option value="2027887700014">2027887700014</option>
-                                                <option value="2027887700015">2027887700015</option>
-                                                <option value="2027887700016">2027887700016</option>
+                                                {accountDetails.map((account) => (
+                                                    <option key={account.id} value={account.account_number}>
+                                                        {account.account_number}
+                                                    </option>
+                                                ))}
                                             </select>
                                         </div>
                                     </div>
@@ -2736,202 +2767,497 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                 </div>
                             </div>
                         </div>
+                        {/* Previous Payments Section */}
+                        {previousPayments.length > 0 && (
+                            <div>
+                                <h4 className="text-md font-medium text-gray-700 mb-3 ml-20">Previous Payments: {previousPayments.length} </h4>
+                                <div className="mb-6 justify-items-center">
+                                    <div className="space-y-4 max-h-64 overflow-y-auto">
+                                        {previousPayments.map((payment, index) => (
+                                            <div key={index} className="">
+                                                {/* First Row: Date, Amount, Mode */}
+                                                <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-4 mb-4">
+                                                    <div className="grid grid-cols-3 gap-4">
+                                                        {/* Date */}
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                                                            <input
+                                                                type="text"
+                                                                value={new Date(payment.date).toLocaleDateString('en-GB')}
+                                                                readOnly
+                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                            />
+                                                        </div>
+
+                                                        {/* Amount */}
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                                                            <input
+                                                                type="text"
+                                                                value={payment.amount.toLocaleString('en-IN')}
+                                                                readOnly
+                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                            />
+                                                        </div>
+
+                                                        {/* Mode */}
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Mode</label>
+                                                            <input
+                                                                type="text"
+                                                                value={payment.bill_payment_mode}
+                                                                readOnly
+                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Second Row: Transaction Number, Account Number, Cheque Fields */}
+                                                <div className="border-2 border-[#BF9853] border-opacity-25 rounded-lg p-4">
+                                                    <div className="space-y-4">
+                                                        {/* Cheque Fields Row (if cheque payment) */}
+                                                        {payment.bill_payment_mode === "Cheque" && (
+                                                            <div className="grid grid-cols-2 gap-4">
+                                                                {/* Cheque No */}
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={payment.cheque_number || ""}
+                                                                        readOnly
+                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                    />
+                                                                </div>
+                                                                {/* Cheque Date */}
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={payment.cheque_date ? new Date(payment.cheque_date).toLocaleDateString('en-GB') : ""}
+                                                                        readOnly
+                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        {/* Transaction Number and Account Number Row */}
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            {/* Transaction Number */}
+                                                            <div>
+                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={payment.transaction_number || ""}
+                                                                    readOnly
+                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                />
+                                                            </div>
+                                                            {/* Account Number */}
+                                                            <div>
+                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={payment.account_number || ""}
+                                                                    readOnly
+                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {/* Status Message for Claim type */}
+                        {currentProjectAdvanceRow && currentProjectAdvanceRow.type === "Claim" && currentProjectAdvanceRow.send_to_expenses_entry && (
+                            <div className="mt-6 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                <div className="text-center">
+                                    <span className="text-sm font-medium text-green-700">
+                                        This Claim Amount Was Already Sent to the Expense Entry
+                                    </span>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Action Buttons */}
+                        <div className="flex justify-between items-center mt-6">
+                            {/* Add To Expense Entry Button - only for Claim type */}
+                            {currentProjectAdvanceRow && currentProjectAdvanceRow.type === "Claim" && !currentProjectAdvanceRow.send_to_expenses_entry && (
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            // First, get the next ENo from the expenses form API
+                                            const enoResponse = await fetch('https://backendaab.in/aabuilderDash/expenses_form/get_form');
+                                            if (!enoResponse.ok) {
+                                                throw new Error('Failed to fetch ENo');
+                                            }
+                                            const enoData = await enoResponse.json();
+                                            const nextEno = enoData.length > 0 ? Math.max(...enoData.map(item => item.eno || 0)) + 1 : 1;
+
+                                            // Prepare expenses form data
+                                            const expensesFormData = {
+                                                accountType: "Claim",
+                                                eno: nextEno,
+                                                date: currentProjectAdvanceRow.date,
+                                                siteName: siteOptions.find(opt => opt.id === Number(currentProjectAdvanceRow.project_id))?.label || "",
+                                                vendor: vendorOptions.find(opt => opt.id === Number(currentProjectAdvanceRow.vendor_id))?.label || "",
+                                                quantity: 1,
+                                                contractor: contractorOptions.find(opt => opt.id === Number(currentProjectAdvanceRow.contractor_id))?.label || "",
+                                                amount: Number(currentProjectAdvanceRow.amount) + previousPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
+                                                category: "Claim",
+                                                comments: `Claim from Weekly Payment `,
+                                                machineTools: "",
+                                                billCopyUrl: currentProjectAdvanceRow.bill_copy_url
+                                            };
+
+                                            // Send data to expenses form API
+                                            const expensesFormResponse = await fetch('https://backendaab.in/aabuilderDash/expenses_form/save', {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Content-Type': 'application/json',
+                                                },
+                                                body: JSON.stringify(expensesFormData)
+                                            });
+
+                                            if (!expensesFormResponse.ok) {
+                                                throw new Error('Failed to save to expenses form');
+                                            }
+
+                                            // Then update the weekly expenses status
+                                            const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/${currentProjectAdvanceRow.id}/send-to-expenses`, {
+                                                method: 'PUT',
+                                                headers: {
+                                                    'Content-Type': 'application/json',
+                                                },
+                                            });
+                                            
+                                            if (response.ok) {
+                                                // Refresh the expenses data from server to get updated status
+                                                await fetchExpenses();
+                                                
+                                                // Update the current row as well
+                                                setCurrentProjectAdvanceRow(prev => ({ ...prev, send_to_expenses_entry: true }));
+                                                
+                                                // Show success message
+                                                setPopup({
+                                                    show: true,
+                                                    message: "Successfully added to expense entry!",
+                                                    type: "success",
+                                                    dateStr: new Date().toLocaleDateString('en-GB')
+                                                });
+                                                
+                                                // Close popup after 2 seconds
+                                                setTimeout(() => {
+                                                    setShowPaymentPopup(false);
+                                                    setPaymentPopupData({
+                                                        date: new Date().toISOString().split('T')[0],
+                                                        amount: "",
+                                                        paymentMode: "",
+                                                        chequeNo: "",
+                                                        chequeDate: "",
+                                                        transactionNumber: "",
+                                                        accountNumber: ""
+                                                    });
+                                                    setPreviousPayments([]);
+                                                    setCurrentProjectAdvanceRow(null);
+                                                }, 2000);
+                                            } else {
+                                                throw new Error('Failed to update expense entry status');
+                                            }
+                                        } catch (error) {
+                                            console.error('Error updating expense entry status:', error);
+                                            setPopup({
+                                                show: true,
+                                                message: "Failed to add to expense entry. Please try again.",
+                                                type: "error",
+                                                dateStr: new Date().toLocaleDateString('en-GB')
+                                            });
+                                        }
+                                    }}
+                                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                                >
+                                    Add To Expense Entry
+                                </button>
+                            )}
+
+                            {/* Right side buttons */}
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        setShowPaymentPopup(false);
+                                        setPaymentPopupData({
+                                            date: new Date().toISOString().split('T')[0],
+                                            amount: "",
+                                            paymentMode: "",
+                                            chequeNo: "",
+                                            chequeDate: "",
+                                            transactionNumber: "",
+                                            accountNumber: ""
+                                        });
+                                        setPreviousPayments([]);
+                                        setCurrentProjectAdvanceRow(null);
+                                    }}
+                                    className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            if (currentProjectAdvanceRow && paymentPopupData.paymentMode && paymentPopupData.amount) {
+                                                let advancePortalId = null;
+                                                let staffAdvancePortalId = null;
+
+                                                // Handle Project Advance type first
+                                                if (currentProjectAdvanceRow.type === "Project Advance" && currentProjectAdvanceRow.advance_portal_id) {
+                                                    try {
+                                                        // Get the last entry number from all advance portal records and add 1
+                                                        const res = await fetch("https://backendaab.in/aabuildersDash/api/advance_portal/getAll");
+                                                        if (!res.ok) throw new Error("Failed to fetch entry numbers");
+                                                        const allData = await res.json();
+                                                        const maxEntryNo =
+                                                            allData.length > 0
+                                                                ? Math.max(...allData.map((item) => item.entry_no || 0))
+                                                                : 0;
+                                                        const nextEntryNo = maxEntryNo + 1;
+                                                        // Get week number
+                                                        const getWeekNumber = () => {
+                                                            const now = new Date();
+                                                            const start = new Date(now.getFullYear(), 0, 1);
+                                                            const diff =
+                                                                now - start + (start.getTimezoneOffset() - now.getTimezoneOffset()) * 60000;
+                                                            const oneWeek = 604800000; // ms in a week
+                                                            return Math.floor(diff / oneWeek) + 1;
+                                                        };
+                                                        // Get description from portalDescriptions state
+                                                        const description = portalDescriptions[currentProjectAdvanceRow.advance_portal_id] || "";
+                                                        const advanceUpdateData = {
+                                                            type: "Advance",
+                                                            date: paymentPopupData.date,
+                                                            description: description,
+                                                            bill_amount: 0,
+                                                            amount: parseFloat(paymentPopupData.amount),
+                                                            project_id: currentProjectAdvanceRow.project_id,
+                                                            vendor_id: currentProjectAdvanceRow.vendor_id,
+                                                            contractor_id: currentProjectAdvanceRow.contractor_id,
+                                                            entry_no: nextEntryNo,
+                                                            week_no: getWeekNumber(),
+                                                            file_url: "",
+                                                            transfer_site_id: 0,
+                                                            refund_amount: 0,
+                                                            payment_mode: paymentPopupData.paymentMode,
+                                                            not_allow_to_edit: true
+                                                        };
+                                                        const advanceResponse = await fetch(
+                                                            "https://backendaab.in/aabuildersDash/api/advance_portal/save",
+                                                            {
+                                                                method: "POST",
+                                                                headers: { "Content-Type": "application/json" },
+                                                                body: JSON.stringify(advanceUpdateData)
+                                                            }
+                                                        );
+                                                        if (!advanceResponse.ok) {
+                                                            console.error("Failed to update advance portal payment mode");
+                                                        } else {
+                                                            const advanceResponseData = await advanceResponse.json();
+                                                            advancePortalId = advanceResponseData.advancePortalId || advanceResponseData.advance_portal_id;
+                                                            console.log("Advance portal payment mode updated successfully, ID:", advancePortalId);
+                                                        }
+                                                    } catch (error) {
+                                                        console.error("Error updating advance portal payment mode:", error);
+                                                    }
+                                                }
+
+                                                // Handle Staff Advance type
+                                                if (currentProjectAdvanceRow.type === "Staff Advance") {
+                                                    try {
+                                                        // Get the last entry number from staff-advance/all endpoint
+                                                        const staffAdvanceRes = await fetch("https://backendaab.in/aabuildersDash/api/staff-advance/all");
+                                                        if (!staffAdvanceRes.ok) throw new Error("Failed to fetch staff advance entry numbers");
+                                                        const staffAdvanceData = await staffAdvanceRes.json();
+                                                        const maxEntryNo =
+                                                            staffAdvanceData.length > 0
+                                                                ? Math.max(...staffAdvanceData.map((item) => item.entry_no || 0))
+                                                                : 0;
+                                                        const nextEntryNo = maxEntryNo + 1;
+
+                                                        // Get week number
+                                                        const getWeekNumber = () => {
+                                                            const now = new Date();
+                                                            const start = new Date(now.getFullYear(), 0, 1);
+                                                            const diff =
+                                                                now - start + (start.getTimezoneOffset() - now.getTimezoneOffset()) * 60000;
+                                                            const oneWeek = 604800000; // ms in a week
+                                                            return Math.floor(diff / oneWeek) + 1;
+                                                        };
+
+                                                        const staffAdvanceSaveData = {
+                                                            date: paymentPopupData.date,
+                                                            employee_id: currentProjectAdvanceRow.employee_id,
+                                                            project_id: currentProjectAdvanceRow.project_id,
+                                                            type: "Advance",
+                                                            from_purpose_id: 4,
+                                                            staff_payment_mode: paymentPopupData.paymentMode,
+                                                            entry_no: nextEntryNo,
+                                                            week_no: getWeekNumber(),
+                                                            amount: parseFloat(paymentPopupData.amount),
+                                                            staff_refund_amount: 0.0,
+                                                            description: "",
+                                                            file_url: null,
+                                                            labour_id: 0,
+                                                            not_allow_to_edit: true
+                                                        };
+
+                                                        const staffAdvanceResponse = await fetch(
+                                                            "https://backendaab.in/aabuildersDash/api/staff-advance/save",
+                                                            {
+                                                                method: "POST",
+                                                                headers: { "Content-Type": "application/json" },
+                                                                body: JSON.stringify(staffAdvanceSaveData)
+                                                            }
+                                                        );
+
+                                                        if (!staffAdvanceResponse.ok) {
+                                                            console.error("Failed to save staff advance");
+                                                        } else {
+                                                            const staffAdvanceResponseData = await staffAdvanceResponse.json();
+                                                            staffAdvancePortalId = staffAdvanceResponseData.staffAdvancePortalId || staffAdvanceResponseData.staff_advance_portal_id;
+                                                            console.log("Staff advance saved successfully, ID:", staffAdvancePortalId);
+                                                        }
+                                                    } catch (error) {
+                                                        console.error("Error saving staff advance:", error);
+                                                    }
+                                                }
+
+                                                // Now save the weekly payment bill with the portal IDs
+                                                const paymentData = {
+                                                    date: paymentPopupData.date,
+                                                    created_at: new Date().toISOString(),
+                                                    contractor_id: currentProjectAdvanceRow.contractor_id || null,
+                                                    vendor_id: currentProjectAdvanceRow.vendor_id || null,
+                                                    employee_id: currentProjectAdvanceRow.employee_id || null,
+                                                    project_id: currentProjectAdvanceRow.project_id || null,
+                                                    type: currentProjectAdvanceRow.type || null,
+                                                    bill_payment_mode: paymentPopupData.paymentMode,
+                                                    amount: parseFloat(paymentPopupData.amount),
+                                                    status: true,
+                                                    weekly_number: currentWeekNumber,
+                                                    weekly_payment_expense_id: currentProjectAdvanceRow.id,
+                                                    advance_portal_id: advancePortalId,
+                                                    staff_advance_portal_id: staffAdvancePortalId,
+                                                    cheque_number: paymentPopupData.chequeNo || null,
+                                                    cheque_date: paymentPopupData.chequeDate || null,
+                                                    transaction_number: paymentPopupData.transactionNumber || null,
+                                                    account_number: paymentPopupData.accountNumber || null
+                                                };
+                                                console.log("Saving payment data:", paymentData);
+                                                await saveWeeklyPaymentBill(paymentData);
+                                                await fetchWeeklyPaymentBills();
+                                            }
+                                        } catch (error) {
+                                            console.error("Error saving payment:", error);
+                                        }
+
+                                        setShowPaymentPopup(false);
+                                        setPaymentPopupData({
+                                            date: new Date().toISOString().split('T')[0],
+                                            amount: "",
+                                            paymentMode: "",
+                                            chequeNo: "",
+                                            chequeDate: "",
+                                            transactionNumber: "",
+                                            accountNumber: ""
+                                        });
+                                        setPreviousPayments([]);
+                                        setCurrentProjectAdvanceRow(null);
+                                    }}
+                                    className="px-4 py-2 bg-[#BF9853] text-white rounded-lg"
+                                    disabled={!paymentPopupData.paymentMode || !paymentPopupData.amount}
+                                >
+                                    Submit
+                                </button>
+                            </div>
+                        </div>
+                        {/* Total Amount Display for Claim type - at bottom */}
+                        {currentProjectAdvanceRow && currentProjectAdvanceRow.type === "Claim" && (
+                            <div className="mt- p-3 text-center -ml-[600px]">
+                                <span className="text-sm font-medium text-gray-700">Total Amount: </span>
+                                <span className="text-lg font-semibold text-gray-900">
+                                    ₹{(Number(currentProjectAdvanceRow.amount) + previousPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)).toLocaleString('en-IN')}
+                                </span>
+                            </div>
+                        )}
+
+                    </div>
+                </div>
+            )}
+            {/* File Upload Popup */}
+            {fileUploadPopup && (
+                <div
+                    className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+                    onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                            setFileUploadPopup(false);
+                            setCurrentFileRow(null);
+                            setSelectedFileForPopup(null);
+                        }
+                    }}
+                    tabIndex={0}
+                >
+                    <div className="bg-white rounded-xl shadow-lg p-6 w-[500px]">
+                        <h3 className="text-lg font-semibold mb-4 text-center">
+                            {currentFileRow?.bill_copy_url ? 'Change File' : 'Upload File'}
+                        </h3>
+                        {currentFileRow?.bill_copy_url && (
+                            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                                <p className="text-sm text-gray-600 mb-2">Current file:</p>
+                                <a href={currentFileRow.bill_copy_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:text-blue-800 underline"
+                                >
+                                    View Current File
+                                </a>
+                            </div>
+                        )}
+                        <div className="mb-4">
+                            <label className="block mb-2 text-sm font-medium">
+                                Select PDF File
+                            </label>
+                            <input
+                                type="file"
+                                accept="application/pdf"
+                                onChange={handleFileSelectInPopup}
+                                className="w-full p-2 border-2 border-[#BF9853] border-opacity-25 rounded-lg focus:outline-none"
+                            />
+                            {selectedFileForPopup && (
+                                <p className="text-sm text-green-600 mt-2">
+                                    ✓ {selectedFileForPopup.name} selected
+                                </p>
+                            )}
+                        </div>
                         <div className="flex justify-end gap-3 mt-6">
                             <button
                                 onClick={() => {
-                                    setShowPaymentPopup(false);
-                                    setPaymentPopupData({
-                                        date: new Date().toISOString().split('T')[0],
-                                        amount: "",
-                                        paymentMode: "",
-                                        chequeNo: "",
-                                        chequeDate: "",
-                                        transactionNumber: "",
-                                        accountNumber: ""
-                                    });
-                                    setPreviousPayments([]);
-                                    setCurrentProjectAdvanceRow(null);
+                                    setFileUploadPopup(false);
+                                    setCurrentFileRow(null);
+                                    setSelectedFileForPopup(null);
                                 }}
-                                className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg"
+                                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
                             >
                                 Cancel
                             </button>
-                            <button
-                                onClick={async () => {
-                                    try {
-                                        if (currentProjectAdvanceRow && paymentPopupData.paymentMode && paymentPopupData.amount) {
-                                            let advancePortalId = null;
-                                            let staffAdvancePortalId = null;
-
-                                            // Handle Project Advance type first
-                                            if (currentProjectAdvanceRow.type === "Project Advance" && currentProjectAdvanceRow.advance_portal_id) {
-                                                try {
-                                                    // Get the last entry number from all advance portal records and add 1
-                                                    const res = await fetch("https://backendaab.in/aabuildersDash/api/advance_portal/getAll");
-                                                    if (!res.ok) throw new Error("Failed to fetch entry numbers");
-                                                    const allData = await res.json();
-                                                    const maxEntryNo =
-                                                        allData.length > 0
-                                                            ? Math.max(...allData.map((item) => item.entry_no || 0))
-                                                            : 0;
-                                                    const nextEntryNo = maxEntryNo + 1;
-                                                    // Get week number
-                                                    const getWeekNumber = () => {
-                                                        const now = new Date();
-                                                        const start = new Date(now.getFullYear(), 0, 1);
-                                                        const diff =
-                                                            now - start + (start.getTimezoneOffset() - now.getTimezoneOffset()) * 60000;
-                                                        const oneWeek = 604800000; // ms in a week
-                                                        return Math.floor(diff / oneWeek) + 1;
-                                                    };
-                                                    // Get description from portalDescriptions state
-                                                    const description = portalDescriptions[currentProjectAdvanceRow.advance_portal_id] || "";
-                                                    const advanceUpdateData = {
-                                                        type: "Advance",
-                                                        date: paymentPopupData.date,
-                                                        description: description,
-                                                        bill_amount: 0,
-                                                        amount: parseFloat(paymentPopupData.amount),
-                                                        project_id: currentProjectAdvanceRow.project_id,
-                                                        vendor_id: currentProjectAdvanceRow.vendor_id,
-                                                        contractor_id: currentProjectAdvanceRow.contractor_id,
-                                                        entry_no: nextEntryNo,
-                                                        week_no: getWeekNumber(),
-                                                        file_url: "",
-                                                        transfer_site_id: 0,
-                                                        refund_amount: 0,
-                                                        payment_mode: paymentPopupData.paymentMode,
-                                                        not_allow_to_edit: true
-                                                    };
-                                                    const advanceResponse = await fetch(
-                                                        "https://backendaab.in/aabuildersDash/api/advance_portal/save",
-                                                        {
-                                                            method: "POST",
-                                                            headers: { "Content-Type": "application/json" },
-                                                            body: JSON.stringify(advanceUpdateData)
-                                                        }
-                                                    );
-                                                    if (!advanceResponse.ok) {
-                                                        console.error("Failed to update advance portal payment mode");
-                                                    } else {
-                                                        const advanceResponseData = await advanceResponse.json();
-                                                        advancePortalId = advanceResponseData.advancePortalId || advanceResponseData.advance_portal_id;
-                                                        console.log("Advance portal payment mode updated successfully, ID:", advancePortalId);
-                                                    }
-                                                } catch (error) {
-                                                    console.error("Error updating advance portal payment mode:", error);
-                                                }
-                                            }
-
-                                            // Handle Staff Advance type
-                                            if (currentProjectAdvanceRow.type === "Staff Advance") {
-                                                try {
-                                                    // Get the last entry number from staff-advance/all endpoint
-                                                    const staffAdvanceRes = await fetch("https://backendaab.in/aabuildersDash/api/staff-advance/all");
-                                                    if (!staffAdvanceRes.ok) throw new Error("Failed to fetch staff advance entry numbers");
-                                                    const staffAdvanceData = await staffAdvanceRes.json();
-                                                    const maxEntryNo =
-                                                        staffAdvanceData.length > 0
-                                                            ? Math.max(...staffAdvanceData.map((item) => item.entry_no || 0))
-                                                            : 0;
-                                                    const nextEntryNo = maxEntryNo + 1;
-
-                                                    // Get week number
-                                                    const getWeekNumber = () => {
-                                                        const now = new Date();
-                                                        const start = new Date(now.getFullYear(), 0, 1);
-                                                        const diff =
-                                                            now - start + (start.getTimezoneOffset() - now.getTimezoneOffset()) * 60000;
-                                                        const oneWeek = 604800000; // ms in a week
-                                                        return Math.floor(diff / oneWeek) + 1;
-                                                    };
-
-                                                    const staffAdvanceSaveData = {
-                                                        date: paymentPopupData.date,
-                                                        employee_id: currentProjectAdvanceRow.employee_id,
-                                                        project_id: currentProjectAdvanceRow.project_id,
-                                                        type: "Advance",
-                                                        from_purpose_id: 4,
-                                                        staff_payment_mode: paymentPopupData.paymentMode,
-                                                        entry_no: nextEntryNo,
-                                                        week_no: getWeekNumber(),
-                                                        amount: parseFloat(paymentPopupData.amount),
-                                                        staff_refund_amount: 0.0,
-                                                        description: "",
-                                                        file_url: null,
-                                                        labour_id: 0,
-                                                        not_allow_to_edit: true
-                                                    };
-
-                                                    const staffAdvanceResponse = await fetch(
-                                                        "https://backendaab.in/aabuildersDash/api/staff-advance/save",
-                                                        {
-                                                            method: "POST",
-                                                            headers: { "Content-Type": "application/json" },
-                                                            body: JSON.stringify(staffAdvanceSaveData)
-                                                        }
-                                                    );
-
-                                                    if (!staffAdvanceResponse.ok) {
-                                                        console.error("Failed to save staff advance");
-                                                    } else {
-                                                        const staffAdvanceResponseData = await staffAdvanceResponse.json();
-                                                        staffAdvancePortalId = staffAdvanceResponseData.staffAdvancePortalId || staffAdvanceResponseData.staff_advance_portal_id;
-                                                        console.log("Staff advance saved successfully, ID:", staffAdvancePortalId);
-                                                    }
-                                                } catch (error) {
-                                                    console.error("Error saving staff advance:", error);
-                                                }
-                                            }
-
-                                            // Now save the weekly payment bill with the portal IDs
-                                            const paymentData = {
-                                                date: paymentPopupData.date,
-                                                created_at: new Date().toISOString(),
-                                                contractor_id: currentProjectAdvanceRow.contractor_id || null,
-                                                vendor_id: currentProjectAdvanceRow.vendor_id || null,
-                                                employee_id: currentProjectAdvanceRow.employee_id || null,
-                                                project_id: currentProjectAdvanceRow.project_id || null,
-                                                type: currentProjectAdvanceRow.type || null,
-                                                bill_payment_mode: paymentPopupData.paymentMode,
-                                                amount: parseFloat(paymentPopupData.amount),
-                                                status: true,
-                                                weekly_number: currentWeekNumber,
-                                                weekly_payment_expense_id: currentProjectAdvanceRow.id,
-                                                advance_portal_id: advancePortalId,
-                                                staff_advance_portal_id: staffAdvancePortalId,
-                                                cheque_number: paymentPopupData.chequeNo || null,
-                                                cheque_date: paymentPopupData.chequeDate || null,
-                                                transaction_number: paymentPopupData.transactionNumber || null,
-                                                account_number: paymentPopupData.accountNumber || null
-                                            };                
-                                            console.log("Saving payment data:", paymentData);
-                                            await saveWeeklyPaymentBill(paymentData);
-                                            await fetchWeeklyPaymentBills();
-                                        }
-                                    } catch (error) {
-                                        console.error("Error saving payment:", error);
-                                    }
-
-                                    setShowPaymentPopup(false);
-                                    setPaymentPopupData({
-                                        date: new Date().toISOString().split('T')[0],
-                                        amount: "",
-                                        paymentMode: "",
-                                        chequeNo: "",
-                                        chequeDate: "",
-                                        transactionNumber: "",
-                                        accountNumber: ""
-                                    });
-                                    setPreviousPayments([]);
-                                    setCurrentProjectAdvanceRow(null);
-                                }}
-                                className="px-4 py-2 bg-[#BF9853] text-white rounded-lg"
-                                disabled={!paymentPopupData.paymentMode || !paymentPopupData.amount}
+                            <button onClick={handleSaveFileFromPopup} disabled={!selectedFileForPopup}
+                                className={`px-4 py-2 rounded-lg ${!selectedFileForPopup
+                                    ? 'bg-gray-400 cursor-not-allowed'
+                                    : 'bg-green-600 hover:bg-green-700'
+                                    } text-white`}
                             >
-                                Submit
+                                {currentFileRow?.bill_copy_url ? 'Update File' : 'Upload File'}
                             </button>
                         </div>
                     </div>

@@ -37,6 +37,16 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editFormData, setEditFormData] = useState({});
   const [editingId, setEditingId] = useState(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentModalData, setPaymentModalData] = useState({
+    date: new Date().toISOString().split('T')[0],
+    amount: "",
+    paymentMode: "",
+    chequeNo: "",
+    chequeDate: "",
+    transactionNumber: "",
+    accountNumber: ""
+  });
   useEffect(() => {
     const savedselectedType = sessionStorage.getItem('selectedType');
     const savedContractorVendor = sessionStorage.getItem('selectedOption');
@@ -91,9 +101,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
     if (!value) return "";
     return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
-
   const handleAmountChange = (e) => {
-    // Remove commas before saving
     const rawValue = e.target.value.replace(/,/g, "");
     if (!isNaN(rawValue)) {
       setAdvanceAmount(rawValue);
@@ -227,7 +235,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
         setSiteOptions(combinedSiteOptions);
       } catch (error) {
         console.error("Fetch error: ", error);
-        
+
         // Fallback: if API fails, still show predefined options
         const predefinedSiteOptions = [
           {
@@ -444,17 +452,28 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
         return;
       }
     }
+    // Check if payment mode requires popup details
+    if (["GPay", "PhonePe", "Net Banking", "Cheque"].includes(paymentMode)) {
+      // Set up payment modal data and show popup
+      setPaymentModalData({
+        date: dateValue,
+        amount: advanceAmount,
+        paymentMode: paymentMode,
+        chequeNo: "",
+        chequeDate: "",
+        transactionNumber: "",
+        accountNumber: ""
+      });
+      setShowPaymentModal(true);
+      return; // Don't proceed with normal submission
+    }
     setIsSubmitting(true); // Start loading
-
     try {
-      // --- existing code unchanged ---
       const res = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/getAll');
       if (!res.ok) throw new Error('Failed to fetch entry numbers');
-
       const allData = await res.json();
       const maxEntryNo = allData.length > 0 ? Math.max(...allData.map(item => item.entry_no || 0)) : 0;
       const nextEntryNo = maxEntryNo + 1;
-
       const createPayload = (overrides = {}) => ({
         type: selectedType,
         date: dateValue,
@@ -475,17 +494,14 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
         file_url: '',
         ...overrides
       });
-
       if (selectedType === 'Transfer') {
         const amountValue = parseFloat(advanceAmount) || 0;
-
         const firstPayload = createPayload({ amount: -Math.abs(amountValue) });
         const secondPayload = createPayload({
           project_id: parseInt(transferSiteId),
           transfer_site_id: selectedSite?.id || 0,
           amount: Math.abs(amountValue)
         });
-
         await Promise.all([
           fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
             method: 'POST',
@@ -509,14 +525,11 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
           body: JSON.stringify(payload)
         });
       }
-
       toast.success('Advance saved successfully!', {
         position: "top-center",
         autoClose: 3000,
         theme: "colored"
       });
-
-      // reset form logic stays same...
       setAdvanceAmount('');
       setDescription('');
       setPaymentMode('');
@@ -525,7 +538,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
       fetchAdvanceData();
       if (selectedOption) handleChange(selectedOption);
       if (selectedOption && selectedSite) calculateProjectAdvance(selectedOption, selectedSite);
-
     } catch (error) {
       console.error('Error submitting data:', error);
       toast.error('Failed to save data!', {
@@ -538,7 +550,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
     }
   };
 
-  // Function to get the current week number
   const getWeekNumber = () => {
     const now = new Date();
     const start = new Date(now.getFullYear(), 0, 1);
@@ -563,11 +574,9 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
       setFilteredAmount(0);
       return;
     }
-
     const from = new Date(fromDate);
     const to = new Date(toDate);
     to.setHours(23, 59, 59, 999);
-
     const filtered = advanceData.filter(entry => {
       const entryDate = new Date(entry.date);
       const isInDateRange = entryDate >= from && entryDate <= to;
@@ -575,20 +584,15 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
         !filteredPaymentMode || entry.payment_mode === filteredPaymentMode;
       return isInDateRange && isMatchingPayment;
     });
-
-    // ✅ Sum only the "amount" field, respecting positive/negative values
     const total = filtered.reduce((sum, entry) => {
       const amount = parseFloat(entry.amount) || 0;
       return sum + amount;
     }, 0);
-
     setFilteredAmount(total);
   }, [fromDate, toDate, filteredPaymentMode, advanceData]);
-  // ✅ Calculate today's total amount (only using "amount" field)
   useEffect(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
     const todayTotal = advanceData
       .filter(entry => {
         const entryDate = new Date(entry.date);
@@ -599,7 +603,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
         const amount = parseFloat(entry.amount) || 0;
         return sum + amount;
       }, 0);
-
     setTodayAmount(todayTotal);
   }, [advanceData]);
   // ✅ Export PDF function
@@ -819,17 +822,11 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
       },
       { totalAmount: 0, totalRefund: 0, totalBill: 0 }
     );
-  
+
     const outstanding = totalAmount - totalRefund - totalBill;
-  
-    console.log("Total Amount:", totalAmount);
-    console.log("Total Refund:", totalRefund);
-    console.log("Total Bill:", totalBill);
-    console.log("Outstanding:", outstanding);
-  
     setTotalOutstanding(outstanding);
   }, [advanceData]);
-  
+
   const formatNumber = (num) => {
     if (!num) return '';
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -862,6 +859,130 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
     });
     setIsEditModalOpen(true);
   };
+  const handlePaymentSubmit = async () => {
+    if (!paymentModalData.transactionNumber && paymentModalData.paymentMode !== "Cash") {
+      alert("Please enter transaction number.");
+      return;
+    }
+    if (!paymentModalData.accountNumber && paymentModalData.paymentMode !== "Cash") {
+      alert("Please select account number.");
+      return;
+    }
+    if (paymentModalData.paymentMode === "Cheque" && (!paymentModalData.chequeNo || !paymentModalData.chequeDate)) {
+      alert("Please enter cheque number and date.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Get entry number
+      const res = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/getAll');
+      if (!res.ok) throw new Error('Failed to fetch entry numbers');
+
+      const allData = await res.json();
+      const maxEntryNo = allData.length > 0 ? Math.max(...allData.map(item => item.entry_no || 0)) : 0;
+      const nextEntryNo = maxEntryNo + 1;
+
+      // Create advance portal payload
+      const advancePayload = {
+        type: selectedType,
+        date: paymentModalData.date,
+        vendor_id: selectedOption?.type === 'Vendor' ? selectedOption.id : 0,
+        contractor_id: selectedOption?.type === 'Contractor' ? selectedOption.id : 0,
+        project_id: selectedSite?.id || 0,
+        transfer_site_id: selectedType === 'Transfer' ? parseInt(transferSiteId) : 0,
+        payment_mode: paymentModalData.paymentMode,
+        amount:
+          selectedType === 'Advance' || selectedType === 'Transfer' || selectedType === 'Bill Settlement'
+            ? parseFloat(paymentModalData.amount) || 0
+            : 0,
+        bill_amount: selectedType === 'Bill Settlement' ? parseFloat(billAmount) || 0 : 0,
+        refund_amount: selectedType === 'Refund' ? parseFloat(paymentModalData.amount) || 0 : 0,
+        entry_no: nextEntryNo,
+        week_no: getWeekNumber(),
+        description: description,
+        file_url: '',
+      };
+
+      // Save to advance portal
+      const advanceResponse = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(advancePayload)
+      });
+
+      if (!advanceResponse.ok) {
+        throw new Error('Failed to save advance portal data');
+      }
+
+      const advanceResult = await advanceResponse.json();
+
+      // Create weekly payment bills payload
+      const weeklyPaymentBillPayload = {
+        date: paymentModalData.date,
+        created_at: new Date().toISOString(),
+        contractor_id: selectedOption?.type === 'Contractor' ? selectedOption.id : null,
+        vendor_id: selectedOption?.type === 'Vendor' ? selectedOption.id : null,
+        employee_id: null,
+        project_id: selectedSite?.id || null,
+        type: selectedType,
+        bill_payment_mode: paymentModalData.paymentMode,
+        amount: parseFloat(paymentModalData.amount),
+        status: true,
+        weekly_number: "",
+        weekly_payment_expense_id: null,
+        advance_portal_id: advanceResult.id || advanceResult.advancePortalId,
+        staff_advance_portal_id: null,
+        claim_payment_id: null,
+        cheque_number: paymentModalData.chequeNo || null,
+        cheque_date: paymentModalData.chequeDate || null,
+        transaction_number: paymentModalData.transactionNumber || null,
+        account_number: paymentModalData.accountNumber || null
+      };
+
+      // Save to weekly payment bills
+      const weeklyResponse = await fetch('https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(weeklyPaymentBillPayload)
+      });
+
+      if (!weeklyResponse.ok) {
+        throw new Error('Failed to save weekly payment bills data');
+      }
+
+      toast.success('Advance saved successfully and added to Weekly Payment Bills!', {
+        position: "top-center",
+        autoClose: 3000,
+        theme: "colored"
+      });
+
+      // Reset form
+      setAdvanceAmount('');
+      setDescription('');
+      setPaymentMode('');
+      setBillAmount('');
+      setEntryNo(nextEntryNo);
+      setShowPaymentModal(false);
+      fetchAdvanceData();
+      if (selectedOption) handleChange(selectedOption);
+      if (selectedOption && selectedSite) calculateProjectAdvance(selectedOption, selectedSite);
+
+    } catch (error) {
+      console.error('Error submitting data:', error);
+      toast.error('Failed to save data!', {
+        position: "top-center",
+        autoClose: 3000,
+        theme: "colored"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleUpdate = async () => {
     try {
       if (editFormData.type === "Transfer") {
@@ -965,6 +1086,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                 <option value=''>Select</option>
                 <option value='Cash'>Cash</option>
                 <option value='GPay'>GPay</option>
+                <option value='PhonePe'>PhonePe</option>
                 <option value='Net Banking'>Net Banking</option>
                 <option value='Cheque'>Cheque</option>
               </select>
@@ -990,10 +1112,8 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
           </div>
         </div>
         <div className='ml-4 p-6  gap-6'>
-          {/* Form */}
           <div className='bg-white w-[1700px] p-6 rounded-md shadow-sm flex '>
             <div className='grid grid-cols-2 gap-4 text-left h-[500px]'>
-              {/* Select Type */}
               <div className='flex items-center gap-3'>
                 <label className='font-semibold text-[#E4572E]'>Select Type</label>
                 <select
@@ -1013,7 +1133,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                   <option value='Transfer'>Transfer</option>
                 </select>
               </div>
-              {/* Date */}
               <div className='flex items-center gap-3'>
                 <label className='font-semibold text-[#E4572E]'>Date</label>
                 <input
@@ -1024,7 +1143,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                   className='w-[144px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
                 />
               </div>
-              {/* Contractor/Vendor */}
               <div className=''> <div className='flex'>
                 <label className='font-semibold block'>Contractor/Vendor<span className="text-red-500">*</span></label>
               </div>
@@ -1037,7 +1155,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                   styles={customStyles}
                 />
               </div>
-              {/* Overall Advance */}
               <div>
                 <label className='font-semibold block'>Overall Advance</label>
                 <input
@@ -1046,7 +1163,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                   className='w-[263px] h-[45px] px-2 py-1 rounded-lg bg-[#F2F2F2] focus:outline-none'
                 />
               </div>
-              {/* Project Name */}
               <div>
                 <label className='font-semibold block'>Project Name<span className="text-red-500">*</span></label>
                 <Select
@@ -1060,7 +1176,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                   className='w-[263px] h-[45px] focus:outline-none'
                 />
               </div>
-              {/* Project Advance */}
               {selectedType !== 'Bill Settlement' && (
                 <div>
                   <label className='font-semibold block'>Project Advance</label>
@@ -1072,7 +1187,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                   />
                 </div>
               )}
-              {/* Bill Amount (only for Bill Settlement) */}
               {selectedType === 'Bill Settlement' && (
                 <div>
                   <label className='font-semibold block'>Bill Amount<span className="text-red-500">*</span></label>
@@ -1083,7 +1197,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                   />
                 </div>
               )}
-              {/* Transfer Amount */}
               <div>
                 <label className='font-semibold block'>
                   {selectedType === 'Transfer'
@@ -1098,7 +1211,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                   className='w-[263px] h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
                 />
               </div>
-              {/* Conditional Dropdown */}
               <div className=''>
                 {selectedType === 'Transfer' ? (
                   <>
@@ -1124,12 +1236,13 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                       <option value=''>Select</option>
                       <option value='Cash'>Cash</option>
                       <option value='GPay'>GPay</option>
+                      <option value='PhonePe'>PhonePe</option>
                       <option value='Net Banking'>Net Banking</option>
+                      <option value='Cheque'>Cheque</option>
                     </select>
                   </>
                 )}
               </div>
-              {/* Description */}
               <div className='col-span-2'>
                 <label className='font-semibold block'>Description</label>
                 <textarea
@@ -1158,7 +1271,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                   {isSubmitting ? 'Saving...' : getButtonLabel()}
                 </button>
                 <ToastContainer
-                  position="top-right"  // change this
+                  position="top-right"
                   autoClose={3000}
                   hideProgressBar={false}
                   closeOnClick
@@ -1202,10 +1315,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                                 : selectedOption?.type === 'Contractor'
                                   ? entry.contractor_id === selectedOption.id
                                   : false;
-
-                            // Only show rows where the project_id matches the current site
                             const isForCurrentProject = entry.project_id === selectedSite.id;
-
                             return isMatchingVendor && isForCurrentProject;
                           })
                           .sort((a, b) => {
@@ -1223,34 +1333,27 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                               payment_mode,
                               refund_amount
                             } = entry;
-
-                            // Format advance amount
                             const advanceAmount = (() => {
                               if (type === 'Refund') {
                                 return `-${parseFloat(refund_amount || 0).toLocaleString('en-IN')}`;
                               }
                               return parseFloat(amount || 0).toLocaleString('en-IN');
                             })();
-
-                            // Format bill amount
                             const billAmount =
                               type === 'Bill Settlement'
                                 ? parseFloat(bill_amount || 0).toLocaleString('en-IN')
                                 : '';
-
-                            // Determine Transfer/Refund label
                             let transferOrRefund = '';
                             if (type === 'Refund') {
                               transferOrRefund = 'Refund';
                             } else if (type === 'Transfer') {
-                              const relatedSiteId = transfer_site_id; // the opposite project
+                              const relatedSiteId = transfer_site_id;
                               const siteLabel = siteOptions.find(site => site.id === parseInt(relatedSiteId))?.label;
                               transferOrRefund =
                                 parseFloat(amount) < 0
                                   ? `Transfer to ${siteLabel || 'Unknown Site'}`
                                   : `Transfer from ${siteLabel || 'Unknown Site'}`;
                             }
-
                             return (
                               <tr key={index} className="border-t">
                                 <td className="px-3 py-2 text-sm font-semibold">
@@ -1306,7 +1409,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                       />
                     </div>
                     <div>
-                      {/* Amount */}
                       <label className="block mb-2 font-semibold">Amount</label>
                       <input
                         type="number"
@@ -1316,7 +1418,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                       />
                     </div>
                   </div>
-                  {/* Bill Amount */}
                   <div className='flex gap-10'>
                     <div>
                       <label className="block mb-2 font-semibold">Bill Amount</label>
@@ -1327,7 +1428,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                         className="border-2 border-[#BF9853] border-opacity-30  w-[220px] h-[45px] mb-3 rounded-lg no-spinner focus:outline-none"
                       />
                     </div>
-                    {/* Type */}
                     <div>
                       <label className="block mb-2 font-semibold">Type</label>
                       <select
@@ -1343,7 +1443,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                       </select>
                     </div>
                   </div>
-                  {/* Payment Mode */}
                   <div className='flex gap-10'>
                     <div>
                       <label className="block mb-2 font-semibold">Payment Mode</label>
@@ -1358,7 +1457,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                         <option value="Net Banking">Net Banking</option>
                       </select>
                     </div>
-                    {/* Refund Amount */}
                     <div>
                       <label className="block mb-2 font-semibold">Refund Amount</label>
                       <input
@@ -1370,7 +1468,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                     </div>
                   </div>
                 </div>
-                {/* Transfer Site ID (Searchable) */}
                 <div>
                   <label className="block mb-2 font-semibold">Transfer Site</label>
                   <Select
@@ -1398,6 +1495,126 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                   Save
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+        {showPaymentModal && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+            <div className="bg-white text-left rounded-xl p-6 w-[800px] h-[600px] overflow-y-auto flex flex-col">
+              <h3 className="text-lg font-semibold mb-4 text-center">Payment Details</h3>
+              <div className="flex-1 overflow-hidden">
+                <div className="space-y-4 mb-4">
+                  <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                        <input
+                          type="date"
+                          value={paymentModalData.date}
+                          onChange={(e) => setPaymentModalData(prev => ({ ...prev, date: e.target.value }))}
+                          readOnly
+                          className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none bg-gray-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                        <input
+                          type="number"
+                          value={paymentModalData.amount}
+                          readOnly
+                          className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>
+                        <input
+                          type="text"
+                          value={paymentModalData.paymentMode}
+                          readOnly
+                          className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {(paymentModalData.paymentMode === "GPay" || paymentModalData.paymentMode === "PhonePe" ||
+                    paymentModalData.paymentMode === "Net Banking" || paymentModalData.paymentMode === "Cheque") && (
+                      <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
+                        <div className="space-y-4">
+                          {paymentModalData.paymentMode === "Cheque" && (
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No<span className="text-red-500">*</span></label>
+                                <input
+                                  type="text"
+                                  value={paymentModalData.chequeNo}
+                                  onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeNo: e.target.value }))}
+                                  placeholder="Enter cheque number"
+                                  className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date<span className="text-red-500">*</span></label>
+                                <input
+                                  type="date"
+                                  value={paymentModalData.chequeDate}
+                                  onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeDate: e.target.value }))}
+                                  className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                />
+                              </div>
+                            </div>
+                          )}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number<span className="text-red-500">*</span></label>
+                              <input
+                                type="text"
+                                value={paymentModalData.transactionNumber}
+                                onChange={(e) => setPaymentModalData(prev => ({ ...prev, transactionNumber: e.target.value }))}
+                                placeholder="Enter transaction number"
+                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">Account Number<span className="text-red-500">*</span></label>
+                              <select
+                                value={paymentModalData.accountNumber}
+                                onChange={(e) => setPaymentModalData(prev => ({ ...prev, accountNumber: e.target.value }))}
+                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                              >
+                                <option value="">Select Account</option>
+                                <option value="2027887700014">2027887700014</option>
+                                <option value="2027887700015">2027887700015</option>
+                                <option value="2027887700016">2027887700016</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 mt-6 p-4 bg-white">
+                <button
+                  onClick={() => setShowPaymentModal(false)}
+                  className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handlePaymentSubmit}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 bg-[#BF9853] text-white rounded-lg disabled:bg-gray-400"
+                >
+                  {isSubmitting ? 'Saving...' : 'Submit'}
+                </button>
+              </div>
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="absolute top-3 right-4 text-xl font-bold text-gray-500 hover:text-black"
+              >
+                ×
+              </button>
             </div>
           </div>
         )}

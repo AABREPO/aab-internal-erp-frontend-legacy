@@ -500,7 +500,7 @@ const ExpenseTableView = () => {
                                             </th>
                                             <th></th>
                                             <th className="text-base text-left pl-2 font-bold">
-                                                ₹{Number(totalAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                ₹{Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </th>
                                             <th></th>
                                             <th className="px-2">
@@ -667,7 +667,7 @@ const ExpenseTableView = () => {
                                             <td className=" text-sm text-left font-semibold">{expense.contractor}</td>
                                             <td className=" text-sm text-left font-semibold">{expense.quantity}</td>
                                             <td className="text-sm text-left pl-2 font-semibold">
-                                                ₹{Number(expense.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                ₹{Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </td>
                                             <td className=" text-sm text-left font-semibold">{expense.comments}</td>
                                             <td className=" text-sm text-left font-semibold">{expense.category}</td>

@@ -477,7 +477,7 @@ const History = () => {
                                             <td className="px-2 text-left font-semibold">{expense.contractor}</td>
                                             <td className="px-2 text-left font-semibold">{expense.quantity}</td>
                                             <td className="text-sm text-left pl-2 font-semibold">
-                                                ₹{Number(expense.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                ₹{Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </td>
                                             <td className="px-2 text-left font-semibold">{expense.comments}</td>
                                             <td className="px-2 text-left font-semibold">{expense.category}</td>

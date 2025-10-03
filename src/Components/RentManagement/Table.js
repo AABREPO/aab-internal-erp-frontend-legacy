@@ -362,7 +362,7 @@ const Table = () => {
         <table>
             <tr><td class="label">Shop No</td><td>${rent.shopNo}</td></tr>
             <tr><td class="label">Property Name</td><td>${propertyName}</td></tr>
-            <tr><td class="label">Amount Paid</td><td>₹${Number(rent.refundAmount || rent.amount).toLocaleString('en-US', {
+            <tr><td class="label">Amount Paid</td><td>₹${Number(rent.refundAmount || rent.amount).toLocaleString('en-IN', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
         })}</td></tr>
@@ -466,7 +466,7 @@ const Table = () => {
                 const formattedMonths = uniqueForTheMonthOf.map(monthStr => {
                     const [year, month] = monthStr.split('-');
                     const date = new Date(year, parseInt(month) - 1); // months are 0-based
-                    return date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+                    return date.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
                 });
 
                 // Set the formatted options
@@ -518,7 +518,7 @@ const Table = () => {
         const formattedMonths = uniqueMonths.map(monthStr => {
             const [year, month] = monthStr.split('-');
             const date = new Date(year, parseInt(month) - 1);
-            return date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+            return date.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
         });
         setMonthOptions(formattedMonths);
     }, [shopNo, tenantName, paymentMode, formType, selectedRentMonth, selectedDate, rentForms, selectedENo]);
@@ -1056,7 +1056,7 @@ const Table = () => {
                                             <td className={`text-xs sm:text-sm text-left px-2 sm:px-4 font-semibold ${rent.refundAmount ? 'text-red-500' : 'text-black'}`}>
                                                 {Number(rent.refundAmount || rent.amount) === 0
                                                     ? 'NIL'
-                                                    : `₹${Number(rent.refundAmount || rent.amount).toLocaleString('en-US', {
+                                                    : `₹${Number(rent.refundAmount || rent.amount).toLocaleString('en-IN', {
                                                         minimumFractionDigits: 2,
                                                         maximumFractionDigits: 2,
                                                     })}`}

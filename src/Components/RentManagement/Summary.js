@@ -256,9 +256,9 @@ const Summary = () => {
     // Sub-Headers (inside the bordered box)
     doc.setFontSize(9);
     doc.text(`MONTH `, 16, 23);
-    doc.setFontSize(12);
+    doc.setFontSize(10);
     const previousMonthDate = getPreviousMonth(fromDate);
-    doc.text(`${formatMonth(previousMonthDate)}`, 32, 23);
+    doc.text(`${formatMonth(previousMonthDate)}`, 30, 23);
     doc.setFontSize(9);
     doc.text(`DATE`, 18, 33);
     doc.setFontSize(12);

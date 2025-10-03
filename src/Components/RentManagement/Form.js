@@ -44,6 +44,19 @@ const Form = () => {
     const [closureDate, setClosureDate] = useState('');
     const [rentHistoryData, setRentHistoryData] = useState([]);
     const [shopClosureToggle, setShopClosureToggle] = useState(false);
+    const [accountDetails, setAccountDetails] = useState([]);
+    
+    // Weekly Payment Bills popup state
+    const [showWeeklyPaymentPopup, setShowWeeklyPaymentPopup] = useState(false);
+    const [weeklyPaymentData, setWeeklyPaymentData] = useState({
+        date: new Date().toISOString().split('T')[0],
+        amount: "",
+        paymentMode: "",
+        chequeNo: "",
+        chequeDate: "",
+        transactionNumber: "",
+        accountNumber: ""
+    });
     
     // Function to get current week number
     const getCurrentWeekNumber = () => {
@@ -251,6 +264,7 @@ const Form = () => {
         fetchPaymentModes();
         fetchRentalForms();
         fetchRentHistory();
+        fetchAccountDetails();
     }, []);
     const fetchPaymentModes = async () => {
         try {
@@ -292,6 +306,20 @@ const Form = () => {
             }
         } catch (error) {
             console.error('Error fetching rent history:', error);
+        }
+    };
+
+    const fetchAccountDetails = async () => {
+        try {
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/getAll');
+            if (response.ok) {
+                const data = await response.json();
+                setAccountDetails(data);
+            } else {
+                console.error('Error fetching account details');
+            }
+        } catch (error) {
+            console.error('Error fetching account details:', error);
         }
     };
 
@@ -609,215 +637,23 @@ const Form = () => {
             });
             return;
         }
+        // Check if payment mode requires weekly payment bills popup
+        if (["Gpay", "PhonePe", "Net Banking", "Cheque"].includes(formPaymentMode)) {
+            setWeeklyPaymentData({
+                date: paidOnDate,
+                amount: cleanedAmount,
+                paymentMode: formPaymentMode,
+                chequeNo: "",
+                chequeDate: "",
+                transactionNumber: "",
+                accountNumber: ""
+            });
+            setShowWeeklyPaymentPopup(true);
+            return;
+        }
         setIsSubmitting(true);
-        const today = new Date();
-        const day = today.getDate();
-        const month = today.toLocaleString('default', { month: 'long' });
-        const year = today.getFullYear();
-        const getOrdinal = (n) => {
-            const s = ["th", "st", "nd", "rd"];
-            const v = n % 100;
-            return n + (s[(v - 20) % 10] || s[v] || s[0]);
-        };
-        const date = `${month} ${getOrdinal(day)} ${year}`;
         try {
-            const rentFormsRes = await fetch("https://backendaab.in/aabuildersDash/api/rental_forms/getAll");
-            if (!rentFormsRes.ok) throw new Error("Failed to fetch existing rent forms");
-            const rentForms = await rentFormsRes.json();
-            let pdfUrl = '';
-            if (selectedRentFile) {
-                const formData = new FormData();
-                formData.append('pdf', selectedRentFile);
-                formData.append('filename', `${date} `);
-                const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/rentForm/googleUploader/uploadToGoogleDrive", {
-                    method: "POST",
-                    body: formData,
-                });
-                if (!uploadResponse.ok) throw new Error('File upload failed');
-                const uploadResult = await uploadResponse.json();
-                pdfUrl = uploadResult.url;
-            }
-            const tenantInfo = shopInfoMap[formShopNo];
-            const baseMonthlyRent = parseFloat(tenantInfo?.monthlyRent || 0);
-            const isStartingMonth = (dateObj) => {
-                const start = new Date(startingDate);
-                return (
-                    dateObj.getFullYear() === start.getFullYear() &&
-                    dateObj.getMonth() === start.getMonth()
-                );
-            };
-            const cleanedAmount = parseFloat((amount || "").replace(/[^0-9.]/g, ""));
-            let remainingAmount = isNaN(cleanedAmount) ? 0 : cleanedAmount;
-            const submissions = [];
-            if ((selectedRentType === "Rent" || selectedRentType === "Pending Rent") && baseMonthlyRent > 0) {
-                let currentDate = new Date(selectedMonth);
-                const selectedMonthStr = currentDate.toISOString().slice(0, 7);
-                const existingEntriesForSelectedMonth = rentForms.filter(r => {
-                    return (r.formType === "Rent" || r.formType === "Pending Rent") &&
-                        r.shopNo === formShopNo &&
-                        r.forTheMonthOf === selectedMonthStr;
-                });
-                const alreadyPaidForSelectedMonth = existingEntriesForSelectedMonth.reduce(
-                    (sum, r) => sum + parseFloat(r.amount || 0),
-                    0
-                );
-                const applicableRentForSelectedMonth = isStartingMonth(currentDate)
-                    ? parseFloat(calculatedRent || 0)
-                    : baseMonthlyRent;
-                const dueForSelectedMonth = applicableRentForSelectedMonth - alreadyPaidForSelectedMonth;
-                if (dueForSelectedMonth <= 0) {
-                    Swal.fire({
-                        icon: 'info',
-                        title: 'Rent Already Paid',
-                        text: `Rent is already fully paid for ${selectedMonthStr}. Please change the month.`,
-                        confirmButtonColor: '#bf9853'
-                    });
-                    setIsSubmitting(false);
-                    return;
-                }
-                if (selectedRentType === "Pending Rent") {
-                    const calculatedPendingRent = calculatePendingRentForPendingType();
-                    if (cleanedAmount > calculatedPendingRent) {
-                        Swal.fire({
-                            icon: 'warning',
-                            title: 'Payment Exceeds Pending Amount',
-                            text: `Payment amount ₹${cleanedAmount.toLocaleString('en-IN')} exceeds the pending rent amount of ₹${calculatedPendingRent.toLocaleString('en-IN')}. Please enter the correct amount.`,
-                            confirmButtonColor: '#bf9853'
-                        });
-                        setIsSubmitting(false);
-                        return;
-                    }
-                }
-                while (remainingAmount > 0) {
-                    const currentMonthStr = currentDate.toISOString().slice(0, 7);
-                    const existingEntries = rentForms.filter(r => {
-                        if (selectedRentType === "Pending Rent") {
-                            return (r.formType === "Rent" || r.formType === "Pending Rent") &&
-                                r.shopNo === formShopNo &&
-                                r.forTheMonthOf === currentMonthStr;
-                        } else {
-                            return r.formType === "Rent" &&
-                                r.shopNo === formShopNo &&
-                                r.forTheMonthOf === currentMonthStr;
-                        }
-                    });
-                    const alreadyPaid = existingEntries.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
-                    const applicableRent = isStartingMonth(currentDate)
-                        ? parseFloat(calculatedRent || 0)
-                        : baseMonthlyRent;
-                    const dueThisMonth = applicableRent - alreadyPaid;
-                    if (dueThisMonth <= 0) {
-                        Swal.fire({
-                            icon: 'info',
-                            title: 'Rent Already Paid',
-                            text: `Rent is already fully paid for ${currentMonthStr}. Please change the month.`,
-                            confirmButtonColor: '#bf9853'
-                        });
-                        setIsSubmitting(false);
-                        return;
-                    }
-                    const amountToPay = Math.min(remainingAmount, dueThisMonth);
-                    const rentalForm = {
-                        formType: selectedRentType,
-                        shopNo: formShopNo,
-                        eno,
-                        tenantName: formTenantName,
-                        amount: amountToPay,
-                        refundAmount: "",
-                        paymentMode: formPaymentMode,
-                        paidOnDate,
-                        forTheMonthOf: currentMonthStr,
-                        attachedFile: pdfUrl,
-                        shopClosureDate: closureDate || "",
-                    };
-
-                    submissions.push(rentalForm);
-                    remainingAmount -= amountToPay;
-                    currentDate.setMonth(currentDate.getMonth() + 1);
-                }
-            }
-            else {
-                const isClosure = selectedRentType === "Shop Closure";
-                const paymentMode = isClosure && shopClosureToggle 
-                    ? formPaymentMode + " From Cash Register" 
-                    : formPaymentMode;
-                const form = {
-                    formType: selectedRentType,
-                    shopNo: formShopNo,
-                    eno,
-                    tenantName: formTenantName,
-                    amount: isClosure ? "" : cleanedAmount,
-                    refundAmount: isClosure ? cleanedAmount : "",
-                    paymentMode: paymentMode,
-                    paidOnDate,
-                    forTheMonthOf: selectedRentType === "Rent" || selectedRentType === "Pending Rent" ? selectedMonth : "",
-                    attachedFile: pdfUrl,
-                    shopClosureDate: closureDate || "",
-                };
-                submissions.push(form);
-            }
-            for (const form of submissions) {
-                const response = await fetch("https://backendaab.in/aabuildersDash/api/rental_forms/save", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(form),
-                });
-                if (!response.ok) {
-                    console.error("❌ Submission failed for:", form);
-                    throw new Error("Form submission failed");
-                } else {
-                    console.log("✅ Form submitted:", form);
-                }
-            }
-            if (selectedRentType === "Shop Closure" && shopClosureToggle) {
-                const cleanedAmount = parseFloat((amount || "").replace(/[^0-9.]/g, ""));
-                const weeklyExpenseData = {
-                    date: paidOnDate,
-                    contractor_id: 258,
-                    project_id: 9,
-                    type: "Advance Refund",
-                    amount: isNaN(cleanedAmount) ? 0 : cleanedAmount,
-                    weekly_number: getCurrentWeekNumber(),
-                    status: false,
-                    created_at: new Date().toISOString(),
-                };                
-                try {
-                    const weeklyExpenseResponse = await fetch("https://backendaab.in/aabuildersDash/api/weekly-expenses/save", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(weeklyExpenseData),
-                    });                    
-                    if (!weeklyExpenseResponse.ok) {
-                        console.error("❌ Weekly expense submission failed");
-                    } else {
-                        console.log("✅ Weekly expense submitted:", weeklyExpenseData);
-                    }
-                } catch (error) {
-                    console.error("❌ Error submitting weekly expense:", error);
-                }
-            }
-            if (selectedRentType === "Shop Closure" && closureDate && formTenantName && formShopNo) {
-                try {
-                    const updateClosureResponse = await fetch(`https://backendaab.in/aabuildersDash/api/tenantShop/updateClosureDate/${encodeURIComponent(formTenantName)}/${encodeURIComponent(formShopNo)}`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ shopClosureDate: closureDate }),
-                    });
-                    if (!updateClosureResponse.ok) {
-                        console.error("❌ Update closure date failed");
-                    } else {
-                        console.log("✅ Closure date updated successfully");
-                    }
-                } catch (error) {
-                    console.error("❌ Error updating closure date:", error);
-                }
-
-                try {
-                    await vacateShop(selectedTenantId, formShopNo);
-                } catch (err) {
-                    console.error("❌ VacateShop failed", err);
-                }
-            }
+            await submitRentalForm();
             window.location.reload();
             setIsSubmitting(false);
             setFormShopNo('');
@@ -833,6 +669,340 @@ const Form = () => {
             setIsSubmitting(false);
         }
     };
+    // Handle weekly payment bills submission
+    const handleWeeklyPaymentSubmit = async () => {
+        if (!weeklyPaymentData.paymentMode) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Missing Payment Mode',
+                text: 'Please select a Payment Mode.',
+                confirmButtonColor: '#bf9853'
+            });
+            return;
+        }
+        if (!weeklyPaymentData.amount) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Missing Amount',
+                text: 'Please enter an amount.',
+                confirmButtonColor: '#bf9853'
+            });
+            return;
+        }
+        setIsSubmitting(true);
+        setShowWeeklyPaymentPopup(false);
+        try {
+            // First submit the rental form and get the IDs of submitted forms
+            const submittedFormIds = await submitRentalForm();
+            // Then submit to weekly payment bills with the rental form ID
+            const weeklyPaymentBillPayload = {
+                date: weeklyPaymentData.date,
+                created_at: new Date().toISOString(),
+                contractor_id: null,
+                vendor_id: null,
+                employee_id: null,
+                project_id: null,
+                type: "Rent Payment",
+                bill_payment_mode: weeklyPaymentData.paymentMode,
+                amount: parseFloat(weeklyPaymentData.amount),
+                status: true,
+                weekly_number: "",
+                weekly_payment_expense_id: null,
+                advance_portal_id: null,
+                staff_advance_portal_id: null,
+                claim_payment_id: null,
+                cheque_number: weeklyPaymentData.chequeNo || null,
+                cheque_date: weeklyPaymentData.chequeDate || null,
+                transaction_number: weeklyPaymentData.transactionNumber || null,
+                account_number: weeklyPaymentData.accountNumber || null,
+                rent_management_id: submittedFormIds.length > 0 ? submittedFormIds[0] : null,
+                tenant_id: selectedTenantId || null,
+                tenant_complex_name: shopInfoMap[formShopNo]?.propertyName || null,
+                
+            };
+            const weeklyPaymentBillResponse = await fetch(
+                "https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save",
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(weeklyPaymentBillPayload)
+                }
+            );
+            if (!weeklyPaymentBillResponse.ok) {
+                console.error("❌ Weekly payment bill submission failed");
+            } else {
+                console.log("✅ Weekly payment bill submitted:", weeklyPaymentBillPayload);
+            }
+            Swal.fire({
+                icon: 'success',
+                title: 'Success',
+                text: 'Rent payment saved successfully and added to Weekly Payment Bills!',
+                confirmButtonColor: '#bf9853'
+            });
+            // Reset form
+            window.location.reload();
+        } catch (error) {
+            console.error("❌ Error submitting weekly payment:", error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: error.message || 'Error occurred while saving payment.',
+                confirmButtonColor: '#bf9853'
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+    // Extract the rental form submission logic into a separate function
+    const submitRentalForm = async () => {
+        const today = new Date();
+        const day = today.getDate();
+        const month = today.toLocaleString('default', { month: 'long' });
+        const year = today.getFullYear();
+        const getOrdinal = (n) => {
+            const s = ["th", "st", "nd", "rd"];
+            const v = n % 100;
+            return n + (s[(v - 20) % 10] || s[v] || s[0]);
+        };
+        const date = `${month} ${getOrdinal(day)} ${year}`;
+
+        const rentFormsRes = await fetch("https://backendaab.in/aabuildersDash/api/rental_forms/getAll");
+        if (!rentFormsRes.ok) throw new Error("Failed to fetch existing rent forms");
+        const rentForms = await rentFormsRes.json();
+        let pdfUrl = '';
+        if (selectedRentFile) {
+            const formData = new FormData();
+            formData.append('pdf', selectedRentFile);
+            formData.append('filename', `${date} `);
+            const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/rentForm/googleUploader/uploadToGoogleDrive", {
+                method: "POST",
+                body: formData,
+            });
+            if (!uploadResponse.ok) throw new Error('File upload failed');
+            const uploadResult = await uploadResponse.json();
+            pdfUrl = uploadResult.url;
+        }
+        const tenantInfo = shopInfoMap[formShopNo];
+        const baseMonthlyRent = parseFloat(tenantInfo?.monthlyRent || 0);
+        const isStartingMonth = (dateObj) => {
+            const start = new Date(startingDate);
+            return (
+                dateObj.getFullYear() === start.getFullYear() &&
+                dateObj.getMonth() === start.getMonth()
+            );
+        };
+        const cleanedAmount = parseFloat((amount || "").replace(/[^0-9.]/g, ""));
+        let remainingAmount = isNaN(cleanedAmount) ? 0 : cleanedAmount;
+        const submissions = [];
+        if ((selectedRentType === "Rent" || selectedRentType === "Pending Rent") && baseMonthlyRent > 0) {
+            let currentDate = new Date(selectedMonth);
+            const selectedMonthStr = currentDate.toISOString().slice(0, 7);
+            const existingEntriesForSelectedMonth = rentForms.filter(r => {
+                return (r.formType === "Rent" || r.formType === "Pending Rent") &&
+                    r.shopNo === formShopNo &&
+                    r.forTheMonthOf === selectedMonthStr;
+            });
+            const alreadyPaidForSelectedMonth = existingEntriesForSelectedMonth.reduce(
+                (sum, r) => sum + parseFloat(r.amount || 0),
+                0
+            );
+            const applicableRentForSelectedMonth = isStartingMonth(currentDate)
+                ? parseFloat(calculatedRent || 0)
+                : baseMonthlyRent;
+            const dueForSelectedMonth = applicableRentForSelectedMonth - alreadyPaidForSelectedMonth;
+            if (dueForSelectedMonth <= 0) {
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Rent Already Paid',
+                    text: `Rent is already fully paid for ${selectedMonthStr}. Please change the month.`,
+                    confirmButtonColor: '#bf9853'
+                });
+                throw new Error("Rent already paid");
+            }
+            if (selectedRentType === "Pending Rent") {
+                const calculatedPendingRent = calculatePendingRentForPendingType();
+                if (cleanedAmount > calculatedPendingRent) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Payment Exceeds Pending Amount',
+                        text: `Payment amount ₹${cleanedAmount.toLocaleString('en-IN')} exceeds the pending rent amount of ₹${calculatedPendingRent.toLocaleString('en-IN')}. Please enter the correct amount.`,
+                        confirmButtonColor: '#bf9853'
+                    });
+                    throw new Error("Payment exceeds pending amount");
+                }
+            }
+            while (remainingAmount > 0) {
+                const currentMonthStr = currentDate.toISOString().slice(0, 7);
+                const existingEntries = rentForms.filter(r => {
+                    if (selectedRentType === "Pending Rent") {
+                        return (r.formType === "Rent" || r.formType === "Pending Rent") &&
+                            r.shopNo === formShopNo &&
+                            r.forTheMonthOf === currentMonthStr;
+                    } else {
+                        return r.formType === "Rent" &&
+                            r.shopNo === formShopNo &&
+                            r.forTheMonthOf === currentMonthStr;
+                    }
+                });
+                const alreadyPaid = existingEntries.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
+                const applicableRent = isStartingMonth(currentDate)
+                    ? parseFloat(calculatedRent || 0)
+                    : baseMonthlyRent;
+                const dueThisMonth = applicableRent - alreadyPaid;
+                if (dueThisMonth <= 0) {
+                    Swal.fire({
+                        icon: 'info',
+                        title: 'Rent Already Paid',
+                        text: `Rent is already fully paid for ${currentMonthStr}. Please change the month.`,
+                        confirmButtonColor: '#bf9853'
+                    });
+                    throw new Error("Rent already paid");
+                }
+                const amountToPay = Math.min(remainingAmount, dueThisMonth);
+                const rentalForm = {
+                    formType: selectedRentType,
+                    shopNo: formShopNo,
+                    eno,
+                    tenantName: formTenantName,
+                    amount: amountToPay,
+                    refundAmount: "",
+                    paymentMode: formPaymentMode,
+                    paidOnDate,
+                    forTheMonthOf: currentMonthStr,
+                    attachedFile: pdfUrl,
+                    shopClosureDate: closureDate || "",
+                };
+                submissions.push(rentalForm);
+                remainingAmount -= amountToPay;
+                currentDate.setMonth(currentDate.getMonth() + 1);
+            }
+        }
+        else {
+            const isClosure = selectedRentType === "Shop Closure";
+            const paymentMode = isClosure && shopClosureToggle 
+                ? formPaymentMode + " From Cash Register" 
+                : formPaymentMode;
+            const form = {
+                formType: selectedRentType,
+                shopNo: formShopNo,
+                eno,
+                tenantName: formTenantName,
+                amount: isClosure ? "" : cleanedAmount,
+                refundAmount: isClosure ? cleanedAmount : "",
+                paymentMode: paymentMode,
+                paidOnDate,
+                forTheMonthOf: selectedRentType === "Rent" || selectedRentType === "Pending Rent" ? selectedMonth : "",
+                attachedFile: pdfUrl,
+                shopClosureDate: closureDate || "",
+            };
+            submissions.push(form);
+        }
+        const submittedFormIds = [];
+        for (const form of submissions) {
+            const response = await fetch("https://backendaab.in/aabuildersDash/api/rental_forms/save", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(form),
+            });
+            if (!response.ok) {
+                console.error("❌ Submission failed for:", form);
+                throw new Error("Form submission failed");
+            } else {
+                try {
+                    const contentType = response.headers.get("content-type");
+                    if (contentType && contentType.includes("application/json")) {
+                        const savedForm = await response.json();
+                        if (savedForm && savedForm.id) {
+                            submittedFormIds.push(savedForm.id);
+                        }
+                        console.log("✅ Form submitted:", savedForm);
+                    } else {
+                        // If response is not JSON, just log it
+                        const textResponse = await response.text();
+                        console.log("✅ Form submitted:", textResponse);
+                    }
+                } catch (error) {
+                    console.log("✅ Form submitted (could not parse response)");
+                }
+            }
+        }
+        
+        // If we couldn't get IDs from the response, fetch the latest forms to get the IDs
+        if (submittedFormIds.length === 0 && submissions.length > 0) {
+            try {
+                const allFormsRes = await fetch("https://backendaab.in/aabuildersDash/api/rental_forms/getAll");
+                if (allFormsRes.ok) {
+                    const allForms = await allFormsRes.json();
+                    // Get the forms that match our submission criteria
+                    const matchingForms = allForms.filter(f => 
+                        f.eno === eno && 
+                        f.tenantName === formTenantName && 
+                        f.shopNo === formShopNo &&
+                        f.paidOnDate === paidOnDate
+                    );
+                    // Get the IDs from matching forms
+                    matchingForms.forEach(f => {
+                        if (f.id) submittedFormIds.push(f.id);
+                    });
+                }
+            } catch (error) {
+                console.error("Could not fetch form IDs:", error);
+            }
+        }
+        if (selectedRentType === "Shop Closure" && shopClosureToggle) {
+            const cleanedAmount = parseFloat((amount || "").replace(/[^0-9.]/g, ""));
+            const weeklyExpenseData = {
+                date: paidOnDate,
+                contractor_id: 258,
+                project_id: 9,
+                type: "Advance Refund",
+                amount: isNaN(cleanedAmount) ? 0 : cleanedAmount,
+                weekly_number: getCurrentWeekNumber(),
+                status: false,
+                created_at: new Date().toISOString(),
+            };                
+            try {
+                const weeklyExpenseResponse = await fetch("https://backendaab.in/aabuildersDash/api/weekly-expenses/save", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(weeklyExpenseData),
+                });                    
+                if (!weeklyExpenseResponse.ok) {
+                    console.error("❌ Weekly expense submission failed");
+                } else {
+                    console.log("✅ Weekly expense submitted:", weeklyExpenseData);
+                }
+            } catch (error) {
+                console.error("❌ Error submitting weekly expense:", error);
+            }
+        }
+        if (selectedRentType === "Shop Closure" && closureDate && formTenantName && formShopNo) {
+            try {
+                const updateClosureResponse = await fetch(`https://backendaab.in/aabuildersDash/api/tenantShop/updateClosureDate/${encodeURIComponent(formTenantName)}/${encodeURIComponent(formShopNo)}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ shopClosureDate: closureDate }),
+                });
+                if (!updateClosureResponse.ok) {
+                    console.error("❌ Update closure date failed");
+                } else {
+                    console.log("✅ Closure date updated successfully");
+                }
+            } catch (error) {
+                console.error("❌ Error updating closure date:", error);
+            }
+
+            try {
+                await vacateShop(selectedTenantId, formShopNo);
+            } catch (err) {
+                console.error("❌ VacateShop failed", err);
+            }
+        }
+        
+        // Return the IDs of the submitted forms
+        return submittedFormIds;
+    };
+
     const vacateShop = async (tenantId, shopNo) => {
         try {
             const response = await fetch(`https://backendaab.in/aabuildersDash/api/tenantShop/vacateShop/${tenantId}/${shopNo}`, {
@@ -1375,6 +1545,151 @@ const Form = () => {
             >
                 {isSubmitting ? 'Submitting...' : 'Submit'}
             </button>
+            {/* Weekly Payment Bills Popup */}
+            {showWeeklyPaymentPopup && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                    <div className="bg-white text-left rounded-xl p-6 w-[800px] h-[600px] overflow-y-auto flex flex-col">
+                        <h3 className="text-lg font-semibold mb-4 text-center">Payment Details</h3>
+                        <div className="flex-1 overflow-hidden">
+                            <div className="space-y-4 mb-4">
+                                <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                                            <input
+                                                type="date"
+                                                value={weeklyPaymentData.date}
+                                                onChange={(e) => setWeeklyPaymentData(prev => ({ ...prev, date: e.target.value }))}
+                                                readOnly
+                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none bg-gray-100"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                                            <input
+                                                type="number"
+                                                value={weeklyPaymentData.amount}
+                                                readOnly
+                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>
+                                            <input
+                                                type="text"
+                                                value={weeklyPaymentData.paymentMode}
+                                                readOnly
+                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {(weeklyPaymentData.paymentMode === "Gpay" || weeklyPaymentData.paymentMode === "PhonePe" ||
+                                    weeklyPaymentData.paymentMode === "Net Banking" || weeklyPaymentData.paymentMode === "Cheque") && (
+                                    <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
+                                        <div className="space-y-4">
+                                            {weeklyPaymentData.paymentMode === "Cheque" && (
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No<span className="text-red-500">*</span></label>
+                                                        <input
+                                                            type="text"
+                                                            value={weeklyPaymentData.chequeNo}
+                                                            onChange={(e) => setWeeklyPaymentData(prev => ({ ...prev, chequeNo: e.target.value }))}
+                                                            placeholder="Enter cheque number"
+                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date<span className="text-red-500">*</span></label>
+                                                        <input
+                                                            type="date"
+                                                            value={weeklyPaymentData.chequeDate}
+                                                            onChange={(e) => setWeeklyPaymentData(prev => ({ ...prev, chequeDate: e.target.value }))}
+                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number<span className="text-red-500">*</span></label>
+                                                    <input
+                                                        type="text"
+                                                        value={weeklyPaymentData.transactionNumber}
+                                                        onChange={(e) => setWeeklyPaymentData(prev => ({ ...prev, transactionNumber: e.target.value }))}
+                                                        placeholder="Enter transaction number"
+                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Account Number<span className="text-red-500">*</span></label>
+                                                    <select
+                                                        value={weeklyPaymentData.accountNumber}
+                                                        onChange={(e) => setWeeklyPaymentData(prev => ({ ...prev, accountNumber: e.target.value }))}
+                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                    >
+                                                        <option value="">Select Account</option>
+                                                        {accountDetails.map((account) => (
+                                                            <option key={account.id} value={account.account_number}>
+                                                                {account.account_number}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-3 mt-6 p-4 bg-white">
+                            <button
+                                onClick={() => {
+                                    setShowWeeklyPaymentPopup(false);
+                                    setWeeklyPaymentData({
+                                        date: new Date().toISOString().split('T')[0],
+                                        amount: "",
+                                        paymentMode: "",
+                                        chequeNo: "",
+                                        chequeDate: "",
+                                        transactionNumber: "",
+                                        accountNumber: ""
+                                    });
+                                }}
+                                className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleWeeklyPaymentSubmit}
+                                disabled={isSubmitting}
+                                className="px-4 py-2 bg-[#BF9853] text-white rounded-lg disabled:bg-gray-400"
+                            >
+                                {isSubmitting ? 'Saving...' : 'Submit'}
+                            </button>
+                        </div>
+                        <button
+                            onClick={() => {
+                                setShowWeeklyPaymentPopup(false);
+                                setWeeklyPaymentData({
+                                    date: new Date().toISOString().split('T')[0],
+                                    amount: "",
+                                    paymentMode: "",
+                                    chequeNo: "",
+                                    chequeDate: "",
+                                    transactionNumber: "",
+                                    accountNumber: ""
+                                });
+                            }}
+                            className="absolute top-3 right-4 text-xl font-bold text-gray-500 hover:text-black"
+                        >
+                            ×
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

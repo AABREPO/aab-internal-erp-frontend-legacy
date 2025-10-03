@@ -6,6 +6,9 @@ import history from '../Images/History.svg';
 import Filter from '../Images/filter (3).png'
 import NotesStart from '../Images/notes _start.png';
 import NotesEnd from '../Images/notes_end.png';
+import jsPDF from "jspdf";
+import "jspdf-autotable";
+import * as XLSX from 'xlsx';
 
 const BillPayment = ({ username, userRoles = [] }) => {
     const [billPayments, setBillPayments] = useState([]);
@@ -14,6 +17,8 @@ const BillPayment = ({ username, userRoles = [] }) => {
     const [siteOptions, setSiteOptions] = useState([]);
     const [combinedOptions, setCombinedOptions] = useState([]);
     const [employeeOptions, setEmployeeOptions] = useState([]);
+    const [purposeOptions, setPurposeOptions] = useState([]);
+    const [tenantOptions, setTenantOptions] = useState([]);
     const [selectedProjectName, setSelectedProjectName] = useState(null);
     const [selectedContractor, setSelectedContractor] = useState(null);
     const [selectedVendor, setSelectedVendor] = useState(null);
@@ -38,6 +43,9 @@ const BillPayment = ({ username, userRoles = [] }) => {
     const [selectContractororVendorName, setSelectContractororVendorName] = useState('');
     const [selectProjectName, setSelectProjectName] = useState('');
     const [selectType, setSelectType] = useState('');
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(50);
     // Sorting state - default to ID descending (newest first)
     const [sortConfig, setSortConfig] = useState({
         key: 'id',
@@ -126,6 +134,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
                 const data = await response.json();
                 // Sort all entries by ID (newest first) - ID represents creation order
                 const sortedData = data.sort((a, b) => (b.id || 0) - (a.id || 0));
+                console.log(sortedData);
                 setBillPayments(sortedData);
             } else {
                 console.error("Failed to fetch bill payments");
@@ -285,6 +294,58 @@ const BillPayment = ({ username, userRoles = [] }) => {
             console.error("Error fetching project options:", error);
         }
     }, []);
+    
+    // Fetch purpose options from API
+    const fetchPurposeOptions = useCallback(async () => {
+        try {
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/loan-purposes/getAll', {
+                method: "GET",
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            });
+            if (response.ok) {
+                const data = await response.json();
+                const options = data.map(purpose => ({
+                    value: purpose.purpose,
+                    label: purpose.purpose,
+                    id: purpose.id,
+                    type: 'Purpose'
+                }));
+                setPurposeOptions(options);
+            }
+        } catch (error) {
+            console.error("Error fetching purpose options:", error);
+            setPurposeOptions([]);
+        }
+    }, []);
+    
+    // Fetch tenant options from API
+    const fetchTenantOptions = useCallback(async () => {
+        try {
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/tenantShop/getAll', {
+                method: "GET",
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            });
+            if (response.ok) {
+                const data = await response.json();
+                const options = data.map(tenant => ({
+                    value: tenant.tenantName,
+                    label: tenant.tenantName,
+                    id: tenant.id,
+                }));
+                setTenantOptions(options);
+            }
+        } catch (error) {
+            console.error("Error fetching tenant options:", error);
+            setTenantOptions([]);
+        }
+    }, []);
+    
     const handleDeleteBillPayment = async (item) => {
         try {
             let successMessage = "Bill payment deleted successfully!";
@@ -322,7 +383,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
                         type: null,
                         amount: null,
                         bill_payment_mode: null,
-                        date: null,
+                        date: item.date,
                         // Keep entry_no and timestamp unchanged
                         entry_no: item.entry_no,
                         timestamp: item.timestamp
@@ -353,7 +414,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
                         type: null,
                         amount: null,
                         bill_payment_mode: null,
-                        date: null,
+                        date: item.date,
                         // Keep entry_no and timestamp unchanged
                         entry_no: item.entry_no,
                         timestamp: item.timestamp
@@ -429,20 +490,55 @@ const BillPayment = ({ username, userRoles = [] }) => {
         const combined = [
             ...vendorOptions.map(option => ({ ...option, category: 'Vendor' })),
             ...contractorOptions.map(option => ({ ...option, category: 'Contractor' })),
-            ...employeeOptions.map(option => ({ ...option, category: 'Employee' }))
+            ...employeeOptions.map(option => ({ ...option, category: 'Employee' })),
+            ...tenantOptions.map(option => ({ ...option, category: 'Tenant' }))
         ];
         setCombinedOptions(combined);
-    }, [vendorOptions, contractorOptions, employeeOptions]);
+    }, [vendorOptions, contractorOptions, employeeOptions, tenantOptions]);
     useEffect(() => {
         fetchBillPayments();
         fetchVendorOptions();
         fetchContractorOptions();
         fetchEmployeeOptions();
         fetchProjectOptions();
-    }, [fetchBillPayments, fetchVendorOptions, fetchContractorOptions, fetchEmployeeOptions, fetchProjectOptions]);
+        fetchPurposeOptions();
+        fetchTenantOptions();
+    }, [fetchBillPayments, fetchVendorOptions, fetchContractorOptions, fetchEmployeeOptions, fetchProjectOptions, fetchPurposeOptions, fetchTenantOptions]);
+    
+    // Reset to first page when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [selectDate, selectContractororVendorName, selectProjectName, selectType]);
     const getProjectName = (projectId) => {
         const project = siteOptions.find(option => option.id === projectId);
         return project ? project.label : '-';
+    };
+    
+    // New function to get project name or purpose name
+    const getProjectOrPurposeName = (item) => {
+        // Check if this is a tenant - if so, show tenant_complex_name directly from the data
+        const partyData = getPartyNameAndType(item);
+        if (partyData.type === 'Tenant' && item.tenant_complex_name) {
+            return item.tenant_complex_name;
+        }
+        
+        // First try to get project name
+        if (item.project_id) {
+            const projectName = getProjectName(item.project_id);
+            if (projectName !== '-') {
+                return projectName;
+            }
+        }
+        
+        // If no project_id or project not found, try to get purpose name
+        if (item.purpose_id) {
+            const purposeName = getPurposeName(item.purpose_id);
+            if (purposeName !== '-') {
+                return purposeName;
+            }
+        }
+        
+        return '-';
     };
     const getVendorName = (vendorId) => {
         const vendor = vendorOptions.find(option => option.id === vendorId);
@@ -456,10 +552,19 @@ const BillPayment = ({ username, userRoles = [] }) => {
         const employee = employeeOptions.find(option => option.id === employeeId);
         return employee ? employee.label : '-';
     };
+    const getPurposeName = (purposeId) => {
+        const purpose = purposeOptions.find(option => option.id === purposeId);
+        return purpose ? purpose.label : '-';
+    };
+    const getTenantName = (tenantId) => {
+        const tenant = tenantOptions.find(option => option.id === tenantId);
+        return tenant ? tenant.label : '-';
+    };
     const getPartyNameAndType = (item) => {
         const contractorName = getContractorName(item.contractor_id);
         const vendorName = getVendorName(item.vendor_id);
         const employeeName = getEmployeeName(item.employee_id);
+        const tenantName = getTenantName(item.tenant_id);
 
         if (contractorName !== '-') {
             return { name: contractorName, type: 'Contractor' };
@@ -467,6 +572,8 @@ const BillPayment = ({ username, userRoles = [] }) => {
             return { name: vendorName, type: 'Vendor' };
         } else if (employeeName !== '-') {
             return { name: employeeName, type: 'Employee' };
+        } else if (tenantName !== '-') {
+            return { name: tenantName, type: 'Tenant' };
         } else {
             return { name: '-', type: '-' };
         }
@@ -494,7 +601,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
         }
         if (selectProjectName) {
             filtered = filtered.filter(item => {
-                const projectName = getProjectName(item.project_id);
+                const projectName = getProjectOrPurposeName(item);
                 return projectName === selectProjectName;
             });
         }
@@ -506,8 +613,8 @@ const BillPayment = ({ username, userRoles = [] }) => {
                 let aVal, bVal;
                 switch (sortConfig.key) {
                     case 'project_name':
-                        aVal = getProjectName(a.project_id);
-                        bVal = getProjectName(b.project_id);
+                        aVal = getProjectOrPurposeName(a);
+                        bVal = getProjectOrPurposeName(b);
                         break;
                     case 'party_name':
                         aVal = getPartyNameAndType(a).name;
@@ -528,6 +635,10 @@ const BillPayment = ({ username, userRoles = [] }) => {
                     case 'employee_name':
                         aVal = getEmployeeName(a.employee_id);
                         bVal = getEmployeeName(b.employee_id);
+                        break;
+                    case 'tenant_name':
+                        aVal = getTenantName(a.tenant_id);
+                        bVal = getTenantName(b.tenant_id);
                         break;
                     case 'date':
                         aVal = new Date(a.date);
@@ -553,6 +664,22 @@ const BillPayment = ({ username, userRoles = [] }) => {
         return filtered;
     };
     const filteredData = getFilteredData();
+    
+    // Pagination logic
+    const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const currentItems = filteredData.slice(startIndex, endIndex);
+    
+    // Extract unique type values from the data for dropdown options
+    const getUniqueTypes = () => {
+        const uniqueTypes = [...new Set(billPayments.map(item => item.type).filter(type => type && type.trim() !== ''))];
+        return uniqueTypes.map(type => ({
+            value: type,
+            label: type
+        }));
+    };
+    
     const calculatePaymentTotals = () => {
         let upiTotal = 0;
         let netBankingTotal = 0;
@@ -572,6 +699,159 @@ const BillPayment = ({ username, userRoles = [] }) => {
         return { upiTotal, netBankingTotal, chequeTotal };
     };
     const { upiTotal, netBankingTotal, chequeTotal } = calculatePaymentTotals();
+
+    // Export functions
+    const handleExportPDF = () => {
+        const doc = new jsPDF('landscape');
+        const tableColumn = [
+            "S.No",
+            "Date",
+            "Project",
+            "Party Name",
+            "Party Type",
+            "Type",
+            "Amount",
+            "Payment Mode",
+            "Account No",
+            "Cheque No",
+            "Cheque Date"
+        ];
+
+        const tableRows = filteredData.map((item, index) => [
+            index + 1,
+            new Date(item.date).toLocaleDateString(),
+            getProjectOrPurposeName(item),
+            getPartyNameAndType(item).name,
+            getPartyNameAndType(item).type,
+            item.type,
+            `₹${parseFloat(item.amount || 0).toLocaleString()}`,
+            item.bill_payment_mode || '-',
+            item.account_number || '-',
+            item.cheque_number || '-',
+            item.cheque_date ? new Date(item.cheque_date).toLocaleDateString() : '-'
+        ]);
+
+        doc.setFontSize(12);
+        doc.text("Bank Records Report", 14, 10);
+        doc.autoTable({
+            head: [tableColumn],
+            body: tableRows,
+            startY: 15,
+            styles: {
+                fontSize: 7,
+                overflow: 'linebreak',
+                lineColor: [0, 0, 0],
+                lineWidth: 0.1,
+                textColor: [0, 0, 0],
+            },
+            headStyles: {
+                fillColor: false,
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+            },
+            bodyStyles: {
+                fillColor: false,
+                textColor: [0, 0, 0],
+            },
+            theme: 'grid'
+        });
+
+        const fileName = `Bank-Records-${new Date().toISOString().split('T')[0]}.pdf`;
+        doc.save(fileName);
+    };
+
+    const handleExportExcel = () => {
+        const worksheetData = [
+            ["S.No", "Date", "Project", "Party Name", "Party Type", "Type", "Amount", "Payment Mode", "Account No", "Cheque No", "Cheque Date"],
+            ...filteredData.map((item, index) => [
+                index + 1,
+                new Date(item.date).toLocaleDateString(),
+                getProjectOrPurposeName(item),
+                getPartyNameAndType(item).name,
+                getPartyNameAndType(item).type,
+                item.type,
+                parseFloat(item.amount || 0),
+                item.bill_payment_mode || '-',
+                item.account_number || '-',
+                item.cheque_number || '-',
+                item.cheque_date ? new Date(item.cheque_date).toLocaleDateString() : '-'
+            ])
+        ];
+
+        const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Bank Records");
+
+        const fileName = `Bank-Records-${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(workbook, fileName);
+    };
+
+    const handlePrint = () => {
+        const printWindow = window.open('', '_blank');
+        const tableHTML = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Bank Records Report</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 20px; }
+                    h1 { text-align: center; margin-bottom: 20px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    th { background-color: #f5f5f5; font-weight: bold; }
+                    .summary { margin-bottom: 20px; }
+                    .summary div { margin: 5px 0; }
+                </style>
+            </head>
+            <body>
+                <h1>Bank Records Report</h1>
+                <div class="summary">
+                    <div><strong>Total UPI Amount:</strong> ₹${upiTotal.toLocaleString()}</div>
+                    <div><strong>Total NetBanking Amount:</strong> ₹${netBankingTotal.toLocaleString()}</div>
+                    <div><strong>Total Cheque Amount:</strong> ₹${chequeTotal.toLocaleString()}</div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>S.No</th>
+                            <th>Date</th>
+                            <th>Project</th>
+                            <th>Party Name</th>
+                            <th>Party Type</th>
+                            <th>Type</th>
+                            <th>Amount</th>
+                            <th>Payment Mode</th>
+                            <th>Account No</th>
+                            <th>Cheque No</th>
+                            <th>Cheque Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filteredData.map((item, index) => `
+                            <tr>
+                                <td>${index + 1}</td>
+                                <td>${new Date(item.date).toLocaleDateString()}</td>
+                                <td>${getProjectOrPurposeName(item)}</td>
+                                <td>${getPartyNameAndType(item).name}</td>
+                                <td>${getPartyNameAndType(item).type}</td>
+                                <td>${item.type}</td>
+                                <td>₹${parseFloat(item.amount || 0).toLocaleString()}</td>
+                                <td>${item.bill_payment_mode || '-'}</td>
+                                <td>${item.account_number || '-'}</td>
+                                <td>${item.cheque_number || '-'}</td>
+                                <td>${item.cheque_date ? new Date(item.cheque_date).toLocaleDateString() : '-'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </body>
+            </html>
+        `;
+
+        printWindow.document.write(tableHTML);
+        printWindow.document.close();
+        printWindow.print();
+    };
     return (
         <body className="bg-[#FAF6ED]">
             <div className="bg-white ml-10 mr-10 min-h-screen">
@@ -644,7 +924,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Contractor/Vendor/Employee</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Party Name</label>
                                     <Select
                                         value={selectContractororVendorName ? { value: selectContractororVendorName, label: selectContractororVendorName } : null}
                                         onChange={(option) => setSelectContractororVendorName(option ? option.value : '')}
@@ -669,12 +949,14 @@ const BillPayment = ({ username, userRoles = [] }) => {
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
-                                    <input
-                                        type="text"
-                                        value={selectType}
-                                        onChange={(e) => setSelectType(e.target.value)}
-                                        placeholder="Enter type..."
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    <Select
+                                        value={selectType ? { value: selectType, label: selectType } : null}
+                                        onChange={(option) => setSelectType(option ? option.value : '')}
+                                        options={getUniqueTypes()}
+                                        placeholder="Select type..."
+                                        isClearable
+                                        className="basic-single"
+                                        classNamePrefix="select"
                                     />
                                 </div>
                             </div>
@@ -682,39 +964,54 @@ const BillPayment = ({ username, userRoles = [] }) => {
                     </div>
                     <div className="bg-white rounded-lg p-4 shadow-md overflow-hidden">
                         <div className="p-6 border-b border-gray-200">
-                            <h3 className="text-lg font-semibold text-gray-800">Bank Records</h3>
-                            <p className="text-sm text-gray-600 mt-1">Showing {filteredData.length} records</p>
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-800">Bank Records</h3>
+                                <p className="text-sm text-gray-600 mt-1">Showing {startIndex + 1}-{Math.min(endIndex, filteredData.length)} of {filteredData.length} records</p>
+                            </div>
+                            <div className="flex justify-end items-center">
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={handleExportPDF}
+                                        className="text-sm font-medium text-[#E4572E] hover:text-gray-900 focus:outline-none"
+                                    >
+                                        Export PDF
+                                    </button>
+                                    <button
+                                        onClick={handleExportExcel}
+                                        className="text-sm font-medium text-[#007233] hover:text-gray-900 focus:outline-none"
+                                    >
+                                        Export XL
+                                    </button>
+                                    <button
+                                        onClick={handlePrint}
+                                        className="text-sm font-medium text-[#BF9853] hover:text-gray-900 focus:outline-none"
+                                    >
+                                        Print
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                        <div
-                            ref={scrollRef}
-                            className="overflow-y-auto overflow-x-auto max-h-96 rounded-lg border-l-8 border-l-[#BF9853] no-scrollbar"
-                            onMouseDown={handleMouseDown}
-                            onMouseMove={handleMouseMove}
-                            onMouseUp={handleMouseUp}
-                            onMouseLeave={handleMouseUp}
+                        <div ref={scrollRef} className="overflow-y-auto overflow-x-auto max-h-96 rounded-lg border-l-8 border-l-[#BF9853] no-scrollbar"
+                            onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
                         >
                             <table className="w-full min-w-max">
                                 <thead className="bg-[#FAF6ED] sticky text-sm top-0">
                                     <tr>
-                                        <th
-                                            className="px-6 py-3 text-left font-semibold  uppercase tracking-wider whitespace-nowrap min-w-[80px]"
+                                        <th className="px-6 py-3 text-left font-semibold  uppercase tracking-wider whitespace-nowrap min-w-[80px]"
                                         >
                                             S.NO
                                         </th>
-                                        <th
-                                            className="px-6 py-3 text-left font-semibold uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap min-w-[100px]"
+                                        <th className="px-6 py-3 text-left font-semibold uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap min-w-[100px]"
                                             onClick={() => handleSort('date')}
                                         >
                                             DATE {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th
-                                            className="px-6 py-3 text-left font-semibold uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap min-w-[200px]"
+                                        <th className="px-6 py-3 text-left font-semibold uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap min-w-[200px]"
                                             onClick={() => handleSort('project_name')}
                                         >
                                             PROJECT {sortConfig.key === 'project_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th
-                                            className="px-6 py-3 text-left font-semibold uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap min-w-[150px]"
+                                        <th className="px-6 py-3 text-left font-semibold uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap min-w-[150px]"
                                             onClick={() => handleSort('party_name')}
                                         >
                                             PARTY NAME {sortConfig.key === 'party_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
@@ -758,16 +1055,16 @@ const BillPayment = ({ username, userRoles = [] }) => {
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
-                                    {filteredData.map((item, index) => (
+                                    {currentItems.map((item, index) => (
                                         <tr key={index} className="hover:bg-gray-50 odd:bg-white even:bg-[#FAF6ED]">
                                             <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                                {index + 1}
+                                                {startIndex + index + 1}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                 {new Date(item.date).toLocaleDateString()}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                                {getProjectName(item.project_id)}
+                                                {getProjectOrPurposeName(item)}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                 {getPartyNameAndType(item).name}
@@ -826,6 +1123,74 @@ const BillPayment = ({ username, userRoles = [] }) => {
                                 </tbody>
                             </table>
                         </div>
+                        
+                        {/* Pagination Controls */}
+                        <div className="flex items-center justify-between mt-4 px-4 py-3 bg-white border-t border-gray-200">
+                            <div className="flex items-center space-x-2">
+                                <span className="text-sm text-gray-700">Items per page:</span>
+                                <select
+                                    value={itemsPerPage}
+                                    onChange={(e) => {
+                                        setItemsPerPage(Number(e.target.value));
+                                        setCurrentPage(1);
+                                    }}
+                                    className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                >
+                                    <option value={10}>10</option>
+                                    <option value={25}>25</option>
+                                    <option value={50}>50</option>
+                                    <option value={100}>100</option>
+                                </select>
+                                <span className="text-sm text-gray-700">
+                                    Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} entries
+                                </span>
+                            </div>
+                            
+                            <div className="flex items-center space-x-1">
+                                <button
+                                    onClick={() => setCurrentPage(currentPage - 1)}
+                                    disabled={currentPage === 1}
+                                    className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                >
+                                    Previous
+                                </button>
+                                
+                                {/* Page numbers */}
+                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                    let pageNum;
+                                    if (totalPages <= 5) {
+                                        pageNum = i + 1;
+                                    } else if (currentPage <= 3) {
+                                        pageNum = i + 1;
+                                    } else if (currentPage >= totalPages - 2) {
+                                        pageNum = totalPages - 4 + i;
+                                    } else {
+                                        pageNum = currentPage - 2 + i;
+                                    }
+                                    
+                                    return (
+                                        <button
+                                            key={pageNum}
+                                            onClick={() => setCurrentPage(pageNum)}
+                                            className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${
+                                                currentPage === pageNum
+                                                    ? 'bg-[#BF9853] text-white border-[#BF9853]'
+                                                    : 'border-gray-300 hover:bg-[#BF9853] hover:text-white'
+                                            }`}
+                                        >
+                                            {pageNum}
+                                        </button>
+                                    );
+                                })}                                
+                                <button
+                                    onClick={() => setCurrentPage(currentPage + 1)}
+                                    disabled={currentPage === totalPages}
+                                    className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        </div>
                     </div>
                     {popup.show && (
                         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
@@ -848,8 +1213,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
                                         {popup.type === 'success' ? 'Success' : 'Error'}
                                     </h3>
                                     <p className="text-gray-600 mb-4">{popup.message}</p>
-                                    <button
-                                        onClick={() => setPopup({ show: false, message: "", type: "", dateStr: "" })}
+                                    <button onClick={() => setPopup({ show: false, message: "", type: "", dateStr: "" })}
                                         className={`w-full px-4 py-2 rounded-lg font-medium ${popup.type === 'success'
                                             ? 'bg-green-600 text-white hover:bg-green-700'
                                             : 'bg-red-600 text-white hover:bg-red-700'

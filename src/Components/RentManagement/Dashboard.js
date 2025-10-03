@@ -30,6 +30,7 @@ const Dashboard = () => {
     const [selectedDoorNo, setSelectedDoorNo] = useState('');
     const [paymentStatus, setPaymentStatus] = useState('');
     const [selectedProperty, setSelectedProperty] = useState(null);
+    const [selectedOccupancyStatus, setSelectedOccupancyStatus] = useState('');
     const [selectedMonthYear, setSelectedMonthYear] = useState(getCurrentMonth());
     const [tableHeight, setTableHeight] = useState(400); // Default height in pixels
     const scrollRef = useRef(null);
@@ -47,12 +48,14 @@ const Dashboard = () => {
         const savedSelectedDoorNo = sessionStorage.getItem('selectedDoorNo');
         const savedTenantName = sessionStorage.getItem('selectedTenantName');
         const savedSelectedProperty = sessionStorage.getItem('selectedProperty');
+        const savedOccupancyStatus = sessionStorage.getItem('selectedOccupancyStatus');
         try {
             if (savedPaymentStatus) setPaymentStatus(JSON.parse(savedPaymentStatus));
             if (savedShopNo) setSelectedShopNo(JSON.parse(savedShopNo));
             if (savedTenantName) setSelectedTenantName(JSON.parse(savedTenantName));
             if (savedSelectedDoorNo) setSelectedDoorNo(JSON.parse(savedSelectedDoorNo));
             if (savedSelectedProperty) setSelectedProperty(JSON.parse(savedSelectedProperty));
+            if (savedOccupancyStatus) setSelectedOccupancyStatus(JSON.parse(savedOccupancyStatus));
         } catch (error) {
             console.error("Error parsing sessionStorage data:", error);
         }
@@ -67,6 +70,7 @@ const Dashboard = () => {
         sessionStorage.removeItem('selectedDoorNo');
         sessionStorage.removeItem('selectedTenantName');
         sessionStorage.removeItem('selectedProperty');
+        sessionStorage.removeItem('selectedOccupancyStatus');
     };
     useEffect(() => {
         if (paymentStatus) sessionStorage.setItem('paymentStatus', JSON.stringify(paymentStatus));
@@ -74,7 +78,8 @@ const Dashboard = () => {
         if (selectedDoorNo) sessionStorage.setItem('selectedDoorNo', JSON.stringify(selectedDoorNo));
         if (selectedTenantName) sessionStorage.setItem('selectedTenantName', JSON.stringify(selectedTenantName));
         if (selectedProperty) sessionStorage.setItem('selectedProperty', JSON.stringify(selectedProperty));
-    }, [paymentStatus, selectedShopNo, selectedDoorNo, selectedTenantName, selectedProperty]);
+        if (selectedOccupancyStatus) sessionStorage.setItem('selectedOccupancyStatus', JSON.stringify(selectedOccupancyStatus));
+    }, [paymentStatus, selectedShopNo, selectedDoorNo, selectedTenantName, selectedProperty, selectedOccupancyStatus]);
 
     const handleSort = (field) => {
         if (sortField === field) {
@@ -155,20 +160,6 @@ const Dashboard = () => {
         };
         animationFrame.current = requestAnimationFrame(step);
     };
-    [...tableData].sort((a, b) => {
-        let valA = a[sortField]?.toString().toLowerCase() || '';
-        let valB = b[sortField]?.toString().toLowerCase() || '';
-
-        if (sortField === 'shopNo') {
-            // Sort by first character (alphabetical)
-            valA = valA.charAt(0);
-            valB = valB.charAt(0);
-        }
-
-        if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-        if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
-        return 0;
-    });
 
 
     const vacantShops = useMemo(() => {
@@ -498,6 +489,21 @@ const Dashboard = () => {
             const matchesDoorNo = selectedDoorNo ? shop.doorNo === selectedDoorNo : true;
             const matchesProperty = selectedProperty ? shop.propertyName === selectedProperty.value : true;
             const isVacant = shop.tenantName === 'Vacant';
+            const isVacated = shop.vacated;
+            const isOccupied = !isVacant && !isVacated;
+            
+            // Occupancy status filter
+            let matchesOccupancyStatus = true;
+            if (selectedOccupancyStatus) {
+                if (selectedOccupancyStatus === 'vacant') {
+                    matchesOccupancyStatus = isVacant;
+                } else if (selectedOccupancyStatus === 'occupied') {
+                    matchesOccupancyStatus = isOccupied;
+                } else if (selectedOccupancyStatus === 'vacated') {
+                    matchesOccupancyStatus = isVacated;
+                }
+            }
+            
             let matchesMonthStatus = true;
             if (selectedMonth !== '' && paymentStatus !== '') {
                 const monthPayments = shop.months?.[selectedMonth] || [];
@@ -514,7 +520,7 @@ const Dashboard = () => {
                     matchesMonthStatus = totalAmount === 0 && hasStarted;
                 }
             }
-            return matchesShopNo && matchesTenantName && matchesDoorNo && matchesProperty && (!isVacant || paymentStatus === '') && matchesMonthStatus;
+            return matchesShopNo && matchesTenantName && matchesDoorNo && matchesProperty && matchesOccupancyStatus && (!isVacant || paymentStatus === '') && matchesMonthStatus;
         });
     }, [
         tableData,
@@ -523,7 +529,8 @@ const Dashboard = () => {
         selectedDoorNo,
         selectedMonth,
         paymentStatus,
-        selectedProperty, // ✅ Include here
+        selectedProperty,
+        selectedOccupancyStatus,
     ]);
 
     const sortedTableData = useMemo(() => {
@@ -533,20 +540,11 @@ const Dashboard = () => {
             const valA = normalize(a[sortField]?.split(',')[0]);
             const valB = normalize(b[sortField]?.split(',')[0]);
             if (sortField === 'shopNo') {
-                // Match prefix (letters), number, and optional suffix
-                const regex = /^([A-Z]+)?(\d+)?([A-Z]*)?$/;
-                const [, prefixA = '', numA = '', suffixA = ''] =
-                    valA.match(regex) || [];
-                const [, prefixB = '', numB = '', suffixB = ''] =
-                    valB.match(regex) || [];
-                if (prefixA < prefixB) return sortOrder === 'asc' ? -1 : 1;
-                if (prefixA > prefixB) return sortOrder === 'asc' ? 1 : -1;
-                const num1 = parseInt(numA, 10) || 0;
-                const num2 = parseInt(numB, 10) || 0;
-                if (num1 < num2) return sortOrder === 'asc' ? -1 : 1;
-                if (num1 > num2) return sortOrder === 'asc' ? 1 : -1;
-                if (suffixA < suffixB) return sortOrder === 'asc' ? -1 : 1;
-                if (suffixA > suffixB) return sortOrder === 'asc' ? 1 : -1;
+                // Sort by first character only
+                const firstCharA = valA.charAt(0) || '';
+                const firstCharB = valB.charAt(0) || '';
+                if (firstCharA < firstCharB) return sortOrder === 'asc' ? -1 : 1;
+                if (firstCharA > firstCharB) return sortOrder === 'asc' ? 1 : -1;
                 return 0;
             }
             // Default sorting for other fields
@@ -987,6 +985,26 @@ const Dashboard = () => {
                                 }}
                             />
                         </div>
+                        <div className="w-full sm:w-auto sm:min-w-[200px]">
+                            <select
+                                className='w-full h-[45px] border-2 border-[#BF9853] rounded-lg pl-3 focus:outline-none'
+                                value={selectedOccupancyStatus}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    setSelectedOccupancyStatus(value);
+                                    if (value) {
+                                        sessionStorage.setItem('selectedOccupancyStatus', JSON.stringify(value));
+                                    } else {
+                                        sessionStorage.removeItem('selectedOccupancyStatus');
+                                    }
+                                }}
+                            >
+                                <option value="">Select Occupancy Status</option>
+                                <option value="occupied">Occupied Shop</option>
+                                <option value="vacant">Vacant Shop</option>
+                                <option value="vacated">Vacated Shop</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1031,29 +1049,17 @@ const Dashboard = () => {
                         Export PDF
                     </button>
                 </div>
-                <div
-                    ref={scrollRef}
-                    className="rounded-lg border-l-8 border-[#BF9853] overflow-scroll select-none"
-                    style={{ height: `${550}px` }}
-                    onMouseDown={handleMouseDown}
-                    onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={handleMouseUp}
+                <div ref={scrollRef} className="rounded-lg border-l-8 border-[#BF9853] overflow-scroll select-none" style={{ height: `${550}px` }}
+                    onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
                 >
                     <table className="border-collapse w-full text-left min-w-[1165px]">
                         <thead className="sticky top-0">
                             <tr className="bg-[#FAF6ED]">
                                 <th className="px-2 py-2 font-semibold cursor-pointer">S.No</th>
-                                <th
-                                    className="px-4 py-2 font-semibold cursor-pointer"
-                                    onClick={() => handleSort('shopNo')}
-                                >
+                                <th className="px-4 py-2 font-semibold cursor-pointer" onClick={() => handleSort('shopNo')} >
                                     Sh.No {sortField === 'shopNo' && (sortOrder === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th
-                                    className="px-4 py-2 font-semibold cursor-pointer"
-                                    onClick={() => handleSort('tenantName')}
-                                >
+                                <th className="px-4 py-2 font-semibold cursor-pointer" onClick={() => handleSort('tenantName')} >
                                     Shop Name {sortField === 'tenantName' && (sortOrder === 'asc' ? '↑' : '↓')}
                                 </th>
                                 <th className="px-4 py-2 font-semibold">D.No</th>
@@ -1100,30 +1106,24 @@ const Dashboard = () => {
                                         <td className="px-4 py-2" title={(() => {
                                             const advanceDetails = shop.advanceDetails || [];
                                             const adjustmentDetails = shop.advanceAdjustmentDetails || [];
-                                            const shopClosureDetails = shop.shopClosureDetails || [];
-                                            
-                                            let tooltip = [];
-                                            
+                                            const shopClosureDetails = shop.shopClosureDetails || [];                                            
+                                            let tooltip = [];                                            
                                             // Add advance payments
                                             advanceDetails.forEach(detail => {
                                                 tooltip.push(detail);
-                                            });
-                                            
+                                            });                                            
                                             // Add advance adjustments with clear labeling
                                             adjustmentDetails.forEach(detail => {
                                                 tooltip.push(detail + ' (Advance Adjustment)');
-                                            });
-                                            
+                                            });                                            
                                             // Add shop closure payments with clear labeling
                                             shopClosureDetails.forEach(detail => {
                                                 tooltip.push(detail + ' (Shop Closure)');
-                                            });
-                                            
+                                            });                                            
                                             // Add note for vacated shops
                                             if (shop.vacated && shop.advance > 0) {
                                                 tooltip.push('Balance to be returned to tenant');
-                                            }
-                                            
+                                            }                                            
                                             return tooltip.join('\n');
                                         })()}>
                                             {shop.advance != null && shop.shouldCollectAdvance !== false

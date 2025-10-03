@@ -307,7 +307,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
         <table>
             <tr><td class="label">Shop No</td><td>${rent.shopNo}</td></tr>
             <tr><td class="label">Property Name</td><td>${propertyName}</td></tr>
-            <tr><td class="label">Amount Paid</td><td>₹${Number(rent.refundAmount || rent.amount).toLocaleString('en-US', {
+            <tr><td class="label">Amount Paid</td><td>₹${Number(rent.refundAmount || rent.amount).toLocaleString('en-IN', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
         })}</td></tr>
@@ -401,7 +401,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                 const formattedMonths = uniqueForTheMonthOf.map(monthStr => {
                     const [year, month] = monthStr.split('-');
                     const date = new Date(year, parseInt(month) - 1);
-                    return date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+                    return date.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
                 });
                 setMonthOptions(formattedMonths);
             })
@@ -445,7 +445,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
         const formattedMonths = uniqueMonths.map(monthStr => {
             const [year, month] = monthStr.split('-');
             const date = new Date(year, parseInt(month) - 1);
-            return date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+            return date.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
         });
         setMonthOptions(formattedMonths);
     }, [dbShopNo, dbTenantName, dbPaymentMode, dbFormType, selectedDbMonth, selectedDbDate, rentForms, selectedDbENo]);
@@ -593,7 +593,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
             formatDate(rent.timestamp),
             rent.shopNo,
             rent.tenantName,
-            `${Number(rent.refundAmount || rent.amount).toLocaleString('en-US', {
+            `${Number(rent.refundAmount || rent.amount).toLocaleString('en-IN', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
             })}`,
@@ -633,7 +633,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
             formatDate(rent.timestamp),
             rent.shopNo,
             rent.tenantName,
-            `${Number(rent.refundAmount || rent.amount).toLocaleString('en-US', {
+            `${Number(rent.refundAmount || rent.amount).toLocaleString('en-IN', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
             })}`,
@@ -1226,7 +1226,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                                             <td className={`text-sm text-left px-4 font-semibold ${rent.refundAmount ? 'text-red-500' : 'text-black'}`}>
                                                 {Number(rent.refundAmount || rent.amount) === 0
                                                     ? 'NIL'
-                                                    : `₹${Number(rent.refundAmount || rent.amount).toLocaleString('en-US', {
+                                                    : `₹${Number(rent.refundAmount || rent.amount).toLocaleString('en-IN', {
                                                         minimumFractionDigits: 2,
                                                         maximumFractionDigits: 2,
                                                     })}`}

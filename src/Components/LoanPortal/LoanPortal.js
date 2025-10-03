@@ -42,19 +42,21 @@ const LoanPortal = ({ username, userRoles = [] }) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editFormData, setEditFormData] = useState({});
   const [editingId, setEditingId] = useState(null);
+  const [paymentPopupData, setPaymentPopupData] = useState({
+    chequeNo: "",
+    chequeDate: "",
+    transactionNumber: "",
+    accountNumber: ""
+  });
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
-  // Memoized options to prevent unnecessary re-renders
-  const purposeOptions = useMemo(() => [
-    { value: 'Machine Loan', label: 'Machine Loan', id: 1, type: 'Purpose' },
-    { value: 'Material Loan', label: 'Material Loan', id: 2, type: 'Purpose' },
-    { value: 'Equipment Loan', label: 'Equipment Loan', id: 3, type: 'Purpose' },
-    { value: 'Working Capital', label: 'Working Capital', id: 4, type: 'Purpose' },
-    { value: 'Other', label: 'Other', id: 5, type: 'Purpose' }
-  ], []);
+  // State for purpose options - fetched from API
+  const [purposeOptions, setPurposeOptions] = useState([]);
 
   const paymentModeOptions = useMemo(() => [
     { value: 'Cash', label: 'Cash' },
     { value: 'GPay', label: 'GPay' },
+    { value: 'PhonePe', label: 'PhonePe' },
     { value: 'Net Banking', label: 'Net Banking' },
     { value: 'Cheque', label: 'Cheque' },
     { value: 'Advance Transfer', label: 'Advance Transfer' }
@@ -151,6 +153,51 @@ const LoanPortal = ({ username, userRoles = [] }) => {
     }
   }, []);
 
+  const handlePaymentModeChange = useCallback((e) => {
+    const newPaymentMode = e.target.value;
+    setPaymentMode(newPaymentMode);
+    // Reset payment popup data when payment mode changes
+    if (!["GPay", "PhonePe", "Net Banking", "Cheque"].includes(newPaymentMode)) {
+      setPaymentPopupData({
+        chequeNo: "",
+        chequeDate: "",
+        transactionNumber: "",
+        accountNumber: ""
+      });
+    }
+  }, []);
+
+  // Fetch purpose options from API
+  useEffect(() => {
+    const fetchPurposeOptions = async () => {
+      try {
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/loan-purposes/getAll', {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+        if (!response.ok) {
+          throw new Error("Network response was not ok: " + response.statusText);
+        }
+        const data = await response.json();
+        const formattedData = data.map(item => ({
+          value: item.purpose,
+          label: item.purpose,
+          id: item.id,
+          type: 'Purpose'
+        }));
+        setPurposeOptions(formattedData);
+      } catch (error) {
+        console.error("Error fetching purpose options: ", error);
+        // Fallback to empty array on error
+        setPurposeOptions([]);
+      }
+    };
+    fetchPurposeOptions();
+  }, []);
+
   // Fetch vendor names
   useEffect(() => {
     const fetchVendorNames = async () => {
@@ -235,39 +282,118 @@ const LoanPortal = ({ username, userRoles = [] }) => {
         // Add predefined site options
         const predefinedSiteOptions = [
           {
-            value: "Perumal Metal Works",
-            label: "Perumal Metal Works",
-            id: "1",
-            type: "Site",
+            value: "Mason Advance",
+            label: "Mason Advance",
+            id: 1,
             sNo: "1"
           },
           {
-            value: "Ramar Krishnankovil",
-            label: "Ramar Krishnankovil",
-            id: "2",
-            type: "Site",
+            value: "Material Advance",
+            label: "Material Advance",
+            id: 2,
             sNo: "2"
+          },
+          {
+            value: "Weekly Advance",
+            label: "Weekly Advance",
+            id: 3,
+            sNo: "3"
+          },
+          {
+            value: "Excess Advance",
+            label: "Excess Advance",
+            id: 4,
+            sNo: "4"
+          },
+          {
+            value: "Material Rent",
+            label: "Material Rent",
+            id: 5,
+            sNo: "5"
+          },
+          {
+            value: "Subhash Kumar - Kunnur",
+            label: "Subhash Kumar - Kunnur",
+            id: 6,
+            sNo: "6"
+          },
+          {
+            value: "Summary Bill",
+            label: "Summary Bill",
+            id: 7,
+            sNo: "7"
+          },
+          {
+            value: "Daily Wage",
+            label: "Daily Wage",
+            id: 8,
+            sNo: "8"
+          },
+          {
+            value: "Rent Management Portal",
+            label: "Rent Management Portal",
+            id: 9,
+            sNo: "9"
           }
         ];
-
         const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
         setSiteOptions(combinedSiteOptions);
       } catch (error) {
         console.error("Fetch error: ", error);
         const predefinedSiteOptions = [
           {
-            value: "Perumal Metal Works",
-            label: "Perumal Metal Works",
-            id: "1",
-            type: "Site",
+            value: "Mason Advance",
+            label: "Mason Advance",
+            id: 1,
             sNo: "1"
           },
           {
-            value: "Ramar Krishnankovil",
-            label: "Ramar Krishnankovil",
-            id: "2",
-            type: "Site",
+            value: "Material Advance",
+            label: "Material Advance",
+            id: 2,
             sNo: "2"
+          },
+          {
+            value: "Weekly Advance",
+            label: "Weekly Advance",
+            id: 3,
+            sNo: "3"
+          },
+          {
+            value: "Excess Advance",
+            label: "Excess Advance",
+            id: 4,
+            sNo: "4"
+          },
+          {
+            value: "Material Rent",
+            label: "Material Rent",
+            id: 5,
+            sNo: "5"
+          },
+          {
+            value: "Subhash Kumar - Kunnur",
+            label: "Subhash Kumar - Kunnur",
+            id: 6,
+            sNo: "6"
+          },
+          {
+            value: "Summary Bill",
+            label: "Summary Bill",
+            id: 7,
+            sNo: "7"
+          },
+          {
+            value: "Daily Wage",
+            label: "Daily Wage",
+            id: 8,
+            sNo: "8"
+          },
+          {
+            value: "Rent Management Portal",
+            label: "Rent Management Portal",
+            id: 9,
+            sNo: "9"
           }
         ];
         setSiteOptions(predefinedSiteOptions);
@@ -327,7 +453,6 @@ const LoanPortal = ({ username, userRoles = [] }) => {
     };
     fetchData();
   }, []);
-
   // Optimized handleChange with useCallback
   const handleChange = useCallback(async (selected) => {
     setSelectedOption(selected);
@@ -336,7 +461,6 @@ const LoanPortal = ({ username, userRoles = [] }) => {
     } else {
       localStorage.removeItem("loanContractorVendor");
     }
-
     try {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/loans/all');
       if (!response.ok) {
@@ -352,28 +476,81 @@ const LoanPortal = ({ username, userRoles = [] }) => {
               : false;
         })
         .reduce((sum, curr) => {
-          const amount = parseFloat(curr.loan_amount) || 0;
-          return sum + amount;
+          if (curr.type === 'Loan') {
+            // Add loan amounts
+            const amount = parseFloat(curr.amount) || 0;
+            return sum + amount;
+          } else if (curr.type === 'Refund') {
+            // Subtract refund amounts
+            const refundAmount = parseFloat(curr.loan_refund_amount) || 0;
+            return sum - refundAmount;
+          } else if (curr.type === 'Transfer') {
+            // For transfers, subtract only if transfer_Project_id exists (money going out)
+            if (curr.transfer_Project_id) {
+              const transferAmount = parseFloat(curr.amount) || 0;
+              return sum + transferAmount; // amount is already negative, so this subtracts
+            }
+            // If no transfer_Project_id, it's a purpose-to-purpose transfer, don't subtract
+            return sum;
+          }
+          return sum;
         }, 0);
-
       setOverallLoan(total);
     } catch (error) {
       console.error('Error fetching or processing loan data:', error);
       setOverallLoan(0);
     }
   }, []);
-
-
   // Combine vendor and contractor options
   useEffect(() => {
     setCombinedOptions([...vendorOptions, ...contractorOptions]);
   }, [vendorOptions, contractorOptions]);
 
+  // Calculate loan amount for selected purpose and associate
+  const calculateLoanAmount = useCallback(() => {
+    if (!selectedOption || !purpose) {
+      setLoanAmount('');
+      return;
+    }
+    const purposeId = parseInt(purpose, 10);
+    const total = loanData
+      .filter(entry => {
+        // Filter by associate
+        const matchesAssociate = selectedOption.type === 'Vendor'
+          ? entry.vendor_id === selectedOption.id
+          : selectedOption.type === 'Contractor'
+            ? entry.contractor_id === selectedOption.id
+            : false;
+        // Filter by purpose
+        const matchesPurpose = entry.from_purpose_id === purposeId;
+        return matchesAssociate && matchesPurpose;
+      })
+      .reduce((sum, curr) => {
+        if (curr.type === 'Loan') {
+          // Add loan amounts
+          const amount = parseFloat(curr.amount) || 0;
+          return sum + amount;
+        } else if (curr.type === 'Refund') {
+          // Subtract refund amounts
+          const refundAmount = parseFloat(curr.loan_refund_amount) || 0;
+          return sum - refundAmount;
+        } else if (curr.type === 'Transfer') {
+          // Subtract transfer amounts (money going out)
+          const transferAmount = parseFloat(curr.amount) || 0;
+          return sum + transferAmount; // amount is already negative, so this subtracts
+        }
+        return sum;
+      }, 0);
+    setLoanAmount(total.toString());
+  }, [loanData, selectedOption, purpose]);
+  // Update loan amount when data, selectedOption, or purpose changes
+  useEffect(() => {
+    calculateLoanAmount();
+  }, [calculateLoanAmount]);
   // Combine site and purpose options
   useEffect(() => {
     setCombinedSitePurposeOptions([...siteOptions, ...purposeOptions]);
   }, [siteOptions, purposeOptions]);
-
   // Memoized custom styles for Select components
   const customStyles = useMemo(() => ({
     control: (provided, state) => ({
@@ -387,9 +564,109 @@ const LoanPortal = ({ username, userRoles = [] }) => {
       }
     }),
   }), []);
-
-  // Optimized handleSubmit with useCallback
+  // Function to handle the initial submit button click
   const handleSubmit = async () => {
+    // Comprehensive validation for all required fields
+    if (!selectedLoanType) {
+      toast.error("Please select a loan type!", {
+        position: "top-center",
+        autoClose: 3000,
+        theme: "colored"
+      });
+      return;
+    }
+
+    if (!dateValue) {
+      toast.error("Please select a date!", {
+        position: "top-center",
+        autoClose: 3000,
+        theme: "colored"
+      });
+      return;
+    }
+
+    if (!selectedOption) {
+      toast.error("Please select an associate!", {
+        position: "top-center",
+        autoClose: 3000,
+        theme: "colored"
+      });
+      return;
+    }
+
+    if (!purpose) {
+      toast.error("Please select a purpose!", {
+        position: "top-center",
+        autoClose: 3000,
+        theme: "colored"
+      });
+      return;
+    }
+
+    // Validation based on loan type
+    if (selectedLoanType === "Loan") {
+      if (!amountGiven || parseFloat(amountGiven) <= 0) {
+        toast.error("Please enter a valid amount given!", {
+          position: "top-center",
+          autoClose: 3000,
+          theme: "colored"
+        });
+        return;
+      }
+
+      if (!paymentMode) {
+        toast.error("Please select a payment mode!", {
+          position: "top-center",
+          autoClose: 3000,
+          theme: "colored"
+        });
+        return;
+      }
+    }
+
+    if (selectedLoanType === "Refund") {
+      if (!amountGiven || parseFloat(amountGiven) <= 0) {
+        toast.error("Please enter a valid refund amount!", {
+          position: "top-center",
+          autoClose: 3000,
+          theme: "colored"
+        });
+        return;
+      }
+    }
+
+    if (selectedLoanType === "Transfer") {
+      if (!transferSelection) {
+        toast.error("Please select transfer destination!", {
+          position: "top-center",
+          autoClose: 3000,
+          theme: "colored"
+        });
+        return;
+      }
+
+      if (!transferAmount || parseFloat(transferAmount) <= 0) {
+        toast.error("Please enter a valid transfer amount!", {
+          position: "top-center",
+          autoClose: 3000,
+          theme: "colored"
+        });
+        return;
+      }
+    }
+
+    // Check if we need to show payment details popup
+    if (selectedLoanType === "Loan" && ["GPay", "PhonePe", "Net Banking", "Cheque"].includes(paymentMode)) {
+      setShowPaymentModal(true);
+      return;
+    }
+
+    // Otherwise, proceed with direct submission
+    await submitLoanData();
+  };
+
+  // Function to actually submit the loan data
+  const submitLoanData = async () => {
     const payload = {
       type: selectedLoanType,
       date: dateValue,
@@ -410,8 +687,6 @@ const LoanPortal = ({ username, userRoles = [] }) => {
       description,
       file_url: ""
     };
-
-    console.log("🚀 Payload ready to send:", payload);
     try {
       const response = await fetch("https://backendaab.in/aabuildersDash/api/loans/save", {
         method: "POST",
@@ -423,14 +698,116 @@ const LoanPortal = ({ username, userRoles = [] }) => {
       if (!response.ok) {
         throw new Error(`Failed to save loan: ${response.status}`);
       }
-      const data = await response.json();
-      console.log("✅ Loan saved successfully:", data);
-      window.location.reload();
+      const loanResult = await response.json();
+      
+      // If payment mode is GPay, PhonePe, Net Banking, or Cheque, also save to weekly-payment-bills
+      if (selectedLoanType === "Loan" && ["GPay", "PhonePe", "Net Banking", "Cheque"].includes(paymentMode)) {
+        const weeklyPaymentBillPayload = {
+          date: dateValue,
+          created_at: new Date().toISOString(),
+          contractor_id: selectedOption?.type === "Contractor" ? selectedOption.id : null,
+          vendor_id: selectedOption?.type === "Vendor" ? selectedOption.id : null,
+          employee_id: null,
+          project_id: 0,
+          type: "Loan",
+          bill_payment_mode: paymentMode,
+          amount: parseFloat(amountGiven) || 0,
+          status: true,
+          weekly_number: "",
+          weekly_payment_expense_id: null,
+          advance_portal_id: null,
+          staff_advance_portal_id: null,
+          claim_payment_id: null,
+          purpose_id: purpose,
+          loan_portal_id: loanResult.id || loanResult.loanPortalId,
+          cheque_number: paymentMode === "Cheque" ? paymentPopupData.chequeNo : null,
+          cheque_date: paymentMode === "Cheque" ? paymentPopupData.chequeDate : null,
+          transaction_number: paymentPopupData.transactionNumber || null,
+          account_number: paymentPopupData.accountNumber || null
+        };
+
+        const weeklyPaymentBillResponse = await axios.post(
+          "https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save",
+          weeklyPaymentBillPayload,
+          { headers: { "Content-Type": "application/json" } }
+        );
+        
+        toast.success("Loan saved successfully and added to Weekly Payment Bills!", {
+          position: "top-center",
+          autoClose: 3000,
+          theme: "colored"
+        });
+      } else {
+        toast.success("Loan saved successfully!", {
+          position: "top-center",
+          autoClose: 3000,
+          theme: "colored"
+        });
+      }
+      
+      // Reset payment popup data and close modal
+      setPaymentPopupData({
+        chequeNo: "",
+        chequeDate: "",
+        transactionNumber: "",
+        accountNumber: ""
+      });
+      setShowPaymentModal(false);
+      
+      // Reset form fields
+      setAmountGiven('');
+      setTransferAmount('');
+      setDescription('');
+      setSelectedLoanFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      
+      // Refresh loan data to show the new entry
+      setTimeout(async () => {
+        try {
+          const response = await fetch('https://backendaab.in/aabuildersDash/api/loans/all');
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+          const data = await response.json();
+          setLoanData(data);
+        } catch (error) {
+          console.error('Error refreshing loan data:', error);
+        }
+      }, 500);
     } catch (error) {
       console.error("❌ Error saving loan:", error);
+      toast.error("Failed to save loan!", {
+        position: "top-center",
+        autoClose: 3000,
+        theme: "colored"
+      });
     }
   };
 
+  // Function to handle payment modal submission
+  const handlePaymentModalSubmit = async () => {
+    // Validate payment details
+    if (!paymentPopupData.transactionNumber || !paymentPopupData.accountNumber) {
+      toast.error("Please fill all payment details!", {
+        position: "top-center",
+        autoClose: 3000,
+        theme: "colored"
+      });
+      return;
+    }
+    if (paymentMode === "Cheque" && (!paymentPopupData.chequeNo || !paymentPopupData.chequeDate)) {
+      toast.error("Please fill cheque details!", {
+        position: "top-center",
+        autoClose: 3000,
+        theme: "colored"
+      });
+      return;
+    }
+
+    await submitLoanData();
+  };
   // Function to get the current week number
   const getWeekNumber = () => {
     const now = new Date();
@@ -445,28 +822,51 @@ const LoanPortal = ({ username, userRoles = [] }) => {
     setDateValue(formatted);
   }, []);
   // Memoized filtered loan data for better performance
+  const getTransferDestination = useCallback((entry) => {
+    if (entry.type !== "Transfer") return "";
+    const transferAmount = parseFloat(entry.amount) || 0;
+    const currentPurposeId = parseInt(purpose, 10);
+    // Negative amount: from_purpose_id = selected purpose → Show "Transfer To [to_purpose_id]"
+    if (transferAmount < 0 && entry.from_purpose_id === currentPurposeId) {
+      if (entry.to_purpose_id) {
+        const toPurpose = purposeOptions.find(p => p.id === entry.to_purpose_id)?.label || "";
+        return `Transfer To ${toPurpose}`;
+      } else if (entry.transfer_Project_id) {
+        const toSite = siteOptions.find(s => s.id === entry.transfer_Project_id)?.label || "";
+        return `Transfer To ${toSite}`;
+      }
+    }
+    // Positive amount: from_purpose_id = selected purpose → Show "Transfer From [to_purpose_id]"
+    if (transferAmount > 0 && entry.from_purpose_id === currentPurposeId) {
+      if (entry.to_purpose_id) {
+        const toPurpose = purposeOptions.find(p => p.id === entry.to_purpose_id)?.label || "";
+        return `Transfer From ${toPurpose}`;
+      } else if (entry.transfer_Project_id) {
+        const toSite = siteOptions.find(s => s.id === entry.transfer_Project_id)?.label || "";
+        return `Transfer From ${toSite}`;
+      }
+    }
+    return "";
+  }, [purpose, purposeOptions, siteOptions]);
+
   const filteredLoanData = useMemo(() => {
-    if (!selectedOption) return [];
+    if (!selectedOption || !purpose) return [];
+    const purposeId = parseInt(purpose, 10);
+    function matchesAssociate(entry) {
+      if (selectedOption.type === 'Vendor') return entry.vendor_id === selectedOption.id;
+      if (selectedOption.type === 'Contractor') return entry.contractor_id === selectedOption.id;
+      if (selectedOption.type === 'Site') return entry.project_id === selectedOption.id;
+      return false;
+    }
+    function matchesPurpose(entry) {
+      // For all types, only show entries where selected purpose is the from_purpose_id
+      return entry.from_purpose_id === purposeId;
+    }
     return loanData
-      .filter(entry => {
-        const isMatchingVendor =
-          selectedOption?.type === 'Vendor'
-            ? entry.vendor_id === selectedOption.id
-            : selectedOption?.type === 'Contractor'
-              ? entry.contractor_id === selectedOption.id
-              : false;
-        const isMatchingPurpose = purpose
-          ? entry.purpose_id === purpose.id
-          : true;
-        return isMatchingVendor && isMatchingPurpose;
-      })
-      .sort((a, b) => {
-        const timeA = new Date(a.date || a.timestamp).getTime() || 0;
-        const timeB = new Date(b.date || b.timestamp).getTime() || 0;
-        return timeB - timeA;
-      });
-  }, [loanData, selectedOption]);
-  // Calculate filtered amount based on date range and payment mode
+      .filter(entry => matchesAssociate(entry) && matchesPurpose(entry))
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [loanData, selectedOption, purpose]);
+  // Calculate filtered amount based on date range and payment mode (excluding refund amounts)
   useEffect(() => {
     if (!fromDate || !toDate) {
       setFilteredAmount(0);
@@ -479,16 +879,19 @@ const LoanPortal = ({ username, userRoles = [] }) => {
       const entryDate = new Date(entry.date);
       const isInDateRange = entryDate >= from && entryDate <= to;
       const isMatchingPayment =
-        !filteredPaymentMode || entry.mode === filteredPaymentMode;
+        !filteredPaymentMode || entry.loan_payment_mode === filteredPaymentMode;
       return isInDateRange && isMatchingPayment;
     });
     const total = filtered.reduce((sum, entry) => {
-      const amount = parseFloat(entry.loan_amount) || 0;
-      return sum + amount;
+      if (entry.type === 'Loan') {
+        const amount = Math.abs(parseFloat(entry.amount) || 0);
+        return sum + amount;
+      } else {
+        return sum;
+      }
     }, 0);
     setFilteredAmount(total);
   }, [fromDate, toDate, filteredPaymentMode, loanData]);
-  // Calculate today's total amount
   useEffect(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -499,20 +902,31 @@ const LoanPortal = ({ username, userRoles = [] }) => {
         return entryDate.getTime() === today.getTime();
       })
       .reduce((sum, entry) => {
-        const amount = parseFloat(entry.loan_amount) || 0;
-        return sum + amount;
+        if (entry.type === 'Refund') {
+          return sum; 
+        } else {
+          const amount = Math.abs(parseFloat(entry.amount) || 0);
+          return sum + amount;
+        }
       }, 0);
     setTodayAmount(todayTotal);
   }, [loanData]);
-  // Calculate total outstanding
   useEffect(() => {
     const total = loanData.reduce((sum, entry) => {
-      const amount = parseFloat(entry.loan_amount) || 0;
-      return sum + amount;
+      if (entry.type === 'Loan') {
+        const amount = parseFloat(entry.amount) || 0;
+        return sum + amount;
+      } else if (entry.type === 'Refund') {
+        const refundAmount = parseFloat(entry.loan_refund_amount) || 0;
+        return sum - refundAmount;
+      } else if (entry.type === 'Transfer') {
+        const transferAmount = parseFloat(entry.amount) || 0;
+        return sum + transferAmount;
+      }
+      return sum;
     }, 0);
     setTotalOutstanding(total);
   }, [loanData]);
-  // Optimized handlers with useCallback
   const handleFileChange = useCallback((e) => {
     const file = e.target.files[0];
     if (file) {
@@ -539,7 +953,6 @@ const LoanPortal = ({ username, userRoles = [] }) => {
         body: JSON.stringify(editFormData)
       });
       if (!res.ok) throw new Error('Failed to update');
-      // Refresh data instead of reloading the page
       const response = await fetch('https://backendaab.in/aabuildersDash/api/loans/all');
       if (response.ok) {
         const data = await response.json();
@@ -602,6 +1015,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                   <option value=''>Select</option>
                   <option value='Cash'>Cash</option>
                   <option value='GPay'>GPay</option>
+                  <option value='PhonePe'>PhonePe</option>
                   <option value='Net Banking'>Net Banking</option>
                   <option value='Cheque'>Cheque</option>
                   <option value='Advance Transfer'>Advance Transfer</option>
@@ -684,8 +1098,9 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                     <label className='font-semibold block text-sm sm:text-base'>Loan Amount</label>
                     <input
                       value={formatWithCommas(loanAmount)}
-                      onChange={handleLoanAmountChange}
-                      className='w-full h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
+                      readOnly
+                      disabled
+                      className='w-full h-[45px] px-2 py-1 rounded-lg bg-[#F2F2F2] focus:outline-none text-sm'
                     />
                   </div>
                   <div className='space-y-2'>
@@ -726,7 +1141,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                     ) : (
                       <select
                         value={paymentMode}
-                        onChange={(e) => setPaymentMode(e.target.value)}
+                        onChange={handlePaymentModeChange}
                         className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
                       >
                         <option value=''>Select</option>
@@ -779,6 +1194,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                   <div className='flex items-center gap-2'>
                     <input
                       readOnly
+                      value={formatWithCommas(loanAmount)}
                       className='border-2 w-[112px] p-2 border-[#E4572E] text-[#E4572E] font-bold border-opacity-10 rounded h-[33px] bg-[#F2F2F2] focus:outline-none text-xs'
                     />
                   </div>
@@ -794,43 +1210,58 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                       <table className="w-full min-w-[1000px]">
                         <thead className="bg-[#FAF6ED] text-left">
                           <tr>
-                            <th className="px-2 py-2 text-xs sm:text-sm">Date</th>
-                            <th className="px-2 py-2 text-xs sm:text-sm">Loan</th>
-                            <th className="px-2 py-2 text-xs sm:text-sm">Transfer/Refund</th>
+                            <th className="px-6 py-2 text-xs sm:text-sm w-[130px]">Date</th>
+                            <th className="px-2 py-2 text-xs sm:text-sm w-[250px]">Loan</th>
+                            <th className="px-2 py-2 text-xs sm:text-sm w-[250px]">Transfer/Refund</th>
                             <th className="px-2 py-2 text-xs sm:text-sm">Mode</th>
                             <th className="px-2 py-2 text-xs sm:text-sm">Activity</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {filteredLoanData.map((entry, index) => {
-                            const { date, amount, transfer_refund, loan_payment_mode } = entry;
-                            return (
-                              <tr key={index} className="border-t">
-                                <td className="px-2 py-2 text-xs sm:text-sm font-semibold">
-                                  {new Date(date).toLocaleDateString('en-GB')}
-                                </td>
-                                <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold">
-                                  {parseFloat(amount || 0).toLocaleString('en-IN')}
-                                </td>
-                                <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold">
-                                  {transfer_refund || ''}
-                                </td>
-                                <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold">
-                                  {loan_payment_mode || ''}
-                                </td>
-                                <td className="px-2 py-2">
-                                  <button className="rounded-full transition duration-200">
-                                    <img
-                                      src={edit}
-                                      onClick={() => handleEditClick(entry)}
-                                      alt="Edit"
-                                      className="w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200"
-                                    />
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })}
+                          {filteredLoanData.length === 0 ? (
+                            <tr>
+                              <td colSpan="5" className="text-center py-4 text-sm text-gray-500">
+                                No records found for the selected associate and purpose.
+                              </td>
+                            </tr>
+                          ) : (
+                            filteredLoanData.map((entry) => {
+                              const { loanPortalId, date, amount, loan_refund_amount, loan_payment_mode, type } = entry;
+                              const formattedDate = date ? new Date(date).toLocaleDateString('en-GB') : '';
+
+                               // Show refund amount as negative value in Loan column for Refund type, otherwise normal amount
+                               const displayAmount =
+                                 type === 'Refund'
+                                   ? loan_refund_amount != null
+                                     ? (-Math.abs(loan_refund_amount)).toLocaleString('en-IN')
+                                     : ''
+                                   : amount != null
+                                     ? parseFloat(amount).toLocaleString('en-IN')
+                                     : '';
+
+                              return (
+                                <tr key={loanPortalId}>
+                                  <td className="px-2 py-2 text-xs sm:text-sm font-semibold w-[120px]">{formattedDate}</td>
+                                  <td className={`px-2 py-2 text-xs sm:text-sm text-left font-semibold w-[150px] ${type === 'Refund' ? 'text-red-600' : 'text-green-600'}`}>
+                                    {displayAmount}
+                                  </td>
+                                  <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold">
+                                    {type === 'Refund' ? 'Refund' : type === 'Transfer' ? getTransferDestination(entry) : ''}
+                                  </td>
+                                  <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold">{loan_payment_mode || ''}</td>
+                                  <td className="px-2 py-2 w-[120px]">
+                                    <button className="rounded-full transition duration-200" onClick={() => handleEditClick(entry)}>
+                                      <img
+                                        src={edit}
+                                        alt="Edit"
+                                        className="w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200"
+                                      />
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -868,9 +1299,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                 <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4'>
                   <div>
                     <label className="block mb-2 font-semibold text-sm">Payment Mode</label>
-                    <select
-                      value={editFormData.mode}
-                      onChange={(e) => setEditFormData({ ...editFormData, mode: e.target.value })}
+                    <select value={editFormData.mode} onChange={(e) => setEditFormData({ ...editFormData, mode: e.target.value })}
                       className="border-2 border-[#BF9853] border-opacity-30 w-full h-[45px] rounded-lg focus:outline-none text-sm"
                     >
                       <option value="">Select</option>
@@ -881,8 +1310,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                   </div>
                   <div>
                     <label className="block mb-2 font-semibold text-sm">Purpose</label>
-                    <select value={editFormData.purpose}
-                      onChange={(e) => setEditFormData({ ...editFormData, purpose: e.target.value })}
+                    <select value={editFormData.purpose} onChange={(e) => setEditFormData({ ...editFormData, purpose: e.target.value })}
                       className="border-2 border-[#BF9853] border-opacity-30 w-full h-[45px] rounded-lg focus:outline-none text-sm"
                     >
                       <option value="">Select Purpose</option>
@@ -894,9 +1322,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                 </div>
                 <div className='mb-4'>
                   <label className="block mb-2 font-semibold text-sm">Description</label>
-                  <textarea
-                    value={editFormData.description}
-                    onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                  <textarea value={editFormData.description} onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
                     className="border-2 border-[#BF9853] border-opacity-30 w-full h-[60px] rounded-lg focus:outline-none text-sm"
                   />
                 </div>
@@ -907,6 +1333,128 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                 </button>
                 <button onClick={handleUpdate} className="w-[100px] h-[45px] bg-[#BF9853] text-white rounded text-sm">
                   Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Payment Details Modal */}
+        {showPaymentModal && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+            <div className="bg-white text-left rounded-xl p-6 w-[800px] max-h-[90vh] overflow-y-auto flex flex-col">
+              <h3 className="text-lg font-semibold mb-4 text-center">Payment Details</h3>
+              <div className="flex-1 overflow-hidden">
+                <div className="space-y-4 mb-4">
+                  <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                        <input
+                          type="date"
+                          value={dateValue}
+                          readOnly
+                          className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none bg-gray-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                        <input
+                          type="text"
+                          value={formatWithCommas(amountGiven)}
+                          readOnly
+                          className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>
+                        <input
+                          type="text"
+                          value={paymentMode}
+                          readOnly
+                          className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {(paymentMode === "GPay" || paymentMode === "PhonePe" ||
+                    paymentMode === "Net Banking" || paymentMode === "Cheque") && (
+                      <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
+                        <div className="space-y-4">
+                          {paymentMode === "Cheque" && (
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No<span className="text-red-500">*</span></label>
+                                <input
+                                  type="text"
+                                  value={paymentPopupData.chequeNo}
+                                  onChange={(e) => setPaymentPopupData(prev => ({ ...prev, chequeNo: e.target.value }))}
+                                  placeholder="Enter cheque number"
+                                  className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date<span className="text-red-500">*</span></label>
+                                <input
+                                  type="date"
+                                  value={paymentPopupData.chequeDate}
+                                  onChange={(e) => setPaymentPopupData(prev => ({ ...prev, chequeDate: e.target.value }))}
+                                  className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                />
+                              </div>
+                            </div>
+                          )}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number<span className="text-red-500">*</span></label>
+                              <input
+                                type="text"
+                                value={paymentPopupData.transactionNumber}
+                                onChange={(e) => setPaymentPopupData(prev => ({ ...prev, transactionNumber: e.target.value }))}
+                                placeholder="Enter transaction number"
+                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">Account Number<span className="text-red-500">*</span></label>
+                              <select
+                                value={paymentPopupData.accountNumber}
+                                onChange={(e) => setPaymentPopupData(prev => ({ ...prev, accountNumber: e.target.value }))}
+                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                              >
+                                <option value="">Select Account</option>
+                                <option value="2027887700014">2027887700014</option>
+                                <option value="2027887700015">2027887700015</option>
+                                <option value="2027887700016">2027887700016</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 mt-4">
+                <button 
+                  onClick={() => {
+                    setShowPaymentModal(false);
+                    setPaymentPopupData({
+                      chequeNo: "",
+                      chequeDate: "",
+                      transactionNumber: "",
+                      accountNumber: ""
+                    });
+                  }} 
+                  className="w-[100px] h-[45px] border border-[#BF9853] rounded"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handlePaymentModalSubmit} 
+                  className="w-[100px] h-[45px] bg-[#BF9853] text-white rounded"
+                >
+                  Submit
                 </button>
               </div>
             </div>

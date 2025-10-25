@@ -151,6 +151,7 @@ const ClaimPaymentCashRegister = () => {
             <thead className="bg-[#FAF6ED] sticky top-0">
               <tr>
                 <th className="px-4 py-2 text-left">S.No</th>
+                <th className="px-4 py-2 text-left">Time Stamp</th>
                 <th className="px-4 py-2 text-left">Expense Date</th>
                 <th className="px-4 py-2 text-left">Project Name</th>
                 <th className="px-4 py-2 text-left">Expense Amount</th>
@@ -172,6 +173,9 @@ const ClaimPaymentCashRegister = () => {
                 cashRegisterData.map((item, index) => (
                   <tr key={index} className={`even:bg-[#FAF6ED] odd:bg-[#FFFFFF] font-bold text-[14px]`}>
                     <td className="px-4 py-2">{index + 1}</td>
+                    <td className='px-4 py-2'>
+                      {item.expenseData ? formatDate(item.expenseData.timestamp) : '-'}
+                    </td>
                     <td className="px-4 py-2">
                       {item.expenseData ? formatDateOnly(item.expenseData.date) : '-'}
                     </td>
@@ -208,3 +212,17 @@ const ClaimPaymentCashRegister = () => {
 };
 
 export default ClaimPaymentCashRegister;
+
+const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    date.setMinutes(date.getMinutes());
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    let hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? String(hours).padStart(2, '0') : '12';
+    return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+};

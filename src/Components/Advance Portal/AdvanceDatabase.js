@@ -8,6 +8,7 @@ import { sum } from 'mathjs';
 import edit from '../Images/Edit.svg';
 import history from '../Images/History.svg';
 import remove from '../Images/Delete.svg';
+import Attach from '../Images/Attachfile.svg';
 
 const AdvanceDatabase = ({ username, userRoles = [] }) => {
   const [isUploading, setIsUploading] = useState(false);
@@ -23,6 +24,8 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   const [selectDatabaseTransfer, setSelectDatabaseTransfer] = useState('');
   const [selectDatabaseType, setSelectDatabaseType] = useState('');
   const [selectDatabaseMode, setSelectDatabaseMode] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [showAdvancePortalModal, setShowAdvancePortalModal] = useState(false);
   const [file, setFile] = useState(null);
   const [advancePortalAudits, setAdvancePortalAudits] = useState([]);
@@ -34,10 +37,89 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedOption, setSelectedOption] = useState(null);
   const [overallAdvance, setOverallAdvance] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [progress, setProgress] = useState(0);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const fileInputRef = useRef(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
+
+  // Load filters from sessionStorage on mount
+  useEffect(() => {
+    // Check if this is a page refresh or navigation
+    const isPageRefresh = sessionStorage.getItem('advanceDatabasePageLoaded') === null;
+
+    if (isPageRefresh) {
+      // First load or manual refresh - clear filters
+      sessionStorage.removeItem('advanceDatabaseFilters');
+      sessionStorage.setItem('advanceDatabasePageLoaded', 'true');
+    } else {
+      // Navigation from another page - restore filters
+      const savedFilters = sessionStorage.getItem('advanceDatabaseFilters');
+      if (savedFilters) {
+        try {
+          const filters = JSON.parse(savedFilters);
+          if (filters.selectTimeStampDate) setSelectTimeStampDate(filters.selectTimeStampDate);
+          if (filters.selectDatabaseDate) setSelectDatabaseDate(filters.selectDatabaseDate);
+          if (filters.selectDatabaseContractororVendorName) setSelectDatabaseContractororVendorName(filters.selectDatabaseContractororVendorName);
+          if (filters.selectDatabaseProjectName) setSelectDatabaseProjectName(filters.selectDatabaseProjectName);
+          if (filters.selectDatabaseTransfer) setSelectDatabaseTransfer(filters.selectDatabaseTransfer);
+          if (filters.selectDatabaseType) setSelectDatabaseType(filters.selectDatabaseType);
+          if (filters.selectDatabaseMode) setSelectDatabaseMode(filters.selectDatabaseMode);
+          if (filters.startDate) setStartDate(filters.startDate);
+          if (filters.endDate) setEndDate(filters.endDate);
+          if (filters.showFilters !== undefined) setShowFilters(filters.showFilters);
+        } catch (error) {
+          console.error('Error loading filters from sessionStorage:', error);
+        }
+      }
+    }
+
+    // Set flag to indicate page is loaded
+    return () => {
+      // On unmount (when navigating away), keep the flag
+      sessionStorage.setItem('advanceDatabasePageLoaded', 'true');
+    };
+  }, []);
+
+  // Detect page refresh and clear the flag
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Check if it's a refresh (reload)
+      const entries = performance.getEntriesByType('navigation');
+      const navigationType = entries.length > 0 ? entries[0].type : null;
+
+      if (navigationType === 'reload') {
+        sessionStorage.removeItem('advanceDatabasePageLoaded');
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
+
+  // Save filters to sessionStorage whenever they change
+  useEffect(() => {
+    const filters = {
+      selectTimeStampDate,
+      selectDatabaseDate,
+      selectDatabaseContractororVendorName,
+      selectDatabaseProjectName,
+      selectDatabaseTransfer,
+      selectDatabaseType,
+      selectDatabaseMode,
+      startDate,
+      endDate,
+      showFilters
+    };
+    sessionStorage.setItem('advanceDatabaseFilters', JSON.stringify(filters));
+  }, [selectTimeStampDate, selectDatabaseDate, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseMode, startDate, endDate, showFilters]);
 
   const scrollRef = useRef(null);
   const isDragging = useRef(false);
@@ -148,6 +230,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   useEffect(() => {
     const fetchVendorNames = async () => {
       try {
+        setProgress(10);
         const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
           method: "GET",
           credentials: "include",
@@ -166,8 +249,10 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
           type: "Vendor",
         }));
         setVendorOptions(formattedData);
+        setProgress(25);
       } catch (error) {
         console.error("Fetch error: ", error);
+        setError("Failed to load vendor data");
       }
     };
     fetchVendorNames();
@@ -175,6 +260,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   useEffect(() => {
     const fetchContractorNames = async () => {
       try {
+        setProgress(35);
         const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
           method: "GET",
           credentials: "include",
@@ -193,8 +279,10 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
           type: "Contractor",
         }));
         setContractorOptions(formattedData);
+        setProgress(50);
       } catch (error) {
         console.error("Fetch error: ", error);
+        setError("Failed to load contractor data");
       }
     };
     fetchContractorNames();
@@ -275,7 +363,12 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
         lineColor: [100, 100, 100]
       },
       tableLineWidth: 0.3,
-      tableLineColor: [100, 100, 100]
+      tableLineColor: [100, 100, 100],
+      columnStyles: {
+        5: { halign: 'right' }, // Advance
+        6: { halign: 'right' }, // Bill Payment
+        7: { halign: 'right' }  // Refund
+      }
     });
 
     doc.save("Transaction_Report.pdf");
@@ -334,6 +427,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   useEffect(() => {
     const fetchSites = async () => {
       try {
+        setProgress(60);
         const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
@@ -351,93 +445,126 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
           id: item.id,
           sNo: item.siteNo
         }));
-
-        // Add predefined site options with IDs 001, 002, 003, 004
         const predefinedSiteOptions = [
           {
             value: "Mason Advance",
             label: "Mason Advance",
-            id: "1",
+            id: 1,
             sNo: "1"
           },
           {
             value: "Material Advance",
             label: "Material Advance",
-            id: "2",
+            id: 2,
             sNo: "2"
           },
           {
             value: "Weekly Advance",
             label: "Weekly Advance",
-            id: "3",
+            id: 3,
             sNo: "3"
           },
           {
             value: "Excess Advance",
             label: "Excess Advance",
-            id: "4",
+            id: 4,
             sNo: "4"
           },
           {
             value: "Material Rent",
             label: "Material Rent",
-            id: "",
+            id: 5,
             sNo: "5"
           },
           {
             value: "Subhash Kumar - Kunnur",
             label: "Subhash Kumar - Kunnur",
-            id: "6",
+            id: 6,
             sNo: "6"
+          },
+          {
+            value: "Summary Bill",
+            label: "Summary Bill",
+            id: 7,
+            sNo: "7"
+          },
+          {
+            value: "Daily Wage",
+            label: "Daily Wage",
+            id: 8,
+            sNo: "8"
+          },
+          {
+            value: "Rent Management Portal",
+            label: "Rent Management Portal",
+            id: 9,
+            sNo: "9"
           }
         ];
-
         // Combine backend data with predefined options
         const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
         setSiteOptions(combinedSiteOptions);
+        setProgress(75);
       } catch (error) {
         console.error("Fetch error: ", error);
-
-        // Fallback: if API fails, still show predefined options
         const predefinedSiteOptions = [
           {
             value: "Mason Advance",
             label: "Mason Advance",
-            id: "1",
+            id: 1,
             sNo: "1"
           },
           {
             value: "Material Advance",
             label: "Material Advance",
-            id: "2",
+            id: 2,
             sNo: "2"
           },
           {
             value: "Weekly Advance",
             label: "Weekly Advance",
-            id: "3",
+            id: 3,
             sNo: "3"
           },
           {
             value: "Excess Advance",
             label: "Excess Advance",
-            id: "4",
+            id: 4,
             sNo: "4"
           },
           {
             value: "Material Rent",
             label: "Material Rent",
-            id: "",
+            id: 5,
             sNo: "5"
           },
           {
             value: "Subhash Kumar - Kunnur",
             label: "Subhash Kumar - Kunnur",
-            id: "6",
+            id: 6,
             sNo: "6"
+          },
+          {
+            value: "Summary Bill",
+            label: "Summary Bill",
+            id: 7,
+            sNo: "7"
+          },
+          {
+            value: "Daily Wage",
+            label: "Daily Wage",
+            id: 8,
+            sNo: "8"
+          },
+          {
+            value: "Rent Management Portal",
+            label: "Rent Management Portal",
+            id: 9,
+            sNo: "9"
           }
         ];
         setSiteOptions(predefinedSiteOptions);
+        setProgress(75);
       }
     };
     fetchSites();
@@ -445,14 +572,19 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setProgress(85);
         const response = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/getAll');
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
         const data = await response.json();
         setAdvanceData(data);
+        setProgress(100);
+        setLoading(false);
       } catch (error) {
         console.error('Error fetching advance portal data:', error);
+        setError('Failed to load advance data');
+        setLoading(false);
       }
     };
 
@@ -476,6 +608,15 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   };
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
+  };
+
+  const handleEditFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+    // This ensures the input is cleared even if the same file is selected again next time
+    e.target.value = '';
   };
   const handleUpload = async () => {
     if (!file) {
@@ -528,33 +669,42 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
     siteOptions.find(s => String(s.id) === String(id))?.value || "";
 
   const filteredData = advanceData.filter((entry) => {
-    // Timestamp range filter
-    if (selectTimeStampDate && selectDatabaseDate) {
-      // Parse start & end dates from inputs
-      const startDate = new Date(selectTimeStampDate);
-      const endDate = new Date(selectDatabaseDate);
-      // Make sure the time portion doesn't interfere
-      startDate.setHours(0, 0, 0, 0);
-      endDate.setHours(23, 59, 59, 999);
-      // Parse entry timestamp
-      const entryTimestamp = new Date(entry.date);
-      if (entryTimestamp < startDate || entryTimestamp > endDate) {
+    // Date range filter (Start Date and End Date)
+    if (startDate && endDate) {
+      const s = new Date(startDate);
+      const e = new Date(endDate);
+      e.setHours(23, 59, 59, 999);
+      const entryDate = new Date(entry.date);
+      if (entryDate < s || entryDate > e) return false;
+    } else if (startDate) {
+      const s = new Date(startDate);
+      s.setHours(0, 0, 0, 0);
+      const entryDate = new Date(entry.date);
+      if (entryDate < s) return false;
+    } else if (endDate) {
+      const e = new Date(endDate);
+      e.setHours(23, 59, 59, 999);
+      const entryDate = new Date(entry.date);
+      if (entryDate > e) return false;
+    }
+
+    // Timestamp filter (exact date match on timestamp)
+    if (selectTimeStampDate) {
+      const selectedDate = new Date(selectTimeStampDate);
+      const entryTimestamp = new Date(entry.timestamp);
+      // Compare only the date part (ignore time)
+      if (selectedDate.toDateString() !== entryTimestamp.toDateString()) {
         return false;
       }
     }
-    // If only start date is given
-    else if (selectTimeStampDate) {
-      const startDate = new Date(selectTimeStampDate);
-      startDate.setHours(0, 0, 0, 0);
-      const entryTimestamp = new Date(entry.timestamp);
-      if (entryTimestamp < startDate) return false;
-    }
-    // If only end date is given
-    else if (selectDatabaseDate) {
-      const endDate = new Date(selectDatabaseDate);
-      endDate.setHours(23, 59, 59, 999);
-      const entryTimestamp = new Date(entry.timestamp);
-      if (entryTimestamp > endDate) return false;
+
+    // Date filter (exact date match)
+    if (selectDatabaseDate) {
+      const [year, month, day] = selectDatabaseDate.split("-");
+      const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
+      const entryDateObj = new Date(entry.date);
+      const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
+      if (formattedEntryDate !== formattedSelectDate) return false;
     }
     // Contractor/Vendor filter
     if (selectDatabaseContractororVendorName) {
@@ -630,52 +780,71 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
             return 0;
         }
 
+        const entryA = Number(a.entry_no) || 0;
+        const entryB = Number(b.entry_no) || 0;
+
+        // Handle timestamp sorting with matching entry_no direction
+        if (sortConfig.key === 'timestamp') {
+          if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+          if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+          // Secondary sort by entry_no - match the direction of timestamp sort
+          return sortConfig.direction === 'asc' ? entryA - entryB : entryB - entryA;
+        }
+
+        // Handle date sorting with matching entry_no direction
+        if (sortConfig.key === 'date') {
+          if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+          if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+          // Secondary sort by entry_no - match the direction of date sort
+          return sortConfig.direction === 'asc' ? entryA - entryB : entryB - entryA;
+        }
+
+        // Handle entry_no sorting (no secondary sort needed)
+        if (sortConfig.key === 'entry_no') {
+          return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
+        }
+
+        // Handle other fields
         if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
         if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
+
+        // Secondary sort by entry_no - always ascending for non-date/timestamp fields
+        return entryA - entryB;
       });
     } else {
       // Default sorting: entry_no descending
       sortableData.sort((a, b) => Number(b.entry_no) - Number(a.entry_no));
     }
-
     return sortableData;
   }, [filteredData, sortConfig]);
-
   // Pagination logic
   const totalPages = Math.ceil(sortedData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentData = sortedData.slice(startIndex, endIndex);
-
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectTimeStampDate, selectDatabaseDate, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseMode]);
-
+  }, [selectTimeStampDate, selectDatabaseDate, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseMode, startDate, endDate]);
   // Pagination handlers
   const goToPage = (page) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   };
-
   const goToNextPage = () => {
     if (currentPage < totalPages) {
       setCurrentPage(currentPage + 1);
     }
   };
-
   const goToPreviousPage = () => {
     if (currentPage > 1) {
       setCurrentPage(currentPage - 1);
     }
   };
-
   const handleItemsPerPageChange = (e) => {
     const newItemsPerPage = parseInt(e.target.value);
     setItemsPerPage(newItemsPerPage);
     setCurrentPage(1); // Reset to first page when changing items per page
   };
-
   const handleChange = async (selected) => {
     setSelectedOption(selected);
     if (!selected) {
@@ -700,41 +869,32 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
           const amount = parseFloat(curr.amount) || 0;
           const billAmount = parseFloat(curr.bill_amount) || 0;
           const refundAmount = parseFloat(curr.refund_amount) || 0;
-
-          // ✅ Add amount (negative values subtract automatically)
-          // ✅ Subtract bill and refund amounts
           return sum + amount - billAmount - refundAmount;
         }, 0);
-
       setOverallAdvance(total);
     } catch (error) {
       console.error('Error fetching or processing advance data:', error);
       setOverallAdvance(0);
     }
   };
-  // Calculate totals
   const totalAdvance = advanceData.reduce(
     (sum, entry) => sum + (Number(entry.amount) || 0),
     0
   );
-
   const totalBill = advanceData.reduce(
     (sum, entry) => sum + (Number(entry.bill_amount) || 0),
     0
   );
-
   const totalRefund = advanceData.reduce(
     (sum, entry) => sum + (Number(entry.refund_amount) || 0),
     0
   );
-
   const totalTransfer = advanceData.reduce((sum, entry) => {
     if (entry.type === "Transfer" && Number(entry.amount) > 0) {
       return sum + Number(entry.amount);
     }
     return sum;
   }, 0);
-
   const fetchAuditDetails = async (advancePortalId) => {
     try {
       const response = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/history/${advancePortalId}`);
@@ -745,11 +905,9 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       console.error("Error fetching audit details:", error);
     }
   };
-
   const handleEditClick = (entry) => {
     setEditingId(entry.advancePortalId);
-
-    // Set main form data
+    setSelectedFile(null); // Reset selected file when opening edit modal
     setEditFormData({
       date: entry.date?.split('T')[0] || '',
       amount: entry.amount || '',
@@ -766,27 +924,55 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       payment_mode: entry.payment_mode || '',
       refund_amount: entry.refund_amount || ''
     });
-
-    // 🔹 Pre-select contractor/vendor option
     const preSelected = combinedOptions.find(opt =>
       entry.vendor_id ? opt.id === entry.vendor_id && opt.type === "Vendor"
         : entry.contractor_id ? opt.id === entry.contractor_id && opt.type === "Contractor"
           : false
     );
     setSelectedOption(preSelected || null);
-
     setIsEditModalOpen(true);
   };
   const handleUpdate = async () => {
     try {
+      // Upload file if exists
+      let fileUrl = editFormData.file_url || '';
+      if (selectedFile) {
+        try {
+          const formData = new FormData();
+          const formatDateOnly = (dateString) => {
+            const date = new Date(dateString);
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}-${month}-${year}`;
+          };
+          const selectedSite = siteOptions.find(site => site.id === editFormData.project_id);
+          const contractorOrVendor = selectedOption ? selectedOption.label : '';
+          const finalName = `${formatDateOnly(editFormData.date)} ${selectedSite?.sNo || ''} ${contractorOrVendor}`;
+          formData.append('file', selectedFile);
+          formData.append('file_name', finalName);
+          const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+            method: "POST",
+            body: formData,
+          });
+          if (!uploadResponse.ok) {
+            throw new Error('Upload failed');
+          }
+          const uploadResult = await uploadResponse.json();
+          fileUrl = uploadResult.url;
+          console.log('File URL:', fileUrl);
+        } catch (error) {
+          console.error('Error during file upload:', error);
+          alert('Error during file upload. Please try again.');
+          return;
+        }
+      }
+
       const originalRecord = advanceData.find(r => r.advancePortalId === editingId);
       const isTypeChanged = originalRecord?.type !== editFormData.type;
-
-      // Helper to create payload with correct fields based on type
       const createPayload = (overrides = {}, typeOverride) => {
-        const base = { ...editFormData, ...overrides };
+        const base = { ...editFormData, ...overrides, file_url: fileUrl };
         const type = typeOverride || editFormData.type;
-
         switch (type) {
           case 'Advance':
             base.bill_amount = '';
@@ -804,42 +990,31 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
           default:
             break;
         }
-
         return base;
       };
-
-      // 👇 If type changed, we need to assign a new entry_no
       let newEntryNo = editFormData.entry_no;
       if (isTypeChanged) {
         const res = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/getAll');
         const data = await res.json();
-
         const allEntryNos = data
           .map(item => parseInt(item.entry_no))
           .filter(num => !isNaN(num));
-
         const maxEntryNo = Math.max(...allEntryNos, 0);
-        newEntryNo = (maxEntryNo + 1).toString(); // 💡 Ensure it's a string if backend expects that
+        newEntryNo = (maxEntryNo + 1).toString();
       }
-
       if (isTypeChanged) {
         if (editFormData.type === 'Transfer') {
           const amountValue = parseFloat(editFormData.amount) || 0;
-
           const firstPayload = createPayload({
             entry_no: editFormData.entry_no,
             amount: -Math.abs(amountValue)
           }, 'Transfer');
-
           const secondPayload = createPayload({
             entry_no: editFormData.entry_no,
             project_id: parseInt(editFormData.transfer_site_id),
             transfer_site_id: originalRecord?.project_id || 0,
             amount: Math.abs(amountValue)
           }, 'Transfer');
-
-          console.log('Creating new transfer records:', firstPayload, secondPayload);
-
           await Promise.all([
             fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
               method: 'POST',
@@ -855,21 +1030,15 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
             })
           ]);
         } else {
-          // New Advance or Refund entry with new entry_no
           const payload = createPayload({ entry_no: editFormData.entry_no });
-          console.log('Creating new entry after type change:', payload);
-
           const saveRes = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify(payload)
           });
-
           if (!saveRes.ok) throw new Error('Failed to create new record after type change');
         }
-
-        // Clear the original entry
         const clearedData = {
           entry_no: editFormData.entry_no,
           date: editFormData.date,
@@ -885,39 +1054,29 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
           payment_mode: '',
           refund_amount: ''
         };
-
         const clearRes = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${editingId}?editedBy=${username}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(clearedData)
         });
-
         if (!clearRes.ok) throw new Error('Failed to clear original record after type change');
-
       } else if (editFormData.type === 'Transfer') {
         const sameEntryRows = advanceData.filter(r => r.entry_no === editFormData.entry_no);
-
         if (sameEntryRows.length === 2) {
           const editedRecord = sameEntryRows.find(r => r.advancePortalId === editingId);
           const otherRecord = sameEntryRows.find(r => r.advancePortalId !== editingId);
-
           const editedAmount = parseFloat(editFormData.amount) || 0;
-
           const updatedEdited = createPayload({
             ...editFormData,
             transfer_site_id: parseInt(editFormData.transfer_site_id),
             amount: editedAmount // 👈 Keep exactly what user entered
           }, 'Transfer');
-
           const updatedOther = createPayload({
             ...otherRecord,
             project_id: parseInt(editFormData.transfer_site_id),
             transfer_site_id: editedRecord.project_id,
             amount: -editedAmount // 👈 Opposite of what user entered
           }, 'Transfer');
-
-          console.log('Updating Transfer records (fixed):', updatedEdited, updatedOther);
-
           await Promise.all([
             fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${editedRecord.advancePortalId}?editedBy=${username}`, {
               method: 'PUT',
@@ -935,22 +1094,20 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
         }
       }
       else {
-        // Regular update
         const payload = createPayload();
-
-        console.log('Updating normal record:', payload);
-
         const res = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${editingId}?editedBy=${username}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-
         if (!res.ok) throw new Error('Failed to update');
       }
-
       window.location.reload();
       setIsEditModalOpen(false);
+      setSelectedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     } catch (err) {
       console.error('Update error:', err);
     }
@@ -958,16 +1115,13 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   const handleDelete = async (idToDelete) => {
     const confirmDelete = window.confirm("Are you sure you want to delete this record?");
     if (!confirmDelete) return;
-
     try {
       const record = advanceData.find(r => r.advancePortalId === idToDelete);
       if (!record) {
         console.warn('Record not found for ID:', idToDelete);
         return;
       }
-
       const entryNo = record.entry_no;
-
       const clearedData = {
         entry_no: entryNo, // Preserve entry_no
         date: record.date,
@@ -983,15 +1137,11 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
         payment_mode: '',
         refund_amount: ''
       };
-
       if (record.type === 'Transfer') {
-        // Find both entries linked to this transfer entry_no
         const transferRecords = advanceData.filter(r => r.entry_no === entryNo);
-
         if (transferRecords.length !== 2) {
           console.warn(`Expected 2 Transfer records with entry_no ${entryNo}, but found ${transferRecords.length}`);
         }
-
         await Promise.all(
           transferRecords.map(async rec => {
             const res = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${rec.advancePortalId}?editedBy=${username}`, {
@@ -999,29 +1149,22 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(clearedData)
             });
-
             if (!res.ok) {
               throw new Error(`Failed to clear transfer record with ID: ${rec.advancePortalId}`);
             }
           })
         );
-
-        console.log(`Cleared both Transfer entries with entry_no ${entryNo}`);
       } else {
         const res = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${idToDelete}?editedBy=${username}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(clearedData)
         });
-
         if (!res.ok) {
           throw new Error('Failed to clear record');
         }
-
-        console.log(`Cleared record with ID ${idToDelete}`);
       }
-
-      window.location.reload(); // Refresh to reflect changes
+      window.location.reload();
     } catch (error) {
       console.error('Delete error:', error);
     }
@@ -1035,12 +1178,43 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
     },
     { amount: 0, bill_amount: 0, refund_amount: 0 }
   );
+
+  if (loading) {
+    return (
+      <body className='bg-[#FAF6ED]'>
+        <div className='bg-white w-[1850px] h-[500px] p-10 ml-10 flex flex-col items-center justify-center'>
+          <div className="text-lg mb-4">Loading advance database...</div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#BF9853] mb-4"></div>
+          <div className="text-sm text-gray-600">
+            Progress: {progress}%
+          </div>
+          <div className="w-64 bg-gray-200 rounded-full h-2 mt-2">
+            <div
+              className="bg-[#BF9853] h-2 rounded-full transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+        </div>
+      </body>
+    );
+  }
+
+  if (error) {
+    return (
+      <body className='bg-[#FAF6ED]'>
+        <div className='bg-white w-[1850px] h-[500px] p-10 ml-10 flex items-center justify-center'>
+          <div className="text-lg text-red-600">{error}</div>
+        </div>
+      </body>
+    );
+  }
+
   return (
-    <body>
-      <div className='w-[1750px] h-[150px] bg-white ml-10 text-left flex gap-5'>
-        <div className='flex w-[1650px] justify-between'>
-          <div className='flex'>
-            <div className='ml-8 pt-8'>
+    <div className='bg-[#FAF6ED] min-h-screen w-full'>
+      <div className='max-w-[1850px] w-full bg-white rounded-md ml-10 lg:h-[128px] px-4 lg:px-10 text-left flex flex-wrap justify-between items-center gap-5 pb-5'>
+        <div className='flex lg:flex-wrap w-full lg:w-auto justify-between'>
+          <div className='flex flex-wrap gap-[16px] p-4'>
+            <div className=''>
               <label className='block mb-2 font-semibold'>Advance Amount</label>
               <input
                 className='w-[183px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
@@ -1048,7 +1222,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                 readOnly
               />
             </div>
-            <div className='ml-8 pt-8'>
+            <div className=''>
               <label className='block mb-2 font-semibold'>Bill Amount</label>
               <input
                 className='w-[183px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
@@ -1056,30 +1230,48 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                 readOnly
               />
             </div>
-            <div className='ml-8 pt-8'>
+            <div className=''>
               <label className='block mb-2 font-semibold'>Transfer Amount </label>
               <input
                 value={`₹${totalTransfer.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
                 readOnly
-                className='w-[220px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2' />
+                className='w-[183px] lg:w-[220px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2' />
             </div>
-            <div className='ml-8 pt-8'>
+            <div className=''>
               <label className='block mb-2 font-semibold'>Refund Amount</label>
               <input
-                className='w-[220px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
+                className='w-[183px] lg:w-[220px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
                 value={`₹${totalRefund.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
                 readOnly
               />
             </div>
-          </div>
-          <div className='mt-10'>
-            <button onClick={() => setIsOpen(true)} className='w-28 h-[35px] border-2 bg-[#BF9853] border-opacity-25 rounded-lg mt-4 text-white'>Migrate</button>
+            <div className=''>
+              <label className='block mb-2 font-semibold'>Start Date</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className='w-[168px] h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2'
+              />
+            </div>
+            <div className=''>
+              <label className='block mb-2 font-semibold'>End Date</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className='w-[168px] h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2'
+              />
+            </div>
           </div>
         </div>
+        <div className='mr-0 lg:mr-10'>
+          <button onClick={() => setIsOpen(true)} className='w-28 h-[35px] border-2 bg-[#BF9853] border-opacity-25 rounded-lg mt-4 text-white'>Migrate</button>
+        </div>
       </div>
-      <div className='w-[1750px] ml-10 bg-white mt-5 pt-5'>
+      <div className='max-w-[1850px] w-full ml-10 px-4 lg:px-10 bg-white rounded-md h-[650px] mt-5 pt-5'>
         <div
-          className={`text-left flex ${selectDatabaseDate || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseMode
+          className={`text-left flex ${selectTimeStampDate || selectDatabaseDate || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseMode || startDate || endDate
             ? 'flex-col sm:flex-row sm:justify-between'
             : 'flex-row justify-between items-center'
             } mb-3 gap-2`}>
@@ -1091,8 +1283,29 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                 className="w-7 h-7 border border-[#BF9853] rounded-md ml-3"
               />
             </button>
-            {(selectDatabaseDate || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseMode) && (
+            {(selectTimeStampDate || selectDatabaseDate || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseMode || startDate || endDate) && (
               <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
+                {startDate && (
+                  <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
+                    <span className="font-normal">Start Date: </span>
+                    <span className="font-bold">{startDate}</span>
+                    <button onClick={() => setStartDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                  </span>
+                )}
+                {endDate && (
+                  <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
+                    <span className="font-normal">End Date: </span>
+                    <span className="font-bold">{endDate}</span>
+                    <button onClick={() => setEndDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                  </span>
+                )}
+                {selectTimeStampDate && (
+                  <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
+                    <span className="font-normal">Timestamp: </span>
+                    <span className="font-bold">{selectTimeStampDate}</span>
+                    <button onClick={() => setSelectTimeStampDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                  </span>
+                )}
                 {selectDatabaseDate && (
                   <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
                     <span className="font-normal">Date: </span>
@@ -1139,74 +1352,78 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
             )}
           </div>
           <div className='space-x-4 flex justify-end mr-5'>
+            {(selectTimeStampDate || selectDatabaseDate || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseMode || startDate || endDate) && (
+              <button
+                onClick={() => {
+                  setSelectTimeStampDate('');
+                  setSelectDatabaseDate('');
+                  setSelectDatabaseContractororVendorName('');
+                  setSelectDatabaseProjectName('');
+                  setSelectDatabaseTransfer('');
+                  setSelectDatabaseType('');
+                  setSelectDatabaseMode('');
+                  setStartDate('');
+                  setEndDate('');
+                  sessionStorage.removeItem('advanceDatabaseFilters');
+                }}
+                className='text-sm text-red-600 hover:underline font-bold'
+              >
+                Clear All Filters
+              </button>
+            )}
             <button onClick={exportPDF} className='text-sm text-[#E4572E] hover:underline font-bold'>Export PDF</button>
             <button onClick={exportCSV} className='text-sm text-[#007233] hover:underline font-bold'>Export XL</button>
             <button className='text-sm text-[#BF9853] hover:underline font-bold'>Print</button>
           </div>
         </div>
-
-        <div className='border-l-8 border-l-[#BF9853] rounded-lg ml-5 mr-5'>
-          {/* Single Table with Scrollable Container */}
-          <div
-            ref={scrollRef}
-            className='overflow-auto max-h-[600px] thin-scrollbar'
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
+        <div className='border-l-8 border-l-[#BF9853] rounded-lg mx-2 lg:mx-5'>
+          <div ref={scrollRef} className='overflow-auto max-h-[485px] thin-scrollbar'
+            onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
           >
-            <table className="w-[1865px] border-collapse">
+            <table className="min-w-[1865px] w-full border-collapse">
               <thead className="sticky top-0 z-10 bg-white">
                 <tr className="bg-[#FAF6ED]">
-                  <th
-                    className="py-2 pl-3 w-[340px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                  <th className="py-2 pl-3 w-[340px] font-bold text-left cursor-pointer hover:bg-gray-200"
                     onClick={() => handleSort('timestamp')}
                   >
                     Time Stamp {sortConfig.key === 'timestamp' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th
-                    className="pt-2 pl-3 w-[320px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                  <th className="pt-2 pl-3 w-[320px] font-bold text-left cursor-pointer hover:bg-gray-200"
                     onClick={() => handleSort('date')}
                   >
                     Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th
-                    className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                  <th className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200"
                     onClick={() => handleSort('vendor')}
                   >
                     Contractor/Vendor {sortConfig.key === 'vendor' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th
-                    className="px-2 w-[450px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                  <th className="px-2 w-[450px] font-bold text-left cursor-pointer hover:bg-gray-200"
                     onClick={() => handleSort('project')}
                   >
                     Project Name {sortConfig.key === 'project' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th
-                    className="px-2 w-[450px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                  <th className="px-2 w-[450px] font-bold text-left cursor-pointer hover:bg-gray-200"
                     onClick={() => handleSort('transfer')}
                   >
                     Transfer Site {sortConfig.key === 'transfer' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="px-2 w-[100px] font-bold text-left">Advance</th>
-                  <th className="px-2 w-[180px] font-bold text-left whitespace-nowrap">Bill Payment</th>
-                  <th className="px-2 w-[120px] font-bold text-left">Refund</th>
-                  <th
-                    className="px-2 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                  <th className="px-2 w-[100px] font-bold text-right">Advance</th>
+                  <th className="px-2 w-[180px] font-bold text-right whitespace-nowrap">Bill Payment</th>
+                  <th className="px-2 w-[120px] font-bold text-right">Refund</th>
+                  <th className="px-2 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200"
                     onClick={() => handleSort('type')}
                   >
                     Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
                   <th className="px-2 w-[120px] font-bold text-left">Description</th>
-                  <th
-                    className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                  <th className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200"
                     onClick={() => handleSort('mode')}
                   >
                     Mode {sortConfig.key === 'mode' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
                   <th className="px-2 w-[220px] font-bold text-left whitespace-nowrap">Attached file</th>
-                  <th
-                    className="px-2 w-[140px] font-bold text-left cursor-pointer hover:bg-gray-200"
+                  <th className="px-2 w-[140px] font-bold text-left cursor-pointer hover:bg-gray-200"
                     onClick={() => handleSort('entry_no')}
                   >
                     E.No {sortConfig.key === 'entry_no' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
@@ -1241,6 +1458,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                         className=" w-[220px] focus:outline-none text-xs"
                         placeholder="Contractor/Ven..."
                         isSearchable
+                        menuPortalTarget={document.body}
                         isClearable
                         styles={{
                           control: (provided, state) => ({
@@ -1290,6 +1508,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                         className="w-[250px] focus:outline-none text-xs"
                         placeholder="Project Name..."
                         isSearchable
+                        menuPortalTarget={document.body}
                         isClearable
                         styles={{
                           control: (provided, state) => ({
@@ -1339,6 +1558,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                         className="w-[250px] focus:outline-none text-xs"
                         placeholder="Transfer Site..."
                         isSearchable
+                        menuPortalTarget={document.body}
                         isClearable
                         styles={{
                           control: (provided, state) => ({
@@ -1380,15 +1600,16 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                         }}
                       />
                     </th>
-                    <th className='w-[100px] pt-2 pb-2'>{totals.amount.toLocaleString("en-IN")}</th>
-                    <th className='w-[180px] pt-2 pb-2'>{totals.bill_amount.toLocaleString("en-IN")}</th>
-                    <th className='w-[120px] pt-2 pb-2'>{totals.refund_amount.toLocaleString("en-IN")}</th>
+                    <th className='w-[100px] pt-2 pb-2 text-right'>{totals.amount.toLocaleString("en-IN")}</th>
+                    <th className='w-[180px] pt-2 pb-2 text-right'>{totals.bill_amount.toLocaleString("en-IN")}</th>
+                    <th className='w-[120px] pt-2 pb-2 text-right'>{totals.refund_amount.toLocaleString("en-IN")}</th>
                     <th className="">
                       <select
                         value={selectDatabaseType}
                         onChange={(e) => setSelectDatabaseType(e.target.value)}
                         className="p-1  mt-3 mb-3 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
                         placeholder="Type..."
+                        menuPortalTarget={document.body}
                       >
                         <option value=''>Select Type...</option>
                         <option value='Advance'>Advance</option>
@@ -1404,6 +1625,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                         onChange={(e) => setSelectDatabaseMode(e.target.value)}
                         className="p-1  mt-3 mb-3 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
                         placeholder="Mode..."
+                        menuPortalTarget={document.body}
                       >
                         <option value=''>Select</option>
                         <option value='Cash'>Cash</option>
@@ -1423,34 +1645,28 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                     <tr key={entry.id} className="odd:bg-white even:bg-[#FAF6ED]">
                       <td className="text-sm text-left p-2 w-[340px] font-semibold">{formatDate(entry.timestamp)}</td>
                       <td className="text-sm text-left p-2 w-[220px] font-semibold">{formatDateOnly(entry.date)}</td>
-                      {/* Show vendor name if vendor_id exists, else contractor name */}
                       <td className="text-sm text-left font-semibold">
                         {entry.vendor_id
                           ? getVendorName(entry.vendor_id)
                           : getContractorName(entry.contractor_id)}
                       </td>
-                      {/* Project name */}
                       <td className="text-sm text-left w-60 font-semibold">
                         {getSiteName(entry.project_id)}
                       </td>
-                      {/* Transfer site name */}
                       <td className="text-sm text-left font-semibold">
                         {getSiteName(entry.transfer_site_id)}
                       </td>
-                      {/* Amount */}
-                      <td className="text-sm text-left pl-2 font-semibold">
+                      <td className="text-sm text-right font-semibold">
                         {entry.amount != null && entry.amount !== ""
                           ? Number(entry.amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })
                           : ""}
                       </td>
-                      {/* Bill Amount */}
-                      <td className="text-sm text-left pl-2 font-semibold">
+                      <td className="text-sm text-right font-semibold">
                         {entry.bill_amount != null && entry.bill_amount !== ""
                           ? Number(entry.bill_amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })
                           : ""}
                       </td>
-                      {/* Refund Amount */}
-                      <td className="text-sm text-left pl-2 font-semibold">
+                      <td className="text-sm text-right pr-2 font-semibold">
                         {entry.refund_amount != null && entry.refund_amount !== ""
                           ? Number(entry.refund_amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })
                           : ""}
@@ -1458,10 +1674,23 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                       <td className="text-sm text-left font-semibold">{entry.type}</td>
                       <td className="text-sm text-left font-semibold">{entry.description}</td>
                       <td className="text-sm text-left font-semibold">{entry.payment_mode}</td>
-                      <td></td>
+                      <td className="text-sm text-left pl-3">
+                        {entry.file_url ? (
+                          <a
+                            href={entry.file_url}
+                            className="text-red-500 underline"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            View
+                          </a>
+                        ) : (
+                          <span></span>
+                        )}
+                      </td>
                       <td className="text-sm text-left pl-3 font-semibold">{entry.entry_no}</td>
                       <td className=" flex w-[100px] justify-between py-2">
-                        <button 
+                        <button
                           className={`rounded-full transition duration-200 ml-2 mr-3 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
                           disabled={entry.not_allow_to_edit}
                         >
@@ -1472,8 +1701,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                             className={`w-4 h-6 transition duration-200 ${entry.not_allow_to_edit ? '' : 'transform hover:scale-110 hover:brightness-110'}`}
                           />
                         </button>
-                        <button 
-                          className={`-ml-5 -mr-2 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        <button className={`-ml-5 -mr-2 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
                           disabled={entry.not_allow_to_edit}
                         >
                           <img
@@ -1482,8 +1710,8 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                             onClick={entry.not_allow_to_edit ? undefined : () => handleDelete(entry.advancePortalId)}
                             className={`w-4 h-4 transition duration-200 ${entry.not_allow_to_edit ? '' : 'transform hover:scale-110 hover:brightness-110'}`} />
                         </button>
-                        <button 
-                          onClick={entry.not_allow_to_edit ? undefined : () => fetchAuditDetails(entry.advancePortalId)} 
+                        <button
+                          onClick={entry.not_allow_to_edit ? undefined : () => fetchAuditDetails(entry.advancePortalId)}
                           className={`rounded-full transition duration-200 -mr-1 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
                           disabled={entry.not_allow_to_edit}
                         >
@@ -1498,7 +1726,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                   ))
                 ) : (
                   <tr>
-                    <td className="p-2 text-center text-sm text-gray-400" colSpan={14}>
+                    <td className="p-2 text-center text-sm text-gray-400" colSpan={15}>
                       No data available
                     </td>
                   </tr>
@@ -1507,10 +1735,8 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
             </table>
           </div>
         </div>
-        {/* Pagination Controls */}
         {sortedData.length > 0 && (
-          <div className="flex flex-col sm:flex-row justify-between items-center px-5 py-4 bg-white border-t border-gray-200">
-            {/* Items per page selector */}
+          <div className="flex flex-col sm:flex-row justify-between items-center px-5 py-4 bg-white border-t border-gray-200 mb-6">
             <div className="flex items-center space-x-2 mb-4 sm:mb-0">
               <label className="text-sm font-medium text-gray-700">Show:</label>
               <select
@@ -1532,11 +1758,9 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
               </select>
               <span className="text-sm text-gray-700">entries</span>
             </div>
-            {/* Page info */}
             <div className="text-sm text-gray-700 mb-4 sm:mb-0">
               Showing {startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries
             </div>
-            {/* Pagination buttons */}
             <div className="flex items-center space-x-2">
               <button
                 onClick={goToPreviousPage}
@@ -1548,7 +1772,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
               >
                 Previous
               </button>
-              {/* Page numbers */}
               <div className="flex items-center space-x-1">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let pageNum;
@@ -1623,7 +1846,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
             <div className="bg-white p-6 rounded-lg w-[700px]">
               <h2 className="text-lg font-bold mb-4">Edit Entry</h2>
               <div className='grid grid-cols-2 gap-4 text-left ml-5'>
-                {/* Select Type */}
                 <div className='flex items-center gap-3'>
                   <label className='font-semibold text-[#E4572E]'>Select Type</label>
                   <select
@@ -1632,7 +1854,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                       const newType = e.target.value;
                       setEditFormData(prev => {
                         const updated = { ...prev, type: newType };
-                        // Reset amount fields based on new type
                         if (newType === 'Refund') {
                           updated.amount = '';
                           updated.bill_amount = '';
@@ -1659,7 +1880,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                     <option value='Transfer'>Transfer</option>
                   </select>
                 </div>
-                {/* Date */}
                 <div className='flex items-center gap-3'>
                   <label className='font-semibold text-[#E4572E]'>Date</label>
                   <input
@@ -1670,7 +1890,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                     className='w-[144px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
                   />
                 </div>
-                {/* Contractor/Vendor */}
                 <div className=''>
                   <div className='flex'>
                     <label className='font-semibold block'>Contractor/Vendor</label>
@@ -1684,7 +1903,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                     styles={customStyles}
                   />
                 </div>
-                {/* Project Name */}
                 <div>
                   <label className='font-semibold block'>Project Name</label>
                   <Select
@@ -1697,7 +1915,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                     isClearable
                     className='w-[263px] h-[45px] focus:outline-none' />
                 </div>
-                {/* Bill Amount (only for Bill Settlement) */}
                 {editFormData.type === 'Bill Settlement' && (
                   <div>
                     <label className='font-semibold block'>Bill Amount</label>
@@ -1708,7 +1925,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                     />
                   </div>
                 )}
-                {/* Transfer Amount */}
                 <div>
                   <label className='font-semibold block'>
                     {editFormData.type === 'Transfer'
@@ -1723,7 +1939,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                     className='w-[263px] h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
                   />
                 </div>
-                {/* Conditional Dropdown */}
                 <div className=''>
                   {editFormData.type === 'Transfer' ? (
                     <>
@@ -1740,21 +1955,42 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                       />
                     </>
                   ) : (
-                    <>
-                      <label className='font-semibold block'>Payment Mode</label>
-                      <select
-                        value={editFormData.payment_mode}
-                        onChange={(e) => setEditFormData({ ...editFormData, payment_mode: e.target.value })}
-                        className='w-[263px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'>
-                        <option value=''>Select</option>
-                        <option value='Cash'>Cash</option>
-                        <option value='GPay'>GPay</option>
-                        <option value='Net Banking'>Net Banking</option>
-                      </select>
-                    </>
+                    <div className='flex gap-14'>
+                      <div className='space-y-2'>
+                        <label className='font-semibold block'>Payment Mode</label>
+                        <select
+                          value={editFormData.payment_mode}
+                          onChange={(e) => setEditFormData({ ...editFormData, payment_mode: e.target.value })}
+                          className='w-[263px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'>
+                          <option value=''>Select</option>
+                          <option value='Cash'>Cash</option>
+                          <option value='GPay'>GPay</option>
+                          <option value='Net Banking'>Net Banking</option>
+                        </select>
+                      </div>
+                      {editFormData.type === 'Bill Settlement' && (
+                        <div className='space-y-2 mt-6'>
+                          <div className="">
+                            <label htmlFor="editFileInput" className="cursor-pointer flex w-40 items-center  text-orange-600 text-sm font-semibold">
+                              <img className='w-5 h-4 mr-1' alt='' src={Attach}></img>
+                              Attach File
+                            </label>
+                            <input
+                              type="file"
+                              id="editFileInput"
+                              ref={fileInputRef}
+                              className="hidden"
+                              onChange={handleEditFileChange}
+                            />
+                          </div>
+                          {selectedFile && (
+                            <span className="text-gray-600 text-sm">{selectedFile.name}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
-                {/* Description */}
                 <div className='col-span-2'>
                   <label className='font-semibold block'>Description</label>
                   <textarea
@@ -1766,7 +2002,16 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                 </div>
               </div>
               <div className="flex justify-end gap-3 mt-4">
-                <button onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 border border-[#BF9853] w-[100px] h-[45px] rounded">
+                <button
+                  onClick={() => {
+                    setIsEditModalOpen(false);
+                    setSelectedFile(null);
+                    if (fileInputRef.current) {
+                      fileInputRef.current.value = '';
+                    }
+                  }}
+                  className="px-4 py-2 border border-[#BF9853] w-[100px] h-[45px] rounded"
+                >
                   Cancel
                 </button>
                 <button onClick={handleUpdate} className="px-4 py-2 bg-[#BF9853] w-[100px] h-[45px] text-white rounded">
@@ -1779,7 +2024,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
         <AuditModal show={showAdvancePortalModal} onClose={() => setShowAdvancePortalModal(false)} audits={advancePortalAudits} vendorOptions={vendorOptions} contractorOptions={contractorOptions}
           siteOptions={siteOptions} />
       </div>
-    </body>
+    </div>
 
   )
 }
@@ -1832,7 +2077,6 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
     return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
   };
   const formatDisplayValue = (value, field) => {
-    // If vendor or transfer site is 0, show "-"
     if (
       (field.oldKey?.includes("vendor_id") || field.oldKey?.includes("transfer_site_id") ||
         field.newKey?.includes("vendor_id") || field.newKey?.includes("transfer_site_id")) &&
@@ -1860,7 +2104,6 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
             <h2 className="text-xl text-red-500 -mt-10 font-bold">x</h2>
           </button>
         </div>
-        {/* Scroll container for both vertical and horizontal overflow */}
         <div className="overflow-auto mt-2 max-h-80 border border-l-8 border-l-[#BF9853] rounded-lg ml-7">
           <table className="table-fixed min-w-full bg-white">
             <thead className="bg-[#FAF6ED]">

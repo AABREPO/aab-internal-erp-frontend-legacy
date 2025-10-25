@@ -203,7 +203,7 @@ const LoanReport = () => {
             "Date",
             "Contractor",
             "Purpose",
-             "Transfer To",
+            "Transfer To",
             "Loan/Transfer",
             "Refund",
             "Type",
@@ -318,15 +318,15 @@ const LoanReport = () => {
     }, []);
 
     return (
-        <div className="w-full ml-10">
-            <div className="flex items-start justify-between bg-white p-5 rounded-lg mb-5">
+        <div className="max-w-[95vw] mx-auto">
+            <div className="flex flex-wrap  justify-between w-full min-h-[128px] bg-white p-5 rounded mb-5">
                 <div className="flex gap-5">
                     <div className="flex flex-col">
                         <label className="mb-1 font-semibold">Week No</label>
                         <select
                             value={selectedWeek}
                             onChange={(e) => setSelectedWeek(e.target.value)}
-                            className="w-[120px] h-[35px] rounded-lg bg-[#F2F2F2] p-2 focus:outline-none"
+                            className="w-[120px] h-[35px] rounded-lg bg-[#F2F2F2] px-2 focus:outline-none"
                         >
                             {weekOptions.map((w) => (
                                 <option key={w} value={w}>
@@ -351,24 +351,23 @@ const LoanReport = () => {
                         </select>
                     </div>
                 </div>
-
-                <div className="flex flex-col items-end min-w-[110px]" style={{ gap: "4px" }}>
+                <div className="flex p-4" style={{ gap: "16px" }}>
                     <div
-                        className="bg-[#F2F2F2] px-2 py-1 rounded-lg w-full text-center"
+                        className="bg-[#F2F2F2] px-2 py-1 rounded-lg text-center"
                         style={{ fontSize: "14px" }}
                     >
                         <p className="text-xs text-gray-600 mb-0">From Date</p>
                         <p className="font-semibold truncate">{fromDate}</p>
                     </div>
                     <div
-                        className="bg-[#F2F2F2] px-2 py-1 rounded-lg w-full text-center"
+                        className="bg-[#F2F2F2] px-2 py-1 rounded-lg text-center"
                         style={{ fontSize: "14px" }}
                     >
                         <p className="text-xs text-gray-600 mb-0">To Date</p>
                         <p className="font-semibold truncate">{toDate}</p>
                     </div>
                     <div
-                        className="bg-[#F2F2F2] px-2 py-1 rounded-lg w-full text-center"
+                        className="bg-[#F2F2F2] px-2 py-1 rounded-lg text-center"
                         style={{ fontSize: "14px" }}
                     >
                         <p className="text-xs text-gray-600 mb-0">Total Advance</p>
@@ -379,71 +378,71 @@ const LoanReport = () => {
                 </div>
             </div>
 
-            <div className="w-full flex justify-end gap-4 p-4">
-                <button
-                    onClick={exportPdf}
-                    className="text-sm text-[#E4572E] hover:underline font-bold"
+            <div className="w-full bg-white p-4">
+                <div className="w-full flex justify-end gap-4">
+                    <button
+                        onClick={exportPdf}
+                        className="text-sm text-[#E4572E] hover:underline font-bold"
+                    >
+                        Export PDF
+                    </button>
+                    <button
+                        onClick={exportExcel}
+                        className="text-sm text-[#007233] hover:underline font-bold"
+                    >
+                        Export XL
+                    </button>
+                </div>
+                <div
+                    id="reportTable"
+                    className="border-l-8 border-l-[#BF9853] rounded-lg overflow-auto max-h-[600px]"
                 >
-                    Export PDF
-                </button>
-                <button
-                    onClick={exportExcel}
-                    className="text-sm text-[#007233] hover:underline font-bold"
-                >
-                    Export XL
-                </button>
-            </div>
-
-            <div
-                id="reportTable"
-                className="border-l-8 border-l-[#BF9853] rounded-lg overflow-auto max-h-[600px]"
-            >
-                <table className="w-full border-collapse">
-                    <thead className="sticky top-0 z-10 bg-white">
-                        <tr className="bg-[#FAF6ED]">
-                            <th className="p-2 w-[50px] font-bold text-left">S.No</th>
-                            <th className="p-2 w-[120px] font-bold text-left">Date</th>
-                            <th className="p-2 w-[200px] font-bold text-left">Contractor</th>
-                            <th className="p-2 w-[300px] font-bold text-left">Purpose</th>
-                            <th className="p-2 w-[250px] font-bold text-left">Transfer To</th>
-                            <th className="p-2 w-[150px] font-bold text-left">Loan/Transfer</th>
-                            <th className="p-2 w-[100px] font-bold text-left">Refund</th>
-                            <th className="p-2 w-[100px] font-bold text-left">Type</th>
-                            <th className="p-2 w-[100px] font-bold text-left">Mode</th>
-                            <th className="p-2 w-[250px] font-bold text-left">Description</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {reportData.length > 0 ? (
-                            reportData.map((entry, index) => (
-                                <tr
-                                    key={index}
-                                    className="odd:bg-white even:bg-[#FAF6ED]"
-                                >
-                                    <td className="text-sm p-2 font-semibold text-left">{index + 1}</td>
-                                    <td className="text-sm p-2 font-semibold text-left">{formatDateOnly(entry.date)}</td>
-                                    <td className="text-sm p-2 font-semibold text-left">
-                                        {entry.vendor_id ? getVendorName(entry.vendor_id) : getContractorName(entry.contractor_id)}
-                                    </td>
-                                    <td className="text-sm p-2 font-semibold text-left">{getPurposeOrSiteName(entry)}</td>
-                                    <td className="text-sm p-2 font-semibold text-left">{getTransferDestination(entry)}</td>
-                                    <td className="text-sm p-2 font-semibold text-left">{(entry.type === "Loan" || entry.type === "Transfer") ? entry.amount?.toLocaleString("en-IN") : "-"}</td>
-                                    <td className="text-sm p-2 font-semibold text-left">{entry.type === "Refund" ? entry.loan_refund_amount?.toLocaleString("en-IN") : "-"}</td>
-                                    <td className="text-sm p-2 font-semibold text-left">{entry.type}</td>
-                                    <td className="text-sm p-2 font-semibold text-left">{entry.type === 'Transfer' ? '' : (paymentModeOptions.find(opt => opt.value === entry.loan_payment_mode)?.label || entry.loan_payment_mode)}</td>
-
-                                    <td className="text-sm p-2 font-semibold text-left">{entry.description}</td>
-                                </tr>
-                            ))
-                        ) : (
-                            <tr>
-                                <td colSpan="10" className="text-center p-4 text-gray-400">
-                                    No Records available for the selected week
-                                </td>
+                    <table className="w-full min-w-[1400px] border-collapse">
+                        <thead className="sticky top-0 z-10 bg-white">
+                            <tr className="bg-[#FAF6ED] h-12">
+                                <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[80px] font-bold text-left">S.No</th>
+                                <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-bold text-left whitespace-nowrap">Date</th>
+                                <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[180px] font-bold text-left">Contractor</th>
+                                <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[200px] font-bold text-left">Purpose</th>
+                                <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[200px] font-bold text-left whitespace-nowrap">Transfer To</th>
+                                <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[140px] font-bold text-right">Loan/Transfer</th>
+                                <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-bold text-right">Refund</th>
+                                <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[100px] font-bold text-left">Type</th>
+                                <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-bold text-left">Mode</th>
+                                <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[200px] font-bold text-left">Description</th>
                             </tr>
-                        )}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {reportData.length > 0 ? (
+                                reportData.map((entry, index) => (
+                                    <tr
+                                        key={index}
+                                        className="odd:bg-white even:bg-[#FAF6ED] h-12"
+                                    >
+                                        <td className="text-sm pl-4 pr-4 lg:pl-6 lg:pr-6 font-semibold text-left">{index + 1}</td>
+                                        <td className="text-sm pl-4 pr-4 lg:pl-6 lg:pr-6 font-semibold text-left whitespace-nowrap">{formatDateOnly(entry.date)}</td>
+                                        <td className="text-sm pl-4 pr-4 lg:pl-6 lg:pr-6 font-semibold text-left">
+                                            {entry.vendor_id ? getVendorName(entry.vendor_id) : getContractorName(entry.contractor_id)}
+                                        </td>
+                                        <td className="text-sm pl-4 pr-4 lg:pl-6 lg:pr-6 font-semibold text-left">{getPurposeOrSiteName(entry)}</td>
+                                        <td className="text-sm pl-4 pr-4 lg:pl-6 lg:pr-6 font-semibold text-left">{getTransferDestination(entry)}</td>
+                                        <td className="text-sm pl-4 pr-4 lg:pl-6 lg:pr-6 font-semibold text-right">{(entry.type === "Loan" || entry.type === "Transfer") ? entry.amount?.toLocaleString("en-IN") : "-"}</td>
+                                        <td className="text-sm pl-4 pr-4 lg:pl-6 lg:pr-6 font-semibold text-right">{entry.type === "Refund" ? entry.loan_refund_amount?.toLocaleString("en-IN") : "-"}</td>
+                                        <td className="text-sm pl-4 pr-4 lg:pl-6 lg:pr-6 font-semibold text-left">{entry.type}</td>
+                                        <td className="text-sm pl-4 pr-4 lg:pl-6 lg:pr-6 font-semibold text-left">{entry.type === 'Transfer' ? '' : (paymentModeOptions.find(opt => opt.value === entry.loan_payment_mode)?.label || entry.loan_payment_mode)}</td>
+                                        <td className="text-sm pl-4 pr-4 lg:pl-6 lg:pr-6 font-semibold text-left">{entry.description}</td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr className="h-12">
+                                    <td colSpan="10" className="text-center pl-4 pr-4 lg:pl-6 lg:pr-6 text-gray-400">
+                                        No Records available for the selected week
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );

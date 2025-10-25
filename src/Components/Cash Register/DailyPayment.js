@@ -1217,7 +1217,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         handleDateClick(defaultDate);
     }
     const totalAmount = dailyExpenses
-        .filter(row => row.date === selectedDate)        // only current date rows
+        .filter(row => row.date === selectedDate && row.type !== "Staff Advance")        // only current date rows, excluding advance data
         .reduce((sum, row) => sum + (Number(row.amount || 0) + Number(row.extra_amount || 0)), 0);
     const totalRefund = refundPayments
         .reduce((sum, p) => sum + Number(p.amount || 0), 0);
@@ -1262,9 +1262,23 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         doc.line(14, 30, pageWidth - 14, 30); // Line below
         // Reset font
         doc.setFont(undefined, 'normal');
-        // Calculate total amount for selected date
-        const filteredExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate);
+        // Calculate total amount for selected date (excluding advance data and Diwali Bonus)
+        const filteredExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate && row.type !== "Staff Advance" && row.type !== "Diwali Bonus");
         const totalAmount = filteredExpenses.reduce(
+            (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
+            0
+        );
+        
+        // Filter advance data for separate table
+        const advanceExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate && row.type === "Staff Advance");
+        const totalAdvanceAmount = advanceExpenses.reduce(
+            (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
+            0
+        );
+        
+        // Filter Diwali Bonus data for separate table
+        const diwaliBonusExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate && row.type === "Diwali Bonus");
+        const totalDiwaliBonusAmount = diwaliBonusExpenses.reduce(
             (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
             0
         );
@@ -1403,17 +1417,18 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
         doc.text(`NET BALANCE: ${netBalance.toLocaleString('en-IN')}`, 155, 38);
-        // Add Refund Received table heading
+        // Add Refund Received table heading (left side)
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
         doc.text('WAGE REFUND', 14, firstTableEndY + spaceBetweenTables - 2);
-        // Add Refund Received table
+        // Add Refund Received table (left side, half width)
         doc.autoTable({
             startY: firstTableEndY + spaceBetweenTables,
             head: [refundTableColumn],
             body: refundTableRows,
+            tableWidth: 'wrap',
             styles: {
-                fontSize: 9,
+                fontSize: 8,
                 cellPadding: 2,
                 halign: 'left',
                 valign: 'middle',
@@ -1433,11 +1448,158 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 fillColor: false,
             },
             columnStyles: {
-                0: { cellWidth: 15, halign: 'center', fillColor: [255, 255, 255] },    // SNS - white background
-                1: { cellWidth: 50, halign: 'left' },      // Name
-                2: { cellWidth: 25, halign: 'right' }      // Amount
-            }
+                0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },    // SNO - white background
+                1: { cellWidth: 35, halign: 'left' },      // Name
+                2: { cellWidth: 20, halign: 'right' }      // Amount
+            },
+            margin: { left: 14, right: 0 }
+        });        
+        // Get the end position of the refund table
+        const refundTableEndY = doc.lastAutoTable.finalY;
+        
+        // Add Diwali Bonus table (always show, even if empty)
+        // Diwali Bonus table columns
+        const diwaliBonusTableColumn = [
+            "SNO", "NAME", "AMOUNT"
+        ];
+        
+        // Prepare Diwali Bonus table rows
+        const diwaliBonusTableRows = diwaliBonusExpenses
+            .map((row, index) => {
+                const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
+                const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
+                const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
+                const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
+                const name = [employee?.label, vendor?.label, contractor?.label, labour?.label]
+                    .filter(Boolean).join(" | ") || "";
+                const amount = (row.amount || 0) + (row.extra_amount || 0);
+                const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
+                
+                return [
+                    (index + 1).toString(),
+                    name,
+                    formattedAmount
+                ];
+            });
+        
+        // Add total row for Diwali Bonus table
+        diwaliBonusTableRows.push([
+            "",
+            "TOTAL",
+            `${totalDiwaliBonusAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
+        ]);
+        
+        // Add Diwali Bonus table heading
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text('DIWALI BONUS', 14, refundTableEndY + 15);
+        
+        // Add Diwali Bonus table
+        doc.autoTable({
+            startY: refundTableEndY + 20,
+            head: [diwaliBonusTableColumn],
+            body: diwaliBonusTableRows,
+            tableWidth: 'wrap',
+            styles: {
+                fontSize: 8,
+                cellPadding: 2,
+                halign: 'left',
+                valign: 'middle',
+                textColor: [80, 80, 80],
+            },
+            headStyles: {
+                fillColor: [255, 248, 220], // Light orange color
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+                lineColor: [200, 200, 200],
+                lineWidth: 0.1,
+            },
+            bodyStyles: {
+                lineWidth: 0.1,
+            },
+            alternateRowStyles: {
+                fillColor: false,
+            },
+            columnStyles: {
+                0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },    // SNO - white background
+                1: { cellWidth: 35, halign: 'left' },      // Name
+                2: { cellWidth: 20, halign: 'right' }      // Amount
+            },
+            margin: { left: 14, right: 0 }
         });
+        
+        // Add Wage Advance table if there are advance expenses
+        if (advanceExpenses.length > 0) {
+            // Wage Advance table columns
+            const advanceTableColumn = [
+                "S.NO", "PROJECT NAME", "EMPLOYEE NAME", "TOTAL AMOUNT"
+            ];            
+            // Prepare advance table rows
+            const advanceTableRows = advanceExpenses
+                .map((row, index) => {
+                    const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
+                    const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
+                    const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
+                    const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
+                    const name = [employee?.label, vendor?.label, contractor?.label, labour?.label]
+                        .filter(Boolean).join(" | ") || "";
+                    const projectName = siteOptions.find(opt => opt.id === Number(row.project_id))?.label || "";
+                    const amount = (row.amount || 0) + (row.extra_amount || 0);
+                    const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
+                    
+                    return [
+                        (index + 1).toString(),
+                        projectName,
+                        name,
+                        formattedAmount
+                    ];
+                });            
+            // Add total row for advance table
+            advanceTableRows.push([
+                "",
+                "TOTAL",
+                "",
+                `${totalAdvanceAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
+            ]);            
+            // Add Wage Advance table heading (right side)
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text('WAGE ADVANCE', 95, firstTableEndY + spaceBetweenTables - 2);            
+            // Add Wage Advance table (right side, half width)
+            doc.autoTable({
+                startY: firstTableEndY + spaceBetweenTables,
+                head: [advanceTableColumn],
+                body: advanceTableRows,
+                tableWidth: 'wrap',
+                styles: {
+                    fontSize: 8,
+                    cellPadding: 2,
+                    halign: 'left',
+                    valign: 'middle',
+                    textColor: [80, 80, 80],
+                },
+                headStyles: {
+                    fillColor: [255, 248, 220], // Light orange color
+                    textColor: [0, 0, 0],
+                    fontStyle: 'bold',
+                    lineColor: [200, 200, 200],
+                    lineWidth: 0.1,
+                },
+                bodyStyles: {
+                    lineWidth: 0.1,
+                },
+                alternateRowStyles: {
+                    fillColor: false,
+                },
+                columnStyles: {
+                    0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },    // S.NO - white background
+                    1: { cellWidth: 35, halign: 'left' },      // Project Name
+                    2: { cellWidth: 35, halign: 'left' },      // Employee Name
+                    3: { cellWidth: 20, halign: 'right' }      // Total Amount
+                },
+                margin: { left: 95, right: 0 }
+            });
+        }        
         const fileName = `PS ${currentWeekNumber} - Daily Payment Statement ${formatDateOnly(selectedDate)}.pdf`;
         doc.save(fileName);
     };
@@ -1629,8 +1791,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                 Expenses:<span style={{ color: "#E4572E" }}>{Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}</span>
                             </h1>
                         </div>
-                        <div className="w-full h-[600px] rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden ">
-                            {/* Single Table with Scrollable Container */}
+                        <div className="w-full h-[590px] rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden ">
                             <div ref={scrollRef} className="overflow-auto max-h-[600px] thin-scrollbar" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
                                 onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} >
                                 <table className="w-[1200px] border-collapse text-left">

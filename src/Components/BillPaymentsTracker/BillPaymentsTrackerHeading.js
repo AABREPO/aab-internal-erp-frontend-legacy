@@ -4,13 +4,20 @@ import BillDatabase from './BillDatabase';
 import BillStatement from './BillStatement';
 
 const BillPaymentsTrackerHeading = ({ username, userRoles = [] }) => {
-    const [activeTab, setActiveTab] = useState(
-        localStorage.getItem('activePaintTab') || 'pendingbill'
-    );
+    const [activeTab, setActiveTab] = useState(() => {
+        const savedTab = localStorage.getItem('activePaintTab');
+        if (savedTab === 'billdatabase' && (username !== 'Mahalingam M' && username !== 'Admin')) {
+            return 'pendingbill';
+        }
+        return savedTab || 'pendingbill';
+    });
     useEffect(() => {
-        // Save the active tab to localStorage whenever it changes
-        localStorage.setItem('activePaintTab', activeTab);
-    }, [activeTab]);
+        if (activeTab === 'billdatabase' && (username !== 'Mahalingam M' && username !== 'Admin')) {
+            setActiveTab('pendingbill');
+        } else {
+            localStorage.setItem('activePaintTab', activeTab);
+        }
+    }, [activeTab, username]);
     const renderContent = () => {
         switch (activeTab) {
             case 'pendingbill':
@@ -20,7 +27,7 @@ const BillPaymentsTrackerHeading = ({ username, userRoles = [] }) => {
             case 'billstatement':
                 return <BillStatement username={username} userRoles={userRoles} />;
             default:
-                return <PendingBill />;
+                return <PendingBill username={username} userRoles={userRoles}/>;
         }
     };
     return (
@@ -32,12 +39,14 @@ const BillPaymentsTrackerHeading = ({ username, userRoles = [] }) => {
                 >
                     Pending Bill
                 </h2>
-                <h2
-                    className={`link ${activeTab === 'billdatabase' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('billdatabase')}
-                >
-                    Database
-                </h2>
+                {(username === 'Mahalingam M' || username === 'Admin') && (
+                    <h2
+                        className={`link ${activeTab === 'billdatabase' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('billdatabase')}
+                    >
+                        Database
+                    </h2>
+                )}
                 <h2
                     className={`link ${activeTab === 'billstatement' ? 'active' : ''}`}
                     onClick={() => setActiveTab('billstatement')}

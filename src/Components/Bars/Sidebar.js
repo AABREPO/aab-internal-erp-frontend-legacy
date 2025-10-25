@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import home from '../Images/dashboard.svg';
 import homeWhite from '../Images/dashboard1.svg';
 import billing from '../Images/Billing.svg';
@@ -19,6 +19,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
   const [activeMenu, setActiveMenu] = useState('');
   const [activeSubmenuItem, setActiveSubmenuItem] = useState('');
   const [roleModels, setRoleModels] = useState([]);
+  const location = useLocation();
   useEffect(() => {
     const fetchUserRoles = async () => {
       try {
@@ -39,6 +40,81 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
       fetchUserRoles();
     }
   }, [userRoles]);
+
+  // Effect to set active menu and submenu based on current route
+  useEffect(() => {
+    const currentPath = location.pathname;
+    
+    // Define route mappings
+    const routeMappings = {
+      // Billing routes
+      '/tracker/pendingbill': { menu: 'billing', submenu: 'Bill Payments Tracker' },
+      '/entrychecklist': { menu: 'billing', submenu: 'Bill Entry Checklist' },
+      '/invoice-bill/invoice': { menu: 'billing', submenu: 'Invoice' },
+      '/quotation': { menu: 'billing', submenu: 'Quotation' },
+      '/changeOrder': { menu: 'billing', submenu: 'Change Order' },
+      
+      // CRM routes
+      '/enquiry': { menu: 'crm', submenu: 'Enquiry' },
+      '/projects': { menu: 'crm', submenu: 'Projects' },
+      
+      // Account routes
+      '/vendorPaymentsTracker': { menu: 'account', submenu: 'Vendor Payments Tracker' },
+      '/portal/advancePortal': { menu: 'account', submenu: 'Advance Portal' },
+      '/loan/loanportal': { menu: 'account', submenu: 'Loan Portal' },
+      '/paymentReceipt': { menu: 'account', submenu: 'Payment Receipt' },
+      '/rent/Form': { menu: 'account', submenu: 'Rent Management' },
+      '/Claim/claimpaymentsummary': { menu: 'account', submenu: 'Claim Payments' },
+      '/weekly-payment/WeeklyPayment': { menu: 'account', submenu: 'Weekly Payment Register' },
+      '/bank-register': { menu: 'account', submenu: 'Bank Register' },
+      '/expense-entry': { menu: 'account', submenu: 'Expense Entry' },
+      '/expense-dashboard': { menu: 'account', submenu: 'Expense Dashboard' },
+      '/bankreconciliation': { menu: 'account', submenu: 'Bank Reconciliation' },
+      
+      // Procurement routes
+      '/purchaseorder': { menu: 'procurement', submenu: 'Purchase Order' },
+      '/inventory': { menu: 'procurement', submenu: 'Inventory' },
+      '/toolsTracker': { menu: 'procurement', submenu: 'Tools Tracker' },
+      
+      // Design Tools routes
+      '/designtool/tileCalculate': { menu: 'designtools', submenu: 'Tile Calculator' },
+      '/paints/paintCalculation': { menu: 'designtools', submenu: 'Paint Calculator' },
+      '/bath/BathFixtures Matrix': { menu: 'designtools', submenu: 'Bath Fixtures Matrix' },
+      '/rccal/RCCCalculation': { menu: 'designtools', submenu: 'RCC Calculation' },
+      '/switch/SwitchMatrix': { menu: 'designtools', submenu: 'Switch Matrix' },
+      '/masonary/masonarycalculater': { menu: 'designtools', submenu: 'Masonary Calculator' },
+      '/carpentry/carpentrycalculator': { menu: 'designtools', submenu: 'Carpentry Calculator' },
+      
+      // HR routes
+      '/billView': { menu: 'hr', submenu: 'onboarding' },
+      '/attendance': { menu: 'hr', submenu: 'Attendance' },
+      '/staffadvance/staffAdvance': { menu: 'hr', submenu: 'Staff Advance' },
+      '/user_manage': { menu: 'hr', submenu: 'Manage User' },
+      
+      // Master Data routes
+      '/master-data': { menu: 'masterdata', submenu: 'Master Data' },
+      
+      // Utility Hub routes
+      '/utility/dashboard': { menu: 'utility', submenu: 'Dashboard' }
+    };
+    
+    // Find matching route
+    const routeMapping = routeMappings[currentPath];
+    if (routeMapping) {
+      setActiveMenu(routeMapping.menu);
+      setActiveSubmenuItem(routeMapping.submenu);
+    } else {
+      // Check for home route or default
+      if (currentPath === '/' || currentPath === '/dashboard') {
+        setActiveMenu('home');
+        setActiveSubmenuItem('');
+      } else {
+        // Reset if no match found
+        setActiveMenu('');
+        setActiveSubmenuItem('');
+      }
+    }
+  }, [location.pathname]);
   const handleMenuClick = (menu) => {
     setActiveMenu(menu === activeMenu ? '' : menu);
   };
@@ -266,6 +342,19 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
               }}>
               <p className="text-sm cursor-pointer"><li>Cash Register</li></p>
             </Link>
+            <Link to={hasAccessToModel('Bank Register') ? '/bank-register' : '#'}
+              className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Bank Register' ? 'text-red-500' : ''
+                }`}
+              onClick={(e) => {
+                if (!hasAccessToModel('Bank Register')) {
+                  e.preventDefault();
+                  alert("No permissions for this page");
+                  return;
+                }
+                handleSubmenuItemClick('Bank Register');
+              }}>
+              <p className="text-sm cursor-pointer"><li>Bank Register</li></p>
+            </Link>
             <Link
               to={hasAccessToModel('Expense Entry') ? '/expense-entry' : '#'}
               className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Expense Entry' ? 'text-red-500' : ''}`}
@@ -474,6 +563,23 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
           </div>
         )}
         <div
+          className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'utility' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+          onClick={() => handleMenuClick('utility')}
+        >
+          <p className="text-[12px] leading-[15px] font-medium text-base">Utility Hub</p>
+        </div>
+        {activeMenu === 'utility' && (
+          <div className="ml-6">
+            <Link
+              to="utility/dashboard"
+              className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Dashboard' ? 'text-red-500' : ''}`}
+              onClick={() => handleSubmenuItemClick('Dashboard')}
+            >
+              <p className="text-sm cursor-pointer"><li>Dashboard</li></p>
+            </Link>
+          </div>
+        )}
+        <div
           className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'masterdata' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('masterdata')}
         >
@@ -490,6 +596,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
             </Link>
           </div>
         )}
+        
         <div className="mt-[6rem] ml-4 w-44">
           <p style={{ fontSize: '16px', marginTop: '1rem' }}>
             <span className="font-semibold">Last Updated:</span>{' '}

@@ -7,14 +7,21 @@ import AdvanceSummary from './AdvanceSummary';
 
 const AdvanceHeading = ({ username, userRoles = [] }) => {
 
-    const [activeTab, setActiveTab] = useState(
-        localStorage.getItem('activePaintTab') || 'advanceportal'
-    );
+    const [activeTab, setActiveTab] = useState(() => {
+        const savedTab = localStorage.getItem('activePaintTab');
+        if (savedTab === 'advancedatabase' && (username !== 'Mahalingam M' && username !== 'Admin')) {
+            return 'advanceportal';
+        }
+        return savedTab || 'advanceportal';
+    });
 
     useEffect(() => {
-        // Save the active tab to localStorage whenever it changes
-        localStorage.setItem('activePaintTab', activeTab);
-    }, [activeTab]);
+        if (activeTab === 'advancedatabase' && (username !== 'Mahalingam M' && username !== 'Admin')) {
+            setActiveTab('advanceportal');
+        } else {
+            localStorage.setItem('activePaintTab', activeTab);
+        }
+    }, [activeTab, username]);
 
     const renderContent = () => {
         switch (activeTab) {
@@ -33,7 +40,7 @@ const AdvanceHeading = ({ username, userRoles = [] }) => {
         }
     };
     return (
-        <div className="bg-[#FAF6ED]">
+        <div className="bg-[#FAF6ED] min-h-screen w-full h-auto">
             <div className="topbar-title">
                 <h2
                     className={`link ${activeTab === 'advanceportal' ? 'active' : ''}`}
@@ -47,12 +54,14 @@ const AdvanceHeading = ({ username, userRoles = [] }) => {
                 >
                     Table View
                 </h2>
-                <h2
-                    className={`link ${activeTab === 'advancedatabase' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('advancedatabase')}
-                >
-                    Database
-                </h2>
+                {(username === 'Mahalingam M' || username === 'Admin') && (
+                    <h2
+                        className={`link ${activeTab === 'advancedatabase' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('advancedatabase')}
+                    >
+                        Database
+                    </h2>
+                )}
                 <h2
                     className={`link ${activeTab === 'advancereport' ? 'active' : ''}`}
                     onClick={() => setActiveTab('advancereport')}

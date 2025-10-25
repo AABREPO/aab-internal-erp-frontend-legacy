@@ -497,6 +497,18 @@ const TableView = ({ username, userRoles = [] }) => {
   const getLabourName = useCallback((id) => laboursList.find(l => l.id === id)?.label || id, [laboursList]);
   const getPurposeName = useCallback((id) => purposes.find(p => p.id === id)?.label || id, [purposes]);
 
+  // Get unique employee names from records for filter dropdown
+  const employeeNameOptions = useMemo(() => {
+    const uniqueNames = new Set();
+    records.forEach((entry) => {
+      const name = getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id);
+      if (name) {
+        uniqueNames.add(name);
+      }
+    });
+    return Array.from(uniqueNames).map(name => ({ value: name, label: name }));
+  }, [records, getEmployeeName, getLabourName]);
+
   const handleSort = useCallback((key) => {
     setSortConfig((prev) => {
       if (prev.key === key) {
@@ -1212,7 +1224,7 @@ const TableView = ({ username, userRoles = [] }) => {
                     </th>
                     <th className="pt-2 pb-2 w-[220px]">
                       <Select
-                        options={employees}
+                        options={employeeNameOptions}
                         value={selectEmployeeName ? { value: selectEmployeeName, label: selectEmployeeName } : null}
                         onChange={(opt) => setSelectEmployeeName(opt ? opt.value : "")}
                         className="text-xs focus:outline-none"

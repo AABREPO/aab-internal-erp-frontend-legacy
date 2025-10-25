@@ -431,6 +431,11 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 throw new Error("Network response was not ok: " + response.statusText);
             }
             const data = await response.json();
+            // Add Staff Advance to the types if it doesn't exist
+            const hasStaffAdvance = data.some(type => type.type === "Staff Advance");
+            if (!hasStaffAdvance) {
+                data.push({ type: "Staff Advance" });
+            }
             setWeeklyTypes(data);
         } catch (error) {
             console.error("Fetch error: ", error);
@@ -449,6 +454,11 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 throw new Error("Network response was not ok: " + response.statusText);
             }
             const data = await response.json();
+            // Add Staff Advance to the categories if it doesn't exist
+            const hasStaffAdvance = data.some(category => category.category === "Staff Advance");
+            if (!hasStaffAdvance) {
+                data.push({ category: "Staff Advance" });
+            }
             setExpensesCategory(data);
         } catch (error) {
             console.error("Fetch error: ", error);
@@ -842,10 +852,13 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             return;
         }
         const doc = new jsPDF();
+        // Add header with PS number, title, date and day
         doc.setFontSize(14);
         doc.setFont(undefined, 'bold');
+        // Get day name
         const dateObj = new Date(selectedDate);
         const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+        // Calculate center position for the header
         const pageWidth = doc.internal.pageSize.width;
         const headerText = `PS: ${selectedWeek}`;
         const headerText1 = "DAILY PAYMENT STATEMENT";
@@ -855,28 +868,50 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         doc.text(headerText1, 60, 24);
         doc.text(headerText2, 170, 20);
         doc.text(headerText, 14, 20);
+        // Add day name below
         doc.setFontSize(10);
         const dayText = dayName;
         const dayWidth = doc.getTextWidth(dayText);
         doc.text(dayText, 170, 27);
+        // Add lines above and below
         doc.setLineWidth(0.5);
-        doc.line(14, 15, pageWidth - 14, 15); 
-        doc.line(14, 30, pageWidth - 14, 30); 
+        doc.line(14, 15, pageWidth - 14, 15); // Line above
+        doc.line(14, 30, pageWidth - 14, 30); // Line below
+        // Reset font
         doc.setFont(undefined, 'normal');
-        const dateFilteredExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate);
-        const totalAmount = dateFilteredExpenses.reduce(
+        // Calculate total amount for selected date (excluding advance data and Diwali Bonus)
+        const filteredExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate && row.type !== "Staff Advance" && row.type !== "Diwali Bonus");
+        const totalAmount = filteredExpenses.reduce(
             (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
             0
         );
+        
+        // Filter advance data for separate table
+        const advanceExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate && row.type === "Staff Advance");
+        const totalAdvanceAmount = advanceExpenses.reduce(
+            (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
+            0
+        );
+        
+        // Filter Diwali Bonus data for separate table
+        const diwaliBonusExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate && row.type === "Diwali Bonus");
+        const totalDiwaliBonusAmount = diwaliBonusExpenses.reduce(
+            (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
+            0
+        );
+        // Calculate total refund amount for selected date
         const totalRefundAmount = refundPayments.reduce(
             (sum, row) => sum + Number(row.amount || 0),
             0
         );
+        // Reset color for table
         doc.setTextColor(0, 0, 0);
+        // Expenses table columns (removed Date column)
         const expensesTableColumn = [
             "SNO", "PROJECT NAME", "NAME", "QTY", "TYPE", "AMOUNT", "DESCRIPTION"
         ];
-        const expensesTableRows = dateFilteredExpenses
+        // Prepare expenses with projectName and type for sorting
+        const expensesTableRows = filteredExpenses
             .map((row, index) => {
                 const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
                 const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
@@ -900,11 +935,13 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     description
                 };
             })
+            // Sort by projectName ASC, then by type DESC
             .sort((a, b) => {
                 const projectCompare = a.projectName.localeCompare(b.projectName);
                 if (projectCompare !== 0) return projectCompare;
-                return b.type.localeCompare(a.type); 
+                return b.type.localeCompare(a.type); // type DESC
             })
+            // Map to array format for autoTable
             .map((row, idx) => [
                 (idx + 1).toString(),
                 row.projectName,
@@ -914,6 +951,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 row.amount,
                 row.description
             ]);
+        // Add total row for expenses
         expensesTableRows.push([
             "",
             "TOTAL",
@@ -923,16 +961,14 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             `${totalAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`,
             ""
         ]);
-        const netBalance = totalAmount - totalRefundAmount;
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
-        doc.text(`NET BALANCE: ${netBalance.toLocaleString('en-IN')}`, 155, 38);
+        // Add Expenses table heading
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
         doc.text('WAGE EXPENSES', 14, 48);
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
         doc.text('EXPENDITURE PAYMENTS', 14, 38);
+        // Start expenses table
         doc.autoTable({
             startY: 50,
             head: [expensesTableColumn],
@@ -945,19 +981,19 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 textColor: [80, 80, 80],
             },
             headStyles: {
-                fillColor: [255, 248, 220], 
+                fillColor: [255, 248, 220], // Light orange color
                 textColor: [0, 0, 0],
                 fontStyle: 'bold',
                 lineColor: [200, 200, 200],
                 lineWidth: 0.1,
             },
             columnStyles: {
-                0: { cellWidth: 13, halign: 'center', fillColor: [255, 255, 255] },    
+                0: { cellWidth: 13, halign: 'center', fillColor: [255, 255, 255] },    // SNO - white background
                 1: { cellWidth: 47, halign: 'left' },      // Project Name
-                2: { cellWidth: 34, halign: 'left' },      // Name
+                2: { cellWidth: 30, halign: 'left' },      // Name
                 3: { cellWidth: 12, halign: 'center' },    // Qty
-                4: { cellWidth: 22, halign: 'left' },      // Type
-                5: { cellWidth: 18, halign: 'right' },     // Amount
+                4: { cellWidth: 25, halign: 'left' },      // Type
+                5: { cellWidth: 20, halign: 'right' },     // Amount
                 6: { cellWidth: 35, halign: 'left' }       // Description
             },
             bodyStyles: {
@@ -967,8 +1003,22 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 fillColor: false,
             }
         });
+        // Get the end position of the first table
         const firstTableEndY = doc.lastAutoTable.finalY;
-        const spaceBetweenTables = 10;
+        // Add some space between tables
+        const spaceBetweenTables = 15;
+        
+        // Calculate dynamic positioning for flexible tables
+        const docPageWidth = doc.internal.pageSize.width;
+        const leftMargin = 14;
+        const rightMargin = 14;
+        const availableWidth = docPageWidth - leftMargin - rightMargin;
+        const tableSpacing = 10;
+        
+        // Determine if we have advance expenses for flexible layout
+        const hasAdvanceExpenses = advanceExpenses.length > 0;
+        
+        // Refund Received table columns
         const refundTableColumn = [
             "SNO", "NAME", "AMOUNT"
         ];
@@ -985,27 +1035,36 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     formattedAmount
                 ];
             });
+        // Add total row for refunds
         refundTableRows.push([
             "",
             "TOTAL",
             `${totalRefundAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
         ]);
+        const netBalance = totalAmount - totalRefundAmount;
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(`NET BALANCE: ${netBalance.toLocaleString('en-IN')}`, 155, 38);
+        
+        // Add Refund Received table heading (left side)
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
         doc.text('WAGE REFUND', 14, firstTableEndY + spaceBetweenTables - 2);
+        // Add Refund Received table (left side, half width)
         doc.autoTable({
             startY: firstTableEndY + spaceBetweenTables,
             head: [refundTableColumn],
             body: refundTableRows,
+            tableWidth: 'wrap',
             styles: {
-                fontSize: 9,
+                fontSize: 8,
                 cellPadding: 2,
                 halign: 'left',
                 valign: 'middle',
                 textColor: [80, 80, 80],
             },
             headStyles: {
-                fillColor: [255, 248, 220], 
+                fillColor: [255, 248, 220], // Light orange color
                 textColor: [0, 0, 0],
                 fontStyle: 'bold',
                 lineColor: [200, 200, 200],
@@ -1018,15 +1077,162 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 fillColor: false,
             },
             columnStyles: {
-                0: { cellWidth: 15, halign: 'center', fillColor: [255, 255, 255] }, 
-                1: { cellWidth: 50, halign: 'left' }, 
-                2: { cellWidth: 25, halign: 'right' } 
-            }
+                0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },    // SNO - white background
+                1: { cellWidth: 35, halign: 'left' },      // Name
+                2: { cellWidth: 20, halign: 'right' }      // Amount
+            },
+            margin: { left: 14, right: 0 }
+        });        
+        
+        // Get the end position of the refund table
+        const refundTableEndY = doc.lastAutoTable.finalY;
+        
+        // Add Diwali Bonus table (always show, even if empty)
+        // Diwali Bonus table columns
+        const diwaliBonusTableColumn = [
+            "SNO", "NAME", "AMOUNT"
+        ];
+        
+        // Prepare Diwali Bonus table rows
+        const diwaliBonusTableRows = diwaliBonusExpenses
+            .map((row, index) => {
+                const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
+                const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
+                const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
+                const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
+                const name = [employee?.label, vendor?.label, contractor?.label, labour?.label]
+                    .filter(Boolean).join(" | ") || "";
+                const amount = (row.amount || 0) + (row.extra_amount || 0);
+                const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
+                
+                return [
+                    (index + 1).toString(),
+                    name,
+                    formattedAmount
+                ];
+            });
+        
+        // Add total row for Diwali Bonus table
+        diwaliBonusTableRows.push([
+            "",
+            "TOTAL",
+            `${totalDiwaliBonusAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
+        ]);
+        
+        // Add Diwali Bonus table heading
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text('DIWALI BONUS', 14, refundTableEndY + 15);
+        
+        // Add Diwali Bonus table
+        doc.autoTable({
+            startY: refundTableEndY + 20,
+            head: [diwaliBonusTableColumn],
+            body: diwaliBonusTableRows,
+            tableWidth: 'wrap',
+            styles: {
+                fontSize: 8,
+                cellPadding: 2,
+                halign: 'left',
+                valign: 'middle',
+                textColor: [80, 80, 80],
+            },
+            headStyles: {
+                fillColor: [255, 248, 220], // Light orange color
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+                lineColor: [200, 200, 200],
+                lineWidth: 0.1,
+            },
+            bodyStyles: {
+                lineWidth: 0.1,
+            },
+            alternateRowStyles: {
+                fillColor: false,
+            },
+            columnStyles: {
+                0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },    // SNO - white background
+                1: { cellWidth: 35, halign: 'left' },      // Name
+                2: { cellWidth: 20, halign: 'right' }      // Amount
+            },
+            margin: { left: 14, right: 0 }
         });
+        
+        // Add Wage Advance table if there are advance expenses
+        if (advanceExpenses.length > 0) {
+            // Wage Advance table columns
+            const advanceTableColumn = [
+                "S.NO", "PROJECT NAME", "EMPLOYEE NAME", "TOTAL AMOUNT"
+            ];            
+            // Prepare advance table rows
+            const advanceTableRows = advanceExpenses
+                .map((row, index) => {
+                    const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
+                    const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
+                    const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
+                    const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
+                    const name = [employee?.label, vendor?.label, contractor?.label, labour?.label]
+                        .filter(Boolean).join(" | ") || "";
+                    const projectName = siteOptions.find(opt => opt.id === Number(row.project_id))?.label || "";
+                    const amount = (row.amount || 0) + (row.extra_amount || 0);
+                    const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
+                    
+                    return [
+                        (index + 1).toString(),
+                        projectName,
+                        name,
+                        formattedAmount
+                    ];
+                });            
+            // Add total row for advance table
+            advanceTableRows.push([
+                "",
+                "TOTAL",
+                "",
+                `${totalAdvanceAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
+            ]);                 
+            // Add Wage Advance table heading (right side) - fixed position like DailyPayment
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text('WAGE ADVANCE', 95, firstTableEndY + spaceBetweenTables - 2);                   
+            // Add Wage Advance table (right side, half width) - like DailyPayment
+            doc.autoTable({
+                startY: firstTableEndY + spaceBetweenTables,
+                head: [advanceTableColumn],
+                body: advanceTableRows,
+                tableWidth: 102, // Fixed width to ensure side-by-side layout
+                styles: {
+                    fontSize: 8,
+                    cellPadding: 2,
+                    halign: 'left',
+                    valign: 'middle',
+                    textColor: [80, 80, 80],
+                },
+                headStyles: {
+                    fillColor: [255, 248, 220], // Light orange color
+                    textColor: [0, 0, 0],
+                    fontStyle: 'bold',
+                    lineColor: [200, 200, 200],
+                    lineWidth: 0.1,
+                },
+                bodyStyles: {
+                    lineWidth: 0.1,
+                },
+                alternateRowStyles: {
+                    fillColor: false,
+                },
+                columnStyles: {
+                    0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },    // S.NO - white background
+                    1: { cellWidth: 35, halign: 'left' },      // Project Name
+                    2: { cellWidth: 35, halign: 'left' },      // Employee Name
+                    3: { cellWidth: 20, halign: 'right' }      // Total Amount
+                },
+                margin: { left: 95, right: 0 }
+            });
+        }        
         const fileName = `PS ${selectedWeek} - Daily Payment Statement ${formatDateOnly(selectedDate)}.pdf`;
         doc.save(fileName);
     };
-
     // Handler functions for file upload and description (exactly like DailyPayment)
     const handleDescriptionClick = (row) => {
         if (row.description) {
@@ -1041,13 +1247,11 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             setShowPopups(true);
         }
     };
-
     const handleFileUploadClick = (row) => {
         setCurrentFileRow(row);
         setSelectedFileForPopup(null);
         setFileUploadPopup(true);
     };
-
     const handleFileSelectInPopup = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -1055,7 +1259,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         }
         e.target.value = '';
     };
-
     const handleSaveFileFromPopup = async () => {
         if (!selectedFileForPopup || !currentFileRow) return;
         try {
@@ -1117,7 +1320,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             alert("Error during file upload. Please try again.");
         }
     };
-
     const handleUpdate = async () => {
         if (!description.trim()) {
             alert("Please enter a description");
@@ -1174,7 +1376,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             setLoading(false);
         }
     };
-
     // Edit functions for daily expenses
     const handleEditClick = (row) => {
         setEditingDailyExpenseRowId(row.id);
@@ -1193,7 +1394,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             file_url: row.file_url || ""
         });
     };
-
     const saveEditedExpense = async (row) => {
         try {
             const payload = {
@@ -1210,13 +1410,11 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 description: editDailyExpenseData.description || "",
                 file_url: editDailyExpenseData.file_url || null,
             };
-
             const response = await axios.put(
                 `https://backendaab.in/aabuildersDash/api/daily-payments/edit/${row.id}?username=${encodeURIComponent(username)}`,
                 payload,
                 { headers: { "Content-Type": "application/json" } }
             );
-
             // Update UI immediately
             setDailyExpenses((prev) =>
                 prev.map((exp) => (exp.id === row.id ? { ...exp, ...payload } : exp))
@@ -1227,7 +1425,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             alert("Error updating expense. Please try again.");
         }
     };
-
     // Edit functions for refund payments
     const handleEditRefundClick = (row) => {
         setEditingPaymentId(row.id);
@@ -1236,7 +1433,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             amount: row.amount,
         });
     };
-
     const handleEditRefundChange = (e) => {
         const { name, value } = e.target;
         setEditRefundPaymentData((prev) => ({
@@ -1244,14 +1440,12 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             [name]: value,
         }));
     };
-
     const handleEditRefundLabourChange = (selected) => {
         setEditRefundPaymentData((prev) => ({
             ...prev,
             labour_id: selected ? selected.id : "",
         }));
     };
-
     const saveEditedRefundPayment = async (id) => {
         try {
             await axios.put(
@@ -1271,7 +1465,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             alert("Error updating refund payment. Please try again.");
         }
     };
-
     // Delete functions
     const handleDailyExpensesDelete = async (id) => {
         const confirmed = window.confirm("Are you sure you want to delete This Daily Expense Data?");
@@ -1292,7 +1485,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             console.log("Deletion cancelled.");
         }
     };
-
     const handleRefundPaymentsDelete = async (id) => {
         const confirmed = window.confirm("Are you sure you want to delete This Refund Received Data?");
         if (confirmed) {
@@ -1312,7 +1504,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             console.log("Deletion cancelled.");
         }
     };
-
     // History functions
     const fetchAuditDetailsForDailyExpense = async (expensesId) => {
         try {

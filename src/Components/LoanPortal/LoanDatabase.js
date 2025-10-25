@@ -581,24 +581,24 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
   };
   return (
     <body>
-      <div className='w-[1750px] h-[150px] bg-white ml-10 text-left flex gap-5'>
-        <div className='ml-8 pt-8'>
+      <div className='max-w-[95vw] min-h-[128px] bg-white mx-auto px-4 py-4 text-left flex flex-wrap gap-4'>
+        <div className=''>
           <label className='block mb-2 font-semibold'>Loan Amount</label>
           <input
-            className='w-[183px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
+            className='w-[180px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
             value={`₹${totalLoanAmount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
             readOnly
           />
         </div>
-        <div className='ml-8 pt-8'>
+        <div className=''>
           <label className='block mb-2 font-semibold'>Transfer Amount</label>
           <input
-            className='w-[183px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
+            className='w-[220px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
             value={`₹${totalTransferAmount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
             readOnly
           />
         </div>
-        <div className='ml-8 pt-8'>
+        <div className=''>
           <label className='block mb-2 font-semibold'>Refund Amount</label>
           <input
             className='w-[220px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
@@ -607,7 +607,7 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
           />
         </div>
       </div>
-      <div className='w-[1750px] ml-10 bg-white mt-5 pt-5'>
+      <div className='max-w-[95vw] mx-auto bg-white mt-5 pt-5'>
         <div
           className={`text-left flex ${selectDate || selectContractororVendorName || selectProjectName || selectType || selectMode
             ? 'flex-col sm:flex-row sm:justify-between'
@@ -663,48 +663,49 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
             <button className='text-sm text-[#BF9853] hover:underline font-bold'>Print</button>
           </div>
         </div>
-        <div className='border-l-8 border-l-[#BF9853] rounded-lg ml-5 mr-5'>
+        <div className='border-l-8 border-l-[#BF9853] rounded-lg mx-5'>
           <div ref={scrollRef} className='overflow-auto max-h-[600px]'
             onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
           >
-            <table className="w-[1955px] border-collapse">
+            <table className="w-full min-w-[1500px] border-collapse">
               <thead className="sticky top-0 z-10 bg-white ">
-                <tr className="bg-[#FAF6ED]">
-                    <th>Timestamp</th>
-                  <th className="pt-2 pl-3 w-44 font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('date')}>
+                <tr className="bg-[#FAF6ED] h-12">
+                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-bold text-left">Timestamp</th>
+                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[140px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('date')}>
                     Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('vendor')}>
+                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[180px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('vendor')}>
                     Associate {sortConfig.key === 'vendor' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="px-2 w-[300px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('project')}>
+                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[200px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('project')}>
                     Purpose {sortConfig.key === 'project' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="px-2 w-[120px] font-bold text-left">Transfer To</th>
-                  <th className="px-2 w-[170px] font-bold text-left">Loan</th>
-                  <th className="px-2 w-[120px] font-bold text-left">Refund</th>
-                  <th className="px-2 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('type')}>
+                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-bold text-left whitespace-nowrap">Transfer To</th>
+                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[140px] font-bold text-right">Loan</th>
+                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-bold text-right">Refund</th>
+                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('type')}>
                     Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="px-2 w-[120px] font-bold text-left">Description</th>
-                  <th className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 pl-3" onClick={() => handleSort('mode')}>
+                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-bold text-left">Description</th>
+                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[180px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('mode')}>
                     Mode {sortConfig.key === 'mode' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="px-2 w-[80px] font-bold text-left">E.No</th>
-                  <th className="px-2 w-[120px] font-bold text-left">Activity</th>
+                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[80px] font-bold text-left">E.No</th>
+                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[100px] font-bold text-left">Activity</th>
                 </tr>
                 {showFilters && (
-                  <tr className="bg-white border-b border-gray-200">
-                    <th className="pt-2 pb-2 w-44">
+                  <tr className="bg-white border-b border-gray-200 h-12">
+                    <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px]"></th>
+                    <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[140px]">
                       <input
                         type="date"
                         value={selectDate}
                         onChange={(e) => setSelectDate(e.target.value)}
-                        className="p-1 rounded-md bg-transparent w-32 border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none mr-10"
+                        className="p-1 rounded-md bg-transparent w-full max-w-[130px] border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
                         placeholder="Search Date..."
                       />
                     </th>
-                    <th className="pt-2 pb-2 w-[220px]">
+                    <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[180px]">
                       <Select
                         options={combinedOptions}
                         value={selectContractororVendorName ? { value: selectContractororVendorName, label: selectContractororVendorName } : null}
@@ -753,7 +754,7 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
                         }}
                       />
                     </th>
-                    <th className="pt-2 pb-2 w-[300px]">
+                    <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[200px]">
                       <Select
                         options={siteOptions}
                         value={selectProjectName ? { value: selectProjectName, label: selectProjectName } : null}
@@ -802,14 +803,14 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
                         }}
                       />
                     </th>
-                    <th className=' pt-2 pb-2'></th>
-                    <th className=' pt-2 pb-2'></th>
-                    <th className=' pt-2 pb-2'></th>
-                    <th className="pt-2 pb-2">
+                    <th className='pl-4 pr-4 lg:pl-6 lg:pr-6'></th>
+                    <th className='pl-4 pr-4 lg:pl-6 lg:pr-6'></th>
+                    <th className='pl-4 pr-4 lg:pl-6 lg:pr-6'></th>
+                    <th className="pl-4 pr-4 lg:pl-6 lg:pr-6">
                       <select
                         value={selectType}
                         onChange={(e) => setSelectType(e.target.value)}
-                        className="p-1 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                        className="p-1 rounded-md bg-transparent w-full max-w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
                         placeholder="Type..."
                       >
                         <option value=''>Select Type...</option>
@@ -819,12 +820,12 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
                         <option value='Vehicle Loan'>Vehicle Loan</option>
                       </select>
                     </th>
-                    <th className="pt-2 pb-2"></th>
-                    <th className="pt-2 pb-2">
+                    <th className="pl-4 pr-4 lg:pl-6 lg:pr-6"></th>
+                    <th className="pl-4 pr-4 lg:pl-6 lg:pr-6">
                       <select
                         value={selectMode}
                         onChange={(e) => setSelectMode(e.target.value)}
-                        className="p-1 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                        className="p-1 rounded-md bg-transparent w-full max-w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
                         placeholder="Mode..."
                       >
                         <option value=''>Select</option>
@@ -833,24 +834,24 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
                         <option value='Net Banking'>Net Banking</option>
                       </select>
                     </th>
-                    <th className=' pt-2 pb-2'></th>
-                    <th className=' pt-2 pb-2'></th>
+                    <th className='pl-4 pr-4 lg:pl-6 lg:pr-6'></th>
+                    <th className='pl-4 pr-4 lg:pl-6 lg:pr-6'></th>
                   </tr>
                 )}
               </thead>
               <tbody>
                 {currentData.length > 0 ? (
                   currentData.map((entry) => (
-                    <tr key={entry.loanPortalId || entry.id} className="odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="text-sm text-left p-2 w-44 font-semibold">{formatDate(entry.timestamp)}</td>
-                      <td className="text-sm text-left p-2 w-44 font-semibold">{formatDateOnly(entry.date)}</td>
-                      <td className="text-sm text-left w-[250px] font-semibold">
+                    <tr key={entry.loanPortalId || entry.id} className="odd:bg-white even:bg-[#FAF6ED] h-12">
+                      <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-semibold">{formatDate(entry.timestamp)}</td>
+                      <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[140px] font-semibold">{formatDateOnly(entry.date)}</td>
+                      <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[180px] font-semibold">
                         {entry.vendor_id ? getVendorName(entry.vendor_id) : getContractorName(entry.contractor_id)}
                       </td>
-                      <td className="text-sm text-left w-[420px] font-semibold">
+                      <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[200px] font-semibold">
                         {purposeOptions.find(p => p.id === entry.from_purpose_id)?.value || entry.from_purpose_id}
                       </td>
-                      <td className="text-sm text-left w-[140px] font-semibold">
+                      <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-semibold">
                         {entry.type === "Transfer" ? (
                           entry.to_purpose_id
                             ? purposeOptions.find(purpose => purpose.id === entry.to_purpose_id)?.value || ""
@@ -859,25 +860,25 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
                           ""
                         )}
                       </td>
-                      <td className="text-sm text-left pl-2 w-[140px] font-semibold">
+                      <td className="text-sm text-right pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[140px] font-semibold">
                         {(entry.type === "Loan" || entry.type === "Transfer") && entry.amount
                           ? Number(entry.amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
                           : ""}
                         {entry.type === "Refund" ? "-" : ""}
                       </td>
-                      <td className="text-sm text-left pl-2 font-semibold w-[150px]">
+                      <td className="text-sm text-right pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-semibold">
                         {entry.type === "Refund" && entry.loan_refund_amount
                           ? Number(entry.loan_refund_amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
                           : ""}
                       </td>
-                      <td className="text-sm text-left font-semibold w-[200px]">{entry.type}</td>
-                      <td className="text-sm text-left font-semibold w-[140px]">{entry.description}</td>
-                      <td className="text-sm text-left pl-3 font-semibold w-[90px]">
+                      <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[100px] font-semibold">{entry.type}</td>
+                      <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-semibold">{entry.description}</td>
+                      <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[180px] font-semibold">
                         {paymentModeOptions.find(opt => opt.value === entry.loan_payment_mode)?.label || entry.loan_payment_mode || ''}
                       </td>
-                      <td className="text-sm text-left pl-3 font-semibold w-[90px]">{entry.entry_no}</td>
-                      <td className="flex py-2 w-[150px]">
-                        <button className="rounded-full transition duration-200 ml-2 mr-3">
+                      <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[80px] font-semibold">{entry.entry_no}</td>
+                      <td className="flex py-2 pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[100px] justify-center">
+                        <button className="rounded-full transition duration-200">
                           <img
                             src={edit}
                             alt="Edit"
@@ -926,8 +927,8 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
                     </tr>
                   ))
                 ) : (
-                  <tr>
-                    <td className="p-2 text-center text-sm text-gray-400" colSpan={12}>
+                  <tr className="h-12">
+                    <td className="pl-6 pr-6 text-center text-sm text-gray-400" colSpan={12}>
                       No data available
                     </td>
                   </tr>

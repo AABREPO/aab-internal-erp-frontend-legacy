@@ -512,32 +512,28 @@ const BillPayment = ({ username, userRoles = [] }) => {
     const getProjectName = (projectId) => {
         const project = siteOptions.find(option => option.id === projectId);
         return project ? project.label : '-';
-    };
-    
+    };    
     // New function to get project name or purpose name
     const getProjectOrPurposeName = (item) => {
         // Check if this is a tenant - if so, show tenant_complex_name directly from the data
         const partyData = getPartyNameAndType(item);
         if (partyData.type === 'Tenant' && item.tenant_complex_name) {
             return item.tenant_complex_name;
-        }
-        
+        }        
         // First try to get project name
         if (item.project_id) {
             const projectName = getProjectName(item.project_id);
             if (projectName !== '-') {
                 return projectName;
             }
-        }
-        
+        }        
         // If no project_id or project not found, try to get purpose name
         if (item.purpose_id) {
             const purposeName = getPurposeName(item.purpose_id);
             if (purposeName !== '-') {
                 return purposeName;
             }
-        }
-        
+        }        
         return '-';
     };
     const getVendorName = (vendorId) => {
@@ -565,7 +561,6 @@ const BillPayment = ({ username, userRoles = [] }) => {
         const vendorName = getVendorName(item.vendor_id);
         const employeeName = getEmployeeName(item.employee_id);
         const tenantName = getTenantName(item.tenant_id);
-
         if (contractorName !== '-') {
             return { name: contractorName, type: 'Contractor' };
         } else if (vendorName !== '-') {
@@ -663,14 +658,12 @@ const BillPayment = ({ username, userRoles = [] }) => {
         }
         return filtered;
     };
-    const filteredData = getFilteredData();
-    
+    const filteredData = getFilteredData();    
     // Pagination logic
     const totalPages = Math.ceil(filteredData.length / itemsPerPage);
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     const currentItems = filteredData.slice(startIndex, endIndex);
-    
     // Extract unique type values from the data for dropdown options
     const getUniqueTypes = () => {
         const uniqueTypes = [...new Set(billPayments.map(item => item.type).filter(type => type && type.trim() !== ''))];
@@ -678,8 +671,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
             value: type,
             label: type
         }));
-    };
-    
+    };    
     const calculatePaymentTotals = () => {
         let upiTotal = 0;
         let netBankingTotal = 0;
@@ -699,7 +691,6 @@ const BillPayment = ({ username, userRoles = [] }) => {
         return { upiTotal, netBankingTotal, chequeTotal };
     };
     const { upiTotal, netBankingTotal, chequeTotal } = calculatePaymentTotals();
-
     // Export functions
     const handleExportPDF = () => {
         const doc = new jsPDF('landscape');
@@ -716,7 +707,6 @@ const BillPayment = ({ username, userRoles = [] }) => {
             "Cheque No",
             "Cheque Date"
         ];
-
         const tableRows = filteredData.map((item, index) => [
             index + 1,
             new Date(item.date).toLocaleDateString(),
@@ -730,7 +720,6 @@ const BillPayment = ({ username, userRoles = [] }) => {
             item.cheque_number || '-',
             item.cheque_date ? new Date(item.cheque_date).toLocaleDateString() : '-'
         ]);
-
         doc.setFontSize(12);
         doc.text("Bank Records Report", 14, 10);
         doc.autoTable({

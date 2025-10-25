@@ -28,6 +28,8 @@ import LoanPoratlHeading from './Components/LoanPortal/LoanPoratlHeading';
 import BillPaymentsTrackerHeading from './Components/BillPaymentsTracker/BillPaymentsTrackerHeading';
 import MasterData from './Components/MasterData/MasterData';
 import BankReconciliation from './Components/Bank Reconciliation/BankReconciliation .js';
+import UtilityHeading from './Components/UtilityHub/UtilityHeading';
+import BankRegisterHeading from './Components/Bank Register/BankRegisterHeading';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -84,6 +86,8 @@ function App() {
             <Route path='/tracker/*' element={<BillPaymentsTrackerHeading username={user.username} userRoles={user?.userRoles || []}/>} />
             <Route path='/master-data' element={<MasterData username={user.username} userRoles={user?.userRoles || []}/>} />
             <Route path="/bankreconciliation" element={<BankReconciliation username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path="/utility/*" element={<UtilityHeading username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path="/bank-register" element={<BankRegisterHeading username={user.username} userRoles={user?.userRoles || []} />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </div>

@@ -38,6 +38,9 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
   const [filterCategory, setFilterCategory] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [discount, setDiscount] = useState(0);
+  const [discountSubmitted, setDiscountSubmitted] = useState(false);
+  const [submittedDiscounts, setSubmittedDiscounts] = useState(new Set());
+  const [accountDetails, setAccountDetails] = useState([]);
 
   // Drag and scroll functionality
   const scrollRef = useRef(null);
@@ -48,6 +51,13 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
   const animationFrame = useRef(null);
   const lastMove = useRef({ time: 0, x: 0, y: 0 });
 
+  // Debug: Log username on component mount
+  useEffect(() => {
+    console.log("ClaimPaymentSummary - Username prop:", username);
+    if (!username || username.trim() === '') {
+      console.warn("⚠️ WARNING: Username is not available! Payments will not have 'entered_by' information.");
+    }
+  }, [username]);
 
   useEffect(() => {
     // Fetch data from the API
@@ -183,6 +193,29 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
     // Call employee fetch function
     fetchEmployeeDetails();
   }, []);
+
+  // Fetch account details
+  useEffect(() => {
+    const fetchAccountDetails = async () => {
+      try {
+        const response = await fetch("https://backendaab.in/aabuildersDash/api/account-details/getAll", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+        if (!response.ok) {
+          throw new Error("Network response was not ok: " + response.statusText);
+        }
+        const data = await response.json();
+        setAccountDetails(data);
+      } catch (error) {
+        console.error("Error fetching account details:", error);
+      }
+    };
+    fetchAccountDetails();
+  }, []);
   const filteredData = selectedSite
     ? claimDataList.filter(item => item.siteName === selectedSite.value)
     : claimDataList;
@@ -197,7 +230,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
 
           const totalReceived = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
           const totalDiscount = payments.reduce((sum, payment) => sum + (payment.discount_amount || 0), 0);
-          
+
           amounts[row.id] = totalReceived;
           discounts[row.id] = totalDiscount;
         } catch (error) {
@@ -231,6 +264,22 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
       setPopupAmount(baseAmount || "");
     }
   }, [selectedRow]);
+  useEffect(() => {
+    if (remainingAmount > 0 && discount > 0) {
+      const newAmount = remainingAmount - discount;
+      if (newAmount >= 0 && newAmount !== Number(paymentPopupData.amount)) {
+        setPaymentPopupData(prev => ({ ...prev, amount: newAmount.toString() }));
+      }
+    }
+  }, [discount, remainingAmount]);
+  useEffect(() => {
+    if (showModal && selectedRow) {
+      const claimId = selectedRow.id;
+      const hasSubmittedDiscount = submittedDiscounts.has(claimId);
+      const hasPreviousDiscount = claimPaymentsData.some(payment => payment.discount_amount && payment.discount_amount > 0);
+      setDiscountSubmitted(hasSubmittedDiscount || hasPreviousDiscount);
+    }
+  }, [showModal, selectedRow, submittedDiscounts, claimPaymentsData]);
   const getToday = () => {
     const today = new Date();
     return today.toISOString().split("T")[0];
@@ -251,13 +300,9 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
       setPopupAmount(remaining > 0 ? remaining : 0);
       setClaimPaymentsData(claimPayments);
       setMainMode("");
-      
-      // Check if there's a discount amount in the last payment
       const lastPayment = claimPayments[claimPayments.length - 1];
       const existingDiscount = lastPayment && lastPayment.discount_amount ? lastPayment.discount_amount : 0;
       setDiscount(existingDiscount);
-
-      // Initialize payment popup data
       setPaymentPopupData({
         date: getToday(),
         amount: remaining > 0 ? remaining : 0,
@@ -267,33 +312,37 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
         transactionNumber: "",
         accountNumber: ""
       });
-
       setShowModal(true);
     } catch (error) {
       console.error("Error fetching claim payments:", error);
     }
   };
   const handleSavePayment = async () => {
-    if (!paymentPopupData.paymentMode) {
+    if (!username || username.trim() === '') {
+      alert("Error: Username is not available. Please log in again or contact support.");
+      console.error("Username is missing:", username);
+      return;
+    }
+    const isDiscountOnlyPayment = Number(paymentPopupData.amount) === 0 && (discount || 0) >= remainingAmount;
+    const hasDiscountOnly = (discount || 0) > 0 && Number(paymentPopupData.amount) === 0;
+    const hasPaymentAndDiscount = Number(paymentPopupData.amount) > 0 && (discount || 0) > 0;
+    if (Number(paymentPopupData.amount) > 0 && !paymentPopupData.paymentMode) {
       alert("Please select a payment mode.");
       return;
     }
-    if (!paymentPopupData.amount) {
-      alert("Please enter an amount.");
+    if (Number(paymentPopupData.amount) === 0 && (discount || 0) === 0) {
+      alert("Please enter an amount or discount.");
       return;
     }
-
-    // Check if payment amount + discount doesn't exceed remaining amount
     const totalPaymentWithDiscount = Number(paymentPopupData.amount) + (discount || 0);
     if (totalPaymentWithDiscount > remainingAmount) {
       alert(`Payment amount (${paymentPopupData.amount}) + Discount (${discount || 0}) = ${totalPaymentWithDiscount} cannot exceed remaining amount (${remainingAmount})`);
       return;
     }
-
     const newPayment = {
       entered_by: username,
       expenses_claim_id: selectedRow.expenses_claim_id ?? selectedRow.id,
-      payment_mode: paymentPopupData.paymentMode,
+      payment_mode: (isDiscountOnlyPayment || hasDiscountOnly) ? "Discount" : paymentPopupData.paymentMode,
       date: paymentPopupData.date,
       amount: paymentPopupData.amount,
       cash_register_status: false,
@@ -305,9 +354,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
       transaction_number: paymentPopupData.transactionNumber,
       account_number: paymentPopupData.accountNumber
     };
-
     try {
-      // First save to claim_payments
       const response = await fetch("https://backendaab.in/aabuildersDash/api/claim_payments/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -318,7 +365,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
         return;
       }
       const claimPaymentResult = await response.json();
-      if (["Gpay", "PhonePe", "Net Banking", "Cheque"].includes(paymentPopupData.paymentMode)) {
+      if (["Gpay", "PhonePe", "Net Banking", "Cheque"].includes(paymentPopupData.paymentMode) && !isDiscountOnlyPayment) {
         const weeklyPaymentBillPayload = {
           date: paymentPopupData.date,
           created_at: new Date().toISOString(),
@@ -346,11 +393,19 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
           weeklyPaymentBillPayload,
           { headers: { "Content-Type": "application/json" } }
         );
-        window.location.reload();
         alert("Payment saved successfully and added to Weekly Payment Bills!");
+      } else if (isDiscountOnlyPayment || hasDiscountOnly) {
+        alert("Discount applied successfully!");
+        setDiscountSubmitted(true);
+        setSubmittedDiscounts(prev => new Set([...prev, selectedRow.id]));
+      } else if (hasPaymentAndDiscount) {
+        alert("Payment and discount saved successfully!");
+        setDiscountSubmitted(true);
+        setSubmittedDiscounts(prev => new Set([...prev, selectedRow.id]));
       } else {
         alert("Payment saved successfully!");
       }
+      window.location.reload();
       setShowModal(false);
     } catch (error) {
       console.error("Error saving payment:", error);
@@ -375,8 +430,6 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
     }
     return true;
   });
-  console.log(filteredDataWithFilters);
-  // Sorting function
   const handleSort = (column) => {
     if (sortColumn === column) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -385,7 +438,6 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
       setSortDirection('asc');
     }
   };
-  // Sort the data
   const sortedData = [...filteredDataWithFilters].sort((a, b) => {
     if (!sortColumn) return 0;
     let aValue, bValue;
@@ -455,39 +507,32 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
       maximumFractionDigits: 2
     }).format(numAmount);
   };
-
-  // Helper functions to get vendor/contractor IDs
   const getVendorId = (vendorName) => {
     if (!vendorName) return null;
     const vendor = vendorOptions.find(v => v.value === vendorName);
     return vendor ? vendor.id : null;
   };
-
   const getContractorId = (contractorName) => {
     if (!contractorName) return null;
     const contractor = contractorOptions.find(c => c.value === contractorName);
     return contractor ? contractor.id : null;
   };
-
   const getProjectId = (siteName) => {
     if (!siteName) return null;
     const site = siteOption.find(s => s.value === siteName);
     return site ? site.id : null;
   };
-
   const getEmployeeId = (employeeName) => {
     if (!employeeName) return null;
     const employee = employeeOptions.find(e => e.value === employeeName);
     return employee ? employee.id : null;
   };
-
   const clearAllFilters = () => {
     setFilterDate('');
     setFilterProjectName('');
     setFilterCategory('');
     setFilterStatus('');
   };
-  // Drag and scroll event handlers
   const handleMouseDown = (e) => {
     if (!scrollRef.current) return;
     isDragging.current = true;
@@ -558,7 +603,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
   return (
     <body>
       <div className="">
-        <div className='w-[1700px] bg-white h-[130px] rounded ml-10'>
+        <div className='w-[1800px] bg-white h-[130px] rounded ml-10'>
           <div className=" text-left p-7 ml-10">
             <label className="font-semibold mr-2 block mb-2">Project Name</label>
             <Select
@@ -573,7 +618,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
             />
           </div>
         </div>
-        <div className='w-[1700px] bg-white mt-5 p-5 ml-10'>
+        <div className='w-[1800px] bg-white mt-5 p-5 ml-10'>
           <div className="flex justify-between items-center mb-3">
             <div className="flex items-center gap-2">
               <button
@@ -630,59 +675,60 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
             <div ref={scrollRef} className='overflow-auto max-h-[600px] thin-scrollbar' onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
             >
-              <table className="w-full border rounded-lg overflow-hidden">
+              <table className="w-full border rounded-lg overflow-hidden table-fixed">
                 <thead className="bg-[#FAF6ED]">
                   <tr>
-                    <th className="px-4 py-2">S.No</th>
+                    <th className="px-2 py-2 w-16 text-center">S.No</th>
                     <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      className="px-2 py-2 w-24 cursor-pointer hover:bg-[#f0e6d2] select-none"
                       onClick={() => handleSort('date')}
                     >
                       Date {sortColumn === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      className="px-2 py-2 w-40 cursor-pointer hover:bg-[#f0e6d2] select-none"
                       onClick={() => handleSort('siteName')}
                     >
                       Project Name {sortColumn === 'siteName' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      className="px-2 py-2 w-32 cursor-pointer hover:bg-[#f0e6d2] select-none"
                       onClick={() => handleSort('partyName')}
                     >
                       Party Name {sortColumn === 'partyName' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      className="px-2 py-2 w-24 cursor-pointer hover:bg-[#f0e6d2] select-none"
                       onClick={() => handleSort('amount')}
                     >
                       Amount {sortColumn === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      className="px-2 py-2 w-28 cursor-pointer hover:bg-[#f0e6d2] select-none"
                       onClick={() => handleSort('category')}
                     >
                       Category {sortColumn === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      className="px-2 py-2 w-40 cursor-pointer hover:bg-[#f0e6d2] select-none"
                       onClick={() => handleSort('comments')}
                     >
                       Reason {sortColumn === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      className="px-2 py-2 w-24 cursor-pointer hover:bg-[#f0e6d2] select-none"
                       onClick={() => handleSort('status')}
                     >
                       Status {sortColumn === 'status' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      className="px-2 py-2 w-20 cursor-pointer hover:bg-[#f0e6d2] select-none"
                       onClick={() => handleSort('eno')}
                     >
                       E.No {sortColumn === 'eno' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="px-4 py-2">Activity</th>
+                    <th className="px-2 py-2 w-24">Activity</th>
+                    <th className="px-2 py-2 w-16">View</th>
                   </tr>
                   {showFilters && (
                     <tr className="bg-white border-b border-gray-200">
@@ -777,42 +823,40 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                       </th>
                       <th className="pt-2 pb-2"></th>
                       <th className="pt-2 pb-2"></th>
+                      <th className="pt-2 pb-2"></th>
                     </tr>
                   )}
                 </thead>
                 <tbody>
                   {sortedData.map((row, index) => (
                     <tr key={index} className={`even:bg-[#FAF6ED] odd:bg-[#FFFFFF] font-bold text-[14px]`}>
-                      <td className="px-4 py-2">{index + 1}</td>
-                      <td className="px-4 py-2">{formatDateOnly(row.date)}</td>
-                      <td className="px-4 py-2">{row.siteName}</td>
-                      <td className="px-4 py-2">{row.vendor || row.contractor}</td>
-                      <td className="px-4 py-2">{formatIndianCurrency(row.amount)}</td>
-                      <td className="px-4 py-2">{row.category}</td>
-                      <td className="px-4 py-2">{row.comments}</td>
+                      <td className="px-2 py-2 text-center whitespace-nowrap">{index + 1}</td>
+                      <td className="px-2 py-2 whitespace-nowrap">{formatDateOnly(row.date)}</td>
+                      <td className="px-2 py-2 whitespace-nowrap truncate" title={row.siteName}>{row.siteName}</td>
+                      <td className="px-2 py-2 whitespace-nowrap truncate" title={row.vendor || row.contractor}>{row.vendor || row.contractor}</td>
+                      <td className="px-2 py-2 whitespace-nowrap">{formatIndianCurrency(row.amount)}</td>
+                      <td className="px-2 py-2 whitespace-nowrap truncate" title={row.category}>{row.category}</td>
+                      <td className="px-2 py-2 whitespace-nowrap truncate" title={row.comments}>{row.comments}</td>
                       <td
-                        className={`px-4 py-2 font-semibold ${((receivedAmounts[row.id] || 0) + (discountAmounts[row.id] || 0)) >= row.amount
+                        className={`px-2 py-2 font-semibold whitespace-nowrap ${((receivedAmounts[row.id] || 0) + (discountAmounts[row.id] || 0)) >= row.amount
                           ? "text-[#007233]"
                           : "text-[#E4572E]"
                           }`}
                       >
                         {((receivedAmounts[row.id] || 0) + (discountAmounts[row.id] || 0)) >= row.amount ? "Claimed" : "Not Claimed"}
                       </td>
-                      <td className="px-4 py-2">{row.eno}</td>
-                      <td className="px-4 py-2">
+                      <td className="px-2 py-2 whitespace-nowrap">{row.eno}</td>
+                      <td className="px-2 py-2 whitespace-nowrap">
                         {(() => {
                           const actualAmount = row.amount;
                           const received = receivedAmounts[row.id] || 0;
                           const discount = discountAmounts[row.id] || 0;
-                          
-                          // Calculate if payment is fully settled (including discount)
                           const isFullyPaid = (received + discount) >= actualAmount;
-                          
                           if (received === 0) {
                             return (
                               <button
                                 onClick={() => handleOpenModal(row)}
-                                className="border px-3 py-1 rounded-full bg-white hover:bg-gray-100"
+                                className="border px-2 py-1 rounded-full bg-white hover:bg-gray-100 text-xs whitespace-nowrap"
                               >
                                 To Receive
                               </button>
@@ -821,7 +865,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                             return (
                               <span
                                 onClick={() => handleOpenModal(row)}
-                                className="px-3 py-1 rounded-full bg-[#FFD39E] text-black cursor-pointer"
+                                className="px-2 py-1 rounded-full bg-[#FFD39E] text-black cursor-pointer text-xs whitespace-nowrap"
                               >
                                 Received
                               </span>
@@ -830,13 +874,27 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                             return (
                               <span
                                 onClick={() => handleOpenModal(row)}
-                                className="px-3 py-1 rounded-full bg-[#E2F9E1] text-green-700 cursor-pointer"
+                                className="px-2 py-1 rounded-full bg-[#E2F9E1] text-green-700 cursor-pointer text-xs whitespace-nowrap"
                               >
                                 ✓ Received
                               </span>
                             );
                           }
                         })()}
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        {row.billCopy ? (
+                          <a
+                            href={row.billCopy}
+                            className="text-red-500 underline text-xs"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            View
+                          </a>
+                        ) : (
+                          <span></span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -847,7 +905,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
         </div>
         {showModal && (
           <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-            <div className="bg-white text-left rounded-xl p-6 w-[1000px] h-[740px] flex flex-col">
+            <div className="bg-white text-left rounded-xl p-6 w-[1100px] h-[740px] flex flex-col">
               <h3 className="text-lg font-semibold mb-4 text-center">
                 {(remainingAmount - discount) <= 0 ? "Payment Status" : "Add Payment"}
               </h3>
@@ -855,14 +913,10 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                 <div className="flex gap-10 h-full">
                   <div className="flex-1 flex flex-col">
                     <div className="flex-1 overflow-y-auto">
-
-                      {/* Payment Form - Only show if Net Payable is greater than 0 */}
-                      {(remainingAmount - discount) > 0 && (
+                      {remainingAmount > 0 && (remainingAmount - discount) > 0 ? (
                         <div className="space-y-4 mb-4 justify-items-center overflow-y-auto">
-                          {/* First Row: Date, Amount, Mode - with border */}
                           <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-4">
                             <div className="grid grid-cols-3 gap-4">
-                              {/* Date */}
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
                                 <div className="relative">
@@ -874,8 +928,6 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                                   />
                                 </div>
                               </div>
-
-                              {/* Amount */}
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
                                 <input
@@ -883,7 +935,8 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                                   value={paymentPopupData.amount}
                                   onChange={(e) => {
                                     const val = e.target.value;
-                                    if (val === '' || (Number(val) >= 0 && Number(val) <= remainingAmount)) {
+                                    const maxAllowed = remainingAmount - (discount || 0);
+                                    if (val === '' || (Number(val) >= 0 && Number(val) <= maxAllowed)) {
                                       setPaymentPopupData(prev => ({ ...prev, amount: val }));
                                     }
                                   }}
@@ -891,8 +944,6 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                                   className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none no-spinner"
                                 />
                               </div>
-
-                              {/* Mode */}
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Mode</label>
                                 <select
@@ -906,19 +957,16 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                                   <option value="PhonePe">PhonePe</option>
                                   <option value="Net Banking">Net Banking</option>
                                   <option value="Cheque">Cheque</option>
+                                  <option value="Invoice Payment">Invoice Payment</option>
                                 </select>
                               </div>
                             </div>
-                            {/* Second Row: Transaction Number, Account Number, Cheque Fields - with border */}
-                            {/* Only show for Gpay, PhonePe, Net Banking, or Cheque */}
                             {(paymentPopupData.paymentMode === "Gpay" || paymentPopupData.paymentMode === "PhonePe" ||
                               paymentPopupData.paymentMode === "Net Banking" || paymentPopupData.paymentMode === "Cheque") && (
                                 <div className=" p-4">
                                   <div className="space-y-4">
-                                    {/* Cheque Fields Row (only for Cheque mode) */}
                                     {paymentPopupData.paymentMode === "Cheque" && (
                                       <div className="grid grid-cols-2 gap-4">
-                                        {/* Cheque No */}
                                         <div>
                                           <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No</label>
                                           <input
@@ -929,8 +977,6 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                                             className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
                                           />
                                         </div>
-
-                                        {/* Cheque Date */}
                                         <div>
                                           <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date</label>
                                           <input
@@ -942,9 +988,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                                         </div>
                                       </div>
                                     )}
-                                    {/* Transaction Number and Account Number Row */}
                                     <div className="grid grid-cols-2 gap-4">
-                                      {/* Transaction Number */}
                                       <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
                                         <input
@@ -955,8 +999,6 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                                           className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
                                         />
                                       </div>
-
-                                      {/* Account Number */}
                                       <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
                                         <select
@@ -965,9 +1007,11 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                                           className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
                                         >
                                           <option value="">Select Account</option>
-                                          <option value="2027887700014">2027887700014</option>
-                                          <option value="2027887700015">2027887700015</option>
-                                          <option value="2027887700016">2027887700016</option>
+                                          {accountDetails.map((account) => (
+                                            <option key={account.id} value={account.account_number}>
+                                              {account.account_number}
+                                            </option>
+                                          ))}
                                         </select>
                                       </div>
                                     </div>
@@ -975,10 +1019,11 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                                 </div>
                               )}
                           </div>
-
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
                         </div>
                       )}
-                      {/* Previous Payments Section - Show under original fields when amount is not fully paid */}
                       {claimPaymentsData.length > 0 && (
                         <div>
                           <h4 className="text-md font-medium text-gray-700 mb-3 pl-4">Previous Payments : {claimPaymentsData.length}</h4>
@@ -986,10 +1031,8 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                             <div className="space-y-4 max-h-[500px] overflow-y-auto no-scrollbar">
                               {claimPaymentsData.map((payment, index) => (
                                 <div key={index} className="">
-                                  {/* First Row: Date, Amount, Mode */}
                                   <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-4 mb-4 no-scrollbar">
                                     <div className="grid grid-cols-3 gap-4">
-                                      {/* Date */}
                                       <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
                                         <input
@@ -999,8 +1042,6 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                                           className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600"
                                         />
                                       </div>
-
-                                      {/* Amount */}
                                       <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
                                         <input
@@ -1010,8 +1051,6 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                                           className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600"
                                         />
                                       </div>
-
-                                      {/* Mode */}
                                       <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">Mode</label>
                                         <div className="flex items-end gap-2">
@@ -1021,7 +1060,6 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                                             readOnly
                                             className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600"
                                           />
-                                          {/* CR Button (only for Cash mode) */}
                                           {payment.payment_mode === "Cash" && (
                                             <button
                                               className={`w-20 h-[45px] rounded-lg text-white font-semibold 
@@ -1030,7 +1068,6 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                                               onClick={async () => {
                                                 if (payment.cash_register_status) return;
                                                 try {
-                                                  //Check if already exists in backend
                                                   const res = await axios.get(
                                                     `https://backendaab.in/aabuildersDash/api/cash-register/get/${payment.claimPaymentsId}`
                                                   );
@@ -1038,7 +1075,6 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                                                     alert("This payment is already in the cash register.");
                                                     return;
                                                   }
-                                                  //Save to Cash Register
                                                   const cashRegisterPayload = {
                                                     claim_payments_id: payment.claimPaymentsId,
                                                     date: payment.date,
@@ -1051,7 +1087,6 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                                                     cashRegisterPayload,
                                                     { headers: { "Content-Type": "application/json" } }
                                                   );
-                                                  //Save to Payments Received
                                                   const paymentsReceivedPayload = {
                                                     date: payment.date,
                                                     amount: Number(payment.amount),
@@ -1064,11 +1099,9 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                                                     paymentsReceivedPayload,
                                                     { headers: { "Content-Type": "application/json" } }
                                                   );
-                                                  //Update ClaimPayments.cashRegisterStatus → true
                                                   await axios.put(
                                                     `https://backendaab.in/aabuildersDash/api/claim_payments/update-status/${payment.claimPaymentsId}?status=true`
                                                   );
-                                                  // Update UI immediately
                                                   setClaimPaymentsData((prev) =>
                                                     prev.map((p, i) =>
                                                       i === index ? { ...p, cashRegisterStatus: true } : p
@@ -1087,16 +1120,12 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                                         </div>
                                       </div>
                                     </div>
-                                    {/* Second Row: Transaction Number, Account Number, Cheque Fields */}
-                                    {/* Only show for Gpay, PhonePe, Net Banking, or Cheque */}
-                                    {(payment.payment_mode === "Gpay" || payment.payment_mode === "PhonePe" ||
+                                    {(payment.payment_mode === "Gpay" || payment.payment_mode === "PhonePe" || 
                                       payment.payment_mode === "Net Banking" || payment.payment_mode === "Cheque") && (
                                         <div className="p-4">
                                           <div className="space-y-4">
-                                            {/* Cheque Fields Row (if cheque payment) */}
                                             {payment.payment_mode === "Cheque" && (
                                               <div className="grid grid-cols-2 gap-4">
-                                                {/* Cheque No */}
                                                 <div>
                                                   <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No</label>
                                                   <input
@@ -1106,7 +1135,6 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                                                     className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600"
                                                   />
                                                 </div>
-                                                {/* Cheque Date */}
                                                 <div>
                                                   <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date</label>
                                                   <input
@@ -1118,9 +1146,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                                                 </div>
                                               </div>
                                             )}
-                                            {/* Transaction Number and Account Number Row */}
                                             <div className="grid grid-cols-2 gap-4">
-                                              {/* Transaction Number */}
                                               <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
                                                 <input
@@ -1130,7 +1156,6 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                                                   className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600"
                                                 />
                                               </div>
-                                              {/* Account Number */}
                                               <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
                                                 <input
@@ -1151,11 +1176,9 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                           </div>
                         </div>
                       )}
-
                     </div>
                   </div>
-                  {/* Summary Section */}
-                  <div className="w-80 flex flex-col">
+                  <div className="w-[400px] flex flex-col">
                     <div className="flex-1 overflow-y-auto p-4 space-y-4">
                       <div className="text-left">
                         <h4 className="text-lg font-semibold mb-2">Summary</h4>
@@ -1172,26 +1195,41 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                             <span className="text-gray-600">Carry Forward:</span>
                             <span className="font-semibold">0</span>
                           </div>
+                          <hr className="border-gray-300" />
                           <div className="flex justify-between">
                             <span className="text-gray-600">Total Amount:</span>
-                            <span className="font-semibold">{formatIndianCurrency(remainingAmount)}</span>
+                            <span className="font-semibold">{formatIndianCurrency(actualAmount - (actualAmount - remainingAmount))}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-600">Discount:</span>
                             <input
-                              type="number"
-                              value={discount === 0 ? '' : discount}
+                              type="text"
+                              value={
+                                discount === 0
+                                  ? ''
+                                  : discount.toLocaleString('en-IN') 
+                              }
                               onChange={(e) => {
-                                const newDiscount = Number(e.target.value) || 0;
-                                setDiscount(newDiscount);
+                                if (!discountSubmitted) {
+                                  const rawValue = e.target.value.replace(/,/g, '').replace(/\D/g, '');
+                                  const newDiscount = Number(rawValue) || 0;
+                                  setDiscount(newDiscount);
+                                }
                               }}
                               onKeyDown={(e) => {
-                                if (e.key === 'Backspace' && discount === 0) {
+                                if (!discountSubmitted && e.key === 'Backspace' && discount === 0) {
                                   setDiscount('');
                                 }
                               }}
-                              className="w-16 h-6 px-2 text-xs border pl-4 border-gray-300 rounded focus:outline-none"
+                              disabled={discountSubmitted}
+                              className={`w-24 h-6 px-2 no-spinner text-right text-xs border pl-4 border-gray-300 rounded focus:outline-none ${discountSubmitted ? 'bg-gray-100 cursor-not-allowed' : ''
+                                }`}
                               placeholder="0"
+                              title={
+                                discountSubmitted
+                                  ? 'Discount already applied in previous payment'
+                                  : 'Enter discount amount'
+                              }
                             />
                           </div>
                           <hr className="border-gray-300" />
@@ -1244,12 +1282,13 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                     </div>
                   </div>
                 </div>
-              </div>        
+              </div>
               <div className="flex justify-end gap-3 mt-4 p-4 bg-white border-t border-gray-200">
                 <button
                   onClick={() => {
                     setShowModal(false);
                     setDiscount(0);
+                    setDiscountSubmitted(false);
                     setPaymentPopupData({
                       date: new Date().toISOString().split('T')[0],
                       amount: "",
@@ -1277,6 +1316,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                 onClick={() => {
                   setShowModal(false);
                   setDiscount(0);
+                  setDiscountSubmitted(false);
                 }}
                 className="absolute top-3 right-4 text-xl font-bold text-gray-500 hover:text-black"
               >

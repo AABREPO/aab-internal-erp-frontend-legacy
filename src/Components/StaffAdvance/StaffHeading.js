@@ -7,13 +7,20 @@ import StaffSummary from './StaffSummary';
 import StaffAddInput from './StaffAddInput';
 
 const StaffHeading = ({ username, userRoles = [] }) => {
-    const [activeTab, setActiveTab] = useState(
-        localStorage.getItem('activePaintTab') || 'staffAdvance'
-    );
+    const [activeTab, setActiveTab] = useState(() => {
+        const savedTab = localStorage.getItem('activePaintTab');
+        if (savedTab === 'staffDatabase' && (username !== 'Mahalingam M' && username !== 'Admin')) {
+            return 'staffAdvance';
+        }
+        return savedTab || 'staffAdvance';
+    });
     useEffect(() => {
-        // Save the active tab to localStorage whenever it changes
-        localStorage.setItem('activePaintTab', activeTab);
-    }, [activeTab]);
+        if (activeTab === 'staffDatabase' && (username !== 'Mahalingam M' && username !== 'Admin')) {
+            setActiveTab('staffAdvance');
+        } else {
+            localStorage.setItem('activePaintTab', activeTab);
+        }
+    }, [activeTab, username]);
     const renderContent = () => {
         switch (activeTab) {
             case 'staffAdvance':
@@ -47,12 +54,14 @@ const StaffHeading = ({ username, userRoles = [] }) => {
                 >
                     Table View
                 </h2>
-                <h2
-                    className={`link ${activeTab === 'staffDatabase' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('staffDatabase')}
-                >
-                    Database
-                </h2>
+                {(username === 'Mahalingam M' || username === 'Admin') && (
+                    <h2
+                        className={`link ${activeTab === 'staffDatabase' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('staffDatabase')}
+                    >
+                        Database
+                    </h2>
+                )}
                 <h2
                     className={`link ${activeTab === 'staffInput' ? 'active' : ''}`}
                     onClick={() => setActiveTab('staffInput')}

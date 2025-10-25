@@ -12,12 +12,20 @@ import Ebno from './Ebno';
 
 const RHeading = ({ username, userRoles = [] }) => {
   const [activeTab, setActiveTab] = useState(() => {
-    return sessionStorage.getItem('activeTab') || 'form';
+    const savedTab = sessionStorage.getItem('activeTab');
+    if (savedTab === 'database' && (username !== 'Mahalingam M' && username !== 'Admin')) {
+      return 'form';
+    }
+    return savedTab || 'form';
   });
 
   useEffect(() => {
-    sessionStorage.setItem('activeTab', activeTab);
-  }, [activeTab]);
+    if (activeTab === 'database' && (username !== 'Mahalingam M' && username !== 'Admin')) {
+      setActiveTab('form');
+    } else {
+      sessionStorage.setItem('activeTab', activeTab);
+    }
+  }, [activeTab, username]);
 
   const renderContent = () => {
     switch (activeTab) {
@@ -61,12 +69,14 @@ const RHeading = ({ username, userRoles = [] }) => {
         >
           Table View
         </h2>
-        <h2
-          className={`link whitespace-nowrap ${activeTab === 'database' ? 'active' : ''}`}
-          onClick={() => setActiveTab('database')}
-        >
-          Database
-        </h2>
+        {(username === 'Mahalingam M' || username === 'Admin') && (
+          <h2
+            className={`link whitespace-nowrap ${activeTab === 'database' ? 'active' : ''}`}
+            onClick={() => setActiveTab('database')}
+          >
+            Database
+          </h2>
+        )}
         <h2
           className={`link whitespace-nowrap ${activeTab === 'dashboard' ? 'active' : ''}`}
           onClick={() => setActiveTab('dashboard')}

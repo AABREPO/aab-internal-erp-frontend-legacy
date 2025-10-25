@@ -242,6 +242,18 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
   const getLabourName = (id) => laboursList.find(l => l.id === id)?.label || id;
   const getPurposeName = (id) => purposes.find(p => p.id === id)?.label || id;
 
+  // Get unique employee names from records for filter dropdown
+  const employeeNameOptions = useMemo(() => {
+    const uniqueNames = new Set();
+    records.forEach((entry) => {
+      const name = getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id);
+      if (name) {
+        uniqueNames.add(name);
+      }
+    });
+    return Array.from(uniqueNames).map(name => ({ value: name, label: name }));
+  }, [records, getEmployeeName, getLabourName]);
+
   // Advanced filtering logic
   const filteredRecords = useMemo(() => {
     return records.filter((entry) => {
@@ -794,7 +806,7 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
                     className="px-1 sm:px-2 min-w-[120px] sm:min-w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 text-xs sm:text-sm"
                     onClick={() => handleSort('employee')}
                   >
-                    <span className="hidden sm:inline">Contractor/Vendor</span>
+                    <span className="hidden sm:inline">Employee Name</span>
                     <span className="sm:hidden">Employee</span> {sortConfig.key === 'employee' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
                   <th
@@ -859,7 +871,7 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
                     </th>
                     <th className="pt-2 pb-2 min-w-[150px] sm:w-[220px]">
                       <Select
-                        options={employees}
+                        options={employeeNameOptions}
                         value={selectEmployeeName ? { value: selectEmployeeName, label: selectEmployeeName } : null}
                         onChange={(opt) => setSelectEmployeeName(opt ? opt.value : "")}
                         className="text-xs focus:outline-none"

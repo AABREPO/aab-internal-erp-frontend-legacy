@@ -206,7 +206,7 @@ const LoanSummary = () => {
     const exportData = dataToExport.map(item => ({
       Purpose: getPurposeName(item.purposeId),
       "Pending Loan": item.pendingLoan,
-      Refund: item.refund,
+      Balance: item.pendingLoan - item.refund,
       Status: item.status,
       Associate: getAssociateName(item.associateId),
     }));
@@ -224,11 +224,11 @@ const LoanSummary = () => {
       alert("No data to export.");
       return;
     }
-    const head = [["Purpose", "Pending Loan", "Refund", "Status", "Associate"]];
+    const head = [["Purpose", "Pending Loan", "Balance", "Status", "Associate"]];
     const body = dataToExport.map(item => [
       getPurposeName(item.purposeId),
       item.pendingLoan,
-      item.refund,
+      item.pendingLoan - item.refund,
       item.status,
       getAssociateName(item.associateId),
     ]);
@@ -291,213 +291,216 @@ const LoanSummary = () => {
     doc.save("LoanSummary.pdf");
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
-    <div className="p-5 bg-[#FAF6ED] rounded flex gap-10">
-      {/* Left: Associate + Pending Advance */}
-      <div className="w-1/2 flex flex-col">
-        <div style={{ marginBottom: 12 }}>
-          {/* Label above dropdown */}
-          <label
-            style={{
-              fontWeight: "bold",
-              color: "black",
-              fontSize: 14,
-              marginBottom: 6,
-              display: "flex",
-            }}
-          >
-            Associate
-          </label>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <select
-              style={{
-                height: 28,
-                minWidth: 120,
-                padding: "4px 8px",
-                fontSize: 14,
-                borderRadius: 4,
-                border: "1px solid #ccc",
-                flexGrow: 1,
-              }}
-              value={selectedAssociate}
-              onChange={(e) => setSelectedAssociate(e.target.value)}
-            >
-              <option value="">Select Associate</option>
-              {[...vendorOptions, ...contractorOptions].map((assoc) => (
-                <option key={assoc.id} value={assoc.id}>
-                  {assoc.value}
-                </option>
-              ))}
-            </select>
+    <div>
+      <div className="p-6 bg-white max-w-[95vw] mx-auto rounded-lg shadow-sm flex flex-wrap lg:flex-nowrap gap-8">
+        {/* Left Panel: Contractor/Vendor Summary */}
+        <div className="flex-1 text-left bg-white p-6">
+          <div className="mb-4">
+            <label className="block font-semibold mb-2">
+              Contractor/Vendor
+            </label>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+              <select
+                className="flex w-full sm:w-[275px] h-[45px] px-3 text-sm border-2 border-[#BF9853] border-opacity-35 rounded-lg focus:outline-none"
+                value={selectedAssociate}
+                onChange={(e) => setSelectedAssociate(e.target.value)}
+              >
+                <option value="">Select Contractor/Vendor</option>
+                {[...vendorOptions, ...contractorOptions].map((assoc) => (
+                  <option key={assoc.id} value={assoc.id}>
+                    {assoc.value}
+                  </option>
+                ))}
+              </select>
 
-            {/* Pending Advance box */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                padding: "4px 10px",
-                borderRadius: 6,
-                border: "1.5px solid #FDEE98", // light yellow
-                backgroundColor: "#FFFBEA", // pale yellow
-                minWidth: 160,
-                userSelect: "none",
-                fontWeight: "bold",
-                fontSize: 14,
-                justifyContent: "space-between",
-              }}
-              title="Pending Advance"
-            >
-              <span style={{ color: "black" }}>Pending Advance:</span>
-              <span style={{ color: "red" }}>₹{pendingAdvanceAssociate.toLocaleString("en-IN")}</span>
+              {/* Pending Advance badge */}
+              <div className="border-2 h-[37px] border-[#E4572E] border-opacity-35 p-2 px-2 rounded text-sm font-medium whitespace-nowrap">
+                Pending Advance: ₹{pendingAdvanceAssociate.toLocaleString("en-IN")}
+              </div>
             </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex flex-wrap items-center justify-end gap-4 mb-4">
+            <button
+              onClick={exportPdf}
+              className="flex items-center gap-1 text-sm text-[#E4572E] hover:text-[#E4572E] font-semibold transition-colors"
+            >
+              Export PDF
+            </button>
+            <button
+              onClick={exportExcel}
+              className="flex items-center gap-1 text-sm text-[#007233] hover:text-[#007233] font-semibold transition-colors"
+            >
+              Export XL
+            </button>
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-1 text-sm  text-[#Bf9853] hover:text-[#Bf9853] font-semibold transition-colors"
+            >
+              Print
+            </button>
+          </div>
+          <div className="rounded-lg border-l-8 border-l-[#BF9853]">
+            <table className="w-full border-collapse">
+              <thead className="bg-[#FAF6ED]">
+                <tr>
+                  <th className="p-3 text-left font-semibold ">
+                    Purpose
+                  </th>
+                  <th className=" p-3 text-left font-semibold ">
+                    Loan
+                  </th>
+                  <th className="p-3 text-left font-semibold">
+                    Balance
+                  </th>
+                  <th className=" p-3 text-center font-semibold ">
+                    Status
+                  </th>
+                  <th className=" p-3 text-center font-semibold ">
+                    Frequency
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {summaryByAssociate.length === 0 ? (
+                  <tr><td colSpan={3} className="text-center p-6 text-gray-500">No Records Available</td></tr>
+                ) : summaryByAssociate.map((item, i) => (
+                  <tr key={i} className="relative">
+                    <td className="border-b border-gray-100 p-3 text-gray-900">
+                      {getPurposeName(item.purposeId)}
+                    </td>
+                    <td
+                      className="border-b border-gray-100 p-3 text-gray-900 font-medium cursor-pointer"
+                      onMouseEnter={e => handleLoanMouseEnter(e, item.associateId, item.purposeId)}
+                      onMouseLeave={hideTooltip}
+                    >
+                      ₹{item.pendingLoan.toLocaleString("en-IN")}
+                    </td>
+                    <td 
+                      className="border-b border-gray-100 p-3 text-gray-900 font-medium cursor-pointer"
+                      onMouseEnter={e => handleRefundMouseEnter(e, item.associateId, item.purposeId)}
+                      onMouseLeave={hideTooltip}
+                    >
+                      ₹{(item.pendingLoan - item.refund).toLocaleString("en-IN")}
+                    </td>
+                    <td className={`border-b border-gray-100 p-3 text-center font-medium ${item.status === "Cleared" ? "text-green-600" : "text-amber-600"}`}>
+                      {item.status}
+                    </td>
+                    <td></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 
+        {/* Right Panel: To Summary */}
+        <div className="flex-1 bg-white text-left p-6">
+          <div className="mb-4">
+            <label className="block font-semibold mb-2">
+              To
+            </label>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+              <select
+                className="flex w-full sm:w-[275px] h-[45px] px-3 text-sm border-2 border-[#BF9853] border-opacity-35 rounded-lg focus:outline-none"
+                value={selectedPurpose}
+                onChange={(e) => setSelectedPurpose(e.target.value)}
+              >
+                <option value="">Select To</option>
+                {purposeOptions.map((purpose) => (
+                  <option key={purpose.id} value={purpose.id}>
+                    {purpose.value}
+                  </option>
+                ))}
+              </select>
 
-        <div style={{ margin: '4px 0 8px' }}>
-          <span onClick={exportExcel} style={{ textDecoration: 'underline', cursor: 'pointer', marginRight: 18 }} title="Export xl">Export XL</span>
-          <span onClick={exportPdf} style={{ textDecoration: 'underline', cursor: 'pointer' }} title="Export Pdf">Export PDF</span>
-        </div>
-        <table className="border border-gray-300 text-black w-full text-sm border-collapse">
-          <thead className="bg-white">
-            <tr>
-              <th className="border p-2 text-left">Purpose</th>
-              <th className="border p-2 text-left">Pending Loan</th>
-              <th className="border p-2 text-left">Refund</th>
-              <th className="border p-2 text-center">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {summaryByAssociate.length === 0 ? (
-              <tr><td colSpan={4} className="text-center p-6 text-gray-500">No Records Available</td></tr>
-            ) : summaryByAssociate.map((item, i) => (
-              <tr key={i}>
-                <td className="border p-2">{getPurposeName(item.purposeId)}</td>
-                <td
-                  className="border p-2 text-black"
-                  onMouseEnter={e => handleLoanMouseEnter(e, item.associateId, item.purposeId)}
-                  onMouseLeave={hideTooltip}
-                >
-                  {item.pendingLoan.toLocaleString("en-IN")}
-                </td>
-
-                <td
-                  className="border p-2 text-black"
-                  onMouseEnter={e => handleRefundMouseEnter(e, item.associateId, item.purposeId)}
-                  onMouseLeave={hideTooltip}
-                >
-                  {item.refund.toLocaleString("en-IN")}
-                </td>
-
-                <td className={`border p-2 text-center ${item.status === "Cleared" ? "text-green-600" : "text-red-600"}`}>
-                  {item.status}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Right: Purpose + Pending Advance */}
-      <div className="w-1/2 flex flex-col">
-        <div style={{ marginBottom: 12 }}>
-          <label
-            style={{
-              fontWeight: "bold",
-              color: "black",
-              fontSize: 14,
-              marginBottom: 6,
-              display: "flex",
-            }}
-          >
-            Purpose
-          </label>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <select
-              style={{
-                height: 28,
-                minWidth: 120,
-                padding: "4px 8px",
-                fontSize: 14,
-                borderRadius: 4,
-                border: "1px solid #ccc",
-                flexGrow: 1,
-              }}
-              value={selectedPurpose}
-              onChange={(e) => setSelectedPurpose(e.target.value)}
-            >
-              <option value="">Select Purpose</option>
-              {purposeOptions.map((purpose) => (
-                <option key={purpose.id} value={purpose.id}>
-                  {purpose.value}
-                </option>
-              ))}
-            </select>
-
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                padding: "4px 10px",
-                borderRadius: 6,
-                border: "1.5px solid #FDEE98",
-                backgroundColor: "#FFFBEA",
-                minWidth: 160,
-                userSelect: "none",
-                fontWeight: "bold",
-                fontSize: 14,
-                justifyContent: "space-between",
-              }}
-              title="Pending Advance"
-            >
-              <span style={{ color: "black" }}>Pending Advance:</span>
-              <span style={{ color: "red" }}>₹{pendingAdvancePurpose.toLocaleString("en-IN")}</span>
+              {/* Pending Advance badge */}
+              <div className="h-[37px] border-2 border-[#E4572E] border-opacity-35 p-2 rounded text-sm font-medium whitespace-nowrap">
+                Pending Advance: ₹{pendingAdvancePurpose.toLocaleString("en-IN")}
+              </div>
             </div>
           </div>
+
+          {/* Action buttons */}
+          <div className="flex flex-wrap items-center justify-end gap-4 mb-4">
+            <button
+              onClick={exportPdf}
+              className="flex items-center gap-1 text-sm text-[#E4572E] hover:text-[#E4572E] font-semibold"
+            >
+              Export PDF
+            </button>
+            <button
+              onClick={exportExcel}
+              className="flex items-center gap-1 text-sm text-[#007233] hover:text-[#007233] font-semibold"
+            >
+              Export XL
+            </button>
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-1 text-sm text-[#BF9853] hover:text-[#BF9853] font-semibold"
+            >
+              Print
+            </button>
+          </div>
+          <div className="rounded-lg border-l-8 border-l-[#BF9853]">
+            <table className="w-full border-collapse">
+              <thead className="bg-[#FAF6ED]">
+                <tr>
+                  <th className=" p-3 text-left font-semibold">
+                    Contractor/Vendor
+                  </th>
+                  <th className=" p-3 text-left font-semibold">
+                    Loan
+                  </th>
+                  <th className="p-3 text-left font-semibold">
+                    Balance
+                  </th>
+                  <th className=" p-3 text-center font-semibold">
+                    Status
+                  </th>
+                  <th className=" p-3 text-center font-semibold ">
+                    Frequency
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {summaryByPurpose.length === 0 ? (
+                  <tr><td colSpan={3} className="text-center p-6 text-gray-500">No Records Available</td></tr>
+                ) : summaryByPurpose.map((item, i) => (
+                  <tr key={i} className="relative">
+                    <td className="border-b border-gray-100 p-3 text-gray-900">
+                      {getAssociateName(item.associateId)}
+                    </td>
+                    <td
+                      className="border-b border-gray-100 p-3 text-gray-900 font-medium cursor-pointer"
+                      onMouseEnter={e => handleLoanMouseEnter(e, item.associateId, item.purposeId)}
+                      onMouseLeave={hideTooltip}
+                    >
+                      ₹{item.pendingLoan.toLocaleString("en-IN")}
+                    </td>
+                    <td 
+                      className="border-b border-gray-100 p-3 text-gray-900 font-medium cursor-pointer"
+                      onMouseEnter={e => handleRefundMouseEnter(e, item.associateId, item.purposeId)}
+                      onMouseLeave={hideTooltip}
+                    >
+                      ₹{(item.pendingLoan - item.refund).toLocaleString("en-IN")}
+                    </td>
+                    <td className={`border-b border-gray-100 p-3 text-center font-medium ${item.status === "Cleared" ? "text-green-600" : "text-amber-600"}`}>
+                      {item.status}
+                    </td>
+                    <td></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-
-        <div style={{ margin: '4px 0 8px' }}>
-          <span onClick={exportExcel} style={{ textDecoration: 'underline', cursor: 'pointer', marginRight: 18 }} title="Export XL">Export XL</span>
-          <span onClick={exportPdf} style={{ textDecoration: 'underline', cursor: 'pointer' }} title="Export PDF">Export PDF</span>
-        </div>
-        <table className="border border-gray-300 text-black w-full text-sm border-collapse">
-          <thead className="bg-white">
-            <tr>
-              <th className="border p-2 text-left">Associate</th>
-              <th className="border p-2 text-left">Pending Loan</th>
-              <th className="border p-2 text-left">Refund</th>
-              <th className="border p-2 text-center">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {summaryByPurpose.length === 0 ? (
-              <tr><td colSpan={4} className="text-center p-6 text-gray-500">No Records Available</td></tr>
-            ) : summaryByPurpose.map((item, i) => (
-              <tr key={i}>
-                <td className="border p-2">{getAssociateName(item.associateId)}</td>
-                <td
-                  className="border p-2 text-black"
-                  onMouseEnter={e => handleLoanMouseEnter(e, item.associateId, item.purposeId)}
-                  onMouseLeave={hideTooltip}
-                >
-                  {item.pendingLoan.toLocaleString("en-IN")}
-                </td>
-
-                <td
-                  className="border p-2 text-black"
-                  onMouseEnter={e => handleRefundMouseEnter(e, item.associateId, item.purposeId)}
-                  onMouseLeave={hideTooltip}
-                >
-                  {item.refund.toLocaleString("en-IN")}
-                </td>
-
-                <td className={`border p-2 text-center ${item.status === "Cleared" ? "text-green-600" : "text-red-600"}`}>
-                  {item.status}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
 
       {/* Tooltip */}

@@ -23,6 +23,13 @@ const AdvanceReport = () => {
   const [paymentModeFilter, setPaymentModeFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [progress, setProgress] = useState(0);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(50);
 
   const scrollRef = useRef(null);
   const tableRef = useRef(null);
@@ -108,6 +115,7 @@ const AdvanceReport = () => {
   useEffect(() => {
     const fetchVendorNames = async () => {
       try {
+        setProgress(10);
         const res = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
           method: "GET",
           credentials: "include",
@@ -117,8 +125,10 @@ const AdvanceReport = () => {
         setVendorOptions(
           data.map((item) => ({ value: item.vendorName, label: item.vendorName, id: item.id }))
         );
+        setProgress(25);
       } catch (err) {
         console.error(err);
+        setError("Failed to load vendor data");
       }
     };
     fetchVendorNames();
@@ -128,6 +138,7 @@ const AdvanceReport = () => {
   useEffect(() => {
     const fetchContractorNames = async () => {
       try {
+        setProgress(35);
         const res = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
           method: "GET",
           credentials: "include",
@@ -137,8 +148,10 @@ const AdvanceReport = () => {
         setContractorOptions(
           data.map((item) => ({ value: item.contractorName, label: item.contractorName, id: item.id }))
         );
+        setProgress(50);
       } catch (err) {
         console.error(err);
+        setError("Failed to load contractor data");
       }
     };
     fetchContractorNames();
@@ -148,6 +161,7 @@ const AdvanceReport = () => {
   useEffect(() => {
     const fetchSites = async () => {
       try {
+        setProgress(60);
         const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
@@ -209,9 +223,10 @@ const AdvanceReport = () => {
         // Combine backend data with predefined options
         const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
         setSiteOptions(combinedSiteOptions);
+        setProgress(75);
       } catch (error) {
         console.error("Fetch error: ", error);
-        
+
         // Fallback: if API fails, still show predefined options
         const predefinedSiteOptions = [
           {
@@ -252,6 +267,7 @@ const AdvanceReport = () => {
           }
         ];
         setSiteOptions(predefinedSiteOptions);
+        setProgress(75);
       }
     };
     fetchSites();
@@ -261,11 +277,16 @@ const AdvanceReport = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setProgress(85);
         const res = await fetch("https://backendaab.in/aabuildersDash/api/advance_portal/getAll");
         const data = await res.json();
         setAdvanceData(data);
+        setProgress(100);
+        setLoading(false);
       } catch (err) {
         console.error("Error fetching advance data", err);
+        setError("Failed to load advance data");
+        setLoading(false);
       }
     };
     fetchData();
@@ -424,9 +445,43 @@ const AdvanceReport = () => {
     return data;
   }, [filteredData, sortConfig, contractorOptions, vendorOptions, siteOptions]);
 
+  // Pagination logic
+  const totalPages = Math.ceil(sortedData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentData = sortedData.slice(startIndex, endIndex);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [startDate, endDate, week, year, paymentModeFilter, typeFilter]);
+
   const SortIcon = ({ columnKey }) => {
     if (sortConfig.key !== columnKey) return null;
     return <span className="ml-1">{sortConfig.direction === "asc" ? "↑" : "↓"}</span>;
+  };
+
+  // Pagination handlers
+  const goToPage = (page) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleItemsPerPageChange = (e) => {
+    const newItemsPerPage = parseInt(e.target.value);
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1);
   };
 
   // Export PDF (landscape) of tableRef
@@ -450,6 +505,7 @@ const AdvanceReport = () => {
       { header: "Type", dataKey: "type" },
       { header: "Mode", dataKey: "mode" },
       { header: "Description", dataKey: "description" },
+      { header: "Attached file", dataKey: "file" },
     ];
 
     const normStr = v => (v ?? "").toString().trim().toLowerCase();
@@ -495,6 +551,7 @@ const AdvanceReport = () => {
         type: row.type || "",
         mode: row.payment_mode || "",
         description: row.description || "",
+        file: row.file_url ? "Yes" : "-",
       };
     });
 
@@ -525,7 +582,7 @@ const AdvanceReport = () => {
         2: { cellWidth: 110 },
         3: { cellWidth: 140 },
         4: { cellWidth: 140 },
-        5: { cellWidth: 124 },
+        5: { cellWidth: 103 },
       }
     });
 
@@ -554,15 +611,16 @@ const AdvanceReport = () => {
       columnStyles: {
         sno: { cellWidth: 28 },
         date: { cellWidth: 50 },
-        cv: { cellWidth: 102 },
-        project: { cellWidth: 130 },
-        advance: { cellWidth: 45 },
-        bill: { cellWidth: 40 },
-        refund: { cellWidth: 40 },
-        transfer: { cellWidth: 130 },
-        type: { cellWidth: 65 },
-        mode: { cellWidth: 54 },
-        description: { cellWidth: 80 },
+        cv: { cellWidth: 90 },
+        project: { cellWidth: 115 },
+        advance: { cellWidth: 45, halign: 'right' },
+        bill: { cellWidth: 40, halign: 'right' },
+        refund: { cellWidth: 40, halign: 'right' },
+        transfer: { cellWidth: 115 },
+        type: { cellWidth: 60 },
+        mode: { cellWidth: 50 },
+        description: { cellWidth: 75 },
+        file: { cellWidth: 35 },
       }
     });
 
@@ -616,12 +674,13 @@ const AdvanceReport = () => {
       "Type",
       "Mode",
       "Description",
+      "Attached file",
     ];
 
     const summaryRow = [
       "", "", "", "",
       `Total Cash Advance: ${totalAdvanceCash.toLocaleString("en-IN")}`,
-      "", "", "", "", "", ""
+      "", "", "", "", "", "", ""
     ];
 
     const rows = sortedData.map((row, idx) => {
@@ -642,6 +701,7 @@ const AdvanceReport = () => {
         row.type || "",
         row.payment_mode || "",
         row.description || "",
+        row.file_url ? "Yes" : "-",
       ];
     });
 
@@ -658,11 +718,41 @@ const AdvanceReport = () => {
     );
   };
 
+  if (loading) {
+    return (
+      <div className='bg-[#FAF6ED]'>
+        <div className='bg-white w-full max-w-[1850px] h-[500px] rounded-md p-10 ml-4 sm:ml-6 lg:ml-10 flex flex-col items-center justify-center mx-auto'>
+          <div className="text-lg mb-4">Loading advance report...</div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#BF9853] mb-4"></div>
+          <div className="text-sm text-gray-600">
+            Progress: {progress}%
+          </div>
+          <div className="w-64 bg-gray-200 rounded-full h-2 mt-2">
+            <div
+              className="bg-[#BF9853] h-2 rounded-full transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className='bg-[#FAF6ED]'>
+        <div className='bg-white w-full max-w-[1850px] h-[500px] rounded-md p-10 ml-4 sm:ml-6 lg:ml-10 flex items-center justify-center mx-auto'>
+          <div className="text-lg text-red-600">{error}</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div>
-      <div className="flex items-start justify-between bg-white p-4 ml-10 rounded-md shadow-sm w-[1750px]">
+    <div className='bg-[#FAF6ED] min-h-screen w-full'>
+      <div className="flex flex-col xl:flex-row items-start justify-between bg-white p-4 ml-4 sm:ml-6 lg:ml-10 px-4 lg:px-14 lg:h-[128px] rounded-md shadow-sm max-w-[1850px] w-full mb-5">
         {/* Left Section */}
-        <div className="flex space-x-6 text-left">
+        <div className="flex flex-wrap space-x-6 text-left">
           <div>
             <label className="block font-semibold mb-1">Week No</label>
             <select
@@ -758,7 +848,7 @@ const AdvanceReport = () => {
 
         {/* Right Section */}
         <div>
-          <div className="text-sm text-right space-y-1 border-2 border-[#E4572E] border-opacity-15 p-2">
+          <div className="text-sm text-right space-y-1 border-2 border-[#E4572E] border-opacity-15 p-1">
             <div>
               <span className="font-semibold">From Date</span> :{" "}
               <span className="text-red-500">
@@ -776,28 +866,28 @@ const AdvanceReport = () => {
               </span>
             </div>
           </div>
-          <div className="text-sm text-right space-y-1 border-2 border-[#E4572E] border-opacity-15 p-2 mt-2">
+          <div className="text-sm text-right space-y-1 border-2 border-[#E4572E] border-opacity-15 p-1 mt-2">
             <div>
               <span className="font-semibold">Total Advance</span> : <span className="text-red-500 font-semibold">{totalAdvance}</span>
             </div>
           </div>
         </div>
       </div>
-      <div className='w-[1750px] ml-10 bg-white mt-5 pt-5'>
-        <div className='space-x-6 flex justify-end mr-20'>
+      <div className='max-w-[1850px] w-full rounded-md ml-4 h-[650px] sm:ml-6 lg:ml-10 px-4 lg:px-10 bg-white p-4 mx-auto'>
+        <div className='space-x-6 flex justify-end'>
           <button onClick={handleExportPDF} className='text-sm text-[#E4572E] hover:underline font-bold'>Export PDF</button>
           <button onClick={handleExportExcel} className='text-sm text-[#007233] hover:underline font-bold'>Export XL</button>
           <button className='text-sm text-[#BF9853] hover:underline font-bold'>Print</button>
         </div>
         <div
           ref={scrollRef}
-          className=" rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[630px] overflow-auto select-none ml-5 mr-5"
+          className=" rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[500px] overflow-auto select-none "
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
         >
-          <table ref={tableRef} className="table-fixed  min-w-[1635px] w-screen border-collapse">
+          <table ref={tableRef} className="table-fixed min-w-[1835px] w-full border-collapse">
             <thead className='bg-[#FAF6ED]'>
               <tr>
                 <th
@@ -824,9 +914,9 @@ const AdvanceReport = () => {
                 >
                   Project Name <SortIcon columnKey="project" />
                 </th>
-                <th className="px-2 w-[100px] font-bold text-left">Advance</th>
-                <th className="px-2 w-[120px] font-bold text-left">Bill Amount</th>
-                <th className="px-2 w-[120px] font-bold text-left">Refund Amount</th>
+                <th className="px-2 w-[100px] font-bold text-right">Advance</th>
+                <th className="px-2 w-[120px] font-bold text-right">Bill Amount</th>
+                <th className="px-2 w-[120px] font-bold text-right">Refund Amount</th>
                 <th
                   className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
                   onClick={() => requestSort("transfer")}
@@ -851,33 +941,135 @@ const AdvanceReport = () => {
                 >
                   Description <SortIcon columnKey="description" />
                 </th>
+                <th className="px-2 w-[200px] font-bold text-left whitespace-nowrap">Attached file</th>
               </tr>
             </thead>
             <tbody>
-              {filteredData.length === 0 ? (
+              {currentData.length === 0 ? (
                 <tr>
-                  <td colSpan="11" className="text-center py-4 text-gray-500 font-semibold">No Entry is available</td>
+                  <td colSpan="12" className="text-center py-4 text-gray-500 font-semibold">No Entry is available</td>
                 </tr>
               ) : (
-                sortedData.map((row, index) => (
+                currentData.map((row, index) => (
                   <tr key={row.id || index} className="odd:bg-white even:bg-[#FAF6ED]">
-                    <td className="text-sm text-left p-3 w-32 font-semibold">{index + 1}</td>
+                    <td className="text-sm text-left p-3 w-32 font-semibold">{startIndex + index + 1}</td>
                     <td className="text-sm text-left p-3 w-32 font-semibold">{new Date(row.date).toLocaleDateString("en-GB")}</td>
                     <td className="text-sm text-left p-3 w-32 font-semibold">{contractorOptions.find(c => c.id === row.contractor_id)?.label || vendorOptions.find(v => v.id === row.vendor_id)?.label || "-"}</td>
                     <td className="text-sm text-left p-3 w-32 font-semibold">{siteOptions.find(s => String(s.id) === String(row.project_id))?.label || "-"}</td>
-                    <td className="text-sm text-left p-3 w-32 font-semibold">{row.amount?.toLocaleString("en-IN") || "0"}</td>
-                    <td className="text-sm text-left p-3 w-32 font-semibold">{row.bill_amount?.toLocaleString("en-IN") || "0"}</td>
-                    <td className="text-sm text-left p-3 w-32 font-semibold">{row.refund_amount?.toLocaleString("en-IN") || "0"}</td>
+                    <td className="text-sm text-right p-3 w-32 font-semibold">{row.amount?.toLocaleString("en-IN") || "0"}</td>
+                    <td className="text-sm text-right p-3 w-32 font-semibold">{row.bill_amount?.toLocaleString("en-IN") || "0"}</td>
+                    <td className="text-sm text-right pr-1 p-3 w-32 font-semibold">{row.refund_amount?.toLocaleString("en-IN") || "0"}</td>
                     <td className="text-sm text-left p-3 w-32 font-semibold">{siteOptions.find(s => s.id === row.transfer_site_id)?.label || "-"}</td>
                     <td className="text-sm text-left p-3 w-32 font-semibold">{row.type || "-"}</td>
                     <td className="text-sm text-left p-3 w-32 font-semibold">{row.payment_mode || "-"}</td>
                     <td className="text-sm text-left p-3 w-32 font-semibold">{row.description || "-"}</td>
+                    <td className="text-sm text-left p-3 w-32 font-semibold">
+                      {row.file_url ? (
+                        <a
+                          href={row.file_url}
+                          className="text-red-500 underline"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          View
+                        </a>
+                      ) : (
+                        <span></span>
+                      )}
+                    </td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {sortedData.length > 0 && (
+          <div className="flex flex-col sm:flex-row justify-between items-center px-5 py-4 bg-white border-t border-gray-200 mb-8">
+            {/* Items per page selector */}
+            <div className="flex items-center space-x-2 mb-4 sm:mb-0">
+              <label className="text-sm font-medium text-gray-700">Show:</label>
+              <select
+                value={itemsPerPage}
+                onChange={handleItemsPerPageChange}
+                className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent"
+              >
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={200}>200</option>
+                <option value={300}>300</option>
+                <option value={400}>400</option>
+                <option value={500}>500</option>
+                <option value={600}>600</option>
+                <option value={700}>700</option>
+                <option value={800}>800</option>
+                <option value={900}>900</option>
+                <option value={1000}>1000</option>
+              </select>
+              <span className="text-sm text-gray-700">entries</span>
+            </div>
+
+            {/* Page info */}
+            <div className="text-sm text-gray-700 mb-4 sm:mb-0">
+              Showing {startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries
+            </div>
+
+            {/* Pagination buttons */}
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={goToPreviousPage}
+                disabled={currentPage === 1}
+                className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === 1
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
+                  }`}
+              >
+                Previous
+              </button>
+
+              {/* Page numbers */}
+              <div className="flex items-center space-x-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => goToPage(pageNum)}
+                      className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === pageNum
+                        ? 'bg-[#BF9853] text-white'
+                        : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
+                        }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={goToNextPage}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === totalPages
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
+                  }`}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

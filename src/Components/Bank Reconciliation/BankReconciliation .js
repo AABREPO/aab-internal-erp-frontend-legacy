@@ -6,13 +6,6 @@ import logo from '../Images/aablogo.png';
 import Filter from '../Images/filter (3).png';
 import Select from 'react-select';
 
-const ALLOWED_MODES = [
-  "netbanking", "net banking",
-  "gpay", "g pay",
-  "phonepe", "phone pe"
-];
-const normalizeMode = (mode) =>
-  (mode || "").toLowerCase().replace(/\s/g, "");
 const formatCurrency = (val) =>
   val && !isNaN(val) && val !== "" ? `₹${Number(val).toLocaleString("en-IN")}` : "-";
 const formatNumber = (val) =>
@@ -39,6 +32,9 @@ const BankReconciliation = () => {
   const [vendorOptions, setVendorOptions] = useState([]);
   const [contractorOptions, setContractorOptions] = useState([]);
   const [employeeOptions, setEmployeeOptions] = useState([]);
+  const [siteOptions, setSiteOptions] = useState([]);
+  const [purposeOptions, setPurposeOptions] = useState([]);
+  const [tenantOptions, setTenantOptions] = useState([]);
   // Preview modal state
   const [showPreview, setShowPreview] = useState(false);
   const [previewTab, setPreviewTab] = useState("allEntries");
@@ -64,28 +60,158 @@ const BankReconciliation = () => {
   const [filterType, setFilterType] = useState('');
   const [filterReceiptPayment, setFilterReceiptPayment] = useState('');
   const [filterMode, setFilterMode] = useState('');
+  // Sorting state
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   useEffect(() => {
     const fetchAllOptions = async () => {
       try {
         // Vendors
         const vRes = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll");
         const vData = vRes.ok ? await vRes.json() : [];
-        setVendorOptions(vData.map(item => ({ id: item.id, name: item.vendorName })));
+        setVendorOptions(vData.map(item => ({ id: item.id, label: item.vendorName })));
+        
         // Contractors
         const cRes = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll");
         const cData = cRes.ok ? await cRes.json() : [];
-        setContractorOptions(cData.map(item => ({ id: item.id, name: item.contractorName })));
+        setContractorOptions(cData.map(item => ({ id: item.id, label: item.contractorName })));
+        
         // Employees
         const eRes = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll");
         const eData = eRes.ok ? await eRes.json() : [];
-        setEmployeeOptions(eData.map(item => ({ id: item.id, name: item.employee_name })));
+        setEmployeeOptions(eData.map(item => ({ id: item.id, label: item.employee_name })));
+        
+        // Projects with predefined options
+        const pRes = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll");
+        const pData = pRes.ok ? await pRes.json() : [];
+        const formattedProjects = pData.map(item => ({
+          value: item.siteName,
+          label: item.siteName,
+          id: item.id,
+          sNo: item.siteNo
+        }));
+        const predefinedSiteOptions = [
+          { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
+          { value: "Material Advance", label: "Material Advance", id: 2, sNo: "2" },
+          { value: "Weekly Advance", label: "Weekly Advance", id: 3, sNo: "3" },
+          { value: "Excess Advance", label: "Excess Advance", id: 4, sNo: "4" },
+          { value: "Material Rent", label: "Material Rent", id: 5, sNo: "5" },
+          { value: "Subhash Kumar - Kunnur", label: "Subhash Kumar - Kunnur", id: 6, sNo: "6" },
+          { value: "Summary Bill", label: "Summary Bill", id: 7, sNo: "7" },
+          { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
+          { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" }
+        ];
+        setSiteOptions([...predefinedSiteOptions, ...formattedProjects]);
+        
+        // Purpose options
+        const purposeRes = await fetch('https://backendaab.in/aabuildersDash/api/loan-purposes/getAll');
+        const purposeData = purposeRes.ok ? await purposeRes.json() : [];
+        setPurposeOptions(purposeData.map(purpose => ({
+          value: purpose.purpose,
+          label: purpose.purpose,
+          id: purpose.id,
+          type: 'Purpose'
+        })));
+        
+        // Tenant options
+        const tenantRes = await fetch('https://backendaab.in/aabuildersDash/api/tenantShop/getAll');
+        const tenantData = tenantRes.ok ? await tenantRes.json() : [];
+        setTenantOptions(tenantData.map(tenant => ({
+          value: tenant.tenantName,
+          label: tenant.tenantName,
+          id: tenant.id,
+        })));
       } catch { }
     };
     fetchAllOptions();
   }, []);
-  const getVendorName = (id) => vendorOptions.find(v => String(v.id) === String(id))?.name || "";
-  const getContractorName = (id) => contractorOptions.find(c => String(c.id) === String(id))?.name || "";
-  const getEmployeeName = (id) => employeeOptions.find(e => String(e.id) === String(id))?.name || "";
+
+  // Helper functions for mapping IDs to names
+  const getProjectName = (projectId) => {
+    const project = siteOptions.find(option => option.id === projectId);
+    return project ? project.label : '-';
+  };
+
+  const getPurposeName = (purposeId) => {
+    const purpose = purposeOptions.find(option => option.id === purposeId);
+    return purpose ? purpose.label : '-';
+  };
+
+  const getVendorName = (vendorId) => {
+    const vendor = vendorOptions.find(option => option.id === vendorId);
+    return vendor ? vendor.label : '-';
+  };
+
+  const getContractorName = (contractorId) => {
+    const contractor = contractorOptions.find(option => option.id === contractorId);
+    return contractor ? contractor.label : '-';
+  };
+
+  const getEmployeeName = (employeeId) => {
+    const employee = employeeOptions.find(option => option.id === employeeId);
+    return employee ? employee.label : '-';
+  };
+
+  const getTenantName = (tenantId) => {
+    const tenant = tenantOptions.find(option => option.id === tenantId);
+    return tenant ? tenant.label : '-';
+  };
+
+  const getPartyNameAndType = (item) => {
+    const contractorName = getContractorName(item.contractor_id);
+    const vendorName = getVendorName(item.vendor_id);
+    const employeeName = getEmployeeName(item.employee_id);
+    const tenantName = getTenantName(item.tenant_id);
+    
+    if (contractorName !== '-') {
+      return { name: contractorName, type: 'Contractor' };
+    } else if (vendorName !== '-') {
+      return { name: vendorName, type: 'Vendor' };
+    } else if (employeeName !== '-') {
+      return { name: employeeName, type: 'Employee' };
+    } else if (tenantName !== '-') {
+      return { name: tenantName, type: 'Tenant' };
+    } else {
+      return { name: '-', type: '-' };
+    }
+  };
+
+  const getProjectOrPurposeName = (item) => {
+    // Check if this is a tenant - if so, show tenant_complex_name directly from the data
+    const partyData = getPartyNameAndType(item);
+    if (partyData.type === 'Tenant' && item.tenant_complex_name) {
+      return item.tenant_complex_name;
+    }
+    
+    // First try to get project name
+    if (item.project_id) {
+      const projectName = getProjectName(item.project_id);
+      if (projectName !== '-') {
+        return projectName;
+      }
+    }
+    
+    // If no project_id or project not found, try to get purpose name
+    if (item.purpose_id) {
+      const purposeName = getPurposeName(item.purpose_id);
+      if (purposeName !== '-') {
+        return purposeName;
+      }
+    }
+    
+    return '-';
+  };
+
+  const handleSort = (key) => {
+    setSortConfig((prev) => {
+      if (prev.key === key) {
+        // Toggle direction if clicking the same column
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      // Default to ascending if switching column
+      return { key, direction: 'asc' };
+    });
+  };
+
   const applyAllFilters = useCallback(() => {
     let filtered = [...records];
     if (startDate || endDate) {
@@ -112,12 +238,17 @@ const BankReconciliation = () => {
         return (
           dateStr.toLowerCase().includes(searchLower) ||
           (record.module || "").toLowerCase().includes(searchLower) ||
-          (record.particular || "").toLowerCase().includes(searchLower) ||
+          (record.projectName || "").toLowerCase().includes(searchLower) ||
+          (record.partyName || "").toLowerCase().includes(searchLower) ||
+          (record.partyType || "").toLowerCase().includes(searchLower) ||
           (record.type || "").toLowerCase().includes(searchLower) ||
           (record.receiptPayment || "").toLowerCase().includes(searchLower) ||
           debitStr.includes(searchLower) ||
           creditStr.includes(searchLower) ||
-          (record.mode || "").toLowerCase().includes(searchLower) ||
+          (record.paymentMode || "").toLowerCase().includes(searchLower) ||
+          (record.accountNo || "").toLowerCase().includes(searchLower) ||
+          (record.chequeNo || "").toLowerCase().includes(searchLower) ||
+          (record.transactionNo || "").toLowerCase().includes(searchLower) ||
           (record.remarks || "").toLowerCase().includes(searchLower)
         );
       });
@@ -136,7 +267,7 @@ const BankReconciliation = () => {
     }
     if (filterParticular) {
       filtered = filtered.filter(record =>
-        record.particular?.toLowerCase() === filterParticular.toLowerCase()
+        record.partyName?.toLowerCase() === filterParticular.toLowerCase()
       );
     }
     if (filterType) {
@@ -151,24 +282,50 @@ const BankReconciliation = () => {
     }
     if (filterMode) {
       filtered = filtered.filter(record =>
-        record.mode?.toLowerCase() === filterMode.toLowerCase()
+        record.paymentMode?.toLowerCase() === filterMode.toLowerCase()
       );
     }
+    
+    // Apply sorting
+    if (sortConfig.key) {
+      filtered.sort((a, b) => {
+        let aVal = a[sortConfig.key];
+        let bVal = b[sortConfig.key];
+        
+        // Handle date sorting
+        if (sortConfig.key === 'date') {
+          aVal = new Date(aVal);
+          bVal = new Date(bVal);
+        }
+        
+        // Handle numeric sorting for debit and credit
+        if (sortConfig.key === 'debit' || sortConfig.key === 'credit') {
+          aVal = parseFloat(aVal) || 0;
+          bVal = parseFloat(bVal) || 0;
+        }
+        
+        // Handle string sorting (case-insensitive)
+        if (typeof aVal === 'string') {
+          aVal = aVal.toLowerCase();
+          bVal = bVal?.toLowerCase() || '';
+        }
+        
+        if (aVal < bVal) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (aVal > bVal) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    
     setFilteredRecords(filtered);
     setCurrentPage(1);
-  }, [records, startDate, endDate, selectedMonth, searchTerm, filterDate, filterModule, filterParticular, filterType, filterReceiptPayment, filterMode]);
+  }, [records, startDate, endDate, selectedMonth, searchTerm, filterDate, filterModule, filterParticular, filterType, filterReceiptPayment, filterMode, sortConfig]);
   const generatePDF = () => {
-    const headers = [];
-    if (pdfSettings.date) headers.push('Date');
-    if (pdfSettings.module) headers.push('Module');
-    if (pdfSettings.particular) headers.push('Particular');
-    if (pdfSettings.type) headers.push('Type');
-    if (pdfSettings.receiptPayment) headers.push('Receipt/Payment');
-    if (pdfSettings.debit) headers.push('Debit');
-    if (pdfSettings.credit) headers.push('Credit');
-    if (pdfSettings.mode) headers.push('Mode');
-    if (pdfSettings.remarks) headers.push('Remarks');
-    const orientation = headers.length >= 6 ? 'landscape' : 'portrait';
+    const headers = ['Date', 'Module', 'Project Name', 'Party Name', 'Party Type', 'Type', 'Receipt/Payment', 'Debit', 'Credit', 'Payment Mode', 'Account No', 'Cheque No', 'Cheque Date', 'Transaction No', 'Remarks'];
+    const orientation = 'landscape';
     const doc = new jsPDF(orientation, 'mm', 'a4');
     try {
       const img = new Image();
@@ -187,24 +344,30 @@ const BankReconciliation = () => {
       startY = 45;
     }
     const tableData = filteredRecords.map(record => {
-      const row = [];
-      if (pdfSettings.date) row.push(record.date ? new Date(record.date).toLocaleDateString("en-GB") : "-");
-      if (pdfSettings.module) row.push(record.module);
-      if (pdfSettings.particular) row.push(record.particular);
-      if (pdfSettings.type) row.push(record.type);
-      if (pdfSettings.receiptPayment) row.push(record.receiptPayment);
-      if (pdfSettings.debit) row.push(record.debit ? formatNumber(record.debit) : "-");
-      if (pdfSettings.credit) row.push(record.credit ? formatNumber(record.credit) : "-");
-      if (pdfSettings.mode) row.push(record.mode);
-      if (pdfSettings.remarks) row.push(record.remarks || "");
-      return row;
+      return [
+        record.date ? new Date(record.date).toLocaleDateString("en-GB") : "-",
+        record.module,
+        record.projectName || "-",
+        record.partyName || "-",
+        record.partyType || "-",
+        record.type || "-",
+        record.receiptPayment,
+        record.debit ? formatNumber(record.debit) : "-",
+        record.credit ? formatNumber(record.credit) : "-",
+        record.paymentMode || "-",
+        record.accountNo || "-",
+        record.chequeNo || "-",
+        record.chequeDate ? new Date(record.chequeDate).toLocaleDateString("en-GB") : "-",
+        record.transactionNo || "-",
+        record.remarks || ""
+      ];
     });
     doc.autoTable({
       head: [headers],
       body: tableData,
       startY: startY,
       styles: {
-        fontSize: 8,
+        fontSize: 6,
         textColor: [0, 0, 0],
         lineColor: [0, 0, 0],
         lineWidth: 0.1
@@ -223,11 +386,9 @@ const BankReconciliation = () => {
     const finalY = doc.lastAutoTable.finalY + 10;
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
-    if (pdfSettings.debit) doc.text(`Total Debit: ${formatNumber(totalDebit)}`, 14, finalY);
-    if (pdfSettings.credit) doc.text(`Total Credit: ${formatNumber(totalCredit)}`, 14, pdfSettings.debit ? finalY + 8 : finalY);
-    if (pdfSettings.debit && pdfSettings.credit) {
-      doc.text(`Net Balance: ${formatNumber(totalCredit - totalDebit)}`, 14, finalY + 16);
-    }
+    doc.text(`Total Debit: ${formatNumber(totalDebit)}`, 14, finalY);
+    doc.text(`Total Credit: ${formatNumber(totalCredit)}`, 14, finalY + 8);
+    doc.text(`Net Balance: ${formatNumber(totalCredit - totalDebit)}`, 14, finalY + 16);
     const fileName = `Bank_Reconciliation_${startDate || 'all'}_to_${endDate || 'all'}_${new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(fileName);
     setShowPreview(false);
@@ -243,18 +404,24 @@ const BankReconciliation = () => {
   };
   const generateExcel = () => {
     const wsData = [
-      ['Date', 'Module', 'Particular', 'Type', 'Receipt/Payment', 'Debit', 'Credit', 'Mode', 'Remarks']
+      ['Date', 'Module', 'Project Name', 'Party Name', 'Party Type', 'Type', 'Receipt/Payment', 'Debit', 'Credit', 'Payment Mode', 'Account No', 'Cheque No', 'Cheque Date', 'Transaction No', 'Remarks']
     ];
     filteredRecords.forEach(record => {
       wsData.push([
         record.date ? new Date(record.date).toLocaleDateString("en-GB") : "-",
         record.module,
-        record.particular,
-        record.type,
+        record.projectName || "-",
+        record.partyName || "-",
+        record.partyType || "-",
+        record.type || "-",
         record.receiptPayment,
         record.debit ? Number(record.debit) : "",
         record.credit ? Number(record.credit) : "",
-        record.mode,
+        record.paymentMode || "-",
+        record.accountNo || "-",
+        record.chequeNo || "-",
+        record.chequeDate ? new Date(record.chequeDate).toLocaleDateString("en-GB") : "-",
+        record.transactionNo || "-",
         record.remarks || ""
       ]);
     });
@@ -262,23 +429,27 @@ const BankReconciliation = () => {
     const totalCredit = filteredRecords.reduce((sum, record) => sum + (parseFloat(record.credit) || 0), 0);
     const netBalance = totalCredit - totalDebit;
     wsData.push([]); 
-    wsData.push(['Summary:', '', '', '', '', '', '', '', '']);
-    wsData.push(['Total Debit:', '', '', '', '', totalDebit, '', '', '']);
-    wsData.push(['Total Credit:', '', '', '', '', '', totalCredit, '', '']);
-    wsData.push(['Net Balance:', '', '', '', '', '', netBalance, '', '']);
+    wsData.push(['Summary:', '', '', '', '', '', '', totalDebit, totalCredit, '', '', '', '', '', '']);
+    wsData.push(['Net Balance:', '', '', '', '', '', '', '', netBalance, '', '', '', '', '', '']);
     const ws = XLSX.utils.aoa_to_sheet(wsData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Bank Reconciliation');
     const colWidths = [
-      { wch: 12 }, 
-      { wch: 15 }, 
-      { wch: 20 }, 
-      { wch: 12 }, 
-      { wch: 15 }, 
-      { wch: 12 }, 
-      { wch: 12 }, 
-      { wch: 15 }, 
-      { wch: 15 } 
+      { wch: 12 }, // Date
+      { wch: 15 }, // Module
+      { wch: 20 }, // Project Name
+      { wch: 20 }, // Party Name
+      { wch: 12 }, // Party Type
+      { wch: 12 }, // Type
+      { wch: 15 }, // Receipt/Payment
+      { wch: 12 }, // Debit
+      { wch: 12 }, // Credit
+      { wch: 15 }, // Payment Mode
+      { wch: 15 }, // Account No
+      { wch: 12 }, // Cheque No
+      { wch: 12 }, // Cheque Date
+      { wch: 15 }, // Transaction No
+      { wch: 20 }  // Remarks
     ];
     ws['!cols'] = colWidths;
     const headerRange = XLSX.utils.decode_range(ws['!ref']);
@@ -316,15 +487,12 @@ const BankReconciliation = () => {
     setStartY(e.pageY - e.currentTarget.offsetTop);
     setScrollLeft(e.currentTarget.scrollLeft);
     setScrollTop(e.currentTarget.scrollTop);
-    e.currentTarget.style.cursor = 'grabbing';
   };
   const handleMouseLeave = (e) => {
     setIsDragging(false);
-    e.currentTarget.style.cursor = 'grab';
   };
   const handleMouseUp = (e) => {
     setIsDragging(false);
-    e.currentTarget.style.cursor = 'grab';
   };
   const handleMouseMove = (e) => {
     if (!isDragging) return;
@@ -346,7 +514,6 @@ const BankReconciliation = () => {
   };
   const handleTouchMove = (e) => {
     if (!isDragging) return;
-    e.preventDefault();
     const touch = e.touches[0];
     const x = touch.pageX - e.currentTarget.offsetLeft;
     const y = touch.pageY - e.currentTarget.offsetTop;
@@ -361,236 +528,82 @@ const BankReconciliation = () => {
   useEffect(() => {
     const fetchAll = async () => {
       setLoading(true);
-      let all = [];
-      // --- Expenses Form ---
       try {
-        const res = await fetch("https://backendaab.in/aabuilderDash/expenses_form/get_form");
+        const res = await fetch("https://backendaab.in/aabuildersDash/api/weekly-payment-bills/all");
         if (res.ok) {
           const data = await res.json();
-          console.log("Expenses Form Data:", data);
-          all = all.concat(
-            data
-              .filter(item => {
-                const mode = (item.paymentMode || item.accountType || "").toLowerCase();
-                return ALLOWED_MODES.some(m => mode.includes(m)) && (item.type || item.accountType) !== "Transfer";
-              })
-              .map(item => {
-                let type = item.type || item.accountType || "-";
-                let particular = item.vendor || item.contractor || item.employeeName || item.claimNo || "-";
-                if (type === "Claim" && (!particular || particular === "-")) {
-                  particular = item.employeeName || item.claimNo || "-";
-                }
-                if (type === "Daily Wage" && (!particular || particular === "-")) {
-                  particular = item.employeeName || "-";
-                }
-                return {
-                  date: item.date || item.timestamp,
-                  module: "Expenses Form",
-                  particular,
-                  type,
-                  receiptPayment: "Payment",
-                  debit: item.amount,
-                  credit: "",
-                  mode: item.paymentMode || item.accountType || "-",
-                  remarks: "",
-                };
-              })
-          );
+          // Map the data to match the table structure
+          const mappedData = data.map((item) => {
+            const partyData = getPartyNameAndType(item);            
+            // Determine module based on which ID is present
+            let module = "Bill Payment"; // Default
+            if (item.rent_management_id) {
+              module = "Rent Management";
+            } else if (item.advance_portal_id) {
+              module = "Advance Portal";
+            } else if (item.staff_advance_portal_id) {
+              module = "Staff Advance Portal";
+            } else if (item.loan_portal_id) {
+              module = "Loan Portal";
+            } else if (item.claim_payment_id) {
+              module = "Claim Payment";
+            } else if (item.expenses_entry_id) {
+              module = "Expenses Entry";
+            }
+            // Determine Receipt/Payment and Debit/Credit based on type
+            let receiptPayment = "Payment"; // Default
+            let debit = item.amount || 0;
+            let credit = "";
+            // Special handling for Rent Payment types
+            if (item.type === "Rent Payment" && item.rent_management_id) {
+              receiptPayment = "Receipt";
+              debit = "";
+              credit = item.amount || 0;
+            } else if (item.type === "Rent Payment Refund" && item.rent_management_id) {
+              receiptPayment = "Payment";
+              debit = item.amount || 0;
+              credit = "";
+            }
+            return {
+              id: item.id,
+              date: item.date,
+              module: module,
+              projectName: getProjectOrPurposeName(item),
+              partyName: partyData.name,
+              partyType: partyData.type,
+              type: item.type || "-",
+              receiptPayment: receiptPayment,
+              debit: debit,
+              credit: credit,
+              paymentMode: item.bill_payment_mode || "-",
+              accountNo: item.account_number || "-",
+              chequeNo: item.cheque_number || "-",
+              chequeDate: item.cheque_date || "",
+              transactionNo: item.transaction_number || "-",
+              remarks: item.remarks || "",
+            };
+          });
+          mappedData.sort((a, b) => new Date(b.date) - new Date(a.date));
+          setRecords(mappedData);
+          setLoading(false);
+        } else {
+          console.error("Failed to fetch bill payments");
+          setLoading(false);
         }
-      } catch { }
-      // --- Claim Payments ---
-      try {
-        const res = await fetch("https://backendaab.in/aabuilderDash/expenses_form/get_form");
-        if (res.ok) {
-          const data = await res.json();
-          const claimRows = data.filter(item => (item.accountType === "Claim" || item.type === "Claim"));
-          for (const claim of claimRows) {
-            try {
-              const payRes = await fetch(`https://backendaab.in/aabuildersDash/api/claim_payments/get/${claim.id}`);
-              if (payRes.ok) {
-                const payments = await payRes.json();
-                console.log("Claim Payments Data:", payments);
-                payments
-                  .filter(payment => {
-                    const mode = (payment.paymentMode || payment.payment_mode || "").toLowerCase();
-                    return ALLOWED_MODES.some(m => mode.includes(m)) && (payment.type || "Claim") !== "Transfer";
-                  })
-                  .forEach(payment => {
-                    let particular = claim.employeeName || claim.claimNo || payment.employeeName || payment.claimNo || "-";
-                    return all.push({
-                      date: payment.date || payment.paymentDate || claim.date || claim.timestamp,
-                      module: "Claim Payments",
-                      particular,
-                      type: "Claim",
-                      receiptPayment: "Receipt",
-                      debit: "",
-                      credit: payment.amount,
-                      mode: payment.paymentMode || payment.payment_mode || "-",
-                      remarks: "",
-                    });
-                  });
-              }
-            } catch { }
-          }
-        }
-      } catch { }
-      try {
-        const res = await fetch("https://backendaab.in/aabuildersDash/api/rental_forms/getAll");
-        if (res.ok) {
-          const data = await res.json();
-          all = all.concat(
-            data
-              .filter((item) => {
-                const mode = (item.paymentMode || "").toLowerCase();
-                return ALLOWED_MODES.some(m => mode.includes(m)) && (item.formType || "Rent") !== "Transfer";
-              })
-              .map((item) => {
-                let debit = "";
-                let credit = "";
-                let type = item.formType || "Rent";
-                if (type === "Rent") {
-                  credit = item.amount;
-                } else if (type === "Advance") {
-                  debit = item.amount;
-                } else if (type === "Shop Closure") {
-                  credit = item.refundAmount;
-                }
-                return {
-                  date: item.paidOnDate || item.paymentDate || item.timestamp,
-                  module: "Rent Management",
-                  particular: item.tenantName || item.propertyName || "-",
-                  type,
-                  receiptPayment: type === "Advance" ? "Payment" : "Receipt",
-                  debit,
-                  credit,
-                  mode: item.paymentMode,
-                  remarks: "",
-                };
-              })
-          );
-        }
-      } catch { }
-      try {
-        const res = await fetch("https://backendaab.in/aabuildersDash/api/loans/all");
-        if (res.ok) {
-          const data = await res.json();
-          all = all.concat(
-            data
-              .filter((item) => {
-                const mode = (item.loan_payment_mode || "").toLowerCase();
-                return ALLOWED_MODES.some(m => mode.includes(m)) && item.type !== "Transfer";
-              })
-              .map((item) => {
-                let isRefund = item.type === "Refund";
-                let associate =
-                  item.vendor_id
-                    ? getVendorName(item.vendor_id)
-                    : item.contractor_id
-                      ? getContractorName(item.contractor_id)
-                      : "-";
-                return {
-                  date: item.date,
-                  module: "Loan Portal",
-                  particular: associate,
-                  type: item.type,
-                  receiptPayment: isRefund ? "Receipt" : "Payment",
-                  debit: !isRefund ? item.amount : "",
-                  credit: isRefund ? item.loan_refund_amount : "",
-                  mode: item.loan_payment_mode,
-                  remarks: "",
-                };
-              })
-          );
-        }
-      } catch { }
-      try {
-        const res = await fetch("https://backendaab.in/aabuildersDash/api/staff-advance/all");
-        if (res.ok) {
-          const data = await res.json();
-          all = all.concat(
-            data
-              .filter((item) => {
-                const mode = (item.staff_payment_mode || "").toLowerCase();
-                return ALLOWED_MODES.some(m => mode.includes(m)) && item.type !== "Transfer";
-              })
-              .map((item) => {
-                let isRefund = item.type === "Refund";
-                let empName = getEmployeeName(item.employee_id) || (isRefund ? "Refund" : "-");
-                return {
-                  date: item.date,
-                  module: "Staff Advance",
-                  particular: empName,
-                  type: item.type,
-                  receiptPayment: isRefund ? "Receipt" : "Payment",
-                  debit: !isRefund ? item.amount : "",
-                  credit: isRefund ? item.staff_refund_amount : "",
-                  mode: item.staff_payment_mode,
-                  remarks: "",
-                };
-              })
-          );
-        }
-      } catch { }
-      try {
-        const res = await fetch("https://backendaab.in/aabuildersDash/api/advance_portal/getAll");
-        if (res.ok) {
-          const data = await res.json();
-          console.log("Advance Portal Data:", data);
-          all = all.concat(
-            data
-              .filter((item) => {
-                const mode = (item.payment_mode || "").toLowerCase();
-                return ALLOWED_MODES.some(m => mode.includes(m)) && item.type !== "Transfer";
-              })
-              .map((item) => {
-                let debit = "";
-                let credit = "";
-                let isRefund = item.type === "Refund";
-                let isBillSettlement = item.type === "Bill Settlement";
-                if (isRefund) {
-                  credit = item.refund_amount || 0;
-                } else if (isBillSettlement) {
-                  debit = item.amount || 0;
-                } else {
-                  debit = item.amount || 0;
-                }
-                let associatedName = "-";
-                if (item.contractor_id && item.contractor_id !== 0) {
-                  associatedName = getContractorName(item.contractor_id) || `Contractor ID: ${item.contractor_id}`;
-                } else if (item.vendor_id && item.vendor_id !== 0) {
-                  associatedName = getVendorName(item.vendor_id) || `Vendor ID: ${item.vendor_id}`;
-                } else if (item.employee_id && item.employee_id !== 0) {
-                  associatedName = getEmployeeName(item.employee_id) || `Employee ID: ${item.employee_id}`;
-                } else {
-                  associatedName = item.description || `Entry No: ${item.entry_no || '-'}`;
-                }
-                return {
-                  date: item.date,
-                  module: "Advance Portal",
-                  particular: associatedName,
-                  type: item.type,
-                  receiptPayment: isRefund ? "Receipt" : "Payment",
-                  debit,
-                  credit,
-                  mode: item.payment_mode || "-",
-                  remarks: item.description || "",
-                };
-              })
-          );
-        }
-      } catch { }
-      all.sort((a, b) => new Date(b.date) - new Date(a.date));
-      setRecords(all);
-      setLoading(false);
+      } catch (error) {
+        console.error("Error fetching bill payments:", error);
+        setLoading(false);
+      }
     };
     if (
       vendorOptions.length &&
       contractorOptions.length &&
-      employeeOptions.length
+      employeeOptions.length &&
+      siteOptions.length
     ) {
       fetchAll();
     }
-  }, [vendorOptions, contractorOptions, employeeOptions]);
+  }, [vendorOptions, contractorOptions, employeeOptions, siteOptions, purposeOptions, tenantOptions]);
   useEffect(() => {
     if (records.length > 0) {
       applyAllFilters();
@@ -606,7 +619,7 @@ const BankReconciliation = () => {
     return uniqueModules.map(m => ({ value: m, label: m }));
   }, [records]);
   const particularOptions = React.useMemo(() => {
-    const uniqueParticulars = [...new Set(records.map(r => r.particular))].filter(Boolean);
+    const uniqueParticulars = [...new Set(records.map(r => r.partyName))].filter(Boolean);
     return uniqueParticulars.map(p => ({ value: p, label: p }));
   }, [records]);
   const typeOptions = React.useMemo(() => {
@@ -618,7 +631,7 @@ const BankReconciliation = () => {
     return uniqueReceiptPayments.map(rp => ({ value: rp, label: rp }));
   }, [records]);
   const modeOptions = React.useMemo(() => {
-    const uniqueModes = [...new Set(records.map(r => r.mode))].filter(Boolean);
+    const uniqueModes = [...new Set(records.map(r => r.paymentMode))].filter(Boolean);
     return uniqueModes.map(m => ({ value: m, label: m }));
   }, [records]);
   return (
@@ -730,31 +743,99 @@ const BankReconciliation = () => {
               />
             </button>
           </div>
+          <div className="border-l-8 border-l-[#BF9853] rounded-lg">
           <div
-            className="overflow-auto border rounded-lg h-[600px] select-none"
-            style={{ cursor: isDragging ? 'grabbing' : 'default' }}
+            className="overflow-auto max-h-[650px] select-none thin-scrollbar"
             onMouseDown={handleMouseDown}
             onMouseLeave={handleMouseLeave}
             onMouseUp={handleMouseUp}
             onMouseMove={handleMouseMove}
             onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
           >
-            <table className="w-full border-collapse min-w-[1100px]">
-              <thead className="bg-[#FAF6ED] sticky top-0 z-10">
-                <tr>
-                  <th className="p-2 font-bold text-left w-32">Date</th>
-                  <th className="p-2 font-bold text-left w-40">Module</th>
-                  <th className="p-2 font-bold text-left w-48">Particular</th>
-                  <th className="p-2 font-bold text-left w-32">Type</th>
-                  <th className="p-2 font-bold text-left w-40">Receipt/Payment</th>
-                  <th className="p-2 font-bold text-left w-32">Debit</th>
-                  <th className="p-2 font-bold text-left w-32">Credit</th>
-                  <th className="p-2 font-bold text-left w-32">Mode</th>
-                  <th className="p-2 font-bold text-left w-32">Remarks</th>
+            <table className="border-collapse" style={{ minWidth: '100%' }}>
+              <thead className="sticky top-0 z-10 bg-white">
+                <tr className="bg-[#FAF6ED]">
+                  <th className="px-2 py-2 font-bold text-left" style={{ minWidth: '60px', width: '60px' }}>S.No</th>
+                  <th 
+                    className="px-2 py-2 font-bold text-left cursor-pointer hover:bg-gray-200" 
+                    style={{ minWidth: '120px', width: '120px' }}
+                    onClick={() => handleSort('date')}
+                  >
+                    Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th 
+                    className="px-2 py-2 font-bold text-left cursor-pointer hover:bg-gray-200" 
+                    style={{ minWidth: '180px', width: '180px' }}
+                    onClick={() => handleSort('module')}
+                  >
+                    Module {sortConfig.key === 'module' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th 
+                    className="px-2 py-2 font-bold text-left cursor-pointer hover:bg-gray-200" 
+                    style={{ minWidth: '200px', width: '200px' }}
+                    onClick={() => handleSort('projectName')}
+                  >
+                    Project Name {sortConfig.key === 'projectName' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th 
+                    className="px-2 py-2 font-bold text-left cursor-pointer hover:bg-gray-200" 
+                    style={{ minWidth: '200px', width: '200px' }}
+                    onClick={() => handleSort('partyName')}
+                  >
+                    Party Name {sortConfig.key === 'partyName' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th 
+                    className="px-2 py-2 font-bold text-left cursor-pointer hover:bg-gray-200" 
+                    style={{ minWidth: '140px', width: '140px' }}
+                    onClick={() => handleSort('partyType')}
+                  >
+                    Party Type {sortConfig.key === 'partyType' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th 
+                    className="px-2 py-2 font-bold text-left cursor-pointer hover:bg-gray-200" 
+                    style={{ minWidth: '160px', width: '160px' }}
+                    onClick={() => handleSort('type')}
+                  >
+                    Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th 
+                    className="px-2 py-2 font-bold text-left cursor-pointer hover:bg-gray-200" 
+                    style={{ minWidth: '150px', width: '150px' }}
+                    onClick={() => handleSort('receiptPayment')}
+                  >
+                    Receipt/Payment {sortConfig.key === 'receiptPayment' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th 
+                    className="px-2 py-2 font-bold text-left cursor-pointer hover:bg-gray-200" 
+                    style={{ minWidth: '100px', width: '100px' }}
+                    onClick={() => handleSort('debit')}
+                  >
+                    Debit {sortConfig.key === 'debit' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th 
+                    className="px-2 py-2 font-bold text-left cursor-pointer hover:bg-gray-200" 
+                    style={{ minWidth: '100px', width: '100px' }}
+                    onClick={() => handleSort('credit')}
+                  >
+                    Credit {sortConfig.key === 'credit' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th 
+                    className="px-2 py-2 font-bold text-left cursor-pointer hover:bg-gray-200" 
+                    style={{ minWidth: '150px', width: '150px' }}
+                    onClick={() => handleSort('paymentMode')}
+                  >
+                    Payment Mode {sortConfig.key === 'paymentMode' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th className="px-2 py-2 font-bold text-left" style={{ minWidth: '140px', width: '140px' }}>Account No</th>
+                  <th className="px-2 py-2 font-bold text-left" style={{ minWidth: '120px', width: '120px' }}>Cheque No</th>
+                  <th className="px-2 py-2 font-bold text-left" style={{ minWidth: '120px', width: '120px' }}>Cheque Date</th>
+                  <th className="px-2 py-2 font-bold text-left" style={{ minWidth: '140px', width: '140px' }}>Transaction No</th>
+                  <th className="px-2 py-2 font-bold text-left" style={{ minWidth: '200px', width: '200px' }}>Remarks</th>
                 </tr>
                 {showFilters && (
                   <tr className="bg-white border-b border-gray-200">
-                    <th className="p-2 w-32">
+                    <th className="p-2" style={{ minWidth: '60px', width: '60px' }}></th>
+                    <th className="p-2" style={{ minWidth: '120px', width: '120px' }}>
                       <input
                         type="date"
                         value={filterDate}
@@ -762,7 +843,7 @@ const BankReconciliation = () => {
                         className="p-1 rounded-md bg-transparent w-full border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-sm"
                       />
                     </th>
-                    <th className="p-2 w-40">
+                    <th className="p-2" style={{ minWidth: '180px', width: '180px' }}>
                       <Select
                         options={moduleOptions}
                         value={filterModule ? { value: filterModule, label: filterModule } : null}
@@ -791,13 +872,14 @@ const BankReconciliation = () => {
                         }}
                       />
                     </th>
-                    <th className="p-2 w-48">
+                    <th className="p-2" style={{ minWidth: '200px', width: '200px' }}></th>
+                    <th className="p-2" style={{ minWidth: '200px', width: '200px' }}>
                       <Select
                         options={particularOptions}
                         value={filterParticular ? { value: filterParticular, label: filterParticular } : null}
                         onChange={(opt) => setFilterParticular(opt ? opt.value : "")}
                         className="text-xs"
-                        placeholder="Particular..."
+                        placeholder="Party Name..."
                         isSearchable
                         isClearable
                         styles={{
@@ -820,7 +902,8 @@ const BankReconciliation = () => {
                         }}
                       />
                     </th>
-                    <th className="p-2 w-32">
+                    <th className="p-2" style={{ minWidth: '140px', width: '140px' }}></th>
+                    <th className="p-2" style={{ minWidth: '180px', width: '180px' }}>
                       <Select
                         options={typeOptions}
                         value={filterType ? { value: filterType, label: filterType } : null}
@@ -849,7 +932,7 @@ const BankReconciliation = () => {
                         }}
                       />
                     </th>
-                    <th className="p-2 w-40">
+                    <th className="p-2" style={{ minWidth: '150px', width: '150px' }}>
                       <Select
                         options={receiptPaymentOptions}
                         value={filterReceiptPayment ? { value: filterReceiptPayment, label: filterReceiptPayment } : null}
@@ -878,9 +961,9 @@ const BankReconciliation = () => {
                         }}
                       />
                     </th>
-                    <th className="p-2 w-32"></th>
-                    <th className="p-2 w-32"></th>
-                    <th className="p-2 w-32">
+                    <th className="p-2" style={{ minWidth: '120px', width: '120px' }}></th>
+                    <th className="p-2" style={{ minWidth: '120px', width: '120px' }}></th>
+                    <th className="p-2" style={{ minWidth: '150px', width: '150px' }}>
                       <Select
                         options={modeOptions}
                         value={filterMode ? { value: filterMode, label: filterMode } : null}
@@ -909,40 +992,66 @@ const BankReconciliation = () => {
                         }}
                       />
                     </th>
-                    <th className="p-2 w-32"></th>
+                    <th className="p-2" style={{ minWidth: '140px', width: '140px' }}></th>
+                    <th className="p-2" style={{ minWidth: '120px', width: '120px' }}></th>
+                    <th className="p-2" style={{ minWidth: '120px', width: '120px' }}></th>
+                    <th className="p-2" style={{ minWidth: '140px', width: '140px' }}></th>
+                    <th className="p-2" style={{ minWidth: '200px', width: '200px' }}></th>
                   </tr>
                 )}
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="text-center p-4 text-gray-400">
+                    <td colSpan={16} className="text-center p-4 text-gray-400">
                       Loading...
                     </td>
                   </tr>
                 ) : filteredRecords.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="text-center p-4 text-gray-400">
+                    <td colSpan={16} className="text-center p-4 text-gray-400">
                       {records.length === 0 ? "No Records available" : "No records found for the selected date range"}
                     </td>
                   </tr>
                 ) : (
                   currentRecords.map((rec, idx) => (
-                    <tr key={startIndex + idx} className={idx % 2 === 0 ? "bg-white" : "bg-[#FAF6ED]"}>
-                      <td className="text-sm p-2 w-32">{rec.date ? new Date(rec.date).toLocaleDateString("en-GB") : "-"}</td>
-                      <td className="text-sm p-2 w-40">{rec.module}</td>
-                      <td className="text-sm p-2 w-48">{rec.particular}</td>
-                      <td className="text-sm p-2 w-32">{rec.type}</td>
-                      <td className="text-sm p-2 w-40">{rec.receiptPayment}</td>
-                      <td className="text-sm p-2 w-32">{formatCurrency(rec.debit)}</td>
-                      <td className="text-sm p-2 w-32">{formatCurrency(rec.credit)}</td>
-                      <td className="text-sm p-2 w-32">{rec.mode}</td>
-                      <td className="text-sm p-2 w-32"></td>
+                    <tr key={startIndex + idx} className="odd:bg-white even:bg-[#FAF6ED]">
+                      <td className="text-sm text-left p-2 font-semibold" style={{ minWidth: '60px', width: '60px' }}>{startIndex + idx + 1}</td>
+                      <td className="text-sm text-left p-2 font-semibold whitespace-nowrap" style={{ minWidth: '120px', width: '120px' }}>{rec.date ? new Date(rec.date).toLocaleDateString("en-GB") : "-"}</td>
+                      <td className="text-sm text-left p-2 font-semibold" style={{ minWidth: '180px', width: '180px' }}>
+                        <div className="overflow-hidden text-ellipsis whitespace-nowrap" title={rec.module}>{rec.module}</div>
+                      </td>
+                      <td className="text-sm text-left p-2 font-semibold" style={{ minWidth: '200px', width: '200px' }}>
+                        <div className="overflow-hidden text-ellipsis whitespace-nowrap" title={rec.projectName}>{rec.projectName}</div>
+                      </td>
+                      <td className="text-sm text-left p-2 font-semibold" style={{ minWidth: '200px', width: '200px' }}>
+                        <div className="overflow-hidden text-ellipsis whitespace-nowrap" title={rec.partyName}>{rec.partyName}</div>
+                      </td>
+                      <td className="text-sm text-left p-2 font-semibold" style={{ minWidth: '140px', width: '140px' }}>
+                        <div className="overflow-hidden text-ellipsis whitespace-nowrap" title={rec.partyType}>{rec.partyType}</div>
+                      </td>
+                      <td className="text-sm text-left p-2 font-semibold" style={{ minWidth: '160px', width: '160px' }}>
+                        <div className="overflow-hidden text-ellipsis whitespace-nowrap" title={rec.type}>{rec.type}</div>
+                      </td>
+                      <td className="text-sm text-left p-2 font-semibold whitespace-nowrap" style={{ minWidth: '150px', width: '150px' }}>{rec.receiptPayment}</td>
+                      <td className="text-sm text-left p-2 font-semibold whitespace-nowrap" style={{ minWidth: '100px', width: '100px' }}>{formatCurrency(rec.debit)}</td>
+                      <td className="text-sm text-left p-2 font-semibold whitespace-nowrap" style={{ minWidth: '100px', width: '100px' }}>{formatCurrency(rec.credit)}</td>
+                      <td className="text-sm text-left p-2 font-semibold" style={{ minWidth: '150px', width: '150px' }}>
+                        <div className="overflow-hidden text-ellipsis whitespace-nowrap" title={rec.paymentMode}>{rec.paymentMode}</div>
+                      </td>
+                      <td className="text-sm text-left p-2 font-semibold whitespace-nowrap" style={{ minWidth: '140px', width: '140px' }}>{rec.accountNo}</td>
+                      <td className="text-sm text-left p-2 font-semibold whitespace-nowrap" style={{ minWidth: '120px', width: '120px' }}>{rec.chequeNo}</td>
+                      <td className="text-sm text-left p-2 font-semibold whitespace-nowrap" style={{ minWidth: '120px', width: '120px' }}>{rec.chequeDate ? new Date(rec.chequeDate).toLocaleDateString("en-GB") : "-"}</td>
+                      <td className="text-sm text-left p-2 font-semibold whitespace-nowrap" style={{ minWidth: '140px', width: '140px' }}>{rec.transactionNo}</td>
+                      <td className="text-sm text-left p-2 font-semibold" style={{ minWidth: '200px', width: '200px' }}>
+                        <div className="overflow-hidden text-ellipsis whitespace-nowrap" title={rec.remarks}>{rec.remarks}</div>
+                      </td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
+          </div>
           </div>
         </div>
         {filteredRecords.length > 0 && (
@@ -1022,11 +1131,7 @@ const BankReconciliation = () => {
               <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   {showPreview && (
-                    <button
-                      onClick={() => setShowPdfSettings(false)}
-                      className="text-gray-600 hover:text-gray-800"
-                      title="Back to Preview"
-                    >
+                    <button onClick={() => setShowPdfSettings(false)} className="text-gray-600 hover:text-gray-800" title="Back to Preview">
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                       </svg>
@@ -1037,9 +1142,7 @@ const BankReconciliation = () => {
                 <button
                   onClick={() => {
                     setShowPdfSettings(false);
-                    if (!showPreview) {
-                      setShowPreview(false);
-                    }
+                    if (!showPreview) {setShowPreview(false);}
                   }}
                   className="text-gray-400 hover:text-gray-600"
                 >
@@ -1303,41 +1406,47 @@ const BankReconciliation = () => {
                     <table className="w-full border-collapse text-sm">
                       <thead>
                         <tr className="bg-gray-50">
-                          {pdfSettings.date && <th className="border p-2 text-left font-medium">Date</th>}
-                          {pdfSettings.module && <th className="border p-2 text-left font-medium">Module</th>}
-                          {pdfSettings.particular && <th className="border p-2 text-left font-medium">Particular</th>}
-                          {pdfSettings.type && <th className="border p-2 text-left font-medium">Type</th>}
-                          {pdfSettings.receiptPayment && <th className="border p-2 text-left font-medium">Receipt/Payment</th>}
-                          {pdfSettings.debit && <th className="border p-2 text-right font-medium">Debit</th>}
-                          {pdfSettings.credit && <th className="border p-2 text-right font-medium">Credit</th>}
-                          {pdfSettings.mode && <th className="border p-2 text-left font-medium">Mode</th>}
-                          {pdfSettings.remarks && <th className="border p-2 text-left font-medium">Remarks</th>}
+                          <th className="border p-2 text-left font-medium">Date</th>
+                          <th className="border p-2 text-left font-medium">Module</th>
+                          <th className="border p-2 text-left font-medium">Project Name</th>
+                          <th className="border p-2 text-left font-medium">Party Name</th>
+                          <th className="border p-2 text-left font-medium">Party Type</th>
+                          <th className="border p-2 text-left font-medium">Type</th>
+                          <th className="border p-2 text-left font-medium">Receipt/Payment</th>
+                          <th className="border p-2 text-right font-medium">Debit</th>
+                          <th className="border p-2 text-right font-medium">Credit</th>
+                          <th className="border p-2 text-left font-medium">Payment Mode</th>
+                          <th className="border p-2 text-left font-medium">Account No</th>
+                          <th className="border p-2 text-left font-medium">Cheque No</th>
+                          <th className="border p-2 text-left font-medium">Cheque Date</th>
+                          <th className="border p-2 text-left font-medium">Transaction No</th>
+                          <th className="border p-2 text-left font-medium">Remarks</th>
                         </tr>
                       </thead>
                       <tbody>
                         {filteredRecords.slice(0, 10).map((record, idx) => (
                           <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                            {pdfSettings.date && (
-                              <td className="border p-2">
-                                {record.date ? new Date(record.date).toLocaleDateString("en-GB") : "-"}
-                              </td>
-                            )}
-                            {pdfSettings.module && <td className="border p-2">{record.module}</td>}
-                            {pdfSettings.particular && <td className="border p-2">{record.particular}</td>}
-                            {pdfSettings.type && <td className="border p-2">{record.type}</td>}
-                            {pdfSettings.receiptPayment && <td className="border p-2">{record.receiptPayment}</td>}
-                            {pdfSettings.debit && (
-                              <td className="border p-2 text-right text-red-600">
-                                {record.debit ? formatNumber(record.debit) : "-"}
-                              </td>
-                            )}
-                            {pdfSettings.credit && (
-                              <td className="border p-2 text-right text-green-600">
-                                {record.credit ? formatNumber(record.credit) : "-"}
-                              </td>
-                            )}
-                            {pdfSettings.mode && <td className="border p-2">{record.mode}</td>}
-                            {pdfSettings.remarks && <td className="border p-2">{record.remarks || "-"}</td>}
+                            <td className="border p-2">
+                              {record.date ? new Date(record.date).toLocaleDateString("en-GB") : "-"}
+                            </td>
+                            <td className="border p-2">{record.module}</td>
+                            <td className="border p-2">{record.projectName || "-"}</td>
+                            <td className="border p-2">{record.partyName || "-"}</td>
+                            <td className="border p-2">{record.partyType || "-"}</td>
+                            <td className="border p-2">{record.type || "-"}</td>
+                            <td className="border p-2">{record.receiptPayment}</td>
+                            <td className="border p-2 text-right text-red-600">
+                              {record.debit ? formatNumber(record.debit) : "-"}
+                            </td>
+                            <td className="border p-2 text-right text-green-600">
+                              {record.credit ? formatNumber(record.credit) : "-"}
+                            </td>
+                            <td className="border p-2">{record.paymentMode || "-"}</td>
+                            <td className="border p-2">{record.accountNo || "-"}</td>
+                            <td className="border p-2">{record.chequeNo || "-"}</td>
+                            <td className="border p-2">{record.chequeDate ? new Date(record.chequeDate).toLocaleDateString("en-GB") : "-"}</td>
+                            <td className="border p-2">{record.transactionNo || "-"}</td>
+                            <td className="border p-2">{record.remarks || "-"}</td>
                           </tr>
                         ))}
                       </tbody>

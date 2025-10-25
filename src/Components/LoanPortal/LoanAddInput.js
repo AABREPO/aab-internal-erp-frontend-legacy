@@ -139,7 +139,7 @@ const LoanAddInput = ({ username, userRoles = [] }) => {
     );
 
     return (
-        <div className="p-4 bg-white ml-6 mr-8">
+        <div className="p-4 bg-white ml-10 mr-10">
             <div className="lg:flex space-x-[2%] lg:w-full md:w-[32rem] w-[20rem] overflow-x-auto">
                 <div>
                     <div className="flex items-center mb-2 lg:mt-0 mt-3 ">

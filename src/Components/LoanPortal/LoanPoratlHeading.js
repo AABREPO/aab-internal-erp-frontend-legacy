@@ -7,14 +7,21 @@ import LoanReport from './LoanReport';
 import LoanSummary from './LoanSummary';
 
 const LoanPoratlHeading = ({ username, userRoles = [] }) => {
-  const [activeTab, setActiveTab] = useState(
-        localStorage.getItem('activePaintTab') || 'loanportal'
-    );
+    const [activeTab, setActiveTab] = useState(() => {
+        const savedTab = localStorage.getItem('activePaintTab');
+        if (savedTab === 'loandatabase' && (username !== 'Mahalingam M' && username !== 'Admin')) {
+            return 'loanportal';
+        }
+        return savedTab || 'loanportal';
+    });
 
     useEffect(() => {
-        // Save the active tab to localStorage whenever it changes
-        localStorage.setItem('activePaintTab', activeTab);
-    }, [activeTab]);
+        if (activeTab === 'loandatabase' && (username !== 'Mahalingam M' && username !== 'Admin')) {
+            setActiveTab('loanportal');
+        } else {
+            localStorage.setItem('activePaintTab', activeTab);
+        }
+    }, [activeTab, username]);
 
     const renderContent = () => {
         switch (activeTab) {
@@ -36,43 +43,57 @@ const LoanPoratlHeading = ({ username, userRoles = [] }) => {
     };
     return (
         <div className="bg-[#FAF6ED]">
-            <div className="topbar-title">
-                <h2
-                    className={`link ${activeTab === 'loanportal' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('loanportal')}
-                >
-                    Loan
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'loantableview' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('loantableview')}
-                >
-                    Table View
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'loandatabase' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('loandatabase')}
-                >
-                    Database
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'loanaddinput' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('loanaddinput')}
-                >
-                    Add Input
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'loanreport' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('loanreport')}
-                >
-                    Report
-                </h2>                
-                <h2
-                    className={`link ${activeTab === 'loansummary' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('loansummary')}
-                >
-                    Summary
-                </h2>
+            <div className="topbar-title flex gap-[20px] w-[865px] flex-nowrap">
+                <div className="flex-shrink-0">
+                    <h2
+                        className={`link ${activeTab === 'loanportal' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('loanportal')}
+                    >
+                        Loan
+                    </h2>
+                </div>
+                <div className="flex-shrink-0">
+                    <h2
+                        className={`link ${activeTab === 'loantableview' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('loantableview')}
+                    >
+                        Table View
+                    </h2>
+                </div>
+                {(username === 'Mahalingam M' || username === 'Admin') && (
+                    <div className="flex-shrink-0">
+                        <h2
+                            className={`link ${activeTab === 'loandatabase' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('loandatabase')}
+                        >
+                            Database
+                        </h2>
+                    </div>
+                )}
+                <div className="flex-shrink-0">
+                    <h2
+                        className={`link ${activeTab === 'loanaddinput' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('loanaddinput')}
+                    >
+                        Add Input
+                    </h2>
+                </div>
+                <div className="flex-shrink-0">
+                    <h2
+                        className={`link ${activeTab === 'loanreport' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('loanreport')}
+                    >
+                        Report
+                    </h2>
+                </div>
+                <div className="flex-shrink-0">
+                    <h2
+                        className={`link ${activeTab === 'loansummary' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('loansummary')}
+                    >
+                        Summary
+                    </h2>
+                </div>
             </div>
             <div className="content">
                 {renderContent()}

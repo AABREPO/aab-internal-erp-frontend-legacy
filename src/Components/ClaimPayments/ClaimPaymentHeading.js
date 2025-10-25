@@ -3,16 +3,24 @@ import ClaimPaymentSummary from './ClaimPaymentSummary';
 import ClaimPaymentTableView from './ClaimPaymentTableView';
 import ClaimPaymentDatabase from './ClaimPaymentDatabase';
 import ClaimPaymentCashRegister from './ClaimPaymentCashRegister';
+import ClaimPaymentClaimHistory from './ClaimPaymentClaimHistory';
 
 const ClaimPaymentHeading = ({ username, userRoles = [] }) => {
-  const [activeTab, setActiveTab] = useState(
-        localStorage.getItem('activePaintTab') || 'claimpaymentsummary'
-    );
+  const [activeTab, setActiveTab] = useState(() => {
+        const savedTab = localStorage.getItem('activePaintTab');
+        if (savedTab === 'claimpaymentdatabase' && (username !== 'Mahalingam M' && username !== 'Admin')) {
+            return 'claimpaymentsummary';
+        }
+        return savedTab || 'claimpaymentsummary';
+    });
 
     useEffect(() => {
-        // Save the active tab to localStorage whenever it changes
-        localStorage.setItem('activePaintTab', activeTab);
-    }, [activeTab]);
+        if (activeTab === 'claimpaymentdatabase' && (username !== 'Mahalingam M' && username !== 'Admin')) {
+            setActiveTab('claimpaymentsummary');
+        } else {
+            localStorage.setItem('activePaintTab', activeTab);
+        }
+    }, [activeTab, username]);
 
     const renderContent = () => {
         switch (activeTab) {
@@ -24,6 +32,8 @@ const ClaimPaymentHeading = ({ username, userRoles = [] }) => {
                 return <ClaimPaymentDatabase username={username} userRoles={userRoles}/>;
             case 'claimpaymentcashregister':
                 return <ClaimPaymentCashRegister username={username} userRoles={userRoles}/>;
+                case 'claimpaymentclaimhistory':
+                    return <ClaimPaymentClaimHistory username={username} userRoles={userRoles}/>;
             default:
                 return <ClaimPaymentSummary />;
         }
@@ -43,17 +53,25 @@ const ClaimPaymentHeading = ({ username, userRoles = [] }) => {
                 >
                     Table View
                 </h2>
-                <h2
-                    className={`link ${activeTab === 'claimpaymentdatabase' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('claimpaymentdatabase')}
-                >
-                    Database
-                </h2>
+                {(username === 'Mahalingam M' || username === 'Admin') && (
+                    <h2
+                        className={`link ${activeTab === 'claimpaymentdatabase' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('claimpaymentdatabase')}
+                    >
+                        Database
+                    </h2>
+                )}
                 <h2
                     className={`link ${activeTab === 'claimpaymentcashregister' ? 'active' : ''}`}
                     onClick={() => setActiveTab('claimpaymentcashregister')}
                 >
                     Cash Register
+                </h2>
+                <h2
+                    className={`link ${activeTab === 'claimpaymentclaimhistory' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('claimpaymentclaimhistory')}
+                >
+                    Claim History
                 </h2>
             </div>
             <div className="content">

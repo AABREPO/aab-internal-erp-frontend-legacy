@@ -7,14 +7,23 @@ import History from './History';
 import Database from './Database';
 import AddInput from './AddInput';
 
-const Heading = () => {
+const Heading = ({ username, userRoles = [] }) => {
     const location = useLocation();
-    const [activeTab, setActiveTab] = useState(location.pathname);
+    const [activeTab, setActiveTab] = useState(() => {
+        const savedTab = location.pathname;
+        if (savedTab === '/invoice-bill/database' && (username !== 'Mahalingam M' && username !== 'Admin')) {
+            return '/invoice-bill/invoice';
+        }
+        return savedTab;
+    });
 
     useEffect(() => {
-        // Save the active tab to localStorage whenever it changes
-        localStorage.setItem('activeInvoiceTab', activeTab);
-    }, [activeTab]);
+        if (activeTab === '/invoice-bill/database' && (username !== 'Mahalingam M' && username !== 'Admin')) {
+            setActiveTab('/invoice-bill/invoice');
+        } else {
+            localStorage.setItem('activeInvoiceTab', activeTab);
+        }
+    }, [activeTab, username]);
 
     const renderContent = () => {
         switch (activeTab) {
@@ -58,12 +67,14 @@ const Heading = () => {
                 >
                     History
                 </h2>
-                <h2
-                    className={`link ${activeTab === '/invoice-bill/database' ? 'active' : ''}`}
-                    onClick={() => handleTabClick('/invoice-bill/database')}
-                >
-                    Database
-                </h2>
+                {(username === 'Mahalingam M' || username === 'Admin') && (
+                    <h2
+                        className={`link ${activeTab === '/invoice-bill/database' ? 'active' : ''}`}
+                        onClick={() => handleTabClick('/invoice-bill/database')}
+                    >
+                        Database
+                    </h2>
+                )}
                 <h2
                     className={`link ${activeTab === '/invoice-bill/addinput' ? 'active' : ''}`}
                     onClick={() => handleTabClick('/invoice-bill/addinput')}

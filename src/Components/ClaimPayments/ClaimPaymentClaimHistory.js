@@ -2,21 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import Select from 'react-select';
 import Filter from '../Images/filter (3).png';
 
-const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
+const ClaimPaymentClaimHistory = ({ username, userRoles = [] }) => {
   const [claimDataList, setClaimDataList] = useState([]);
   const [siteOption, setSiteOption] = useState([]);
   const [selectedSite, setSelectedSite] = useState(null);
-  const [receivedAmounts, setReceivedAmounts] = useState({});
-  const [discountAmounts, setDiscountAmounts] = useState({});
-  const [sortColumn, setSortColumn] = useState('date');
-  const [sortDirection, setSortDirection] = useState('desc'); // Default to newest first
+  const [allPaymentsData, setAllPaymentsData] = useState([]);
+  const [sortColumn, setSortColumn] = useState(null);
+  const [sortDirection, setSortDirection] = useState('desc'); // Default to newest entered first
   const [showFilters, setShowFilters] = useState(false);
   const [filterDate, setFilterDate] = useState('');
   const [filterProjectName, setFilterProjectName] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
-  const [showModal, setShowModal] = useState(false);
-  const [selectedRow, setSelectedRow] = useState(null);
-  const [claimPaymentsData, setClaimPaymentsData] = useState([]);
 
   // Drag and scroll functionality
   const scrollRef = useRef(null);
@@ -75,49 +71,63 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
     fetchSites();
   }, []);
 
-  const filteredData = selectedSite
-    ? claimDataList.filter(item => item.siteName === selectedSite.value)
-    : claimDataList;
-
-  // Fetch received amounts and discounts
+  // Fetch all payments with claim details
   useEffect(() => {
-    const fetchReceivedAmounts = async () => {
-      const amounts = {};
-      const discounts = {};
-      for (const row of filteredData) {
-        try {
-          const res = await fetch(`https://backendaab.in/aabuildersDash/api/claim_payments/get/${row.id}`);
-          const payments = await res.json();
+    const fetchAllPayments = async () => {
+      if (claimDataList.length === 0) return;
 
+      const allPayments = [];
+      
+      for (const claim of claimDataList) {
+        try {
+          const res = await fetch(`https://backendaab.in/aabuildersDash/api/claim_payments/get/${claim.id}`);
+          const payments = await res.json();
+          console.log("payments",payments);
+          // Check if claim is fully paid
           const totalReceived = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
           const totalDiscount = payments.reduce((sum, payment) => sum + (payment.discount_amount || 0), 0);
+          const isFullyPaid = (totalReceived + totalDiscount) >= claim.amount;
 
-          amounts[row.id] = totalReceived;
-          discounts[row.id] = totalDiscount;
+          // Include all claims (both fully paid and partially paid)
+          // Sort payments by date (latest first)
+          const sortedPayments = payments.sort((a, b) => new Date(b.date) - new Date(a.date));
+          
+          // Combine claim data with each payment
+          sortedPayments.forEach((payment, index) => {
+            allPayments.push({
+              ...payment,
+              claimData: claim,
+              entryNumber: sortedPayments.length - index,
+              totalPayments: sortedPayments.length,
+              isFullyPaid: isFullyPaid
+            });
+          });
         } catch (error) {
-          console.error(`Error fetching payments for row ${row.id}`, error);
-          amounts[row.id] = 0;
-          discounts[row.id] = 0;
+          console.error(`Error fetching payments for claim ${claim.id}`, error);
         }
       }
-      setReceivedAmounts(amounts);
-      setDiscountAmounts(discounts);
+      console.log("allPayments",allPayments);
+      setAllPaymentsData(allPayments);
     };
-    if (filteredData.length > 0) {
-      fetchReceivedAmounts();
-    }
-  }, [filteredData]);
 
-  // Apply additional filters (showing all data, not just fully received)
-  const filteredDataWithFilters = filteredData.filter((row) => {
+    fetchAllPayments();
+  }, [claimDataList]);
+
+  // Apply site filter
+  const siteFilteredData = selectedSite
+    ? allPaymentsData.filter(item => item.claimData.siteName === selectedSite.value)
+    : allPaymentsData;
+
+  // Apply additional filters
+  const filteredDataWithFilters = siteFilteredData.filter((row) => {
     if (filterDate) {
       const [year, month, day] = filterDate.split("-");
       const formattedFilterDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
       const rowDate = formatDateOnly(row.date);
       if (rowDate !== formattedFilterDate) return false;
     }
-    if (filterProjectName && row.siteName !== filterProjectName) return false;
-    if (filterCategory && row.category !== filterCategory) return false;
+    if (filterProjectName && row.claimData.siteName !== filterProjectName) return false;
+    if (filterCategory && row.claimData.category !== filterCategory) return false;
     return true;
   });
 
@@ -133,32 +143,55 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
 
   // Sort the data
   const sortedData = [...filteredDataWithFilters].sort((a, b) => {
-    if (!sortColumn) return 0;
+    if (!sortColumn) {
+      // Default sort: newest entries first (by claimPaymentsId descending - higher IDs at top)
+      return (b.claimPaymentsId || b.id || 0) - (a.claimPaymentsId || a.id || 0);
+    }
     let aValue, bValue;
     switch (sortColumn) {
-      case 'date':
+      case 'entryId':
+        aValue = a.id || 0;
+        bValue = b.id || 0;
+        break;
+      case 'claimDate':
+        aValue = new Date(a.claimData.date);
+        bValue = new Date(b.claimData.date);
+        break;
+      case 'paymentDate':
         aValue = new Date(a.date);
         bValue = new Date(b.date);
         break;
       case 'siteName':
-        aValue = a.siteName || '';
-        bValue = b.siteName || '';
+        aValue = a.claimData.siteName || '';
+        bValue = b.claimData.siteName || '';
         break;
-      case 'amount':
+      case 'partyName':
+        aValue = a.claimData.vendor || a.claimData.contractor || '';
+        bValue = b.claimData.vendor || b.claimData.contractor || '';
+        break;
+      case 'totalAmount':
+        aValue = parseFloat(a.claimData.amount) || 0;
+        bValue = parseFloat(b.claimData.amount) || 0;
+        break;
+      case 'paymentAmount':
         aValue = parseFloat(a.amount) || 0;
         bValue = parseFloat(b.amount) || 0;
         break;
       case 'category':
-        aValue = a.category || '';
-        bValue = b.category || '';
-        break;
-      case 'comments':
-        aValue = a.comments || '';
-        bValue = b.comments || '';
+        aValue = a.claimData.category || '';
+        bValue = b.claimData.category || '';
         break;
       case 'eno':
-        aValue = a.eno || '';
-        bValue = b.eno || '';
+        aValue = a.claimData.eno || '';
+        bValue = b.claimData.eno || '';
+        break;
+      case 'paymentMode':
+        aValue = a.payment_mode || '';
+        bValue = b.payment_mode || '';
+        break;
+      case 'enteredBy':
+        aValue = a.entered_by || '';
+        bValue = b.entered_by || '';
         break;
       default:
         return 0;
@@ -173,6 +206,8 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
     return 0;
   });
 
+  console.log("sortedData",sortedData);
+  console.log("filteredDataWithFilters",filteredDataWithFilters);
   const customStyles = {
     control: (provided, state) => ({
       ...provided,
@@ -215,17 +250,6 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
     setFilterCategory('');
   };
 
-  const handleViewDetails = async (row) => {
-    setSelectedRow(row);
-    try {
-      const response = await fetch(`https://backendaab.in/aabuildersDash/api/claim_payments/get/${row.id}`);
-      const claimPayments = await response.json();
-      setClaimPaymentsData(claimPayments);
-      setShowModal(true);
-    } catch (error) {
-      console.error("Error fetching claim payments:", error);
-    }
-  };
 
   // Drag and scroll event handlers
   const handleMouseDown = (e) => {
@@ -318,7 +342,7 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
             />
           </div>
         </div>
-        <div className='w-[1800px] bg-white mt-5 p-5 ml-10'>
+        <div className='w-[1800px] h-[600px] bg-white mt-5 p-5 ml-10'>
           <div className="flex justify-between items-center mb-3">
             <div className="flex items-center gap-2">
               <button
@@ -332,7 +356,7 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
                 />
               </button>
               <span className="ml-4 text-sm font-medium text-gray-600">
-                Total Entries: <span className="font-bold text-[#BF9853]">{sortedData.length}</span>
+                Total Claimed Entries: <span className="font-bold text-[#007233]">{sortedData.length}</span>
               </span>
             </div>
             {(filterDate || filterProjectName || filterCategory) && (
@@ -368,58 +392,79 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
             )}
           </div>
           <div className="rounded-lg border-l-8 border-l-[#BF9853]">
-            <div ref={scrollRef} className='overflow-auto max-h-[600px] thin-scrollbar' onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
+            <div ref={scrollRef} className='overflow-auto max-h-[500px] thin-scrollbar' onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
             >
-            <table className="w-full border rounded-lg overflow-hidden">
-              <thead className="bg-[#FAF6ED]">
-                <tr>
-                  <th className="px-4 py-2">S.No</th>
+              <table className="w-full border rounded-lg overflow-auto">
+                <thead className="bg-[#FAF6ED]">
+                  <tr>
+                    <th className="px-6 py-3 whitespace-nowrap min-w-[80px]">S.No</th>
                     <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
-                      onClick={() => handleSort('date')}
+                      className="px-6 py-3 whitespace-nowrap min-w-[130px] cursor-pointer hover:bg-[#d4edd6] select-none"
+                      onClick={() => handleSort('claimDate')}
                     >
-                      Date {sortColumn === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      Claim Date {sortColumn === 'claimDate' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      className="px-6 py-3 whitespace-nowrap min-w-[180px] cursor-pointer hover:bg-[#d4edd6] select-none"
                       onClick={() => handleSort('siteName')}
                     >
                       Project Name {sortColumn === 'siteName' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      className="px-6 py-3 whitespace-nowrap min-w-[160px] cursor-pointer hover:bg-[#d4edd6] select-none"
                       onClick={() => handleSort('partyName')}
                     >
                       Party Name {sortColumn === 'partyName' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
-                      onClick={() => handleSort('amount')}
+                      className="px-6 py-3 whitespace-nowrap min-w-[150px] cursor-pointer hover:bg-[#d4edd6] select-none"
+                      onClick={() => handleSort('totalAmount')}
                     >
-                      Amount {sortColumn === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      Claim Amount {sortColumn === 'totalAmount' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      className="px-6 py-3 whitespace-nowrap min-w-[130px] cursor-pointer hover:bg-[#d4edd6] select-none"
                       onClick={() => handleSort('category')}
                     >
                       Category {sortColumn === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
-                      onClick={() => handleSort('comments')}
-                    >
-                      Reason {sortColumn === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
-                    </th>
-                  <th className="px-4 py-2">Status</th>
-                    <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      className="px-6 py-3 whitespace-nowrap min-w-[100px] cursor-pointer hover:bg-[#d4edd6] select-none"
                       onClick={() => handleSort('eno')}
                     >
                       E.No {sortColumn === 'eno' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
-                  <th className="px-4 py-2">View</th>
-                    <th className="px-4 py-2">Details</th>
+                    <th
+                      className="px-6 py-3 whitespace-nowrap min-w-[150px] cursor-pointer hover:bg-[#d4edd6] select-none"
+                      onClick={() => handleSort('paymentDate')}
+                    >
+                      Payment Date {sortColumn === 'paymentDate' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th
+                      className="px-6 py-3 whitespace-nowrap min-w-[160px] cursor-pointer hover:bg-[#d4edd6] select-none"
+                      onClick={() => handleSort('paymentAmount')}
+                    >
+                      Payment Amount {sortColumn === 'paymentAmount' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th className="px-6 py-3 whitespace-nowrap min-w-[120px]">Discount</th>
+                    <th
+                      className="px-6 py-3 whitespace-nowrap min-w-[150px] cursor-pointer hover:bg-[#d4edd6] select-none"
+                      onClick={() => handleSort('paymentMode')}
+                    >
+                      Payment Mode {sortColumn === 'paymentMode' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th className="px-6 py-3 whitespace-nowrap min-w-[130px]">Cheque No</th>
+                    <th className="px-6 py-3 whitespace-nowrap min-w-[140px]">Cheque Date</th>
+                    <th className="px-6 py-3 whitespace-nowrap min-w-[150px]">Transaction No</th>
+                    <th className="px-6 py-3 whitespace-nowrap min-w-[140px]">Account No</th>
+                    <th
+                      className="px-6 py-3 whitespace-nowrap min-w-[130px] cursor-pointer hover:bg-[#d4edd6] select-none"
+                      onClick={() => handleSort('enteredBy')}
+                    >
+                      Entered By {sortColumn === 'enteredBy' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th className="px-6 py-3 whitespace-nowrap min-w-[110px]">View Bill</th>
                   </tr>
                   {showFilters && (
                     <tr className="bg-white border-b border-gray-200">
@@ -429,13 +474,13 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
                           type="date"
                           value={filterDate}
                           onChange={(e) => setFilterDate(e.target.value)}
-                          className="p-1 rounded-md bg-transparent -ml-6 w-32 border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
+                          className="p-1 rounded-md bg-transparent -ml-6 w-32 border-[3px] border-[#007233] border-opacity-[20%] focus:outline-none"
                           placeholder="Search Date..."
                         />
                       </th>
                       <th className="pt-2 pb-2">
                         <Select
-                          options={[...new Set(filteredData.map(item => item.siteName))].map(siteName => ({
+                          options={[...new Set(allPaymentsData.map(item => item.claimData.siteName))].map(siteName => ({
                             value: siteName,
                             label: siteName
                           }))}
@@ -451,12 +496,12 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
                               backgroundColor: 'transparent',
                               borderWidth: '3px',
                               borderColor: state.isFocused
-                                ? 'rgba(191, 152, 83, 0.2)'
-                                : 'rgba(191, 152, 83, 0.2)',
+                                ? 'rgba(0, 114, 51, 0.2)'
+                                : 'rgba(0, 114, 51, 0.2)',
                               borderRadius: '6px',
-                              boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                              boxShadow: state.isFocused ? '0 0 0 1px rgba(0, 114, 51, 0.5)' : 'none',
                               '&:hover': {
-                                borderColor: 'rgba(191, 152, 83, 0.2)',
+                                borderColor: 'rgba(0, 114, 51, 0.2)',
                               },
                             }),
                             placeholder: (provided) => ({
@@ -473,7 +518,7 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
                               textAlign: 'left',
                               fontWeight: 'normal',
                               fontSize: '15px',
-                              backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                              backgroundColor: state.isFocused ? 'rgba(0, 114, 51, 0.1)' : 'white',
                               color: 'black',
                             }),
                             singleValue: (provided) => ({
@@ -491,11 +536,11 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
                         <select
                           value={filterCategory}
                           onChange={(e) => setFilterCategory(e.target.value)}
-                          className="p-1 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                          className="p-1 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#007233] border-opacity-[20%] focus:outline-none text-xs"
                           placeholder="Category..."
                         >
                           <option value=''>Select Category...</option>
-                          {[...new Set(filteredData.map(item => item.category))].map(category => (
+                          {[...new Set(allPaymentsData.map(item => item.claimData.category))].map(category => (
                             <option key={category} value={category}>{category}</option>
                           ))}
                         </select>
@@ -505,32 +550,43 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
                       <th className="pt-2 pb-2"></th>
                       <th className="pt-2 pb-2"></th>
                       <th className="pt-2 pb-2"></th>
-                </tr>
+                      <th className="pt-2 pb-2"></th>
+                      <th className="pt-2 pb-2"></th>
+                      <th className="pt-2 pb-2"></th>
+                      <th className="pt-2 pb-2"></th>
+                      <th className="pt-2 pb-2"></th>
+                      <th className="pt-2 pb-2"></th>
+                      <th className="pt-2 pb-2"></th>
+                    </tr>
                   )}
-              </thead>
-              <tbody>
-                  {sortedData.map((row, index) => {
-                  const received = receivedAmounts[row.id] || 0;
-                  const discount = discountAmounts[row.id] || 0;
-                    const isClaimed = (received + discount) >= row.amount;
-                  
-                  return (
-                      <tr key={index} className={`even:bg-[#FAF6ED] odd:bg-[#FFFFFF] font-bold text-[14px]`}>
-                      <td className="px-4 py-2">{index + 1}</td>
-                      <td className="px-4 py-2">{formatDateOnly(row.date)}</td>
-                      <td className="px-4 py-2">{row.siteName}</td>
-                      <td className="px-4 py-2">{row.vendor || row.contractor}</td>
-                      <td className="px-4 py-2">{formatIndianCurrency(row.amount)}</td>
-                      <td className="px-4 py-2">{row.category}</td>
-                      <td className="px-4 py-2">{row.comments}</td>
-                        <td className={`px-4 py-2 font-semibold ${isClaimed ? 'text-[#007233]' : 'text-[#E4572E]'}`}>
-                          {isClaimed ? '✓ Claimed' : 'Not Claimed'}
+                </thead>
+                <tbody>
+                  {sortedData.map((row, index) => (
+                    <tr key={index} className={`even:bg-[#FAF6ED] odd:bg-[#FFFFFF] font-bold text-[13px]`}>
+                      <td className="px-6 py-3 whitespace-nowrap">{index + 1}</td>
+                      <td className="px-6 py-3 whitespace-nowrap">{formatDateOnly(row.claimData.date)}</td>
+                      <td className="px-6 py-3 whitespace-nowrap">{row.claimData.siteName}</td>
+                      <td className="px-6 py-3 whitespace-nowrap">{row.claimData.vendor || row.claimData.contractor}</td>
+                      <td className="px-6 py-3 whitespace-nowrap">{formatIndianCurrency(row.claimData.amount)}</td>
+                      <td className="px-6 py-3 whitespace-nowrap">{row.claimData.category}</td>
+                      <td className="px-6 py-3 whitespace-nowrap">{row.claimData.eno}</td>
+                      <td className="px-6 py-3 whitespace-nowrap">{formatDateOnly(row.date)}</td>
+                      <td className="px-6 py-3 whitespace-nowrap">{formatIndianCurrency(row.amount)}</td>
+                      <td className="px-6 py-3 whitespace-nowrap text-orange-600">
+                        {row.discount_amount > 0 ? formatIndianCurrency(row.discount_amount) : '-'}
                       </td>
-                      <td className="px-4 py-2">{row.eno}</td>
-                      <td className="px-4 py-2">
-                        {row.billCopy ? (
+                      <td className="px-6 py-3 whitespace-nowrap">{row.payment_mode}</td>
+                      <td className="px-6 py-3 whitespace-nowrap">{row.cheque_number || '-'}</td>
+                      <td className="px-6 py-3 whitespace-nowrap">
+                        {row.cheque_date ? formatDateOnly(row.cheque_date) : '-'}
+                      </td>
+                      <td className="px-6 py-3 whitespace-nowrap">{row.transaction_number || '-'}</td>
+                      <td className="px-6 py-3 whitespace-nowrap">{row.account_number || '-'}</td>
+                      <td className="px-6 py-3 whitespace-nowrap text-[#007233]">{row.entered_by || '-'}</td>
+                      <td className="px-6 py-3 whitespace-nowrap">
+                        {row.claimData.billCopy ? (
                           <a
-                            href={row.billCopy}
+                            href={row.claimData.billCopy}
                             className="text-red-500 underline"
                             target="_blank"
                             rel="noopener noreferrer"
@@ -538,138 +594,19 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
                             View
                           </a>
                         ) : (
-                          <span></span>
+                          <span>-</span>
                         )}
                       </td>
-                        <td className="px-4 py-2">
-                          <button
-                            onClick={() => handleViewDetails(row)}
-                            className="border px-3 py-1 rounded-full bg-[#BF9853] text-white hover:bg-[#a57f3f]"
-                          >
-                            Details
-                          </button>
-                        </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        </div>
-        {/* Details Modal */}
-        {showModal && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-            <div className="bg-white text-left rounded-xl p-6 w-[900px] max-h-[700px] flex flex-col">
-              <h3 className="text-lg font-semibold mb-4 text-center">Claim Payment Details</h3>
-                    <div className="flex-1 overflow-y-auto">
-                <div className="space-y-4">
-                  {/* Claim Information */}
-                  <div className="border-2 border-[#BF9853] border-opacity-25 rounded-lg p-4">
-                    <h4 className="text-md font-semibold mb-3 text-[#BF9853]">Claim Information</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                              <div>
-                        <span className="text-gray-600 text-sm">Date:</span>
-                        <p className="font-semibold">{formatDateOnly(selectedRow.date)}</p>
-                    </div>
-                              <div>
-                        <span className="text-gray-600 text-sm">Project:</span>
-                        <p className="font-semibold">{selectedRow.siteName}</p>
-                    </div>
-                              <div>
-                        <span className="text-gray-600 text-sm">Party Name:</span>
-                        <p className="font-semibold">{selectedRow.vendor || selectedRow.contractor}</p>
-                            </div>
-                                        <div>
-                        <span className="text-gray-600 text-sm">Category:</span>
-                        <p className="font-semibold">{selectedRow.category}</p>
-                                        </div>
-                                        <div>
-                        <span className="text-gray-600 text-sm">Total Amount:</span>
-                        <p className="font-semibold text-[#BF9853]">{formatIndianCurrency(selectedRow.amount)}</p>
-                                      </div>
-                                      <div>
-                        <span className="text-gray-600 text-sm">E.No:</span>
-                        <p className="font-semibold">{selectedRow.eno}</p>
-                                      </div>
-                      {selectedRow.comments && (
-                        <div className="col-span-2">
-                          <span className="text-gray-600 text-sm">Reason:</span>
-                          <p className="font-semibold">{selectedRow.comments}</p>
-                                </div>
-                              )}
-                          </div>
-                        </div>
-
-                  {/* Payment History */}
-                        <div>
-                    <h4 className="text-md font-semibold mb-3 text-[#BF9853]">Payment History ({claimPaymentsData.length})</h4>
-                    <div className="space-y-3 max-h-[350px] overflow-y-auto">
-                              {claimPaymentsData.map((payment, index) => (
-                        <div key={index} className="border-2 border-[#BF9853] border-opacity-25 rounded-lg p-4">
-                                    <div className="grid grid-cols-3 gap-4">
-                                      <div>
-                              <span className="text-gray-600 text-sm">Date:</span>
-                              <p className="font-semibold">{formatDateOnly(payment.date)}</p>
-                                      </div>
-                                      <div>
-                              <span className="text-gray-600 text-sm">Amount:</span>
-                              <p className="font-semibold">{formatIndianCurrency(payment.amount)}</p>
-                                      </div>
-                                      <div>
-                              <span className="text-gray-600 text-sm">Mode:</span>
-                              <p className="font-semibold">{payment.payment_mode}</p>
-                                        </div>
-                            {payment.discount_amount > 0 && (
-                              <div>
-                                <span className="text-gray-600 text-sm">Discount:</span>
-                                <p className="font-semibold text-orange-600">{formatIndianCurrency(payment.discount_amount)}</p>
-                                      </div>
-                            )}
-                            {payment.cheque_number && (
-                              <>
-                                <div>
-                                  <span className="text-gray-600 text-sm">Cheque No:</span>
-                                  <p className="font-semibold">{payment.cheque_number}</p>
-                                    </div>
-                                                <div>
-                                  <span className="text-gray-600 text-sm">Cheque Date:</span>
-                                  <p className="font-semibold">{formatDateOnly(payment.cheque_date)}</p>
-                                                </div>
-                              </>
-                            )}
-                            {payment.transaction_number && (
-                                                <div>
-                                <span className="text-gray-600 text-sm">Transaction No:</span>
-                                <p className="font-semibold">{payment.transaction_number}</p>
-                                              </div>
-                                            )}
-                            {payment.account_number && (
-                                              <div>
-                                <span className="text-gray-600 text-sm">Account No:</span>
-                                <p className="font-semibold">{payment.account_number}</p>
-                                        </div>
-                                      )}
-                                  </div>
-                                </div>
-                              ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-gray-200">
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 bg-[#BF9853] text-white rounded-lg hover:bg-[#a57f3f]"
-                >
-                  Close
-                </button>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
-        )}
+        </div>
       </div>
     </body>
-  )
+  );
 }
-export default ClaimPaymentTableView
+
+export default ClaimPaymentClaimHistory;

@@ -555,6 +555,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
   const customStyles = useMemo(() => ({
     control: (provided, state) => ({
       ...provided,
+      height: '45px',
       borderWidth: '2px',
       borderRadius: '8px',
       borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'rgba(191, 152, 83, 0.2)',
@@ -699,7 +700,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
         throw new Error(`Failed to save loan: ${response.status}`);
       }
       const loanResult = await response.json();
-      
+
       // If payment mode is GPay, PhonePe, Net Banking, or Cheque, also save to weekly-payment-bills
       if (selectedLoanType === "Loan" && ["GPay", "PhonePe", "Net Banking", "Cheque"].includes(paymentMode)) {
         const weeklyPaymentBillPayload = {
@@ -731,7 +732,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
           weeklyPaymentBillPayload,
           { headers: { "Content-Type": "application/json" } }
         );
-        
+
         toast.success("Loan saved successfully and added to Weekly Payment Bills!", {
           position: "top-center",
           autoClose: 3000,
@@ -744,7 +745,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
           theme: "colored"
         });
       }
-      
+
       // Reset payment popup data and close modal
       setPaymentPopupData({
         chequeNo: "",
@@ -753,7 +754,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
         accountNumber: ""
       });
       setShowPaymentModal(false);
-      
+
       // Reset form fields
       setAmountGiven('');
       setTransferAmount('');
@@ -762,7 +763,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-      
+
       // Refresh loan data to show the new entry
       setTimeout(async () => {
         try {
@@ -903,7 +904,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
       })
       .reduce((sum, entry) => {
         if (entry.type === 'Refund') {
-          return sum; 
+          return sum;
         } else {
           const amount = Math.abs(parseFloat(entry.amount) || 0);
           return sum + amount;
@@ -976,16 +977,16 @@ const LoanPortal = ({ username, userRoles = [] }) => {
   return (
     <body>
       <div>
-        <div className='mr-8 ml-8'>
-          <div className='bg-white w-full max-w-[1850px]  p-4 text-left'>
-            <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4'>
+        <div className='mr-10 ml-10'>
+          <div className=' flex gap-10 text-left'>
+            <div className='bg-white w-full max-w-[1210px] p-4 rounded-md h-[128px] flex gap-[16px]'>
               <div className='space-y-2'>
                 <h2 className='font-semibold text-sm sm:text-base'>From Date</h2>
                 <input
                   type='date'
                   value={fromDate}
                   onChange={(e) => setFromDate(e.target.value)}
-                  className='border-2 border-[#BF9853] border-opacity-30 rounded-lg pl-3 w-full h-[45px] focus:outline-none text-sm'
+                  className='border-2 border-[#BF9853] border-opacity-30 rounded-lg px-2 py-1 w-[168px] h-[45px] focus:outline-none text-sm'
                 />
               </div>
               <div className='space-y-2'>
@@ -994,7 +995,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                   type='date'
                   value={toDate}
                   onChange={(e) => setToDate(e.target.value)}
-                  className='border-2 border-[#BF9853] border-opacity-30 rounded-lg pl-3 w-full h-[45px] focus:outline-none text-sm'
+                  className='border-2 border-[#BF9853] border-opacity-30 rounded-lg px-2 py-1 w-[168px] h-[45px] focus:outline-none text-sm'
                 />
               </div>
               <div className='space-y-2'>
@@ -1002,7 +1003,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                 <input
                   readOnly
                   value={filteredAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                  className='bg-[#F2F2F2] rounded-lg p-2 w-full h-[45px] focus:outline-none text-sm'
+                  className='bg-[#F2F2F2] rounded-lg p-2 w-[107px] h-[45px] focus:outline-none text-sm'
                 />
               </div>
               <div className='space-y-2'>
@@ -1021,24 +1022,26 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                   <option value='Advance Transfer'>Advance Transfer</option>
                 </select>
               </div>
+            </div>
+            <div className='flex bg-white w-[600px] h-[128px] rounded-md p-4 gap-[16px]'>
               <div className='space-y-2'>
                 <h2 className='font-semibold text-sm sm:text-base'>Today Amount</h2>
                 <input readOnly type='text'
                   value={todayAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                  className='bg-[#F2F2F2] rounded-lg p-2 w-full h-[45px] focus:outline-none text-sm'
+                  className='bg-[#F2F2F2] rounded-lg p-2 w-[144px] h-[45px] focus:outline-none text-sm'
                 />
               </div>
               <div className='space-y-2'>
                 <h2 className='font-semibold text-sm sm:text-base'>Total Outstanding</h2>
                 <input readOnly type='text'
                   value={totalOutstanding.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                  className='bg-[#F2F2F2] p-2 rounded-lg w-full h-[45px] focus:outline-none text-sm'
+                  className='bg-[#F2F2F2] p-2 rounded-lg w-[144px] h-[45px] focus:outline-none text-sm'
                 />
               </div>
             </div>
           </div>
         </div>
-        <div className='mx-auto px-4 sm:px-6 lg:px-8 mt-5'>
+        <div className='mx-auto px-5 sm:px-6 lg:px-10 mt-5'>
           <div className='bg-white w-full max-w-[1850px] p-4 lg:p-6 rounded-md shadow-sm'>
             <div className='flex flex-col xl:flex-row gap-6'>
               <div className='flex-1 xl:max-w-[600px]'>
@@ -1084,7 +1087,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                   <div className='space-y-2'>
                     <label className='font-semibold block text-sm sm:text-base'>Purpose</label>
                     <select value={purpose} onChange={(e) => setPurpose(e.target.value)}
-                      className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
+                      className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px- py-2 rounded-lg focus:outline-none text-sm'
                     >
                       <option value=''>Select Purpose</option>
                       {purposeOptions.map(option => (
@@ -1158,7 +1161,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       placeholder="Type your text here..."
-                      className='w-full border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
+                      className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-2 rounded-lg focus:outline-none text-sm'
                     />
                   </div>
                   <div className='col-span-1 sm:col-span-2 space-y-4'>
@@ -1190,7 +1193,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                 </div>
               </div>
               <div className='flex-1 xl:ml-6 xl:min-w-[800px]'>
-                <div className='flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-2'>
+                <div className='flex flex-col sm:flex-row items-start sm:items-center justify-end mb-4 gap-4'>
                   <div className='flex items-center gap-2'>
                     <input
                       readOnly
@@ -1204,68 +1207,72 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                     <span className='text-[#BF9853] font-semibold hover:underline cursor-pointer text-sm'>Print</span>
                   </div>
                 </div>
-                <div className='border-l-8 border-l-[#BF9853] rounded-lg h-[400px] overflow-auto'>
-                  {selectedOption && (
-                    <div className='overflow-x-auto'>
-                      <table className="w-full min-w-[1000px]">
-                        <thead className="bg-[#FAF6ED] text-left">
+                <div className='border-l-8 border-l-[#BF9853] rounded-lg overflow-auto'>
+                  <div className='overflow-x-auto'>
+                    <table className="w-full min-w-[1000px]">
+                      <thead className="bg-[#FAF6ED] text-left">
+                        <tr>
+                          <th className="px-6 py-2 text-xs sm:text-sm w-[130px]">Date</th>
+                          <th className="px-2 py-2 text-xs sm:text-sm w-[250px]">Loan</th>
+                          <th className="px-2 py-2 text-xs sm:text-sm w-[250px]">Transfer/Refund</th>
+                          <th className="px-2 py-2 text-xs sm:text-sm">Mode</th>
+                          <th className="px-2 py-2 text-xs sm:text-sm">Activity</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {!selectedOption ? (
                           <tr>
-                            <th className="px-6 py-2 text-xs sm:text-sm w-[130px]">Date</th>
-                            <th className="px-2 py-2 text-xs sm:text-sm w-[250px]">Loan</th>
-                            <th className="px-2 py-2 text-xs sm:text-sm w-[250px]">Transfer/Refund</th>
-                            <th className="px-2 py-2 text-xs sm:text-sm">Mode</th>
-                            <th className="px-2 py-2 text-xs sm:text-sm">Activity</th>
+                            <td colSpan="5" className="text-center py-4 text-sm text-gray-500">
+                              Please select an associate to view loan records.
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody>
-                          {filteredLoanData.length === 0 ? (
-                            <tr>
-                              <td colSpan="5" className="text-center py-4 text-sm text-gray-500">
-                                No records found for the selected associate and purpose.
-                              </td>
-                            </tr>
-                          ) : (
-                            filteredLoanData.map((entry) => {
-                              const { loanPortalId, date, amount, loan_refund_amount, loan_payment_mode, type } = entry;
-                              const formattedDate = date ? new Date(date).toLocaleDateString('en-GB') : '';
+                        ) : filteredLoanData.length === 0 ? (
+                          <tr>
+                            <td colSpan="5" className="text-center py-4 text-sm text-gray-500">
+                              No records found for the selected associate and purpose.
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredLoanData.map((entry) => {
+                            const { loanPortalId, date, amount, loan_refund_amount, loan_payment_mode, type } = entry;
+                            const formattedDate = date ? new Date(date).toLocaleDateString('en-GB') : '';
 
-                               // Show refund amount as negative value in Loan column for Refund type, otherwise normal amount
-                               const displayAmount =
-                                 type === 'Refund'
-                                   ? loan_refund_amount != null
-                                     ? (-Math.abs(loan_refund_amount)).toLocaleString('en-IN')
-                                     : ''
-                                   : amount != null
-                                     ? parseFloat(amount).toLocaleString('en-IN')
-                                     : '';
+                            // Show refund amount as negative value in Loan column for Refund type, otherwise normal amount
+                            const displayAmount =
+                              type === 'Refund'
+                                ? loan_refund_amount != null
+                                  ? (-Math.abs(loan_refund_amount)).toLocaleString('en-IN')
+                                  : ''
+                                : amount != null
+                                  ? parseFloat(amount).toLocaleString('en-IN')
+                                  : '';
 
-                              return (
-                                <tr key={loanPortalId}>
-                                  <td className="px-2 py-2 text-xs sm:text-sm font-semibold w-[120px]">{formattedDate}</td>
-                                  <td className={`px-2 py-2 text-xs sm:text-sm text-left font-semibold w-[150px] ${type === 'Refund' ? 'text-red-600' : 'text-green-600'}`}>
-                                    {displayAmount}
-                                  </td>
-                                  <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold">
-                                    {type === 'Refund' ? 'Refund' : type === 'Transfer' ? getTransferDestination(entry) : ''}
-                                  </td>
-                                  <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold">{loan_payment_mode || ''}</td>
-                                  <td className="px-2 py-2 w-[120px]">
-                                    <button className="rounded-full transition duration-200" onClick={() => handleEditClick(entry)}>
-                                      <img
-                                        src={edit}
-                                        alt="Edit"
-                                        className="w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200"
-                                      />
-                                    </button>
-                                  </td>
-                                </tr>
-                              );
-                            })
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                            return (
+                              <tr key={loanPortalId}>
+                                <td className="px-2 py-2 text-xs sm:text-sm font-semibold w-[120px]">{formattedDate}</td>
+                                <td className={`px-2 py-2 text-xs sm:text-sm text-left font-semibold w-[150px] ${type === 'Refund' ? 'text-red-600' : 'text-green-600'}`}>
+                                  {displayAmount}
+                                </td>
+                                <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold">
+                                  {type === 'Refund' ? 'Refund' : type === 'Transfer' ? getTransferDestination(entry) : ''}
+                                </td>
+                                <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold">{loan_payment_mode || ''}</td>
+                                <td className="px-2 py-2 w-[120px]">
+                                  <button className="rounded-full transition duration-200" onClick={() => handleEditClick(entry)}>
+                                    <img
+                                      src={edit}
+                                      alt="Edit"
+                                      className="w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200"
+                                    />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1377,7 +1384,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                       </div>
                     </div>
                   </div>
-                  
+
                   {(paymentMode === "GPay" || paymentMode === "PhonePe" ||
                     paymentMode === "Net Banking" || paymentMode === "Cheque") && (
                       <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
@@ -1436,7 +1443,7 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                 </div>
               </div>
               <div className="flex justify-end gap-3 mt-4">
-                <button 
+                <button
                   onClick={() => {
                     setShowPaymentModal(false);
                     setPaymentPopupData({
@@ -1445,13 +1452,13 @@ const LoanPortal = ({ username, userRoles = [] }) => {
                       transactionNumber: "",
                       accountNumber: ""
                     });
-                  }} 
+                  }}
                   className="w-[100px] h-[45px] border border-[#BF9853] rounded"
                 >
                   Cancel
                 </button>
-                <button 
-                  onClick={handlePaymentModalSubmit} 
+                <button
+                  onClick={handlePaymentModalSubmit}
                   className="w-[100px] h-[45px] bg-[#BF9853] text-white rounded"
                 >
                   Submit

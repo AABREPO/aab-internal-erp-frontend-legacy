@@ -345,7 +345,7 @@ const RentalAgreement = () => {
         const centeredLine = formatAgreementDateLine(Agreementcreatedate);
         const centeredTextWidth = doc.getTextWidth(centeredLine);
         const centeredX = (pageWidth - centeredTextWidth) / 2;
-        const enhancedPercentage = Agreementvalidity*5;
+        const enhancedPercentage = Agreementvalidity;
         console.log(enhancedPercentage);
         doc.text(centeredLine, centeredX, cursorY);
         cursorY += lineHeight;
@@ -450,7 +450,7 @@ const RentalAgreement = () => {
             
                       (15) The Tenant shall not claim any compensation or any other amount at the time of vacating the rented portion except the advance amount.
             
-                      (16) The period of tenancy for ${Agreementvalidity} (${agreementValidityInWords}) months, commencing from Rs.${formattedMonthlyRent}/- (${rentInWords} Rupees), rent is to be enhanced ${enhancedPercentage}% for every three years from the previous rent;
+                      (16) The period of tenancy for ${Agreementvalidity} (${agreementValidityInWords}) months, commencing from Rs.${formattedMonthlyRent}/- (${rentInWords} Rupees), rent is to be enhanced ${selectedPercent}% for every three years from the previous rent;
                 `.trim();
 
         const firstLineMargin = 40;

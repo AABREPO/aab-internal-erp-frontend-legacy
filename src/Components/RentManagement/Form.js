@@ -694,6 +694,9 @@ const Form = () => {
         try {
             // First submit the rental form and get the IDs of submitted forms
             const submittedFormIds = await submitRentalForm();
+            // Determine the type based on rent type and refund amount
+            const isShopClosureWithRefund = selectedRentType === "Shop Closure" && weeklyPaymentData.amount && parseFloat(weeklyPaymentData.amount) > 0;
+            const paymentType = isShopClosureWithRefund ? "Rent Payment Refund" : "Rent Payment";            
             // Then submit to weekly payment bills with the rental form ID
             const weeklyPaymentBillPayload = {
                 date: weeklyPaymentData.date,
@@ -702,7 +705,7 @@ const Form = () => {
                 vendor_id: null,
                 employee_id: null,
                 project_id: null,
-                type: "Rent Payment",
+                type: paymentType,
                 bill_payment_mode: weeklyPaymentData.paymentMode,
                 amount: parseFloat(weeklyPaymentData.amount),
                 status: true,
@@ -717,8 +720,7 @@ const Form = () => {
                 account_number: weeklyPaymentData.accountNumber || null,
                 rent_management_id: submittedFormIds.length > 0 ? submittedFormIds[0] : null,
                 tenant_id: selectedTenantId || null,
-                tenant_complex_name: shopInfoMap[formShopNo]?.propertyName || null,
-                
+                tenant_complex_name: shopInfoMap[formShopNo]?.propertyName || null,                
             };
             const weeklyPaymentBillResponse = await fetch(
                 "https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save",
@@ -736,7 +738,9 @@ const Form = () => {
             Swal.fire({
                 icon: 'success',
                 title: 'Success',
-                text: 'Rent payment saved successfully and added to Weekly Payment Bills!',
+                text: isShopClosureWithRefund 
+                    ? 'Rent refund saved successfully and added to Weekly Payment Bills!' 
+                    : 'Rent payment saved successfully and added to Weekly Payment Bills!',
                 confirmButtonColor: '#bf9853'
             });
             // Reset form
@@ -765,7 +769,6 @@ const Form = () => {
             return n + (s[(v - 20) % 10] || s[v] || s[0]);
         };
         const date = `${month} ${getOrdinal(day)} ${year}`;
-
         const rentFormsRes = await fetch("https://backendaab.in/aabuildersDash/api/rental_forms/getAll");
         if (!rentFormsRes.ok) throw new Error("Failed to fetch existing rent forms");
         const rentForms = await rentFormsRes.json();
@@ -915,18 +918,14 @@ const Form = () => {
                         if (savedForm && savedForm.id) {
                             submittedFormIds.push(savedForm.id);
                         }
-                        console.log("✅ Form submitted:", savedForm);
                     } else {
-                        // If response is not JSON, just log it
                         const textResponse = await response.text();
-                        console.log("✅ Form submitted:", textResponse);
                     }
                 } catch (error) {
                     console.log("✅ Form submitted (could not parse response)");
                 }
             }
-        }
-        
+        }        
         // If we couldn't get IDs from the response, fetch the latest forms to get the IDs
         if (submittedFormIds.length === 0 && submissions.length > 0) {
             try {

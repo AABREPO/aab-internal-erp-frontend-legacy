@@ -9,6 +9,16 @@ import NotesEnd from '../Images/notes_end.png';
 import fileUpload from '../Images/file_upload.png';
 import download from '../Images/file_download.png'
 import file from '../Images/file.png';
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
+// Helper function to clean URL by removing surrounding quotes
+function cleanUrl(url) {
+    if (!url) return url;
+    // Remove surrounding quotes if they exist
+    return url.replace(/^["']|["']$/g, '');
+}
+
 // Helper function to get start and end date of ISO week
 function getStartAndEndDateOfISOWeek(weekNo, year) {
     const simple = new Date(year, 0, 1 + (weekNo - 1) * 7);
@@ -300,6 +310,11 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     const [currentFileRow, setCurrentFileRow] = useState(null);
     const [selectedFileForPopup, setSelectedFileForPopup] = useState(null);
     const [accountDetails, setAccountDetails] = useState([]);
+    // Category selection popup states
+    const [showCategoryPopup, setShowCategoryPopup] = useState(false);
+    const [categoryOptions, setCategoryOptions] = useState([]);
+    const [selectedCategory, setSelectedCategory] = useState(null);
+    const [isConfirmingCategory, setIsConfirmingCategory] = useState(false);
     // Weekly Payment Bill Data List states
 
     const [showPaymentDetailsPopup, setShowPaymentDetailsPopup] = useState(false);
@@ -390,12 +405,12 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 contractorOptions.find(opt => opt.id === Number(currentFileRow.contractor_id))?.label ||
                 employeeOptions.find(opt => opt.id === Number(currentFileRow.employee_id))?.label ||
                 "";
-            
+
             const formData = new FormData();
             const finalName = `${currentFileRow.date}-${siteNo}-${name}`;
             formData.append("file", selectedFileForPopup);
             formData.append("file_name", finalName);
-            
+
             const uploadResponse = await fetch(
                 "https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive",
                 {
@@ -403,36 +418,36 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     body: formData,
                 }
             );
-            
+
             if (!uploadResponse.ok) {
                 throw new Error("File upload failed");
             }
-            
+
             const uploadResult = await uploadResponse.json();
             const pdfUrl = uploadResult.url;
-            
+
             // Update the bill copy URL using the weekly expenses API
             const updateResponse = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/${currentFileRow.id}/bill-copy-url`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(pdfUrl)
+                body: JSON.stringify({ billCopyUrl: pdfUrl })
             });
-            
+
             if (!updateResponse.ok) {
                 throw new Error("Failed to update bill copy URL");
             }
-            
+
             // Update local state
             setExpenses((prev) =>
                 prev.map((exp) => (exp.id === currentFileRow.id ? { ...exp, bill_copy_url: pdfUrl } : exp))
             );
-            
+
             setFileUploadPopup(false);
             setCurrentFileRow(null);
             setSelectedFileForPopup(null);
-            
+
             // Show success message
             setPopup({
                 show: true,
@@ -440,7 +455,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 type: "success",
                 dateStr: new Date().toLocaleDateString('en-GB')
             });
-            
+
         } catch (error) {
             console.error("Error uploading file:", error);
             setPopup({
@@ -658,6 +673,9 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     useEffect(() => {
         fetchAccountDetails();
     }, []);
+    useEffect(() => {
+        fetchCategories();
+    }, []);
     const fetchWeeklyType = async () => {
         try {
             const response = await fetch('https://backendaab.in/aabuildersDash/api/weekly_types/getAll');
@@ -684,6 +702,30 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             }
         } catch (error) {
             console.error('Error fetching account details:', error);
+        }
+    };
+
+    const fetchCategories = async () => {
+        try {
+            const response = await fetch("https://backendaab.in/aabuilderDash/api/expenses_categories/getAll", {
+                method: "GET",
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            });
+            if (!response.ok) {
+                throw new Error("Network response was not ok: " + response.statusText);
+            }
+            const data = await response.json();
+            const formattedData = data.map(item => ({
+                id: item.id,
+                value: item.category,
+                label: item.category,
+            }));
+            setCategoryOptions(formattedData);
+        } catch (error) {
+            console.error("Fetch error: ", error);
         }
     };
     const fetchCurrentWeekNumber = useCallback(() => {
@@ -1493,6 +1535,606 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             alert("Failed to update description");
         }
     };
+
+    // PDF Generation function
+    const generatePDF = () => {
+        // Safety check for currentWeekNumber
+        if (!currentWeekNumber) {
+            alert("Please ensure week data is loaded before generating the PDF.");
+            return;
+        }
+
+        const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const year = new Date().getFullYear();
+
+        // Get week dates
+        const weekDates = getStartAndEndDateOfISOWeek(currentWeekNumber, year);
+        const weekStartDate = weekDates.startDate.toLocaleDateString("en-GB");
+        const weekEndDate = weekDates.endDate.toLocaleDateString("en-GB");
+
+        // Safety check for expenses and payments arrays
+        if (!Array.isArray(expenses) || !Array.isArray(payments)) {
+            alert("Error: Data not loaded properly. Please refresh the page and try again.");
+            return;
+        }
+
+        const totalExpenses = filteredExpenses.reduce((t, e) => t + Number(e.amount || 0), 0);
+        const totalPayments = payments.reduce((t, p) => t + Number(p.amount || 0), 0);
+        const balance = totalPayments - totalExpenses;
+
+        // Helper function to format date
+        const formatDateOnly = (dateString) => {
+            if (!dateString) return "";
+            try {
+                const date = new Date(dateString);
+                if (isNaN(date.getTime())) return "";
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const year = date.getFullYear();
+                return `${day}-${month}-${year}`;
+            } catch (error) {
+                console.error("Error formatting date:", error);
+                return "";
+            }
+        };
+
+        // Helper function to format date with time
+        const formatDate = (dateString) => {
+            if (!dateString) return "";
+            try {
+                const date = new Date(dateString);
+                if (isNaN(date.getTime())) return "";
+                date.setMinutes(date.getMinutes());
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const year = date.getFullYear();
+                let hours = date.getHours();
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                hours = hours % 12;
+                hours = hours ? String(hours).padStart(2, '0') : '12';
+                return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+            } catch (error) {
+                console.error("Error formatting date:", error);
+                return "";
+            }
+        };
+
+        // ===== FUNCTION TO DRAW HEADER =====
+        const drawHeader = (doc, titleText = "") => {
+            doc.setFontSize(10);
+            doc.setTextColor(0, 0, 0);
+            // Outer rectangle + lines
+            doc.rect(20, 24, 810, 40);
+            // PS label
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(10);
+            doc.text(`PS: ${String(currentWeekNumber || "")}`, 30, 40);
+            // Current Date under PS
+            doc.setFontSize(9);
+            doc.text(String(new Date().toLocaleDateString("en-GB") || ""), 30, 55);
+            // Main Title (dynamic)
+            doc.setFontSize(14);
+            doc.setFont("helvetica", "bold");
+            doc.text(titleText, 180, 50);
+            // Dates stacked
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(10);
+            doc.text(`START  ${String(weekStartDate || "")}`, 460, 40);
+            doc.text(`END    ${String(weekEndDate || "")}`, 465, 58);
+            // === Expenses with green background ===
+            doc.setFillColor(220, 250, 220); // light green
+            doc.rect(620, 25, 190, 18.5, "F"); // background box for Balance
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text("EXPENSES", 660, 37);
+            doc.text(
+                String(totalExpenses.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
+                730, 37
+            );
+            // === Balance with pink background ===
+            doc.setFillColor(250, 220, 220); // light pink
+            doc.rect(620, 44, 190, 18.5, "F"); // background box for Expenses
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text("BALANCE", 660, 58);
+            doc.text(
+                String(balance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
+                740, 58
+            );
+        };
+
+        // Draw header on first page with "WEEKLY PAYMENT REPORT"
+        drawHeader(doc, "WEEKLY PAYMENT REPORT");
+
+        // ===== EXPENSES TABLE =====
+        const expensesHeaders = [["SNO", "Date", "Contractor/Vendor", "Site Name", "Type", "Amount", "AC", "C", ""]];
+        // Use the same filtered expenses as the UI, but exclude certain types for PDF
+        const pdfFilteredExpenses = filteredExpenses.filter(row => row.type !== "Project Advance" && row.type !== "Staff Advance" && row.type !== "Staff Salary" && row.type !== "Daily" && row.type !== "Diwali Bonus");
+        const expensesData = pdfFilteredExpenses.map((row, idx) => [
+            String(idx + 1 || ""),
+            String(row.date ? formatDateOnly(row.date) : ""),
+            String(combinedOptions.find(opt =>
+                (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
+                (opt.type === "Vendor" && opt.id === Number(row.vendor_id)) ||
+                (opt.type === "Employee" && opt.id === Number(row.employee_id))
+            )?.label || ""),
+            String(siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""),
+            String(row.type || ""),
+            String(Number(row.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
+            "", "", ""
+        ]);
+
+        autoTable(doc, {
+            head: expensesHeaders,
+            body: expensesData,
+            margin: { top: 64, left: 20 }, // give space for custom header
+            tableWidth: 810,
+            theme: "grid",
+            styles: {
+                fontSize: 8,
+                cellPadding: 3,
+                textColor: [0, 0, 0],
+                lineColor: [0, 0, 0],
+                lineWidth: 0.5
+            },
+            headStyles: {
+                textColor: [0, 0, 0],
+                fillColor: [255, 230, 230],
+                lineColor: [0, 0, 0],
+                lineWidth: 1.0,
+                fontStyle: 'normal'
+            },
+            columnStyles: {
+                5: { halign: 'right' } // Amount column
+            },
+            didDrawPage: (data) => {
+                drawHeader(doc, "WEEKLY PAYMENT REPORT");
+                if (data.pageNumber > 1) {
+                    doc.setFontSize(10);
+                }
+            },
+            // Enable page breaks for large tables
+            pageBreak: 'auto',
+            // Ensure table continues properly on new pages
+            showHead: 'everyPage',
+        });
+
+        // ===== PAYMENTS TABLE =====
+        const paymentsHeaders = [["DATE RECEIVED", "AMOUNT", "TYPE"]];
+        const paymentsData = payments.map(r => [
+            String(r.created_at ? formatDate(r.created_at) : ""),
+            String(Number(r.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
+            String(r.type || "")
+        ]);
+        paymentsData.push([
+            { content: "TOTAL", styles: { fontStyle: "bold" } },
+            { content: String(totalPayments.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"), styles: { fontStyle: "bold" } },
+            { content: "", styles: { fontStyle: "bold" } }
+        ]);
+        paymentsData.push([
+            { content: "BALANCE", styles: { fontStyle: "bold" } },
+            { content: String(balance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"), styles: { fontStyle: "bold" } },
+            { content: "", styles: { fontStyle: "bold" } }
+        ]);
+
+        // ===== NEW PAGE for remaining tables =====
+        doc.addPage();
+        drawHeader(doc, "WEEKLY PAYMENT STATEMENT");
+        const baseY = 110;
+
+        // Add heading for payments table
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("PAYMENT RECEIVED", 22, baseY - 25);
+
+        autoTable(doc, {
+            head: paymentsHeaders,
+            body: paymentsData,
+            startY: baseY - 20,
+            margin: { left: 20 },
+            tableWidth: 210,
+            theme: "grid",
+            styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
+            headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+            bodyStyles: { fontStyle: 'bold' },
+            columnStyles: {
+                1: { halign: 'right' } // Amount column
+            },
+            didDrawPage: () => {
+                drawHeader(doc);
+            }
+        });
+
+        // ----- HANDOVER DETAILS -----
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("HANDOVER DETAILS", 22, baseY + 250);
+        autoTable(doc, {
+            head: [["DATE RETURNED", "AMOUNT"]],
+            body: [
+                ["", ""],
+                ["RETURNED", "0"]
+            ],
+            startY: baseY + 255,
+            margin: { left: 22 },
+            tableWidth: 200,
+            theme: "grid",
+            styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
+            headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+            bodyStyles: { fontStyle: 'bold' },
+            columnStyles: {
+                1: { halign: 'right' } // Amount column
+            },
+            didDrawPage: () => {
+                drawHeader(doc);
+            }
+        });
+
+        // ===== DRAW VERTICAL DIVIDER AFTER HANDOVER DETAILS =====
+        const dividerX = 260;  // adjust X position as needed
+        const headerBottomY = 65; // header ends at y=24+55=79
+        const pageHeight = doc.internal.pageSize.getHeight();
+        // Draw vertical line (from bottom of header box down to page bottom margin)
+        doc.setDrawColor(0, 0, 0);  // black
+        doc.setLineWidth(0.5);
+        doc.line(dividerX, headerBottomY, dividerX, pageHeight - 0);
+
+        // ----- EXTRA -----
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        // Filter for Daily type expenses
+        const dailyExpenses = filteredExpenses.filter(expense => expense.type === "Daily");
+        const dailyExpenseData = dailyExpenses.map(expense => [
+            String(expense.date ? formatDateOnly(expense.date) : ""), // Date in first column
+            String(Number(expense.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00") // Amount in second column
+        ]);
+
+        // Calculate total of daily expenses
+        const dailyExpensesTotal = dailyExpenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
+
+        // If no daily expenses, show a message
+        if (dailyExpenseData.length === 0) {
+            dailyExpenseData.push(["No Daily Expenses", "0.00"]);
+        }
+
+        autoTable(doc, {
+            head: [["DAILY WAGE", "AMOUNT"]],
+            body: dailyExpenseData,
+            startY: baseY + 210,
+            margin: { left: 300 },
+            tableWidth: 200,
+            theme: "grid",
+            styles: {
+                fontSize: 8,
+                cellPadding: 3,
+                textColor: [0, 0, 0],
+                lineColor: [0, 0, 0],
+                lineWidth: 0.5
+            },
+            headStyles: {
+                textColor: [0, 0, 0],
+                fillColor: [255, 230, 230],
+                lineColor: [0, 0, 0],
+                lineWidth: 1,
+                fontStyle: 'bold',
+                halign: 'left'  // <-- aligns header cells to the right
+            },
+            bodyStyles: {
+                fontStyle: 'bold'
+            },
+            columnStyles: {
+                0: { halign: 'left' },   // First column stays left-aligned
+                1: { halign: 'right' }   // Second column (amount) right-aligned
+            },
+            didDrawPage: () => {
+                drawHeader(doc);
+            }
+        });
+
+        // ===== BOX NEXT TO DAILY WAGE =====
+        const dailyWageTable = doc.lastAutoTable;
+        if (dailyWageTable) {
+            // Position the box at the same Y as the Daily Wage table
+            const boxY = dailyWageTable.finalY + 2; // small spacing below table
+            const boxX = 300;  // to the right of the Daily Wage table
+            const boxWidth = 200;
+            const boxHeight = 20;
+            const splitX = boxX + 114; // divider inside the box
+
+            // Draw rectangle
+            doc.rect(boxX, boxY, boxWidth, boxHeight);
+            // Divider line inside box
+            doc.line(splitX, boxY, splitX, boxY + boxHeight);
+            // Add "TOTAL" text on left
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.text("TOTAL", boxX + 10, boxY + 13); // 10pt padding left, vertically centered
+            // Add total amount on right, right-aligned inside box
+            doc.text(
+                String(dailyExpensesTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })),
+                boxX + boxWidth - 10,
+                boxY + 13,
+                { align: "right" }
+            );
+        }
+
+        // ----- SUMMARY -----
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("EXPENDITURE PAYMENTS", 300, baseY - 25);
+
+        // Initialize summaryMap with all weeklyTypes (with 0 count and 0 total)
+        const summaryMap = weeklyTypes.reduce((acc, typeObj) => {
+            acc[typeObj.type] = { count: 0, total: 0 };
+            return acc;
+        }, {});
+
+        // Populate summaryMap with actual expense data (including expenses with amount > 0)
+        filteredExpenses
+            .filter(expense => Number(expense.amount) > 0)
+            .forEach(expense => {
+                const type = expense.type;
+                const amount = Number(expense.amount);
+                if (summaryMap[type]) {
+                    summaryMap[type].count += 1;
+                    summaryMap[type].total += amount;
+                }
+            });
+
+        const summaryData = Object.entries(summaryMap)
+            .map(([type, { count, total }]) => [
+                String(type || ""),
+                String(Number(total || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
+                count,
+                total // Keep original total for sorting
+            ])
+            .sort((a, b) => {
+                // Sort by total amount: non-zero amounts first, then zero amounts
+                const totalA = Number(a[3]);
+                const totalB = Number(b[3]);
+
+                if (totalA === 0 && totalB === 0) {
+                    // Both are zero, sort alphabetically by type name
+                    return a[0].localeCompare(b[0]);
+                } else if (totalA === 0) {
+                    // A is zero, B is not - put A after B
+                    return 1;
+                } else if (totalB === 0) {
+                    // B is zero, A is not - put B after A
+                    return -1;
+                } else {
+                    // Both are non-zero, sort by amount descending
+                    return totalB - totalA;
+                }
+            })
+            .map(([type, formattedTotal, count, originalTotal]) => [
+                type,
+                formattedTotal,
+                count
+            ]); // Remove the original total from final array
+
+        autoTable(doc, {
+            head: [["SUMMARY", "TOTAL"]],
+            body: summaryData.map(r => [String(r[0] || ""), String(r[1] || "0")]),
+            startY: baseY - 20,
+            margin: { left: 300 },
+            tableWidth: 200,
+            theme: "grid",
+            styles: { fontSize: 9, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
+            headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+            bodyStyles: { fontStyle: 'bold' },
+            columnStyles: {
+                1: { halign: 'right' } // Amount column
+            },
+            didDrawPage: () => {
+                drawHeader(doc);
+            },
+            didDrawCell: (data) => {
+                // Only for body rows in first column
+                if (data.section === 'body' && data.column.index === 0 && data.row && data.row.index !== undefined) {
+                    const rowData = summaryData[data.row.index];
+                    if (rowData && rowData[2] !== undefined) {
+                        const count = rowData[2];  // third element = count
+                        if (data.cell && typeof data.cell.x === 'number' && typeof data.cell.y === 'number' && typeof data.cell.height === 'number') {
+                            const textX = data.cell.x - 3; // 10pt to the left of table
+                            const textY = data.cell.y + data.cell.height / 2 + 2; // vertical centering
+                            doc.setFontSize(9);
+                            doc.text(String(count || "0"), textX, textY, { align: 'right' });
+                        }
+                    }
+                }
+            }
+        });
+
+        // draw counts outside table
+        const summaryTable = doc.lastAutoTable;
+        if (summaryTable && summaryTable.body && Array.isArray(summaryTable.body)) {
+            summaryData.forEach((row, i) => {
+                const count = row[2];
+                if (count > 1 && summaryTable.body[i] && typeof summaryTable.body[i].y === 'number') {
+                    const rowY = summaryTable.body[i].y + 6;
+                    const leftX = (summaryTable.settings && summaryTable.settings.margin && summaryTable.settings.margin.left) ? summaryTable.settings.margin.left - 15 : 285;
+                    doc.setFontSize(9);
+                    doc.text(String(count || ""), leftX, rowY, { align: "right" });
+                }
+            });
+        }
+
+        const summaryTotal = summaryData.reduce((acc, row) => acc + Number(String(row[1] || "0").replace(/,/g, "")), 0);
+        const summaryBoxY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 15 : baseY + 100;
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.rect(300, summaryBoxY - 12, 200, 20);
+        const splitX = 420;
+        doc.line(splitX, summaryBoxY - 12, splitX, summaryBoxY + 8);
+        doc.text("TOTAL", 310, summaryBoxY + 3);
+        doc.text(
+            String(summaryTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
+            490,
+            summaryBoxY + 3,
+            { align: "right" }
+        );
+
+        const newTableX = 520;
+        let newTableY = baseY;
+
+        // Staff Advance table
+        const staffAdvanceEntries = filteredExpenses.filter(e => e.type === "Staff Advance");
+        const staffAdvanceCount = staffAdvanceEntries.length;
+        const staffAdvanceTotal = staffAdvanceEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+        const staffAdvanceHead = [[
+            String(staffAdvanceCount || "0"),
+            "STAFF ADVANCE",
+            "PROJECT NAME",
+            String(staffAdvanceTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+        ]];
+        const staffAdvanceBody = staffAdvanceEntries.map(e => [
+            String(e.date ? formatDateOnly(e.date) : ""),
+            String(combinedOptions.find(opt =>
+                (opt.type === "Contractor" && opt.id === Number(e.contractor_id)) ||
+                (opt.type === "Vendor" && opt.id === Number(e.vendor_id)) ||
+                (opt.type === "Employee" && opt.id === Number(e.employee_id))
+            )?.label || ""),
+            String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
+            String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+        ]);
+
+        autoTable(doc, {
+            head: staffAdvanceHead,
+            body: staffAdvanceBody,
+            startY: newTableY - 20,
+            margin: { left: newTableX },
+            tableWidth: 310,
+            theme: "grid",
+            styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
+            headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+            bodyStyles: { fontStyle: 'bold' },
+            columnStyles: {
+                3: { halign: 'right' }
+            },
+            didParseCell: (data) => {
+                if (data.section === 'head' && data.column.index === 3) {
+                    data.cell.styles.halign = 'right';
+                }
+            },
+            didDrawPage: () => {
+                drawHeader(doc);
+            }
+        });
+
+        newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
+
+        // Staff Salary table
+        const staffSalaryEntries = filteredExpenses.filter(e => e.type === "Staff Salary");
+        const staffSalaryCount = staffSalaryEntries.length;
+        const staffSalaryTotal = staffSalaryEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+        const staffSalaryHead = [[
+            String(staffSalaryCount || "0"),
+            "STAFF SALARY",
+            "PROJECT NAME",
+            String(staffSalaryTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+        ]];
+        const staffSalaryBody = staffSalaryEntries.map(e => [
+            String(e.date ? formatDateOnly(e.date) : ""),
+            String(combinedOptions.find(opt =>
+                (opt.type === "Contractor" && opt.id === Number(e.contractor_id)) ||
+                (opt.type === "Vendor" && opt.id === Number(e.vendor_id)) ||
+                (opt.type === "Employee" && opt.id === Number(e.employee_id))
+            )?.label || ""),
+            String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
+            String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+        ]);
+
+        autoTable(doc, {
+            head: staffSalaryHead,
+            body: staffSalaryBody,
+            startY: newTableY,
+            margin: { left: newTableX },
+            tableWidth: 310,
+            theme: "grid",
+            styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
+            headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+            bodyStyles: { fontStyle: 'bold' },
+            columnStyles: {
+                1: { halign: 'right' }
+            },
+            didDrawPage: () => {
+                drawHeader(doc);
+            }
+        });
+
+        newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
+
+        // Filter for Diwali Bonus type expenses
+        const diwaliBonusEntries = filteredExpenses.filter(e => e.type === "Diwali Bonus");
+        const diwaliBonusCount = diwaliBonusEntries.length;
+        const diwaliBonusTotal = diwaliBonusEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+        // Position Diwali Bonus table below Staff Salary table with proper spacing
+        const diwaliBonusY = newTableY + 30; // Add extra spacing to avoid overlap
+
+        // Add heading for Diwali Bonus table
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("DIWALI BONUS", newTableX, diwaliBonusY - 25);
+
+        const diwaliBonusHead = [[
+            String(diwaliBonusCount || "0"),
+            "NAME",
+            "AMOUNT",
+            String(diwaliBonusTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+        ]];
+        const diwaliBonusBody = diwaliBonusEntries.map(e => [
+            String(e.date ? formatDateOnly(e.date) : ""),
+            String(combinedOptions.find(opt =>
+                (opt.type === "Contractor" && opt.id === Number(e.contractor_id)) ||
+                (opt.type === "Vendor" && opt.id === Number(e.vendor_id)) ||
+                (opt.type === "Employee" && opt.id === Number(e.employee_id))
+            )?.label || ""),
+            String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
+            ""
+        ]);
+
+        autoTable(doc, {
+            head: diwaliBonusHead,
+            body: diwaliBonusBody,
+            startY: diwaliBonusY - 20,
+            margin: { left: newTableX },
+            tableWidth: 310,
+            theme: "grid",
+            styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
+            headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+            bodyStyles: { fontStyle: 'bold' },
+            columnStyles: {
+                2: { halign: 'right' },
+                3: { halign: 'right' }
+            },
+            didParseCell: (data) => {
+                if (data.section === 'head' && data.column.index === 3) {
+                    data.cell.styles.halign = 'right';
+                }
+            },
+            didDrawPage: () => {
+                drawHeader(doc);
+            }
+        });
+
+        newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
+
+        const lastPeriodEndDate = expenses
+            .map(exp => exp.period_end_date)
+            .filter(Boolean)
+            .pop();
+
+        newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
+
+        doc.save(`PR ${currentWeekNumber || ""} - Weekly Payment Report ${formatDateOnly(lastPeriodEndDate)}.pdf`);
+    };
+
     return (
         <div>
             <div className="mt-[-28px] flex justify-end mr-5">
@@ -1502,19 +2144,30 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     </span>
                 </h1>
             </div>
+
             <div className="mx-auto w-auto p-6 bg-white ml-[30px] mr-6 rounded-md border border-transparent">
-                <div className="text-left">
-                    <button onClick={() => setShowFilters(!showFilters)}>
-                        <img
-                            src={Filter}
-                            alt="Toggle Filter"
-                            className="w-7 h-7 border border-[#BF9853] rounded-md mb-3"
-                        />
-                    </button>
+                <div className="flex justify-between">
+                    <div className="text-left">
+                        <button onClick={() => setShowFilters(!showFilters)}>
+                            <img
+                                src={Filter}
+                                alt="Toggle Filter"
+                                className="w-7 h-7 border border-[#BF9853] rounded-md mb-3"
+                            />
+                        </button>
+                    </div>
+                    <div className="-mt-4justify-end mr-6">
+                        {(username === 'Admin' || username === 'Mahalingam M') && (
+                            <button className="font-semibold text-lg cursor-pointer flex items-center gap-2" onClick={generatePDF}>
+                                Report
+                                <img className='w-6 h-5' src={download} alt="Download" />
+                            </button>
+                        )}
+                    </div>
                 </div>
-                <div className="w-full mt- flex flex-col xl:flex-row gap-6">
+                <div className="w-full flex flex-col xl:flex-row gap-6">
                     <div className="flex-[3] min-w-0">
-                        <div className="flex justify-between mb-4">
+                        <div className="flex justify-between">
                             <h1 className="font-bold text-xl">PS: {currentWeekNumber ?? "-"}</h1>
                             <h1 className="font-bold text-base">
                                 Expenses: <span style={{ color: "#E4572E" }}>
@@ -2270,7 +2923,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                 )}
                                                                 {row.bill_copy_url ? (
                                                                     <a
-                                                                        href={row.bill_copy_url}
+                                                                        href={cleanUrl(row.bill_copy_url)}
                                                                         target="_blank"
                                                                         rel="noopener noreferrer"
                                                                         className="cursor-pointer ml-3"
@@ -2788,7 +3441,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                 className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
                                                             />
                                                         </div>
-
                                                         {/* Amount */}
                                                         <div>
                                                             <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
@@ -2799,7 +3451,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                 className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
                                                             />
                                                         </div>
-
                                                         {/* Mode */}
                                                         <div>
                                                             <label className="block text-sm font-medium text-gray-700 mb-2">Mode</label>
@@ -2812,7 +3463,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                         </div>
                                                     </div>
                                                 </div>
-
                                                 {/* Second Row: Transaction Number, Account Number, Cheque Fields */}
                                                 <div className="border-2 border-[#BF9853] border-opacity-25 rounded-lg p-4">
                                                     <div className="space-y-4">
@@ -2872,7 +3522,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                 </div>
                             </div>
                         )}
-                        {/* Status Message for Claim type */}
                         {currentProjectAdvanceRow && currentProjectAdvanceRow.type === "Claim" && currentProjectAdvanceRow.send_to_expenses_entry && (
                             <div className="mt-6 p-3 bg-green-50 border border-green-200 rounded-lg">
                                 <div className="text-center">
@@ -2882,109 +3531,19 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                 </div>
                             </div>
                         )}
-
-                        {/* Action Buttons */}
                         <div className="flex justify-between items-center mt-6">
-                            {/* Add To Expense Entry Button - only for Claim type */}
                             {currentProjectAdvanceRow && currentProjectAdvanceRow.type === "Claim" && !currentProjectAdvanceRow.send_to_expenses_entry && (
                                 <button
-                                    onClick={async () => {
-                                        try {
-                                            // First, get the next ENo from the expenses form API
-                                            const enoResponse = await fetch('https://backendaab.in/aabuilderDash/expenses_form/get_form');
-                                            if (!enoResponse.ok) {
-                                                throw new Error('Failed to fetch ENo');
-                                            }
-                                            const enoData = await enoResponse.json();
-                                            const nextEno = enoData.length > 0 ? Math.max(...enoData.map(item => item.eno || 0)) + 1 : 1;
-
-                                            // Prepare expenses form data
-                                            const expensesFormData = {
-                                                accountType: "Claim",
-                                                eno: nextEno,
-                                                date: currentProjectAdvanceRow.date,
-                                                siteName: siteOptions.find(opt => opt.id === Number(currentProjectAdvanceRow.project_id))?.label || "",
-                                                vendor: vendorOptions.find(opt => opt.id === Number(currentProjectAdvanceRow.vendor_id))?.label || "",
-                                                quantity: 1,
-                                                contractor: contractorOptions.find(opt => opt.id === Number(currentProjectAdvanceRow.contractor_id))?.label || "",
-                                                amount: Number(currentProjectAdvanceRow.amount) + previousPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
-                                                category: "Claim",
-                                                comments: `Claim from Weekly Payment `,
-                                                machineTools: "",
-                                                billCopyUrl: currentProjectAdvanceRow.bill_copy_url
-                                            };
-
-                                            // Send data to expenses form API
-                                            const expensesFormResponse = await fetch('https://backendaab.in/aabuilderDash/expenses_form/save', {
-                                                method: 'POST',
-                                                headers: {
-                                                    'Content-Type': 'application/json',
-                                                },
-                                                body: JSON.stringify(expensesFormData)
-                                            });
-
-                                            if (!expensesFormResponse.ok) {
-                                                throw new Error('Failed to save to expenses form');
-                                            }
-
-                                            // Then update the weekly expenses status
-                                            const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/${currentProjectAdvanceRow.id}/send-to-expenses`, {
-                                                method: 'PUT',
-                                                headers: {
-                                                    'Content-Type': 'application/json',
-                                                },
-                                            });
-                                            
-                                            if (response.ok) {
-                                                // Refresh the expenses data from server to get updated status
-                                                await fetchExpenses();
-                                                
-                                                // Update the current row as well
-                                                setCurrentProjectAdvanceRow(prev => ({ ...prev, send_to_expenses_entry: true }));
-                                                
-                                                // Show success message
-                                                setPopup({
-                                                    show: true,
-                                                    message: "Successfully added to expense entry!",
-                                                    type: "success",
-                                                    dateStr: new Date().toLocaleDateString('en-GB')
-                                                });
-                                                
-                                                // Close popup after 2 seconds
-                                                setTimeout(() => {
-                                                    setShowPaymentPopup(false);
-                                                    setPaymentPopupData({
-                                                        date: new Date().toISOString().split('T')[0],
-                                                        amount: "",
-                                                        paymentMode: "",
-                                                        chequeNo: "",
-                                                        chequeDate: "",
-                                                        transactionNumber: "",
-                                                        accountNumber: ""
-                                                    });
-                                                    setPreviousPayments([]);
-                                                    setCurrentProjectAdvanceRow(null);
-                                                }, 2000);
-                                            } else {
-                                                throw new Error('Failed to update expense entry status');
-                                            }
-                                        } catch (error) {
-                                            console.error('Error updating expense entry status:', error);
-                                            setPopup({
-                                                show: true,
-                                                message: "Failed to add to expense entry. Please try again.",
-                                                type: "error",
-                                                dateStr: new Date().toLocaleDateString('en-GB')
-                                            });
-                                        }
+                                    onClick={() => {
+                                        setSelectedCategory(null);
+                                        setIsConfirmingCategory(false);
+                                        setShowCategoryPopup(true);
                                     }}
                                     className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
                                 >
                                     Add To Expense Entry
                                 </button>
                             )}
-
-                            {/* Right side buttons */}
                             <div className="flex gap-3">
                                 <button
                                     onClick={() => {
@@ -3011,11 +3570,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                             if (currentProjectAdvanceRow && paymentPopupData.paymentMode && paymentPopupData.amount) {
                                                 let advancePortalId = null;
                                                 let staffAdvancePortalId = null;
-
-                                                // Handle Project Advance type first
                                                 if (currentProjectAdvanceRow.type === "Project Advance" && currentProjectAdvanceRow.advance_portal_id) {
                                                     try {
-                                                        // Get the last entry number from all advance portal records and add 1
                                                         const res = await fetch("https://backendaab.in/aabuildersDash/api/advance_portal/getAll");
                                                         if (!res.ok) throw new Error("Failed to fetch entry numbers");
                                                         const allData = await res.json();
@@ -3024,7 +3580,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                 ? Math.max(...allData.map((item) => item.entry_no || 0))
                                                                 : 0;
                                                         const nextEntryNo = maxEntryNo + 1;
-                                                        // Get week number
                                                         const getWeekNumber = () => {
                                                             const now = new Date();
                                                             const start = new Date(now.getFullYear(), 0, 1);
@@ -3033,7 +3588,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             const oneWeek = 604800000; // ms in a week
                                                             return Math.floor(diff / oneWeek) + 1;
                                                         };
-                                                        // Get description from portalDescriptions state
                                                         const description = portalDescriptions[currentProjectAdvanceRow.advance_portal_id] || "";
                                                         const advanceUpdateData = {
                                                             type: "Advance",
@@ -3071,11 +3625,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                         console.error("Error updating advance portal payment mode:", error);
                                                     }
                                                 }
-
-                                                // Handle Staff Advance type
                                                 if (currentProjectAdvanceRow.type === "Staff Advance") {
                                                     try {
-                                                        // Get the last entry number from staff-advance/all endpoint
                                                         const staffAdvanceRes = await fetch("https://backendaab.in/aabuildersDash/api/staff-advance/all");
                                                         if (!staffAdvanceRes.ok) throw new Error("Failed to fetch staff advance entry numbers");
                                                         const staffAdvanceData = await staffAdvanceRes.json();
@@ -3084,8 +3635,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                 ? Math.max(...staffAdvanceData.map((item) => item.entry_no || 0))
                                                                 : 0;
                                                         const nextEntryNo = maxEntryNo + 1;
-
-                                                        // Get week number
                                                         const getWeekNumber = () => {
                                                             const now = new Date();
                                                             const start = new Date(now.getFullYear(), 0, 1);
@@ -3094,7 +3643,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             const oneWeek = 604800000; // ms in a week
                                                             return Math.floor(diff / oneWeek) + 1;
                                                         };
-
                                                         const staffAdvanceSaveData = {
                                                             date: paymentPopupData.date,
                                                             employee_id: currentProjectAdvanceRow.employee_id,
@@ -3111,7 +3659,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             labour_id: 0,
                                                             not_allow_to_edit: true
                                                         };
-
                                                         const staffAdvanceResponse = await fetch(
                                                             "https://backendaab.in/aabuildersDash/api/staff-advance/save",
                                                             {
@@ -3120,7 +3667,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                 body: JSON.stringify(staffAdvanceSaveData)
                                                             }
                                                         );
-
                                                         if (!staffAdvanceResponse.ok) {
                                                             console.error("Failed to save staff advance");
                                                         } else {
@@ -3132,8 +3678,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                         console.error("Error saving staff advance:", error);
                                                     }
                                                 }
-
-                                                // Now save the weekly payment bill with the portal IDs
                                                 const paymentData = {
                                                     date: paymentPopupData.date,
                                                     created_at: new Date().toISOString(),
@@ -3154,7 +3698,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                     transaction_number: paymentPopupData.transactionNumber || null,
                                                     account_number: paymentPopupData.accountNumber || null
                                                 };
-                                                console.log("Saving payment data:", paymentData);
                                                 await saveWeeklyPaymentBill(paymentData);
                                                 await fetchWeeklyPaymentBills();
                                             }
@@ -3182,7 +3725,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                 </button>
                             </div>
                         </div>
-                        {/* Total Amount Display for Claim type - at bottom */}
                         {currentProjectAdvanceRow && currentProjectAdvanceRow.type === "Claim" && (
                             <div className="mt- p-3 text-center -ml-[600px]">
                                 <span className="text-sm font-medium text-gray-700">Total Amount: </span>
@@ -3191,11 +3733,9 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                 </span>
                             </div>
                         )}
-
                     </div>
                 </div>
             )}
-            {/* File Upload Popup */}
             {fileUploadPopup && (
                 <div
                     className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
@@ -3215,7 +3755,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                         {currentFileRow?.bill_copy_url && (
                             <div className="mb-4 p-3 bg-gray-50 rounded-lg">
                                 <p className="text-sm text-gray-600 mb-2">Current file:</p>
-                                <a href={currentFileRow.bill_copy_url}
+                                <a href={cleanUrl(currentFileRow.bill_copy_url)}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-blue-600 hover:text-blue-800 underline"
@@ -3263,7 +3803,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
             )}
-            {/* Payment Details Popup */}
             {showPaymentDetailsPopup && (
                 <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
                     <div className="bg-white rounded-xl shadow-lg p-6 w-[500px] max-h-[600px] overflow-y-auto">
@@ -3304,6 +3843,186 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                 className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
                             >
                                 Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {showCategoryPopup && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                    <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
+                        <h3 className="text-lg font-semibold mb-4 text-center">Select Category</h3>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Category
+                            </label>
+                            <Select
+                                value={selectedCategory}
+                                onChange={(selectedOption) => setSelectedCategory(selectedOption)}
+                                options={categoryOptions}
+                                placeholder="Select Category..."
+                                isSearchable
+                                isClearable
+                                styles={{
+                                    control: (provided, state) => ({
+                                        ...provided,
+                                        backgroundColor: 'white',
+                                        borderWidth: '2px',
+                                        borderColor: state.isFocused
+                                            ? '#BF9853'
+                                            : '#BF9853',
+                                        borderRadius: '8px',
+                                        boxShadow: state.isFocused ? '0 0 0 1px #BF9853' : 'none',
+                                        '&:hover': {
+                                            borderColor: '#BF9853',
+                                        },
+                                    }),
+                                    placeholder: (provided) => ({
+                                        ...provided,
+                                        color: '#999',
+                                        textAlign: 'left',
+                                    }),
+                                    menu: (provided) => ({
+                                        ...provided,
+                                        zIndex: 9999,
+                                    }),
+                                    option: (provided, state) => ({
+                                        ...provided,
+                                        textAlign: 'left',
+                                        fontWeight: 'normal',
+                                        fontSize: '15px',
+                                        backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                        color: 'black',
+                                    }),
+                                    singleValue: (provided) => ({
+                                        ...provided,
+                                        textAlign: 'left',
+                                        fontWeight: 'normal',
+                                        color: 'black',
+                                    }),
+                                    indicatorSeparator: () => ({
+                                        display: 'none'
+                                    }),
+                                    indicatorsContainer: (provided) => ({
+                                        ...provided,
+                                        height: '40px',
+                                        gap: '0px'
+                                    }),
+                                    clearIndicator: (provided) => ({
+                                        ...provided,
+                                        padding: '2px'
+                                    }),
+                                    dropdownIndicator: (provided) => ({
+                                        ...provided,
+                                        padding: '2px'
+                                    })
+                                }}
+                            />
+                        </div>
+                        <div className="flex justify-end gap-3 mt-6">
+                            <button
+                                onClick={() => {
+                                    setShowCategoryPopup(false);
+                                    setSelectedCategory(null);
+                                    setIsConfirmingCategory(false);
+                                }}
+                                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    if (!selectedCategory || isConfirmingCategory) {
+                                        if (!selectedCategory) {
+                                            alert("Please select a category");
+                                        }
+                                        return;
+                                    }
+
+                                    // Set loading state and close popup immediately
+                                    setIsConfirmingCategory(true);
+                                    setShowCategoryPopup(false);
+
+                                    try {
+                                        const enoResponse = await fetch('https://backendaab.in/aabuilderDash/expenses_form/get_form');
+                                        if (!enoResponse.ok) {
+                                            throw new Error('Failed to fetch ENo');
+                                        }
+                                        const enoData = await enoResponse.json();
+                                        const nextEno = enoData.length > 0 ? Math.max(...enoData.map(item => item.eno || 0)) + 1 : 1;
+                                        const expensesFormData = {
+                                            accountType: "Claim",
+                                            eno: nextEno,
+                                            date: currentProjectAdvanceRow.date,
+                                            siteName: siteOptions.find(opt => opt.id === Number(currentProjectAdvanceRow.project_id))?.label || "",
+                                            vendor: vendorOptions.find(opt => opt.id === Number(currentProjectAdvanceRow.vendor_id))?.label || "",
+                                            quantity: 1,
+                                            contractor: contractorOptions.find(opt => opt.id === Number(currentProjectAdvanceRow.contractor_id))?.label || "",
+                                            amount: Number(currentProjectAdvanceRow.amount) + previousPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
+                                            category: selectedCategory.value,
+                                            comments: `Claim from Weekly Payment `,
+                                            machineTools: "",
+                                            billCopyUrl: currentProjectAdvanceRow.bill_copy_url
+                                        };
+                                        const expensesFormResponse = await fetch('https://backendaab.in/aabuilderDash/expenses_form/save', {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                            },
+                                            body: JSON.stringify(expensesFormData)
+                                        });
+                                        if (!expensesFormResponse.ok) {
+                                            throw new Error('Failed to save to expenses form');
+                                        }
+                                        const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/${currentProjectAdvanceRow.id}/send-to-expenses`, {
+                                            method: 'PUT',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                            },
+                                        });
+                                        if (response.ok) {
+                                            await fetchExpenses();
+                                            setCurrentProjectAdvanceRow(prev => ({ ...prev, send_to_expenses_entry: true }));
+                                            setPopup({
+                                                show: true,
+                                                message: "Successfully added to expense entry!",
+                                                type: "success",
+                                                dateStr: new Date().toLocaleDateString('en-GB')
+                                            });
+                                            setTimeout(() => {
+                                                setShowPaymentPopup(false);
+                                                setPaymentPopupData({
+                                                    date: new Date().toISOString().split('T')[0],
+                                                    amount: "",
+                                                    paymentMode: "",
+                                                    chequeNo: "",
+                                                    chequeDate: "",
+                                                    transactionNumber: "",
+                                                    accountNumber: ""
+                                                });
+                                                setPreviousPayments([]);
+                                                setCurrentProjectAdvanceRow(null);
+                                                setSelectedCategory(null);
+                                                setIsConfirmingCategory(false);
+                                            }, 2000);
+                                        } else {
+                                            throw new Error('Failed to update expense entry status');
+                                        }
+                                    } catch (error) {
+                                        console.error('Error updating expense entry status:', error);
+                                        setIsConfirmingCategory(false);
+                                        setPopup({
+                                            show: true,
+                                            message: "Failed to add to expense entry. Please try again.",
+                                            type: "error",
+                                            dateStr: new Date().toLocaleDateString('en-GB')
+                                        });
+                                    }
+                                }}
+                                className="px-4 py-2 bg-[#BF9853] text-white rounded-lg hover:bg-[#BF9853]/90 transition-colors"
+                                disabled={!selectedCategory || isConfirmingCategory}
+                            >
+                                {isConfirmingCategory ? "Processing..." : "Confirm"}
                             </button>
                         </div>
                     </div>

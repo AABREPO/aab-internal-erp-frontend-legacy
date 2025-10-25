@@ -40,6 +40,15 @@ const Form = ({ username, userRoles = [] }) => {
         transactionNumber: "",
         accountNumber: ""
     });
+    const [accountDetails, setAccountDetails] = useState([]);
+    const [selectedEbNumber, setSelectedEbNumber] = useState(null);
+    const [selectedMonths, setSelectedMonths] = useState('');
+    const [thirdInput, setThirdInput] = useState('');
+    const [ebNumberOptions, setEbNumberOptions] = useState([]);
+    const [utilityType, setUtilityType] = useState('');
+    const [projectData, setProjectData] = useState(null);
+    console.log('projectData:', projectData);
+    console.log('ebNumberOptions:', ebNumberOptions);
     useEffect(() => {
         const fetchUserRoles = async () => {
             try {
@@ -219,7 +228,109 @@ const Form = ({ username, userRoles = [] }) => {
         };
         fetchAccountType();
     }, []);
+    useEffect(() => {
+        const fetchAccountDetails = async () => {
+            try {
+                const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/getAll');
+                if (response.ok) {
+                    const data = await response.json();
+                    setAccountDetails(data);
+                } else {
+                    console.error('Error fetching account details');
+                }
+            } catch (error) {
+                console.error('Error fetching account details:', error);
+            }
+        };
+        fetchAccountDetails();
+    }, []);
     useEffect(() => { setCombinedOptions([...vendorOptions, ...contractorOptions]); }, [vendorOptions, contractorOptions]);
+    
+    // Effect to fetch project data when site is selected
+    useEffect(() => {
+        if (selectedSite && selectedSite.id) {
+            fetchProjectData(selectedSite.id);
+        } else {
+            setProjectData(null);
+            setEbNumberOptions([]);
+        }
+    }, [selectedSite]);
+
+    // Effect to update EB number options when utility type or project data changes
+    useEffect(() => {
+        console.log('useEffect triggered - utilityType:', utilityType, 'projectData:', projectData);
+        if (utilityType && projectData) {
+            updateEbNumberOptions(utilityType, projectData);
+        } else {
+            setEbNumberOptions([]);
+        }
+    }, [utilityType, projectData]);
+    
+    // Function to fetch project data by ID
+    const fetchProjectData = async (projectId) => {
+        try {
+            const response = await fetch(`https://backendaab.in/aabuilderDash/api/projects/get/${projectId}`);
+            if (response.ok) {
+                const data = await response.json();
+                setProjectData(data);
+                return data;
+            } else {
+                console.error('Failed to fetch project data');
+                return null;
+            }
+        } catch (error) {
+            console.error('Error fetching project data:', error);
+            return null;
+        }
+    };
+
+    // Function to update EB number options based on utility type and project data
+    const updateEbNumberOptions = (utilityType, projectData) => {
+        if (!projectData || !projectData.propertyDetails) {
+            setEbNumberOptions([]);
+            return;
+        }
+
+        const options = [];
+        projectData.propertyDetails.forEach((property, index) => {
+            let optionValue = '';
+            let optionLabel = '';
+
+            switch (utilityType) {
+                case 'Electricity':
+                    if (property.ebNo) {
+                        optionValue = property.ebNo;
+                        optionLabel = property.ebNo;
+                    }
+                    break;
+                case 'Property':
+                    if (property.propertyTaxNo) {
+                        optionValue = property.propertyTaxNo;
+                        optionLabel = property.propertyTaxNo;
+                    }
+                    break;
+                case 'Water':
+                    if (property.waterTaxNo) {
+                        optionValue = property.waterTaxNo;
+                        optionLabel = property.waterTaxNo;
+                    }
+                    break;
+                default:
+                    return;
+            }
+
+            if (optionValue && optionLabel) {
+                options.push({
+                    value: optionValue,
+                    label: optionLabel,
+                    id: index
+                });
+            }
+        });
+
+        console.log('Generated EB Number Options:', options);
+        setEbNumberOptions(options);
+    };
     const handleChange = (selectedOption) => {
         setSelectedOption(selectedOption);
         if (selectedOption) {
@@ -233,7 +344,6 @@ const Form = ({ username, userRoles = [] }) => {
         if (file) {
             setSelectedFile(file);
         }
-        // This ensures the input is cleared even if the same file is selected again next time
         e.target.value = '';
     };
     const handleCategoryChange = (selectedCategory) => {
@@ -289,13 +399,11 @@ const Form = ({ username, userRoles = [] }) => {
             alert('Please fill out all required fields.');
             return;
         }
-        if (selectedAccountType === 'Claim' && !paymentMode) {
-            alert('Please select a payment mode for Claim account type.');
+        if ((selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills') && !paymentMode) {
+            alert('Please select a payment mode for this account type.');
             return;
         }
-        // Check if payment mode requires popup details for Claim account type
-        if (selectedAccountType === 'Claim' && ["GPay", "PhonePe", "Net Banking", "Cheque"].includes(paymentMode)) {
-            // Set up payment modal data and show popup
+        if ((selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills') && ["GPay", "PhonePe", "Net Banking", "Cheque"].includes(paymentMode)) {
             setPaymentModalData({
                 date: date,
                 amount: amount,
@@ -306,9 +414,8 @@ const Form = ({ username, userRoles = [] }) => {
                 accountNumber: ""
             });
             setShowPaymentModal(true);
-            return; // Don't proceed with normal submission
+            return;
         }
-
         setIsSubmitting(true);
         try {
             if (selectedAccountType !== 'Daily Wage' && !selectedFile) {
@@ -359,7 +466,11 @@ const Form = ({ username, userRoles = [] }) => {
                 category: selectedCategory ? selectedCategory.label : '',
                 comments: comments,
                 machineTools: selectedMachineTools ? selectedMachineTools.label : '',
-                billCopyUrl: pdfUrl || ''
+                billCopyUrl: pdfUrl || '',
+                utilityType: utilityType || '',
+                utilityTypeNumber: selectedEbNumber ? selectedEbNumber.label : '',
+                utilityForTheMonth: selectedMonths || '',
+                utilityValidityDays: thirdInput || ''
             };
             const formResponse = await fetch("https://backendaab.in/aabuilderDash/expenses_form/save", {
                 method: "POST",
@@ -392,16 +503,18 @@ const Form = ({ username, userRoles = [] }) => {
         setSelectedMachine(null);
         setSelectedType("");
         setPaymentMode('');
+        setSelectedEbNumber(null);
+        setSelectedMonths('');
+        setThirdInput('');
+        setUtilityType('');
+        setProjectData(null);
+        setEbNumberOptions([]);
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
     };
-
     const handlePaymentSubmit = async () => {
-        if (!paymentModalData.transactionNumber && paymentModalData.paymentMode !== "Cash") {
-            alert("Please enter transaction number.");
-            return;
-        }
+        // Transaction number is now optional, so we don't need to validate it
         if (!paymentModalData.accountNumber && paymentModalData.paymentMode !== "Cash") {
             alert("Please select account number.");
             return;
@@ -410,11 +523,8 @@ const Form = ({ username, userRoles = [] }) => {
             alert("Please enter cheque number and date.");
             return;
         }
-
         setIsSubmitting(true);
-
         try {
-            // Upload file if exists
             let pdfUrl = '';
             if (selectedFile) {
                 try {
@@ -445,7 +555,6 @@ const Form = ({ username, userRoles = [] }) => {
             } else if (selectedType === 'Contractor') {
                 contractor = selectedOption ? selectedOption.label : '';
             }
-            // Create expenses form payload
             const expensesPayload = {
                 accountType: selectedAccountType,
                 eno: eno,
@@ -458,9 +567,12 @@ const Form = ({ username, userRoles = [] }) => {
                 category: selectedCategory ? selectedCategory.label : '',
                 comments: comments,
                 machineTools: selectedMachineTools ? selectedMachineTools.label : '',
-                billCopyUrl: pdfUrl || ''
+                billCopyUrl: pdfUrl || '',
+                utilityType: utilityType || '',
+                utilityTypeNumber: selectedEbNumber ? selectedEbNumber.label : '',
+                utilityForTheMonth: selectedMonths || '',
+                utilityValidityDays: thirdInput || ''
             };
-            // Save to expenses form
             const expensesResponse = await fetch("https://backendaab.in/aabuilderDash/expenses_form/save", {
                 method: "POST",
                 headers: {
@@ -468,76 +580,42 @@ const Form = ({ username, userRoles = [] }) => {
                 },
                 body: JSON.stringify(expensesPayload),
             });
-
             if (!expensesResponse.ok) {
                 const errorText = await expensesResponse.text();
                 throw new Error(`Expenses form submission failed: ${errorText}`);
             }
-
             let expensesResult;
             let expensesId = null;
-
             try {
                 const responseText = await expensesResponse.text();
-                console.log('Expenses API response:', responseText);
-
                 if (responseText.trim().startsWith('{') || responseText.trim().startsWith('[')) {
                     expensesResult = JSON.parse(responseText);
                     expensesId = expensesResult.id || expensesResult.eno;
                 } else {
-                    // Handle plain text success response
-                    console.log('Expenses form submitted successfully (plain text response)');
                     expensesResult = { message: responseText };
-
-                    // Fetch the latest expenses form to get the ID
                     try {
                         const allFormsRes = await fetch("https://backendaab.in/aabuilderDash/expenses_form/get_form");
                         if (allFormsRes.ok) {
                             const allForms = await allFormsRes.json();
-                            console.log('All expenses forms:', allForms);
-                            console.log('Looking for form with:', {
-                                eno: eno,
-                                date: paymentModalData.date,
-                                siteName: selectedSite.label
-                            });
-
                             if (allForms.length > 0) {
-                                // Get the most recent form that matches our criteria
                                 let matchingForm = allForms.find(f =>
                                     f.eno === eno &&
                                     f.date === paymentModalData.date &&
                                     f.siteName === selectedSite.label
                                 );
-
-                                console.log('Matching form found:', matchingForm);
-
                                 if (matchingForm) {
-                                    expensesId = matchingForm.id; // Use the primary key id from the entity (lowercase)
-                                    console.log('Found expenses form ID:', expensesId);
+                                    expensesId = matchingForm.id;
                                 } else {
-                                    console.log('No exact matching form found. Available forms:', allForms.map(f => ({
-                                        ENo: f.eno,
-                                        date: f.date,
-                                        siteName: f.siteName,
-                                        id: f.id
-                                    })));
-
-                                    // Fallback: Get the most recent form with matching ENo
                                     const recentFormWithEno = allForms
                                         .filter(f => f.eno === eno)
                                         .sort((a, b) => new Date(b.timestamp || b.date) - new Date(a.timestamp || a.date))[0];
-
                                     if (recentFormWithEno) {
                                         expensesId = recentFormWithEno.id;
-                                        console.log('Using most recent form with ENo:', expensesId, recentFormWithEno);
                                     } else {
-                                        // Last fallback: Get the most recent form overall
                                         const mostRecentForm = allForms
                                             .sort((a, b) => new Date(b.timestamp || b.date) - new Date(a.timestamp || a.date))[0];
-
                                         if (mostRecentForm) {
                                             expensesId = mostRecentForm.id;
-                                            console.log('Using most recent form overall:', expensesId, mostRecentForm);
                                         }
                                     }
                                 }
@@ -555,8 +633,6 @@ const Form = ({ username, userRoles = [] }) => {
                 console.error('Response parsing error:', parseError);
                 throw new Error('Failed to parse expenses form API response');
             }
-
-            // Create weekly payment bills payload
             const weeklyPaymentBillPayload = {
                 date: paymentModalData.date,
                 created_at: new Date().toISOString(),
@@ -564,7 +640,7 @@ const Form = ({ username, userRoles = [] }) => {
                 vendor_id: selectedOption?.type === 'Vendor' ? selectedOption.id : null,
                 employee_id: null,
                 project_id: selectedSite?.id || null,
-                type: "Claim Payment",
+                type: selectedAccountType === 'Claim' ? "Claim Payment" : "Utility Payment",
                 bill_payment_mode: paymentModalData.paymentMode,
                 amount: parseFloat(paymentModalData.amount),
                 status: true,
@@ -578,7 +654,6 @@ const Form = ({ username, userRoles = [] }) => {
                 transaction_number: paymentModalData.transactionNumber || null,
                 account_number: paymentModalData.accountNumber || null
             };
-            // Save to weekly payment bills
             const weeklyResponse = await fetch('https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -592,19 +667,16 @@ const Form = ({ username, userRoles = [] }) => {
             let weeklyResult;
             try {
                 const responseText = await weeklyResponse.text();
-                console.log('Weekly payment bills API response:', responseText);
-
                 if (responseText.trim().startsWith('{') || responseText.trim().startsWith('[')) {
                     weeklyResult = JSON.parse(responseText);
                 } else {
-                    console.error('Non-JSON response from weekly payment bills:', responseText);
                     throw new Error(`Weekly payment bills API returned non-JSON response: ${responseText}`);
                 }
             } catch (parseError) {
                 console.error('Weekly payment bills response parsing error:', parseError);
                 throw new Error('Failed to parse weekly payment bills API response');
             }
-            toast.success('Claim payment saved successfully and added to Weekly Payment Bills!', {
+            toast.success(`${selectedAccountType} payment saved successfully and added to Weekly Payment Bills!`, {
                 position: "top-center",
                 autoClose: 3000,
                 theme: "colored"
@@ -633,6 +705,15 @@ const Form = ({ username, userRoles = [] }) => {
     }, []);
     return (
         <body className=' bg-[#FAF6ED]'>
+            <style jsx>{`
+                input:hover, select:hover {
+                    border-color: rgba(191, 152, 83, 0.2) !important;
+                }
+                input:focus, select:focus {
+                    border-color: rgba(191, 152, 83, 1) !important;
+                    outline: none !important;
+                }
+            `}</style>
             <div className=" mx-auto p-6 bg-white rounded-lg shadow-lg lg:w-[1824px]">
                 <form onSubmit={handleUpload}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -644,7 +725,6 @@ const Form = ({ username, userRoles = [] }) => {
                                     onChange={(e) => {
                                         const selectedValue = e.target.value;
                                         setSelectedAccountType(selectedValue);
-                                        // Find the selected option object
                                         const selectedOption = accountTypeOptions.find(option => option.value === selectedValue);
                                         if (selectedOption) {
                                             console.log("Selected ID:", selectedOption.id);
@@ -658,95 +738,166 @@ const Form = ({ username, userRoles = [] }) => {
                                     ))}
                                 </select>
                             </div>
-                            <div className='text-left'>
-                                <label className="text-md font-semibold block mb-1">Date <span className="text-red-500">*</span></label>
-                                <input
-                                    type="date"
-                                    value={date}
-                                    onChange={(e) => setDate(e.target.value)}
-                                    className="border-2 border-[#BF9853] w-[168px] h-[45px] rounded-lg px-4 py-2 focus:outline-none border-opacity-[0.20]"
-                                />
-                            </div>
-                        </div>
-                        <div className='text-left'>
-                            <label className="text-md font-semibold mb-2  block">Project Name <span className="text-red-500">*</span></label>
-                            <Select
-                                options={sortedSiteOptions || []}
-                                placeholder="Select a site..."
-                                isSearchable={true}
-                                value={selectedSite}
-                                onChange={setSelectedSite}
-                                styles={customStyles}
-                                isClearable
-                                className="custom-select rounded-lg w-[290px] h-[45px]"
-                            />
-                        </div>
-                        <div className='text-left lg:ml-[-570px] md:ml-[-70px]'>
-                            <div className='flex'>
-                                <label className="text-md font-semibold mb-2 block">Vendor/Contractor Name <span className="text-red-500">*</span></label>
-                                {selectedType && <span className="text-xs text-orange-600 font-semibold block ml-10 mt-3">{selectedType}</span>}
-                            </div>
-                            <Select
-                                options={combinedOptions}
-                                value={selectedOption}
-                                onChange={handleChange}
-                                placeholder="Select an Option..."
-                                styles={customStyles}
-                                isClearable
-                                className="custom-select rounded-lg w-[290px] h-[45px] "
-                            />
-                        </div>
-                        <div className='text-left'>
-                            <label className="text-md font-semibold mb-2 block">Quantity</label>
-                            <input
-                                type="text"
-                                value={quantity}
-                                onChange={(e) => setQuantity(e.target.value)}
-                                className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[45px] focus:outline-none border-opacity-[0.20]"
-                            />
-                        </div>
-                        <div className='text-left lg:ml-[-570px] md:ml-[-70px]'>
-                            <label className="text-md font-semibold mb-2 block">Amount <span className="text-red-500">*</span></label>
-                            <div className="relative w-[290px] h-[45px]">
-                                <span className="absolute top-1/2 left-4 transform -translate-y-1/2 text-gray-600 text-lg">₹</span>
-                                <input
-                                    type="text"
-                                    value={formatNumber(amount)}
-                                    onChange={handleAmountChange}
-                                    onWheel={(e) => e.target.blur()}
-                                    className="pl-8 pr-4 border-2 border-[#BF9853] rounded-lg w-full h-full focus:outline-none border-opacity-[0.20]"
-                                />
-                            </div>
-                        </div>
-                        <div className='flex gap-10'>
-                            <div className={`text-left ${selectedAccountType === 'Claim' ? '' : ''}`}>
-                                <label className="text-md font-semibold mb-2 block">Category <span className="text-red-500">*</span></label>
-                                <Select
-                                    options={categoryOptions}
-                                    value={selectedCategory}
-                                    onChange={handleCategoryChange}
-                                    styles={customStyles}
-                                    isClearable
-                                    placeholder="Select a category..."
-                                    className="custom-select rounded-lg w-[290px] h-[45px]"
-                                />
-                            </div>
-                            {selectedAccountType === 'Claim' && (
-                                <div className='text-left'>
-                                    <label className="text-md font-semibold mb-2 block">Payment Mode <span className="text-red-500">*</span></label>
-                                    <select
-                                        value={paymentMode}
-                                        onChange={(e) => setPaymentMode(e.target.value)}
-                                        className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[43px] focus:outline-none border-opacity-[0.20]"
-                                    >
-                                        <option value="">Select Payment Mode</option>
-                                        <option value="GPay">GPay</option>
-                                        <option value="PhonePe">PhonePe</option>
-                                        <option value="Net Banking">Net Banking</option>
-                                        <option value="Cheque">Cheque</option>
-                                    </select>
+                            <div className='text-left flex gap-4'>
+                                <div>
+                                    <label className="text-md font-semibold block mb-1">Date <span className="text-red-500">*</span></label>
+                                    <input
+                                        type="date"
+                                        value={date}
+                                        onChange={(e) => setDate(e.target.value)}
+                                        className="border-2 border-[#BF9853] w-[168px] h-[45px] rounded-lg px-4 py-2 focus:outline-none border-opacity-[0.20]"
+                                    />
                                 </div>
-                            )}
+                                {selectedAccountType === 'Utility Bills' && (
+                                    <div className='text-left lg:ml-[145px] md:ml-[-70px]'>
+                                        <h4 className="text-base font-semibold mb-2 ">Utility Type <span className="text-red-500">*</span></h4>
+                                        <select
+                                            className="h-[45px] border-2 border-[#BF9853] rounded-lg px-4 py-2 focus:outline-none border-opacity-[0.20] w-[182px]"
+                                            value={utilityType}
+                                            onChange={(e) => setUtilityType(e.target.value)}
+                                        >
+                                            <option value="" disabled>--- Select ---</option>
+                                            <option value="Electricity">Electricity</option>
+                                            <option value="Property">Property</option>
+                                            <option value="Water">Water</option>
+                                            <option value="Telecom">Telecom</option>
+                                            <option value="Subscription">Subscription</option>
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div>
+                            <div className='flex gap-10 mb-3'>
+                                <div className='text-left'>
+                                    <label className="text-md font-semibold mb-2  block">Project Name <span className="text-red-500">*</span></label>
+                                    <Select
+                                        options={sortedSiteOptions || []}
+                                        placeholder="Select a site..."
+                                        isSearchable={true}
+                                        value={selectedSite}
+                                        onChange={setSelectedSite}
+                                        styles={customStyles}
+                                        isClearable
+                                        className="custom-select rounded-lg w-[290px] h-[45px]"
+                                    />
+                                </div>
+                                <div className='text-left'>
+                                    <div className='flex'>
+                                        <label className="text-md font-semibold mb-2 block">Vendor/Contractor Name <span className="text-red-500">*</span></label>
+                                        {selectedType && <span className="text-xs text-orange-600 font-semibold block ml-10 mt-3">{selectedType}</span>}
+                                    </div>
+                                    <Select
+                                        options={combinedOptions}
+                                        value={selectedOption}
+                                        onChange={handleChange}
+                                        placeholder="Select an Option..."
+                                        styles={customStyles}
+                                        isClearable
+                                        className="custom-select rounded-lg w-[290px] h-[45px] "
+                                    />
+                                </div>
+                            </div>
+                            <div className='flex gap-10 mb-3'>
+                                <div className='text-left'>
+                                    <label className="text-md font-semibold mb-2 block">Quantity</label>
+                                    <input
+                                        type="text"
+                                        value={quantity}
+                                        onChange={(e) => setQuantity(e.target.value)}
+                                        className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[45px] focus:outline-none border-opacity-[0.20]"
+                                    />
+                                </div>
+                                <div className='text-left'>
+                                    <label className="text-md font-semibold mb-2 block">Amount <span className="text-red-500">*</span></label>
+                                    <div className="relative w-[290px] h-[45px]">
+                                        <span className="absolute top-1/2 left-4 transform -translate-y-1/2 text-gray-600 text-lg">₹</span>
+                                        <input
+                                            type="text"
+                                            value={formatNumber(amount)}
+                                            onChange={handleAmountChange}
+                                            onWheel={(e) => e.target.blur()}
+                                            className="pl-8 pr-4 border-2 border-[#BF9853] rounded-lg w-full h-full focus:outline-none border-opacity-[0.20]"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className='flex gap-10 mb-3'>
+                                <div className={`text-left ${selectedAccountType === 'Claim' ? '' : ''}`}>
+                                    <label className="text-md font-semibold mb-2 block">Category <span className="text-red-500">*</span></label>
+                                    <Select
+                                        options={categoryOptions}
+                                        value={selectedCategory}
+                                        onChange={handleCategoryChange}
+                                        styles={customStyles}
+                                        isClearable
+                                        placeholder="Select a category..."
+                                        className="custom-select rounded-lg w-[290px] h-[45px]"
+                                    />
+                                </div>
+                                {(selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills') && (
+                                    <div className='text-left'>
+                                        <label className="text-md font-semibold mb-2 block">Payment Mode <span className="text-red-500">*</span></label>
+                                        <select
+                                            value={paymentMode}
+                                            onChange={(e) => setPaymentMode(e.target.value)}
+                                            className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[43px] focus:outline-none border-opacity-[0.20]"
+                                        >
+                                            <option value="">Select Payment Mode</option>
+                                            <option value="GPay">GPay</option>
+                                            <option value="PhonePe">PhonePe</option>
+                                            <option value="Net Banking">Net Banking</option>
+                                            <option value="Cheque">Cheque</option>
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+                             {selectedAccountType === 'Utility Bills' && (
+                                 <>
+                                     <div className='flex gap-10 mb-3'>
+                                         <div className='text-left'>
+                                             <label className="text-md font-semibold mb-2 block">
+                                                 {utilityType === 'Electricity' ? 'EB Number' : 
+                                                  utilityType === 'Property' ? 'Property Tax Number' : 
+                                                  utilityType === 'Water' ? 'Water Tax Number' : 'Number'}
+                                             </label>
+                                             <Select
+                                                 options={ebNumberOptions}
+                                                 value={selectedEbNumber}
+                                                 onChange={setSelectedEbNumber}
+                                                 styles={customStyles}
+                                                 isClearable
+                                                 placeholder={`Select ${utilityType === 'Electricity' ? 'EB Number' : 
+                                                           utilityType === 'Property' ? 'Property Tax Number' : 
+                                                           utilityType === 'Water' ? 'Water Tax Number' : 'Number'}...`}
+                                                 className="custom-select rounded-lg w-[290px] h-[45px]"
+                                             />
+                                         </div>
+                                         <div className='text-left'>
+                                             <label className="text-md font-semibold mb-2 block">Months</label>
+                                             <input
+                                                 type="month"
+                                                 value={selectedMonths}
+                                                 onChange={(e) => setSelectedMonths(e.target.value)}
+                                                 placeholder="Enter months..."
+                                                 className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[45px] focus:outline-none border-opacity-[0.20]"
+                                             />
+                                         </div>
+                                     </div>
+                                     {(utilityType === 'Telecom' || utilityType === 'Subscription') && (
+                                         <div className='text-left'>
+                                             <label className="text-md font-semibold mb-2 block">Additional Input</label>
+                                             <input
+                                                 type="text"
+                                                 value={thirdInput}
+                                                 onChange={(e) => setThirdInput(e.target.value)}
+                                                 placeholder="Enter additional information..."
+                                                 className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[45px] focus:outline-none border-opacity-[0.20]"
+                                             />
+                                         </div>
+                                     )}
+                                 </>
+                             )}
                         </div>
                         {showMachineTools && (
                             <div className='text-left lg:ml-[-570px]'>
@@ -870,12 +1021,12 @@ const Form = ({ username, userRoles = [] }) => {
                                                 )}
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div>
-                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number<span className="text-red-500">*</span></label>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
                                                         <input
                                                             type="text"
                                                             value={paymentModalData.transactionNumber}
                                                             onChange={(e) => setPaymentModalData(prev => ({ ...prev, transactionNumber: e.target.value }))}
-                                                            placeholder="Enter transaction number"
+                                                            placeholder="Enter transaction number (optional)"
                                                             className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
                                                         />
                                                     </div>
@@ -887,9 +1038,11 @@ const Form = ({ username, userRoles = [] }) => {
                                                             className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
                                                         >
                                                             <option value="">Select Account</option>
-                                                            <option value="2027887700014">2027887700014</option>
-                                                            <option value="2027887700015">2027887700015</option>
-                                                            <option value="2027887700016">2027887700016</option>
+                                                            {accountDetails.map((account) => (
+                                                                <option key={account.id} value={account.account_number}>
+                                                                    {account.account_number}
+                                                                </option>
+                                                            ))}
                                                         </select>
                                                     </div>
                                                 </div>
@@ -924,7 +1077,7 @@ const customStyles = {
         borderColor: state.isFocused ? 'rgba(191, 152, 83, 1)' : 'rgba(191, 152, 83, 0.2)',
         boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.2)' : 'none',
         '&:hover': {
-            borderColor: 'rgba(191, 152, 83, 0.5)',
+            borderColor: 'rgba(191, 152, 83, 0.2)',
         }
     }),
 };

@@ -162,6 +162,16 @@ const Userroleandpermission = () => {
       name: "Loan Portal",
       level: "Level 1",
     },
+    {
+      id: 32,
+      name: "Bank Register",
+      level: "Level 1",
+    },
+    {
+      id: 33,
+      name:"Bank Reconciliation",
+      level:"level 1",
+    }
     
   ];
   const [availableModules, setAvailableModules] = useState(modules);

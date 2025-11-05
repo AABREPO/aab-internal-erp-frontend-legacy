@@ -7,6 +7,11 @@ import ExpensesAddInput from './ExpensesEntry/ExpensesInputData';
 import EntryChecking from './ExpensesEntry/EntryCheck';
 const Heading = ({ username, userRoles = [] }) => {
     const [activeTab, setActiveTab] = useState(() => {
+        // Check if there's prefill data to navigate to expense-entry
+        const prefillData = localStorage.getItem('expenseEntryPrefill');
+        if (prefillData) {
+            return 'expense-entry';
+        }
         const savedTab = localStorage.getItem('activeTab');
         if (savedTab === 'database' && (username !== 'Mahalingam M' && username !== 'Admin')) {
             return 'expense-entry';

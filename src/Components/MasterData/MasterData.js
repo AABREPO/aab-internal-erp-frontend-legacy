@@ -305,7 +305,7 @@ const MasterData = ({ username, userRoles = [] }) => {
 
   // Master table data with all table headings
   const masterTableData = [
-    { id: 'project-names', name: 'Project Names', description: 'Manage project names and site numbers' },
+    { id: 'project-management', name: 'Project Management', description: 'Manage project details with owners and properties' },
     { id: 'vendor-names', name: 'Vendor Names', description: 'Manage vendor information' },
     { id: 'contractor-names', name: 'Contractor Names', description: 'Manage contractor information' },
     { id: 'categories', name: 'Categories', description: 'Manage expense categories' },
@@ -314,8 +314,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     { id: 'labours-list', name: 'Labours List', description: 'Manage labour information' },
     { id: 'Account Details', name: 'Account Details', description: 'Manage account information' },
     { id: 'bank-account-type', name: 'Bank Account Type', description: 'Manage bank account types' },
-    { id: 'eb-service-link', name: 'EB Service Link', description: 'Manage EB service links with project IDs' },
-    { id: 'project-management', name: 'Project Management', description: 'Manage project details with owners and properties' }
+    { id: 'eb-service-link', name: 'EB Service Link', description: 'Manage EB service links with project IDs' }
   ];
   const [vendorQrImageFile, setVendorQrImageFile] = useState(null);
   const [vendorQrImagePreview, setVendorQrImagePreview] = useState(null);
@@ -953,12 +952,12 @@ const MasterData = ({ username, userRoles = [] }) => {
     try {
       console.log('Starting Aadhaar PDF upload for:', employeeName);
       console.log('File details:', file);
-      
+
       const formData = new FormData();
       const finalName = `${employeeName}_Aadhaar_${new Date().toISOString().split('T')[0]}`;
       formData.append('file', file);
       formData.append('file_name', finalName);
-      
+
       console.log('Uploading with filename:', finalName);
 
       const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
@@ -977,11 +976,11 @@ const MasterData = ({ username, userRoles = [] }) => {
 
       const uploadResult = await uploadResponse.json();
       console.log('Upload result:', uploadResult);
-      
+
       // Check different possible response structures
       const url = uploadResult.url || uploadResult.data?.url || uploadResult.fileUrl || uploadResult.downloadUrl;
       console.log('Extracted URL:', url);
-      
+
       return url;
     } catch (error) {
       console.error('Error during Aadhaar PDF upload:', error);
@@ -994,18 +993,10 @@ const MasterData = ({ username, userRoles = [] }) => {
 
     // Handle Aadhaar PDF upload first
     let aadhaarUrl = '';
-    
+
     if (aadhaarPdfFile) {
       try {
-        console.log('Uploading Aadhaar PDF...');
-        console.log('File selected:', aadhaarPdfFile);
-        console.log('File name:', aadhaarPdfFile.name);
-        console.log('File size:', aadhaarPdfFile.size);
-        console.log('File type:', aadhaarPdfFile.type);
-        
         aadhaarUrl = await uploadAadhaarPdfToGoogleDrive(aadhaarPdfFile, employeeName);
-        console.log('Aadhaar PDF uploaded successfully:', aadhaarUrl);
-        
         if (!aadhaarUrl) {
           throw new Error('Upload completed but no URL returned');
         }
@@ -1209,6 +1200,44 @@ const MasterData = ({ username, userRoles = [] }) => {
       });
 
       if (response.ok) {
+        // Sync with Project Names API
+        try {
+          // Check if a Project Names record exists with the same projectId (as siteNo)
+          const existingSiteName = siteNames.find(site => site.siteNo === newProject.projectId.toString());
+
+          const siteNamePayload = {
+            siteName: newProject.projectName,
+            siteNo: newProject.projectId
+          };
+
+          if (existingSiteName) {
+            // Update existing Project Names record
+            const siteNameResponse = await fetch(`https://backendaab.in/aabuilderDash/api/project_Names/edit/${existingSiteName.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(siteNamePayload),
+            });
+
+            if (siteNameResponse.ok) {
+              fetchSiteNames(); // Refresh site names list
+            }
+          } else {
+            // Create new Project Names record
+            const siteNameResponse = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(siteNamePayload),
+            });
+
+            if (siteNameResponse.ok) {
+              fetchSiteNames(); // Refresh site names list
+            }
+          }
+        } catch (syncError) {
+          console.error('Error syncing with Project Names:', syncError);
+          // Don't fail the main operation if sync fails
+        }
+
         setMessage('Project saved successfully!');
         closeProjectManagement();
         fetchProjects();
@@ -1400,7 +1429,6 @@ const MasterData = ({ username, userRoles = [] }) => {
         } else if (qrImageData.startsWith('iVBORw0KGgo')) {
           qrImageData = `data:image/png;base64,${qrImageData}`;
         } else {
-          // Default to JPEG
           qrImageData = `data:image/jpeg;base64,${qrImageData}`;
         }
       }
@@ -1409,7 +1437,6 @@ const MasterData = ({ username, userRoles = [] }) => {
     } else {
       setEditQrImagePreview(null);
     }
-    // Store original data for reset on cancel
     setOriginalAccountData({
       accountHolderName: item.account_holder_name,
       accountNumber: item.account_number,
@@ -1428,18 +1455,15 @@ const MasterData = ({ username, userRoles = [] }) => {
     setEditBankAccountType(item.bank_account_type);
     setIsBankAccountTypeEditOpen(true);
   };
-
   const handleEditEbServiceLink = (item) => {
     setSelectedEbServiceLinkId(item.id);
     setEditProjectId(item.project_id?.toString() || '');
-    // Find the project in siteNames using project_id (which is now siteNo) and set the selected project
     const project = siteNames.find(site => site.siteNo === item.project_id.toString());
     setEditSelectedProject(project ? { value: project.siteNo, label: project.siteName } : null);
     setEditDoorNo(item.door_no || '');
     setEditEbServiceNo(item.eb_service_no || '');
     setIsEbServiceLinkEditOpen(true);
   };
-
   const handleEditProject = (item) => {
     setSelectedProjectId(item.id);
     setEditProject({
@@ -1471,14 +1495,31 @@ const MasterData = ({ username, userRoles = [] }) => {
     });
     setIsProjectEditOpen(true);
   };
-
   const handleDeleteProject = async (id) => {
     if (window.confirm('Are you sure you want to delete this project?')) {
       try {
+        const projectToDelete = projects.find(project => project.id === id);
         const response = await fetch(`https://backendaab.in/aabuilderDash/api/projects/delete/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
+          if (projectToDelete) {
+            try {
+              const existingSiteNameBySiteNo = siteNames.find(site => site.siteNo === projectToDelete.projectId?.toString());
+              const existingSiteNameById = siteNames.find(site => site.id === id);
+              const existingSiteName = existingSiteNameById || existingSiteNameBySiteNo;
+              if (existingSiteName) {
+                const siteNameResponse = await fetch(`https://backendaab.in/aabuilderDash/api/project_Names/delete/${existingSiteName.id}`, {
+                  method: 'DELETE',
+                });
+                if (siteNameResponse.ok) {
+                  fetchSiteNames(); // Refresh site names list
+                }
+              }
+            } catch (syncError) {
+              console.error('Error syncing delete with Project Names:', syncError);
+            }
+          }
           setMessage('Project deleted successfully!');
           fetchProjects();
         }
@@ -1490,9 +1531,7 @@ const MasterData = ({ username, userRoles = [] }) => {
 
   const handleSubmitEditProject = async (e) => {
     e.preventDefault();
-
     try {
-      // Map frontend state to backend field names
       const payload = {
         projectName: editProject.projectName,
         projectAddress: editProject.projectAddress,
@@ -1502,7 +1541,6 @@ const MasterData = ({ username, userRoles = [] }) => {
         ownerDetails: editProject.ownerDetailsList,       // mapped for backend
         propertyDetails: editProject.propertyDetailsList  // mapped for backend
       };
-
       const response = await fetch(`https://backendaab.in/aabuilderDash/api/projects/edit/${selectedProjectId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -1510,6 +1548,36 @@ const MasterData = ({ username, userRoles = [] }) => {
       });
 
       if (response.ok) {
+        try {
+          const existingSiteNameBySiteNo = siteNames.find(site => site.siteNo === editProject.projectId.toString());
+          const existingSiteNameById = siteNames.find(site => site.id === selectedProjectId);
+          const existingSiteName = existingSiteNameById || existingSiteNameBySiteNo;
+          const siteNamePayload = {
+            siteName: editProject.projectName,
+            siteNo: editProject.projectId
+          };
+          if (existingSiteName) {
+            const siteNameResponse = await fetch(`https://backendaab.in/aabuilderDash/api/project_Names/edit/${existingSiteName.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(siteNamePayload),
+            });
+            if (siteNameResponse.ok) {
+              fetchSiteNames(); // Refresh site names list
+            }
+          } else {
+            const siteNameResponse = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(siteNamePayload),
+            });
+            if (siteNameResponse.ok) {
+              fetchSiteNames(); // Refresh site names list
+            }
+          }
+        } catch (syncError) {
+          console.error('Error syncing with Project Names:', syncError);
+        }
         setMessage('Project updated successfully!');
         setIsProjectEditOpen(false);
         fetchProjects();
@@ -1523,7 +1591,6 @@ const MasterData = ({ username, userRoles = [] }) => {
       setMessage('Error occurred while updating project.');
     }
   };
-  // Reset functions to restore original data on cancel
   const resetVendorData = () => {
     if (originalVendorData) {
       setEditVendorName(originalVendorData.vendorName || '');
@@ -2527,19 +2594,15 @@ const MasterData = ({ username, userRoles = [] }) => {
     } else {
       selectedData = ebServiceLinks.filter(item => selectedExportItems.includes(item.id));
     }
-
     if (selectedData.length === 0) {
       alert('Please select at least one item to export');
       return;
     }
-
-    // Helper function to format ID with prefix and padding
     const formatId = (id, prefix) => {
       if (!id) return '';
       const paddedId = id.toString().padStart(4, '0');
       return `${prefix}${paddedId}`;
     };
-
     const worksheetData = selectedData.map((item) => {
       if (exportDataType === 'ebServiceLink') {
         return {
@@ -2556,7 +2619,7 @@ const MasterData = ({ username, userRoles = [] }) => {
           'Beneficiary Name': item.employee_name || '',
           'Account Number': item.account_number || '',
           'IFSC Code': item.ifsc_code || '',
-          'Account Type': '', // Always empty
+          'Account Type': '',
           'Mobile Number': item.employee_mobile_number || '',
           'Email ID': item.contact_email || 'aabsvprentry@gmail.com',
           'Address 1': '',
@@ -2573,7 +2636,7 @@ const MasterData = ({ username, userRoles = [] }) => {
           'Beneficiary Name': exportDataType === 'vendor' ? (item.vendorName || '') : (item.contractorName || ''),
           'Account Number': item.account_number || '',
           'IFSC Code': item.ifsc_code || '',
-          'Account Type': '', // Always empty
+          'Account Type': '',
           'Mobile Number': item.contact_number || '',
           'Email ID': item.contact_email || 'aabsvprentry@gmail.com',
           'Address 1': '',
@@ -2586,24 +2649,24 @@ const MasterData = ({ username, userRoles = [] }) => {
     });
     const worksheet = XLSX.utils.json_to_sheet(worksheetData);
     const columnWidths = exportDataType === 'ebServiceLink' ? [
-      { wch: 10 }, // ID
-      { wch: 15 }, // Project ID
-      { wch: 15 }, // Door No
-      { wch: 20 }  // EB Service No
+      { wch: 10 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 20 }
     ] : [
-      { wch: 12 }, // Customer ID
-      { wch: 25 }, // Beneficiary Code
-      { wch: 25 }, // Beneficiary Name
-      { wch: 20 }, // Account Number
-      { wch: 15 }, // IFSC Code
-      { wch: 15 }, // Account Type
-      { wch: 18 }, // Mobile Number
-      { wch: 30 }, // Email ID
-      { wch: 15 }, // Address 1
-      { wch: 15 }, // Address 2
-      { wch: 15 }, // Address 3
-      { wch: 15 }, // Address 4
-      { wch: 12 }  // ZIP Code
+      { wch: 12 },
+      { wch: 25 },
+      { wch: 25 },
+      { wch: 20 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 18 },
+      { wch: 30 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 12 }
     ];
     worksheet['!cols'] = columnWidths;
     const workbook = XLSX.utils.book_new();
@@ -2683,67 +2746,73 @@ const MasterData = ({ username, userRoles = [] }) => {
             <div key={table.id}
               className={selectedTable === table.id ? 'ring-4 ring-[#faf9f8] ring-opacity-50 rounded-lg shadow-lg' : ''}
             >
-              {table.id === 'project-names' && (
+              {table.id === 'project-management' && (
                 <div>
-                  <div className="flex items-center mb-2">
+                  <div className="flex items-center mb-2 lg:mt-0 mt-3">
                     <input
                       type="text"
                       className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
-                      placeholder="Search Project Name.."
-                      value={siteNameSearch}
-                      onChange={(e) => setSiteNameSearch(e.target.value)}
+                      placeholder="Search Project.."
+                      value={projectManagementSearch}
+                      onChange={(e) => setProjectManagementSearch(e.target.value)}
                     />
                     <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
                       <img src={search} alt='search' className=' w-5 h-5' />
                     </button>
                     <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
-                      onClick={openSiteNames}>
+                      onClick={openProjectManagement}>
                       + Add
                     </button>
                   </div>
-                  <button className="flex items-center font-bold px-1 ml-4 text-[#E4572E] mb-6"
-                    onClick={() => document.getElementById('siteNamesFileInput').click()}>
+                  <button className="flex items-center text-[#E4572E] font-bold px-1 ml-4 mt-2 mb-6"
+                    onClick={() => document.getElementById('projectManagementFileInput').click()}>
                     <img src={imports} alt='import' className='w-4 h-4 mr-1' />
                     Import File
                   </button>
                   <input
                     type="file"
-                    id="siteNamesFileInput"
-                    accept=".xlsx,.xls,.csv"
+                    id="projectManagementFileInput"
+                    accept=".sql"
                     style={{ display: 'none' }}
-                    onChange={(e) => handleBulkUpload(e, 'siteNames')}
+                    onChange={(e) => handleProjectManagementBulkUpload(e)}
                   />
                   <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
                     <div className="bg-[#FAF6ED]">
                       <table className="table-auto lg:w-72">
                         <thead className='bg-[#FAF6ED]'>
                           <tr className="border-b">
-                            <th className="p-2 text-left lg:w-16 text-xl font-bold">P.ID</th>
+                            <th className="p-2 text-left lg:w-16 text-xl font-bold">S.No</th>
                             <th className="p-2 text-left lg:w-72 text-xl font-bold">Project Name</th>
                           </tr>
                         </thead>
                       </table>
                     </div>
                     <div className="overflow-y-auto max-h-[550px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-                      <table className="table-auto lg:w-72">
+                      <table className="table-auto lg:w-full w-full">
                         <tbody>
-                          {filteredSiteNames.map((item, index) => (
+                          {projects.filter(project =>
+                            project.projectName?.toLowerCase().includes(projectManagementSearch.toLowerCase()) ||
+                            project.projectAddress?.toLowerCase().includes(projectManagementSearch.toLowerCase()) ||
+                            project.projectId?.toLowerCase().includes(projectManagementSearch.toLowerCase())
+                          ).map((item, index) => (
                             <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                              <td className="p-2 text-left font-semibold">{item.siteNo}</td>
+                              <td className="p-2 text-left font-semibold">
+                                {(projects.findIndex(p => p.id === item.id) + 1).toString().padStart(2, '0')}
+                              </td>
                               <td className="p-2 text-left group flex font-semibold">
                                 <div className="flex flex-grow">
-                                  {item.siteName}
+                                  {item.projectName || ''}
                                 </div>
                                 <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                                   <button
-                                    onClick={() => handleEditSiteName(item)}
+                                    onClick={() => handleEditProject(item)}
                                     className="text-blue-600 hover:text-blue-800"
                                     title="Edit"
                                   >
                                     <img src={edit} alt="Edit" className="w-4 h-4" />
                                   </button>
                                   <button
-                                    onClick={() => handleDeleteSiteName(item.id)}
+                                    onClick={() => handleDeleteProject(item.id)}
                                     className="text-red-600 hover:text-red-800"
                                     title="Delete"
                                   >
@@ -3489,88 +3558,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                   </div>
                 </div>
               )}
-              {table.id === 'project-management' && (
-                <div>
-                  <div className="flex items-center mb-2 lg:mt-0 mt-3">
-                    <input
-                      type="text"
-                      className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
-                      placeholder="Search Project.."
-                      value={projectManagementSearch}
-                      onChange={(e) => setProjectManagementSearch(e.target.value)}
-                    />
-                    <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
-                      <img src={search} alt='search' className=' w-5 h-5' />
-                    </button>
-                    <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
-                      onClick={openProjectManagement}>
-                      + Add
-                    </button>
-                  </div>
-                  <button className="flex items-center text-[#E4572E] font-bold px-1 ml-4 mt-2 mb-6"
-                    onClick={() => document.getElementById('projectManagementFileInput').click()}>
-                    <img src={imports} alt='import' className='w-4 h-4 mr-1' />
-                    Import File
-                  </button>
-                  <input
-                    type="file"
-                    id="projectManagementFileInput"
-                    accept=".sql"
-                    style={{ display: 'none' }}
-                    onChange={(e) => handleProjectManagementBulkUpload(e)}
-                  />
-                  <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
-                    <div className="bg-[#FAF6ED]">
-                      <table className="table-auto lg:w-72">
-                        <thead className='bg-[#FAF6ED]'>
-                          <tr className="border-b">
-                            <th className="p-2 text-left lg:w-16 text-xl font-bold">S.No</th>
-                            <th className="p-2 text-left lg:w-72 text-xl font-bold">Project Name</th>
-                          </tr>
-                        </thead>
-                      </table>
-                    </div>
-                    <div className="overflow-y-auto max-h-[550px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-                      <table className="table-auto lg:w-full w-full">
-                        <tbody>
-                          {projects.filter(project =>
-                            project.projectName?.toLowerCase().includes(projectManagementSearch.toLowerCase()) ||
-                            project.projectAddress?.toLowerCase().includes(projectManagementSearch.toLowerCase()) ||
-                            project.projectId?.toLowerCase().includes(projectManagementSearch.toLowerCase())
-                          ).map((item, index) => (
-                            <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                              <td className="p-2 text-left font-semibold">
-                                {(projects.findIndex(p => p.id === item.id) + 1).toString().padStart(2, '0')}
-                              </td>
-                              <td className="p-2 text-left group flex font-semibold">
-                                <div className="flex flex-grow">
-                                  {item.projectName || ''}
-                                </div>
-                                <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  <button
-                                    onClick={() => handleEditProject(item)}
-                                    className="text-blue-600 hover:text-blue-800"
-                                    title="Edit"
-                                  >
-                                    <img src={edit} alt="Edit" className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteProject(item.id)}
-                                    className="text-red-600 hover:text-red-800"
-                                    title="Delete"
-                                  >
-                                    <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              )}
+
             </div>
           ))}
         </div>
@@ -4027,231 +4015,231 @@ const MasterData = ({ username, userRoles = [] }) => {
         )
       }
       {isEmployeeDataOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-            <div className="bg-white rounded-md px-2 py-2 text-left w-[1100px]">
-              <div className='p-4'>
-                <div>
-                  <button className="text-red-500 ml-[95%]" onClick={closeEmployeeDetails}>
-                    <img src={cross} alt='cross' className='w-5 h-5' />
-                  </button>
-                </div>
-                <div className="flex justify-between">
-                  <form onSubmit={handleSubmitEmployeeData} encType="multipart/form-data">
-                    <div className='flex justify-between gap-10'>
-                      <div className='mr-5'>
-                        <div className='flex gap-4'>
-                          <div className="mb-4">
-                            <label className="block text-lg font-medium mb-2">Employee Name</label>
-                            <input
-                              type="text"
-                              className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
-                              placeholder="Enter Employee Name"
-                              value={employeeName}
-                              onChange={(e) => setEmployeeName(e.target.value)}
-                              required
-                            />
-                          </div>
-                          <div className="mb-4">
-                            <label className="block text-lg font-medium mb-2">Employee ID</label>
-                            <input
-                              type="text"
-                              className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
-                              placeholder="Enter Employee ID"
-                              value={employeeId}
-                              onChange={(e) => setEmployeeId(e.target.value)}
-                              required
-                            />
-                          </div>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+          <div className="bg-white rounded-md px-2 py-2 text-left w-[1100px]">
+            <div className='p-4'>
+              <div>
+                <button className="text-red-500 ml-[95%]" onClick={closeEmployeeDetails}>
+                  <img src={cross} alt='cross' className='w-5 h-5' />
+                </button>
+              </div>
+              <div className="flex justify-between">
+                <form onSubmit={handleSubmitEmployeeData} encType="multipart/form-data">
+                  <div className='flex justify-between gap-10'>
+                    <div className='mr-5'>
+                      <div className='flex gap-4'>
+                        <div className="mb-4">
+                          <label className="block text-lg font-medium mb-2">Employee Name</label>
+                          <input
+                            type="text"
+                            className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
+                            placeholder="Enter Employee Name"
+                            value={employeeName}
+                            onChange={(e) => setEmployeeName(e.target.value)}
+                            required
+                          />
                         </div>
-                        <div className='flex gap-4'>
-                          <div className="mb-4">
-                            <label className="block text-lg font-medium mb-2">Designation</label>
-                            <input
-                              type="text"
-                              className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
-                              placeholder="Enter Designation"
-                              value={roleOfEmployee}
-                              onChange={(e) => setRoleOfEmployee(e.target.value)}
-                              required
-                            />
-                          </div>
-                          <div className="mb-4">
-                            <label className="block text-lg font-medium mb-2">Mobile Number</label>
-                            <input
-                              type="text"
-                              className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
-                              placeholder="Enter Mobile Number"
-                              value={mobileNumber}
-                              onChange={(e) => setMobileNumber(e.target.value)}
-                              required
-                            />
-                          </div>
-                        </div>
-                        <div className='flex gap-4'>
-                          <div className="mb-4">
-                            <label className="block text-lg font-medium mb-2">Account Holder Name</label>
-                            <input
-                              type="text"
-                              className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
-                              placeholder="Enter Account Holder Name"
-                              value={empAccountHolderName}
-                              onChange={(e) => setEmpAccountHolderName(e.target.value)}
-                            />
-                          </div>
-                          <div className="mb-4">
-                            <label className="block text-lg font-medium mb-2">Account Number</label>
-                            <input
-                              type="text"
-                              className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
-                              placeholder="Enter Account Number"
-                              value={empAccountNumber}
-                              onChange={(e) => setEmpAccountNumber(e.target.value)}
-                            />
-                          </div>
-                        </div>
-                        <div className='flex gap-4'>
-                          <div className="mb-4">
-                            <label className="block text-lg font-medium mb-2">Bank Name</label>
-                            <input
-                              type="text"
-                              className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
-                              placeholder="Enter Bank Name"
-                              value={empBankName}
-                              onChange={(e) => setEmpBankName(e.target.value)}
-                            />
-                          </div>
-                          <div className="mb-4">
-                            <label className="block text-lg font-medium mb-2">IFSC Code</label>
-                            <input
-                              type="text"
-                              className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
-                              placeholder="Enter IFSC Code"
-                              value={empIfscCode}
-                              onChange={(e) => setEmpIfscCode(e.target.value)}
-                            />
-                          </div>
-                        </div>
-                        <div className='flex gap-4'>
-                          <div className="mb-4">
-                            <label className="block text-lg font-medium mb-2">Branch</label>
-                            <input
-                              type="text"
-                              className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
-                              placeholder="Enter Branch"
-                              value={empBranch}
-                              onChange={(e) => setEmpBranch(e.target.value)}
-                            />
-                          </div>
-                          <div className="mb-4">
-                            <label className="block text-lg font-medium mb-2">UPI ID</label>
-                            <input
-                              type="text"
-                              className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
-                              placeholder="Enter UPI ID"
-                              value={empUpiId}
-                              onChange={(e) => setEmpUpiId(e.target.value)}
-                            />
-                          </div>
-                        </div>
-                        <div className='flex gap-4'>
-                          <div className="mb-4">
-                            <label className="block text-lg font-medium mb-2">GPay Number</label>
-                            <input
-                              type="text"
-                              className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
-                              placeholder="Enter GPay Number"
-                              value={empGpayNumber}
-                              onChange={(e) => setEmpGpayNumber(e.target.value)}
-                            />
-                          </div>
-                          <div className="mb-4">
-                            <label className="block text-lg font-medium mb-2">Contact Email</label>
-                            <input
-                              type="email"
-                              className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
-                              placeholder="Enter Contact Email"
-                              value={empContactEmail}
-                              onChange={(e) => setEmpContactEmail(e.target.value)}
-                            />
-                          </div>
+                        <div className="mb-4">
+                          <label className="block text-lg font-medium mb-2">Employee ID</label>
+                          <input
+                            type="text"
+                            className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
+                            placeholder="Enter Employee ID"
+                            value={employeeId}
+                            onChange={(e) => setEmployeeId(e.target.value)}
+                            required
+                          />
                         </div>
                       </div>
-                      {/* QR Image Section */}
-                      <div className="w-52 mt-10">
-                        <div>
-                          <div className="mb-4">
-                            <div className="w-48 h-48 border-2 border-[#BF9853] border-opacity-35 rounded-lg flex items-center justify-center bg-gray-50">
-                              {empUpiQRImage ? (
-                                <img src={URL.createObjectURL(empUpiQRImage)} alt="QR Preview" className="w-full h-full object-contain rounded-lg" />
-                              ) : (
-                                <span className="text-gray-400 text-sm">Profile Preview</span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="mb-4">
-                            <input
-                              type="file"
-                              id="employeeQrImageUpload"
-                              accept="image/*"
-                              onChange={(e) => setEmpUpiQRImage(e.target.files[0])}
-                              className="hidden"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => document.getElementById('employeeQrImageUpload').click()}
-                              className="w-52 bg-[#BF9853] text-white px-4 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
-                            >
-                              Add Image
-                            </button>
-                          </div>
-                        </div>
-                        <div className="flex space-x-2 justify-end mt-52 ml-5">
-                          <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
-                            Submit
-                          </button>
-                          <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={closeEmployeeDetails}>
-                            Cancel
-                          </button>
-                        </div>
-                        <div className="mt-4 ml-5">
+                      <div className='flex gap-4'>
+                        <div className="mb-4">
+                          <label className="block text-lg font-medium mb-2">Designation</label>
                           <input
-                            type="file"
-                            id="aadhaarPdfUpload"
-                            accept=".pdf"
-                            onChange={(e) => setAadhaarPdfFile(e.target.files[0])}
-                            className="hidden"
+                            type="text"
+                            className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
+                            placeholder="Enter Designation"
+                            value={roleOfEmployee}
+                            onChange={(e) => setRoleOfEmployee(e.target.value)}
+                            required
                           />
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => document.getElementById('aadhaarPdfUpload').click()}
-                              className="bg-[#BF9853] text-white px-2 py-2 w-48 -ml-14 rounded-lg hover:bg-yellow-800 font-semibold"
-                            >
-                              Select Aadhaar PDF
-                            </button>
-                            {aadhaarImageUrl && (
-                              <button
-                                type="button"
-                                onClick={() => window.open(aadhaarImageUrl, '_blank')}
-                                className="bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 font-semibold"
-                                title="View existing Aadhaar PDF"
-                              >
-                                📄
-                              </button>
-                            )}
-                          </div>
-                          {aadhaarPdfFile && (
-                            <p className="text-sm text-green-600 mt-2 -ml-14">Selected: {aadhaarPdfFile.name}</p>
-                          )}
+                        </div>
+                        <div className="mb-4">
+                          <label className="block text-lg font-medium mb-2">Mobile Number</label>
+                          <input
+                            type="text"
+                            className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
+                            placeholder="Enter Mobile Number"
+                            value={mobileNumber}
+                            onChange={(e) => setMobileNumber(e.target.value)}
+                            required
+                          />
+                        </div>
+                      </div>
+                      <div className='flex gap-4'>
+                        <div className="mb-4">
+                          <label className="block text-lg font-medium mb-2">Account Holder Name</label>
+                          <input
+                            type="text"
+                            className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
+                            placeholder="Enter Account Holder Name"
+                            value={empAccountHolderName}
+                            onChange={(e) => setEmpAccountHolderName(e.target.value)}
+                          />
+                        </div>
+                        <div className="mb-4">
+                          <label className="block text-lg font-medium mb-2">Account Number</label>
+                          <input
+                            type="text"
+                            className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
+                            placeholder="Enter Account Number"
+                            value={empAccountNumber}
+                            onChange={(e) => setEmpAccountNumber(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className='flex gap-4'>
+                        <div className="mb-4">
+                          <label className="block text-lg font-medium mb-2">Bank Name</label>
+                          <input
+                            type="text"
+                            className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
+                            placeholder="Enter Bank Name"
+                            value={empBankName}
+                            onChange={(e) => setEmpBankName(e.target.value)}
+                          />
+                        </div>
+                        <div className="mb-4">
+                          <label className="block text-lg font-medium mb-2">IFSC Code</label>
+                          <input
+                            type="text"
+                            className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
+                            placeholder="Enter IFSC Code"
+                            value={empIfscCode}
+                            onChange={(e) => setEmpIfscCode(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className='flex gap-4'>
+                        <div className="mb-4">
+                          <label className="block text-lg font-medium mb-2">Branch</label>
+                          <input
+                            type="text"
+                            className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
+                            placeholder="Enter Branch"
+                            value={empBranch}
+                            onChange={(e) => setEmpBranch(e.target.value)}
+                          />
+                        </div>
+                        <div className="mb-4">
+                          <label className="block text-lg font-medium mb-2">UPI ID</label>
+                          <input
+                            type="text"
+                            className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
+                            placeholder="Enter UPI ID"
+                            value={empUpiId}
+                            onChange={(e) => setEmpUpiId(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className='flex gap-4'>
+                        <div className="mb-4">
+                          <label className="block text-lg font-medium mb-2">GPay Number</label>
+                          <input
+                            type="text"
+                            className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
+                            placeholder="Enter GPay Number"
+                            value={empGpayNumber}
+                            onChange={(e) => setEmpGpayNumber(e.target.value)}
+                          />
+                        </div>
+                        <div className="mb-4">
+                          <label className="block text-lg font-medium mb-2">Contact Email</label>
+                          <input
+                            type="email"
+                            className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
+                            placeholder="Enter Contact Email"
+                            value={empContactEmail}
+                            onChange={(e) => setEmpContactEmail(e.target.value)}
+                          />
                         </div>
                       </div>
                     </div>
-                  </form>
-                </div>
+                    {/* QR Image Section */}
+                    <div className="w-52 mt-10">
+                      <div>
+                        <div className="mb-4">
+                          <div className="w-48 h-48 border-2 border-[#BF9853] border-opacity-35 rounded-lg flex items-center justify-center bg-gray-50">
+                            {empUpiQRImage ? (
+                              <img src={URL.createObjectURL(empUpiQRImage)} alt="QR Preview" className="w-full h-full object-contain rounded-lg" />
+                            ) : (
+                              <span className="text-gray-400 text-sm">Profile Preview</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="mb-4">
+                          <input
+                            type="file"
+                            id="employeeQrImageUpload"
+                            accept="image/*"
+                            onChange={(e) => setEmpUpiQRImage(e.target.files[0])}
+                            className="hidden"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => document.getElementById('employeeQrImageUpload').click()}
+                            className="w-52 bg-[#BF9853] text-white px-4 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
+                          >
+                            Add Image
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex space-x-2 justify-end mt-52 ml-5">
+                        <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
+                          Submit
+                        </button>
+                        <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={closeEmployeeDetails}>
+                          Cancel
+                        </button>
+                      </div>
+                      <div className="mt-4 ml-5">
+                        <input
+                          type="file"
+                          id="aadhaarPdfUpload"
+                          accept=".pdf"
+                          onChange={(e) => setAadhaarPdfFile(e.target.files[0])}
+                          className="hidden"
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => document.getElementById('aadhaarPdfUpload').click()}
+                            className="bg-[#BF9853] text-white px-2 py-2 w-48 -ml-14 rounded-lg hover:bg-yellow-800 font-semibold"
+                          >
+                            Select Aadhaar PDF
+                          </button>
+                          {aadhaarImageUrl && (
+                            <button
+                              type="button"
+                              onClick={() => window.open(aadhaarImageUrl, '_blank')}
+                              className="bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 font-semibold"
+                              title="View existing Aadhaar PDF"
+                            >
+                              📄
+                            </button>
+                          )}
+                        </div>
+                        {aadhaarPdfFile && (
+                          <p className="text-sm text-green-600 mt-2 -ml-14">Selected: {aadhaarPdfFile.name}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </form>
               </div>
             </div>
           </div>
-        )
+        </div>
+      )
       }
       {
         isLaboursListDataOpen && (
@@ -5619,13 +5607,15 @@ const MasterData = ({ username, userRoles = [] }) => {
                 </div>
                 <div className="mb-4 pl-5">
                   <label className="block text-lg font-medium mb-2">Project Category</label>
-                  <input className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                    placeholder="Enter Project Category"
-                    type="text"
+                  <select className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
                     value={newProject.projectCategory}
                     onChange={(e) =>
                       setNewProject((prev) => ({ ...prev, projectCategory: e.target.value }))
-                    }></input>
+                    }>
+                    <option value="">Select Project Category</option>
+                    <option value="Client Project">Client Project</option>
+                    <option value="Own Project">Own Project</option>
+                  </select>
                 </div>
               </div>
               <div className="mb-4 pl-5">
@@ -5731,6 +5721,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                       <option value="Shop">Shop</option>
                       <option value="House">House</option>
                       <option value="Land">Land</option>
+                      <option value="Office">Office</option>
                     </select>
                   </div>
                   <div>
@@ -5786,13 +5777,6 @@ const MasterData = ({ username, userRoles = [] }) => {
                         placeholder='EB NO'
                         className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
                       />
-                      <input
-                        type='text'
-                        value={detail.ebNoFrequency}
-                        onChange={(e) => handleNewDetailChange(index, 'ebNoFrequency', e.target.value)}
-                        placeholder='Frequency'
-                        className='w-14 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none ml-1'
-                      />
                     </div>
                   </div>
                   <div className="relative">
@@ -5805,13 +5789,6 @@ const MasterData = ({ username, userRoles = [] }) => {
                         placeholder='Property Tax No'
                         className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
                       />
-                      <input
-                        type='text'
-                        value={detail.propertyTaxFrequency}
-                        onChange={(e) => handleNewDetailChange(index, 'propertyTaxFrequency', e.target.value)}
-                        placeholder='Frequency'
-                        className='w-14 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none ml-1'
-                      />
                     </div>
                   </div>
                   <div className="relative">
@@ -5823,13 +5800,6 @@ const MasterData = ({ username, userRoles = [] }) => {
                         onChange={(e) => handleNewDetailChange(index, 'waterTaxNo', e.target.value)}
                         placeholder='Water Tax No'
                         className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
-                      />
-                      <input
-                        type='text'
-                        value={detail.waterTaxFrequency}
-                        onChange={(e) => handleNewDetailChange(index, 'waterTaxFrequency', e.target.value)}
-                        placeholder='Frequency'
-                        className='w-14 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none ml-1'
                       />
                     </div>
                   </div>
@@ -5872,308 +5842,288 @@ const MasterData = ({ username, userRoles = [] }) => {
           </div>
         </div>
       )}
-      {
-        isProjectEditOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-            <div className="bg-white rounded-md w-[95rem] h-[40rem] text-left overflow-y-auto pl-20">
-              <div>
-                <button className="text-red-500 ml-[95%]" onClick={() => setIsProjectEditOpen(false)}>
-                  <img src={cross} alt="close" className="w-5 h-5" />
-                </button>
-              </div>
-              <form onSubmit={handleSubmitEditProject}>
-                <div className="flex gap-4">
-                  <div className="mb-4 pl-5">
-                    <label className="block text-lg font-medium mb-2">Project Name</label>
-                    <input
-                      type="text"
-                      value={editProject.projectName}
-                      onChange={(e) =>
-                        setEditProject((prev) => ({ ...prev, projectName: e.target.value }))
-                      }
-                      className="w-[35rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                      placeholder="Enter Project Name"
-                      required
-                    />
-                  </div>
-                  <div className="mb-4 pl-5">
-                    <label className="block text-lg font-medium mb-2">Project ID</label>
-                    <input className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                      placeholder="Enter Project ID"
-                      type="text"
-                      value={editProject.projectId}
-                      onChange={(e) =>
-                        setEditProject((prev) => ({ ...prev, projectId: e.target.value }))
-                      }></input>
-                  </div>
-                </div>
-                <div className="flex gap-4">
-                  <div className="mb-4 pl-5">
-                    <label className="block text-lg font-medium mb-2">Project Reference Name</label>
-                    <input className="w-[35rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                      placeholder="Enter Project Reference Name"
-                      type="text"
-                      value={editProject.projectReferenceName}
-                      onChange={(e) =>
-                        setEditProject((prev) => ({ ...prev, projectReferenceName: e.target.value }))
-                      }></input>
-                  </div>
-                  <div className="mb-4 pl-5">
-                    <label className="block text-lg font-medium mb-2">Project Category</label>
-                    <input className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                      placeholder="Enter Project Category"
-                      type="text"
-                      value={editProject.projectCategory}
-                      onChange={(e) =>
-                        setEditProject((prev) => ({ ...prev, projectCategory: e.target.value }))
-                      }></input>
-                  </div>
+      {isProjectEditOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+          <div className="bg-white rounded-md w-[95rem] h-[40rem] text-left overflow-y-auto pl-20">
+            <div>
+              <button className="text-red-500 ml-[95%]" onClick={() => setIsProjectEditOpen(false)}>
+                <img src={cross} alt="close" className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmitEditProject}>
+              <div className="flex gap-4">
+                <div className="mb-4 pl-5">
+                  <label className="block text-lg font-medium mb-2">Project Name</label>
+                  <input
+                    type="text"
+                    value={editProject.projectName}
+                    onChange={(e) =>
+                      setEditProject((prev) => ({ ...prev, projectName: e.target.value }))
+                    }
+                    className="w-[35rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    placeholder="Enter Project Name"
+                    required
+                  />
                 </div>
                 <div className="mb-4 pl-5">
-                  <label className="block text-lg font-medium mb-2">Project Address</label>
-                  <input className="w-[62rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                    placeholder="Enter Project Address"
+                  <label className="block text-lg font-medium mb-2">Project ID</label>
+                  <input className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    placeholder="Enter Project ID"
                     type="text"
-                    value={editProject.projectAddress}
+                    value={editProject.projectId}
                     onChange={(e) =>
-                      setEditProject((prev) => ({ ...prev, projectAddress: e.target.value }))
+                      setEditProject((prev) => ({ ...prev, projectId: e.target.value }))
                     }></input>
                 </div>
-                {editProject.ownerDetailsList.map((owner, index) => (
-                  <div key={index} className="mb-2">
-                    <div className="flex mb-2 ">
-                      <div className="mt-12 mr-4">
-                        {index + 1}.
-                      </div>
-                      <div className='flex mb-2 gap-5'>
-                        <div className="flex flex-col">
-                          <label className="mb-1 text-lg font-medium">Client Name</label>
-                          <input
-                            type="text"
-                            value={owner.clientName}
-                            onChange={(e) => handleEditOwnerChange(index, 'clientName', e.target.value)}
-                            placeholder="Client Name"
-                            className="w-80 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
-                          />
-                        </div>
-                        <div className="flex flex-col">
-                          <label className="mb-1 text-lg font-medium">Father Name</label>
-                          <input
-                            type="text"
-                            value={owner.fatherName}
-                            onChange={(e) => handleEditOwnerChange(index, 'fatherName', e.target.value)}
-                            placeholder="Father Name"
-                            className="w-72 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
-                          />
-                        </div>
-                        <div className="flex flex-col">
-                          <label className="mb-1 text-lg font-medium">Mobile</label>
-                          <input
-                            type="text"
-                            value={owner.mobile}
-                            onChange={(e) => handleEditOwnerChange(index, 'mobile', e.target.value)}
-                            placeholder="Mobile"
-                            className="w-60 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
-                          />
-                        </div>
-                        <div className="flex flex-col">
-                          <label className="mb-1 text-lg font-medium">Age</label>
-                          <input
-                            type="text"
-                            value={owner.age}
-                            onChange={(e) => handleEditOwnerChange(index, 'age', e.target.value)}
-                            placeholder="Age"
-                            className="w-20 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    <div className=" relative pl-4">
-                      <label className="block text-lg font-medium ">Client Address</label>
-                      <input
-                        type="text"
-                        value={owner.clientAddress}
-                        onChange={(e) => handleEditOwnerChange(index, 'clientAddress', e.target.value)}
-                        placeholder="Client Address"
-                        className="w-[62rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const updatedOwners = [...editProject.ownerDetailsList];
-                          updatedOwners.splice(index, 1);
-                          setEditProject((prev) => ({
-                            ...prev,
-                            ownerDetailsList: updatedOwners,
-                          }));
-                        }}
-                        className="absolute ml-2 mt-3 text-red-500 font-bold text-xl"
-                        title="Remove this owner"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                <button type="button" className="text-[#E4572E] font-bold ml-4 px-1 border-dashed border-b-2 border-[#BF9853]" onClick={addEditOwner}>+ Add Another Owner</button>
-                {editProject.propertyDetailsList.map((detail, index) => (
-                  <div className="flex mb-2 gap-5" key={index}>
-                    <div className="mt-12">
+              </div>
+              <div className="flex gap-4">
+                <div className="mb-4 pl-5">
+                  <label className="block text-lg font-medium mb-2">Project Reference Name</label>
+                  <input className="w-[35rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    placeholder="Enter Project Reference Name"
+                    type="text"
+                    value={editProject.projectReferenceName}
+                    onChange={(e) =>
+                      setEditProject((prev) => ({ ...prev, projectReferenceName: e.target.value }))
+                    }></input>
+                </div>
+                <div className="mb-4 pl-5">
+                  <label className="block text-lg font-medium mb-2">Project Category</label>
+                  <select className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    value={editProject.projectCategory}
+                    onChange={(e) =>
+                      setEditProject((prev) => ({ ...prev, projectCategory: e.target.value }))
+                    }>
+                    <option value="">Select Project Category</option>
+                    <option value="Client Project">Client Project</option>
+                    <option value="Own Project">Own Project</option>
+                  </select>
+                </div>
+              </div>
+              <div className="mb-4 pl-5">
+                <label className="block text-lg font-medium mb-2">Project Address</label>
+                <input className="w-[62rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                  placeholder="Enter Project Address"
+                  type="text"
+                  value={editProject.projectAddress}
+                  onChange={(e) =>
+                    setEditProject((prev) => ({ ...prev, projectAddress: e.target.value }))
+                  }></input>
+              </div>
+              {editProject.ownerDetailsList.map((owner, index) => (
+                <div key={index} className="mb-2">
+                  <div className="flex mb-2 ">
+                    <div className="mt-12 mr-4">
                       {index + 1}.
                     </div>
-                    <div className="">
-                      <label className="block mb-1 text-lg font-medium">Project Type</label>
-                      <select
-                        value={detail.projectType}
-                        onChange={(e) => handleEditDetailChange(index, 'projectType', e.target.value)}
-                        className="w-40  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
-                      >
-                        <option value="">Select Type</option>
-                        <option value="Shop">Shop</option>
-                        <option value="House">House</option>
-                        <option value="Land">Land</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block mb-1 text-lg font-medium">Floor Name</label>
-                      <select
-                        value={detail.floorName}
-                        onChange={(e) => handleEditDetailChange(index, 'floorName', e.target.value)}
-                        className="w-36  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
-                      >
-                        <option value="">Select Floor</option>
-                        <option value="Ground Floor">Ground Floor</option>
-                        <option value="First Floor">First Floor</option>
-                        <option value="Second Floor">Second Floor</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block mb-1 text-lg font-medium">Shop No</label>
-                      <input
-                        type="text"
-                        value={detail.shopNo}
-                        onChange={(e) => handleEditDetailChange(index, 'shopNo', e.target.value)}
-                        placeholder="Shop No"
-                        className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
-                      />
-                    </div>
-                    <div>
-                      <label className="block mb-1 text-lg font-medium">Door No</label>
-                      <input
-                        type="text"
-                        value={detail.doorNo}
-                        onChange={(e) => handleEditDetailChange(index, 'doorNo', e.target.value)}
-                        placeholder="Door No"
-                        className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
-                      />
-                    </div>
-                    <div>
-                      <label className="block mb-1 text-lg font-medium">Area</label>
-                      <input
-                        type="text"
-                        value={detail.area}
-                        onChange={(e) => handleEditDetailChange(index, 'area', e.target.value)}
-                        placeholder="Area"
-                        className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
-                      />
-                    </div>
-                    <div className="relative">
-                      <label className='block mb-1 text-lg font-medium '>EB.NO</label>
-                      <div className="flex">
+                    <div className='flex mb-2 gap-5'>
+                      <div className="flex flex-col">
+                        <label className="mb-1 text-lg font-medium">Client Name</label>
                         <input
-                          type='text'
-                          value={detail.ebNo}
-                          onChange={(e) => handleEditDetailChange(index, 'ebNo', e.target.value)}
-                          placeholder='EB NO'
-                          className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
-                        />
-                        <input
-                          type='text'
-                          value={detail.ebNoFrequency}
-                          onChange={(e) => handleEditDetailChange(index, 'ebNoFrequency', e.target.value)}
-                          placeholder='Frequency'
-                          className='w-14 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none ml-1'
+                          type="text"
+                          value={owner.clientName}
+                          onChange={(e) => handleEditOwnerChange(index, 'clientName', e.target.value)}
+                          placeholder="Client Name"
+                          className="w-80 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
                         />
                       </div>
-                    </div>
-                    <div className="relative">
-                      <label className='block mb-1 text-lg font-medium '>Property Tax No</label>
-                      <div className="flex">
+                      <div className="flex flex-col">
+                        <label className="mb-1 text-lg font-medium">Father Name</label>
                         <input
-                          type='text'
-                          value={detail.propertyTaxNo}
-                          onChange={(e) => handleEditDetailChange(index, 'propertyTaxNo', e.target.value)}
-                          placeholder='Property Tax No'
-                          className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
-                        />
-                        <input
-                          type='text'
-                          value={detail.propertyTaxFrequency}
-                          onChange={(e) => handleEditDetailChange(index, 'propertyTaxFrequency', e.target.value)}
-                          placeholder='Frequency'
-                          className='w-14 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none ml-1'
+                          type="text"
+                          value={owner.fatherName}
+                          onChange={(e) => handleEditOwnerChange(index, 'fatherName', e.target.value)}
+                          placeholder="Father Name"
+                          className="w-72 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
                         />
                       </div>
-                    </div>
-                    <div className="relative">
-                      <label className='block mb-1 text-lg font-medium '>Water Tax No</label>
-                      <div className="flex">
+                      <div className="flex flex-col">
+                        <label className="mb-1 text-lg font-medium">Mobile</label>
                         <input
-                          type='text'
-                          value={detail.waterTaxNo}
-                          onChange={(e) => handleEditDetailChange(index, 'waterTaxNo', e.target.value)}
-                          placeholder='Water Tax No'
-                          className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
-                        />
-                        <input
-                          type='text'
-                          value={detail.waterTaxFrequency}
-                          onChange={(e) => handleEditDetailChange(index, 'waterTaxFrequency', e.target.value)}
-                          placeholder='Frequency'
-                          className='w-14 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none ml-1'
+                          type="text"
+                          value={owner.mobile}
+                          onChange={(e) => handleEditOwnerChange(index, 'mobile', e.target.value)}
+                          placeholder="Mobile"
+                          className="w-60 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
                         />
                       </div>
-                    </div>
-                    <div className="flex items-end mb-3">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const updatedList = [...editProject.propertyDetailsList];
-                          updatedList.splice(index, 1);
-                          setEditProject(prev => ({
-                            ...prev,
-                            propertyDetailsList: updatedList,
-                          }));
-                        }}
-                        className="text-red-500 font-bold text-xl hover:text-red-700"
-                        title="Remove this row"
-                      >
-                        ✕
-                      </button>
+                      <div className="flex flex-col">
+                        <label className="mb-1 text-lg font-medium">Age</label>
+                        <input
+                          type="text"
+                          value={owner.age}
+                          onChange={(e) => handleEditOwnerChange(index, 'age', e.target.value)}
+                          placeholder="Age"
+                          className="w-20 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                        />
+                      </div>
                     </div>
                   </div>
-                ))}
-                <button type="button" className="text-[#E4572E] font-bold px-1 ml-3 border-dashed border-b-2 border-[#BF9853] " onClick={addEditPropertyDetail}>+ Add on</button>
-                <div className="flex space-x-2 mt-6 mb-4 ml-5">
-                  <button
-                    type="submit"
-                    className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
-                  >
-                    Update
-                  </button>
-                  <button
-                    type="button"
-                    className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
-                    onClick={() => setIsProjectEditOpen(false)}
-                  >
-                    Cancel
-                  </button>
+                  <div className=" relative pl-4">
+                    <label className="block text-lg font-medium ">Client Address</label>
+                    <input
+                      type="text"
+                      value={owner.clientAddress}
+                      onChange={(e) => handleEditOwnerChange(index, 'clientAddress', e.target.value)}
+                      placeholder="Client Address"
+                      className="w-[62rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updatedOwners = [...editProject.ownerDetailsList];
+                        updatedOwners.splice(index, 1);
+                        setEditProject((prev) => ({
+                          ...prev,
+                          ownerDetailsList: updatedOwners,
+                        }));
+                      }}
+                      className="absolute ml-2 mt-3 text-red-500 font-bold text-xl"
+                      title="Remove this owner"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </div>
-              </form>
-            </div>
+              ))}
+              <button type="button" className="text-[#E4572E] font-bold ml-4 px-1 border-dashed border-b-2 border-[#BF9853]" onClick={addEditOwner}>+ Add Another Owner</button>
+              {editProject.propertyDetailsList.map((detail, index) => (
+                <div className="flex mb-2 gap-5" key={index}>
+                  <div className="mt-12">
+                    {index + 1}.
+                  </div>
+                  <div className="">
+                    <label className="block mb-1 text-lg font-medium">Project Type</label>
+                    <select
+                      value={detail.projectType}
+                      onChange={(e) => handleEditDetailChange(index, 'projectType', e.target.value)}
+                      className="w-40  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                    >
+                      <option value="">Select Type</option>
+                      <option value="Shop">Shop</option>
+                      <option value="House">House</option>
+                      <option value="Land">Land</option>
+                      <option value="Office">Office</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-lg font-medium">Floor Name</label>
+                    <select
+                      value={detail.floorName}
+                      onChange={(e) => handleEditDetailChange(index, 'floorName', e.target.value)}
+                      className="w-36  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                    >
+                      <option value="">Select Floor</option>
+                      <option value="Ground Floor">Ground Floor</option>
+                      <option value="First Floor">First Floor</option>
+                      <option value="Second Floor">Second Floor</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-lg font-medium">Shop No</label>
+                    <input
+                      type="text"
+                      value={detail.shopNo}
+                      onChange={(e) => handleEditDetailChange(index, 'shopNo', e.target.value)}
+                      placeholder="Shop No"
+                      className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-lg font-medium">Door No</label>
+                    <input
+                      type="text"
+                      value={detail.doorNo}
+                      onChange={(e) => handleEditDetailChange(index, 'doorNo', e.target.value)}
+                      placeholder="Door No"
+                      className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-lg font-medium">Area</label>
+                    <input
+                      type="text"
+                      value={detail.area}
+                      onChange={(e) => handleEditDetailChange(index, 'area', e.target.value)}
+                      placeholder="Area"
+                      className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                    />
+                  </div>
+                  <div className="relative">
+                    <label className='block mb-1 text-lg font-medium '>EB.NO</label>
+                    <div className="flex">
+                      <input
+                        type='text'
+                        value={detail.ebNo}
+                        onChange={(e) => handleEditDetailChange(index, 'ebNo', e.target.value)}
+                        placeholder='EB NO'
+                        className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                      />
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <label className='block mb-1 text-lg font-medium '>Property Tax No</label>
+                    <div className="flex">
+                      <input
+                        type='text'
+                        value={detail.propertyTaxNo}
+                        onChange={(e) => handleEditDetailChange(index, 'propertyTaxNo', e.target.value)}
+                        placeholder='Property Tax No'
+                        className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                      />
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <label className='block mb-1 text-lg font-medium '>Water Tax No</label>
+                    <div className="flex">
+                      <input
+                        type='text'
+                        value={detail.waterTaxNo}
+                        onChange={(e) => handleEditDetailChange(index, 'waterTaxNo', e.target.value)}
+                        placeholder='Water Tax No'
+                        className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-end mb-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updatedList = [...editProject.propertyDetailsList];
+                        updatedList.splice(index, 1);
+                        setEditProject(prev => ({
+                          ...prev,
+                          propertyDetailsList: updatedList,
+                        }));
+                      }}
+                      className="text-red-500 font-bold text-xl hover:text-red-700"
+                      title="Remove this row"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <button type="button" className="text-[#E4572E] font-bold px-1 ml-3 border-dashed border-b-2 border-[#BF9853] " onClick={addEditPropertyDetail}>+ Add on</button>
+              <div className="flex space-x-2 mt-6 mb-4 ml-5">
+                <button
+                  type="submit"
+                  className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
+                >
+                  Update
+                </button>
+                <button
+                  type="button"
+                  className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
+                  onClick={() => setIsProjectEditOpen(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
-        )
-      }
+        </div>
+      )}
       {isEditEmployeeDataOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
           <div className="bg-white rounded-md px-2 py-2 text-left w-[1100px]">
@@ -6185,9 +6135,8 @@ const MasterData = ({ username, userRoles = [] }) => {
               </div>
               <div className="flex justify-between">
                 <form onSubmit={async (e) => {
-                  e.preventDefault();                  
-                  // Handle Aadhaar PDF upload first
-                  let aadhaarUrl = editAadhaarImageUrl;                  
+                  e.preventDefault();
+                  let aadhaarUrl = editAadhaarImageUrl;
                   if (editAadhaarPdfFile) {
                     try {
                       aadhaarUrl = await uploadAadhaarPdfToGoogleDrive(editAadhaarPdfFile, editEmployeeName);
@@ -6202,7 +6151,6 @@ const MasterData = ({ username, userRoles = [] }) => {
                   } else {
                     console.log('No Aadhaar PDF file selected, using existing URL:', editAadhaarImageUrl);
                   }
-                  // Prepare employee data with updated Aadhaar URL
                   const formData = new FormData();
                   const employeeDetails = {
                     employee_name: editEmployeeName,
@@ -6219,7 +6167,6 @@ const MasterData = ({ username, userRoles = [] }) => {
                     contact_email: editEmpContactEmail,
                     aadhaar_image_url: aadhaarUrl
                   };
-                  // Create a blob for the employee data (like vendor implementation)
                   const employeeBlob = new Blob([JSON.stringify(employeeDetails)], { type: 'application/json' });
                   formData.append('employeeDetails', employeeBlob);
                   if (editEmpUpiQRImage) {
@@ -6462,7 +6409,6 @@ const MasterData = ({ username, userRoles = [] }) => {
                         </div>
                       </div>
                     </div>
-                    {/* QR Image Section */}
                     <div className="w-52 mt-10">
                       <div>
                         <div className="mb-4">
@@ -6555,391 +6501,377 @@ const MasterData = ({ username, userRoles = [] }) => {
           </div>
         </div>
       )}
-
       {isEditLaboursListDataOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-            <div className="bg-white rounded-md w-[30rem] h-80 px-2 py-2">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+          <div className="bg-white rounded-md w-[30rem] h-80 px-2 py-2">
+            <div>
+              <button className="text-red-500 ml-[95%]" onClick={() => setIsEditLaboursListDataOpen(false)}>
+                <img src={cross} alt='cross' className='w-5 h-5' />
+              </button>
+            </div>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              try {
+                const response = await fetch(`https://backendaab.in/aabuildersDash/api/labours-details/update/${selectedLabourDataId}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    labour_name: editLabourName,
+                    labour_salary: editLabourSalary
+                  }),
+                });
+                if (response.ok) {
+                  setMessage('Labour data updated successfully!');
+                  setIsEditLaboursListDataOpen(false);
+                  window.location.reload();
+                }
+              } catch (error) {
+                console.error('Error:', error);
+              }
+            }}>
+              <div className="mb-4">
+                <label className="block text-lg font-medium mb-2 -ml-64">Labour Name</label>
+                <input
+                  type="text"
+                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
+                  placeholder="Enter Name"
+                  value={editLabourName}
+                  onChange={(e) => setEditLabourName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-lg font-medium mb-2 -ml-80">Salary</label>
+                <input
+                  type="number"
+                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
+                  placeholder="Enter Salary"
+                  value={editLabourSalary}
+                  onChange={(e) => setEditLabourSalary(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="flex space-x-2 mt-4 ml-12">
+                <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
+                  Update
+                </button>
+                <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={() => setIsEditLaboursListDataOpen(false)}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )
+      }
+      {isAccountDetailsEditOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+          <div className="bg-white rounded-md px-2 py-2 text-left w-[1100px]">
+            <div className='p-4'>
               <div>
-                <button className="text-red-500 ml-[95%]" onClick={() => setIsEditLaboursListDataOpen(false)}>
+                <button className="text-red-500 ml-[95%]" onClick={resetAccountData}>
                   <img src={cross} alt='cross' className='w-5 h-5' />
                 </button>
               </div>
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                try {
-                  const response = await fetch(`https://backendaab.in/aabuildersDash/api/labours-details/update/${selectedLabourDataId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      labour_name: editLabourName,
-                      labour_salary: editLabourSalary
-                    }),
-                  });
-                  if (response.ok) {
-                    setMessage('Labour data updated successfully!');
-                    setIsEditLaboursListDataOpen(false);
-                    window.location.reload();
-                  }
-                } catch (error) {
-                  console.error('Error:', error);
-                }
-              }}>
-                <div className="mb-4">
-                  <label className="block text-lg font-medium mb-2 -ml-64">Labour Name</label>
-                  <input
-                    type="text"
-                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                    placeholder="Enter Name"
-                    value={editLabourName}
-                    onChange={(e) => setEditLabourName(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="mb-4">
-                  <label className="block text-lg font-medium mb-2 -ml-80">Salary</label>
-                  <input
-                    type="number"
-                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                    placeholder="Enter Salary"
-                    value={editLabourSalary}
-                    onChange={(e) => setEditLabourSalary(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="flex space-x-2 mt-4 ml-12">
-                  <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
-                    Update
-                  </button>
-                  <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={() => setIsEditLaboursListDataOpen(false)}>
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )
-      }
-      {isAccountDetailsEditOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-            <div className="bg-white rounded-md px-2 py-2 text-left w-[1100px]">
-              <div className='p-4'>
-                <div>
-                  <button className="text-red-500 ml-[95%]" onClick={resetAccountData}>
-                    <img src={cross} alt='cross' className='w-5 h-5' />
-                  </button>
-                </div>
-                <div className="flex justify-between">
-                  <div className="flex">
-                    <form className='' onSubmit={async (e) => {
-                      e.preventDefault();
-                      // Convert Base64 to proper format for backend
-                      let qrImageBase64 = null;
-                      if (editQrImagePreview) {
-                        // Remove data URL prefix if present and keep only Base64 data
-                        qrImageBase64 = editQrImagePreview.includes(',') ? editQrImagePreview.split(',')[1] : editQrImagePreview;
+              <div className="flex justify-between">
+                <div className="flex">
+                  <form className='' onSubmit={async (e) => {
+                    e.preventDefault();
+                    let qrImageBase64 = null;
+                    if (editQrImagePreview) {
+                      qrImageBase64 = editQrImagePreview.includes(',') ? editQrImagePreview.split(',')[1] : editQrImagePreview;
+                    }
+                    const updateData = {
+                      account_holder_name: editAccountHolderName,
+                      account_number: editAccountNumber,
+                      bank_name: editBankName,
+                      branch: editBranch,
+                      ifsc_code: editIfscCode,
+                      upi_id: editUpiId,
+                      gpay_number: editGpayNumber,
+                      account_type: editAccountType,
+                      upi_qr_image: qrImageBase64
+                    };
+                    try {
+                      const response = await fetch(`https://backendaab.in/aabuildersDash/api/account-details/update/${selectedAccountId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(updateData),
+                      });
+                      if (response.ok) {
+                        setMessage('Account details updated successfully!');
+                        setIsAccountDetailsEditOpen(false);
+                        window.location.reload();
                       }
-                      const updateData = {
-                        account_holder_name: editAccountHolderName,
-                        account_number: editAccountNumber,
-                        bank_name: editBankName,
-                        branch: editBranch,
-                        ifsc_code: editIfscCode,
-                        upi_id: editUpiId,
-                        gpay_number: editGpayNumber,
-                        account_type: editAccountType,
-                        upi_qr_image: qrImageBase64
-                      };
-                      try {
-                        const response = await fetch(`https://backendaab.in/aabuildersDash/api/account-details/update/${selectedAccountId}`, {
-                          method: 'PUT',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify(updateData),
-                        });
-                        if (response.ok) {
-                          setMessage('Account details updated successfully!');
-                          setIsAccountDetailsEditOpen(false);
-                          window.location.reload();
-                        }
-                      } catch (error) {
-                        console.error('Error:', error);
-                      }
-                    }}>
-                      <div className='flex gap-16'>
-                        <div>
-                          <div className='flex gap-4'>
-                            <div className="mb-4">
-                              <label className="block text-lg font-medium mb-2">Account Holder Name</label>
-                              <div className="relative">
-                                <input
-                                  type="text"
-                                  className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 pr-12 rounded-lg h-14 focus:outline-none"
-                                  placeholder="Enter Account Holder Name"
-                                  value={editAccountHolderName}
-                                  onChange={(e) => setEditAccountHolderName(e.target.value)}
-                                  disabled={!isAccountEditMode}
-                                  required
+                    } catch (error) {
+                      console.error('Error:', error);
+                    }
+                  }}>
+                    <div className='flex gap-16'>
+                      <div>
+                        <div className='flex gap-4'>
+                          <div className="mb-4">
+                            <label className="block text-lg font-medium mb-2">Account Holder Name</label>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 pr-12 rounded-lg h-14 focus:outline-none"
+                                placeholder="Enter Account Holder Name"
+                                value={editAccountHolderName}
+                                onChange={(e) => setEditAccountHolderName(e.target.value)}
+                                disabled={!isAccountEditMode}
+                                required
+                              />
+                              {!isAccountEditMode && (
+                                <CopyButton
+                                  text={editAccountHolderName}
+                                  fieldName="Account Holder Name"
+                                  buttonId="account-holder-name"
                                 />
-                                {!isAccountEditMode && (
-                                  <CopyButton
-                                    text={editAccountHolderName}
-                                    fieldName="Account Holder Name"
-                                    buttonId="account-holder-name"
-                                  />
-                                )}
-                              </div>
-                            </div>
-                            <div className="mb-4">
-                              <label className="block text-lg font-medium mb-2">Account Number</label>
-                              <div className="relative">
-                                <input
-                                  type="text"
-                                  className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 pr-12 rounded-lg h-14 focus:outline-none"
-                                  placeholder="Enter Account Number"
-                                  value={editAccountNumber}
-                                  onChange={(e) => setEditAccountNumber(e.target.value)}
-                                  disabled={!isAccountEditMode}
-                                  required
-                                />
-                                {!isAccountEditMode && (
-                                  <CopyButton
-                                    text={editAccountNumber}
-                                    fieldName="Account Number"
-                                    buttonId="account-number"
-                                  />
-                                )}
-                              </div>
+                              )}
                             </div>
                           </div>
-                          <div className='flex gap-4'>
-                            <div className="mb-4">
-                              <label className="block text-lg font-medium mb-2">Bank Name</label>
-                              <div className="relative">
-                                <input
-                                  type="text"
-                                  className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 pr-12 rounded-lg h-14 focus:outline-none"
-                                  placeholder="Enter Bank Name"
-                                  value={editBankName}
-                                  onChange={(e) => setEditBankName(e.target.value)}
-                                  disabled={!isAccountEditMode}
-                                  required
+                          <div className="mb-4">
+                            <label className="block text-lg font-medium mb-2">Account Number</label>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 pr-12 rounded-lg h-14 focus:outline-none"
+                                placeholder="Enter Account Number"
+                                value={editAccountNumber}
+                                onChange={(e) => setEditAccountNumber(e.target.value)}
+                                disabled={!isAccountEditMode}
+                                required
+                              />
+                              {!isAccountEditMode && (
+                                <CopyButton
+                                  text={editAccountNumber}
+                                  fieldName="Account Number"
+                                  buttonId="account-number"
                                 />
-                                {!isAccountEditMode && (
-                                  <CopyButton
-                                    text={editBankName}
-                                    fieldName="Bank Name"
-                                    buttonId="account-bank-name"
-                                  />
-                                )}
-                              </div>
-                            </div>
-                            <div className="mb-4">
-                              <label className="block text-lg font-medium mb-2">IFSC Code</label>
-                              <div className="relative">
-                                <input
-                                  type="text"
-                                  className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 pr-12 rounded-lg h-14 focus:outline-none"
-                                  placeholder="Enter IFSC Code"
-                                  value={editIfscCode}
-                                  onChange={(e) => setEditIfscCode(e.target.value)}
-                                  disabled={!isAccountEditMode}
-                                  required
-                                />
-                                {!isAccountEditMode && (
-                                  <CopyButton
-                                    text={editIfscCode}
-                                    fieldName="IFSC Code"
-                                    buttonId="account-ifsc-code"
-                                  />
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          <div className='flex gap-4'>
-                            <div className="mb-4">
-                              <label className="block text-lg font-medium mb-2">Branch</label>
-                              <div className="relative">
-                                <input
-                                  type="text"
-                                  className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 pr-12 rounded-lg h-14 focus:outline-none"
-                                  placeholder="Enter Branch"
-                                  value={editBranch}
-                                  onChange={(e) => setEditBranch(e.target.value)}
-                                  disabled={!isAccountEditMode}
-                                  required
-                                />
-                                {!isAccountEditMode && (
-                                  <CopyButton
-                                    text={editBranch}
-                                    fieldName="Branch"
-                                    buttonId="account-branch"
-                                  />
-                                )}
-                              </div>
-                            </div>
-                            <div className="mb-4">
-                              <label className="block text-lg font-medium mb-2">UPI ID</label>
-                              <div className="relative">
-                                <input
-                                  type="text"
-                                  className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 pr-12 rounded-lg h-14 focus:outline-none"
-                                  placeholder="Enter UPI ID"
-                                  value={editUpiId}
-                                  onChange={(e) => setEditUpiId(e.target.value)}
-                                  disabled={!isAccountEditMode}
-                                />
-                                {!isAccountEditMode && (
-                                  <CopyButton
-                                    text={editUpiId}
-                                    fieldName="UPI ID"
-                                    buttonId="account-upi-id"
-                                  />
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          <div className='flex gap-4'>
-                            <div className="mb-4">
-                              <label className="block text-lg font-medium mb-2">GPay Number</label>
-                              <div className="relative">
-                                <input
-                                  type="text"
-                                  className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 pr-12 rounded-lg h-14 focus:outline-none"
-                                  placeholder="Enter GPay Number"
-                                  value={editGpayNumber}
-                                  onChange={(e) => setEditGpayNumber(e.target.value)}
-                                  disabled={!isAccountEditMode}
-                                />
-                                {!isAccountEditMode && (
-                                  <CopyButton
-                                    text={editGpayNumber}
-                                    fieldName="GPay Number"
-                                    buttonId="account-gpay-number"
-                                  />
-                                )}
-                              </div>
-                            </div>
-                            <div className="mb-4">
-                              <label className="block text-lg font-medium mb-2">Account Type</label>
-                              <div className="relative">
-                                <select
-                                  className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 pr-12 rounded-lg h-14 focus:outline-none"
-                                  value={editAccountType}
-                                  onChange={(e) => setEditAccountType(e.target.value)}
-                                  disabled={!isAccountEditMode}
-                                  required
-                                >
-                                  <option value="">Select Account Type</option>
-                                  {bankAccountTypes.map((type) => (
-                                    <option key={type.id} value={type.bank_account_type}>
-                                      {type.bank_account_type}
-                                    </option>
-                                  ))}
-                                </select>
-                                {!isAccountEditMode && (
-                                  <CopyButton
-                                    text={editAccountType}
-                                    fieldName="Account Type"
-                                    buttonId="account-type"
-                                  />
-                                )}
-                              </div>
+                              )}
                             </div>
                           </div>
                         </div>
-                        {/* QR Image Section */}
-                        <div className="w-52 mt-10">
-                          <div>
-                            <div className="mb-4">
-                              <div className="w-48 h-48 border-2 border-[#BF9853] border-opacity-35 rounded-lg flex items-center justify-center bg-gray-50">
-                                {editQrImagePreview ? (
-                                  <img src={editQrImagePreview} alt="QR Preview" className="w-full h-full object-contain rounded-lg" />
-                                ) : (
-                                  <span className="text-gray-400 text-sm">QR Image Preview</span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="mb-4">
+                        <div className='flex gap-4'>
+                          <div className="mb-4">
+                            <label className="block text-lg font-medium mb-2">Bank Name</label>
+                            <div className="relative">
                               <input
-                                type="file"
-                                id="editQrImageUpload"
-                                accept="image/*"
-                                onChange={handleEditQrImageUpload}
-                                className="hidden"
+                                type="text"
+                                className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 pr-12 rounded-lg h-14 focus:outline-none"
+                                placeholder="Enter Bank Name"
+                                value={editBankName}
+                                onChange={(e) => setEditBankName(e.target.value)}
+                                disabled={!isAccountEditMode}
+                                required
                               />
-                              <button
-                                type="button"
-                                onClick={() => document.getElementById('editQrImageUpload').click()}
-                                className="w-52 bg-[#BF9853] text-white px-4 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
-                              >
-                                Add QR
-                              </button>
-                            </div>
-                            <div className="mb-4">
-                              <button
-                                type="button"
-                                onClick={() => setIsAccountEditMode(!isAccountEditMode)}
-                                className="w-52 bg-[#BF9853] text-white px-4 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
-                              >
-                                {isAccountEditMode ? 'Disable Edit' : 'Edit Account Details'}
-                              </button>
+                              {!isAccountEditMode && (
+                                <CopyButton
+                                  text={editBankName}
+                                  fieldName="Bank Name"
+                                  buttonId="account-bank-name"
+                                />
+                              )}
                             </div>
                           </div>
-                          <div className="flex space-x-2 justify-end mt-16">
-                            <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
-                              Update
-                            </button>
-                            <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={resetAccountData}>
-                              Cancel
-                            </button>
+                          <div className="mb-4">
+                            <label className="block text-lg font-medium mb-2">IFSC Code</label>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 pr-12 rounded-lg h-14 focus:outline-none"
+                                placeholder="Enter IFSC Code"
+                                value={editIfscCode}
+                                onChange={(e) => setEditIfscCode(e.target.value)}
+                                disabled={!isAccountEditMode}
+                                required
+                              />
+                              {!isAccountEditMode && (
+                                <CopyButton
+                                  text={editIfscCode}
+                                  fieldName="IFSC Code"
+                                  buttonId="account-ifsc-code"
+                                />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className='flex gap-4'>
+                          <div className="mb-4">
+                            <label className="block text-lg font-medium mb-2">Branch</label>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 pr-12 rounded-lg h-14 focus:outline-none"
+                                placeholder="Enter Branch"
+                                value={editBranch}
+                                onChange={(e) => setEditBranch(e.target.value)}
+                                disabled={!isAccountEditMode}
+                                required
+                              />
+                              {!isAccountEditMode && (
+                                <CopyButton
+                                  text={editBranch}
+                                  fieldName="Branch"
+                                  buttonId="account-branch"
+                                />
+                              )}
+                            </div>
+                          </div>
+                          <div className="mb-4">
+                            <label className="block text-lg font-medium mb-2">UPI ID</label>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 pr-12 rounded-lg h-14 focus:outline-none"
+                                placeholder="Enter UPI ID"
+                                value={editUpiId}
+                                onChange={(e) => setEditUpiId(e.target.value)}
+                                disabled={!isAccountEditMode}
+                              />
+                              {!isAccountEditMode && (
+                                <CopyButton
+                                  text={editUpiId}
+                                  fieldName="UPI ID"
+                                  buttonId="account-upi-id"
+                                />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className='flex gap-4'>
+                          <div className="mb-4">
+                            <label className="block text-lg font-medium mb-2">GPay Number</label>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 pr-12 rounded-lg h-14 focus:outline-none"
+                                placeholder="Enter GPay Number"
+                                value={editGpayNumber}
+                                onChange={(e) => setEditGpayNumber(e.target.value)}
+                                disabled={!isAccountEditMode}
+                              />
+                              {!isAccountEditMode && (
+                                <CopyButton
+                                  text={editGpayNumber}
+                                  fieldName="GPay Number"
+                                  buttonId="account-gpay-number"
+                                />
+                              )}
+                            </div>
+                          </div>
+                          <div className="mb-4">
+                            <label className="block text-lg font-medium mb-2">Account Type</label>
+                            <div className="relative">
+                              <select
+                                className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 pr-12 rounded-lg h-14 focus:outline-none"
+                                value={editAccountType}
+                                onChange={(e) => setEditAccountType(e.target.value)}
+                                disabled={!isAccountEditMode}
+                                required
+                              >
+                                <option value="">Select Account Type</option>
+                                {bankAccountTypes.map((type) => (
+                                  <option key={type.id} value={type.bank_account_type}>
+                                    {type.bank_account_type}
+                                  </option>
+                                ))}
+                              </select>
+                              {!isAccountEditMode && (
+                                <CopyButton
+                                  text={editAccountType}
+                                  fieldName="Account Type"
+                                  buttonId="account-type"
+                                />
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </form>
-                  </div>
-
+                      <div className="w-52 mt-10">
+                        <div>
+                          <div className="mb-4">
+                            <div className="w-48 h-48 border-2 border-[#BF9853] border-opacity-35 rounded-lg flex items-center justify-center bg-gray-50">
+                              {editQrImagePreview ? (
+                                <img src={editQrImagePreview} alt="QR Preview" className="w-full h-full object-contain rounded-lg" />
+                              ) : (
+                                <span className="text-gray-400 text-sm">QR Image Preview</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="mb-4">
+                            <input
+                              type="file"
+                              id="editQrImageUpload"
+                              accept="image/*"
+                              onChange={handleEditQrImageUpload}
+                              className="hidden"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => document.getElementById('editQrImageUpload').click()}
+                              className="w-52 bg-[#BF9853] text-white px-4 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
+                            >
+                              Add QR
+                            </button>
+                          </div>
+                          <div className="mb-4">
+                            <button
+                              type="button"
+                              onClick={() => setIsAccountEditMode(!isAccountEditMode)}
+                              className="w-52 bg-[#BF9853] text-white px-4 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
+                            >
+                              {isAccountEditMode ? 'Disable Edit' : 'Edit Account Details'}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex space-x-2 justify-end mt-16">
+                          <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
+                            Update
+                          </button>
+                          <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={resetAccountData}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </form>
                 </div>
+
               </div>
             </div>
           </div>
-        )
+        </div>
+      )
       }
-      {
-        tooltipData && (
-          <div className="fixed z-50 bg-white text-black p-3 rounded shadow-lg text-sm max-w-xs border"
-            style={{ left: tooltipPosition.x + 10, top: tooltipPosition.y - 10, pointerEvents: 'none' }}
-          >
-            {tooltipData.map((entry, index) => (
-              <div key={index} className="mb-1">
-                <span className="font-semibold text-gray-700">{entry.label}:</span>
-                <span className="ml-1 text-gray-900">{entry.value}</span>
-              </div>
-            ))}
-          </div>
-        )
+      {tooltipData && (
+        <div className="fixed z-50 bg-white text-black p-3 rounded shadow-lg text-sm max-w-xs border"
+          style={{ left: tooltipPosition.x + 10, top: tooltipPosition.y - 10, pointerEvents: 'none' }}
+        >
+          {tooltipData.map((entry, index) => (
+            <div key={index} className="mb-1">
+              <span className="font-semibold text-gray-700">{entry.label}:</span>
+              <span className="ml-1 text-gray-900">{entry.value}</span>
+            </div>
+          ))}
+        </div>
+      )
       }
       {isExportTypeModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-white rounded-lg px-8 py-6 w-96">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-[#BF9853]">Select Export Type</h2>
-              <button
-                onClick={() => setIsExportTypeModalOpen(false)}
-                className="text-red-500 hover:text-red-700"
-              >
+              <button onClick={() => setIsExportTypeModalOpen(false)} className="text-red-500 hover:text-red-700">
                 <img src={cross} alt='close' className='w-5 h-5' />
               </button>
             </div>
             <div className="flex flex-col space-y-4">
-              <button
-                onClick={() => handleExportTypeSelect('pdf')}
-                className="bg-[#BF9853] text-white px-8 py-4 rounded-lg hover:bg-yellow-800 font-semibold text-lg transition-colors"
-              >
+              <button onClick={() => handleExportTypeSelect('pdf')} className="bg-[#BF9853] text-white px-8 py-4 rounded-lg hover:bg-yellow-800 font-semibold text-lg transition-colors">
                 Export as PDF
               </button>
-              <button
-                onClick={() => handleExportTypeSelect('excel')}
-                className="bg-[#BF9853] text-white px-8 py-4 rounded-lg hover:bg-yellow-800 font-semibold text-lg transition-colors"
-              >
+              <button onClick={() => handleExportTypeSelect('excel')} className="bg-[#BF9853] text-white px-8 py-4 rounded-lg hover:bg-yellow-800 font-semibold text-lg transition-colors">
                 Export as Excel
               </button>
             </div>
@@ -6958,22 +6890,14 @@ const MasterData = ({ username, userRoles = [] }) => {
                         'EB Service Links'
                 } to Export
               </h2>
-              <button
-                onClick={() => setIsExportSelectionModalOpen(false)}
-                className="text-red-500 hover:text-red-700"
-              >
+              <button onClick={() => setIsExportSelectionModalOpen(false)} className="text-red-500 hover:text-red-700">
                 <img src={cross} alt='close' className='w-5 h-5' />
               </button>
             </div>
             <div className="flex gap-6 flex-1 overflow-hidden">
               <div className="flex-1 flex flex-col">
                 <h3 className="text-lg font-semibold text-gray-800 mb-3">
-                  Available {
-                    exportDataType === 'vendor' ? 'Vendors' :
-                      exportDataType === 'contractor' ? 'Contractors' :
-                        exportDataType === 'employee' ? 'Employees' :
-                          'EB Service Links'
-                  }
+                  Available {exportDataType === 'vendor' ? 'Vendors' : exportDataType === 'contractor' ? 'Contractors' : exportDataType === 'employee' ? 'Employees' : 'EB Service Links'}
                 </h3>
                 <div className="mb-4">
                   <div className="relative">
@@ -6981,9 +6905,9 @@ const MasterData = ({ username, userRoles = [] }) => {
                       type="text"
                       className="w-full border-2 border-[#BF9853] border-opacity-35 rounded-lg p-3 pr-10 focus:outline-none focus:border-[#BF9853]"
                       placeholder={`Search ${exportDataType === 'vendor' ? 'vendor' :
-                          exportDataType === 'contractor' ? 'contractor' :
-                            exportDataType === 'employee' ? 'employee' :
-                              'EB service link'
+                        exportDataType === 'contractor' ? 'contractor' :
+                          exportDataType === 'employee' ? 'employee' :
+                            'EB service link'
                         }...`}
                       value={exportSearchTerm}
                       onChange={(e) => setExportSearchTerm(e.target.value)}
@@ -6992,16 +6916,10 @@ const MasterData = ({ username, userRoles = [] }) => {
                   </div>
                 </div>
                 <div className="flex space-x-3 mb-4">
-                  <button
-                    onClick={handleSelectAllExportItems}
-                    className="px-4 py-2 bg-[#BF9853] text-white rounded-lg hover:bg-yellow-800 font-semibold text-sm transition-colors"
-                  >
+                  <button onClick={handleSelectAllExportItems} className="px-4 py-2 bg-[#BF9853] text-white rounded-lg hover:bg-yellow-800 font-semibold text-sm transition-colors" >
                     Select All
                   </button>
-                  <button
-                    onClick={handleDeselectAllExportItems}
-                    className="px-4 py-2 border-2 border-[#BF9853] text-[#BF9853] rounded-lg hover:bg-[#FAF6ED] font-semibold text-sm transition-colors"
-                  >
+                  <button onClick={handleDeselectAllExportItems} className="px-4 py-2 border-2 border-[#BF9853] text-[#BF9853] rounded-lg hover:bg-[#FAF6ED] font-semibold text-sm transition-colors" >
                     Deselect All
                   </button>
                 </div>
@@ -7018,10 +6936,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                   ) : (
                     <div className="space-y-2">
                       {(exportDataType === 'vendor' ? filteredExportVendors : exportDataType === 'contractor' ? filteredExportContractors : exportDataType === 'employee' ? getFilteredExportData() : filteredExportEbServiceLinks).map((item) => (
-                        <label
-                          key={item.id}
-                          className="flex items-center p-3 hover:bg-[#FAF6ED] rounded-lg cursor-pointer transition-colors"
-                        >
+                        <label key={item.id} className="flex items-center p-3 hover:bg-[#FAF6ED] rounded-lg cursor-pointer transition-colors" >
                           <input
                             type="checkbox"
                             checked={selectedExportItems.includes(item.id)}

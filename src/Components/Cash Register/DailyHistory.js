@@ -852,13 +852,10 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             return;
         }
         const doc = new jsPDF();
-        // Add header with PS number, title, date and day
         doc.setFontSize(14);
         doc.setFont(undefined, 'bold');
-        // Get day name
         const dateObj = new Date(selectedDate);
         const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
-        // Calculate center position for the header
         const pageWidth = doc.internal.pageSize.width;
         const headerText = `PS: ${selectedWeek}`;
         const headerText1 = "DAILY PAYMENT STATEMENT";
@@ -868,49 +865,37 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         doc.text(headerText1, 60, 24);
         doc.text(headerText2, 170, 20);
         doc.text(headerText, 14, 20);
-        // Add day name below
         doc.setFontSize(10);
         const dayText = dayName;
         const dayWidth = doc.getTextWidth(dayText);
         doc.text(dayText, 170, 27);
-        // Add lines above and below
         doc.setLineWidth(0.5);
         doc.line(14, 15, pageWidth - 14, 15); // Line above
-        doc.line(14, 30, pageWidth - 14, 30); // Line below
-        // Reset font
+        doc.line(14, 30, pageWidth - 14, 30);
         doc.setFont(undefined, 'normal');
-        // Calculate total amount for selected date (excluding advance data and Diwali Bonus)
         const filteredExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate && row.type !== "Staff Advance" && row.type !== "Diwali Bonus");
         const totalAmount = filteredExpenses.reduce(
             (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
             0
         );
-        
-        // Filter advance data for separate table
         const advanceExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate && row.type === "Staff Advance");
         const totalAdvanceAmount = advanceExpenses.reduce(
             (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
             0
         );
-        
-        // Filter Diwali Bonus data for separate table
         const diwaliBonusExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate && row.type === "Diwali Bonus");
         const totalDiwaliBonusAmount = diwaliBonusExpenses.reduce(
             (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
             0
         );
-        // Calculate total refund amount for selected date
         const totalRefundAmount = refundPayments.reduce(
             (sum, row) => sum + Number(row.amount || 0),
             0
         );
-        // Reset color for table
         doc.setTextColor(0, 0, 0);
-        // Expenses table columns (removed Date column)
         const expensesTableColumn = [
             "SNO", "PROJECT NAME", "NAME", "QTY", "TYPE", "AMOUNT", "DESCRIPTION"
         ];
-        // Prepare expenses with projectName and type for sorting
         const expensesTableRows = filteredExpenses
             .map((row, index) => {
                 const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
@@ -935,13 +920,11 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     description
                 };
             })
-            // Sort by projectName ASC, then by type DESC
             .sort((a, b) => {
                 const projectCompare = a.projectName.localeCompare(b.projectName);
                 if (projectCompare !== 0) return projectCompare;
                 return b.type.localeCompare(a.type); // type DESC
             })
-            // Map to array format for autoTable
             .map((row, idx) => [
                 (idx + 1).toString(),
                 row.projectName,
@@ -951,7 +934,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 row.amount,
                 row.description
             ]);
-        // Add total row for expenses
         expensesTableRows.push([
             "",
             "TOTAL",
@@ -961,14 +943,12 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             `${totalAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`,
             ""
         ]);
-        // Add Expenses table heading
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
         doc.text('WAGE EXPENSES', 14, 48);
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
         doc.text('EXPENDITURE PAYMENTS', 14, 38);
-        // Start expenses table
         doc.autoTable({
             startY: 50,
             head: [expensesTableColumn],
@@ -981,20 +961,20 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 textColor: [80, 80, 80],
             },
             headStyles: {
-                fillColor: [255, 248, 220], // Light orange color
+                fillColor: [255, 248, 220], 
                 textColor: [0, 0, 0],
                 fontStyle: 'bold',
                 lineColor: [200, 200, 200],
                 lineWidth: 0.1,
             },
             columnStyles: {
-                0: { cellWidth: 13, halign: 'center', fillColor: [255, 255, 255] },    // SNO - white background
-                1: { cellWidth: 47, halign: 'left' },      // Project Name
-                2: { cellWidth: 30, halign: 'left' },      // Name
-                3: { cellWidth: 12, halign: 'center' },    // Qty
-                4: { cellWidth: 25, halign: 'left' },      // Type
-                5: { cellWidth: 20, halign: 'right' },     // Amount
-                6: { cellWidth: 35, halign: 'left' }       // Description
+                0: { cellWidth: 13, halign: 'center', fillColor: [255, 255, 255] },  
+                1: { cellWidth: 47, halign: 'left' },     
+                2: { cellWidth: 30, halign: 'left' },     
+                3: { cellWidth: 12, halign: 'center' },
+                4: { cellWidth: 25, halign: 'left' },    
+                5: { cellWidth: 20, halign: 'right' },   
+                6: { cellWidth: 35, halign: 'left' } 
             },
             bodyStyles: {
                 lineWidth: 0.1,
@@ -1003,22 +983,14 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 fillColor: false,
             }
         });
-        // Get the end position of the first table
         const firstTableEndY = doc.lastAutoTable.finalY;
-        // Add some space between tables
         const spaceBetweenTables = 15;
-        
-        // Calculate dynamic positioning for flexible tables
         const docPageWidth = doc.internal.pageSize.width;
         const leftMargin = 14;
         const rightMargin = 14;
         const availableWidth = docPageWidth - leftMargin - rightMargin;
         const tableSpacing = 10;
-        
-        // Determine if we have advance expenses for flexible layout
         const hasAdvanceExpenses = advanceExpenses.length > 0;
-        
-        // Refund Received table columns
         const refundTableColumn = [
             "SNO", "NAME", "AMOUNT"
         ];
@@ -1035,7 +1007,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     formattedAmount
                 ];
             });
-        // Add total row for refunds
         refundTableRows.push([
             "",
             "TOTAL",
@@ -1045,12 +1016,9 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
         doc.text(`NET BALANCE: ${netBalance.toLocaleString('en-IN')}`, 155, 38);
-        
-        // Add Refund Received table heading (left side)
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
         doc.text('WAGE REFUND', 14, firstTableEndY + spaceBetweenTables - 2);
-        // Add Refund Received table (left side, half width)
         doc.autoTable({
             startY: firstTableEndY + spaceBetweenTables,
             head: [refundTableColumn],
@@ -1064,7 +1032,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 textColor: [80, 80, 80],
             },
             headStyles: {
-                fillColor: [255, 248, 220], // Light orange color
+                fillColor: [255, 248, 220], 
                 textColor: [0, 0, 0],
                 fontStyle: 'bold',
                 lineColor: [200, 200, 200],
@@ -1077,94 +1045,78 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 fillColor: false,
             },
             columnStyles: {
-                0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },    // SNO - white background
-                1: { cellWidth: 35, halign: 'left' },      // Name
-                2: { cellWidth: 20, halign: 'right' }      // Amount
+                0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },   
+                1: { cellWidth: 35, halign: 'left' },    
+                2: { cellWidth: 20, halign: 'right' }      
             },
             margin: { left: 14, right: 0 }
         });        
-        
-        // Get the end position of the refund table
         const refundTableEndY = doc.lastAutoTable.finalY;
-        
-        // Add Diwali Bonus table (always show, even if empty)
-        // Diwali Bonus table columns
-        const diwaliBonusTableColumn = [
-            "SNO", "NAME", "AMOUNT"
-        ];
-        
-        // Prepare Diwali Bonus table rows
-        const diwaliBonusTableRows = diwaliBonusExpenses
-            .map((row, index) => {
-                const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
-                const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
-                const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
-                const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
-                const name = [employee?.label, vendor?.label, contractor?.label, labour?.label]
-                    .filter(Boolean).join(" | ") || "";
-                const amount = (row.amount || 0) + (row.extra_amount || 0);
-                const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
-                
-                return [
-                    (index + 1).toString(),
-                    name,
-                    formattedAmount
-                ];
+        if (diwaliBonusExpenses.length > 0) {
+            const diwaliBonusTableColumn = [
+                "SNO", "NAME", "AMOUNT"
+            ];
+            const diwaliBonusTableRows = diwaliBonusExpenses
+                .map((row, index) => {
+                    const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
+                    const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
+                    const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
+                    const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
+                    const name = [employee?.label, vendor?.label, contractor?.label, labour?.label]
+                        .filter(Boolean).join(" | ") || "";
+                    const amount = (row.amount || 0) + (row.extra_amount || 0);
+                    const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
+                    return [
+                        (index + 1).toString(),
+                        name,
+                        formattedAmount
+                    ];
+                });
+            diwaliBonusTableRows.push([
+                "",
+                "TOTAL",
+                `${totalDiwaliBonusAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
+            ]);
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text('DIWALI BONUS', 14, refundTableEndY + 15);
+            doc.autoTable({
+                startY: refundTableEndY + 20,
+                head: [diwaliBonusTableColumn],
+                body: diwaliBonusTableRows,
+                tableWidth: 'wrap',
+                styles: {
+                    fontSize: 8,
+                    cellPadding: 2,
+                    halign: 'left',
+                    valign: 'middle',
+                    textColor: [80, 80, 80],
+                },
+                headStyles: {
+                    fillColor: [255, 248, 220], 
+                    textColor: [0, 0, 0],
+                    fontStyle: 'bold',
+                    lineColor: [200, 200, 200],
+                    lineWidth: 0.1,
+                },
+                bodyStyles: {
+                    lineWidth: 0.1,
+                },
+                alternateRowStyles: {
+                    fillColor: false,
+                },
+                columnStyles: {
+                    0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },   
+                    1: { cellWidth: 35, halign: 'left' },   
+                    2: { cellWidth: 20, halign: 'right' }      
+                },
+                margin: { left: 14, right: 0 }
             });
-        
-        // Add total row for Diwali Bonus table
-        diwaliBonusTableRows.push([
-            "",
-            "TOTAL",
-            `${totalDiwaliBonusAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
-        ]);
-        
-        // Add Diwali Bonus table heading
-        doc.setFontSize(12);
-        doc.setFont(undefined, 'bold');
-        doc.text('DIWALI BONUS', 14, refundTableEndY + 15);
-        
-        // Add Diwali Bonus table
-        doc.autoTable({
-            startY: refundTableEndY + 20,
-            head: [diwaliBonusTableColumn],
-            body: diwaliBonusTableRows,
-            tableWidth: 'wrap',
-            styles: {
-                fontSize: 8,
-                cellPadding: 2,
-                halign: 'left',
-                valign: 'middle',
-                textColor: [80, 80, 80],
-            },
-            headStyles: {
-                fillColor: [255, 248, 220], // Light orange color
-                textColor: [0, 0, 0],
-                fontStyle: 'bold',
-                lineColor: [200, 200, 200],
-                lineWidth: 0.1,
-            },
-            bodyStyles: {
-                lineWidth: 0.1,
-            },
-            alternateRowStyles: {
-                fillColor: false,
-            },
-            columnStyles: {
-                0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },    // SNO - white background
-                1: { cellWidth: 35, halign: 'left' },      // Name
-                2: { cellWidth: 20, halign: 'right' }      // Amount
-            },
-            margin: { left: 14, right: 0 }
-        });
-        
-        // Add Wage Advance table if there are advance expenses
+        }
         if (advanceExpenses.length > 0) {
-            // Wage Advance table columns
             const advanceTableColumn = [
                 "S.NO", "PROJECT NAME", "EMPLOYEE NAME", "TOTAL AMOUNT"
             ];            
-            // Prepare advance table rows
             const advanceTableRows = advanceExpenses
                 .map((row, index) => {
                     const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
@@ -1184,23 +1136,20 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                         formattedAmount
                     ];
                 });            
-            // Add total row for advance table
             advanceTableRows.push([
                 "",
                 "TOTAL",
                 "",
                 `${totalAdvanceAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
             ]);                 
-            // Add Wage Advance table heading (right side) - fixed position like DailyPayment
             doc.setFontSize(12);
             doc.setFont(undefined, 'bold');
-            doc.text('WAGE ADVANCE', 95, firstTableEndY + spaceBetweenTables - 2);                   
-            // Add Wage Advance table (right side, half width) - like DailyPayment
+            doc.text('WAGE ADVANCE', 95, firstTableEndY + spaceBetweenTables - 2);    
             doc.autoTable({
                 startY: firstTableEndY + spaceBetweenTables,
                 head: [advanceTableColumn],
                 body: advanceTableRows,
-                tableWidth: 102, // Fixed width to ensure side-by-side layout
+                tableWidth: 102, 
                 styles: {
                     fontSize: 8,
                     cellPadding: 2,
@@ -1209,7 +1158,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     textColor: [80, 80, 80],
                 },
                 headStyles: {
-                    fillColor: [255, 248, 220], // Light orange color
+                    fillColor: [255, 248, 220], 
                     textColor: [0, 0, 0],
                     fontStyle: 'bold',
                     lineColor: [200, 200, 200],
@@ -1222,10 +1171,10 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     fillColor: false,
                 },
                 columnStyles: {
-                    0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },    // S.NO - white background
-                    1: { cellWidth: 35, halign: 'left' },      // Project Name
-                    2: { cellWidth: 35, halign: 'left' },      // Employee Name
-                    3: { cellWidth: 20, halign: 'right' }      // Total Amount
+                    0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },   
+                    1: { cellWidth: 35, halign: 'left' },      
+                    2: { cellWidth: 35, halign: 'left' },      
+                    3: { cellWidth: 20, halign: 'right' }      
                 },
                 margin: { left: 95, right: 0 }
             });
@@ -1233,15 +1182,12 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         const fileName = `PS ${selectedWeek} - Daily Payment Statement ${formatDateOnly(selectedDate)}.pdf`;
         doc.save(fileName);
     };
-    // Handler functions for file upload and description (exactly like DailyPayment)
     const handleDescriptionClick = (row) => {
         if (row.description) {
-            // If description exists, show it in a read-only modal
             setDescription(row.description);
-            setEntryId(null); // No editing allowed
+            setEntryId(null); 
             setShowPopups(true);
         } else {
-            // If no description, allow editing
             setEntryId(row.id);
             setDescription("");
             setShowPopups(true);
@@ -1263,8 +1209,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         if (!selectedFileForPopup || !currentFileRow) return;
         try {
             const project = siteOptions.find(opt => opt.id === Number(currentFileRow.project_id));
-            const siteNo = project?.siteNo || ""; // use siteNo if available, fallback to label
-            // Find matching name from whichever id exists
+            const siteNo = project?.siteNo || "";
             const name =
                 laboursList.find(opt => opt.id === Number(currentFileRow.labour_id))?.label ||
                 vendorOptions.find(opt => opt.id === Number(currentFileRow.vendor_id))?.label ||
@@ -1287,7 +1232,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             }
             const uploadResult = await uploadResponse.json();
             const pdfUrl = uploadResult.url;
-            // Update the row with the new file URL while preserving all existing data
             const payload = {
                 date: currentFileRow.date,
                 labour_id: Number(currentFileRow.labour_id) || null,
@@ -1307,11 +1251,9 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 payload,
                 { headers: { "Content-Type": "application/json" } }
             );
-            // Update UI without reload
             setDailyExpenses((prev) =>
                 prev.map((exp) => (exp.id === currentFileRow.id ? { ...exp, file_url: pdfUrl } : exp))
             );
-            // Close popup and reset state
             setFileUploadPopup(false);
             setCurrentFileRow(null);
             setSelectedFileForPopup(null);
@@ -1327,12 +1269,10 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         }
         setLoading(true);
         try {
-            // Find the current expense data to preserve all existing fields
             const currentExpense = dailyExpenses.find(exp => exp.id === entryId);
             if (!currentExpense) {
                 throw new Error("Expense not found");
             }
-            // Create payload with all existing data plus the new description
             const payload = {
                 date: currentExpense.date,
                 labour_id: Number(currentExpense.labour_id) || null,
@@ -1347,7 +1287,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 description: description.trim(),
                 file_url: currentExpense.file_url || null,
             };
-            // Use the same API endpoint as saveEditedExpense
             await axios.put(
                 `https://backendaab.in/aabuildersDash/api/daily-payments/edits/${entryId}?username=${encodeURIComponent(username)}`,
                 payload,
@@ -1358,7 +1297,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 }
             );
             alert("Description updated successfully!");
-            // Update the local state to reflect the change
             setDailyExpenses(prev =>
                 prev.map(exp =>
                     exp.id === entryId
@@ -1376,7 +1314,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             setLoading(false);
         }
     };
-    // Edit functions for daily expenses
     const handleEditClick = (row) => {
         setEditingDailyExpenseRowId(row.id);
         setEditDailyExpenseData({
@@ -1415,17 +1352,15 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 payload,
                 { headers: { "Content-Type": "application/json" } }
             );
-            // Update UI immediately
             setDailyExpenses((prev) =>
                 prev.map((exp) => (exp.id === row.id ? { ...exp, ...payload } : exp))
             );
-            setEditingDailyExpenseRowId(null); // exit edit mode
+            setEditingDailyExpenseRowId(null);
         } catch (error) {
             console.error("Error updating expense:", error);
             alert("Error updating expense. Please try again.");
         }
     };
-    // Edit functions for refund payments
     const handleEditRefundClick = (row) => {
         setEditingPaymentId(row.id);
         setEditRefundPaymentData({
@@ -1452,20 +1387,18 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 `https://backendaab.in/aabuildersDash/api/refund_received/edit/${id}?username=${encodeURIComponent(username)}`,
                 editRefundPaymentData
             );
-            // Update UI immediately
             setRefundPayments((prev) =>
                 prev.map((row) =>
                     row.id === id ? { ...row, ...editRefundPaymentData } : row
                 )
             );
-            setEditingPaymentId(null); // exit edit mode
+            setEditingPaymentId(null); 
             console.log("Refund payment updated successfully");
         } catch (error) {
             console.error("Error updating refund payment:", error);
             alert("Error updating refund payment. Please try again.");
         }
     };
-    // Delete functions
     const handleDailyExpensesDelete = async (id) => {
         const confirmed = window.confirm("Are you sure you want to delete This Daily Expense Data?");
         if (confirmed) {
@@ -1474,9 +1407,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     `https://backendaab.in/aabuildersDash/api/daily-payments/delete/${id}?username=${encodeURIComponent(username)}`,
                     { headers: { "Content-Type": "application/json" } }
                 );
-                // Update UI immediately
                 setDailyExpenses((prev) => prev.filter((expense) => expense.id !== id));
-                console.log("Daily expense deleted successfully");
             } catch (error) {
                 console.error("Error deleting daily expense:", error);
                 alert("Error deleting daily expense. Please try again.");
@@ -1493,9 +1424,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     `https://backendaab.in/aabuildersDash/api/refund_received/delete/${id}?username=${encodeURIComponent(username)}`,
                     { headers: { "Content-Type": "application/json" } }
                 );
-                // Update UI immediately
                 setRefundPayments((prev) => prev.filter((refund) => refund.id !== id));
-                console.log("Refund payment deleted successfully");
             } catch (error) {
                 console.error("Error deleting refund payment:", error);
                 alert("Error deleting refund payment. Please try again.");
@@ -1504,7 +1433,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             console.log("Deletion cancelled.");
         }
     };
-    // History functions
     const fetchAuditDetailsForDailyExpense = async (expensesId) => {
         try {
             const response = await fetch(`https://backendaab.in/aabuildersDash/api/daily_entry_audit/daily_expense/${expensesId}`);
@@ -1583,8 +1511,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                                             <div className="font-semibold text-[#E4572E]">
                                                 {day.toLocaleDateString("en-US", { weekday: "short" })}
                                             </div>
-                                            <button
-                                                onClick={() => handleDateClick(dateStr)}
+                                            <button onClick={() => handleDateClick(dateStr)}
                                                 className={`p- rounded-lg border text-center w-20 h-[37px] mt-1 ${selectedDate === dateStr
                                                     ? "bg-[#BF9853] text-white border-[#BF9853]"
                                                     : "bg-white border-gray-300"
@@ -1634,10 +1561,8 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                         </div>
                         <div className="w-full h-[500px] rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden">
                             <div ref={scrollRef} className="overflow-auto max-h-[500px] w-full thin-scrollbar"
-                                onMouseDown={(e) => handleMouseDown(e, scrollRef)}
-                                onMouseMove={(e) => handleMouseMove(e, scrollRef)}
-                                onMouseUp={() => handleMouseUp(scrollRef)}
-                                onMouseLeave={() => handleMouseUp(scrollRef)}
+                                onMouseDown={(e) => handleMouseDown(e, scrollRef)} onMouseMove={(e) => handleMouseMove(e, scrollRef)}
+                                onMouseUp={() => handleMouseUp(scrollRef)} onMouseLeave={() => handleMouseUp(scrollRef)}
                             >
                                 <table className="w-full min-w-[1200px] lg:min-w-[1450px] border-collapse text-left">
                                     <thead className="sticky top-0 z-10 bg-white">

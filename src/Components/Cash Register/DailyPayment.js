@@ -73,10 +73,16 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     const currentWeek = weeks.find((w) => w.number === Number(selectedWeek));
     const [weeklyReceivedTypes, setWeeklyReceivedTypes] = useState([]);
     const [isChangeButtonActive, setIsChangeButtonActive] = useState(false);
+    const [isRefundChangeButtonActive, setIsRefundChangeButtonActive] = useState(false);
     const [currentFileRow, setCurrentFileRow] = useState(null);
     const [selectedFileForPopup, setSelectedFileForPopup] = useState(null);
+    const [purposeOptions, setPurposeOptions] = useState([]);
+    const [showPurposePopup, setShowPurposePopup] = useState(false);
+    const [selectedPurpose, setSelectedPurpose] = useState(null);
+    const [pendingRefundData, setPendingRefundData] = useState(null);
     useEffect(() => {
         fetchWeeklyReceivedType();
+        fetchPurposeOptions();
     }, []);
     const fetchWeeklyReceivedType = async () => {
         try {
@@ -90,6 +96,31 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         } catch (error) {
             console.error('Error:', error);
             console.log('Error fetching Payment Received type.');
+        }
+    };
+    const fetchPurposeOptions = async () => {
+        try {
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/loan-purposes/getAll', {
+                method: "GET",
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            });
+            if (!response.ok) {
+                throw new Error("Network response was not ok: " + response.statusText);
+            }
+            const data = await response.json();
+            const formattedData = data.map(item => ({
+                value: item.purpose,
+                label: item.purpose,
+                id: item.id,
+                type: 'Purpose'
+            }));
+            setPurposeOptions(formattedData);
+        } catch (error) {
+            console.error("Error fetching purpose options: ", error);
+            setPurposeOptions([]);
         }
     };
     useEffect(() => {
@@ -275,10 +306,16 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     const [newRefundReceived, setNewRefundReceived] = useState({
         date: new Date().toISOString().split("T")[0],
         labour_id: "",
+        vendor_id: "",
+        contractor_id: "",
+        employee_id: "",
         amount: ""
     });
     const [editRefundPaymentData, setEditRefundPaymentData] = useState({
         labour_id: "",
+        vendor_id: "",
+        contractor_id: "",
+        employee_id: "",
         amount: "",
     });
     const [payments, setPayments] = useState([]);
@@ -295,6 +332,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             type: row.type,
             amount: row.amount,
             extra_amount: row.extra_amount,
+            quantity: row.quantity || "",
             description: row.description || "",
             file_url: row.file_url || "",
             staff_advance_portal_id: row.staff_advance_portal_id || ""
@@ -316,7 +354,10 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     const handleEditRefundClick = (row) => {
         setEditingPaymentId(row.id);
         setEditRefundPaymentData({
-            labour_id: row.labour_id,
+            labour_id: row.labour_id || "",
+            vendor_id: row.vendor_id || "",
+            contractor_id: row.contractor_id || "",
+            employee_id: row.employee_id || "",
             amount: row.amount,
         });
     };
@@ -327,11 +368,25 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             [name]: value,
         }));
     };
-    const handleEditRefundLabourChange = (selected) => {
-        setEditRefundPaymentData((prev) => ({
-            ...prev,
-            labour_id: selected ? selected.id : "",
-        }));
+    const handleEditRefundLabourChange = (selectedOption) => {
+        if (selectedOption) {
+            const { type, id } = selectedOption;
+            setEditRefundPaymentData((prev) => ({
+                ...prev,
+                labour_id: type === "Labour" ? id : "",
+                vendor_id: type === "Vendor" ? id : "",
+                contractor_id: type === "Contractor" ? id : "",
+                employee_id: type === "Employee" ? id : "",
+            }));
+        } else {
+            setEditRefundPaymentData((prev) => ({
+                ...prev,
+                labour_id: "",
+                vendor_id: "",
+                contractor_id: "",
+                employee_id: "",
+            }));
+        }
     };
     const handleFileChange = (e) => {
         const file = e.target.files[0];
@@ -655,45 +710,70 @@ const DailyPayment = ({ username, userRoles = [] }) => {
 
     const handleRefundSubmit = async () => {
         try {
-            const entryNo = await getLastEntryNumber();            
-            // Always send to staff-advance API
-            const staffAdvancePayload = {
-                date: selectedDate,
-                type: "Refund",
-                labour_id: Number(newRefundReceived.labour_id) || null,
-                staff_refund_amount: Number(newRefundReceived.amount),
-                week_no: Number(currentWeekNumber),
-                staff_payment_mode: "Cash",
-                from_purpose_id: 5,
-                entry_no: entryNo
-            };
-            const staffAdvanceResponse = await axios.post(
-                "https://backendaab.in/aabuildersDash/api/staff-advance/save",
-                staffAdvancePayload,
-                { headers: { "Content-Type": "application/json" } }
-            );
-
-            // Get the staffAdvancePortalId from the response
-            const staffAdvancePortalId = staffAdvanceResponse.data?.staffAdvancePortalId;
-
-            // Always send to refund_received API with staff_advance_portal_id
-            const refundPayload = {
-                date: selectedDate,
-                labour_id: newRefundReceived.labour_id,
-                amount: Number(newRefundReceived.amount),
-                weekly_number: Number(currentWeekNumber),
-                staff_advance_portal_id: staffAdvancePortalId
-            };
-            await axios.post(
-                "https://backendaab.in/aabuildersDash/api/refund_received/save",
-                refundPayload,
-                { headers: { "Content-Type": "application/json" } }
-            );
-
+            // Check if it's a labour or employee refund
+            const isLabourOrEmployeeRefund = (newRefundReceived.labour_id && Number(newRefundReceived.labour_id) > 0) || 
+                                           (newRefundReceived.employee_id && Number(newRefundReceived.employee_id) > 0);
+            // Check if it's a vendor or contractor refund
+            const isVendorOrContractorRefund = (newRefundReceived.vendor_id && Number(newRefundReceived.vendor_id) > 0) || 
+                                             (newRefundReceived.contractor_id && Number(newRefundReceived.contractor_id) > 0);
+            if (isLabourOrEmployeeRefund) {
+                // Only send to staff-advance API for labour/employee refunds
+                const entryNo = await getLastEntryNumber();            
+                const staffAdvancePayload = {
+                    date: selectedDate,
+                    type: "Refund",
+                    labour_id: Number(newRefundReceived.labour_id) || null,
+                    employee_id: Number(newRefundReceived.employee_id) || null,
+                    staff_refund_amount: Number(newRefundReceived.amount),
+                    week_no: Number(currentWeekNumber),
+                    staff_payment_mode: "Cash",
+                    from_purpose_id: 5,
+                    entry_no: entryNo
+                };
+                const staffAdvanceResponse = await axios.post(
+                    "https://backendaab.in/aabuildersDash/api/staff-advance/save",
+                    staffAdvancePayload,
+                    { headers: { "Content-Type": "application/json" } }
+                );
+                // Get the staffAdvancePortalId from the response
+                const staffAdvancePortalId = staffAdvanceResponse.data?.staffAdvancePortalId;
+                // Send to refund_received API with staff_advance_portal_id
+                const refundPayload = {
+                    date: selectedDate,
+                    labour_id: Number(newRefundReceived.labour_id) || null,
+                    employee_id: Number(newRefundReceived.employee_id) || null,
+                    amount: Number(newRefundReceived.amount),
+                    weekly_number: Number(currentWeekNumber),
+                    staff_advance_portal_id: staffAdvancePortalId
+                };
+                await axios.post(
+                    "https://backendaab.in/aabuildersDash/api/refund_received/save",
+                    refundPayload,
+                    { headers: { "Content-Type": "application/json" } }
+                );
+            } else if (isVendorOrContractorRefund) {
+                // For vendor/contractor refunds - show purpose popup first
+                setPendingRefundData({
+                    date: selectedDate,
+                    vendor_id: Number(newRefundReceived.vendor_id) || null,
+                    contractor_id: Number(newRefundReceived.contractor_id) || null,
+                    amount: Number(newRefundReceived.amount),
+                    weekly_number: Number(currentWeekNumber)
+                });
+                setShowPurposePopup(true);
+                return; // Don't proceed with submission yet
+            } else {
+                alert("Please select a labour, employee, vendor, or contractor for the refund.");
+                return;
+            }
             window.location.reload();
             // Reset form after save
             setNewRefundReceived({
-                labour_id: null,
+                date: new Date().toISOString().split("T")[0],
+                labour_id: "",
+                vendor_id: "",
+                contractor_id: "",
+                employee_id: "",
                 amount: "",
             });
         } catch (error) {
@@ -706,8 +786,76 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             handleRefundSubmit();
         }
     };
+    const handlePurposeSelection = async () => {
+        if (!selectedPurpose) {
+            alert("Please select a purpose");
+            return;
+        }
+        if (!pendingRefundData) {
+            alert("No pending refund data found");
+            return;
+        }
+        try {
+            // For vendor/contractor refunds - send to loan portal API as Refund type
+            const loanPortalPayload = {
+                type: "Refund",
+                date: pendingRefundData.date,
+                amount: 0, // For refunds, amount is 0 in loan portal
+                loan_payment_mode: "Cash",
+                loan_refund_amount: Number(pendingRefundData.amount),
+                from_purpose_id: selectedPurpose.id,
+                transfer_Project_id: 0,
+                to_purpose_id: 0,
+                vendor_id: Number(pendingRefundData.vendor_id) || 0,
+                contractor_id: Number(pendingRefundData.contractor_id) || 0,
+                project_id: 0,
+                description: "Refund from Cash Register",
+                file_url: ""
+            };
+            const loanPortalResponse = await axios.post(
+                "https://backendaab.in/aabuildersDash/api/loans/save",
+                loanPortalPayload,
+                { headers: { "Content-Type": "application/json" } }
+            );
+            // Also send to refund_received API for tracking
+            const refundPayload = {
+                date: pendingRefundData.date,
+                vendor_id: Number(pendingRefundData.vendor_id) || null,
+                contractor_id: Number(pendingRefundData.contractor_id) || null,
+                amount: Number(pendingRefundData.amount),
+                weekly_number: Number(pendingRefundData.weekly_number),
+                staff_advance_portal_id: null,
+                loan_portal_id: loanPortalResponse.data?.id || loanPortalResponse.data?.loanPortalId
+            };
+            await axios.post(
+                "https://backendaab.in/aabuildersDash/api/refund_received/save",
+                refundPayload,
+                { headers: { "Content-Type": "application/json" } }
+            );
+            // Close popup and reset form
+            setShowPurposePopup(false);
+            setSelectedPurpose(null);
+            setPendingRefundData(null);
+            window.location.reload();
+            // Reset form after save
+            setNewRefundReceived({
+                date: new Date().toISOString().split("T")[0],
+                labour_id: "",
+                vendor_id: "",
+                contractor_id: "",
+                employee_id: "",
+                amount: "",
+            });
+        } catch (error) {
+            console.error("Error saving refund with purpose:", error);
+            alert("Error saving refund. Please try again.");
+        }
+    };
     const handleChangeButtonClick = () => {
         setIsChangeButtonActive(prev => !prev);
+    };
+    const handleRefundChangeButtonClick = () => {
+        setIsRefundChangeButtonActive(prev => !prev);
     };
     useEffect(() => {
         const handleWheel = (event) => {
@@ -737,18 +885,30 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 file_url: editDailyExpenseData.file_url || null,  // 🔹 send url here
                 staff_advance_portal_id: editDailyExpenseData.staff_advance_portal_id || null,
             };
-
+            
             // Check if type changed from Staff Advance to another type
             const wasStaffAdvance = row.type === "Staff Advance";
             const isNowStaffAdvance = editDailyExpenseData.type === "Staff Advance";
             const typeChangedFromStaffAdvance = wasStaffAdvance && !isNowStaffAdvance;
             const typeChangedToStaffAdvance = !wasStaffAdvance && isNowStaffAdvance;
             const amountChanged = Number(row.amount) !== Number(editDailyExpenseData.amount);
-
+            
+            // Check if anything actually changed first
+            const isChanged = Object.keys(payload).some(
+                (key) => {
+                    const payloadValue = payload[key] ?? "";
+                    const rowValue = row[key] ?? "";
+                    // Handle numeric comparisons for numeric fields
+                    const numericFields = ['labour_id', 'vendor_id', 'contractor_id', 'employee_id', 'project_id', 'quantity', 'amount', 'extra_amount'];
+                    if (numericFields.includes(key)) {
+                        return Number(payloadValue) !== Number(rowValue);
+                    }
+                    return String(payloadValue) !== String(rowValue);
+                }
+            ) || typeChangedFromStaffAdvance || typeChangedToStaffAdvance;
             // If type changed from Staff Advance to another type, delete staff advance portal record
             if (typeChangedFromStaffAdvance) {
                 payload.staff_advance_portal_id = null;
-                
                 // Delete the staff advance portal record
                 if (row.staff_advance_portal_id) {
                     try {
@@ -761,7 +921,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     }
                 }
             }
-
             // If type changed to Staff Advance, create new staff advance portal record
             if (typeChangedToStaffAdvance) {
                 try {
@@ -781,7 +940,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         staffAdvancePayload,
                         { headers: { "Content-Type": "application/json" } }
                     );
-                    
                     // Get the staffAdvancePortalId from the response
                     const staffAdvancePortalId = staffAdvanceResponse.data?.staffAdvancePortalId;
                     payload.staff_advance_portal_id = staffAdvancePortalId;
@@ -789,7 +947,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     console.error("Error creating staff advance portal:", error);
                 }
             }
-
             // If amount changed and it's still Staff Advance, update staff advance portal
             if (amountChanged && isNowStaffAdvance && row.staff_advance_portal_id) {
                 try {
@@ -805,7 +962,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         description: editDailyExpenseData.description || "",
                         file_url: editDailyExpenseData.file_url || null
                     };
-                    
                     await axios.put(
                         `https://backendaab.in/aabuildersDash/api/staff-advance/${row.staff_advance_portal_id}?editedBy=${encodeURIComponent(username)}`,
                         staffAdvanceUpdatePayload,
@@ -815,15 +971,13 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     console.error("Error updating staff advance portal amount:", error);
                 }
             }
-
-            const isChanged = Object.keys(payload).some(
-                (key) => String(payload[key]) !== String(row[key] ?? "")
-            );
+            
+            // If no changes were made, exit edit mode without updating
             if (!isChanged) {
-                console.log("No changes detected. Skipping update.");
                 setEditingDailyExpenseRowId(null);
                 return;
             }
+            
             const response = await axios.put(
                 `https://backendaab.in/aabuildersDash/api/daily-payments/edit/${row.id}?username=${encodeURIComponent(username)}`,
                 payload,
@@ -870,7 +1024,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         try {
             // Find the refund payment data to check for staff_advance_portal_id
             const refundData = refundPayments.find(refund => refund.id === id);
-            
             // If it has a staff_advance_portal_id, update that record first
             if (refundData && refundData.staff_advance_portal_id) {
                 try {
@@ -878,6 +1031,9 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         type: "Refund",
                         date: refundData.date,
                         labour_id: Number(editRefundPaymentData.labour_id) || null,
+                        vendor_id: Number(editRefundPaymentData.vendor_id) || null,
+                        contractor_id: Number(editRefundPaymentData.contractor_id) || null,
+                        employee_id: Number(editRefundPaymentData.employee_id) || null,
                         from_purpose_id: 5,
                         to_purpose_id: null,
                         staff_payment_mode: "Cash",
@@ -886,7 +1042,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         description: "",
                         file_url: null
                     };
-                    
                     await axios.put(
                         `https://backendaab.in/aabuildersDash/api/staff-advance/${refundData.staff_advance_portal_id}?editedBy=${encodeURIComponent(username)}`,
                         staffAdvanceUpdatePayload,
@@ -896,7 +1051,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     console.error("Error updating staff advance portal for refund:", error);
                 }
             }
-
             await axios.put(
                 `https://backendaab.in/aabuildersDash/api/refund_received/edit/${id}?username=${encodeURIComponent(username)}`,
                 editRefundPaymentData
@@ -907,8 +1061,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     row.id === id ? { ...row, ...editRefundPaymentData } : row
                 )
             );
-            setEditingPaymentId(null); // exit edit mode
-            console.log("Refund payment updated successfully");
+            setEditingPaymentId(null);
         } catch (error) {
             console.error("Error updating refund payment:", error);
         }
@@ -937,10 +1090,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         const confirmed = window.confirm("Are you sure you want to delete This Daily Expense Data?");
         if (confirmed) {
             try {
-                // Find the expense data from the current state to get staff_advance_portal_id
                 const expenseData = dailyExpenses.find(expense => expense.id === id);
-                
-                // If it has a staff_advance_portal_id, delete that record first
                 if (expenseData && expenseData.staff_advance_portal_id) {
                     try {
                         await axios.delete(
@@ -951,8 +1101,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         console.error("Error deleting staff advance portal:", error);
                     }
                 }
-
-                // Then delete the daily expense
                 const response = await fetch(`https://backendaab.in/aabuildersDash/api/daily-payments/delete/${id}`, {
                     method: 'DELETE',
                 });
@@ -975,10 +1123,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         const confirmed = window.confirm("Are you sure you want to delete This Refund Received Data?");
         if (confirmed) {
             try {
-                // Find the refund payment data to check for staff_advance_portal_id
                 const refundData = refundPayments.find(refund => refund.id === id);
-                
-                // If it has a staff_advance_portal_id, delete that record first
                 if (refundData && refundData.staff_advance_portal_id) {
                     try {
                         await axios.delete(
@@ -989,7 +1134,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         console.error("Error deleting staff advance portal for refund:", error);
                     }
                 }
-
                 const response = await fetch(`https://backendaab.in/aabuildersDash/api/refund_received/delete/${id}`, {
                     method: 'DELETE',
                 });
@@ -1014,16 +1158,12 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 (newDailyExpense.labour_id && Number(newDailyExpense.labour_id) > 0) ||
                 (newDailyExpense.contractor_id && Number(newDailyExpense.contractor_id) > 0) ||
                 (newDailyExpense.vendor_id && Number(newDailyExpense.vendor_id) > 0);
-
             if (!hasAnyId || !newDailyExpense.project_id || !newDailyExpense.type || !newDailyExpense.amount) {
                 alert("Please select all requried details.");
                 return;
             }
-            // Check if this is a Staff Advance type
             if (newDailyExpense.type === "Staff Advance") {
                 const entryNo = await getLastEntryNumber();
-                
-                // Send to staff-advance API
                 const staffAdvancePayload = {
                     date: selectedDate,
                     type: "Advance",
@@ -1034,17 +1174,12 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     from_purpose_id: 5,
                     entry_no: entryNo
                 };
-                
                 const staffAdvanceResponse = await axios.post(
                     "https://backendaab.in/aabuildersDash/api/staff-advance/save",
                     staffAdvancePayload,
                     { headers: { "Content-Type": "application/json" } }
                 );
-
-                // Get the staffAdvancePortalId from the response
                 const staffAdvancePortalId = staffAdvanceResponse.data?.staffAdvancePortalId;
-
-                // Also send to daily-payments API with staff_advance_portal_id
                 const dailyPaymentPayload = {
                     date: selectedDate,
                     created_at: new Date().toISOString(),
@@ -1065,8 +1200,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     dailyPaymentPayload,
                     { headers: { "Content-Type": "application/json" } }
                 );
-
-                // Save Weekly Expense "meta row" (amount will be recalculated in backend)
                 const expenseForBackend = {
                     date: selectedDate,
                     contractor_id: contractorOptions.find(opt => opt.label === "Company Labour")?.id || null,
@@ -1083,7 +1216,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     { headers: { "Content-Type": "application/json" } }
                 );
             } else {
-                // ✅ Save Daily Entry (original logic for non-Staff Advance)
                 const payload = {
                     date: selectedDate,
                     created_at: new Date().toISOString(),
@@ -1103,7 +1235,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     payload,
                     { headers: { "Content-Type": "application/json" } }
                 );
-                // ✅ Save Weekly Expense "meta row" (amount will be recalculated in backend)
                 const expenseForBackend = {
                     date: selectedDate,
                     contractor_id: contractorOptions.find(opt => opt.label === "Company Labour")?.id || null,
@@ -1123,7 +1254,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             // ✅ Refresh UI
             await handleDateClick(selectedDate);
             window.location.reload();
-            // ✅ Reset form
             setNewDailyExpense({
                 labour_id: "",
                 vendor_id: "",
@@ -1158,7 +1288,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         }
         return days;
     };
-    // Generate 7 days if week selected (your existing code)
     const days = [];
     if (currentWeek) {
         const start = new Date(currentWeek.start);
@@ -1182,8 +1311,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             setSelectedDate(defaultDate);
             setNewDailyExpense((prev) => ({ ...prev, date: defaultDate }));
         }
-        // empty dependency array → only run once
-        // DO NOT put currentWeekDays in deps
     }, []);
     // format helper
     const formatDate = (date) =>
@@ -1205,7 +1332,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             setRefundPayments([]);
         }
     };
-    // ✅ get today's date
     const today = new Date().toISOString().split("T")[0];
     if (!selectedDate && currentWeekDays.length > 0) {
         const todayInWeek = currentWeekDays.find(
@@ -1267,15 +1393,13 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         const totalAmount = filteredExpenses.reduce(
             (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
             0
-        );
-        
+        );        
         // Filter advance data for separate table
         const advanceExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate && row.type === "Staff Advance");
         const totalAdvanceAmount = advanceExpenses.reduce(
             (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
             0
-        );
-        
+        );        
         // Filter Diwali Bonus data for separate table
         const diwaliBonusExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate && row.type === "Diwali Bonus");
         const totalDiwaliBonusAmount = diwaliBonusExpenses.reduce(
@@ -1351,7 +1475,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
         doc.text('EXPENDITURE PAYMENTS', 14, 38);
-        // Start expenses table
         doc.autoTable({
             startY: 50,
             head: [expensesTableColumn],
@@ -1364,20 +1487,20 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 textColor: [80, 80, 80],
             },
             headStyles: {
-                fillColor: [255, 248, 220], // Light orange color
+                fillColor: [255, 248, 220], 
                 textColor: [0, 0, 0],
                 fontStyle: 'bold',
                 lineColor: [200, 200, 200],
                 lineWidth: 0.1,
             },
             columnStyles: {
-                0: { cellWidth: 13, halign: 'center', fillColor: [255, 255, 255] },    // SNO - white background
-                1: { cellWidth: 47, halign: 'left' },      // Project Name
-                2: { cellWidth: 30, halign: 'left' },      // Name
-                3: { cellWidth: 12, halign: 'center' },    // Qty
-                4: { cellWidth: 25, halign: 'left' },      // Type
-                5: { cellWidth: 20, halign: 'right' },     // Amount
-                6: { cellWidth: 35, halign: 'left' }       // Description
+                0: { cellWidth: 13, halign: 'center', fillColor: [255, 255, 255] },
+                1: { cellWidth: 47, halign: 'left' },  
+                2: { cellWidth: 30, halign: 'left' },     
+                3: { cellWidth: 12, halign: 'center' },  
+                4: { cellWidth: 25, halign: 'left' },   
+                5: { cellWidth: 20, halign: 'right' },    
+                6: { cellWidth: 35, halign: 'left' }     
             },
             bodyStyles: {
                 lineWidth: 0.1,
@@ -1386,19 +1509,18 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 fillColor: false,
             }
         });
-        // Get the end position of the first table
         const firstTableEndY = doc.lastAutoTable.finalY;
-        // Add some space between tables
         const spaceBetweenTables = 10;
-        // Refund Received table columns
         const refundTableColumn = [
             "SNO", "NAME", "AMOUNT"
         ];
         const refundTableRows = refundPayments
             .reverse()
             .map((row, index) => {
+                const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
+                const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
                 const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
-                const name = labour?.label || "";
+                const name = vendor?.label || contractor?.label || labour?.label || "";
                 const amount = Number(row.amount || 0);
                 const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
                 return [
@@ -1407,7 +1529,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     formattedAmount
                 ];
             });
-        // Add total row for refunds
         refundTableRows.push([
             "",
             "TOTAL",
@@ -1417,11 +1538,9 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
         doc.text(`NET BALANCE: ${netBalance.toLocaleString('en-IN')}`, 155, 38);
-        // Add Refund Received table heading (left side)
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
         doc.text('WAGE REFUND', 14, firstTableEndY + spaceBetweenTables - 2);
-        // Add Refund Received table (left side, half width)
         doc.autoTable({
             startY: firstTableEndY + spaceBetweenTables,
             head: [refundTableColumn],
@@ -1435,7 +1554,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 textColor: [80, 80, 80],
             },
             headStyles: {
-                fillColor: [255, 248, 220], // Light orange color
+                fillColor: [255, 248, 220], 
                 textColor: [0, 0, 0],
                 fontStyle: 'bold',
                 lineColor: [200, 200, 200],
@@ -1448,93 +1567,78 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 fillColor: false,
             },
             columnStyles: {
-                0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },    // SNO - white background
-                1: { cellWidth: 35, halign: 'left' },      // Name
-                2: { cellWidth: 20, halign: 'right' }      // Amount
+                0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },  
+                1: { cellWidth: 35, halign: 'left' },     
+                2: { cellWidth: 20, halign: 'right' }    
             },
             margin: { left: 14, right: 0 }
         });        
-        // Get the end position of the refund table
         const refundTableEndY = doc.lastAutoTable.finalY;
-        
-        // Add Diwali Bonus table (always show, even if empty)
-        // Diwali Bonus table columns
-        const diwaliBonusTableColumn = [
-            "SNO", "NAME", "AMOUNT"
-        ];
-        
-        // Prepare Diwali Bonus table rows
-        const diwaliBonusTableRows = diwaliBonusExpenses
-            .map((row, index) => {
-                const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
-                const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
-                const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
-                const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
-                const name = [employee?.label, vendor?.label, contractor?.label, labour?.label]
-                    .filter(Boolean).join(" | ") || "";
-                const amount = (row.amount || 0) + (row.extra_amount || 0);
-                const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
-                
-                return [
-                    (index + 1).toString(),
-                    name,
-                    formattedAmount
-                ];
+        if (diwaliBonusExpenses.length > 0) {
+            const diwaliBonusTableColumn = [
+                "SNO", "NAME", "AMOUNT"
+            ];        
+            const diwaliBonusTableRows = diwaliBonusExpenses
+                .map((row, index) => {
+                    const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
+                    const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
+                    const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
+                    const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
+                    const name = [employee?.label, vendor?.label, contractor?.label, labour?.label]
+                        .filter(Boolean).join(" | ") || "";
+                    const amount = (row.amount || 0) + (row.extra_amount || 0);
+                    const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;                
+                    return [
+                        (index + 1).toString(),
+                        name,
+                        formattedAmount
+                    ];
+                });        
+            diwaliBonusTableRows.push([
+                "",
+                "TOTAL",
+                `${totalDiwaliBonusAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
+            ]);        
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text('DIWALI BONUS', 14, refundTableEndY + 15);        
+            doc.autoTable({
+                startY: refundTableEndY + 20,
+                head: [diwaliBonusTableColumn],
+                body: diwaliBonusTableRows,
+                tableWidth: 'wrap',
+                styles: {
+                    fontSize: 8,
+                    cellPadding: 2,
+                    halign: 'left',
+                    valign: 'middle',
+                    textColor: [80, 80, 80],
+                },
+                headStyles: {
+                    fillColor: [255, 248, 220],
+                    textColor: [0, 0, 0],
+                    fontStyle: 'bold',
+                    lineColor: [200, 200, 200],
+                    lineWidth: 0.1,
+                },
+                bodyStyles: {
+                    lineWidth: 0.1,
+                },
+                alternateRowStyles: {
+                    fillColor: false,
+                },
+                columnStyles: {
+                    0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },
+                    1: { cellWidth: 35, halign: 'left' }, 
+                    2: { cellWidth: 20, halign: 'right' } 
+                },
+                margin: { left: 14, right: 0 }
             });
-        
-        // Add total row for Diwali Bonus table
-        diwaliBonusTableRows.push([
-            "",
-            "TOTAL",
-            `${totalDiwaliBonusAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
-        ]);
-        
-        // Add Diwali Bonus table heading
-        doc.setFontSize(12);
-        doc.setFont(undefined, 'bold');
-        doc.text('DIWALI BONUS', 14, refundTableEndY + 15);
-        
-        // Add Diwali Bonus table
-        doc.autoTable({
-            startY: refundTableEndY + 20,
-            head: [diwaliBonusTableColumn],
-            body: diwaliBonusTableRows,
-            tableWidth: 'wrap',
-            styles: {
-                fontSize: 8,
-                cellPadding: 2,
-                halign: 'left',
-                valign: 'middle',
-                textColor: [80, 80, 80],
-            },
-            headStyles: {
-                fillColor: [255, 248, 220], // Light orange color
-                textColor: [0, 0, 0],
-                fontStyle: 'bold',
-                lineColor: [200, 200, 200],
-                lineWidth: 0.1,
-            },
-            bodyStyles: {
-                lineWidth: 0.1,
-            },
-            alternateRowStyles: {
-                fillColor: false,
-            },
-            columnStyles: {
-                0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },    // SNO - white background
-                1: { cellWidth: 35, halign: 'left' },      // Name
-                2: { cellWidth: 20, halign: 'right' }      // Amount
-            },
-            margin: { left: 14, right: 0 }
-        });
-        
-        // Add Wage Advance table if there are advance expenses
+        }        
         if (advanceExpenses.length > 0) {
-            // Wage Advance table columns
             const advanceTableColumn = [
                 "S.NO", "PROJECT NAME", "EMPLOYEE NAME", "TOTAL AMOUNT"
             ];            
-            // Prepare advance table rows
             const advanceTableRows = advanceExpenses
                 .map((row, index) => {
                     const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
@@ -1546,7 +1650,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     const projectName = siteOptions.find(opt => opt.id === Number(row.project_id))?.label || "";
                     const amount = (row.amount || 0) + (row.extra_amount || 0);
                     const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
-                    
                     return [
                         (index + 1).toString(),
                         projectName,
@@ -1554,18 +1657,15 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         formattedAmount
                     ];
                 });            
-            // Add total row for advance table
             advanceTableRows.push([
                 "",
                 "TOTAL",
                 "",
                 `${totalAdvanceAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
             ]);            
-            // Add Wage Advance table heading (right side)
             doc.setFontSize(12);
             doc.setFont(undefined, 'bold');
-            doc.text('WAGE ADVANCE', 95, firstTableEndY + spaceBetweenTables - 2);            
-            // Add Wage Advance table (right side, half width)
+            doc.text('WAGE ADVANCE', 95, firstTableEndY + spaceBetweenTables - 2); 
             doc.autoTable({
                 startY: firstTableEndY + spaceBetweenTables,
                 head: [advanceTableColumn],
@@ -1579,7 +1679,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     textColor: [80, 80, 80],
                 },
                 headStyles: {
-                    fillColor: [255, 248, 220], // Light orange color
+                    fillColor: [255, 248, 220],
                     textColor: [0, 0, 0],
                     fontStyle: 'bold',
                     lineColor: [200, 200, 200],
@@ -1592,10 +1692,10 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     fillColor: false,
                 },
                 columnStyles: {
-                    0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },    // S.NO - white background
-                    1: { cellWidth: 35, halign: 'left' },      // Project Name
-                    2: { cellWidth: 35, halign: 'left' },      // Employee Name
-                    3: { cellWidth: 20, halign: 'right' }      // Total Amount
+                    0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },
+                    1: { cellWidth: 35, halign: 'left' }, 
+                    2: { cellWidth: 35, halign: 'left' }, 
+                    3: { cellWidth: 20, halign: 'right' }
                 },
                 margin: { left: 95, right: 0 }
             });
@@ -1610,12 +1710,10 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         }
         setLoading(true);
         try {
-            // Find the current expense data to preserve all existing fields
             const currentExpense = dailyExpenses.find(exp => exp.id === entryId);
             if (!currentExpense) {
                 throw new Error("Expense not found");
             }
-            // Create payload with all existing data plus the new description
             const payload = {
                 date: currentExpense.date,
                 labour_id: Number(currentExpense.labour_id) || null,
@@ -1630,15 +1728,10 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 description: description.trim(),
                 file_url: currentExpense.file_url || null,
             };
-            // Use the same API endpoint as saveEditedExpense
             await axios.put(
                 `https://backendaab.in/aabuildersDash/api/daily-payments/edits/${entryId}?username=${encodeURIComponent(username)}`,
                 payload,
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                }
+                {headers: {"Content-Type": "application/json",},}
             );
             alert("Description updated successfully!");
             setDailyExpenses(prev =>
@@ -1741,11 +1834,9 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                     const dateStr = day.toISOString().split("T")[0];
                                     return (
                                         <div key={idx} className="flex flex-col items-left w-20 mx-auto">
-                                            {/* Day Name */}
                                             <div className="font-semibold text-[#E4572E]">
                                                 {day.toLocaleDateString("en-US", { weekday: "short" })}
                                             </div>
-                                            {/* Date Button */}
                                             <button
                                                 onClick={() => handleDateClick(dateStr)}
                                                 className={`p- rounded-lg border text-center w-20 h-[37px] mt-1 ${selectedDate === dateStr
@@ -1780,7 +1871,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 </h1>
             </div>
             <div className="mx-auto w-auto p-6 border-collapse bg-[#FFFFFF] ml-[30px] mr-6 rounded-md">
-                {/* EXPENSES TABLE */}
                 <div className="w-full mt- flex flex-col xl:flex-row gap-6">
                     <div className="flex-[2] min-w-0">
                         <div className="flex justify-between mb-4">
@@ -1810,7 +1900,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                 onClick={() => handleSort('amount')}>
                                                 Amount {sortConfig.key === 'amount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                             </th>
-
                                             <th className="py-2 px-1 text-left w-[120px] cursor-pointer hover:bg-gray-200"
                                                 onClick={() => handleSort('type')}>
                                                 Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
@@ -1910,15 +1999,10 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                         />
                                                     </div>
                                                     <div>
-                                                        <button
-                                                            className="font-semibold text-[25px]"
-                                                            onClick={() => setShowExtraAmount(prev => !prev)}
-                                                            type="button"
-                                                        >
+                                                        <button className="font-semibold text-[25px]" onClick={() => setShowExtraAmount(prev => !prev)} type="button">
                                                             +
                                                         </button>
                                                     </div>
-                                                    {/* Conditionally render extra input */}
                                                     {showExtraAmount && (
                                                         <div>
                                                             <input
@@ -2186,11 +2270,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                                         <img src={file} className="w-4 h-4" alt="Open File" />
                                                                     </a>
                                                                 ) : (
-                                                                    <button
-                                                                        onClick={() => handleFileUploadClick(row)}
-                                                                        className="cursor-pointer"
-                                                                        title="Upload File"
-                                                                    >
+                                                                    <button onClick={() => handleFileUploadClick(row)} className="cursor-pointer" title="Upload File" >
                                                                         <img
                                                                             src={fileUpload}
                                                                             className="w-4 h-4 opacity-70 hover:opacity-100"
@@ -2290,7 +2370,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                     </td>
                                                     <td className="py-2 relative">
                                                         <div className="flex gap-2 w-[80px]">
-                                                            {/* Edit Button */}
                                                             {editingDailyExpenseRowId === row.id ? (
                                                                 <button className="text-green-600 font-bold text-lg relative z-10" onClick={() => saveEditedExpense(row)}>
                                                                     ✓
@@ -2308,11 +2387,9 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                                     </button>
                                                                 )
                                                             )}
-                                                            {/* Delete Button */}
                                                             <button onClick={() => handleDailyExpensesDelete(row.id)}>
                                                                 <img src={Delete} className="w-5 h-4" alt="Delete" />
                                                             </button>
-                                                            {/* History Button */}
                                                             <button onClick={() => fetchAuditDetailsForDailyExpense(row.id)}>
                                                                 <img src={history} className="w-5 h-4" alt="History" />
                                                             </button>
@@ -2333,7 +2410,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                             </h1>
                         </div>
                         <div>
-                            <div className="w-full rounded-lg border-l-8 border-l-[#BF9853] overflow-x-auto" style={{ maxHeight: "400px" }}>
+                            <div className="w-full rounded-lg border-l-8 border-l-[#BF9853] overflow-x-auto" style={{ maxHeight: "600px" }}>
                                 <table className="w-full min-w-[320px] border-collapse">
                                     <thead className="bg-[#FAF6ED] h-12">
                                         <tr>
@@ -2347,30 +2424,78 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                             <tr key={row.id || index} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
                                                 <td className="px-1 py-2">
                                                     {editingPaymentId === row.id ? (
-                                                        <Select
-                                                            name="labour_id"
-                                                            className="w-[180px]"
-                                                            placeholder="Labour Name"
-                                                            isSearchable
-                                                            isClearable
-                                                            value={laboursList.find(opt => opt.id === editRefundPaymentData.labour_id) || null}
-                                                            onChange={handleEditRefundLabourChange}
-                                                            options={laboursList}
-                                                            menuPortalTarget={document.body}
-                                                            styles={customStyles}
-                                                        />
+                                                        (() => {
+                                                            let optionsToShow = combinedOptions;
+                                                            let placeholderText = "Select Name";
+                                                            if (Number(row.labour_id)) {
+                                                                optionsToShow = laboursList;
+                                                                placeholderText = "Labour Name";
+                                                            } else if (Number(row.contractor_id)) {
+                                                                optionsToShow = contractorOptions;
+                                                                placeholderText = "Contractor Name";
+                                                            } else if (Number(row.vendor_id)) {
+                                                                optionsToShow = vendorOptions;
+                                                                placeholderText = "Vendor Name";
+                                                            } else if (Number(row.employee_id)) {
+                                                                optionsToShow = employeeOptions;
+                                                                placeholderText = "Employee Name";
+                                                            }
+                                                            const selectedValue =
+                                                                optionsToShow.find(opt =>
+                                                                    (optionsToShow === laboursList && Number(opt.id) === Number(editRefundPaymentData.labour_id)) ||
+                                                                    (optionsToShow === contractorOptions && Number(opt.id) === Number(editRefundPaymentData.contractor_id)) ||
+                                                                    (optionsToShow === vendorOptions && Number(opt.id) === Number(editRefundPaymentData.vendor_id)) ||
+                                                                    (optionsToShow === employeeOptions && Number(opt.id) === Number(editRefundPaymentData.employee_id))
+                                                                ) || null;
+                                                            return (
+                                                                <Select
+                                                                    name="labour_id"
+                                                                    className="w-[180px]"
+                                                                    placeholder={placeholderText}
+                                                                    isSearchable
+                                                                    isClearable
+                                                                    value={selectedValue}
+                                                                    onChange={handleEditRefundLabourChange}
+                                                                    options={optionsToShow}
+                                                                    menuPortalTarget={document.body}
+                                                                    styles={customStyles}
+                                                                />
+                                                            );
+                                                        })()
                                                     ) : (
-                                                        laboursList.find(opt => opt.id === Number(row.labour_id))?.label || ""
+                                                        <div className="flex items-center justify-between w-full gap-2">
+                                                            <div className="truncate pr-2">
+                                                                {(() => {
+                                                                    const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
+                                                                    const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
+                                                                    const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
+                                                                    const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
+                                                                    const labels = [employee?.label, vendor?.label, contractor?.label, labour?.label].filter(Boolean);
+                                                                    return labels.join(", ") || "";
+                                                                })()}
+                                                            </div>
+                                                            {(() => {
+                                                                const hasLabourId = row.labour_id && Number(row.labour_id) > 0;
+                                                                const hasVendorOrContractorId = (row.vendor_id && Number(row.vendor_id) > 0) || 
+                                                                                                    (row.contractor_id && Number(row.contractor_id) > 0);
+                                                                if (!hasLabourId && !hasVendorOrContractorId) return null;                                                                
+                                                                return (
+                                                                    <div className="bg-[#E3F2FD] text-[#1565C0] font-semibold px-3 py-[2px] text-xs rounded-full whitespace-nowrap">
+                                                                        {hasLabourId ? 'Staff Portal' : 'Loan Portal'}
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
                                                     )}
                                                 </td>
-                                                <td className=" py-2">
+                                                <td className=" py-2 text-center">
                                                     {editingPaymentId === row.id ? (
                                                         <input
                                                             type="number"
                                                             name="amount"
                                                             value={editRefundPaymentData.amount}
                                                             onChange={handleEditRefundChange}
-                                                            className="border-2 border-[#BF9853] border-opacity-25 rounded-lg w-[90px] h-[40px] focus:outline-none no-spinner"
+                                                            className="border-2 border-[#BF9853] border-opacity-25 rounded-lg w-[90px] h-[40px] text-center focus:outline-none no-spinner"
                                                             min="0"
                                                             step="any"
                                                             onWheel={(e) => e.preventDefault()}
@@ -2401,20 +2526,54 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                             </tr>
                                         ))}
                                         <tr>
-                                            <td className=" py-2 text-left">
-                                                <Select
-                                                    name="labour_id"
-                                                    className="w-[265px] text-left"
-                                                    placeholder="Labour Name"
-                                                    isSearchable
-                                                    isClearable
-                                                    value={laboursList.find(opt => opt.id === newRefundReceived.labour_id) || null}
-                                                    onChange={handleLabourChange}
-                                                    onKeyDown={handleKeyDown}
-                                                    options={laboursList}
-                                                    styles={customStyles}
-                                                    menuPortalTarget={document.body}
-                                                />
+                                            <td className="py-2 text-left flex items-center gap-2">
+                                                <div>
+                                                    <Select
+                                                        name="labour_id"
+                                                        className="w-[265px] text-left"
+                                                        placeholder={isRefundChangeButtonActive ? "Vendor/Contractor" : "Labour Name"}
+                                                        isSearchable
+                                                        isClearable
+                                                        value={
+                                                            isRefundChangeButtonActive
+                                                                ? combinedOptions.find(opt =>
+                                                                    (opt.type === "Employee" && opt.id === Number(newRefundReceived.employee_id)) ||
+                                                                    (opt.type === "Vendor" && opt.id === Number(newRefundReceived.vendor_id)) ||
+                                                                    (opt.type === "Contractor" && opt.id === Number(newRefundReceived.contractor_id))
+                                                                ) || null
+                                                                : laboursList.find(opt => opt.id === Number(newRefundReceived.labour_id)) || null
+                                                        }
+                                                        onChange={(selectedOption) => {
+                                                            if (selectedOption) {
+                                                                const { type, id, label } = selectedOption;
+                                                                setNewRefundReceived(prev => ({
+                                                                    ...prev,
+                                                                    labour_id: type === "Labour" ? id : "",
+                                                                    vendor_id: type === "Vendor" ? id : "",
+                                                                    contractor_id: type === "Contractor" ? id : "",
+                                                                    employee_id: type === "Employee" ? id : "",
+                                                                }));
+                                                            } else {
+                                                                setNewRefundReceived(prev => ({
+                                                                    ...prev,
+                                                                    labour_id: "",
+                                                                    vendor_id: "",
+                                                                    contractor_id: "",
+                                                                    employee_id: "",
+                                                                }));
+                                                            }
+                                                        }}
+                                                        onKeyDown={handleKeyDown}
+                                                        options={isRefundChangeButtonActive ? combinedOptions : laboursList}
+                                                        styles={customStyles}
+                                                        menuPortalTarget={document.body}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <button onClick={handleRefundChangeButtonClick}>
+                                                        <img src={Change} className={`w-4 h-4 ${isRefundChangeButtonActive ? 'opacity-10' : ''}`} />
+                                                    </button>
+                                                </div>
                                             </td>
                                             <td className=" py-2">
                                                 <input
@@ -2572,6 +2731,114 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     siteOptions={siteOptions} vendorOptions={vendorOptions} employeeOptions={employeeOptions} />
                 <AuditModalWeeklyPaymentsReceived show={showWeeklyPaymentReceivedModal} onClose={() => setShowWeeklyPaymentReceivedModal(false)}
                     audits={weeklyPaymentReceivedAudits} laboursList={laboursList} />
+                {/* Purpose Selection Popup */}
+                {showPurposePopup && (
+                    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+                        onKeyDown={(e) => {
+                            if (e.key === 'Escape') {
+                                setShowPurposePopup(false);
+                                setSelectedPurpose(null);
+                                setPendingRefundData(null);
+                            }
+                        }}
+                        tabIndex={0}
+                    >
+                        <div className="bg-white rounded-xl shadow-lg p-6 w-[500px]">
+                            <h3 className="text-lg font-semibold mb-4 text-center">
+                                Select Purpose for Refund
+                            </h3>
+                            <div className="mb-4">
+                                <label className="block mb-2 text-sm font-medium">
+                                    Purpose <span className="text-red-500">*</span>
+                                </label>
+                                <Select
+                                    name="purpose"
+                                    className="w-full"
+                                    placeholder="Select Purpose"
+                                    isSearchable
+                                    isClearable
+                                    value={selectedPurpose}
+                                    onChange={(selectedOption) => setSelectedPurpose(selectedOption)}
+                                    options={purposeOptions}
+                                    menuPortalTarget={document.body}
+                                    styles={{
+                                        control: (provided, state) => ({
+                                            ...provided,
+                                            minHeight: '45px',
+                                            border: '2px solid rgba(191, 152, 83, 0.25)',
+                                            borderRadius: '8px',
+                                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                            '&:hover': {
+                                                border: '2px solid rgba(191, 152, 83, 0.5)'
+                                            }
+                                        }),
+                                        valueContainer: (provided) => ({
+                                            ...provided,
+                                            padding: '2px 8px'
+                                        }),
+                                        input: (provided) => ({
+                                            ...provided,
+                                            margin: '0px'
+                                        }),
+                                        indicatorSeparator: () => ({
+                                            display: 'none'
+                                        }),
+                                        indicatorsContainer: (provided) => ({
+                                            ...provided,
+                                            height: '45px',
+                                            gap: '0px'
+                                        }),
+                                        clearIndicator: (provided) => ({
+                                            ...provided,
+                                            padding: '2px'
+                                        }),
+                                        dropdownIndicator: (provided) => ({
+                                            ...provided,
+                                            padding: '2px'
+                                        }),
+                                        menuPortal: (provided) => ({
+                                            ...provided,
+                                            zIndex: 9999
+                                        }),
+                                        menu: (provided) => ({
+                                            ...provided,
+                                            zIndex: 9999
+                                        })
+                                    }}
+                                />
+                            </div>
+                            {pendingRefundData && (
+                                <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                                    <p className="text-sm text-gray-600 mb-1">Refund Details:</p>
+                                    <p className="text-sm">Amount: ₹{Number(pendingRefundData.amount).toLocaleString('en-IN')}</p>
+                                    <p className="text-sm">Date: {formatDateOnly(pendingRefundData.date)}</p>
+                                </div>
+                            )}
+                            <div className="flex justify-end gap-3 mt-6">
+                                <button
+                                    onClick={() => {
+                                        setShowPurposePopup(false);
+                                        setSelectedPurpose(null);
+                                        setPendingRefundData(null);
+                                    }}
+                                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handlePurposeSelection}
+                                    disabled={!selectedPurpose}
+                                    className={`px-4 py-2 rounded-lg ${!selectedPurpose
+                                        ? 'bg-gray-400 cursor-not-allowed'
+                                        : 'bg-green-600 hover:bg-green-700'
+                                        } text-white`}
+                                >
+                                    Submit Refund
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </body >
     )
@@ -2608,7 +2875,6 @@ const AuditModal = ({ show, onClose, audits, laboursList, siteOptions, vendorOpt
         return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
     };
     const formatDisplayValue = (value, field) => {
-        // If vendor, contractor, labour, employee or transfer site is 0, show "-"
         if (
             (field.oldKey?.includes("labour_id") || field.oldKey?.includes("vendor_id") || field.oldKey?.includes("contractor_id") || field.oldKey?.includes("employee_id") || field.oldKey?.includes("transfer_site_id") ||
                 field.newKey?.includes("labour_id") || field.newKey?.includes("vendor_id") || field.newKey?.includes("contractor_id") || field.newKey?.includes("employee_id") || field.newKey?.includes("transfer_site_id")) &&
@@ -2617,7 +2883,6 @@ const AuditModal = ({ show, onClose, audits, laboursList, siteOptions, vendorOpt
             return "-";
         }
         if (field.lookup) {
-            // Handle different lookup types based on field label
             if (field.label.includes("Vendor")) {
                 return getNameById(value, vendorOptions || []);
             } else if (field.label.includes("Contractor")) {
@@ -2647,7 +2912,6 @@ const AuditModal = ({ show, onClose, audits, laboursList, siteOptions, vendorOpt
                         <h2 className="text-xl text-red-500 -mt-10 font-bold">x</h2>
                     </button>
                 </div>
-                {/* Scroll container for both vertical and horizontal overflow */}
                 <div className="overflow-auto mt-2 max-h-80 border border-l-8 border-l-[#BF9853] rounded-lg ml-7">
                     <table className="table-fixed min-w-full bg-white">
                         <thead className="bg-[#FAF6ED]">
@@ -2719,7 +2983,6 @@ const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits, laboursList }
         return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
     };
     const formatDisplayValue = (value, field) => {
-        // If vendor or transfer site is 0, show "-"
         if (
             (field.oldKey?.includes("labour_id") || field.oldKey?.includes("transfer_site_id") ||
                 field.newKey?.includes("labour_id") || field.newKey?.includes("transfer_site_id")) &&
@@ -2747,7 +3010,6 @@ const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits, laboursList }
                         <h2 className="text-xl text-red-500 -mt-10 font-bold">x</h2>
                     </button>
                 </div>
-                {/* Scroll container for both vertical and horizontal overflow */}
                 <div className="overflow-auto mt-2 max-h-80 border border-l-8 border-l-[#BF9853] rounded-lg ml-7">
                     <table className="table-fixed min-w-full bg-white">
                         <thead className="bg-[#FAF6ED]">

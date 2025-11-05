@@ -30,6 +30,8 @@ import MasterData from './Components/MasterData/MasterData';
 import BankReconciliation from './Components/Bank Reconciliation/BankReconciliation .js';
 import UtilityHeading from './Components/UtilityHub/UtilityHeading';
 import BankRegisterHeading from './Components/Bank Register/BankRegisterHeading';
+import QuotationHeading from './Components/Quotation/QuotationHeading';
+import DirectoryHeading from './Components/Directory/DirectoryHeading';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -52,7 +54,7 @@ function App() {
     setUser('');
     localStorage.removeItem('user');
   };
-  
+
   return (
     <Router>
       {!user ? (
@@ -63,31 +65,33 @@ function App() {
           <Sidebar userRoles={user?.userRoles || []} />
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/expense-entry/*" element={<Heading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path="/designtool/*" element={<DHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path="/invoice-bill/*" element={<InHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path="/paints/*" element={<PHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path="/rccal/*" element={<RcHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path="/bath/*" element={<BHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path="/switch/*" element={<SHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path="/weekly-payment/*" element={<WeeklyPaymentHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path="/rent/*" element={<RHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path="/masonary/*" element={<MHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path="/carpentry/*" element={<CHeading username={user.username} userRoles={user?.userRoles || []}/>}/>
-            <Route path="/entrychecklist/*" element={<BillHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path='/purchaseorder/*' element={<PurchaseHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path='/inventory/*' element={<InventoryHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path='/user_manage/*' element={<ManageHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path='/attendance' element={<Attendancelog username={user.username} />}/>
+            <Route path="/expense-entry/*" element={<Heading username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path="/designtool/*" element={<DHeading username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path="/invoice-bill/*" element={<InHeading username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path="/paints/*" element={<PHeading username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path="/rccal/*" element={<RcHeading username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path="/bath/*" element={<BHeading username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path="/switch/*" element={<SHeading username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path="/weekly-payment/*" element={<WeeklyPaymentHeading username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path="/rent/*" element={<RHeading username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path="/masonary/*" element={<MHeading username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path="/carpentry/*" element={<CHeading username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path="/entrychecklist/*" element={<BillHeading username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path='/purchaseorder/*' element={<PurchaseHeading username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path='/inventory/*' element={<InventoryHeading username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path='/user_manage/*' element={<ManageHeading username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path='/attendance' element={<Attendancelog username={user.username} />} />
             <Route path='/portal/*' element={<AdvanceHeading username={user.username} userRoles={user?.userRoles || []} />} />
-            <Route path='/Claim/*' element={<ClaimPaymentHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path='/staffadvance/*' element={<StaffHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path='/loan/*' element={<LoanPoratlHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path='/tracker/*' element={<BillPaymentsTrackerHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path='/master-data' element={<MasterData username={user.username} userRoles={user?.userRoles || []}/>} />
+            <Route path='/Claim/*' element={<ClaimPaymentHeading username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path='/staffadvance/*' element={<StaffHeading username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path='/loan/*' element={<LoanPoratlHeading username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path='/tracker/*' element={<BillPaymentsTrackerHeading username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path='/master-data' element={<MasterData username={user.username} userRoles={user?.userRoles || []} />} />
             <Route path="/bankreconciliation" element={<BankReconciliation username={user.username} userRoles={user?.userRoles || []} />} />
             <Route path="/utility/*" element={<UtilityHeading username={user.username} userRoles={user?.userRoles || []} />} />
             <Route path="/bank-register" element={<BankRegisterHeading username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path="/quotation/*" element={<QuotationHeading username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path="/directory/*" element={<DirectoryHeading username={user.username} userRoles={user?.userRoles || []} />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </div>

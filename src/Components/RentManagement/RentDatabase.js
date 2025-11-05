@@ -94,7 +94,9 @@ const RentDatabase = ({ username, userRoles = [] }) => {
     const [rentFormData, setRentFormData] = useState({
         formType: '',
         shopNo: '',
+        shopNoId: null,
         tenantName: '',
+        tenantNameId: null,
         amount: '',
         refundAmount: '',
         paymentMode: '',
@@ -148,6 +150,10 @@ const RentDatabase = ({ username, userRoles = [] }) => {
         console.log('Current items:', currentItems);
     }, [sortField, sortOrder, currentItems]);
     const [allShops, setAllShops] = useState([]);
+    const [properties, setProperties] = useState([]);
+    const [tenantShopData, setTenantShopData] = useState([]);
+    const [shopNoIdToShopNoMap, setShopNoIdToShopNoMap] = useState({});
+    const [tenantNameIdToTenantNameMap, setTenantNameIdToTenantNameMap] = useState({});
     useEffect(() => {
         fetchProperties();
     }, []);
@@ -156,6 +162,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
             const response = await fetch('https://backendaab.in/aabuildersDash/api/properties/all');
             if (response.ok) {
                 const data = await response.json();
+                setProperties(data);
                 // Extract property names
                 const extractedShops = [];
                 data.forEach(property => {
@@ -284,7 +291,9 @@ const RentDatabase = ({ username, userRoles = [] }) => {
         }
     };
     const handlePrint = (rent) => {
-        const matchingShop = allShops.find(shop => shop.shopNo === rent.shopNo);
+        const displayShopNo = rent.shopNoId && shopNoIdToShopNoMap[rent.shopNoId] ? shopNoIdToShopNoMap[rent.shopNoId] : rent.shopNo;
+        const displayTenantName = rent.tenantNameId && tenantNameIdToTenantNameMap[rent.tenantNameId] ? tenantNameIdToTenantNameMap[rent.tenantNameId] : rent.tenantName;
+        const matchingShop = allShops.find(shop => shop.shopNo === displayShopNo);
         const propertyName = matchingShop?.propertyName || 'N/A';
         const qrCodeImage = QRCode;
         const receiptHtml = `
@@ -305,7 +314,8 @@ const RentDatabase = ({ username, userRoles = [] }) => {
     <body>
         <h2>Rent Payment Receipt</h2>
         <table>
-            <tr><td class="label">Shop No</td><td>${rent.shopNo}</td></tr>
+            <tr><td class="label">Shop No</td><td>${displayShopNo}</td></tr>
+            <tr><td class="label">Tenant Name</td><td>${displayTenantName}</td></tr>
             <tr><td class="label">Property Name</td><td>${propertyName}</td></tr>
             <tr><td class="label">Amount Paid</td><td>₹${Number(rent.refundAmount || rent.amount).toLocaleString('en-IN', {
             minimumFractionDigits: 2,
@@ -458,12 +468,23 @@ const RentDatabase = ({ username, userRoles = [] }) => {
     };
     useEffect(() => {
         fetchTenants();
-    }, []);
+    }, [properties]);
     const fetchTenants = async () => {
         try {
             const response = await fetch('https://backendaab.in/aabuildersDash/api/tenantShop/getAll');
             if (response.ok) {
                 const data = await response.json();
+                setTenantShopData(data);
+                // Build mapping from shopNo to shopNoId from properties
+                const shopNoToIdMap = {};
+                properties.forEach(property => {
+                    property.propertyDetailsList?.forEach(detail => {
+                        if (detail.shopNo && detail.id) {
+                            shopNoToIdMap[detail.shopNo] = detail.id;
+                        }
+                    });
+                });
+                
                 const activeTenants = data.filter(t =>
                     t.property?.some(p =>
                         p.shops?.some(shop => shop.active)
@@ -478,7 +499,8 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                                 label: t.tenantName,
                                 value: t.tenantName,
                                 tenantId: t.id,
-                                shopNo: shop.shopNo
+                                shopNo: shop.shopNo,
+                                shopNoId: shopNoToIdMap[shop.shopNo] || null
                             }))
                     )
                 );
@@ -486,8 +508,18 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                     (t, i, arr) => t.label && arr.findIndex(x => x.value === t.value) === i
                 );
                 setTenantOptions(tenantOptionsUnique);
-                const uniqueShopNos = [...new Set(options.map(o => o.shopNo).filter(Boolean))];
-                const shopOptions = uniqueShopNos.map(no => ({ label: no, value: no }));
+                // Get unique shop numbers with their IDs
+                const shopMap = new Map();
+                options.forEach(o => {
+                    if (o.shopNo && !shopMap.has(o.shopNo)) {
+                        shopMap.set(o.shopNo, o.shopNoId);
+                    }
+                });
+                const shopOptions = Array.from(shopMap.entries()).map(([shopNo, shopNoId]) => ({ 
+                    label: shopNo, 
+                    value: shopNo,
+                    shopNoId: shopNoId
+                }));
                 setShopNoOptions(shopOptions);
             } else {
                 console.log('Error fetching tenants.');
@@ -497,6 +529,29 @@ const RentDatabase = ({ username, userRoles = [] }) => {
             console.log('Error fetching properties.');
         }
     };
+    
+    // Build mapping from IDs to actual values
+    useEffect(() => {
+        // Build shopNoId -> shopNo mapping from properties
+        const shopNoIdMap = {};
+        properties.forEach(property => {
+            property.propertyDetailsList?.forEach(detail => {
+                if (detail.id && detail.shopNo) {
+                    shopNoIdMap[detail.id] = detail.shopNo;
+                }
+            });
+        });
+        setShopNoIdToShopNoMap(shopNoIdMap);
+        
+        // Build tenantNameId -> tenantName mapping from tenantShopData
+        const tenantNameIdMap = {};
+        tenantShopData.forEach(tenant => {
+            if (tenant.id && tenant.tenantName) {
+                tenantNameIdMap[tenant.id] = tenant.tenantName;
+            }
+        });
+        setTenantNameIdToTenantNameMap(tenantNameIdMap);
+    }, [properties, tenantShopData]);
     const handleChange = (e) => {
         const { name, type, value, files } = e.target;
         // Prevent clearing the date field
@@ -522,14 +577,16 @@ const RentDatabase = ({ username, userRoles = [] }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         const {
-            formType, shopNo, tenantName, amount,
+            formType, shopNo, shopNoId, tenantName, tenantNameId, amount,
             refundAmount, paymentMode, paidOnDate,
             forTheMonthOf, attachedFile
         } = rentFormData;
         const payload = {
             formType,
             shopNo,
+            shopNoId,
             tenantName,
+            tenantNameId,
             amount,
             refundAmount,
             paymentMode,
@@ -591,8 +648,8 @@ const RentDatabase = ({ username, userRoles = [] }) => {
         ];
         const rows = currentItems.map(rent => [
             formatDate(rent.timestamp),
-            rent.shopNo,
-            rent.tenantName,
+            rent.shopNoId && shopNoIdToShopNoMap[rent.shopNoId] ? shopNoIdToShopNoMap[rent.shopNoId] : rent.shopNo,
+            rent.tenantNameId && tenantNameIdToTenantNameMap[rent.tenantNameId] ? tenantNameIdToTenantNameMap[rent.tenantNameId] : rent.tenantName,
             `${Number(rent.refundAmount || rent.amount).toLocaleString('en-IN', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
@@ -631,8 +688,8 @@ const RentDatabase = ({ username, userRoles = [] }) => {
         ];
         const tableRows = filteredRentForm.map((rent) => [
             formatDate(rent.timestamp),
-            rent.shopNo,
-            rent.tenantName,
+            rent.shopNoId && shopNoIdToShopNoMap[rent.shopNoId] ? shopNoIdToShopNoMap[rent.shopNoId] : rent.shopNo,
+            rent.tenantNameId && tenantNameIdToTenantNameMap[rent.tenantNameId] ? tenantNameIdToTenantNameMap[rent.tenantNameId] : rent.tenantName,
             `${Number(rent.refundAmount || rent.amount).toLocaleString('en-IN', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
@@ -1221,8 +1278,16 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                                     {sortedItems.map((rent, index) => (
                                         <tr key={rent.id} className="odd:bg-white even:bg-[#FAF6ED]">
                                             <td className=" text-sm text-left px-4 font-semibold">{formatDate(rent.timestamp)}</td>
-                                            <td className=" text-sm text-left px-4 py-2 font-semibold">{rent.shopNo}</td>
-                                            <td className=" text-sm text-left px-4 font-semibold">{rent.tenantName}</td>
+                                            <td className=" text-sm text-left px-4 py-2 font-semibold">
+                                                {rent.shopNoId && shopNoIdToShopNoMap[rent.shopNoId] 
+                                                    ? shopNoIdToShopNoMap[rent.shopNoId] 
+                                                    : rent.shopNo}
+                                            </td>
+                                            <td className=" text-sm text-left px-4 font-semibold">
+                                                {rent.tenantNameId && tenantNameIdToTenantNameMap[rent.tenantNameId] 
+                                                    ? tenantNameIdToTenantNameMap[rent.tenantNameId] 
+                                                    : rent.tenantName}
+                                            </td>
                                             <td className={`text-sm text-left px-4 font-semibold ${rent.refundAmount ? 'text-red-500' : 'text-black'}`}>
                                                 {Number(rent.refundAmount || rent.amount) === 0
                                                     ? 'NIL'
@@ -1311,7 +1376,11 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                                             name="shopNo"
                                             value={shopNoOptions.find(option => option.value === rentFormData.shopNo)}
                                             onChange={(selectedOption) =>
-                                                setRentFormData({ ...rentFormData, shopNo: selectedOption?.value || '' })
+                                                setRentFormData({ 
+                                                    ...rentFormData, 
+                                                    shopNo: selectedOption?.value || '',
+                                                    shopNoId: selectedOption?.shopNoId || null
+                                                })
                                             }
                                             options={shopNoOptions}
                                             placeholder="--- Select Site ---"
@@ -1344,7 +1413,11 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                                             options={tenantOptions}
                                             value={tenantOptions.find(opt => opt.value === rentFormData.tenantName)}
                                             onChange={(selectedOption) =>
-                                                setRentFormData({ ...rentFormData, tenantName: selectedOption?.value || '' })
+                                                setRentFormData({ 
+                                                    ...rentFormData, 
+                                                    tenantName: selectedOption?.value || '',
+                                                    tenantNameId: selectedOption?.tenantId || null
+                                                })
                                             }
                                             isClearable
                                             styles={{

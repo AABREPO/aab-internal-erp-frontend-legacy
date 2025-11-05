@@ -321,14 +321,18 @@ const Tenant = () => {
                     <td className="py-2 px-4 text-sm font-semibold text-left">₹{totalAdvance.toLocaleString()}</td>
                     <td className="py-2 px-4 text-sm font-semibold text-left">₹{totalRent.toLocaleString()}</td>
                     <td className="py-2 pr-4 text-center">
-                      <a
-                        href={agreement.agreementUrl}
-                        className="text-red-500 underline font-semibold "
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        View
-                      </a>
+                      {agreement.agreementUrl ? (
+                        <a
+                          href={agreement.agreementUrl}
+                          className="text-red-500 underline font-semibold "
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          View
+                        </a>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
                     </td>
                     <td className="py-2 pr-2 text-center">
                       {aadhaarFile ? (

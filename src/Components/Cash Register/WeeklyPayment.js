@@ -12,28 +12,32 @@ import file from '../Images/file.png';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-// Helper function to clean URL by removing surrounding quotes
+// Helper function to clean URL by removing surrounding quotes and parsing JSON if needed
 function cleanUrl(url) {
-    if (!url) return url;
-    // Remove surrounding quotes if they exist
-    return url.replace(/^["']|["']$/g, '');
+    if (!url) return url;    
+    let cleanedUrl = url.replace(/^["']|["']$/g, '');
+    if (cleanedUrl.includes('{') && cleanedUrl.includes('billCopyUrl')) {
+        try {
+            const parsed = JSON.parse(cleanedUrl);
+            if (parsed.billCopyUrl) {
+                return parsed.billCopyUrl;
+            }
+        } catch (e) {
+            console.warn('Failed to parse URL as JSON:', cleanedUrl);
+        }
+    }    
+    return cleanedUrl;
 }
-
-// Helper function to get start and end date of ISO week
 function getStartAndEndDateOfISOWeek(weekNo, year) {
     const simple = new Date(year, 0, 1 + (weekNo - 1) * 7);
     let dayOfWeek = simple.getDay();
-    // Treat Sunday (0) as 7
     if (dayOfWeek === 0) {
         dayOfWeek = 7;
     }
-    // Get Monday of that week
     const ISOweekStart = new Date(simple);
     ISOweekStart.setDate(simple.getDate() - dayOfWeek + 1);
-    // Get Sunday of that week
     const ISOweekEnd = new Date(ISOweekStart);
     ISOweekEnd.setDate(ISOweekStart.getDate() + 6);
-    // Normalize both to midnight
     ISOweekStart.setHours(0, 0, 0, 0);
     ISOweekEnd.setHours(23, 59, 59, 999);
     return { startDate: ISOweekStart, endDate: ISOweekEnd };
@@ -63,8 +67,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     const [expenses, setExpenses] = useState([]);
     const [weeklyReceivedTypes, setWeeklyReceivedTypes] = useState([]);
     const [currentRow, setCurrentRow] = useState([]);
-
-    // Filter state variables
     const [showFilters, setShowFilters] = useState(false);
     const [selectDate, setSelectDate] = useState('');
     const [selectContractororVendorName, setSelectContractororVendorName] = useState('');
@@ -656,6 +658,12 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                         label: "Rent Management Portal",
                         id: 9,
                         sNo: "9"
+                    },
+                    {
+                        value:"Multi-Project Batch",
+                        label:"Multi-Project Batch",
+                        id:10,
+                        sNo:"10"
                     }
                 ];
                 // Combine backend data with predefined options
@@ -1644,13 +1652,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 740, 58
             );
         };
-
-        // Draw header on first page with "WEEKLY PAYMENT REPORT"
         drawHeader(doc, "WEEKLY PAYMENT REPORT");
-
-        // ===== EXPENSES TABLE =====
         const expensesHeaders = [["SNO", "Date", "Contractor/Vendor", "Site Name", "Type", "Amount", "AC", "C", ""]];
-        // Use the same filtered expenses as the UI, but exclude certain types for PDF
         const pdfFilteredExpenses = filteredExpenses.filter(row => row.type !== "Project Advance" && row.type !== "Staff Advance" && row.type !== "Staff Salary" && row.type !== "Daily" && row.type !== "Diwali Bonus");
         const expensesData = pdfFilteredExpenses.map((row, idx) => [
             String(idx + 1 || ""),
@@ -1665,11 +1668,10 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             String(Number(row.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
             "", "", ""
         ]);
-
         autoTable(doc, {
             head: expensesHeaders,
             body: expensesData,
-            margin: { top: 64, left: 20 }, // give space for custom header
+            margin: { top: 64, left: 20 },
             tableWidth: 810,
             theme: "grid",
             styles: {
@@ -1687,7 +1689,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 fontStyle: 'normal'
             },
             columnStyles: {
-                5: { halign: 'right' } // Amount column
+                5: { halign: 'right' }
             },
             didDrawPage: (data) => {
                 drawHeader(doc, "WEEKLY PAYMENT REPORT");
@@ -1695,13 +1697,9 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     doc.setFontSize(10);
                 }
             },
-            // Enable page breaks for large tables
             pageBreak: 'auto',
-            // Ensure table continues properly on new pages
             showHead: 'everyPage',
         });
-
-        // ===== PAYMENTS TABLE =====
         const paymentsHeaders = [["DATE RECEIVED", "AMOUNT", "TYPE"]];
         const paymentsData = payments.map(r => [
             String(r.created_at ? formatDate(r.created_at) : ""),
@@ -1718,17 +1716,12 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             { content: String(balance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"), styles: { fontStyle: "bold" } },
             { content: "", styles: { fontStyle: "bold" } }
         ]);
-
-        // ===== NEW PAGE for remaining tables =====
         doc.addPage();
         drawHeader(doc, "WEEKLY PAYMENT STATEMENT");
         const baseY = 110;
-
-        // Add heading for payments table
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.text("PAYMENT RECEIVED", 22, baseY - 25);
-
         autoTable(doc, {
             head: paymentsHeaders,
             body: paymentsData,
@@ -1740,14 +1733,12 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
             bodyStyles: { fontStyle: 'bold' },
             columnStyles: {
-                1: { halign: 'right' } // Amount column
+                1: { halign: 'right' }
             },
             didDrawPage: () => {
                 drawHeader(doc);
             }
         });
-
-        // ----- HANDOVER DETAILS -----
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.text("HANDOVER DETAILS", 22, baseY + 250);
@@ -1771,34 +1762,23 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 drawHeader(doc);
             }
         });
-
-        // ===== DRAW VERTICAL DIVIDER AFTER HANDOVER DETAILS =====
         const dividerX = 260;  // adjust X position as needed
         const headerBottomY = 65; // header ends at y=24+55=79
         const pageHeight = doc.internal.pageSize.getHeight();
-        // Draw vertical line (from bottom of header box down to page bottom margin)
         doc.setDrawColor(0, 0, 0);  // black
         doc.setLineWidth(0.5);
         doc.line(dividerX, headerBottomY, dividerX, pageHeight - 0);
-
-        // ----- EXTRA -----
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
-        // Filter for Daily type expenses
         const dailyExpenses = filteredExpenses.filter(expense => expense.type === "Daily");
         const dailyExpenseData = dailyExpenses.map(expense => [
             String(expense.date ? formatDateOnly(expense.date) : ""), // Date in first column
             String(Number(expense.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00") // Amount in second column
         ]);
-
-        // Calculate total of daily expenses
         const dailyExpensesTotal = dailyExpenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
-
-        // If no daily expenses, show a message
         if (dailyExpenseData.length === 0) {
             dailyExpenseData.push(["No Daily Expenses", "0.00"]);
         }
-
         autoTable(doc, {
             head: [["DAILY WAGE", "AMOUNT"]],
             body: dailyExpenseData,
@@ -1832,26 +1812,18 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 drawHeader(doc);
             }
         });
-
-        // ===== BOX NEXT TO DAILY WAGE =====
         const dailyWageTable = doc.lastAutoTable;
         if (dailyWageTable) {
-            // Position the box at the same Y as the Daily Wage table
             const boxY = dailyWageTable.finalY + 2; // small spacing below table
             const boxX = 300;  // to the right of the Daily Wage table
             const boxWidth = 200;
             const boxHeight = 20;
-            const splitX = boxX + 114; // divider inside the box
-
-            // Draw rectangle
+            const splitX = boxX + 114;
             doc.rect(boxX, boxY, boxWidth, boxHeight);
-            // Divider line inside box
             doc.line(splitX, boxY, splitX, boxY + boxHeight);
-            // Add "TOTAL" text on left
             doc.setFontSize(10);
             doc.setFont("helvetica", "bold");
-            doc.text("TOTAL", boxX + 10, boxY + 13); // 10pt padding left, vertically centered
-            // Add total amount on right, right-aligned inside box
+            doc.text("TOTAL", boxX + 10, boxY + 13);
             doc.text(
                 String(dailyExpensesTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })),
                 boxX + boxWidth - 10,
@@ -1859,19 +1831,13 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 { align: "right" }
             );
         }
-
-        // ----- SUMMARY -----
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.text("EXPENDITURE PAYMENTS", 300, baseY - 25);
-
-        // Initialize summaryMap with all weeklyTypes (with 0 count and 0 total)
         const summaryMap = weeklyTypes.reduce((acc, typeObj) => {
             acc[typeObj.type] = { count: 0, total: 0 };
             return acc;
         }, {});
-
-        // Populate summaryMap with actual expense data (including expenses with amount > 0)
         filteredExpenses
             .filter(expense => Number(expense.amount) > 0)
             .forEach(expense => {
@@ -1882,7 +1848,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     summaryMap[type].total += amount;
                 }
             });
-
         const summaryData = Object.entries(summaryMap)
             .map(([type, { count, total }]) => [
                 String(type || ""),
@@ -1891,21 +1856,15 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 total // Keep original total for sorting
             ])
             .sort((a, b) => {
-                // Sort by total amount: non-zero amounts first, then zero amounts
                 const totalA = Number(a[3]);
                 const totalB = Number(b[3]);
-
                 if (totalA === 0 && totalB === 0) {
-                    // Both are zero, sort alphabetically by type name
                     return a[0].localeCompare(b[0]);
                 } else if (totalA === 0) {
-                    // A is zero, B is not - put A after B
                     return 1;
                 } else if (totalB === 0) {
-                    // B is zero, A is not - put B after A
                     return -1;
                 } else {
-                    // Both are non-zero, sort by amount descending
                     return totalB - totalA;
                 }
             })
@@ -1932,7 +1891,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 drawHeader(doc);
             },
             didDrawCell: (data) => {
-                // Only for body rows in first column
                 if (data.section === 'body' && data.column.index === 0 && data.row && data.row.index !== undefined) {
                     const rowData = summaryData[data.row.index];
                     if (rowData && rowData[2] !== undefined) {
@@ -1947,8 +1905,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 }
             }
         });
-
-        // draw counts outside table
         const summaryTable = doc.lastAutoTable;
         if (summaryTable && summaryTable.body && Array.isArray(summaryTable.body)) {
             summaryData.forEach((row, i) => {
@@ -1961,7 +1917,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 }
             });
         }
-
         const summaryTotal = summaryData.reduce((acc, row) => acc + Number(String(row[1] || "0").replace(/,/g, "")), 0);
         const summaryBoxY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 15 : baseY + 100;
         doc.setFontSize(10);
@@ -1979,12 +1934,9 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
 
         const newTableX = 520;
         let newTableY = baseY;
-
-        // Staff Advance table
         const staffAdvanceEntries = filteredExpenses.filter(e => e.type === "Staff Advance");
         const staffAdvanceCount = staffAdvanceEntries.length;
         const staffAdvanceTotal = staffAdvanceEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-
         const staffAdvanceHead = [[
             String(staffAdvanceCount || "0"),
             "STAFF ADVANCE",
@@ -2001,7 +1953,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
             String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
         ]);
-
         autoTable(doc, {
             head: staffAdvanceHead,
             body: staffAdvanceBody,
@@ -2026,12 +1977,9 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         });
 
         newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
-
-        // Staff Salary table
         const staffSalaryEntries = filteredExpenses.filter(e => e.type === "Staff Salary");
         const staffSalaryCount = staffSalaryEntries.length;
         const staffSalaryTotal = staffSalaryEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-
         const staffSalaryHead = [[
             String(staffSalaryCount || "0"),
             "STAFF SALARY",
@@ -2048,7 +1996,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
             String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
         ]);
-
         autoTable(doc, {
             head: staffSalaryHead,
             body: staffSalaryBody,
@@ -2066,22 +2013,14 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 drawHeader(doc);
             }
         });
-
         newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
-
-        // Filter for Diwali Bonus type expenses
         const diwaliBonusEntries = filteredExpenses.filter(e => e.type === "Diwali Bonus");
         const diwaliBonusCount = diwaliBonusEntries.length;
         const diwaliBonusTotal = diwaliBonusEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-
-        // Position Diwali Bonus table below Staff Salary table with proper spacing
-        const diwaliBonusY = newTableY + 30; // Add extra spacing to avoid overlap
-
-        // Add heading for Diwali Bonus table
+        const diwaliBonusY = newTableY + 30;
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.text("DIWALI BONUS", newTableX, diwaliBonusY - 25);
-
         const diwaliBonusHead = [[
             String(diwaliBonusCount || "0"),
             "NAME",
@@ -2098,7 +2037,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
             ""
         ]);
-
         autoTable(doc, {
             head: diwaliBonusHead,
             body: diwaliBonusBody,
@@ -2122,19 +2060,14 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 drawHeader(doc);
             }
         });
-
         newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
-
         const lastPeriodEndDate = expenses
             .map(exp => exp.period_end_date)
             .filter(Boolean)
             .pop();
-
         newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
-
         doc.save(`PR ${currentWeekNumber || ""} - Weekly Payment Report ${formatDateOnly(lastPeriodEndDate)}.pdf`);
     };
-
     return (
         <div>
             <div className="mt-[-28px] flex justify-end mr-5">
@@ -2144,7 +2077,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     </span>
                 </h1>
             </div>
-
             <div className="mx-auto w-auto p-6 bg-white ml-[30px] mr-6 rounded-md border border-transparent">
                 <div className="flex justify-between">
                     <div className="text-left">

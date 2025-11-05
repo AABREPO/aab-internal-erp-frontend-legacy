@@ -129,13 +129,7 @@ const LoanTableview = ({ username, userRoles = [] }) => {
     const year = date.getFullYear();
     return `${day}-${month}-${year}`;
   };
-  const purposeOptions = useMemo(() => [
-    { value: 'Machine Loan', label: 'Machine Loan', id: 1, type: 'Purpose' },
-    { value: 'Material Loan', label: 'Material Loan', id: 2, type: 'Purpose' },
-    { value: 'Equipment Loan', label: 'Equipment Loan', id: 3, type: 'Purpose' },
-    { value: 'Working Capital', label: 'Working Capital', id: 4, type: 'Purpose' },
-    { value: 'Other', label: 'Other', id: 5, type: 'Purpose' }
-  ], []);
+  const [purposeOptions, setPurposeOptions] = useState([]);
   const paymentModeOptions = useMemo(() => [
     { id: 1, value: 'Cash', label: 'Cash' },
     { id: 2, value: 'GPay', label: 'GPay' },
@@ -236,6 +230,33 @@ const LoanTableview = ({ username, userRoles = [] }) => {
   useEffect(() => {
     setCombinedSitePurposeOptions([...siteOptions, ...purposeOptions]);
   }, [siteOptions, purposeOptions]);
+  // Fetch purpose options from API (align with LoanPortal.js)
+  useEffect(() => {
+    const fetchPurposeOptions = async () => {
+      try {
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/loan-purposes/getAll', {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (!response.ok) {
+          throw new Error('Network response was not ok: ' + response.statusText);
+        }
+        const data = await response.json();
+        const formattedData = data.map(item => ({
+          value: item.purpose,
+          label: item.purpose,
+          id: item.id,
+          type: 'Purpose'
+        }));
+        setPurposeOptions(formattedData);
+      } catch (error) {
+        console.error('Error fetching purpose options: ', error);
+        setPurposeOptions([]);
+      }
+    };
+    fetchPurposeOptions();
+  }, []);
   useEffect(() => {
     const fetchSites = async () => {
       try {

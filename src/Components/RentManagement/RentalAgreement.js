@@ -257,7 +257,15 @@ const RentalAgreement = () => {
         const lineHeight = 7;
         const pageHeight = doc.internal.pageSize.height;
         const maxLineWidth = pageWidth - marginLeft - marginRight;
-        // Title
+        const addFooter = () => {
+            const footerY = pageHeight - 8;
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.text("TENANT", marginLeft, footerY);
+            const tenantText = "LANDLORD";
+            const tenantTextWidth = doc.getTextWidth(tenantText);
+            doc.text(tenantText, pageWidth - marginRight - tenantTextWidth, footerY);
+        };
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');
         const textWidth = doc.getTextWidth(title);
@@ -283,7 +291,6 @@ const RentalAgreement = () => {
         )?.propertyAddress || "";
         const floorBedroomDescriptions = (ownersProperty || []).map(owner => {
             const { selectFloor = [], bedroomsByFloor = {}, propertyType, area, doorNo } = owner;
-            // Build floor text like "Ground Floor - 2 Bedrooms" if it's a House
             const floorDescription = selectFloor.map(floor => {
                 const count = bedroomsByFloor[floor.label] || 0;
                 if (propertyType === "House") {
@@ -291,13 +298,11 @@ const RentalAgreement = () => {
                 } else {
                     return `${floor.label}`;
                 }
-            }).join(", "); // Still join with comma if multiple floors for same owner
-            // Construct the full sentence for this owner
+            }).join(", ");
             return `${floorDescription} of the building at the above said premises of area ${area} Sqft bearing ${doorNo}, ${propertyAddress}`;
         });
         const floorBedroomDescriptions1 = (ownersProperty || []).map(owner => {
             const { selectFloor = [], bedroomsByFloor = {}, propertyType, doorNo } = owner;
-            // Build floor text like "Ground Floor - 2 Bedrooms" if it's a House
             const floorDescription = selectFloor.map(floor => {
                 const count = bedroomsByFloor[floor.label] || 0;
                 if (propertyType === "House") {
@@ -305,15 +310,12 @@ const RentalAgreement = () => {
                 } else {
                     return `${floor.label}`;
                 }
-            }).join(", "); // Still join with comma if multiple floors for same owner
-            // Construct the full sentence for this owner
+            }).join(", ");
             return `${floorDescription} of the building at ${doorNo}, ${propertyAddress}`;
         });
-        // Join all owner sentences with ' & '
         const combinedFloorDescription = floorBedroomDescriptions.join(" & ");
         const combinedFloorDescription1 = floorBedroomDescriptions1.join(" & ");
         const BeforeDatemarginLeft = 30;
-        // First part of the paragraph before the centered date
         const contentBeforeDate = `THIS DEED OF RENTAL AGREEMENT ENTERED into at Srivilliputtur, this the`;
         doc.setFontSize(13);
         doc.setFont("helvetica", "normal");
@@ -333,7 +335,6 @@ const RentalAgreement = () => {
             const day = dateObj.getDate();
             const year = dateObj.getFullYear();
             const month = dateObj.toLocaleString("default", { month: "long" });
-            // Helper to add ordinal suffix to day
             const getOrdinal = (n) => {
                 const s = ["th", "st", "nd", "rd"];
                 const v = n % 100;
@@ -356,29 +357,26 @@ const RentalAgreement = () => {
             return `Mr. ${owner.fullName}, aged ${owner.age} years, son of Mr. ${owner.fatherName}, residing at Door No.${owner.ownerAddress}${isLast ? ', hereinafter called the' : ','}`;
         });
         const tenantDetails = tenants.flatMap(group => group.tenantsList || []);
-        // Render landlordIntro
         cursorY += 10;
         const customLandlordFirstLineMargin = 30;
-        const landlordLineSpacing = 2; // 👈 Add extra row space (same as tenant spacing)
+        const landlordLineSpacing = 2;
         landlordLinesRaw.forEach((line, index) => {
             if (cursorY > pageHeight - 20) {
                 doc.addPage();
                 cursorY = defaultMarginTop;
             }
-            const wrappedLines = doc.splitTextToSize(line, landlordIntroWidth); // Handles wrapping for long lines
+            const wrappedLines = doc.splitTextToSize(line, landlordIntroWidth);
             wrappedLines.forEach((wrappedLine, subIndex) => {
                 const leftMargin = (index === 0 && subIndex === 0) ? customLandlordFirstLineMargin : marginLeft;
                 doc.text(wrappedLine.trim(), leftMargin, cursorY);
                 cursorY += lineHeight;
             });
-            cursorY += landlordLineSpacing; // 👈 Apply spacing between landlord entries
+            cursorY += landlordLineSpacing;
         });
-        // Center "LANDLORD"
         const landlordTag = owners.length > 1 ? "“LANDLORDS”" : "“LANDLORD”";
         const landlordTagWidth = doc.getTextWidth(landlordTag);
         doc.text(landlordTag, (pageWidth - landlordTagWidth) / 2, cursorY);
         cursorY += lineHeight + 3;
-        // Center "AND"
         const andLine = "AND";
         const andWidth = doc.getTextWidth(andLine);
         doc.text(andLine, (pageWidth - andWidth) / 2, cursorY);
@@ -387,26 +385,24 @@ const RentalAgreement = () => {
             const isLast = index === tenantDetails.length - 1;
             return `Mr. ${tenant.tenantFullName}, aged ${tenant.tenantAge} years, son of Mr. ${tenant.tenantFatherName}, residing at Door No. ${tenant.tenantAddress}${isLast ? ', hereinafter called the' : ','}`;
         });
-        const customTenantFirstLineMargin = 30; // 👈 Customize this value too
+        const customTenantFirstLineMargin = 30;
         tenantLines.forEach((line, index) => {
             if (cursorY > pageHeight - 20) {
                 doc.addPage();
                 cursorY = defaultMarginTop;
             }
-            const wrappedLines = doc.splitTextToSize(line, landlordIntroWidth); // in case the line is long
+            const wrappedLines = doc.splitTextToSize(line, landlordIntroWidth); 
             wrappedLines.forEach((wrappedLine, subIndex) => {
                 const leftMargin = (index === 0 && subIndex === 0) ? customTenantFirstLineMargin : marginLeft;
                 doc.text(wrappedLine.trim(), leftMargin, cursorY);
                 cursorY += lineHeight;
             });
-            cursorY += 2; // 👈 Additional spacing between tenant entries
+            cursorY += 2; 
         });
-        // Center "TENANT"
         const tenantTag = tenantDetails.length > 1 ? "“TENANTS”" : "“TENANT”";
         const tenantTagWidth = doc.getTextWidth(tenantTag);
         doc.text(tenantTag, (pageWidth - tenantTagWidth) / 2, cursorY);
         cursorY += lineHeight;
-        // 👇 Force new page here
         doc.addPage();
         isFirstPage = false;
         cursorY = defaultMarginTop;
@@ -454,7 +450,7 @@ const RentalAgreement = () => {
                 `.trim();
 
         const firstLineMargin = 40;
-        const paragraphs = restOfContent.trim().split(/\n\s*\n/); // Split into paragraphs by empty lines
+        const paragraphs = restOfContent.trim().split(/\n\s*\n/);
         paragraphs.forEach(paragraph => {
             const lines = doc.splitTextToSize(paragraph.trim(), maxLineWidth);
             lines.forEach((line, index) => {
@@ -469,35 +465,23 @@ const RentalAgreement = () => {
             });
             cursorY += 3;
         });
-        // Center-aligned "SCHEDULE"
         const scheduleTitle = "SCHEDULE";
         const scheduleTitleWidth = doc.getTextWidth(scheduleTitle);
         const scheduleTitleX = (pageWidth - scheduleTitleWidth) / 2;
-
         doc.setFontSize(14);
         doc.setFont("helvetica", "bold");
-
-        cursorY += 0; // Add more if you want a bigger gap
-
+        cursorY += 0;
         doc.text(scheduleTitle, pageWidth / 2, cursorY, { align: "center" });
-
         const underlineY = cursorY + 1;
-
         doc.setLineWidth(0.3);
-
-        // 👇 Adjust underline width and centering
         const underlinePadding = 3;
         const underlineStartX = (pageWidth - scheduleTitleWidth - underlinePadding) / 2;
         const underlineEndX = (pageWidth + scheduleTitleWidth + underlinePadding) / 2;
-
         doc.line(underlineStartX, underlineY, underlineEndX, underlineY);
-
         cursorY += lineHeight + 5;
-
-        // Left-aligned schedule content
         doc.setFontSize(13);
         doc.setFont("helvetica", "normal");
-        const customFirstLineMargin = marginLeft + 15; // You can change indent size here
+        const customFirstLineMargin = marginLeft + 15; 
         const scheduleContent = `All that piece and portion of ${combinedFloorDescription1}, including separate T.N.E.B. Meter and Existing Provisions as listed below.`;
         const scheduleLines = doc.splitTextToSize(scheduleContent.trim(), maxLineWidth);
         scheduleLines.forEach((line, index) => {
@@ -509,9 +493,7 @@ const RentalAgreement = () => {
             doc.text(line.trim(), leftMargin, cursorY);
             cursorY += lineHeight;
         });
-        // Filter out empty items before adding them to the table
         const filteredItems = items.filter(item => item.name.trim() !== "");
-        // Only create the table if there are valid items
         if (filteredItems.length > 0) {
             doc.autoTable({
                 startY: cursorY + 2,
@@ -536,23 +518,15 @@ const RentalAgreement = () => {
                 },
                 margin: { left: 40, top: 30 },
             });
-
             cursorY = doc.autoTable.previous.finalY + 10;
-
         }
-
-        // Add extra space or new page before the witness section if needed
         if (cursorY > pageHeight - 60) {
             doc.addPage();
             cursorY = defaultMarginTop;
         }
-
-        // Paragraph with custom first-line indent
         const afterTableText = `
         IN WITNESS WHEREOF the parties have set their respective hands to this Rental Agreement on the day, month, and year first above written in the presence of the under-mentioned witnesses:
         `.trim();
-
-
         const afterTableLines = doc.splitTextToSize(afterTableText, maxLineWidth);
         afterTableLines.forEach((line, index) => {
             if (cursorY > pageHeight - 20) {
@@ -563,7 +537,6 @@ const RentalAgreement = () => {
             doc.text(line.trim(), leftMargin, cursorY);
             cursorY += lineHeight;
         });
-        // Ensure space for witness section
         if (cursorY > pageHeight - 60) {
             doc.addPage();
             cursorY = defaultMarginTop;
@@ -593,6 +566,11 @@ WITNESSES:
             doc.text(line, marginLeft, cursorY);
             cursorY += lineHeight;
         });
+        const totalPages = doc.internal.getNumberOfPages();
+        for (let i = 1; i < totalPages; i++) {
+            doc.setPage(i);
+            addFooter();
+        }
         const filename = `${selectedProperty.value}_${propertyDoorNo}_R${revisionCount}`;
         doc.save(filename);
         return doc.output('blob');
@@ -609,11 +587,9 @@ WITNESSES:
                 tenant.id === tenantId ? { ...tenant, [field]: value } : tenant
             )
         );
-        // Add to options if it's a new value
         if (value && !options.find((opt) => opt.value === value)) {
             setOptions((prevOptions) => [...prevOptions, { value, label: value }]);
         }
-        // Filter full names only from the selected tenantName group
         if (field === 'tenantName') {
             const selectedGroup = tenantList.find(t => t.tenantName === value);
             if (selectedGroup && selectedGroup.tenantDetailsList) {
@@ -629,12 +605,11 @@ WITNESSES:
             }
         }
     };
-    // Update partner-level fields inside tenantsList
     const handlePartnerChange = (tenantId, partnerIndex, field, value) => {
         setTenants((prev) =>
             prev.map((tenant) => {
                 if (tenant.id === tenantId) {
-                    const updatedPartners = [...tenant.tenantsList]; // <-- make sure you're using the correct key
+                    const updatedPartners = [...tenant.tenantsList];
                     updatedPartners[partnerIndex] = {
                         ...updatedPartners[partnerIndex],
                         [field]: value,
@@ -645,7 +620,6 @@ WITNESSES:
             })
         );
     };
-    // Handle file upload for partner inside tenantsList
     const handleFileChange = (tenantId, partnerIndex, file) => {
         setTenants((prev) =>
             prev.map((tenant) => {
@@ -661,7 +635,6 @@ WITNESSES:
             })
         );
     };
-    // Add new tenant
     const addTenant = () => {
         setTenants((prev) => [
             ...prev,
@@ -681,11 +654,9 @@ WITNESSES:
             },
         ]);
     };
-    // Remove tenant by id
     const removeTenant = (tenantId) => {
         setTenants((prev) => prev.filter((t) => t.id !== tenantId));
     };
-    // Add partner inside tenantsList of a tenant
     const addPartner = (tenantId) => {
         setTenants((prev) =>
             prev.map((tenant) => {
@@ -709,7 +680,6 @@ WITNESSES:
             })
         );
     };
-    // Remove partner from tenantsList
     const removePartner = (tenantId, partnerIndex) => {
         setTenants((prev) =>
             prev.map((tenant) => {
@@ -740,7 +710,6 @@ WITNESSES:
             if (response.ok) {
                 const data = await response.json();
                 setProperties(data);
-                // Extract property names
                 const propertyNamesList = data.map((item) => item.propertyName);
                 setPropertyNames(propertyNamesList);
             } else {
@@ -784,20 +753,16 @@ WITNESSES:
     const handleAgreementValidity = (event) => {
         const validity = event.target.value;
         setAgreementValidity(validity);
-
-        // Percentage logic: 5% per 12 months, capped at 50%
         if (validity) {
             const percent = Math.min(Math.floor(validity / 12) * 5, 50);
             setSelectedPercent(percent.toString());
         } else {
             setSelectedPercent('');
         }
-
         if (!validity) {
             setAgreementEndDate("");
             return;
         }
-
         calculateEndDate(Agreementstartdate, validity);
     };
     const handlenoticeperiod = (event) => {

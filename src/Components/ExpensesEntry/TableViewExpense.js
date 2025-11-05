@@ -21,7 +21,6 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
     const [contractorOptions, setContractorOptions] = useState([]);
     const [categoryOptions, setCategoryOptions] = useState([]);
     const [machineToolsOptions, setMachineToolsOptions] = useState([]);
-    // Initialize filter states from localStorage or defaults
     const [selectedSiteName, setSelectedSiteName] = useState(() => {
         return localStorage.getItem('expenseFilter_siteName') || '';
     });
@@ -46,15 +45,30 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
     const [selectedDate, setSelectedDate] = useState(() => {
         return localStorage.getItem('expenseFilter_date') || '';
     });
+    const [startDate, setStartDate] = useState(() => {
+        return localStorage.getItem('expenseFilter_startDate') || '';
+    });
+    const [endDate, setEndDate] = useState(() => {
+        return localStorage.getItem('expenseFilter_endDate') || '';
+    });
     const [selectedAccountType, setSelectedAccountType] = useState(() => {
         return localStorage.getItem('expenseFilter_accountType') || '';
     });
     const [accountTypeOption, setAccountTypeOption] = useState([]);
+    const [editAccountTypeOptions, setEditAccountTypeOptions] = useState([]);
     const [siteOption, setSiteOption] = useState([]);
     const [vendorOption, setVendorOption] = useState([]);
     const [contractorOption, setContractorOption] = useState([]);
     const [categoryOption, setCategoryOption] = useState([]);
     const [machineToolsOption, setMachineToolsOption] = useState([]);
+
+    const [editPaymentMode, setEditPaymentMode] = useState('');
+    const [editUtilityType, setEditUtilityType] = useState('');
+    const [editEbNumberOptions, setEditEbNumberOptions] = useState([]);
+    const [editSelectedEbNumber, setEditSelectedEbNumber] = useState(null);
+    const [editSelectedMonths, setEditSelectedMonths] = useState('');
+    const [editThirdInput, setEditThirdInput] = useState('');
+    const [editProjectData, setEditProjectData] = useState(null);
     const [showFilters, setShowFilters] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(50);
@@ -67,7 +81,6 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
     const velocity = useRef({ x: 0, y: 0 });
     const animationFrame = useRef(null);
     const lastMove = useRef({ time: 0, x: 0, y: 0 });
-
     const handleMouseDown = (e) => {
         isDragging.current = true;
         start.current = { x: e.clientX, y: e.clientY };
@@ -84,7 +97,6 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         scrollRef.current.style.userSelect = 'none';
         cancelMomentum();
     };
-
     const handleMouseMove = (e) => {
         if (!isDragging.current) return;
         const dx = e.clientX - start.current.x;
@@ -110,18 +122,15 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         scrollRef.current.style.userSelect = '';
         applyMomentum();
     };
-
     const cancelMomentum = () => {
         if (animationFrame.current) {
             cancelAnimationFrame(animationFrame.current);
             animationFrame.current = null;
         }
     };
-
     const applyMomentum = () => {
         const friction = 0.95;
         const minVelocity = 0.1;
-
         const step = () => {
             const { x, y } = velocity.current;
             if (Math.abs(x) > minVelocity || Math.abs(y) > minVelocity) {
@@ -134,43 +143,38 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                 cancelMomentum();
             }
         };
-
         animationFrame.current = requestAnimationFrame(step);
     };
-
     useEffect(() => {
         return () => cancelMomentum();
     }, []);
-
-    // Save filter values to localStorage whenever they change
     useEffect(() => {
         localStorage.setItem('expenseFilter_siteName', selectedSiteName);
     }, [selectedSiteName]);
-
     useEffect(() => {
         localStorage.setItem('expenseFilter_vendor', selectedVendor);
     }, [selectedVendor]);
-
     useEffect(() => {
         localStorage.setItem('expenseFilter_contractor', selectedContractor);
     }, [selectedContractor]);
-
     useEffect(() => {
         localStorage.setItem('expenseFilter_category', selectedCategory);
     }, [selectedCategory]);
-
     useEffect(() => {
         localStorage.setItem('expenseFilter_machineTools', selectedMachineTools);
     }, [selectedMachineTools]);
-
     useEffect(() => {
         localStorage.setItem('expenseFilter_accountType', selectedAccountType);
     }, [selectedAccountType]);
-
     useEffect(() => {
         localStorage.setItem('expenseFilter_date', selectedDate);
     }, [selectedDate]);
-
+    useEffect(() => {
+        localStorage.setItem('expenseFilter_startDate', startDate);
+    }, [startDate]);
+    useEffect(() => {
+        localStorage.setItem('expenseFilter_endDate', endDate);
+    }, [endDate]);
     useEffect(() => {
         localStorage.setItem('expenseFilter_eno', selectedEno);
     }, [selectedEno]);
@@ -186,7 +190,15 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         otherVendorName: '',
         otherContractorName: '',
         machineTools: '',
-        billCopy: ''
+        billCopy: '',
+        paymentMode: '',
+        utilityType: '',
+        utilityTypeNumber: '',
+        utilityForTheMonth: '',
+        utilityValidityDays: '',
+        projectId: '',
+        vendorId: '',
+        contractorId: ''
     });
     const [modalIsOpen, setModalIsOpen] = useState(false);
     const [userPermissions, setUserPermissions] = useState([]);
@@ -219,11 +231,10 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                 const sortedExpenses = response.data.sort((a, b) => {
                     const enoA = parseInt(a.eno, 10);
                     const enoB = parseInt(b.eno, 10);
-                    return enoB - enoA; // descending order
+                    return enoB - enoA;
                 });
                 setExpenses(sortedExpenses);
                 setFilteredExpenses(sortedExpenses);
-                // Extract unique values for the dropdowns
                 const uniqueEnos = [...new Set(response.data.map(expense => expense.eno))];
                 const uniqueAccountTypes = [...new Set(response.data.map(expense => expense.accountType))];
                 const uniqueMachineTools = [...new Set(response.data.map(expense => expense.machineTools))];
@@ -235,7 +246,6 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                 const uniqueCategoryOptions = [...new Set(response.data.map(expense => expense.category))];
                 const contractorOption = uniqueContractorOptions.map(name => ({ value: name, label: name }));
                 const categoryOption = uniqueCategoryOptions.map(name => ({ value: name, label: name }));
-                // Set the unique dropdown options in state
                 setEnoOptions(uniqueEnos);
                 setAccountTypeOptions(uniqueAccountTypes);
                 setMachineToolsOptions(uniqueMachineTools);
@@ -263,6 +273,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                 }
                 const data = await response.json();
                 const formattedData = data.map(item => ({
+                    id: item.id,
                     value: item.siteName,
                     label: item.siteName,
                     sNo: item.siteNo
@@ -289,6 +300,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                 }
                 const data = await response.json();
                 const formattedData = data.map(item => ({
+                    id: item.id,
                     value: item.vendorName,
                     label: item.vendorName,
                     type: "Vendor",
@@ -315,6 +327,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                 }
                 const data = await response.json();
                 const formattedData = data.map(item => ({
+                    id: item.id,
                     value: item.contractorName,
                     label: item.contractorName,
                     type: "Contractor",
@@ -393,8 +406,10 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                 const formattedData = data.map(item => ({
                     value: item.accountType,
                     label: item.accountType,
+                    id: item.id,
                 }));
                 setAccountTypeOption(formattedData);
+                setEditAccountTypeOptions(formattedData);
             } catch (error) {
                 console.error("Fetch error: ", error);
             }
@@ -417,9 +432,9 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
             ]],
             body: exportFilteredExpenses.map(exp => [
                 formatDateOnly(exp.date),
-                exp.siteName,
-                exp.vendor,
-                exp.contractor,
+                getDisplaySiteName(exp),
+                getDisplayVendorName(exp),
+                getDisplayContractorName(exp),
                 exp.quantity,
                 parseInt(exp.amount).toLocaleString(),
                 exp.comments,
@@ -435,29 +450,45 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                 fillColor: [191, 152, 83],
             },
         });
-
         const dateStr = new Date().toISOString().slice(0, 10);
         doc.save(`Filtered_Expenses_${dateStr}.pdf`);
     };
-
     useEffect(() => {
         const filtered = expenses.filter(expense => {
+            if (startDate && endDate) {
+                const s = new Date(startDate);
+                const e = new Date(endDate);
+                e.setHours(23, 59, 59, 999);
+                const expenseDate = new Date(expense.date);
+                if (expenseDate < s || expenseDate > e) return false;
+            } else if (startDate) {
+                const s = new Date(startDate);
+                s.setHours(0, 0, 0, 0);
+                const expenseDate = new Date(expense.date);
+                if (expenseDate < s) return false;
+            } else if (endDate) {
+                const e = new Date(endDate);
+                e.setHours(23, 59, 59, 999);
+                const expenseDate = new Date(expense.date);
+                if (expenseDate > e) return false;
+            }
             return (
                 (selectedSiteName ? expense.siteName === selectedSiteName : true) &&
                 (selectedVendor ? expense.vendor === selectedVendor : true) &&
                 (selectedContractor ? expense.contractor === selectedContractor : true) &&
                 (selectedCategory ? expense.category === selectedCategory : true) &&
                 (selectedMachineTools ? expense.machineTools === selectedMachineTools : true) &&
-                (selectedAccountType ? expense.accountType === selectedAccountType : true) &&
+                (selectedAccountType ? 
+                    (selectedAccountType === 'Unknown' ? 
+                        (!expense.accountType || expense.accountType === '') : 
+                        expense.accountType === selectedAccountType
+                    ) : true) &&
                 (selectedDate ? expense.date === selectedDate : true) &&
                 (selectedEno ? String(expense.eno) === String(selectedEno) : true)
             );
         });
-
         setFilteredExpenses(filtered);
-        setCurrentPage(1); // Reset to first page when filters change
-
-        // Set export data if any filters are applied
+        setCurrentPage(1); 
         const anyFilterApplied = [
             selectedSiteName,
             selectedVendor,
@@ -468,19 +499,13 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
             selectedDate,
             selectedEno
         ].some(Boolean);
-
         setExportFilteredExpenses(anyFilterApplied ? filtered : []);
-
-        // Set total amount
         const total = filtered.reduce((sum, item) => sum + Number(item.amount || 0), 0);
         setTotalAmount(total);
-
-        // Dynamically update dropdown options from filtered data
         const getOptions = (data, key) => {
             const unique = [...new Set(data.map(item => item[key]).filter(Boolean))];
             return unique.map(val => ({ value: val, label: val }));
         };
-
         setSiteOptions(getOptions(filtered, "siteName"));
         setVendorOptions(getOptions(filtered, "vendor"));
         setContractorOptions(getOptions(filtered, "contractor"));
@@ -497,14 +522,15 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         selectedMachineTools,
         selectedAccountType,
         selectedDate,
+        startDate,
+        endDate,
         selectedEno,
         expenses
     ]);
     const handleChange = (e) => {
         const { name, type, value, files } = e.target;
-        // Prevent clearing the date field
         if (name === "date" && value === "") {
-            return; // Don't update formData if date is being cleared
+            return;
         }
         setFormData({
             ...formData,
@@ -523,7 +549,6 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
     };
     const handleSave = async (event) => {
         event.preventDefault();
-
         let updatedBillCopy = formData.billCopy;
         setIsSubmitting(true);
         if (selectedFile) {
@@ -532,12 +557,10 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                 const finalName = `${formatDateOnly(formData.date)} - ${formData.siteName} - ${formData.vendor || formData.contractor} `;
                 uploadFormData.append('file', selectedFile);
                 uploadFormData.append('file_name', finalName);
-
                 const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
                     method: "POST",
                     body: uploadFormData,
                 });
-
                 if (!uploadResponse.ok) {
                     throw new Error('File upload failed');
                 }
@@ -554,7 +577,6 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
             billCopy: updatedBillCopy,
             editedBy: username,
         };
-
         try {
             const response = await fetch(`https://backendaab.in/aabuilderDash/expenses_form/update/${editId}`, {
                 method: 'PUT',
@@ -563,12 +585,8 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                 },
                 body: JSON.stringify(updatedFormData)
             });
-
             if (!response.ok) throw new Error('Failed to update expense');
-
             const resultText = await response.text();
-            console.log(resultText);
-
             setExpenses(expenses.map(exp => (exp.id === editId ? { ...exp, ...updatedFormData } : exp)));
             setModalIsOpen(false);
             setIsSubmitting(false);
@@ -579,7 +597,6 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
             alert('Failed to update expense');
         }
     };
-    // Sorting function
     const handleSort = (field) => {
         if (sortField === field) {
             setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -587,17 +604,13 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
             setSortField(field);
             setSortDirection('asc');
         }
-        setCurrentPage(1); // Reset to first page when sorting
+        setCurrentPage(1); 
     };
 
-    // Sort data
     const sortedExpenses = [...filteredExpenses].sort((a, b) => {
         if (!sortField) return 0;
-        
         let aValue = a[sortField];
         let bValue = b[sortField];
-        
-        // Handle different data types
         if (sortField === 'date') {
             aValue = new Date(aValue);
             bValue = new Date(bValue);
@@ -608,21 +621,88 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
             aValue = String(aValue || '').toLowerCase();
             bValue = String(bValue || '').toLowerCase();
         }
-        
         if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
         if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
         return 0;
     });
-
-    // Pagination logic
     const totalPages = Math.ceil(sortedExpenses.length / itemsPerPage);
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     const currentItems = sortedExpenses.slice(startIndex, endIndex);
     const currentExportItems = exportFilteredExpenses;
+    const accountTypeSummary = React.useMemo(() => {
+        const summary = {};
+        filteredExpenses.forEach(expense => {
+            const accountType = expense.accountType || 'Unknown';
+            if (!summary[accountType]) {
+                summary[accountType] = {
+                    totalAmount: 0,
+                    entryCount: 0
+                };
+            }
+            summary[accountType].totalAmount += Number(expense.amount) || 0;
+            summary[accountType].entryCount += 1;
+        });
+        return summary;
+    }, [filteredExpenses]);
+    const projectIdToName = React.useMemo(() => {
+        const map = {};
+        siteOption.forEach(option => {
+            if (option.id) {
+                map[option.id] = option.label;
+            }
+        });
+        return map;
+    }, [siteOption]);
+    const vendorIdToName = React.useMemo(() => {
+        const map = {};
+        vendorOption.forEach(option => {
+            if (option.id) {
+                map[option.id] = option.label;
+            }
+        });
+        return map;
+    }, [vendorOption]);
+    const contractorIdToName = React.useMemo(() => {
+        const map = {};
+        contractorOption.forEach(option => {
+            if (option.id) {
+                map[option.id] = option.label;
+            }
+        });
+        return map;
+    }, [contractorOption]);
+    const getDisplaySiteName = (expense) => {
+        if (expense.projectId && projectIdToName[expense.projectId]) {
+            return projectIdToName[expense.projectId];
+        }
+        return expense.siteName || '';
+    };
+    const getDisplayVendorName = (expense) => {
+        if (expense.vendorId && vendorIdToName[expense.vendorId]) {
+            return vendorIdToName[expense.vendorId];
+        }
+        return expense.vendor || '';
+    };
+    const getDisplayContractorName = (expense) => {
+        if (expense.contractorId && contractorIdToName[expense.contractorId]) {
+            return contractorIdToName[expense.contractorId];
+        }
+        return expense.contractor || '';
+    };
     const handleEditClick = (expense) => {
         setEditId(expense.id);
-        setFormData(expense);
+        setFormData({
+            ...expense,
+            paymentMode: expense.paymentMode || '',
+            utilityType: expense.utilityType || '',
+            utilityTypeNumber: expense.utilityTypeNumber || '',
+            utilityForTheMonth: expense.utilityForTheMonth || '',
+            utilityValidityDays: expense.utilityValidityDays || '',
+            projectId: expense.projectId || '',
+            vendorId: expense.vendorId || '',
+            contractorId: expense.contractorId || ''
+        });
         setModalIsOpen(true);
     };
     const handleCancel = () => {
@@ -637,13 +717,14 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         setSelectedMachineTools('');
         setSelectedAccountType('');
         setSelectedDate('');
+        setStartDate('');
+        setEndDate('');
         setSelectedEno('');
         setFilteredExpenses(expenses);
         setCurrentPage(1);
         setSortField('');
         setSortDirection('asc');
-        
-        // Clear localStorage as well
+
         localStorage.removeItem('expenseFilter_siteName');
         localStorage.removeItem('expenseFilter_vendor');
         localStorage.removeItem('expenseFilter_contractor');
@@ -651,6 +732,8 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         localStorage.removeItem('expenseFilter_machineTools');
         localStorage.removeItem('expenseFilter_accountType');
         localStorage.removeItem('expenseFilter_date');
+        localStorage.removeItem('expenseFilter_startDate');
+        localStorage.removeItem('expenseFilter_endDate');
         localStorage.removeItem('expenseFilter_eno');
     };
     const exportToCSV = () => {
@@ -676,9 +759,9 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         const rows = currentExportItems.map(expense => [
             formatDate(expense.timestamp),
             formatDateOnly(expense.date),
-            expense.siteName,
-            expense.vendor,
-            expense.contractor,
+            getDisplaySiteName(expense),
+            getDisplayVendorName(expense),
+            getDisplayContractorName(expense),
             expense.quantity,
             `${Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
             expense.comments,
@@ -711,9 +794,86 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                         <span className=' text-[#BF9853] mr-9 font-semibold hover:underline'>Print</span>
                     </div>
                 </div>
+                {Object.keys(accountTypeSummary).length > 0 && (
+                    <div className="w-full max-w-[1860px] mx-auto p-4 bg-white shadow-lg mb-4">
+                        <div className="flex flex-wrap gap-5 items-end">
+                            <div>
+                                <label className="block mb-2 font-semibold text-[#BF9853]">Start Date</label>
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className="w-[168px] h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2"
+                                />
+                            </div>
+                            <div>
+                                <label className="block mb-2 font-semibold text-[#BF9853]">End Date</label>
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className="w-[168px] h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2"
+                                />
+                            </div>
+                            
+                            {Object.entries(accountTypeSummary)
+                                .sort(([a], [b]) => {
+                                    if (a === 'Unknown') return 1;
+                                    if (b === 'Unknown') return -1;
+                                    return a.localeCompare(b);
+                                })
+                                .map(([accountType, data]) => (
+                                <div key={accountType} className="cursor-pointer transition-all duration-200 hover:scale-105" onClick={() => setSelectedAccountType(accountType)}>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className={`font-semibold transition-colors duration-200 ${selectedAccountType === accountType ? 'text-[#E4572E]' : 'text-[#BF9853] hover:text-[#E4572E]'}`}>
+                                            {accountType}
+                                        </label>
+                                        <span className="text-sm text-red-500 font-medium">
+                                            {data.entryCount}
+                                        </span>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        value={`₹${Number(data.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                        readOnly
+                                        className={`w-[200px] h-[45px] cursor-pointer rounded-lg border-2 focus:outline-none p-2 text-lg font-bold text-center transition-all duration-200 ${
+                                            selectedAccountType === accountType 
+                                                ? 'border-[#E4572E] bg-[#FEF2F2] text-[#E4572E] shadow-md' 
+                                                : 'border-[#BF9853] border-opacity-25 text-gray-800 hover:border-[#BF9853] hover:border-opacity-75 hover:shadow-sm hover:bg-[#FAF6ED]'
+                                        }`}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                {Object.keys(accountTypeSummary).length === 0 && (
+                    <div className="w-full max-w-[1860px] mx-auto p-4 bg-white shadow-lg mb-4">
+                        <div className="flex flex-wrap gap-5 items-end">
+                            <div>
+                                <label className="block mb-2 font-semibold text-[#BF9853]">Start Date</label>
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className="w-[168px] h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2"
+                                />
+                            </div>
+                            <div>
+                                <label className="block mb-2 font-semibold text-[#BF9853]">End Date</label>
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className="w-[168px] h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
                 <div className="w-full max-w-[1860px] mx-auto p-4 bg-white shadow-lg overflow-x-auto">
-                    <div className={`text-left flex ${selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools
-                            ? 'flex-col sm:flex-row sm:justify-between' : 'flex-row justify-between items-center'} mb-3 gap-2`}>
+                    <div className={`text-left flex ${selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || startDate || endDate
+                        ? 'flex-col sm:flex-row sm:justify-between' : 'flex-row justify-between items-center'} mb-3 gap-2`}>
                         <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3">
                             <button className='pl-2' onClick={() => setShowFilters(!showFilters)}>
                                 <img
@@ -722,8 +882,22 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                     className="w-7 h-7 border border-[#BF9853] rounded-md"
                                 />
                             </button>
-                            {(selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools) && (
+                            {(selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || startDate || endDate) && (
                                 <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
+                                    {startDate && (
+                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
+                                            <span className="font-normal">Start Date: </span>
+                                            <span className="font-bold">{startDate}</span>
+                                            <button onClick={() => setStartDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                        </span>
+                                    )}
+                                    {endDate && (
+                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
+                                            <span className="font-normal">End Date: </span>
+                                            <span className="font-bold">{endDate}</span>
+                                            <button onClick={() => setEndDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                        </span>
+                                    )}
                                     {selectedDate && (
                                         <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
                                             <span className="font-normal">Date: </span>
@@ -785,13 +959,9 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                         </div>
                     </div>
                     <div>
-                        <div
-                            ref={scrollRef}
+                        <div ref={scrollRef}
                             className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[600px] overflow-scroll select-none thin-scrollbar"
-                            onMouseDown={handleMouseDown}
-                            onMouseMove={handleMouseMove}
-                            onMouseUp={handleMouseUp}
-                            onMouseLeave={handleMouseUp}
+                            onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
                         >
                             <table className="table-fixed  min-w-[1765px] w-screen border-collapse">
                                 <thead>
@@ -1234,16 +1404,16 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                     {currentItems.map((expense, index) => (
                                         <tr key={expense.id} className="odd:bg-white even:bg-[#FAF6ED]">
                                             <td className=" text-sm text-left pl-3 w-32 ">{formatDateOnly(expense.date)}</td>
-                                            <td className=" text-sm text-left w-60 ">{expense.siteName}</td>
-                                            <td className=" text-sm text-left ">{expense.vendor}</td>
-                                            <td className=" text-sm text-left ">{expense.contractor}</td>
+                                            <td className=" text-sm text-left w-60 ">{getDisplaySiteName(expense)}</td>
+                                            <td className=" text-sm text-left ">{getDisplayVendorName(expense)}</td>
+                                            <td className=" text-sm text-left ">{getDisplayContractorName(expense)}</td>
                                             <td className=" text-sm text-left ">{expense.quantity}</td>
                                             <td className="text-sm text-left pl-2 ">
                                                 ₹{Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </td>
                                             <td className=" text-sm text-left ">{expense.comments}</td>
                                             <td className=" text-sm text-left ">{expense.category}</td>
-                                            <td className=" text-sm text-left ">{expense.accountType}</td>                                            
+                                            <td className=" text-sm text-left ">{expense.accountType}</td>
                                             <td className=" text-sm text-left ">{expense.machineTools}</td>
                                             <td className=" text-sm text-left ">{expense.source}</td>
                                             <td className=" text-sm text-left pl-3 ">{expense.eno}</td>
@@ -1277,8 +1447,6 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                 </tbody>
                             </table>
                         </div>
-                        
-                        {/* Pagination Controls */}
                         <div className="flex items-center justify-between mt-4 px-4 py-3 bg-white border-t border-gray-200">
                             <div className="flex items-center space-x-2">
                                 <span className="text-sm text-gray-700">Items per page:</span>
@@ -1304,22 +1472,20 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                     <option value={900}>900</option>
                                     <option value={1000}>1000</option>
                                 </select>
-                            </div>                            
+                            </div>
                             <div className="flex items-center space-x-2">
                                 <span className="text-sm text-gray-700">
                                     Showing {startIndex + 1} to {Math.min(endIndex, sortedExpenses.length)} of {sortedExpenses.length} entries
                                 </span>
-                            </div>                            
+                            </div>
                             <div className="flex items-center space-x-1">
-
                                 <button
                                     onClick={() => setCurrentPage(currentPage - 1)}
                                     disabled={currentPage === 1}
                                     className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
                                 >
                                     Previous
-                                </button>                                
-                                {/* Page numbers */}
+                                </button>
                                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                                     let pageNum;
                                     if (totalPages <= 5) {
@@ -1330,21 +1496,20 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                         pageNum = totalPages - 4 + i;
                                     } else {
                                         pageNum = currentPage - 2 + i;
-                                    }                                    
+                                    }
                                     return (
                                         <button
                                             key={pageNum}
                                             onClick={() => setCurrentPage(pageNum)}
-                                            className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${
-                                                currentPage === pageNum
+                                            className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${currentPage === pageNum
                                                     ? 'bg-[#BF9853] text-white border-[#BF9853]'
                                                     : 'border-gray-300 hover:bg-[#BF9853] hover:text-white'
-                                            }`}
+                                                }`}
                                         >
                                             {pageNum}
                                         </button>
                                     );
-                                })}                                
+                                })}
                                 <button
                                     onClick={() => setCurrentPage(currentPage + 1)}
                                     disabled={currentPage === totalPages}
@@ -1352,9 +1517,8 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                 >
                                     Next
                                 </button>
-
                             </div>
-                        </div>                        
+                        </div>
                         <Modal
                             isOpen={modalIsOpen}
                             onRequestClose={handleCancel}
@@ -1383,10 +1547,11 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                             onChange={handleChange}
                                             className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none">
                                             <option value="" disabled>--- Select ---</option>
-                                            <option value="Daily Wage">Daily Wage</option>
-                                            <option value="Weekly Payment">Weekly Payment</option>
-                                            <option value="Claim">Claim</option>
-                                            <option value="Bill Payments">Bill Payments</option>
+                                            {editAccountTypeOptions.map((option) => (
+                                                <option key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </option>
+                                            ))}
                                         </select>
                                     </div>
                                     <div>
@@ -1395,7 +1560,11 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                             name="siteName"
                                             value={siteOption.find(option => option.value === formData.siteName)}
                                             onChange={(selectedOption) =>
-                                                setFormData({ ...formData, siteName: selectedOption?.value || '' })
+                                                setFormData({ 
+                                                    ...formData, 
+                                                    siteName: selectedOption?.value || '',
+                                                    projectId: selectedOption?.id || ''
+                                                })
                                             }
                                             options={siteOption}
                                             placeholder="--- Select Site ---"
@@ -1417,7 +1586,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                     color: 'black',
                                                 }),
                                             }}
-                                            menuPlacement="bottom" // Controls the placement of the dropdown menu
+                                            menuPlacement="bottom"
                                             menuPosition="absolute"
                                         />
                                     </div>
@@ -1428,21 +1597,27 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                             options={vendorOption}
                                             value={vendorOption.find(opt => opt.value === formData.vendor)}
                                             onChange={(selectedOption) =>
-                                                setFormData({ ...formData, vendor: selectedOption?.value || '' })
+                                                setFormData({ 
+                                                    ...formData, 
+                                                    vendor: selectedOption?.value || '',
+                                                    vendorId: selectedOption?.id || '',
+                                                    contractor: selectedOption ? '' : formData.contractor,
+                                                    contractorId: selectedOption ? '' : formData.contractorId
+                                                })
                                             }
                                             isDisabled={!!formData.contractor}
                                             isClearable
                                             styles={{
                                                 control: (base, state) => ({
                                                     ...base,
-                                                    borderColor: 'rgba(191, 152, 83, 0.2)', // <-- Border with 20% opacity
+                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
                                                     borderWidth: '2px',
                                                     borderRadius: '0.5rem',
                                                     padding: '0.25rem',
                                                     textAlign: 'left',
                                                     boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
                                                     '&:hover': {
-                                                        borderColor: 'rgba(191, 152, 83, 0.4)', // Slightly darker on hover
+                                                        borderColor: 'rgba(191, 152, 83, 0.4)',
                                                     },
                                                 }),
                                                 placeholder: (base) => ({
@@ -1477,21 +1652,27 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                             options={contractorOption}
                                             value={contractorOption.find(opt => opt.value === formData.contractor)}
                                             onChange={(selectedOption) =>
-                                                setFormData({ ...formData, contractor: selectedOption?.value || '' })
+                                                setFormData({ 
+                                                    ...formData, 
+                                                    contractor: selectedOption?.value || '',
+                                                    contractorId: selectedOption?.id || '',
+                                                    vendor: selectedOption ? '' : formData.vendor,
+                                                    vendorId: selectedOption ? '' : formData.vendorId
+                                                })
                                             }
                                             isDisabled={!!formData.vendor}
                                             isClearable
                                             styles={{
                                                 control: (base, state) => ({
                                                     ...base,
-                                                    borderColor: 'rgba(191, 152, 83, 0.2)', // <-- Border with 20% opacity
+                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
                                                     borderWidth: '2px',
                                                     borderRadius: '0.5rem',
                                                     padding: '0.25rem',
                                                     textAlign: 'left',
                                                     boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
                                                     '&:hover': {
-                                                        borderColor: 'rgba(191, 152, 83, 0.4)', // Slightly darker on hover
+                                                        borderColor: 'rgba(191, 152, 83, 0.4)',
                                                     },
                                                 }),
                                                 placeholder: (base) => ({
@@ -1558,7 +1739,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                     color: 'black',
                                                 }),
                                             }}
-                                            menuPlacement="bottom" // Controls the placement of the dropdown menu
+                                            menuPlacement="bottom" 
                                             menuPosition="absolute"
                                         />
                                     </div>
@@ -1598,6 +1779,82 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                         />
                                         <input type="file" className="hidden" id="fileInput" onChange={handleFileChange} />
                                     </div>
+                                    {(formData.accountType === 'Claim' || formData.accountType === 'Utility Bills') && (
+                                        <div>
+                                            <label className="block text-gray-500 font-semibold text-left">Payment Mode *</label>
+                                            <select
+                                                name="paymentMode"
+                                                value={formData.paymentMode}
+                                                onChange={handleChange}
+                                                className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none">
+                                                <option value="">Select Payment Mode</option>
+                                                <option value="GPay">GPay</option>
+                                                <option value="PhonePe">PhonePe</option>
+                                                <option value="Net Banking">Net Banking</option>
+                                                <option value="Cheque">Cheque</option>
+                                            </select>
+                                        </div>
+                                    )}
+                                    {formData.accountType === 'Utility Bills' && (
+                                        <>
+                                            <div>
+                                                <label className="block text-gray-500 font-semibold text-left">Utility Type *</label>
+                                                <select
+                                                    name="utilityType"
+                                                    value={formData.utilityType}
+                                                    onChange={handleChange}
+                                                    className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none">
+                                                    <option value="" disabled>--- Select ---</option>
+                                                    <option value="Electricity">Electricity</option>
+                                                    <option value="Property">Property</option>
+                                                    <option value="Water">Water</option>
+                                                    <option value="Telecom">Telecom</option>
+                                                    <option value="Subscription">Subscription</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-gray-500 font-semibold text-left">
+                                                    {formData.utilityType === 'Electricity' ? 'EB Number' :
+                                                        formData.utilityType === 'Property' ? 'Property Tax Number' :
+                                                            formData.utilityType === 'Water' ? 'Water Tax Number' : 'Number'}
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    name="utilityTypeNumber"
+                                                    value={formData.utilityTypeNumber}
+                                                    onChange={handleChange}
+                                                    placeholder={`Enter ${formData.utilityType === 'Electricity' ? 'EB Number' :
+                                                        formData.utilityType === 'Property' ? 'Property Tax Number' :
+                                                            formData.utilityType === 'Water' ? 'Water Tax Number' : 'Number'}...`}
+                                                    className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-gray-500 font-semibold text-left">Months</label>
+                                                <input
+                                                    type="month"
+                                                    name="utilityForTheMonth"
+                                                    value={formData.utilityForTheMonth}
+                                                    onChange={handleChange}
+                                                    placeholder="Enter months..."
+                                                    className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                                />
+                                            </div>
+                                            {(formData.utilityType === 'Telecom' || formData.utilityType === 'Subscription') && (
+                                                <div>
+                                                    <label className="block text-gray-500 font-semibold text-left">Additional Input</label>
+                                                    <input
+                                                        type="text"
+                                                        name="utilityValidityDays"
+                                                        value={formData.utilityValidityDays}
+                                                        onChange={handleChange}
+                                                        placeholder="Enter additional information..."
+                                                        className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                                    />
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
                                     <div className="col-span-2 flex justify-end space-x-4 mt-4 border-t-2 ">
                                         <button type="button" onClick={handleCancel} className="px-4 py-2 border-2 border-opacity-[] border-[#BF9853] text-[#BF9853] rounded mt-3">
                                             Cancel

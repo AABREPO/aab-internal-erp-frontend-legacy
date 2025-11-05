@@ -13,11 +13,28 @@ import file from '../Images/file.png';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-// Helper function to clean URL by removing surrounding quotes
+// Helper function to clean URL by removing surrounding quotes and parsing JSON if needed
 function cleanUrl(url) {
     if (!url) return url;
-    // Remove surrounding quotes if they exist
-    return url.replace(/^["']|["']$/g, '');
+    
+    // First remove surrounding quotes if they exist
+    let cleanedUrl = url.replace(/^["']|["']$/g, '');
+    
+    // Check if the URL contains JSON structure (starts with { and contains billCopyUrl)
+    if (cleanedUrl.includes('{') && cleanedUrl.includes('billCopyUrl')) {
+        try {
+            // Try to parse as JSON and extract the billCopyUrl
+            const parsed = JSON.parse(cleanedUrl);
+            if (parsed.billCopyUrl) {
+                return parsed.billCopyUrl;
+            }
+        } catch (e) {
+            // If JSON parsing fails, return the original cleaned URL
+            console.warn('Failed to parse URL as JSON:', cleanedUrl);
+        }
+    }
+    
+    return cleanedUrl;
 }
 
 const History = ({ username, userRoles = [] }) => {

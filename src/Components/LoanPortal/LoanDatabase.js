@@ -7,17 +7,17 @@ import 'react-toastify/dist/ReactToastify.css';
 import Filter from '../Images/filter (3).png'
 import Reload from '../Images/rotate-right.png'
 import edit from '../Images/Edit.svg';
+import history from '../Images/History.svg';
+import remove from '../Images/Delete.svg';
 const LoanDatabase = ({ username, userRoles = [] }) => {   
   const [vendorOptions, setVendorOptions] = useState([]);
   const [contractorOptions, setContractorOptions] = useState([]);
   const [combinedOptions, setCombinedOptions] = useState([]);
-  const [selectedOption, setSelectedOption] = useState(null);
   const [siteOptions, setSiteOptions] = useState([]);
   const [loanData, setLoanData] = useState([]);
   const [selectDate, setSelectDate] = useState('');
   const [selectContractororVendorName, setSelectContractororVendorName] = useState('');
   const [selectProjectName, setSelectProjectName] = useState('');
-  const [selectTransfer, setSelectTransfer] = useState('');
   const [selectType, setSelectType] = useState('');
   const [selectMode, setSelectMode] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -35,10 +35,10 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
   const [editDescription, setEditDescription] = useState('');
   const [combinedSitePurposeOptions, setCombinedSitePurposeOptions] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-  const [overallLoan, setOverallLoan] = useState(0);
-  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [loanPortalAudits, setLoanPortalAudits] = useState([]);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const scrollRef = useRef(null);
   const isDragging = useRef(false);
   const start = useRef({ x: 0, y: 0 });
@@ -46,7 +46,6 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
   const velocity = useRef({ x: 0, y: 0 });
   const animationFrame = useRef(null);
   const lastMove = useRef({ time: 0, x: 0, y: 0 });
-  // Drag functionality for table scrolling
   const handleMouseDown = (e) => {
     if (!scrollRef.current) return;
     isDragging.current = true;
@@ -114,7 +113,6 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
     };
     animationFrame.current = requestAnimationFrame(step);
   };
-  // Helper functions
   const formatWithCommas = (value) => {
     if (!value) return "";
     return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -132,14 +130,7 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
     const year = date.getFullYear();
     return `${day}-${month}-${year}`;
   };
-  const purposeOptions = useMemo(() => [
-    { value: 'Machine Loan', label: 'Machine Loan', id: 1, type: 'Purpose' },
-    { value: 'Material Loan', label: 'Material Loan', id: 2, type: 'Purpose' },
-    { value: 'Equipment Loan', label: 'Equipment Loan', id: 3, type: 'Purpose' },
-    { value: 'Working Capital', label: 'Working Capital', id: 4, type: 'Purpose' },
-    { value: 'Other', label: 'Other', id: 5, type: 'Purpose' }
-  ], []);
-
+  const [purposeOptions, setPurposeOptions] = useState([]);
   const paymentModeOptions = useMemo(() => [
     { id: 1, value: 'Cash', label: 'Cash' },
     { id: 2, value: 'GPay', label: 'GPay' },
@@ -147,8 +138,6 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
     { id: 4, value: 'Cheque', label: 'Cheque' },
     { id: 5, value: 'Advance Transfer', label: 'Advance Transfer' }
   ], []);
-
-  // Custom styles for Select components in edit modal
   const customStyles = useMemo(() => ({
     control: (provided, state) => ({
       ...provided,
@@ -239,11 +228,36 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
   useEffect(() => {
     setCombinedOptions([...vendorOptions, ...contractorOptions]);
   }, [vendorOptions, contractorOptions]);
-
-  // Combine site and purpose options for edit modal
   useEffect(() => {
     setCombinedSitePurposeOptions([...siteOptions, ...purposeOptions]);
   }, [siteOptions, purposeOptions]);
+  // Fetch purpose options from API (align with LoanPortal.js)
+  useEffect(() => {
+    const fetchPurposeOptions = async () => {
+      try {
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/loan-purposes/getAll', {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (!response.ok) {
+          throw new Error('Network response was not ok: ' + response.statusText);
+        }
+        const data = await response.json();
+        const formattedData = data.map(item => ({
+          value: item.purpose,
+          label: item.purpose,
+          id: item.id,
+          type: 'Purpose'
+        }));
+        setPurposeOptions(formattedData);
+      } catch (error) {
+        console.error('Error fetching purpose options: ', error);
+        setPurposeOptions([]);
+      }
+    };
+    fetchPurposeOptions();
+  }, []);
   useEffect(() => {
     const fetchSites = async () => {
       try {
@@ -288,7 +302,6 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
     fetchData();
   }, []);
   const filteredData = loanData.filter((entry) => {
-    // Date filter
     if (selectDate) {
       const [year, month, day] = selectDate.split("-");
       const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
@@ -296,7 +309,6 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
       const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
       if (formattedEntryDate !== formattedSelectDate) return false;
     }
-    // Contractor/Vendor filter
     if (selectContractororVendorName) {
       const name =
         entry.vendor_id
@@ -305,23 +317,19 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
       if (name.toLowerCase() !== selectContractororVendorName.toLowerCase())
         return false;
     }
-    // Project Name filter
     if (selectProjectName) {
       const projectName = getSiteName(entry.project_id) || "";
       if (projectName.toLowerCase() !== selectProjectName.toLowerCase())
         return false;
     }
-    // Type filter
     if (selectType) {
       if (entry.loan_type?.toLowerCase() !== selectType.toLowerCase()) return false;
     }
-    // Mode filter
     if (selectMode) {
       if (entry.payment_mode?.toLowerCase() !== selectMode.toLowerCase()) return false;
     }
     return true;
   });
-  // Sorting functionality
   const handleSort = (key) => {
     setSortConfig((prev) => {
       if (prev.key === key) {
@@ -364,7 +372,6 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
         return 0;
       });
     } else {
-      // Default sorting: Most recent entries first
       sortableData.sort((a, b) => {
         const dateA = new Date(a.date);
         const dateB = new Date(b.date);
@@ -373,16 +380,13 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
     }
     return sortableData;
   }, [filteredData, sortConfig]);
-  // Pagination logic
   const totalPages = Math.ceil(sortedData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentData = sortedData.slice(startIndex, endIndex);
-  // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [selectDate, selectContractororVendorName, selectProjectName, selectType, selectMode]);
-  // Pagination handlers
   const goToPage = (page) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   };
@@ -401,8 +405,6 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
     setItemsPerPage(newItemsPerPage);
     setCurrentPage(1);
   };
-
-  // Export functionality
   const exportPDF = () => {
     const doc = new jsPDF("l", "pt", "a4");
     const headers = [
@@ -515,10 +517,115 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
     link.click();
     document.body.removeChild(link);
   };
-
+  const fetchAuditDetails = async (loanPortalId) => {
+    try {
+      const response = await fetch(`https://backendaab.in/aabuildersDash/api/loans/audit/history/${loanPortalId}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setLoanPortalAudits(data);
+      setShowHistoryModal(true);
+    } catch (error) {
+      console.error("Error fetching audit details:", error);
+      toast.error("Failed to fetch audit history", {
+        position: "top-center",
+        autoClose: 3000,
+        theme: "colored",
+      });
+    }
+  };
+  const handleDelete = async (idToDelete) => {
+    const confirmDelete = window.confirm("Are you sure you want to delete this record?");
+    if (!confirmDelete) return;
+    try {
+      const record = loanData.find(r => r.loanPortalId === idToDelete || r.id === idToDelete);
+      if (!record) {
+        console.warn('Record not found for ID:', idToDelete);
+        toast.error("Record not found", {
+          position: "top-center",
+          autoClose: 3000,
+          theme: "colored",
+        });
+        return;
+      }
+      const entryNo = record.entry_no;
+      const clearedData = {
+        loanPortalId: idToDelete,
+        type: '',
+        date: record.date, // Preserve date
+        amount: 0,
+        loan_refund_amount: 0,
+        loan_payment_mode: '',
+        from_purpose_id: 0,
+        to_purpose_id: 0,
+        vendor_id: 0,
+        contractor_id: 0,
+        project_id: 0,
+        transfer_Project_id: 0,
+        entry_no: entryNo, // Preserve entry_no
+        description: '',
+      };
+      if (record.type === 'Transfer') {
+        const transferRecords = loanData.filter(r => r.entry_no === entryNo);
+        if (transferRecords.length !== 2) {
+          console.warn(`Expected 2 Transfer records with entry_no ${entryNo}, but found ${transferRecords.length}`);
+        }
+        await Promise.all(
+          transferRecords.map(async rec => {
+            const clearedTransferData = {
+              loanPortalId: rec.loanPortalId || rec.id,
+              type: '',
+              date: rec.date,
+              amount: 0,
+              loan_refund_amount: 0,
+              loan_payment_mode: '',
+              from_purpose_id: 0,
+              to_purpose_id: 0,
+              vendor_id: 0,
+              contractor_id: 0,
+              project_id: 0,
+              transfer_Project_id: 0,
+              entry_no: entryNo,
+              description: '',
+            };
+            const res = await fetch(`https://backendaab.in/aabuildersDash/api/loans/${rec.loanPortalId || rec.id}?editedBy=${username}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(clearedTransferData)
+            });
+            if (!res.ok) {
+              throw new Error(`Failed to clear transfer record with ID: ${rec.loanPortalId || rec.id}`);
+            }
+          })
+        );
+      } else {
+        const res = await fetch(`https://backendaab.in/aabuildersDash/api/loans/${idToDelete}?editedBy=${username}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(clearedData)
+        });
+        if (!res.ok) {
+          throw new Error('Failed to clear record');
+        }
+      }
+      toast.success("Record deleted successfully!", {
+        position: "top-center",
+        autoClose: 3000,
+        theme: "colored",
+      });
+      window.location.reload();
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast.error(error.message || "Failed to delete record!", {
+        position: "top-center",
+        autoClose: 3000,
+        theme: "colored",
+      });
+    }
+  };
   const handleUpdate = async () => {
     try {
-
       const payload = {
         loanPortalId: editingId,
         type: editSelectedType,
@@ -552,7 +659,6 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
           body: JSON.stringify(payload),
         }
       );
-      window.location.reload();
       if (!res.ok) throw new Error('Failed to update');
       const updatedDataArray = await res.json();
       setLoanData(prev => {
@@ -570,6 +676,7 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
         autoClose: 3000,
         theme: "colored",
       });
+      window.location.reload();
     } catch (error) {
       console.error(error);
       toast.error(error.message || "Failed to update entry!", {
@@ -877,7 +984,7 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
                         {paymentModeOptions.find(opt => opt.value === entry.loan_payment_mode)?.label || entry.loan_payment_mode || ''}
                       </td>
                       <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[80px] font-semibold">{entry.entry_no}</td>
-                      <td className="flex py-2 pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[100px] justify-center">
+                      <td className="flex py-2 pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[100px] justify-center gap-2">
                         <button className="rounded-full transition duration-200">
                           <img
                             src={edit}
@@ -921,6 +1028,26 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
                               setEditDescription(entry.description || '');
                               setIsEditModalOpen(true);
                             }}
+                          />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(entry.loanPortalId || entry.id)}
+                          className="rounded-full transition duration-200"
+                        >
+                          <img
+                            src={remove}
+                            alt="delete"
+                            className="w-4 h-4 transform hover:scale-110 hover:brightness-110 transition duration-200"
+                          />
+                        </button>
+                        <button
+                          onClick={() => fetchAuditDetails(entry.loanPortalId || entry.id)}
+                          className="rounded-full transition duration-200"
+                        >
+                          <img
+                            src={history}
+                            alt="history"
+                            className="w-4 h-5 transform hover:scale-110 hover:brightness-110 transition duration-200"
                           />
                         </button>
                       </td>
@@ -1141,6 +1268,15 @@ const LoanDatabase = ({ username, userRoles = [] }) => {
             </div>
           </div>
         )}
+        <AuditModal 
+          show={showHistoryModal} 
+          onClose={() => setShowHistoryModal(false)} 
+          audits={loanPortalAudits} 
+          vendorOptions={vendorOptions} 
+          contractorOptions={contractorOptions}
+          siteOptions={siteOptions}
+          purposeOptions={purposeOptions}
+        />
       </div>
       <ToastContainer position="top-center" autoClose={3000} theme="colored" />
     </body>
@@ -1160,3 +1296,151 @@ const formatDate = (dateString) => {
     hours = hours ? String(hours).padStart(2, '0') : '12';
     return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
   };
+
+const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, siteOptions, purposeOptions }) => {
+  if (!show) return null;
+  
+  const getNameById = (id, options) => {
+    if (!id && id !== 0) return "-";
+    const found = options.find(opt => String(opt.id) === String(id));
+    return found ? found.label : id;
+  };
+  
+  const fields = [
+    { oldKey: "old_date", newKey: "new_date", label: "Date", width: "120px" },
+    { oldKey: "old_type", newKey: "new_type", label: "Type", width: "100px" },
+    { oldKey: "old_vendor_id", newKey: "new_vendor_id", label: "Vendor", width: "150px", lookup: vendorOptions },
+    { oldKey: "old_contractor_id", newKey: "new_contractor_id", label: "Contractor", width: "150px", lookup: contractorOptions },
+    { oldKey: "old_project_id", newKey: "new_project_id", label: "Project", width: "180px", lookup: siteOptions },
+    { oldKey: "old_transfer_project_id", newKey: "new_transfer_project_id", label: "Transfer Project", width: "180px", lookup: siteOptions },
+    { oldKey: "old_from_purpose_id", newKey: "new_from_purpose_id", label: "From Purpose", width: "180px", lookup: purposeOptions },
+    { oldKey: "old_to_purpose_id", newKey: "new_to_purpose_id", label: "To Purpose", width: "180px", lookup: purposeOptions },
+    { oldKey: "old_loan_payment_mode", newKey: "new_loan_payment_mode", label: "Payment Mode", width: "120px" },
+    { oldKey: "old_amount", newKey: "new_amount", label: "Amount", width: "100px" },
+    { oldKey: "old_loan_refund_amount", newKey: "new_loan_refund_amount", label: "Refund Amount", width: "120px" },
+    { oldKey: "old_description", newKey: "new_description", label: "Description", width: "200px" },
+    { oldKey: "old_file_url", newKey: "new_file_url", label: "File URL", width: "200px" },
+  ];
+  
+  const formatDateTime = (dateString) => {
+    if (!dateString) return "-";
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    let hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12 || 12;
+    hours = String(hours).padStart(2, "0");
+    return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+  };
+  
+  const formatDisplayValue = (value, field) => {
+    if (
+      (field.oldKey?.includes("vendor_id") || field.oldKey?.includes("contractor_id") ||
+        field.oldKey?.includes("project_id") || field.oldKey?.includes("transfer_project_id") ||
+        field.oldKey?.includes("from_purpose_id") || field.oldKey?.includes("to_purpose_id") ||
+        field.newKey?.includes("vendor_id") || field.newKey?.includes("contractor_id") ||
+        field.newKey?.includes("project_id") || field.newKey?.includes("transfer_project_id") ||
+        field.newKey?.includes("from_purpose_id") || field.newKey?.includes("to_purpose_id")) &&
+      String(value) === "0"
+    ) {
+      return "-";
+    }
+    if (field.lookup) {
+      return getNameById(value, field.lookup);
+    }
+    if (field.label.includes("Amount")) {
+      return value ? Number(value).toLocaleString("en-IN") : "-";
+    }
+    if (field.label === "Date") {
+      return value ? new Date(value).toLocaleDateString("en-GB") : "-";
+    }
+    if (field.label === "File URL") {
+      return value ? (
+        <a href={value} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">
+          View
+        </a>
+      ) : "-";
+    }
+    return value ?? "-";
+  };
+  
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+      <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1800px] mx-4 p-2">
+        <div className="flex justify-between items-center mt-4 ml-7 mr-7">
+          <h2 className="text-xl font-bold">History</h2>
+          <button onClick={onClose}>
+            <h2 className="text-xl text-red-500 -mt-10 font-bold">x</h2>
+          </button>
+        </div>
+        <div className="overflow-auto mt-2 max-h-80 border border-l-8 border-l-[#BF9853] rounded-lg ml-7">
+          <table className="table-fixed min-w-full bg-white">
+            <thead className="bg-[#FAF6ED]">
+              <tr>
+                <th style={{ width: "130px" }}>Time Stamp</th>
+                <th style={{ width: "120px" }}>Edited By</th>
+                {fields.map((f) => (
+                  <th
+                    key={f.label}
+                    style={{ width: f.width }}
+                    className="border-b py-2 px-2 text-center font-bold whitespace-nowrap overflow-hidden text-ellipsis"
+                  >
+                    {f.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {audits.length > 0 ? (
+                audits.map((audit, index) => (
+                  <tr
+                    key={index}
+                    className="odd:bg-white even:bg-[#FAF6ED]"
+                  >
+                    <td
+                      className="whitespace-nowrap overflow-hidden text-ellipsis"
+                      style={{ width: "130px" }}
+                    >
+                      {formatDateTime(audit.edited_date)}
+                    </td>
+                    <td
+                      className="whitespace-nowrap overflow-hidden text-ellipsis"
+                      style={{ width: "120px" }}
+                    >
+                      {audit.edited_by}
+                    </td>
+                    {fields.map((f) => {
+                      const oldDisplay = formatDisplayValue(audit[f.oldKey], f);
+                      const newDisplay = formatDisplayValue(audit[f.newKey], f);
+                      const changed = oldDisplay !== newDisplay;
+                      return (
+                        <td
+                          key={f.label}
+                          style={{ width: f.width }}
+                          title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
+                          className={`whitespace-nowrap overflow-hidden text-ellipsis px-2 ${changed ? "bg-[#BF9853] font-bold" : ""
+                            }`}
+                        >
+                          {oldDisplay}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="p-4 text-center text-sm text-gray-400" colSpan={fields.length + 2}>
+                    No audit history available
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};

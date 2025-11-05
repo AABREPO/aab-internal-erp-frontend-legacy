@@ -28,7 +28,66 @@ const InputData = ({ username, userRoles = [] }) => {
   const [usedShopNos, setUsedShopNos] = useState(new Set());
   const [userPermissions, setUserPermissions] = useState([]);
   const [shouldCollectAdvance, setShouldCollectAdvance] = useState(true); // default is Yes
+  const [isProjectManagementOpen, setIsProjectManagementOpen] = useState(false);
+  const [isProjectEditOpen, setIsProjectEditOpen] = useState(false);
+  const [projects, setProjects] = useState([]);
+  const [selectedProjectId, setSelectedProjectId] = useState(null);
+  const [projectManagementSearch, setProjectManagementSearch] = useState('');
   const moduleName = "Rent Management";
+  const [newProject, setNewProject] = useState({
+    projectName: '',
+    projectAddress: '',
+    projectId: '',
+    projectCategory: '',
+    projectReferenceName: '',
+    ownerDetailsList: [{
+      clientName: "",
+      fatherName: "",
+      mobile: "",
+      age: "",
+      clientAddress: ""
+    }],
+    propertyDetailsList: [{
+      projectType: "",
+      floorName: "",
+      shopNo: "",
+      doorNo: "",
+      area: "",
+      ebNo: "",
+      ebNoFrequency: "",
+      propertyTaxNo: "",
+      propertyTaxFrequency: "",
+      waterTaxNo: "",
+      waterTaxFrequency: ""
+    }]
+  });
+  const [editProject, setEditProject] = useState({
+    projectName: '',
+    projectAddress: '',
+    projectId: '',
+    projectCategory: '',
+    projectReferenceName: '',
+    ownerDetailsList: [{
+      clientName: "",
+      fatherName: "",
+      mobile: "",
+      age: "",
+      clientAddress: ""
+    }],
+    propertyDetailsList: [{
+      projectType: "",
+      floorName: "",
+      shopNo: "",
+      doorNo: "",
+      area: "",
+      ebNo: "",
+      ebNoFrequency: "",
+      propertyTaxNo: "",
+      propertyTaxFrequency: "",
+      waterTaxNo: "",
+      waterTaxFrequency: ""
+    }]
+  });
   useEffect(() => {
     const fetchUserRoles = async () => {
       try {
@@ -50,6 +109,23 @@ const InputData = ({ username, userRoles = [] }) => {
       fetchUserRoles();
     }
   }, [userRoles]);
+  const fetchProjects = async () => {
+    try {
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
+      if (response.ok) {
+        const data = await response.json();
+        const ownProjects = Array.isArray(data)
+          ? data.filter(p => (p.projectCategory || '').toLowerCase() === 'own project')
+          : [];
+        setProjects(ownProjects);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+  useEffect(() => {
+    fetchProjects();
+  }, []);
   const [editProperties, setEditProperties] = useState({
     propertyName: '',
     propertyAddress: '',
@@ -117,6 +193,50 @@ const InputData = ({ username, userRoles = [] }) => {
       }
     ]
   })
+
+  // Edit form handler functions
+  const handleEditOwnerChange = (index, field, value) => {
+    const updatedOwners = [...editProject.ownerDetailsList];
+    updatedOwners[index][field] = value;
+    setEditProject((prev) => ({ ...prev, ownerDetailsList: updatedOwners }));
+  };
+
+  const handleEditDetailChange = (index, field, value) => {
+    const updatedDetails = [...editProject.propertyDetailsList];
+    updatedDetails[index][field] = value;
+    setEditProject((prev) => ({ ...prev, propertyDetailsList: updatedDetails }));
+  };
+const addEditOwner = () => {
+    setEditProject((prev) => ({
+      ...prev,
+      ownerDetailsList: [...prev.ownerDetailsList, {
+        clientName: "",
+        fatherName: "",
+        mobile: "",
+        age: "",
+        clientAddress: ""
+      }]
+    }));
+  };
+
+  const addEditPropertyDetail = () => {
+    setEditProject((prev) => ({
+      ...prev,
+      propertyDetailsList: [...prev.propertyDetailsList, {
+        projectType: "",
+        floorName: "",
+        shopNo: "",
+        doorNo: "",
+        area: "",
+        ebNo: "",
+        ebNoFrequency: "",
+        propertyTaxNo: "",
+        propertyTaxFrequency: "",
+        waterTaxNo: "",
+        waterTaxFrequency: ""
+      }]
+    }));
+  };
   const handleTenantChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -936,6 +1056,297 @@ const InputData = ({ username, userRoles = [] }) => {
       });
     });
   }, [editformData, properties]);
+  const handleEditProject = (item) => {
+    setSelectedProjectId(item.id);
+    setEditProject({
+      projectName: item.projectName || '',
+      projectAddress: item.projectAddress || '',
+      projectId: item.projectId || '',
+      projectCategory: item.projectCategory || '',
+      projectReferenceName: item.projectReferenceName || '',
+      ownerDetailsList: item.ownerDetails && item.ownerDetails.length > 0 ? item.ownerDetails : [{
+        clientName: "",
+        fatherName: "",
+        mobile: "",
+        age: "",
+        clientAddress: ""
+      }],
+      propertyDetailsList: item.propertyDetails && item.propertyDetails.length > 0 ? item.propertyDetails : [{
+        projectType: "",
+        floorName: "",
+        shopNo: "",
+        doorNo: "",
+        area: "",
+        ebNo: "",
+        ebNoFrequency: "",
+        propertyTaxNo: "",
+        propertyTaxFrequency: "",
+        waterTaxNo: "",
+        waterTaxFrequency: ""
+      }]
+    });
+    setIsProjectEditOpen(true);
+  };
+  const handleSubmitEditProject = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        projectName: editProject.projectName,
+        projectAddress: editProject.projectAddress,
+        projectId: editProject.projectId,
+        projectCategory: editProject.projectCategory,
+        projectReferenceName: editProject.projectReferenceName,
+        ownerDetails: editProject.ownerDetailsList,       // mapped for backend
+        propertyDetails: editProject.propertyDetailsList  // mapped for backend
+      };
+      const response = await fetch(`https://backendaab.in/aabuilderDash/api/projects/edit/${selectedProjectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        try {
+          const existingSiteNameBySiteNo = siteNames.find(site => site.siteNo === editProject.projectId.toString());
+          const existingSiteNameById = siteNames.find(site => site.id === selectedProjectId);
+          const existingSiteName = existingSiteNameById || existingSiteNameBySiteNo;
+          const siteNamePayload = {
+            siteName: editProject.projectName,
+            siteNo: editProject.projectId
+          };
+          if (existingSiteName) {
+            const siteNameResponse = await fetch(`https://backendaab.in/aabuilderDash/api/project_Names/edit/${existingSiteName.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(siteNamePayload),
+            });
+            if (siteNameResponse.ok) {
+              fetchSiteNames(); // Refresh site names list
+            }
+          } else {
+            const siteNameResponse = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(siteNamePayload),
+            });
+            if (siteNameResponse.ok) {
+              fetchSiteNames(); // Refresh site names list
+            }
+          }
+        } catch (syncError) {
+          console.error('Error syncing with Project Names:', syncError);
+        }
+        setMessage('Project updated successfully!');
+        setIsProjectEditOpen(false);
+        fetchProjects();
+      } else {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        setMessage('Failed to update project.');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      setMessage('Error occurred while updating project.');
+    }
+  };
+  const openProjectManagement = () => {
+    // Generate next project ID
+    const generateNextProjectId = () => {
+      if (projects.length === 0) {
+        return '1'; // Start with 1 if no projects exist
+      }
+
+      // Extract numbers from existing project IDs and find the highest
+      const projectIds = projects
+        .map(project => project.projectId)
+        .filter(projectId => projectId && projectId.toString().trim() !== '')
+        .map(projectId => {
+          // Try to extract numeric value from various formats
+          const numericMatch = projectId.toString().match(/\d+/);
+          return numericMatch ? parseInt(numericMatch[0]) : null;
+        })
+        .filter(num => num !== null && !isNaN(num));
+
+      if (projectIds.length === 0) {
+        return '1'; // Default to 1 if no valid numbers found
+      }
+
+      const maxNumber = Math.max(...projectIds);
+      const nextNumber = maxNumber + 1;
+      return nextNumber.toString();
+    };
+
+    // Set the auto-generated project ID
+    const nextProjectId = generateNextProjectId();
+    setNewProject(prev => ({
+      ...prev,
+      projectId: nextProjectId
+    }));
+
+    setIsProjectManagementOpen(true);
+  };
+  const closeProjectManagement = () => {
+    setIsProjectManagementOpen(false);
+    // Reset form data with default sets
+    setNewProject({
+      projectName: '',
+      projectAddress: '',
+      projectId: '',
+      projectCategory: '',
+      projectReferenceName: '',
+      ownerDetailsList: [{
+        clientName: "",
+        fatherName: "",
+        mobile: "",
+        age: "",
+        clientAddress: ""
+      }],
+      propertyDetailsList: [{
+        projectType: "",
+        floorName: "",
+        shopNo: "",
+        doorNo: "",
+        area: "",
+        ebNo: "",
+        ebNoFrequency: "",
+        propertyTaxNo: "",
+        propertyTaxFrequency: "",
+        waterTaxNo: "",
+        waterTaxFrequency: ""
+      }]
+    });
+  };
+  const handleDeleteProject = async (id) => {
+    if (window.confirm('Are you sure you want to delete this project?')) {
+      try {
+        const projectToDelete = projects.find(project => project.id === id);
+        const response = await fetch(`https://backendaab.in/aabuilderDash/api/projects/delete/${id}`, {
+          method: 'DELETE',
+        });
+        if (response.ok) {
+          if (projectToDelete) {
+            try {
+              const existingSiteNameBySiteNo = siteNames.find(site => site.siteNo === projectToDelete.projectId?.toString());
+              const existingSiteNameById = siteNames.find(site => site.id === id);
+              const existingSiteName = existingSiteNameById || existingSiteNameBySiteNo;
+              if (existingSiteName) {
+                const siteNameResponse = await fetch(`https://backendaab.in/aabuilderDash/api/project_Names/delete/${existingSiteName.id}`, {
+                  method: 'DELETE',
+                });
+                if (siteNameResponse.ok) {
+                  fetchSiteNames(); // Refresh site names list
+                }
+              }
+            } catch (syncError) {
+              console.error('Error syncing delete with Project Names:', syncError);
+            }
+          }
+          setMessage('Project deleted successfully!');
+          fetchProjects();
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    }
+  };
+  const handleSubmitProject = async (e) => {
+    e.preventDefault();
+
+    try {
+      // Map frontend state to backend field names
+      const payload = {
+        projectName: newProject.projectName,
+        projectAddress: newProject.projectAddress,
+        projectId: newProject.projectId,
+        projectCategory: newProject.projectCategory,
+        projectReferenceName: newProject.projectReferenceName,
+        ownerDetails: newProject.ownerDetailsList,      // map to backend
+        propertyDetails: newProject.propertyDetailsList // map to backend
+      };
+
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        // Sync with Project Names API
+        try {
+          // Check if a Project Names record exists with the same projectId (as siteNo)
+          const existingSiteName = siteNames.find(site => site.siteNo === newProject.projectId.toString());
+
+          const siteNamePayload = {
+            siteName: newProject.projectName,
+            siteNo: newProject.projectId
+          };
+
+          if (existingSiteName) {
+            // Update existing Project Names record
+            const siteNameResponse = await fetch(`https://backendaab.in/aabuilderDash/api/project_Names/edit/${existingSiteName.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(siteNamePayload),
+            });
+
+            if (siteNameResponse.ok) {
+              fetchSiteNames(); // Refresh site names list
+            }
+          } else {
+            // Create new Project Names record
+            const siteNameResponse = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(siteNamePayload),
+            });
+
+            if (siteNameResponse.ok) {
+              fetchSiteNames(); // Refresh site names list
+            }
+          }
+        } catch (syncError) {
+          console.error('Error syncing with Project Names:', syncError);
+          // Don't fail the main operation if sync fails
+        }
+
+        setMessage('Project saved successfully!');
+        closeProjectManagement();
+        fetchProjects();
+      } else {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        setMessage('Failed to save project.');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      setMessage('Error occurred while saving project.');
+    }
+  };
+  const handleProjectManagementBulkUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/upload-sql', {
+        method: 'POST',
+        body: formData,
+      });
+      if (response.ok) {
+        const result = await response.text();
+        setMessage(`Project Management bulk upload successful! ${result}`);
+        fetchProjects(); // Refresh the project list
+      } else {
+        const errorData = await response.text();
+        setMessage(`Project Management bulk upload failed: ${errorData}`);
+      }
+    } catch (error) {
+      console.error('Project Management bulk upload error:', error);
+      setMessage(`Project Management bulk upload failed: ${error.message}`);
+    }
+    // Reset the file input
+    e.target.value = '';
+  };
   return (
     <div className="p-4 bg-white ml-12 mr-8">
       <div className=" lg:flex space-x-[2%] w-full overflow-x-auto">
@@ -1168,6 +1579,78 @@ const InputData = ({ username, userRoles = [] }) => {
                               <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handlePaymentModeDelete(item.id)} />
                             </button>
                           )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div className="flex items-center mb-2 lg:mt-0 mt-3">
+            <input
+              type="text"
+              className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
+              placeholder="Search Project.."
+              value={projectManagementSearch}
+              onChange={(e) => setProjectManagementSearch(e.target.value)}
+            />
+            <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
+              <img src={search} alt='search' className=' w-5 h-5' />
+            </button>
+            <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
+              onClick={openProjectManagement}>
+              + Add
+            </button>
+          </div>
+          <button className="flex items-center text-[#E4572E] font-bold px-1 ml-4 mt-2 mb-2"
+            onClick={() => document.getElementById('projectManagementFileInput').click()}>
+            <img src={imports} alt='import' className='w-4 h-4 mr-1' />
+            Import File
+          </button>
+          <input
+            type="file"
+            id="projectManagementFileInput"
+            accept=".sql"
+            style={{ display: 'none' }}
+            onChange={(e) => handleProjectManagementBulkUpload(e)}
+          />
+          <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
+            <div className="bg-[#FAF6ED]">
+              <table className="table-auto lg:w-60">
+                <thead className='bg-[#FAF6ED]'>
+                  <tr className="border-b">
+                    <th className="p-2 text-left lg:w-16 text-xl font-bold">S.No</th>
+                    <th className="p-2 text-left lg:w-52 text-xl font-bold">Project Name</th>
+                  </tr>
+                </thead>
+              </table>
+            </div>
+            <div className="overflow-y-auto max-h-[550px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+              <table className="table-auto lg:w-full w-full">
+                <tbody>
+                  {projects.filter(project =>
+                    project.projectName?.toLowerCase().includes(projectManagementSearch.toLowerCase()) ||
+                    project.projectAddress?.toLowerCase().includes(projectManagementSearch.toLowerCase()) ||
+                    project.projectId?.toLowerCase().includes(projectManagementSearch.toLowerCase())
+                  ).map((item, index) => (
+                    <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
+                      <td className="p-2 text-left font-semibold">
+                        {(projects.findIndex(p => p.id === item.id) + 1).toString().padStart(2, '0')}
+                      </td>
+                      <td className="p-2 text-left group flex font-semibold">
+                        <div className="flex flex-grow">
+                          {item.projectName || ''}
+                        </div>
+                        <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                          <button onClick={() => handleEditProject(item)} className="text-blue-600 hover:text-blue-800" title="Edit" >
+                            <img src={edit} alt="Edit" className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleDeleteProject(item.id)} className="text-red-600 hover:text-red-800" title="Delete" >
+                            <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -2301,22 +2784,22 @@ const InputData = ({ username, userRoles = [] }) => {
                         className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
                         placeholder="Advance"
                       />
-                        <input
-                          type="date"
-                          name="startingDate"
-                          value={shop.startingDate}
-                          onChange={(e) => {
-                            const rawValue = e.target.value;
-                            handleShopeditChange(pIndex, sIndex, {
-                              target: {
-                                name: 'startingDate',
-                                value: rawValue, // store unformatted numeric value
-                              },
-                            });
-                          }}
-                          className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
-                          placeholder="Advance"
-                        />
+                      <input
+                        type="date"
+                        name="startingDate"
+                        value={shop.startingDate}
+                        onChange={(e) => {
+                          const rawValue = e.target.value;
+                          handleShopeditChange(pIndex, sIndex, {
+                            target: {
+                              name: 'startingDate',
+                              value: rawValue, // store unformatted numeric value
+                            },
+                          });
+                        }}
+                        className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
+                        placeholder="Advance"
+                      />
                       <div className="relative flex">
                         <input
                           type="date"
@@ -2683,6 +3166,570 @@ const InputData = ({ username, userRoles = [] }) => {
                 Cancel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {isProjectManagementOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+          <div className="bg-white rounded-md w-[95rem] h-[40rem] text-left overflow-y-auto pl-20">
+            <div className='flex justify-end mt-4'>
+              <div>
+                <button className="text-red-500 " onClick={closeProjectManagement}>
+                  <img src={cross} alt="close" className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <form onSubmit={handleSubmitProject}>
+              <div className="flex gap-4">
+                <div className="mb-4 pl-5">
+                  <label className="block text-lg font-medium mb-2">Project Name</label>
+                  <input
+                    type="text"
+                    value={newProject.projectName}
+                    onChange={(e) =>
+                      setNewProject((prev) => ({ ...prev, projectName: e.target.value }))
+                    }
+                    className="w-[35rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    placeholder="Enter Project Name"
+                    required
+                  />
+                </div>
+                <div className="mb-4 pl-5">
+                  <label className="block text-lg font-medium mb-2">Project ID</label>
+                  <input className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    placeholder="Enter Project ID"
+                    type="text"
+                    value={newProject.projectId}
+                    onChange={(e) =>
+                      setNewProject((prev) => ({ ...prev, projectId: e.target.value }))
+                    }></input>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <div className="mb-4 pl-5">
+                  <label className="block text-lg font-medium mb-2">Project Reference Name</label>
+                  <input className="w-[35rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    placeholder="Enter Project Reference Name"
+                    type="text"
+                    value={newProject.projectReferenceName}
+                    onChange={(e) =>
+                      setNewProject((prev) => ({ ...prev, projectReferenceName: e.target.value }))
+                    }></input>
+                </div>
+                <div className="mb-4 pl-5">
+                  <label className="block text-lg font-medium mb-2">Project Category</label>
+                  <select className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    value={newProject.projectCategory}
+                    onChange={(e) =>
+                      setNewProject((prev) => ({ ...prev, projectCategory: e.target.value }))
+                    }>
+                    <option value="">Select Project Category</option>
+                    <option value="Client Project">Client Project</option>
+                    <option value="Own Project">Own Project</option>
+                  </select>
+                </div>
+              </div>
+              <div className="mb-4 pl-5">
+                <label className="block text-lg font-medium mb-2">Project Address</label>
+                <input className="w-[62rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                  placeholder="Enter Project Address"
+                  type="text"
+                  value={newProject.projectAddress}
+                  onChange={(e) =>
+                    setNewProject((prev) => ({ ...prev, projectAddress: e.target.value }))
+                  }></input>
+              </div>
+              {newProject.ownerDetailsList.map((owner, index) => (
+                <div key={index} className="mb-2">
+                  <div className="flex mb-2 ">
+                    <div className="mt-12 mr-4">
+                      {index + 1}.
+                    </div>
+                    <div className='flex mb-2 gap-5'>
+                      <div className="flex flex-col">
+                        <label className="mb-1 text-lg font-medium">Client Name</label>
+                        <input
+                          type="text"
+                          value={owner.clientName}
+                          onChange={(e) => handleNewOwnerChange(index, 'clientName', e.target.value)}
+                          placeholder="Client Name"
+                          className="w-80 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="mb-1 text-lg font-medium">Father Name</label>
+                        <input
+                          type="text"
+                          value={owner.fatherName}
+                          onChange={(e) => handleNewOwnerChange(index, 'fatherName', e.target.value)}
+                          placeholder="Father Name"
+                          className="w-72 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="mb-1 text-lg font-medium">Mobile</label>
+                        <input
+                          type="text"
+                          value={owner.mobile}
+                          onChange={(e) => handleNewOwnerChange(index, 'mobile', e.target.value)}
+                          placeholder="Mobile"
+                          className="w-60 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="mb-1 text-lg font-medium">Age</label>
+                        <input
+                          type="text"
+                          value={owner.age}
+                          onChange={(e) => handleNewOwnerChange(index, 'age', e.target.value)}
+                          placeholder="Age"
+                          className="w-20 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className=" relative pl-4">
+                    <label className="block text-lg font-medium ">Client Address</label>
+                    <input
+                      type="text"
+                      value={owner.clientAddress}
+                      onChange={(e) => handleNewOwnerChange(index, 'clientAddress', e.target.value)}
+                      placeholder="Client Address"
+                      className="w-[62rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updatedOwners = [...newProject.ownerDetailsList];
+                        updatedOwners.splice(index, 1);
+                        setNewProject((prev) => ({
+                          ...prev,
+                          ownerDetailsList: updatedOwners,
+                        }));
+                      }}
+                      className="absolute ml-2 mt-3 text-red-500 font-bold text-xl"
+                      title="Remove this owner"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <button type="button" className="text-[#E4572E] font-bold ml-4 px-1 border-dashed border-b-2 border-[#BF9853]" onClick={addNewOwner}>+ Add Another Owner</button>
+              {newProject.propertyDetailsList.map((detail, index) => (
+                <div className="flex mb-2 gap-5" key={index}>
+                  <div className="mt-12">
+                    {index + 1}.
+                  </div>
+                  <div className="">
+                    <label className="block mb-1 text-lg font-medium">Project Type</label>
+                    <select
+                      value={detail.projectType}
+                      onChange={(e) => handleNewDetailChange(index, 'projectType', e.target.value)}
+                      className="w-40  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                    >
+                      <option value="">Select Type</option>
+                      <option value="Shop">Shop</option>
+                      <option value="House">House</option>
+                      <option value="Land">Land</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-lg font-medium">Floor Name</label>
+                    <select
+                      value={detail.floorName}
+                      onChange={(e) => handleNewDetailChange(index, 'floorName', e.target.value)}
+                      className="w-36  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                    >
+                      <option value="">Select Floor</option>
+                      <option value="Ground Floor">Ground Floor</option>
+                      <option value="First Floor">First Floor</option>
+                      <option value="Second Floor">Second Floor</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-lg font-medium">Shop No</label>
+                    <input
+                      type="text"
+                      value={detail.shopNo}
+                      onChange={(e) => handleNewDetailChange(index, 'shopNo', e.target.value)}
+                      placeholder="Shop No"
+                      className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-lg font-medium">Door No</label>
+                    <input
+                      type="text"
+                      value={detail.doorNo}
+                      onChange={(e) => handleNewDetailChange(index, 'doorNo', e.target.value)}
+                      placeholder="Door No"
+                      className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-lg font-medium">Area</label>
+                    <input
+                      type="text"
+                      value={detail.area}
+                      onChange={(e) => handleNewDetailChange(index, 'area', e.target.value)}
+                      placeholder="Area"
+                      className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                    />
+                  </div>
+                  <div className="relative">
+                    <label className='block mb-1 text-lg font-medium '>EB.NO</label>
+                    <div className="flex">
+                      <input
+                        type='text'
+                        value={detail.ebNo}
+                        onChange={(e) => handleNewDetailChange(index, 'ebNo', e.target.value)}
+                        placeholder='EB NO'
+                        className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                      />
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <label className='block mb-1 text-lg font-medium '>Property Tax No</label>
+                    <div className="flex">
+                      <input
+                        type='text'
+                        value={detail.propertyTaxNo}
+                        onChange={(e) => handleNewDetailChange(index, 'propertyTaxNo', e.target.value)}
+                        placeholder='Property Tax No'
+                        className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                      />
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <label className='block mb-1 text-lg font-medium '>Water Tax No</label>
+                    <div className="flex">
+                      <input
+                        type='text'
+                        value={detail.waterTaxNo}
+                        onChange={(e) => handleNewDetailChange(index, 'waterTaxNo', e.target.value)}
+                        placeholder='Water Tax No'
+                        className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-end mb-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updatedList = [...newProject.propertyDetailsList];
+                        updatedList.splice(index, 1);
+                        setNewProject(prev => ({
+                          ...prev,
+                          propertyDetailsList: updatedList,
+                        }));
+                      }}
+                      className="text-red-500 font-bold text-xl hover:text-red-700"
+                      title="Remove this row"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <button type="button" className="text-[#E4572E] font-bold px-1 ml-3 border-dashed border-b-2 border-[#BF9853] " onClick={addNewPropertyDetail}>+ Add on</button>
+              <div className="flex space-x-2 mt-6 mb-4 ml-5">
+                <button
+                  type="submit"
+                  className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
+                >
+                  Submit
+                </button>
+                <button
+                  type="button"
+                  className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
+                  onClick={closeProjectManagement}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {isProjectEditOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+          <div className="bg-white rounded-md w-[95rem] h-[40rem] text-left overflow-y-auto pl-20">
+            <div>
+              <button className="text-red-500 ml-[95%]" onClick={() => setIsProjectEditOpen(false)}>
+                <img src={cross} alt="close" className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmitEditProject}>
+              <div className="flex gap-4">
+                <div className="mb-4 pl-5">
+                  <label className="block text-lg font-medium mb-2">Project Name</label>
+                  <input
+                    type="text"
+                    value={editProject.projectName}
+                    onChange={(e) =>
+                      setEditProject((prev) => ({ ...prev, projectName: e.target.value }))
+                    }
+                    className="w-[35rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    placeholder="Enter Project Name"
+                    required
+                  />
+                </div>
+                <div className="mb-4 pl-5">
+                  <label className="block text-lg font-medium mb-2">Project ID</label>
+                  <input className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    placeholder="Enter Project ID"
+                    type="text"
+                    value={editProject.projectId}
+                    onChange={(e) =>
+                      setEditProject((prev) => ({ ...prev, projectId: e.target.value }))
+                    }></input>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <div className="mb-4 pl-5">
+                  <label className="block text-lg font-medium mb-2">Project Reference Name</label>
+                  <input className="w-[35rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    placeholder="Enter Project Reference Name"
+                    type="text"
+                    value={editProject.projectReferenceName}
+                    onChange={(e) =>
+                      setEditProject((prev) => ({ ...prev, projectReferenceName: e.target.value }))
+                    }></input>
+                </div>
+                <div className="mb-4 pl-5">
+                  <label className="block text-lg font-medium mb-2">Project Category</label>
+                  <select className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    value={editProject.projectCategory}
+                    onChange={(e) =>
+                      setEditProject((prev) => ({ ...prev, projectCategory: e.target.value }))
+                    }>
+                    <option value="">Select Project Category</option>
+                    <option value="Client Project">Client Project</option>
+                    <option value="Own Project">Own Project</option>
+                  </select>
+                </div>
+              </div>
+              <div className="mb-4 pl-5">
+                <label className="block text-lg font-medium mb-2">Project Address</label>
+                <input className="w-[62rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                  placeholder="Enter Project Address"
+                  type="text"
+                  value={editProject.projectAddress}
+                  onChange={(e) =>
+                    setEditProject((prev) => ({ ...prev, projectAddress: e.target.value }))
+                  }></input>
+              </div>
+              {editProject.ownerDetailsList.map((owner, index) => (
+                <div key={index} className="mb-2">
+                  <div className="flex mb-2 ">
+                    <div className="mt-12 mr-4">
+                      {index + 1}.
+                    </div>
+                    <div className='flex mb-2 gap-5'>
+                      <div className="flex flex-col">
+                        <label className="mb-1 text-lg font-medium">Client Name</label>
+                        <input
+                          type="text"
+                          value={owner.clientName}
+                          onChange={(e) => handleEditOwnerChange(index, 'clientName', e.target.value)}
+                          placeholder="Client Name"
+                          className="w-80 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="mb-1 text-lg font-medium">Father Name</label>
+                        <input
+                          type="text"
+                          value={owner.fatherName}
+                          onChange={(e) => handleEditOwnerChange(index, 'fatherName', e.target.value)}
+                          placeholder="Father Name"
+                          className="w-72 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="mb-1 text-lg font-medium">Mobile</label>
+                        <input
+                          type="text"
+                          value={owner.mobile}
+                          onChange={(e) => handleEditOwnerChange(index, 'mobile', e.target.value)}
+                          placeholder="Mobile"
+                          className="w-60 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="mb-1 text-lg font-medium">Age</label>
+                        <input
+                          type="text"
+                          value={owner.age}
+                          onChange={(e) => handleEditOwnerChange(index, 'age', e.target.value)}
+                          placeholder="Age"
+                          className="w-20 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className=" relative pl-4">
+                    <label className="block text-lg font-medium ">Client Address</label>
+                    <input
+                      type="text"
+                      value={owner.clientAddress}
+                      onChange={(e) => handleEditOwnerChange(index, 'clientAddress', e.target.value)}
+                      placeholder="Client Address"
+                      className="w-[62rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updatedOwners = [...editProject.ownerDetailsList];
+                        updatedOwners.splice(index, 1);
+                        setEditProject((prev) => ({
+                          ...prev,
+                          ownerDetailsList: updatedOwners,
+                        }));
+                      }}
+                      className="absolute ml-2 mt-3 text-red-500 font-bold text-xl"
+                      title="Remove this owner"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <button type="button" className="text-[#E4572E] font-bold ml-4 px-1 border-dashed border-b-2 border-[#BF9853]" onClick={addEditOwner}>+ Add Another Owner</button>
+              {editProject.propertyDetailsList.map((detail, index) => (
+                <div className="flex mb-2 gap-5" key={index}>
+                  <div className="mt-12">
+                    {index + 1}.
+                  </div>
+                  <div className="">
+                    <label className="block mb-1 text-lg font-medium">Project Type</label>
+                    <select
+                      value={detail.projectType}
+                      onChange={(e) => handleEditDetailChange(index, 'projectType', e.target.value)}
+                      className="w-40  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                    >
+                      <option value="">Select Type</option>
+                      <option value="Shop">Shop</option>
+                      <option value="House">House</option>
+                      <option value="Land">Land</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-lg font-medium">Floor Name</label>
+                    <select
+                      value={detail.floorName}
+                      onChange={(e) => handleEditDetailChange(index, 'floorName', e.target.value)}
+                      className="w-36  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                    >
+                      <option value="">Select Floor</option>
+                      <option value="Ground Floor">Ground Floor</option>
+                      <option value="First Floor">First Floor</option>
+                      <option value="Second Floor">Second Floor</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-lg font-medium">Shop No</label>
+                    <input
+                      type="text"
+                      value={detail.shopNo}
+                      onChange={(e) => handleEditDetailChange(index, 'shopNo', e.target.value)}
+                      placeholder="Shop No"
+                      className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-lg font-medium">Door No</label>
+                    <input
+                      type="text"
+                      value={detail.doorNo}
+                      onChange={(e) => handleEditDetailChange(index, 'doorNo', e.target.value)}
+                      placeholder="Door No"
+                      className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-lg font-medium">Area</label>
+                    <input
+                      type="text"
+                      value={detail.area}
+                      onChange={(e) => handleEditDetailChange(index, 'area', e.target.value)}
+                      placeholder="Area"
+                      className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                    />
+                  </div>
+                  <div className="relative">
+                    <label className='block mb-1 text-lg font-medium '>EB.NO</label>
+                    <div className="flex">
+                      <input
+                        type='text'
+                        value={detail.ebNo}
+                        onChange={(e) => handleEditDetailChange(index, 'ebNo', e.target.value)}
+                        placeholder='EB NO'
+                        className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                      />
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <label className='block mb-1 text-lg font-medium '>Property Tax No</label>
+                    <div className="flex">
+                      <input
+                        type='text'
+                        value={detail.propertyTaxNo}
+                        onChange={(e) => handleEditDetailChange(index, 'propertyTaxNo', e.target.value)}
+                        placeholder='Property Tax No'
+                        className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                      />
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <label className='block mb-1 text-lg font-medium '>Water Tax No</label>
+                    <div className="flex">
+                      <input
+                        type='text'
+                        value={detail.waterTaxNo}
+                        onChange={(e) => handleEditDetailChange(index, 'waterTaxNo', e.target.value)}
+                        placeholder='Water Tax No'
+                        className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-end mb-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updatedList = [...editProject.propertyDetailsList];
+                        updatedList.splice(index, 1);
+                        setEditProject(prev => ({
+                          ...prev,
+                          propertyDetailsList: updatedList,
+                        }));
+                      }}
+                      className="text-red-500 font-bold text-xl hover:text-red-700"
+                      title="Remove this row"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <button type="button" className="text-[#E4572E] font-bold px-1 ml-3 border-dashed border-b-2 border-[#BF9853] " onClick={addEditPropertyDetail}>+ Add on</button>
+              <div className="flex space-x-2 mt-6 mb-4 ml-5">
+                <button
+                  type="submit"
+                  className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
+                >
+                  Update
+                </button>
+                <button
+                  type="button"
+                  className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
+                  onClick={() => setIsProjectEditOpen(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

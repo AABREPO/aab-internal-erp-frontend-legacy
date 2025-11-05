@@ -19,6 +19,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
   const [selectTransfer, setSelectTransfer] = useState('');
   const [selectType, setSelectType] = useState('');
   const [selectMode, setSelectMode] = useState('');
+  const [selectEntryNo, setSelectEntryNo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -58,6 +59,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
           if (filters.selectTransfer) setSelectTransfer(filters.selectTransfer);
           if (filters.selectType) setSelectType(filters.selectType);
           if (filters.selectMode) setSelectMode(filters.selectMode);
+          if (filters.selectEntryNo) setSelectEntryNo(filters.selectEntryNo);
           if (filters.startDate) setStartDate(filters.startDate);
           if (filters.endDate) setEndDate(filters.endDate);
           if (filters.showFilters !== undefined) setShowFilters(filters.showFilters);
@@ -101,12 +103,13 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
       selectTransfer,
       selectType,
       selectMode,
+      selectEntryNo,
       startDate,
       endDate,
       showFilters
     };
     sessionStorage.setItem('advanceTableViewFilters', JSON.stringify(filters));
-  }, [selectDate, selectContractororVendorName, selectProjectName, selectTransfer, selectType, selectMode, startDate, endDate, showFilters]);
+  }, [selectDate, selectContractororVendorName, selectProjectName, selectTransfer, selectType, selectMode, selectEntryNo, startDate, endDate, showFilters]);
 
   const scrollRef = useRef(null);
   const isDragging = useRef(false);
@@ -694,6 +697,10 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     if (selectMode) {
       if (entry.payment_mode?.toLowerCase() !== selectMode.toLowerCase()) return false;
     }
+    // Entry No filter (partial match)
+    if (selectEntryNo) {
+      if (!entry.entry_no?.toString().includes(selectEntryNo.toString())) return false;
+    }
     return true;
   });
   const sortedData = React.useMemo(() => {
@@ -771,7 +778,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
   const currentData = sortedData.slice(startIndex, endIndex);
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectDate, selectContractororVendorName, selectProjectName, selectTransfer, selectType, selectMode, startDate, endDate]);
+  }, [selectDate, selectContractororVendorName, selectProjectName, selectTransfer, selectType, selectMode, selectEntryNo, startDate, endDate]);
   const goToPage = (page) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   };
@@ -1121,11 +1128,11 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
           </div>
         </div>
         <div className='rounded-md w-full max-w-[1850px] ml-4 mr-4 sm:ml-6 lg:ml-10 lg:mr-10 px-4 lg:px-10 bg-white mt-5 pt-5 h-[650px]'>
-          <div
-            className={`text-left flex ${selectDate || selectContractororVendorName || selectProjectName || selectTransfer || selectType || selectMode || startDate || endDate
-              ? 'flex-col sm:flex-row sm:justify-between'
-              : 'flex-row justify-between items-center'
-              } mb-3 gap-2`}>
+                      <div
+              className={`text-left flex ${selectDate || selectContractororVendorName || selectProjectName || selectTransfer || selectType || selectMode || selectEntryNo || startDate || endDate
+                ? 'flex-col sm:flex-row sm:justify-between'
+                : 'flex-row justify-between items-center'
+                } mb-3 gap-2`}>
             <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3">
               <button className='pl-2' onClick={() => setShowFilters(!showFilters)}>
                 <img
@@ -1134,7 +1141,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                   className="w-7 h-7 border border-[#BF9853] rounded-md ml-3"
                 />
               </button>
-              {(selectDate || selectContractororVendorName || selectProjectName || selectTransfer || selectType || selectMode || startDate || endDate) && (
+              {(selectDate || selectContractororVendorName || selectProjectName || selectTransfer || selectType || selectMode || selectEntryNo || startDate || endDate) && (
                 <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
                   {startDate && (
                     <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
@@ -1192,11 +1199,18 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                       <button onClick={() => setSelectMode('')} className="text-[#BF9853] text-2xl ml-1">×</button>
                     </span>
                   )}
+                  {selectEntryNo && (
+                    <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
+                      <span className="font-normal">Entry No: </span>
+                      <span className="font-bold">{selectEntryNo}</span>
+                      <button onClick={() => setSelectEntryNo('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                    </span>
+                  )}
                 </div>
               )}
             </div>
             <div className='space-x-4 flex justify-end mr-4'>
-              {(selectDate || selectContractororVendorName || selectProjectName || selectTransfer || selectType || selectMode || startDate || endDate) && (
+              {(selectDate || selectContractororVendorName || selectProjectName || selectTransfer || selectType || selectMode || selectEntryNo || startDate || endDate) && (
                 <button
                   onClick={() => {
                     setSelectDate('');
@@ -1205,6 +1219,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                     setSelectTransfer('');
                     setSelectType('');
                     setSelectMode('');
+                    setSelectEntryNo('');
                     setStartDate('');
                     setEndDate('');
                     sessionStorage.removeItem('advanceTableViewFilters');
@@ -1470,7 +1485,15 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                         </select>
                       </th>
                       <th className='w-[220px] pt-2 pb-2'></th>
-                      <th className='w-[80px] pt-2 pb-2'></th>
+                      <th className="pt-2 pb-2">
+                        <input
+                          type="text"
+                          value={selectEntryNo}
+                          onChange={(e) => setSelectEntryNo(e.target.value)}
+                          className="p-1 rounded-md bg-transparent w-[80px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                          placeholder="Entry No..."
+                        />
+                      </th>
                       <th className='w-[120px] pt-2 pb-2'></th>
                     </tr>
                   )}

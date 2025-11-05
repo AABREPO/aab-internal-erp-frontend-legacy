@@ -149,15 +149,12 @@ const Form = () => {
             if (response.ok) {
                 const data = await response.json();
                 setTenantShopData(data);
-
-                // For regular types, filter active tenants only
                 if (selectedRentType !== "Pending Rent") {
                     const activeTenants = data.filter(t =>
                         t.property?.some(p =>
                             p.shops?.some(shop => shop.active)
                         )
                     );
-                    // Step 2: Map all active tenant-shop combinations
                     const options = activeTenants.flatMap(t =>
                         t.property.flatMap(p =>
                             p.shops
@@ -175,8 +172,7 @@ const Form = () => {
                     );
                     setTenantOptions(tenantOptionsUnique);
                 } else {
-                    // For Pending Rent, include all tenants (active and vacated)
-                    const allTenants = data.filter(t => t.tenantName); // Filter out any invalid entries
+                    const allTenants = data.filter(t => t.tenantName);
                     const options = allTenants.flatMap(t =>
                         t.property?.flatMap(p =>
                             p.shops?.map(shop => ({
@@ -213,6 +209,16 @@ const Form = () => {
     const [shopInfoMap, setShopInfoMap] = useState({});
     useEffect(() => {
         const newShopInfoMap = {};
+        // First, build a mapping from shopNo to shopNoId from properties data
+        const shopNoToIdMap = {};
+        properties.forEach(property => {
+            property.propertyDetailsList?.forEach(detail => {
+                if (detail.shopNo && detail.id) {
+                    shopNoToIdMap[detail.shopNo] = detail.id;
+                }
+            });
+        });
+
         tenantShopData.forEach(tenant => {
             tenant.property?.forEach(property => {
                 property.shops?.forEach(shop => {
@@ -222,14 +228,16 @@ const Form = () => {
                             propertyName: property.propertyName || '',
                             advanceAmount: shop.advanceAmount || '',
                             monthlyRent: shop.monthlyRent || '',
-                            startingDate: shop.startingDate
+                            startingDate: shop.startingDate,
+                            tenantNameId: tenant.id,
+                            shopNoId: shopNoToIdMap[shop.shopNo] || null
                         };
                     }
                 });
             });
         });
         setShopInfoMap(newShopInfoMap);
-    }, [tenantShopData]);
+    }, [tenantShopData, properties]);
     const formatINR = (value) => {
         const numericValue = value.replace(/[^0-9]/g, '');
         if (!numericValue) return '';
@@ -376,7 +384,6 @@ const Form = () => {
         });
         rentHistoryData.forEach(history => {
             const shopDetails = tenantShopMapping[history.tenantWithShopNoId];
-            console.log(shopDetails);
         });
         // Filter rent history data for the specific shopNo by first finding matching tenantWithShopNoIds
         const matchingTenantShopIds = Object.keys(tenantShopMapping).filter(id =>
@@ -865,8 +872,10 @@ const Form = () => {
                 const rentalForm = {
                     formType: selectedRentType,
                     shopNo: formShopNo,
+                    shopNoId: tenantInfo?.shopNoId || null,
                     eno,
                     tenantName: formTenantName,
+                    tenantNameId: tenantInfo?.tenantNameId || null,
                     amount: amountToPay,
                     refundAmount: "",
                     paymentMode: formPaymentMode,
@@ -888,8 +897,10 @@ const Form = () => {
             const form = {
                 formType: selectedRentType,
                 shopNo: formShopNo,
+                shopNoId: tenantInfo?.shopNoId || null,
                 eno,
                 tenantName: formTenantName,
+                tenantNameId: tenantInfo?.tenantNameId || null,
                 amount: isClosure ? "" : cleanedAmount,
                 refundAmount: isClosure ? cleanedAmount : "",
                 paymentMode: paymentMode,
@@ -990,15 +1001,12 @@ const Form = () => {
             } catch (error) {
                 console.error("❌ Error updating closure date:", error);
             }
-
             try {
                 await vacateShop(selectedTenantId, formShopNo);
             } catch (err) {
                 console.error("❌ VacateShop failed", err);
             }
         }
-        
-        // Return the IDs of the submitted forms
         return submittedFormIds;
     };
 
@@ -1126,7 +1134,6 @@ const Form = () => {
             );
         }
     }, [selectedRentType, formTenantName, formShopNo, rentHistoryData, tenantShopData]);
-    // Auto-fill amount with Total Pending Rent when closure date is selected for Rent type
     useEffect(() => {
         if (selectedRentType === "Rent" && formTenantName && formShopNo && startingDate && closureDate) {
             const totalPendingRent = calculatePendingRentUpToDate(closureDate);
@@ -1134,11 +1141,9 @@ const Form = () => {
                 setAmount(totalPendingRent.toString());
             }
         } else if (selectedRentType === "Rent" && !closureDate && calculatedRent) {
-            // Reset to calculated rent when closure date is cleared
             setAmount(calculatedRent.toString());
         }
     }, [selectedRentType, formTenantName, formShopNo, startingDate, closureDate, calculatedRent]);
-
     const handleSubmitOldData = async (e) => {
         e.preventDefault();
         if (!file) {

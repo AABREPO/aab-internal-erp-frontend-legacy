@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import ReactDOM from 'react-dom';
 import CreatableSelect from 'react-select/creatable';
@@ -234,8 +234,8 @@ function InvoiceTable() {
     setItems(updatedItems);
   };
   const [amountPaid, setAmountPaid] = useState("");
-  const [clientName, setClientName] = useState("");
-  const [projectType, setProjectType] = useState("");
+  const [clientName, setClientName] = useState(null);
+  const [projectType, setProjectType] = useState(null);
   const [projectNameOptions, setProjectNameOptions] = useState([]);
   const [selectedProjectName, setSelectedProjectName] = useState(null);
   const [invoiceDate, setInvoiceDate] = useState("");
@@ -247,34 +247,43 @@ function InvoiceTable() {
   const [invoiceCache, setInvoiceCache] = useState({});
   const [projectTypeOptions, setProjectTypeOptions] = useState([]);
   const [currentInvoice, setCurrentInvoice] = useState(null);
+  const [autoFilledProject, setAutoFilledProject] = useState(false);
   const [allInvoices, setAllInvoices] = useState([]);
- const getBaseInvoiceNumber = (invoiceNumber) => {
-  if (!invoiceNumber) return "";
-  return invoiceNumber.includes(".") ? invoiceNumber.split(".")[0] : invoiceNumber;
-};
+  const [isCloneModalOpen, setIsCloneModalOpen] = useState(false);
+  const [cloneProjectName, setCloneProjectName] = useState(null);
+  // 🔹 Track the previous project ID before switching
+  const previousProjectRef = useRef(null);
+  const [previousProjectName, setPreviousProjectName] = useState(null);
+  const [isCloning, setIsCloning] = useState(false);
+  const [isInvoiceLocked, setIsInvoiceLocked] = useState(false);
+  const [isModalProjectChange, setIsModalProjectChange] = useState(false);
 
-const generateNewInvoiceNumber = (existingInvoiceNumbers = [], currentInvoiceNumber = "") => {
-  const baseInv = getBaseInvoiceNumber(currentInvoiceNumber) || "INV200-01";
+  const getBaseInvoiceNumber = (invoiceNumber) => {
+    if (!invoiceNumber) return "";
+    return invoiceNumber.includes(".") ? invoiceNumber.split(".")[0] : invoiceNumber;
+  };
 
-  // Find all suffix numbers for this base invoice
-  const suffixes = existingInvoiceNumbers
-    .filter(num => num.startsWith(baseInv))
-    .map(num => {
-      if (num === baseInv) return 0;
-      const suffixStr = num.slice(baseInv.length + 1);
-      const suffixNum = parseFloat(suffixStr);
-      return isNaN(suffixNum) ? 0 : suffixNum;
-    });
+  const generateNewInvoiceNumber = (existingInvoiceNumbers = [], currentInvoiceNumber = "") => {
+    const baseInv = getBaseInvoiceNumber(currentInvoiceNumber) || "INV200-01";
+    // Find all suffix numbers for this base invoice
+    const suffixes = existingInvoiceNumbers
+      .filter(num => num.startsWith(baseInv))
+      .map(num => {
+        if (num === baseInv) return 0;
+        const suffixStr = num.slice(baseInv.length + 1);
+        const suffixNum = parseFloat(suffixStr);
+        return isNaN(suffixNum) ? 0 : suffixNum;
+      });
 
-  const maxSuffix = Math.max(...suffixes, 0);
+    const maxSuffix = Math.max(...suffixes, 0);
 
-  if (maxSuffix === 0) {
-    return baseInv;
-  } else {
-    // Increment decimal suffix by +0.1 for next version
-    return `${baseInv}.${(maxSuffix + 0.1).toFixed(1)}`;
-  }
-};
+    if (maxSuffix === 0) {
+      return baseInv;
+    } else {
+      // Increment decimal suffix by +0.1 for next version
+      return `${baseInv}.${(maxSuffix + 0.1).toFixed(1)}`;
+    }
+  };
   useEffect(() => {
     async function fetchAllInvoices() {
       try {
@@ -287,24 +296,8 @@ const generateNewInvoiceNumber = (existingInvoiceNumbers = [], currentInvoiceNum
     }
     fetchAllInvoices();
   }, []);
-  useEffect(() => {
-    if (
-      projectNameOptions.length > 0 &&
-      projectTypeOptions.length > 0 &&
-      invoiceNumber &&
-      currentInvoice
-    ) {
-      const selectedProjectNameOption =
-        projectNameOptions.find(opt => opt.value === currentInvoice.project_id) || null;
-      const selectedProjectTypeOption =
-        projectTypeOptions.find(opt => opt.value === currentInvoice.project_type) || null;
 
-      ReactDOM.unstable_batchedUpdates(() => {
-        setSelectedProjectName(selectedProjectNameOption);
-        setProjectType(selectedProjectTypeOption);
-      });
-    }
-  }, [projectNameOptions, projectTypeOptions, invoiceNumber, currentInvoice]);
+
   useEffect(() => {
     const fetchProjectNames = async () => {
       try {
@@ -317,10 +310,9 @@ const generateNewInvoiceNumber = (existingInvoiceNumbers = [], currentInvoiceNum
         const data = await response.json();
         const formattedProjects = data.map(item => ({
           value: item.id,
-          label: item.siteName,
-          siteNo: item.siteNo
+          value: item.siteNo,
+          label: item.siteName
         }));
-
         setProjectNameOptions(formattedProjects);
       } catch (error) {
         console.error("Failed to fetch project names:", error);
@@ -328,46 +320,140 @@ const generateNewInvoiceNumber = (existingInvoiceNumbers = [], currentInvoiceNum
     };
     fetchProjectNames();
   }, []);
-
-const handleProjectNameChange = (selectedOption) => {
-  setSelectedProjectName(selectedOption);
-
+const handleProjectNameChange = async (selectedOption) => {
   if (!selectedOption) {
-    setInvoiceVersions([]);
-    setInvoiceNumber("");
+    ReactDOM.unstable_batchedUpdates(() => {
+      setSelectedProjectName(null);
+      setProjectType(null);
+      setInvoiceNumber("");
+      setInvoiceVersions([]);
+      setCurrentInvoice(null);
+      setItems([]);
+      setClientName(null);
+      setClientAddress("");
+      setInvoiceDate("");
+      setAmountPaid("");
+      setIsInvoiceLocked(false);
+    });
     return;
   }
 
-  // Filter invoices related to the selected project
-  const filteredInvoices = allInvoices.filter(invEntry =>
-    Number(invEntry.invoice.project_id) === Number(selectedOption.value)
-  );
+  setSelectedProjectName(selectedOption);
+  setProjectType(selectedOption.project_type || selectedOption.label || "");
 
-  // Extract all invoice numbers (including versions with decimal suffixes)
-  const existingInvoiceNumbers = filteredInvoices.map(invEntry => invEntry.invoice.invoice_number);
+  const projectID = String(selectedOption.value);
+  const storedClone = sessionStorage.getItem(`cloned_${projectID}`);
+  let restored = false;
 
-  let invoiceOptions = filteredInvoices.map(invEntry => ({
-    value: invEntry.invoice.invoice_number,
-    label: invEntry.invoice.invoice_number,
-  }));
+  if (storedClone) {
+    const data = JSON.parse(storedClone);
+    console.log("🟢 Restoring cloned data for project:", projectID, data);
 
-  if (invoiceOptions.length === 0) {
-    // If no invoices exist, generate a new invoice number base
-    const newInvNum = generateNewInvoiceNumber([], "INV200-01");
-    invoiceOptions = [{ value: newInvNum, label: newInvNum }];
+    const permanentOptions = allInvoices
+      .filter((inv) => inv.invoice && String(inv.invoice.project_id) === projectID)
+      .map((inv) => ({
+        value: inv.invoice.invoice_number,
+        label: inv.invoice.invoice_number,
+      }));
+
+    const cachedOptions = Object.values(invoiceCache || {})
+      .filter((data) => data.invoice && String(data.invoice.project_id) === projectID)
+      .map((data) => ({
+        value: data.invoice.invoice_number,
+        label: data.invoice.invoice_number,
+      }));
+
+    const combinedOptionsMap = new Map();
+    [...permanentOptions, ...cachedOptions].forEach((opt) => {
+      combinedOptionsMap.set(opt.value, { value: opt.value, label: opt.label });
+    });
+
+    let invoiceOptions = Array.from(combinedOptionsMap.values()).sort((a, b) =>
+      a.value.localeCompare(b.value, undefined, { numeric: true })
+    );
+
+    if (invoiceOptions.length === 0) {
+      const baseInv = `INV${projectID}-01`;
+      invoiceOptions = [{ value: baseInv, label: `${baseInv}` }];
+    }
+
     setInvoiceVersions(invoiceOptions);
-    setInvoiceNumber(newInvNum);
-    return;
+
+    const invoiceToSelect = data.invoiceNumber || invoiceOptions[invoiceOptions.length - 1]?.value || "";
+    setInvoiceNumber(invoiceToSelect);
+
+    // ✅ Restore only cloned items for this project
+    setItems(data.clonedItems || []);
+
+    setClientName(null);
+    setClientAddress("");
+    setInvoiceDate("");
+    setAmountPaid("");
+    setCurrentInvoice(null);
+    setIsInvoiceLocked(false);
+
+    restored = true;
   }
 
-  setInvoiceVersions(invoiceOptions);
+  // ✅ If not cloned, proceed normally
+  if (!restored) {
+    if (!isCloning && !isModalProjectChange) {
+      ReactDOM.unstable_batchedUpdates(() => {
+        setInvoiceNumber("");
+        setInvoiceVersions([]);
+        setCurrentInvoice(null);
+        setItems([]);
+        setClientName(null);
+        setClientAddress("");
+        setInvoiceDate("");
+        setAmountPaid("");
+        setIsInvoiceLocked(false);
+      });
+    }
 
-  // If current invoice number exists in options, keep it, else pick first available invoice number
-  if (invoiceOptions.some(opt => opt.value === invoiceNumber)) {
-    setInvoiceNumber(invoiceNumber);
-  } else {
-    setInvoiceNumber(invoiceOptions[0].value);
+    const permanentOptions = allInvoices
+      .filter((inv) => inv.invoice && String(inv.invoice.project_id) === projectID)
+      .map((inv) => ({
+        value: inv.invoice.invoice_number,
+        label: inv.invoice.invoice_number,
+      }));
+
+    const cachedOptions = Object.values(invoiceCache || {})
+      .filter((data) => data.invoice && String(data.invoice.project_id) === projectID)
+      .map((data) => ({
+        value: data.invoice.invoice_number,
+        label: data.invoice.invoice_number,
+      }));
+
+    const combinedOptionsMap = new Map();
+    [...permanentOptions, ...cachedOptions].forEach((opt) => {
+      combinedOptionsMap.set(opt.value, { value: opt.value, label: opt.label });
+    });
+
+    let invoiceOptions = Array.from(combinedOptionsMap.values()).sort((a, b) =>
+      a.value.localeCompare(b.value, undefined, { numeric: true })
+    );
+
+    if (invoiceOptions.length === 0) {
+      const baseInv = `INV${projectID}-01`;
+      invoiceOptions = [{ value: baseInv, label: baseInv }];
+    }
+
+    setInvoiceVersions(invoiceOptions);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const invoiceToSelect = invoiceOptions[invoiceOptions.length - 1]?.value || "";
+    setInvoiceNumber(invoiceToSelect);
+
+    if (!isCloning && !isModalProjectChange) {
+      await handleInvoiceVersionChange({ value: invoiceToSelect });
+      setIsInvoiceLocked(/ D\d+(\.\d+)?/.test(invoiceToSelect));
+    } else {
+      console.log("🟢 Skipped invoice data load — cloning/modal mode");
+    }
   }
+
+  if (isCloning) setIsCloning(false);
 };
   const [cachedInvoiceVersions, setCachedInvoiceVersions] = useState([]);
   useEffect(() => {
@@ -377,17 +463,14 @@ const handleProjectNameChange = (selectedOption) => {
     axios.get(`https://backendaab.in/aabuildersDash/api/invoices/versions/${encodeURIComponent(baseInvNum)}`)
       .then(res => {
         const fetchedOptions = res.data.map(invNum => ({ value: invNum, label: invNum }));
-        // Ensure base invoice is in the list
         if (!fetchedOptions.find(o => o.value === baseInvNum)) {
           fetchedOptions.unshift({ value: baseInvNum, label: baseInvNum });
         }
-        // Update cache first to keep consistent source of truth
         setCachedInvoiceVersions(prevCache => {
           const cacheValues = new Set(prevCache.map(o => o.value));
           const newCacheEntries = fetchedOptions.filter(opt => !cacheValues.has(opt.value));
           return [...prevCache, ...newCacheEntries];
         });
-        // Merge with previous state to keep cumulative list for dropdown
         setInvoiceVersions(prevOptions => {
           const existingValues = new Set(prevOptions.map(o => o.value));
           const newOptions = fetchedOptions.filter(opt => !existingValues.has(opt.value));
@@ -396,7 +479,6 @@ const handleProjectNameChange = (selectedOption) => {
       })
       .catch(err => {
         console.error('Failed to load invoice versions:', err);
-        // On error fallback to cache or last known invoice number
         setInvoiceVersions(cachedInvoiceVersions.length > 0 ? cachedInvoiceVersions : [{ value: invoiceNumber, label: invoiceNumber }]);
       });
   }, [invoiceNumber]);
@@ -412,7 +494,6 @@ const handleProjectNameChange = (selectedOption) => {
           setAmountPaid(invoice.amount_paid || '');
           const mappedItems = mapFetchedItems(items || []);
           setItems(mappedItems);
-          // NEW: Set currentInvoice for dropdown synchronization
           setCurrentInvoice(invoice);
         }
       })
@@ -439,7 +520,6 @@ const handleProjectNameChange = (selectedOption) => {
         `https://backendaab.in/aabuildersDash/api/invoices/versions/${encodeURIComponent(baseInvoiceNumber)}`
       );
       const options = res.data.map(invNum => ({ value: invNum, label: invNum }));
-      // Ensure the base invoice number is included
       if (!options.find(o => o.value === baseInvoiceNumber)) {
         options.unshift({ value: baseInvoiceNumber, label: baseInvoiceNumber });
       }
@@ -449,38 +529,114 @@ const handleProjectNameChange = (selectedOption) => {
     }
   };
   const handleInvoiceVersionChange = async (selectedOption) => {
-    if (!selectedOption) return;
-    const selectedInvoiceNum = selectedOption.value;
-    setInvoiceNumber(selectedInvoiceNum);
-    try {
-      let invoiceData = invoiceCache[selectedInvoiceNum];
-      if (!invoiceData) {
-        const res = await axios.get(
-          `https://backendaab.in/aabuildersDash/api/invoices/${encodeURIComponent(selectedInvoiceNum)}`,
-          { headers: { "Content-Type": "application/json" } }
-        );
-        invoiceData = {
-          invoice: res.data.invoice,
-          items: mapFetchedItems(res.data.items || []),
-        };
-        setInvoiceCache(prev => ({ ...prev, [selectedInvoiceNum]: invoiceData }));
-      }
-      const { invoice, items } = invoiceData;
-      const projectNameOption = projectNameOptions.find(opt => opt.value === invoice.project_id) || null;
-      const projectTypeOption = projectTypes.find(opt => opt.value === invoice.project_type) || null;
-      const clientOption = clients.find(c => c.id === invoice.client_id) || null;
-      // Batch all state updates to avoid intermediate empty UI flicker
+    if (!selectedOption) {
       ReactDOM.unstable_batchedUpdates(() => {
-        setInvoiceDate(invoice.date || "");
+        setInvoiceNumber("");
+        setInvoiceDate("");
+        setClientName(null);
+        setClientAddress("");
+        setProjectType(null);
+        setAmountPaid("");
+        setItems([]);
+        setCurrentInvoice(null);
+      });
+      return;
+    }
+    const selectedInvoiceNumber = selectedOption.value;
+    setInvoiceNumber(selectedInvoiceNumber);
+    try {
+      // ✅ Step 1: Use cache first
+      if (invoiceCache[selectedInvoiceNumber]) {
+        const cachedData = invoiceCache[selectedInvoiceNumber];
+
+        ReactDOM.unstable_batchedUpdates(() => {
+          setCurrentInvoice(cachedData.invoice);
+          setItems(cachedData.items || []);
+
+          const clientOption =
+            clients.find(
+              c =>
+                c.id === cachedData.invoice.client_id ||
+                c.value === cachedData.invoice.client_id
+            ) || null;
+
+          setClientName(clientOption);
+          setClientAddress(cachedData.invoice.client_address || "");
+          setInvoiceDate(cachedData.invoice.invoice_date || "");
+          setAmountPaid(
+            cachedData.invoice.amount_paid ??
+            amountPaid ?? 0
+          );
+          const matchedType =
+            projectTypes.find(
+              pt =>
+                String(pt.value).toLowerCase().trim() ===
+                String(cachedData.invoice.project_type).toLowerCase().trim() ||
+                String(pt.label).toLowerCase().trim() ===
+                String(cachedData.invoice.project_type).toLowerCase().trim()
+            ) ||
+            (cachedData.invoice.project_type
+              ? { value: cachedData.invoice.project_type, label: cachedData.invoice.project_type }
+              : null);
+
+          setProjectType(matchedType);
+        });
+        return;
+      }
+      const selectedInvEntry = allInvoices.find(
+        invEntry => invEntry.invoice.invoice_number === selectedInvoiceNumber
+      );
+      if (!selectedInvEntry) {
+        console.warn("Invoice not found for number:", selectedInvoiceNumber);
+        return;
+      }
+      const invoiceData = selectedInvEntry.invoice;
+      const itemList = selectedInvEntry.items || [];
+      const newCache = {
+        ...invoiceCache,
+        [selectedInvoiceNumber]: {
+          invoice: invoiceData,
+          items: itemList,
+        },
+      };
+      setInvoiceCache(newCache);
+      ReactDOM.unstable_batchedUpdates(() => {
+        setCurrentInvoice(invoiceData);
+        setItems(itemList);
+
+        const clientOption =
+          clients.find(
+            c =>
+              c.id === invoiceData.client_id ||
+              c.value === invoiceData.client_id
+          ) || null;
+
         setClientName(clientOption);
-        setClientAddress(invoice.client_address || "");
-        setSelectedProjectName(projectNameOption);
-        setProjectType(projectTypeOption);
-        setAmountPaid(invoice.amount_paid || 0);
-        setItems(items);
+        setClientAddress(invoiceData.client_address || "");
+        setInvoiceDate(invoiceData.invoice_date || "");
+        setAmountPaid(
+          invoiceData.amount_paid ??
+          currentInvoice?.amount_paid ??
+          amountPaid ??
+          0
+        );
+
+        const matchedType =
+          projectTypes.find(
+            pt =>
+              String(pt.value).toLowerCase().trim() ===
+              String(invoiceData.project_type).toLowerCase().trim() ||
+              String(pt.label).toLowerCase().trim() ===
+              String(invoiceData.project_type).toLowerCase().trim()
+          ) ||
+          (invoiceData.project_type
+            ? { value: invoiceData.project_type, label: invoiceData.project_type }
+            : null);
+
+        setProjectType(matchedType);
       });
     } catch (error) {
-      console.error("Failed to fetch invoice details on dropdown change:", error);
+      console.error("Error while handling invoice version change:", error);
     }
   };
   const calculateTotalAmount = () => {
@@ -520,36 +676,22 @@ const handleProjectNameChange = (selectedOption) => {
    }, [items, clientName, projectType, invoiceDate, amountPaid]);*/
   // Fixed code: on mount, load invoice number from localStorage if exists, else generate new once
   // Initialize or generate invoice number on mount
-useEffect(() => {
-  localStorage.removeItem("lastInvoiceNumber");  // Clear legacy localStorage
-  localStorage.removeItem("invoiceNumber");
-
-  async function initializeInvoices() {
-    try {
-      const res = await axios.get("https://backendaab.in/aabuildersDash/api/invoices/all-with-items");
-      const invoices = res.data || [];
-      setAllInvoices(invoices);
-
-      // Extract existing invoice numbers from backend data
-      const existingInvoiceNumbers = invoices.map(inv => inv.invoice.invoice_number);
-      const baseInv = "INV200-1";  // or compute your base dynamically if needed
-
-      // Generate new invoice number using your versioning logic
-      const newInvNum = generateNewInvoiceNumber(existingInvoiceNumbers, baseInv);
-      setInvoiceNumber(newInvNum);
-      localStorage.setItem("lastInvoiceNumber", newInvNum);
-      localStorage.setItem("invoiceNumber", newInvNum);
-
-      // Create dropdown options of base invoice numbers (excluding suffixes)
-      const baseInvoiceNumbers = [...new Set(existingInvoiceNumbers.map(num => num.split('.')[0]))];
-      const invoiceOptions = baseInvoiceNumbers.map(num => ({ value: num, label: num }));
-      setInvoiceVersions(invoiceOptions);
-    } catch (error) {
-      console.error("Failed to initialize invoices", error);
+  useEffect(() => {
+    async function initializeInvoices() {
+      try {
+        const res = await axios.get("https://backendaab.in/aabuildersDash/api/invoices/all-with-items");
+        const invoices = res.data || [];
+        setAllInvoices(invoices);
+        // Do not initialize invoiceNumber or invoiceVersions here
+        // Leave empty so invoice dropdown is empty until user selects a project
+        setInvoiceVersions([]);
+        setInvoiceNumber("");
+      } catch (error) {
+        console.error("Failed to initialize invoices", error);
+      }
     }
-  }
-  initializeInvoices();
-}, []);
+    initializeInvoices();
+  }, []);
 
 
   // Clear all other invoice state and localStorage on mount, but NOT invoice number
@@ -572,113 +714,126 @@ useEffect(() => {
   // to prevent repopulating stale invoice UI data
 
   // }, [items, clientName, projectType, invoiceDate, amountPaid]);
-
   useEffect(() => {
     if (
-      projectNameOptions.length > 0 &&
-      projectTypeOptions.length > 0 &&
+      currentInvoice &&
       invoiceNumber &&
-      currentInvoice
+      (invoiceNumber.includes(" D") || invoiceNumber.includes(".")) && // only for copied invoices
+      projectNameOptions.length > 0 &&
+      projectTypes.length > 0 &&
+      !autoFilledProject
     ) {
       const selectedProjectNameOption =
-        projectNameOptions.find(opt => opt.value === currentInvoice.project_id) || null;
+        projectNameOptions.find(
+          opt => String(opt.value) === String(currentInvoice.project_id)
+        ) || null;
+
       const selectedProjectTypeOption =
-        projectTypeOptions.find(opt => opt.value === currentInvoice.project_type) || null;
+        projectTypes.find(
+          pt =>
+            String(pt.value) === String(currentInvoice.project_type) ||
+            String(pt.label) === String(currentInvoice.project_type)
+        ) || { value: currentInvoice.project_type, label: currentInvoice.project_type };
+
       ReactDOM.unstable_batchedUpdates(() => {
         setSelectedProjectName(selectedProjectNameOption);
         setProjectType(selectedProjectTypeOption);
+        setAutoFilledProject(true);
       });
+
+      console.log("✅ Auto-filled copied invoice:", currentInvoice.project_type);
     }
-  }, [projectNameOptions, projectTypeOptions, invoiceNumber, currentInvoice]);
-const saveDraftToBackend = async () => {
-  if (!invoiceNumber) {
-    alert("Invoice number required before saving draft.");
-    return;
-  }
+  }, [currentInvoice, invoiceNumber, projectNameOptions, projectTypes, autoFilledProject]);
 
-  const totalAmount = calculateTotalAmount();
+  const saveDraftToBackend = async () => {
+    if (!invoiceNumber) {
+      alert("Invoice number required before saving draft.");
+      return;
+    }
 
-  const invoiceData = {
-    invoice: {
-      invoice_number: invoiceNumber,
-      status: "draft",
-      date: invoiceDate,
-      client_name: clientName ? clientName.value : "",
-      client_address: clientAddress || "",
-      client_id: clientName ? clientName.id : null,
-      project_name: selectedProjectName ? selectedProjectName.label : "",
-      project_id: selectedProjectName ? selectedProjectName.value : null,
-      project_type: projectType ? projectType.value : "",
-      amount_paid: parseFloat(amountPaid) || 0,
-      total_amount: totalAmount,
-    },
-    items: items.flatMap(item =>
-      item.subItems.map(sub => ({
-        description: item.description?.label || item.description || "",
-        sub_description: sub.description?.label || sub.description || "",
-        size_input: sub.sizeInput || "",
-        qty: sub.qty || "",
-        rate: parseFloat(sub.rate) || 0,
-        unit: sub.unit?.value || sub.unit || "",
-        amount: parseFloat(sub.amount) || 0,
-        is_main_row: false,
-        invoice_id: null,
-        item_id: sub.key || null,
-      }))
-    ),
-  };
+    const totalAmount = calculateTotalAmount();
 
-  try {
-    const res = await axios.post("https://backendaab.in/aabuildersDash/api/invoices/draft", invoiceData, {
-      headers: { "Content-Type": "application/json" },
-    });
+    const invoiceData = {
+      invoice: {
+        invoice_number: invoiceNumber,
+        status: "draft",
+        date: invoiceDate,
+        client_name: clientName ? clientName.value : "",
+        client_address: clientAddress || "",
+        client_id: clientName ? clientName.id : null,
+        project_name: selectedProjectName ? selectedProjectName.label : "",
+        project_id: selectedProjectName ? selectedProjectName.value : null,
+        project_type: projectType ? projectType.value : "",
+        amount_paid: parseFloat(amountPaid) || 0,
+        total_amount: totalAmount,
+      },
+      items: items.flatMap(item =>
+        item.subItems.map(sub => ({
+          description: item.description?.label || item.description || "",
+          sub_description: sub.description?.label || sub.description || "",
+          size_input: sub.sizeInput || "",
+          qty: sub.qty || "",
+          rate: parseFloat(sub.rate) || 0,
+          unit: sub.unit?.value || sub.unit || "",
+          amount: parseFloat(sub.amount) || 0,
+          is_main_row: false,
+          invoice_id: null,
+          item_id: sub.key || null,
+        }))
+      ),
+    };
 
-    const savedInvoice = res.data;
+    try {
+      const res = await axios.post("https://backendaab.in/aabuildersDash/api/invoices/draft", invoiceData, {
+        headers: { "Content-Type": "application/json" },
+      });
 
-    alert("Draft saved successfully!");
+      const savedInvoice = res.data;
 
-    // Update invoiceNumber state and local cache from backend-generated number
-    setInvoiceNumber(savedInvoice.invoiceNumber);
-    localStorage.setItem("lastInvoiceNumber", savedInvoice.invoiceNumber);
+      alert("Draft saved successfully!");
 
-    // Clear local form states except project dropdown
-    setItems([]);
-    setClientName(null);
-    setProjectType(null);
-    setInvoiceDate("");
-    setAmountPaid("");
-    setClientAddress("");
+      // Update invoiceNumber state and local cache from backend-generated number
+      setInvoiceNumber(savedInvoice.invoiceNumber);
+      localStorage.setItem("lastInvoiceNumber", savedInvoice.invoiceNumber);
 
-    // Refresh all invoices
-    const resAll = await axios.get("https://backendaab.in/aabuildersDash/api/invoices/all-with-items");
-    setAllInvoices(resAll.data);
+      // Clear local form states except project dropdown
+      setItems([]);
+      setClientName(null);
+      setProjectType(null);
+      setInvoiceDate("");
+      setAmountPaid("");
+      setClientAddress("");
 
-    // Refresh filtered invoice options per current project selection
-    if (selectedProjectName) {
-      const filteredInvoices = resAll.data.filter(invEntry =>
-        Number(invEntry.invoice.project_id) === Number(selectedProjectName.value)
-      );
-      const invoiceOptions = filteredInvoices.map(invEntry => ({
-        value: invEntry.invoice.invoiceNumber,
-        label: invEntry.invoice.invoice_number,
-      }));
-      setInvoiceVersions(invoiceOptions);
+      // Refresh all invoices
+      const resAll = await axios.get("https://backendaab.in/aabuildersDash/api/invoices/all-with-items");
+      setAllInvoices(resAll.data);
 
-      if (invoiceOptions.length > 0) {
-        if (!invoiceOptions.find(opt => opt.value === savedInvoice.invoiceNumber)) {
-          setInvoiceNumber(invoiceOptions[0].value);
-          handleInvoiceVersionChange({ value: invoiceOptions[0].value });
+      // Refresh filtered invoice options per current project selection
+      if (selectedProjectName) {
+        const filteredInvoices = resAll.data.filter(invEntry =>
+          Number(invEntry.invoice.project_id) === Number(selectedProjectName.value)
+        );
+        const invoiceOptions = filteredInvoices.map(invEntry => ({
+          value: invEntry.invoice.invoiceNumber,
+          label: invEntry.invoice.invoice_number,
+        }));
+        setInvoiceVersions(invoiceOptions);
+
+        if (invoiceOptions.length > 0) {
+          if (!invoiceOptions.find(opt => opt.value === savedInvoice.invoiceNumber)) {
+            setInvoiceNumber(invoiceOptions[0].value);
+            handleInvoiceVersionChange({ value: invoiceOptions[0].value });
+          } else {
+            setInvoiceNumber(savedInvoice.invoiceNumber);
+          }
         } else {
-          setInvoiceNumber(savedInvoice.invoiceNumber);
+          setInvoiceNumber('');
         }
-      } else {
-        setInvoiceNumber('');
       }
+    } catch (error) {
+      alert("Error saving draft: " + (error.response?.data?.message || error.message));
     }
-  } catch (error) {
-    alert("Error saving draft: " + (error.response?.data?.message || error.message));
-  }
-};
+  };
   const finalizeInvoiceBackend = async () => {
     if (!invoiceNumber || invoiceNumber.trim() === '') {
       alert('Invoice number is missing. Cannot finalize.');
@@ -713,95 +868,238 @@ const saveDraftToBackend = async () => {
       alert('Error finalizing invoice: ' + (error.response?.data?.message || error.message));
     }
   };
-const handleMakeCopy = () => {
-  if (!invoiceNumber) {
-    alert("No invoice selected to copy");
-    return;
-  }
+  const handleMakeCopy = () => {
+    if (!invoiceNumber) {
+      alert("No invoice selected to copy");
+      return;
+    }
 
-  // Find suffix after dot if exists, e.g. .1, .2
-  const suffixIndex = invoiceNumber.indexOf('.');
-  let baseNumStr = invoiceNumber;
-  let suffix = '';
+    let baseNumStr = invoiceNumber;
+    let newInvoiceNumber = "";
 
-  if (suffixIndex !== -1) {
-    baseNumStr = invoiceNumber.substring(0, suffixIndex);
-    suffix = invoiceNumber.substring(suffixIndex);
-  }
+    // 🔹 Case 1: Base invoice (no D or .)
+    if (!invoiceNumber.includes(" D")) {
+      const topLevelCopies = invoiceVersions
+        .filter(opt => opt.value.startsWith(baseNumStr + " D") && !opt.value.includes("."))
+        .map(opt => opt.value);
+      const nextIndex = topLevelCopies.length + 1;
+      newInvoiceNumber = `${baseNumStr} D${nextIndex}`;
+    }
+    // 🔹 Case 2: First-level copy (like "INV123 D1")
+    else if (/ D\d+$/.test(invoiceNumber)) {
+      const subCopies = invoiceVersions
+        .filter(opt => opt.value.startsWith(`${baseNumStr}.`))
+        .map(opt => opt.value);
+      const nextSubIndex = subCopies.length + 1;
+      newInvoiceNumber = `${baseNumStr}.${nextSubIndex}`;
+    }
+    // 🔹 Case 3: Sub-copy (like "INV123 D1.1")
+    else if (/ D\d+\.\d+$/.test(invoiceNumber)) {
+      const prefix = invoiceNumber.substring(0, invoiceNumber.lastIndexOf("."));
+      const subCopies = invoiceVersions
+        .filter(opt => opt.value.startsWith(prefix + "."))
+        .map(opt => opt.value);
+      const nextSubIndex = subCopies.length + 1;
+      newInvoiceNumber = `${prefix}.${nextSubIndex}`;
+    }
 
-  // Match INV prefix and base number with hyphen, e.g. "INV200-01"
-  const prefixMatch = baseNumStr.match(/^([A-Z]+)([\d\-]+)$/);
-  if (!prefixMatch) {
-    alert("Invalid invoice number format");
-    return;
-  }
+    if (!newInvoiceNumber) {
+      alert("Unable to generate invoice copy");
+      return;
+    }
 
-  const prefix = prefixMatch[1]; // "INV"
-  const numPart = prefixMatch[2]; // "200-01"
+    if (invoiceVersions.some(opt => opt.value === newInvoiceNumber)) {
+      alert("Copy invoice number already exists");
+      return;
+    }
 
-  // Split numeric part on hyphen
-  const parts = numPart.split('-');
-  if (parts.length < 2) {
-    alert("Invalid invoice number format: missing hyphen");
-    return;
-  }
+    const currentInvoiceData = { invoice: { ...currentInvoice }, items: [...items] };
+    const clonedItems = JSON.parse(JSON.stringify(currentInvoiceData.items));
 
-  const mainPart = parts.slice(0, -1).join('-'); // "200"
-  const lastNumStr = parts[parts.length - 1]; // "01"
-  const lastNum = parseInt(lastNumStr, 10);
-  if (isNaN(lastNum)) {
-    alert("Invalid invoice number format: last part is not a number");
-    return;
-  }
+    const clonedInvoice = {
+      ...currentInvoiceData.invoice,
+      invoice_number: newInvoiceNumber,
+    };
 
-  // Increment decimal suffix if present, otherwise start at .1
-  let newSuffix;
-  if (suffix) {
-    const currentSuffixNum = parseFloat(suffix.substring(1)) || 0;
-    newSuffix = '.' + (currentSuffixNum + 1).toFixed(1);
-  } else {
-    newSuffix = '.1';
-  }
+    const normalizedInvoice = {
+      ...clonedInvoice,
+      invoiceNumber: clonedInvoice.invoice_number || clonedInvoice.invoiceNumber || "",
+      client_name: clonedInvoice.client_name || (clientName ? clientName.value : ""),
+      client_id: clonedInvoice.client_id || (clientName ? clientName.id : null),
+      client_address: clonedInvoice.client_address || clientAddress || "",
+      project_type:
+        currentInvoice?.project_type ||
+        (projectType ? projectType.value : "") ||
+        clonedInvoice.project_type ||
+        "",
+      project_id:
+        currentInvoice?.project_id ||
+        (selectedProjectName ? selectedProjectName.value : null) ||
+        clonedInvoice.project_id ||
+        null,
 
-  // Rebuild invoice number with prefix, main part, incremented number and new decimal suffix
-  const newBaseNumStr = `${prefix}${mainPart}-${lastNumStr}`;
-  const newInvoiceNumber = newBaseNumStr + newSuffix;
+      amount_paid:
+        clonedInvoice.amount_paid ??
+        currentInvoice?.amount_paid ??
+        amountPaid ??
+        0,
+      invoice_date:
+        clonedInvoice.invoice_date ||
+        currentInvoice?.invoice_date ||
+        invoiceDate ||
+        "",
+    };
+    ReactDOM.unstable_batchedUpdates(() => {
+      setInvoiceVersions(prev => [
+        ...prev,
+        { value: normalizedInvoice.invoiceNumber, label: normalizedInvoice.invoiceNumber },
+      ]);
 
-  // Check if new invoice number exists already
-  if (invoiceVersions.some(opt => opt.value === newInvoiceNumber)) {
-    alert("Copy invoice number already exists");
-    return;
-  }
+      setInvoiceCache(prev => ({
+        ...prev,
+        [normalizedInvoice.invoiceNumber]: {
+          invoice: normalizedInvoice,
+          items: clonedItems,
+        },
+      }));
+      setAllInvoices(prev => [
+        ...prev,
+        {
+          invoice: normalizedInvoice,
+          items: clonedItems,
+        },
+      ]);
+      // Refresh UI states
+      setInvoiceNumber(normalizedInvoice.invoiceNumber);
+      setCurrentInvoice(normalizedInvoice);
+      setItems(clonedItems);
+      setClientAddress(normalizedInvoice.client_address || "");
+      setAmountPaid(normalizedInvoice.amount_paid || 0);
 
-  // Retrieve current invoice data or fallback
-  const currentInvoiceData = invoiceCache[invoiceNumber] || {
-    invoice: currentInvoice,
-    items: items,
+      const clientOption = Array.isArray(clients)
+        ? clients.find(
+          c =>
+            c.id === normalizedInvoice.client_id ||
+            c.value === normalizedInvoice.client_id
+        )
+        : null;
+      setClientName(clientOption || null);
+    });
+    // Reset autofill flag to re-trigger project name/type sync if needed
+    setAutoFilledProject(false);
+
+    alert(`Invoice copied to ${newInvoiceNumber}`);
   };
+ const fetchItemsForProject = (projectId) => {
+  const projectInvoices = allInvoices.filter(
+    (invEntry) => String(invEntry.invoice.project_id) === String(projectId)
+  );
 
-  // Deep clone to avoid mutation and ensure React state updates correctly
-  const clonedItems = JSON.parse(JSON.stringify(currentInvoiceData.items));
-  const clonedInvoice = { ...currentInvoiceData.invoice, invoice_number: newInvoiceNumber };
+  const uniqueItemsMap = new Map();
 
-  // Batch all state updates together to avoid flickers or partial updates
-  ReactDOM.unstable_batchedUpdates(() => {
-    setInvoiceVersions(prev => [...prev, { value: newInvoiceNumber, label: newInvoiceNumber }]);
-    setInvoiceCache(prev => ({ ...prev, [newInvoiceNumber]: { invoice: clonedInvoice, items: clonedItems } }));
-    setInvoiceNumber(newInvoiceNumber);
-    setCurrentInvoice(clonedInvoice);
-    setItems(clonedItems);
-    setClientName(clonedInvoice.client_name ? findOption(clients, clonedInvoice.client_name) : null);
-    setClientAddress(clonedInvoice.client_address || "");
-    setProjectType(projectTypes.find(pt => pt.value === clonedInvoice.project_type) || null);
-    setSelectedProjectName(projectNameOptions.find(p => p.value === clonedInvoice.project_id) || null);
-    setAmountPaid(clonedInvoice.amount_paid || "");
+  // FIX: Aggregate and deduplicate items from all versions of the project's invoices.
+  // We use description, quantity, and unitPrice as a composite key for uniqueness.
+  projectInvoices.flatMap((invEntry) => invEntry.items || []).forEach(item => {
+    // Create a unique key based on descriptive fields
+    // Assuming 'description', 'quantity', and 'unitPrice' define a unique item
+    const key = `${item.description}_${item.quantity}_${item.unitPrice}`;
+    
+    // Store the item, clearing database-specific IDs/links to prepare it for a new save
+    if (!uniqueItemsMap.has(key)) {
+        uniqueItemsMap.set(key, { 
+            ...item, 
+            itemId: null, 
+            invoice: null, 
+            version: null 
+        });
+    }
   });
 
-  alert(`Invoice copied to ${newInvoiceNumber}`);
+  // Return the unique items as a list
+  return Array.from(uniqueItemsMap.values());
 };
 
+const handleCloneClick = () => {
+  setIsCloneModalOpen(true);
+  setCloneProjectName(null);
+  setIsModalProjectChange(true); // ✅ mark that changes now come from modal
+};
 
+const handleConfirmClone = async () => {
+  if (!cloneProjectName) {
+    // Note: It's best practice to replace alert() with a custom modal UI in production React apps.
+    alert("Please select a project to clone to.");
+    return;
+  }
 
+  // get source ID robustly
+  const sourceId = selectedProjectName?.value ?? selectedProjectName?.siteNo ?? null;
+  const targetId = cloneProjectName?.value ?? cloneProjectName?.siteNo ?? null;
+
+  if (!sourceId) {
+    alert("No source project selected to clone from.");
+    return;
+  }
+  if (!targetId) {
+    alert("No target project selected to clone to.");
+    return;
+  }
+
+  const confirmMessage = `Do you want to clone items from project ${selectedProjectName?.label || sourceId} to project ${cloneProjectName.label}?`;
+  if (!window.confirm(confirmMessage)) return;
+
+  // Ensure allInvoices loaded; if not, try re-fetching once.
+  if (!Array.isArray(allInvoices) || allInvoices.length === 0) {
+    console.log("handleConfirmClone: allInvoices empty, attempting to refresh from backend...");
+    try {
+      const res = await axios.get("https://backendaab.in/aabuildersDash/api/invoices/all-with-items");
+      setAllInvoices(res.data || []);
+    } catch (err) {
+      console.error("Failed to refresh invoices before clone:", err);
+    }
+  }
+  
+  // Fetch cloned items (now correctly deduplicated by fetchItemsForProject)
+  const clonedItems = fetchItemsForProject(sourceId);
+  if (!clonedItems || clonedItems.length === 0) {
+    console.warn("No items found to clone. Diagnostics:");
+    console.warn("selectedProjectName:", selectedProjectName);
+    console.warn("allInvoices length:", Array.isArray(allInvoices) ? allInvoices.length : allInvoices);
+    alert("No items found in source project to clone. Make sure the source project has invoices/items and that project IDs match invoice.project_id.");
+    return;
+  }
+  
+  // Save cloned items to session storage for restoration in the target project
+  sessionStorage.setItem(
+    `cloned_${String(targetId)}`,
+    JSON.stringify({
+      sourceProjectId: sourceId,
+      targetProjectId: targetId,
+      clonedItems, // This is the deduplicated list
+      timestamp: new Date().toISOString()
+    })
+  );
+
+  setIsCloning(true);
+  setIsModalProjectChange(true);
+  setIsCloneModalOpen(false);
+  
+  // Switch to target project. This call triggers handleProjectNameChange, 
+  // which will RESTORE the items from sessionStorage.
+  await handleProjectNameChange(cloneProjectName);
+  
+  // ❌ REMOVED: The redundant setItems(clonedItems) call. 
+  // It is now handled inside handleProjectNameChange's restoration logic.
+
+  setClientName(null);
+  setClientAddress("");
+  setInvoiceDate("");
+  setAmountPaid("");
+  setCurrentInvoice(null);
+  setIsInvoiceLocked(false);
+  setIsCloning(false);
+  setTimeout(() => setIsModalProjectChange(false), 100);
+};
   const handleAddItem = () => {
     setItems([
       ...items,
@@ -1083,7 +1381,6 @@ const handleMakeCopy = () => {
     setItems(updatedItems);
   };
   let displayIndex = 1;
-
   return (
     <body className='bg-[#FAF6ED]'>
       <div className="mx-auto p-4 " >
@@ -1391,183 +1688,247 @@ const handleMakeCopy = () => {
               </div>
             </div>
           </div>
-          <div className=" ml-8 pr-4  bg-white rounded-xl" style={{ width: "350px" }}>
-            <div className=" block p-4 ml-10">
-              <div className=' block'>
-                <div className="">
-                  <div className="mb-4  block">
-                    <label className="flex mb-1 -ml-10 font-semibold">Date</label>
-                    <input
-                      type="date"
-                      value={invoiceDate}
-                      onChange={(e) => setInvoiceDate(e.target.value)}
-                      className=" w-64 p-2 h-10  border-[#FAF6ED] -ml-[5.5rem] rounded-lg" style={{ border: '2px solid #FAF6ED' }}
-                    />
-                  </div>
-                  <div className="block">
-                    <div className="mb-4">
-                      <label className="block mb-2 mt-3 -ml-[15rem] font-semibold">Invoice</label>
-                      <Select
-                        options={invoiceVersions}
-                        value={invoiceVersions.find(opt => opt.value === invoiceNumber) || null}
-                        onChange={handleInvoiceVersionChange}
-                        placeholder="Select Invoice Version"
-                        className="flex h-10 -ml-[2.6rem] w-64 text-left"
-                        styles={{
-                          control: (base) => ({
-                            ...base,
-                            border: '2px solid #FAF6ED',
-                            backgroundColor: 'transparent',
-                            boxShadow: 'none',
-                            borderRadius: '8px',
-                            width: '320px',
-                            textAlign: 'left',
-                          }),
-                          indicatorSeparator: () => ({ display: 'none' }),
-                          placeholder: (base) => ({ ...base, color: '#888' }),
-                          singleValue: (base) => ({ ...base, color: '#000' }),
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <label className="block mb-2 mt-0 -ml-[15.5rem] font-semibold">Client Name</label>
+          <div className="ml-8 pr-4 bg-white rounded-xl" style={{ width: "350px" }}>
+            <div className="block p-4 ml-10">
+              <div className="block">
+                <div className="mb-4 block">
+                  <label className="flex mb-1 -ml-10 font-semibold">
+                    Date <span className="text-red-500 ml-1">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={invoiceDate}
+                    onChange={(e) => setInvoiceDate(e.target.value)}
+                    className="w-64 p-2 h-10 border-[#FAF6ED] -ml-[5.5rem] rounded-lg"
+                    style={{ border: "2px solid #FAF6ED" }}
+                    disabled={isInvoiceLocked}
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block mb-2 mt-3 -ml-[15rem] font-semibold">
+                    Invoice
+                  </label>
+                  <Select
+                    options={invoiceVersions}
+                    value={invoiceVersions.find((opt) => opt.value === invoiceNumber) || null}
+                    onChange={handleInvoiceVersionChange}
+                    placeholder="Select Invoice Version"
+                    className="flex h-10 -ml-[2.6rem] w-64 text-left"
+                    styles={{
+                      control: (base) => ({
+                        ...base,
+                        border: "2px solid #FAF6ED",
+                        backgroundColor: "transparent",
+                        boxShadow: "none",
+                        borderRadius: "8px",
+                        width: "320px",
+                        textAlign: "left",
+                      }),
+                      indicatorSeparator: () => ({ display: "none" }),
+                      placeholder: (base) => ({ ...base, color: "#888" }),
+                      singleValue: (base) => ({ ...base, color: "#000" }),
+                    }}
+                    isDisabled={isInvoiceLocked}
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block mb-2 mt-0 -ml-[15.5rem] font-semibold">
+                    Client Name <span className="text-red-500 ml-1">*</span>
+                  </label>
                   <Select
                     options={clients}
                     value={clientName}
-                    onChange={setClientName}
-                    getOptionLabel={option => option.value}
-                    getOptionValue={option => option.id}
-                    className=" w-64 h-10 -ml-[2.6rem] text-left"
+                    onChange={(value) => {
+                      if (!invoiceDate) {
+                        alert("⚠️ Please select a Date");
+                        return;
+                      }
+                      setClientName(value);
+                    }}
+                    getOptionLabel={(option) => option.value}
+                    getOptionValue={(option) => option.id}
+                    className="w-64 h-10 -ml-[2.6rem] text-left"
                     placeholder="Select Client"
                     styles={{
                       control: (base) => ({
                         ...base,
-                        border: '2px solid #FAF6ED ',
-                        backgroundColor: 'transparent',
-                        boxShadow: 'none',
-                        borderRadius: '8px',
-                        textAlign: 'left',
+                        border: "2px solid #FAF6ED",
+                        backgroundColor: "transparent",
+                        boxShadow: "none",
+                        borderRadius: "8px",
+                        textAlign: "left",
                       }),
-                      indicatorSeparator: () => ({
-                        display: 'none',
-                      }),
-                      placeholder: (base) => ({
-                        ...base,
-                        color: '#888',
-                      }),
-                      singleValue: (base) => ({
-                        ...base,
-                        color: '#000',
-                      }),
+                      indicatorSeparator: () => ({ display: "none" }),
+                      placeholder: (base) => ({ ...base, color: "#888" }),
+                      singleValue: (base) => ({ ...base, color: "#000" }),
                     }}
+                    isDisabled={isInvoiceLocked}
                   />
                 </div>
-              </div>
-              <div className='block'>
                 <div className="mb-4">
-                  <label className="block mb-2 mt-3 -ml-[15rem] font-semibold">Project Type</label>
+                  <label className="block mb-2 mt-3 -ml-[15rem] font-semibold">
+                    Project Type <span className="text-red-500 ml-1">*</span>
+                  </label>
                   <Select
                     options={projectTypes}
-                    value={projectType}  // an object like { value: 'Commercial', label: 'Commercial' }
-                    onChange={setProjectType}
+                    value={projectType}
+                    onChange={(value) => {
+                      if (!clientName) {
+                        alert("⚠️ Please select a Client Name");
+                        return;
+                      }
+                      setProjectType(value);
+                    }}
                     placeholder="Select Project Type"
                     className="flex h-10 -ml-[2.6rem] w-64 text-left"
                     styles={{
                       control: (base) => ({
                         ...base,
-                        border: '2px solid #FAF6ED',
-                        backgroundColor: 'transparent',
-                        boxShadow: 'none',
-                        borderRadius: '8px',
-                        width: '320px',
-                        textAlign: 'left',
+                        border: "2px solid #FAF6ED",
+                        backgroundColor: "transparent",
+                        boxShadow: "none",
+                        borderRadius: "8px",
+                        width: "320px",
+                        textAlign: "left",
                       }),
-                      indicatorSeparator: () => ({ display: 'none' }),
-                      placeholder: (base) => ({ ...base, color: '#888' }),
-                      singleValue: (base) => ({ ...base, color: '#000' }),
+                      indicatorSeparator: () => ({ display: "none" }),
+                      placeholder: (base) => ({ ...base, color: "#888" }),
+                      singleValue: (base) => ({ ...base, color: "#000" }),
                     }}
+                    isDisabled={isInvoiceLocked}
                   />
                 </div>
-                <div className='block'>
-                  <div className="mb-4" style={{ display: 'flex', flexDirection: 'column' }}>
-                    <label className="block mb-2 mt-1 -ml-[15rem] font-semibold">Project Name</label>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        marginLeft: '-2.6rem',
+                <div className="mb-4" style={{ display: "flex", flexDirection: "column" }}>
+                  <label className="block mb-2 mt-1 -ml-[15rem] font-semibold">
+                    Project Name
+                  </label>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      marginLeft: "-2.6rem",
+                    }}
+                  >
+                    <Select
+                      options={projectNameOptions}
+                      value={selectedProjectName}
+                      onChange={handleProjectNameChange}
+                      className="flex h-10 text-left"
+                      placeholder="Select Project Name"
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          border: "2px solid #FAF6ED",
+                          backgroundColor: "transparent",
+                          boxShadow: "none",
+                          borderRadius: "8px",
+                          width: "250px",
+                          minWidth: "150px",
+                          textAlign: "left",
+                        }),
+                        indicatorSeparator: () => ({ display: "flex" }),
+                        placeholder: (base) => ({ ...base, color: "#888" }),
+                        singleValue: (base) => ({ ...base, color: "#000" }),
                       }}
-                    >
-                      <Select
-                        options={projectNameOptions}
-                        value={selectedProjectName}
-                        onChange={handleProjectNameChange}
-                        className="flex h-10 text-left"
-                        placeholder="Select Project Name"
-                        styles={{
-                          control: (base) => ({
-                            ...base,
-                            border: '2px solid #FAF6ED',
-                            backgroundColor: 'transparent',
-                            boxShadow: 'none',
-                            borderRadius: '8px',
-                            width: '250px',
-                            minWidth: '150px',
-                            textAlign: 'left',
-                          }),
-                          indicatorSeparator: () => ({ display: 'flex' }),
-                          placeholder: (base) => ({ ...base, color: '#888' }),
-                          singleValue: (base) => ({ ...base, color: '#000' }),
+                    />
+                    {selectedProjectName && (
+                      <div
+                        style={{
+                          padding: "4px 8px",
+                          border: "1px solid #ccc",
+                          borderRadius: "4px",
+                          backgroundColor: "#f0f0f0",
+                          fontWeight: "bold",
+                          flexShrink: 0,
                         }}
-                      />
-                      {selectedProjectName && (
-                        <div
-                          style={{
-                            padding: '4px 8px',
-                            border: '1px solid #ccc',
-                            borderRadius: '4px',
-                            backgroundColor: '#f0f0f0',
-                            fontWeight: 'bold',
-                            flexShrink: 0,
-                          }}
-                        >
-                          ID: {selectedProjectName.siteNo}
-                        </div>
-                      )}
-                    </div>
+                      >
+                        ID: {selectedProjectName.value}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="mb-4">
+                  <label className="block mb-1 -ml-[13.8rem] font-semibold">
+                    Client Address <span className="text-red-500 ml-1">*</span>
+                  </label>
+                  <input
+                    value={clientAddress}
+                    onChange={(e) => setClientAddress(e.target.value)}
+                    onBlur={() => {
+                      if (!clientAddress) {
+                        alert("⚠️ Please enter the Client Address.");
+                      }
+                    }}
+                    className="w-64 h-10 p-2 -ml-[5.5rem] border-2 border-[#FAF6ED] rounded-lg"
+                    placeholder="Enter Client Address"
+                    disabled={isInvoiceLocked}
+                  />
+                </div>
+                <h5 className="-ml-[14.5rem] font-semibold">Client Phone:</h5>
+                <div className="w-64 rounded-md p-2 block border-2 border-[#FAF6ED] -ml-[2rem] bg-gray-100">
+                  <span className="-ml-32">{clientPhone}</span>
+                </div>
+              </div>
+              <div className="flex flex-col space-y-3 mt-8 items-center border-t pt-4">
+                <button
+                  className="w-64 bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-green-800 transition-all duration-200 flex items-center justify-center gap-2"
+                >
+                  Download / Print
+                </button>
+                <button
+                  onClick={handleCloneClick}
+                  className="w-64 bg-blue-500 text-white text-sm font-medium py-2 px-4 rounded-lg shadow-md hover:bg-blue-600 transition-all duration-200 flex items-center justify-center gap-2"
+                >
+                  <i className="fa-solid fa-clone text-xs"></i>
+                  Clone
+                </button>
+                <button
+                  onClick={handleMakeCopy}
+                  className="w-64 bg-[#BF9853] text-white py-2 px-4 rounded-lg shadow-md hover:bg-[#a67f40] transition-all duration-200 flex items-center justify-center gap-2"
+                >
+                  Make A Copy
+                </button>
+                <button
+                  onClick={saveDraftToBackend}
+                  className="w-64 bg-[#E4572E] text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-[#c2461f] transition-all duration-200 flex items-center justify-center gap-2"
+                >
+                  Save Online
+                </button>
+              </div>
+            </div>
+            {isCloneModalOpen && (
+              <div className="fixed inset-0 bg-black bg-opacity-30 flex justify-center items-center z-50">
+                <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+                  <h2 className="text-lg font-bold mb-4">Select Project to Clone Items</h2>
+                  <Select
+                    options={projectNameOptions}
+                    value={cloneProjectName}
+                    onChange={setCloneProjectName}
+                    placeholder="Select Project"
+                    className="mb-4"
+                    isSearchable={true}
+                  />
+                  <div className="flex justify-end space-x-3">
+                    <button
+                      onClick={() => setIsCloneModalOpen(false)}
+                      className="px-4 py-2 border rounded hover:bg-gray-100"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleConfirmClone}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                      disabled={!cloneProjectName}
+                    >
+                      Confirm
+                    </button>
                   </div>
                 </div>
               </div>
-              <div className="mb-4">
-                <label className="block mb-1 -ml-[13.8rem] font-semibold">Client Address:</label>
-                <input
-                  value={clientAddress}
-                  onChange={(e) => setClientAddress(e.target.value)}
-                  className="w-64 h-10 p-2 -ml-[5.5rem] border-2 border-[#FAF6ED] rounded-lg"
-                  rows={3}
-                  placeholder="Enter Client Address"
-                >
-                </input>
-              </div>
-              <h5 className='-ml-[14.5rem] font-semibold'>Client Phone:</h5>
-              <div className="w-64 rounded-md p-2 block  border-2 border-[#FAF6ED] -ml-[2rem] bg-gray-100" style={{}}>
-                <span className='-ml-32 '>{clientPhone}</span>
-              </div>
-            </div>
-            <div className='-ml-10 flex flex-col space-y-5'>
-              <button className="bg-green-700 text-white font-bold py-2 px-4 rounded ml-16 mt-5 block">
-                Download / Print
-              </button>
-              <button onClick={handleMakeCopy} className="bg-[#BF9853] text-white py-2 px-4 rounded ml-16 block">
-                Make A Copy
-              </button>
-              <button onClick={saveDraftToBackend} className="bg-[#E4572E] text-white font-bold py-2 px-4 rounded ml-16 block">
-                Save Online
-              </button>
-            </div>
+            )}
           </div>
+
         </div>
       </div>
     </body>

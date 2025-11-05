@@ -47,8 +47,6 @@ const Form = ({ username, userRoles = [] }) => {
     const [ebNumberOptions, setEbNumberOptions] = useState([]);
     const [utilityType, setUtilityType] = useState('');
     const [projectData, setProjectData] = useState(null);
-    console.log('projectData:', projectData);
-    console.log('ebNumberOptions:', ebNumberOptions);
     useEffect(() => {
         const fetchUserRoles = async () => {
             try {
@@ -246,7 +244,107 @@ const Form = ({ username, userRoles = [] }) => {
     }, []);
     useEffect(() => { setCombinedOptions([...vendorOptions, ...contractorOptions]); }, [vendorOptions, contractorOptions]);
     
-    // Effect to fetch project data when site is selected
+    useEffect(() => {
+        const prefillDataStr = localStorage.getItem('expenseEntryPrefill');
+        if (prefillDataStr && siteOptions.length > 0 && accountTypeOptions.length > 0) {
+            try {
+                const prefillData = JSON.parse(prefillDataStr);
+                
+                const utilityBillsOption = accountTypeOptions.find(opt => opt.value === 'Utility Bills');
+                if (utilityBillsOption) {
+                    setSelectedAccountType('Utility Bills');
+                }
+                
+                setUtilityType('Electricity');
+                
+                const siteOption = siteOptions.find(opt => opt.label === prefillData.siteName);
+                if (siteOption) {
+                    setSelectedSite(siteOption);
+                }
+                
+                const fetchPreviousEntry = async () => {
+                    try {
+                        const response = await axios.get('https://backendaab.in/aabuilderDash/expenses_form/utility/electricity');
+                        const electricityEntries = Array.isArray(response.data) ? response.data : [];
+                        
+                        const previousEntry = electricityEntries
+                            .filter(entry => entry.utilityTypeNumber === prefillData.ebNo)
+                            .sort((a, b) => new Date(b.date || b.timestamp) - new Date(a.date || a.timestamp))[0];
+                        
+                        if (previousEntry) {
+                            if (previousEntry.category && categoryOptions.length > 0) {
+                                const categoryOption = categoryOptions.find(opt => opt.value === previousEntry.category);
+                                if (categoryOption) {
+                                    setSelectedCategory(categoryOption);
+                                }
+                            }
+                            
+                            if (previousEntry.quantity) {
+                                setQuantity(previousEntry.quantity);
+                            }
+                            
+                            if (previousEntry.comments) {
+                                setComments(previousEntry.comments);
+                            }
+                            
+                            if (previousEntry.paymentMode) {
+                                setPaymentMode(previousEntry.paymentMode);
+                            }
+                            
+                            if (previousEntry.utilityValidityDays) {
+                                setThirdInput(previousEntry.utilityValidityDays);
+                            }
+                            
+                            setTimeout(() => {
+                                if (siteOption && projectData) {
+                                }
+                            }, 500);
+                        }
+                        const setTNEBContractor = () => {
+                            if (contractorOptions.length > 0) {
+                                const tnebOption = contractorOptions.find(opt => 
+                                    opt.label === 'TNEB' || opt.value === 'TNEB'
+                                );
+                                if (tnebOption) {
+                                    setSelectedOption(tnebOption);
+                                    setSelectedType('Contractor');
+                                } else {
+                                    const tnebInCombined = combinedOptions.find(opt => 
+                                        (opt.label === 'TNEB' || opt.value === 'TNEB') && opt.type === 'Contractor'
+                                    );
+                                    if (tnebInCombined) {
+                                        setSelectedOption(tnebInCombined);
+                                        setSelectedType('Contractor');
+                                    } else {
+                                        console.warn('TNEB contractor not found in options, creating temporary option without ID');
+                                        const tnebContractor = {
+                                            value: 'TNEB',
+                                            label: 'TNEB',
+                                            type: 'Contractor',
+                                            id: null 
+                                        };
+                                        setSelectedOption(tnebContractor);
+                                        setSelectedType('Contractor');
+                                    }
+                                }
+                            } else {
+                                setTimeout(setTNEBContractor, 500);
+                            }
+                        };
+                        setTNEBContractor();
+                    } catch (error) {
+                        console.error('Error fetching previous entry:', error);
+                    }
+                };
+                setTimeout(() => {
+                    fetchPreviousEntry();
+                }, 500);
+            } catch (error) {
+                console.error('Error parsing prefill data:', error);
+                localStorage.removeItem('expenseEntryPrefill');
+            }
+        }
+    }, [siteOptions, accountTypeOptions, categoryOptions, contractorOptions, combinedOptions]);
     useEffect(() => {
         if (selectedSite && selectedSite.id) {
             fetchProjectData(selectedSite.id);
@@ -255,18 +353,37 @@ const Form = ({ username, userRoles = [] }) => {
             setEbNumberOptions([]);
         }
     }, [selectedSite]);
-
-    // Effect to update EB number options when utility type or project data changes
     useEffect(() => {
-        console.log('useEffect triggered - utilityType:', utilityType, 'projectData:', projectData);
         if (utilityType && projectData) {
             updateEbNumberOptions(utilityType, projectData);
         } else {
             setEbNumberOptions([]);
         }
     }, [utilityType, projectData]);
-    
-    // Function to fetch project data by ID
+    useEffect(() => {
+        const prefillDataStr = localStorage.getItem('expenseEntryPrefill');
+        if (prefillDataStr && ebNumberOptions.length > 0) {
+            try {
+                const prefillData = JSON.parse(prefillDataStr);
+                const ebOption = ebNumberOptions.find(opt => opt.value === prefillData.ebNo);
+                if (ebOption) {
+                    setSelectedEbNumber(ebOption);
+                    setTimeout(() => {
+                        localStorage.removeItem('expenseEntryPrefill');
+                    }, 1000);
+                }
+            } catch (error) {
+                console.error('Error setting EB number:', error);
+                localStorage.removeItem('expenseEntryPrefill');
+            }
+        }
+    }, [ebNumberOptions]);
+    const getCurrentWeekNumber = () => {
+        const now = new Date();
+        const startOfYear = new Date(now.getFullYear(), 0, 1);
+        const days = Math.floor((now - startOfYear) / (24 * 60 * 60 * 1000));
+        return Math.ceil((days + startOfYear.getDay() + 1) / 7);
+    };
     const fetchProjectData = async (projectId) => {
         try {
             const response = await fetch(`https://backendaab.in/aabuilderDash/api/projects/get/${projectId}`);
@@ -283,19 +400,15 @@ const Form = ({ username, userRoles = [] }) => {
             return null;
         }
     };
-
-    // Function to update EB number options based on utility type and project data
     const updateEbNumberOptions = (utilityType, projectData) => {
         if (!projectData || !projectData.propertyDetails) {
             setEbNumberOptions([]);
             return;
         }
-
         const options = [];
         projectData.propertyDetails.forEach((property, index) => {
             let optionValue = '';
             let optionLabel = '';
-
             switch (utilityType) {
                 case 'Electricity':
                     if (property.ebNo) {
@@ -318,7 +431,6 @@ const Form = ({ username, userRoles = [] }) => {
                 default:
                     return;
             }
-
             if (optionValue && optionLabel) {
                 options.push({
                     value: optionValue,
@@ -327,8 +439,6 @@ const Form = ({ username, userRoles = [] }) => {
                 });
             }
         });
-
-        console.log('Generated EB Number Options:', options);
         setEbNumberOptions(options);
     };
     const handleChange = (selectedOption) => {
@@ -418,7 +528,12 @@ const Form = ({ username, userRoles = [] }) => {
         }
         setIsSubmitting(true);
         try {
-            if (selectedAccountType !== 'Daily Wage' && !selectedFile) {
+            if (selectedAccountType === 'Utility Bills' && !selectedFile) {
+                alert('PDF file is required for Utility Bills.');
+                setIsSubmitting(false);
+                return;
+            }
+            if (selectedAccountType !== 'Daily Wage' && selectedAccountType !== 'Utility Bills' && !selectedFile) {
                 alert('PDF file is required for this type.');
                 setIsSubmitting(false);
                 return;
@@ -446,7 +561,6 @@ const Form = ({ username, userRoles = [] }) => {
                     }
                     const uploadResult = await uploadResponse.json();
                     pdfUrl = uploadResult.url;
-                    console.log('File URL:', pdfUrl);
                 } catch (error) {
                     console.error('Error during file upload:', error);
                     alert('Error during file upload. Please try again.');
@@ -454,13 +568,20 @@ const Form = ({ username, userRoles = [] }) => {
                     return;
                 }
             }
+            const projectId = selectedSite ? selectedSite.id : null;
+            const vendorId = selectedType === 'Vendor' && selectedOption ? (selectedOption.id || null) : null;
+            const contractorId = selectedType === 'Contractor' && selectedOption ? (selectedOption.id || null) : null;
             const bodyData = {
                 accountType: selectedAccountType,
                 eno: eno,
                 date: date,
+                paymentMode: paymentMode,
                 siteName: selectedSite ? selectedSite.label : '',
+                projectId: projectId,
                 vendor: vendor,
+                vendorId: vendorId,
                 contractor: contractor,
+                contractorId: contractorId,
                 quantity: quantity,
                 amount: parseInt(amount),
                 category: selectedCategory ? selectedCategory.label : '',
@@ -479,9 +600,106 @@ const Form = ({ username, userRoles = [] }) => {
                 },
                 body: JSON.stringify(bodyData),
             });
-            if (!formResponse.ok) {
-                const errorText = await formResponse.text();
-                throw new Error(`Form submission failed: ${errorText}`);
+            let expensesId = null;
+            let savedExpenseData = null;
+            try {
+                const responseText = await formResponse.text();
+                if (!formResponse.ok) {
+                    throw new Error(`Form submission failed: ${responseText}`);
+                }
+                if (responseText.trim().startsWith('{') || responseText.trim().startsWith('[')) {
+                    const expensesResult = JSON.parse(responseText);
+                    expensesId = expensesResult.id || expensesResult.eno;
+                    savedExpenseData = expensesResult;
+                } else {
+                    try {
+                        const allFormsRes = await fetch("https://backendaab.in/aabuilderDash/expenses_form/get_form");
+                        if (allFormsRes.ok) {
+                            const allForms = await allFormsRes.json();
+                            if (allForms.length > 0) {
+                                let matchingForm = allForms.find(f =>
+                                    f.eno === eno &&
+                                    f.date === date &&
+                                    f.siteName === selectedSite.label
+                                );
+                                if (matchingForm) {
+                                    expensesId = matchingForm.id;
+                                    savedExpenseData = matchingForm;
+                                } else {
+                                    const recentFormWithEno = allForms
+                                        .filter(f => f.eno === eno)
+                                        .sort((a, b) => new Date(b.timestamp || b.date) - new Date(a.timestamp || a.date))[0];
+                                    if (recentFormWithEno) {
+                                        expensesId = recentFormWithEno.id;
+                                        savedExpenseData = recentFormWithEno;
+                                    }
+                                }
+                            }
+                        }
+                    } catch (fetchError) {
+                        console.error('Could not fetch expenses form ID:', fetchError);
+                    }
+                }
+            } catch (parseError) {
+                console.error('Response parsing error:', parseError);
+                if (parseError.message && parseError.message.includes('Form submission failed')) {
+                    throw parseError;
+                }
+            }
+            if (expensesId) {
+                try {
+                    const verifyResponse = await fetch(`https://backendaab.in/aabuilderDash/expenses_form/get_form`);
+                    if (verifyResponse.ok) {
+                        const allForms = await verifyResponse.json();
+                        const savedForm = allForms.find(f => f.id === expensesId);
+                    }
+                } catch (verifyError) {
+                    console.error('Could not verify saved data:', verifyError);
+                }
+            }
+            if (paymentMode === 'Cash' && expensesId) {
+                let vendorId = null;
+                let contractorId = null;
+                if (selectedType === 'Vendor' && selectedOption) {
+                    vendorId = selectedOption.id;
+                } else if (selectedType === 'Contractor' && selectedOption) {
+                    contractorId = selectedOption.id;
+                }
+                const weeklyExpenseData = {
+                    date: date,
+                    created_at: new Date().toISOString(),
+                    contractor_id: contractorId,
+                    vendor_id: vendorId,
+                    employee_id: null,
+                    project_id: 10,
+                    type: utilityType ,
+                    amount: parseFloat(amount),
+                    status: true,
+                    weekly_number: getCurrentWeekNumber(),
+                    advance_portal_id: null,
+                    staff_advance_portal_id: null,
+                    loan_portal_id: null,
+                    rent_management_id: null,
+                    expenses_entry_id: expensesId,
+                    send_to_expenses_entry: false,
+                    bill_copy_url: pdfUrl || ''
+                };
+                try {
+                    const weeklyExpenseResponse = await fetch("https://backendaab.in/aabuildersDash/api/weekly-expenses/save", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify(weeklyExpenseData),
+                    });
+                    if (!weeklyExpenseResponse.ok) {
+                        console.error("❌ Weekly expense submission failed");
+                    } else {
+                        console.log("✅ Weekly expense submitted:", weeklyExpenseData);
+                    }
+                } catch (error) {
+                    console.error("❌ Error submitting weekly expense:", error);
+                }
             }
             setEno(eno + 1);
             resetForm();
@@ -514,13 +732,16 @@ const Form = ({ username, userRoles = [] }) => {
         }
     };
     const handlePaymentSubmit = async () => {
-        // Transaction number is now optional, so we don't need to validate it
         if (!paymentModalData.accountNumber && paymentModalData.paymentMode !== "Cash") {
             alert("Please select account number.");
             return;
         }
         if (paymentModalData.paymentMode === "Cheque" && (!paymentModalData.chequeNo || !paymentModalData.chequeDate)) {
             alert("Please enter cheque number and date.");
+            return;
+        }
+        if (selectedAccountType === 'Utility Bills' && !selectedFile) {
+            alert('PDF file is required for Utility Bills.');
             return;
         }
         setIsSubmitting(true);
@@ -555,19 +776,26 @@ const Form = ({ username, userRoles = [] }) => {
             } else if (selectedType === 'Contractor') {
                 contractor = selectedOption ? selectedOption.label : '';
             }
+            const projectId = selectedSite ? selectedSite.id : null;
+            const vendorId = selectedType === 'Vendor' && selectedOption ? (selectedOption.id || null) : null;
+            const contractorId = selectedType === 'Contractor' && selectedOption ? (selectedOption.id || null) : null;
             const expensesPayload = {
                 accountType: selectedAccountType,
                 eno: eno,
                 date: paymentModalData.date,
                 siteName: selectedSite ? selectedSite.label : '',
+                projectId: projectId,
                 vendor: vendor,
+                vendorId: vendorId,
                 contractor: contractor,
+                contractorId: contractorId,
                 quantity: quantity,
                 amount: parseInt(paymentModalData.amount),
                 category: selectedCategory ? selectedCategory.label : '',
                 comments: comments,
                 machineTools: selectedMachineTools ? selectedMachineTools.label : '',
                 billCopyUrl: pdfUrl || '',
+                paymentMode: paymentModalData.paymentMode,
                 utilityType: utilityType || '',
                 utilityTypeNumber: selectedEbNumber ? selectedEbNumber.label : '',
                 utilityForTheMonth: selectedMonths || '',
@@ -580,17 +808,18 @@ const Form = ({ username, userRoles = [] }) => {
                 },
                 body: JSON.stringify(expensesPayload),
             });
-            if (!expensesResponse.ok) {
-                const errorText = await expensesResponse.text();
-                throw new Error(`Expenses form submission failed: ${errorText}`);
-            }
             let expensesResult;
             let expensesId = null;
+            let savedExpenseData = null;
             try {
                 const responseText = await expensesResponse.text();
+                if (!expensesResponse.ok) {
+                    throw new Error(`Expenses form submission failed: ${responseText}`);
+                }
                 if (responseText.trim().startsWith('{') || responseText.trim().startsWith('[')) {
                     expensesResult = JSON.parse(responseText);
                     expensesId = expensesResult.id || expensesResult.eno;
+                    savedExpenseData = expensesResult;
                 } else {
                     expensesResult = { message: responseText };
                     try {
@@ -605,17 +834,20 @@ const Form = ({ username, userRoles = [] }) => {
                                 );
                                 if (matchingForm) {
                                     expensesId = matchingForm.id;
+                                    savedExpenseData = matchingForm;
                                 } else {
                                     const recentFormWithEno = allForms
                                         .filter(f => f.eno === eno)
                                         .sort((a, b) => new Date(b.timestamp || b.date) - new Date(a.timestamp || a.date))[0];
                                     if (recentFormWithEno) {
                                         expensesId = recentFormWithEno.id;
+                                        savedExpenseData = recentFormWithEno;
                                     } else {
                                         const mostRecentForm = allForms
                                             .sort((a, b) => new Date(b.timestamp || b.date) - new Date(a.timestamp || a.date))[0];
                                         if (mostRecentForm) {
                                             expensesId = mostRecentForm.id;
+                                            savedExpenseData = mostRecentForm;
                                         }
                                     }
                                 }
@@ -632,6 +864,17 @@ const Form = ({ username, userRoles = [] }) => {
             } catch (parseError) {
                 console.error('Response parsing error:', parseError);
                 throw new Error('Failed to parse expenses form API response');
+            }
+            if (expensesId) {
+                try {
+                    const verifyResponse = await fetch(`https://backendaab.in/aabuilderDash/expenses_form/get_form`);
+                    if (verifyResponse.ok) {
+                        const allForms = await verifyResponse.json();
+                        const savedForm = allForms.find(f => f.id === expensesId);
+                    }
+                } catch (verifyError) {
+                    console.error('Could not verify saved data:', verifyError);
+                }
             }
             const weeklyPaymentBillPayload = {
                 date: paymentModalData.date,
@@ -660,13 +903,12 @@ const Form = ({ username, userRoles = [] }) => {
                 credentials: 'include',
                 body: JSON.stringify(weeklyPaymentBillPayload)
             });
-            if (!weeklyResponse.ok) {
-                const errorText = await weeklyResponse.text();
-                throw new Error(`Weekly payment bills submission failed: ${errorText}`);
-            }
             let weeklyResult;
             try {
                 const responseText = await weeklyResponse.text();
+                if (!weeklyResponse.ok) {
+                    throw new Error(`Weekly payment bills submission failed: ${responseText}`);
+                }
                 if (responseText.trim().startsWith('{') || responseText.trim().startsWith('[')) {
                     weeklyResult = JSON.parse(responseText);
                 } else {
@@ -844,6 +1086,7 @@ const Form = ({ username, userRoles = [] }) => {
                                             className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[43px] focus:outline-none border-opacity-[0.20]"
                                         >
                                             <option value="">Select Payment Mode</option>
+                                            <option value="Cash">Cash</option>
                                             <option value="GPay">GPay</option>
                                             <option value="PhonePe">PhonePe</option>
                                             <option value="Net Banking">Net Banking</option>
@@ -927,11 +1170,11 @@ const Form = ({ username, userRoles = [] }) => {
                             <div className='flex'>
                                 <label htmlFor="fileInput" className="cursor-pointer flex items-center text-orange-600">
                                     <img className='w-5 h-4' alt='' src={Attach}></img>
-                                    Attach file
+                                    Attach file {selectedAccountType === 'Utility Bills' && <span className="text-red-500 ml-1">*</span>}
                                 </label>
                                 <input type="file" id="fileInput" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
                             </div>
-                            {selectedFile && <span className="text-gray-600 lg:-ml-[94rem] -ml-40">{selectedFile.name}</span>}
+                            {selectedFile && <span className="text-gray-600 lg:-ml-[84rem] -ml-48">{selectedFile.name}</span>}
                         </div>
                         <div className="flex ">
                             {userPermissions.includes("Create") && (

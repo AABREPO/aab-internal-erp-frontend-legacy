@@ -284,6 +284,12 @@ const BillPayment = ({ username, userRoles = [] }) => {
                         label: "Rent Management Portal",
                         id: 9,
                         sNo: "9"
+                    },
+                    {
+                        value:"Multi-Project Batch",
+                        label:"Multi-Project Batch",
+                        id:10,
+                        sNo:"10"
                     }
                 ];
                 // Combine backend data with predefined options
@@ -320,7 +326,6 @@ const BillPayment = ({ username, userRoles = [] }) => {
             setPurposeOptions([]);
         }
     }, []);
-    
     // Fetch tenant options from API
     const fetchTenantOptions = useCallback(async () => {
         try {
@@ -351,8 +356,6 @@ const BillPayment = ({ username, userRoles = [] }) => {
             let successMessage = "Bill payment deleted successfully!";
             let errorMessage = "Failed to delete bill payment. Please try again.";
             let allOperationsSuccessful = true;
-
-            // First, always delete the bill payment record
             const deleteResponse = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-payment-bills/delete/${item.id}`, {
                 method: "DELETE",
                 credentials: "include",
@@ -360,13 +363,10 @@ const BillPayment = ({ username, userRoles = [] }) => {
                     "Content-Type": "application/json",
                 },
             });
-
             if (!deleteResponse.ok) {
                 allOperationsSuccessful = false;
                 errorMessage = "Failed to delete bill payment. Please try again.";
             }
-
-            // Then, if the item has advance_portal_id, also clear the advance portal data
             if (item.advance_portal_id) {
                 const clearResponse = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${item.advance_portal_id}?editedBy=${username}`, {
                     method: "PUT",
@@ -375,7 +375,6 @@ const BillPayment = ({ username, userRoles = [] }) => {
                         "Content-Type": "application/json",
                     },
                     body: JSON.stringify({
-                        // Clear all fields except entry_no and timestamp
                         project_id: null,
                         contractor_id: null,
                         vendor_id: null,
@@ -384,12 +383,10 @@ const BillPayment = ({ username, userRoles = [] }) => {
                         amount: null,
                         bill_payment_mode: null,
                         date: item.date,
-                        // Keep entry_no and timestamp unchanged
                         entry_no: item.entry_no,
                         timestamp: item.timestamp
                     })
                 });
-
                 if (!clearResponse.ok) {
                     allOperationsSuccessful = false;
                     errorMessage = "Bill payment deleted but failed to clear advance portal data.";
@@ -397,7 +394,6 @@ const BillPayment = ({ username, userRoles = [] }) => {
                     successMessage = "Bill payment deleted and advance portal data cleared successfully!";
                 }
             }
-            // If the item has staff_advance_portal_id, also clear the staff advance data
             else if (item.staff_advance_portal_id) {
                 const clearResponse = await fetch(`https://backendaab.in/aabuildersDash/api/staff-advance/${item.staff_advance_portal_id}?editedBy=${username}`, {
                     method: "PUT",
@@ -406,7 +402,6 @@ const BillPayment = ({ username, userRoles = [] }) => {
                         "Content-Type": "application/json",
                     },
                     body: JSON.stringify({
-                        // Clear all fields except entry_no and timestamp
                         project_id: null,
                         contractor_id: null,
                         vendor_id: null,
@@ -415,12 +410,10 @@ const BillPayment = ({ username, userRoles = [] }) => {
                         amount: null,
                         bill_payment_mode: null,
                         date: item.date,
-                        // Keep entry_no and timestamp unchanged
                         entry_no: item.entry_no,
                         timestamp: item.timestamp
                     })
                 });
-
                 if (!clearResponse.ok) {
                     allOperationsSuccessful = false;
                     errorMessage = "Bill payment deleted but failed to clear staff advance data.";
@@ -435,7 +428,6 @@ const BillPayment = ({ username, userRoles = [] }) => {
                     type: "success",
                     dateStr: ""
                 });
-                // Refresh the data
                 fetchBillPayments();
             } else {
                 setPopup({
@@ -444,7 +436,6 @@ const BillPayment = ({ username, userRoles = [] }) => {
                     type: "error",
                     dateStr: ""
                 });
-                // Still refresh the data even if some operations failed
                 fetchBillPayments();
             }
         } catch (error) {
@@ -990,6 +981,10 @@ const BillPayment = ({ username, userRoles = [] }) => {
                                         >
                                             S.NO
                                         </th>
+                                        <th className="px-6 py-3 text-left font-semibold  uppercase tracking-wider whitespace-nowrap min-w-[80px]"
+                                        >
+                                            TIMESTAMP
+                                        </th>
                                         <th className="px-6 py-3 text-left font-semibold uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap min-w-[100px]"
                                             onClick={() => handleSort('date')}
                                         >
@@ -1048,6 +1043,17 @@ const BillPayment = ({ username, userRoles = [] }) => {
                                         <tr key={index} className="hover:bg-gray-50 odd:bg-white even:bg-[#FAF6ED]">
                                             <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                 {startIndex + index + 1}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                {new Date(item.created_at).toLocaleDateString('en-GB', {
+                                                    day: '2-digit',
+                                                    month: '2-digit',
+                                                    year: 'numeric'
+                                                }) + ' ' + new Date(item.created_at).toLocaleTimeString('en-US', {
+                                                    hour: '2-digit',
+                                                    minute: '2-digit',
+                                                    hour12: true
+                                                })}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                 {new Date(item.date).toLocaleDateString()}

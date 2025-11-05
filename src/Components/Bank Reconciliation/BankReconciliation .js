@@ -98,7 +98,8 @@ const BankReconciliation = () => {
           { value: "Subhash Kumar - Kunnur", label: "Subhash Kumar - Kunnur", id: 6, sNo: "6" },
           { value: "Summary Bill", label: "Summary Bill", id: 7, sNo: "7" },
           { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
-          { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" }
+          { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
+          {value:"Multi-Project Batch",label:"Multi-Project Batch",id:10,sNo:"10"}
         ];
         setSiteOptions([...predefinedSiteOptions, ...formattedProjects]);
         

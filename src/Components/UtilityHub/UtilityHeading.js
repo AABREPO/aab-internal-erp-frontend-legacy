@@ -6,6 +6,10 @@ import SubscriptionTab from './SubscriptionTab';
 import AMCTab from './AMCTab';
 import ElectricityTab from './ElectricityTab';
 import UtilityDashboard from './UtilityDashboard';
+import ElectricityDatabase from './ElectricityDatabase';
+import PropertyDatabase from './PropertyDatabase';
+import WaterDatabase from './WaterDatabase';
+import DatabaseTab from './DatabaseTab';
 
 const UtilityHeading = ({ username, userRoles = [] }) => {
     const [activeTab, setActiveTab] = useState(
@@ -33,6 +37,14 @@ const UtilityHeading = ({ username, userRoles = [] }) => {
                 return <SubscriptionTab username={username} userRoles={userRoles} />;
             case 'amc':
                 return <AMCTab username={username} userRoles={userRoles} />;
+            case 'database':
+                return <DatabaseTab username={username} userRoles={userRoles} />;
+            case 'electricity-database':
+                return <ElectricityDatabase username={username} userRoles={userRoles} />;
+            case 'property-database':
+                return <PropertyDatabase username={username} userRoles={userRoles} />;
+            case 'water-database':
+                return <WaterDatabase username={username} userRoles={userRoles} />;
 
             default:
                 return <PropertyTab username={username} userRoles={userRoles} />;
@@ -84,6 +96,12 @@ const UtilityHeading = ({ username, userRoles = [] }) => {
                     onClick={() => setActiveTab('amc')}
                 >
                     AMC
+                </h2>
+                <h2
+                    className={`link ${activeTab === 'database' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('database')}
+                >
+                    Database
                 </h2>
 
             </div>

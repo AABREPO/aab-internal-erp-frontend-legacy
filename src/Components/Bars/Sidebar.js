@@ -44,7 +44,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
   // Effect to set active menu and submenu based on current route
   useEffect(() => {
     const currentPath = location.pathname;
-    
+
     // Define route mappings
     const routeMappings = {
       // Billing routes
@@ -53,11 +53,11 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
       '/invoice-bill/invoice': { menu: 'billing', submenu: 'Invoice' },
       '/quotation': { menu: 'billing', submenu: 'Quotation' },
       '/changeOrder': { menu: 'billing', submenu: 'Change Order' },
-      
+
       // CRM routes
       '/enquiry': { menu: 'crm', submenu: 'Enquiry' },
       '/projects': { menu: 'crm', submenu: 'Projects' },
-      
+
       // Account routes
       '/vendorPaymentsTracker': { menu: 'account', submenu: 'Vendor Payments Tracker' },
       '/portal/advancePortal': { menu: 'account', submenu: 'Advance Portal' },
@@ -70,12 +70,12 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
       '/expense-entry': { menu: 'account', submenu: 'Expense Entry' },
       '/expense-dashboard': { menu: 'account', submenu: 'Expense Dashboard' },
       '/bankreconciliation': { menu: 'account', submenu: 'Bank Reconciliation' },
-      
+
       // Procurement routes
       '/purchaseorder': { menu: 'procurement', submenu: 'Purchase Order' },
       '/inventory': { menu: 'procurement', submenu: 'Inventory' },
       '/toolsTracker': { menu: 'procurement', submenu: 'Tools Tracker' },
-      
+
       // Design Tools routes
       '/designtool/tileCalculate': { menu: 'designtools', submenu: 'Tile Calculator' },
       '/paints/paintCalculation': { menu: 'designtools', submenu: 'Paint Calculator' },
@@ -84,20 +84,20 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
       '/switch/SwitchMatrix': { menu: 'designtools', submenu: 'Switch Matrix' },
       '/masonary/masonarycalculater': { menu: 'designtools', submenu: 'Masonary Calculator' },
       '/carpentry/carpentrycalculator': { menu: 'designtools', submenu: 'Carpentry Calculator' },
-      
+
       // HR routes
       '/billView': { menu: 'hr', submenu: 'onboarding' },
       '/attendance': { menu: 'hr', submenu: 'Attendance' },
       '/staffadvance/staffAdvance': { menu: 'hr', submenu: 'Staff Advance' },
       '/user_manage': { menu: 'hr', submenu: 'Manage User' },
-      
+
       // Master Data routes
       '/master-data': { menu: 'masterdata', submenu: 'Master Data' },
-      
+
       // Utility Hub routes
       '/utility/dashboard': { menu: 'utility', submenu: 'Dashboard' }
     };
-    
+
     // Find matching route
     const routeMapping = routeMappings[currentPath];
     if (routeMapping) {
@@ -213,8 +213,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
             </Link>
           </div>
         )}
-        <div
-          className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'crm' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+        <div className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'crm' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('crm')}
         >
           <img src={activeMenu === 'crm' ? crmWhite : crm} alt="crm" className="h-4 w-4" />
@@ -390,8 +389,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
             </Link>
           </div>
         )}
-        <div
-          className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'procurement' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+        <div className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'procurement' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('procurement')}
         >
           <img src={activeMenu === 'procurement' ? procurementWhite : procurement} alt="procurement" className="h-4 w-4" />
@@ -435,8 +433,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
             </Link>
           </div>
         )}
-        <div
-          className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'designtools' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+        <div className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'designtools' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('designtools')}
         >
           <img src={activeMenu === 'designtools' ? designtoolsWhite : designtools} alt="designtools" className="h-4 w-4" />
@@ -527,8 +524,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
             </Link>
           </div>
         )}
-        <div
-          className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'hr' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+        <div className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'hr' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('hr')}
         >
           <img src={activeMenu === 'hr' ? hrWhite : hr} alt="hr" className="h-4 w-4" />
@@ -562,8 +558,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
             </Link>
           </div>
         )}
-        <div
-          className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'utility' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+        <div className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'utility' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('utility')}
         >
           <p className="text-[12px] leading-[15px] font-medium text-base">Utility Hub</p>
@@ -577,10 +572,16 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
             >
               <p className="text-sm cursor-pointer"><li>Dashboard</li></p>
             </Link>
+            <Link
+              to="/directory"
+              className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Directory' ? 'text-red-500' : ''}`}
+              onClick={() => handleSubmenuItemClick('Directory')}
+            >
+              <p className="text-sm cursor-pointer"><li>Directory</li></p>
+            </Link>
           </div>
         )}
-        <div
-          className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'masterdata' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+        <div className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'masterdata' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('masterdata')}
         >
           <p className="text-[12px] leading-[15px] font-medium text-base">Master Data</p>
@@ -596,7 +597,6 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
             </Link>
           </div>
         )}
-        
         <div className="mt-[6rem] ml-4 w-44">
           <p style={{ fontSize: '16px', marginTop: '1rem' }}>
             <span className="font-semibold">Last Updated:</span>{' '}

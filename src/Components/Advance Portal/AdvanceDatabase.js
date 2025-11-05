@@ -24,6 +24,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   const [selectDatabaseTransfer, setSelectDatabaseTransfer] = useState('');
   const [selectDatabaseType, setSelectDatabaseType] = useState('');
   const [selectDatabaseMode, setSelectDatabaseMode] = useState('');
+  const [selectDatabaseEntryNo, setSelectDatabaseEntryNo] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [showAdvancePortalModal, setShowAdvancePortalModal] = useState(false);
@@ -69,6 +70,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
           if (filters.selectDatabaseTransfer) setSelectDatabaseTransfer(filters.selectDatabaseTransfer);
           if (filters.selectDatabaseType) setSelectDatabaseType(filters.selectDatabaseType);
           if (filters.selectDatabaseMode) setSelectDatabaseMode(filters.selectDatabaseMode);
+          if (filters.selectDatabaseEntryNo) setSelectDatabaseEntryNo(filters.selectDatabaseEntryNo);
           if (filters.startDate) setStartDate(filters.startDate);
           if (filters.endDate) setEndDate(filters.endDate);
           if (filters.showFilters !== undefined) setShowFilters(filters.showFilters);
@@ -114,12 +116,13 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       selectDatabaseTransfer,
       selectDatabaseType,
       selectDatabaseMode,
+      selectDatabaseEntryNo,
       startDate,
       endDate,
       showFilters
     };
     sessionStorage.setItem('advanceDatabaseFilters', JSON.stringify(filters));
-  }, [selectTimeStampDate, selectDatabaseDate, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseMode, startDate, endDate, showFilters]);
+  }, [selectTimeStampDate, selectDatabaseDate, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseMode, selectDatabaseEntryNo, startDate, endDate, showFilters]);
 
   const scrollRef = useRef(null);
   const isDragging = useRef(false);
@@ -734,6 +737,10 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
     if (selectDatabaseMode) {
       if (entry.payment_mode?.toLowerCase() !== selectDatabaseMode.toLowerCase()) return false;
     }
+    // Entry No filter (partial match)
+    if (selectDatabaseEntryNo) {
+      if (!entry.entry_no?.toString().includes(selectDatabaseEntryNo.toString())) return false;
+    }
     return true; // passes all filters
   });
   const sortedData = React.useMemo(() => {
@@ -825,7 +832,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectTimeStampDate, selectDatabaseDate, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseMode, startDate, endDate]);
+  }, [selectTimeStampDate, selectDatabaseDate, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseMode, selectDatabaseEntryNo, startDate, endDate]);
   // Pagination handlers
   const goToPage = (page) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
@@ -1271,7 +1278,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       </div>
       <div className='max-w-[1850px] w-full ml-10 px-4 lg:px-10 bg-white rounded-md h-[650px] mt-5 pt-5'>
         <div
-          className={`text-left flex ${selectTimeStampDate || selectDatabaseDate || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseMode || startDate || endDate
+          className={`text-left flex ${selectTimeStampDate || selectDatabaseDate || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseMode || selectDatabaseEntryNo || startDate || endDate
             ? 'flex-col sm:flex-row sm:justify-between'
             : 'flex-row justify-between items-center'
             } mb-3 gap-2`}>
@@ -1283,7 +1290,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                 className="w-7 h-7 border border-[#BF9853] rounded-md ml-3"
               />
             </button>
-            {(selectTimeStampDate || selectDatabaseDate || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseMode || startDate || endDate) && (
+            {(selectTimeStampDate || selectDatabaseDate || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseMode || selectDatabaseEntryNo || startDate || endDate) && (
               <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
                 {startDate && (
                   <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
@@ -1348,11 +1355,18 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                     <button onClick={() => setSelectDatabaseMode('')} className="text-[#BF9853] text-2xl ml-1">×</button>
                   </span>
                 )}
+                {selectDatabaseEntryNo && (
+                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
+                    <span className="font-normal">Entry No: </span>
+                    <span className="font-bold">{selectDatabaseEntryNo}</span>
+                    <button onClick={() => setSelectDatabaseEntryNo('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                  </span>
+                )}
               </div>
             )}
           </div>
           <div className='space-x-4 flex justify-end mr-5'>
-            {(selectTimeStampDate || selectDatabaseDate || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseMode || startDate || endDate) && (
+            {(selectTimeStampDate || selectDatabaseDate || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseMode || selectDatabaseEntryNo || startDate || endDate) && (
               <button
                 onClick={() => {
                   setSelectTimeStampDate('');
@@ -1362,6 +1376,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                   setSelectDatabaseTransfer('');
                   setSelectDatabaseType('');
                   setSelectDatabaseMode('');
+                  setSelectDatabaseEntryNo('');
                   setStartDate('');
                   setEndDate('');
                   sessionStorage.removeItem('advanceDatabaseFilters');
@@ -1634,7 +1649,15 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                       </select>
                     </th>
                     <th className='w-[220px] '></th>
-                    <th className='w-[140px] '></th>
+                    <th className='w-[140px] '>
+                      <input
+                        type="text"
+                        value={selectDatabaseEntryNo}
+                        onChange={(e) => setSelectDatabaseEntryNo(e.target.value)}
+                        className="p-1 mt-3 mb-3 rounded-md bg-transparent w-[140px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                        placeholder="Entry No..."
+                      />
+                    </th>
                     <th className='w-[120px] '></th>
                   </tr>
                 )}

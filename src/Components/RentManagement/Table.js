@@ -24,6 +24,11 @@ const Table = () => {
     const [formType, setFormType] = useState('');
     const [eno, setEno] = useState('');
     const [selectedRentMonth, setSelectedRentMonth] = useState('');
+    // New state variables for properties and tenants data
+    const [properties, setProperties] = useState([]);
+    const [tenantShopData, setTenantShopData] = useState([]);
+    const [shopNoIdToShopNoMap, setShopNoIdToShopNoMap] = useState({});
+    const [tenantNameIdToTenantNameMap, setTenantNameIdToTenantNameMap] = useState({});
     useEffect(() => {
         const savedSelectedDate = sessionStorage.getItem('selectedDate');
         const savedShopNo = sessionStorage.getItem('shopNo')
@@ -91,12 +96,16 @@ const Table = () => {
     const [allShops, setAllShops] = useState([]);
     useEffect(() => {
         fetchProperties();
+        fetchTenants();
     }, []);
+    
+    // Fetch properties for allShops
     const fetchProperties = async () => {
         try {
             const response = await fetch('https://backendaab.in/aabuildersDash/api/properties/all');
             if (response.ok) {
                 const data = await response.json();
+                setProperties(data);
                 // Extract property names
                 const extractedShops = [];
                 data.forEach(property => {
@@ -124,6 +133,45 @@ const Table = () => {
             console.log('Error fetching properties.');
         }
     };
+    
+    // Fetch tenants data
+    const fetchTenants = async () => {
+        try {
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/tenantShop/getAll');
+            if (response.ok) {
+                const data = await response.json();
+                setTenantShopData(data);
+            } else {
+                console.log('Error fetching tenants.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            console.log('Error fetching tenants.');
+        }
+    };
+    
+    // Build mapping from IDs to actual values
+    useEffect(() => {
+        // Build shopNoId -> shopNo mapping from properties
+        const shopNoIdMap = {};
+        properties.forEach(property => {
+            property.propertyDetailsList?.forEach(detail => {
+                if (detail.id && detail.shopNo) {
+                    shopNoIdMap[detail.id] = detail.shopNo;
+                }
+            });
+        });
+        setShopNoIdToShopNoMap(shopNoIdMap);
+        
+        // Build tenantNameId -> tenantName mapping from tenantShopData
+        const tenantNameIdMap = {};
+        tenantShopData.forEach(tenant => {
+            if (tenant.id && tenant.tenantName) {
+                tenantNameIdMap[tenant.id] = tenant.tenantName;
+            }
+        });
+        setTenantNameIdToTenantNameMap(tenantNameIdMap);
+    }, [properties, tenantShopData]);
     const sortedItems = sortField
         ? [...currentItems].sort((a, b) => {
             const valA = a[sortField];
@@ -243,8 +291,8 @@ const Table = () => {
             "Type"
         ];
         const rows = filteredRentForm.map(rent => [
-            rent.shopNo,
-            rent.tenantName,
+            rent.shopNoId && shopNoIdToShopNoMap[rent.shopNoId] ? shopNoIdToShopNoMap[rent.shopNoId] : rent.shopNo,
+            rent.tenantNameId && tenantNameIdToTenantNameMap[rent.tenantNameId] ? tenantNameIdToTenantNameMap[rent.tenantNameId] : rent.tenantName,
             `${Number(rent.refundAmount || rent.amount).toLocaleString("en-US", {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
@@ -292,8 +340,8 @@ const Table = () => {
 
         filteredRentForm.forEach((rent) => {
             const row = [
-                rent.shopNo,
-                rent.tenantName,
+                rent.shopNoId && shopNoIdToShopNoMap[rent.shopNoId] ? shopNoIdToShopNoMap[rent.shopNoId] : rent.shopNo,
+                rent.tenantNameId && tenantNameIdToTenantNameMap[rent.tenantNameId] ? tenantNameIdToTenantNameMap[rent.tenantNameId] : rent.tenantName,
                 `${Number(rent.refundAmount || rent.amount).toLocaleString("en-US", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
@@ -336,7 +384,9 @@ const Table = () => {
         doc.save("FilteredRentReport.pdf");
     };
     const handlePrint = (rent) => {
-        const matchingShop = allShops.find(shop => shop.shopNo === rent.shopNo);
+        const displayShopNo = rent.shopNoId && shopNoIdToShopNoMap[rent.shopNoId] ? shopNoIdToShopNoMap[rent.shopNoId] : rent.shopNo;
+        const displayTenantName = rent.tenantNameId && tenantNameIdToTenantNameMap[rent.tenantNameId] ? tenantNameIdToTenantNameMap[rent.tenantNameId] : rent.tenantName;
+        const matchingShop = allShops.find(shop => shop.shopNo === displayShopNo);
         const propertyName = matchingShop?.propertyName || 'N/A';
 
         // Replace this with your actual QR code URL or base64 image
@@ -360,7 +410,8 @@ const Table = () => {
     <body>
         <h2>Rent Payment Receipt</h2>
         <table>
-            <tr><td class="label">Shop No</td><td>${rent.shopNo}</td></tr>
+            <tr><td class="label">Shop No</td><td>${displayShopNo}</td></tr>
+            <tr><td class="label">Tenant Name</td><td>${displayTenantName}</td></tr>
             <tr><td class="label">Property Name</td><td>${propertyName}</td></tr>
             <tr><td class="label">Amount Paid</td><td>₹${Number(rent.refundAmount || rent.amount).toLocaleString('en-IN', {
             minimumFractionDigits: 2,
@@ -1051,8 +1102,16 @@ const Table = () => {
                                 <tbody>
                                     {sortedItems.map((rent, index) => (
                                         <tr key={rent.id} className="odd:bg-white even:bg-[#FAF6ED]">
-                                            <td className="text-xs sm:text-sm pl-1 sm:pl-2 text-left py-2 font-semibold">{rent.shopNo}</td>
-                                            <td className="text-xs sm:text-sm text-left px-1 font-semibold">{rent.tenantName}</td>
+                                            <td className="text-xs sm:text-sm pl-1 sm:pl-2 text-left py-2 font-semibold">
+                                                {rent.shopNoId && shopNoIdToShopNoMap[rent.shopNoId] 
+                                                    ? shopNoIdToShopNoMap[rent.shopNoId] 
+                                                    : rent.shopNo}
+                                            </td>
+                                            <td className="text-xs sm:text-sm text-left px-1 font-semibold">
+                                                {rent.tenantNameId && tenantNameIdToTenantNameMap[rent.tenantNameId] 
+                                                    ? tenantNameIdToTenantNameMap[rent.tenantNameId] 
+                                                    : rent.tenantName}
+                                            </td>
                                             <td className={`text-xs sm:text-sm text-left px-2 sm:px-4 font-semibold ${rent.refundAmount ? 'text-red-500' : 'text-black'}`}>
                                                 {Number(rent.refundAmount || rent.amount) === 0
                                                     ? 'NIL'

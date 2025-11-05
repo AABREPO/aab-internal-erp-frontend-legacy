@@ -624,7 +624,160 @@ const AdvanceReport = () => {
       }
     });
 
-    doc.save(`AdvanceReport_${fromDate.replace(/\//g, "-")}_to_${toDate.replace(/\//g, "-")}.pdf`);
+    // Add second page with Bill Settlement data filtered by selected week using timestamp
+    if (week && year) {
+      const selectedWeekNum = parseInt(week.replace("Week ", ""), 10);
+      const selectedYear = parseInt(year, 10);
+      
+      // Filter Bill Settlement data for the selected week using timestamp (not date)
+      const billSettlementData = advanceData.filter((item) => {
+        // Use timestamp field if available, otherwise fall back to date
+        const itemTimestamp = item.timestamp ? new Date(item.timestamp) : new Date(item.date);
+        const itemWeek = getWeekNumberFromDate(itemTimestamp);
+        const itemYear = itemTimestamp.getFullYear();
+        const itemType = normStr(item.type);
+        return itemYear === selectedYear && 
+               itemWeek === selectedWeekNum && 
+               itemType === "bill settlement";
+      });
+
+      if (billSettlementData.length > 0) {
+        // Sort Bill Settlement data using timestamp
+        const sortedBillSettlement = [...billSettlementData].sort((a, b) => {
+          const modeA = normStr(a.payment_mode), modeB = normStr(b.payment_mode);
+          if (modeA !== modeB) return modeA.localeCompare(modeB);
+          // Use timestamp for sorting if available
+          const timestampA = a.timestamp ? new Date(a.timestamp).getTime() : dateKey(a.date);
+          const timestampB = b.timestamp ? new Date(b.timestamp).getTime() : dateKey(b.date);
+          return timestampA - timestampB;
+        });
+
+        // Calculate totals for Bill Settlement using timestamp
+        const billSettlementFromDate = sortedBillSettlement.length
+          ? new Date(Math.min(...sortedBillSettlement.map((r) => {
+              return r.timestamp ? new Date(r.timestamp) : new Date(r.date);
+            }))).toLocaleDateString("en-GB")
+          : "-";
+        const billSettlementToDate = sortedBillSettlement.length
+          ? new Date(Math.max(...sortedBillSettlement.map((r) => {
+              return r.timestamp ? new Date(r.timestamp) : new Date(r.date);
+            }))).toLocaleDateString("en-GB")
+          : "-";
+        const totalBillAmount = sortedBillSettlement
+          .reduce((sum, row) => sum + (parseFloat(row.bill_amount) || 0), 0);
+
+        // Add new page - ensure it starts fresh
+        doc.addPage();
+
+        // Add timestamp to header
+        const timestamp = new Date().toLocaleString("en-GB", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit"
+        });
+
+        // Draw header for Bill Settlement page
+        doc.autoTable({
+          startY: 20,
+          body: [
+            [
+              { content: "Bill Settlement Report", styles: { fontStyle: 'bold', fontSize: 12 } },
+              { content: `Generated: ${timestamp}`, styles: { fontStyle: 'italic', fontSize: 8 } },
+            ],
+            [
+              { content: "Start Date", styles: { fontStyle: 'bold' } },
+              billSettlementFromDate,
+              { content: "End Date", styles: { fontStyle: 'bold' } },
+              billSettlementToDate,
+              { content: "Total Bill Amount", styles: { fontStyle: 'bold' } },
+              totalBillAmount.toLocaleString("en-IN"),
+            ],
+          ],
+          theme: 'grid',
+          styles: {
+            fontSize: 10,
+            halign: 'left',
+            cellPadding: 5,
+            lineColor: [0, 0, 0],
+            lineWidth: 0.5,
+          },
+          columnStyles: {
+            0: { cellWidth: 110 },
+            1: { cellWidth: 140 },
+            2: { cellWidth: 110 },
+            3: { cellWidth: 140 },
+            4: { cellWidth: 140 },
+            5: { cellWidth: 103 },
+          }
+        });
+
+        // Bill Settlement data rows - use timestamp for date
+        const billSettlementRows = sortedBillSettlement.map((row, index) => {
+          // Use timestamp if available, otherwise use date
+          const rowDate = row.timestamp ? new Date(row.timestamp) : new Date(row.date);
+          return {
+            sno: index + 1,
+            date: isNaN(rowDate) ? "" : rowDate.toLocaleDateString("en-GB"),
+            cv:
+              contractorOptions.find(c => c.id === row.contractor_id)?.label ||
+              vendorOptions.find(v => v.id === row.vendor_id)?.label || "",
+            project: siteOptions.find(s => s.id === row.project_id)?.label || "",
+            advance: row.amount?.toLocaleString("en-IN") || "0",
+            bill: row.bill_amount?.toLocaleString("en-IN") || "0",
+            refund: row.refund_amount?.toLocaleString("en-IN") || "0",
+            transfer: siteOptions.find(s => s.id === row.transfer_site_id)?.label || "",
+            type: row.type || "",
+            mode: row.payment_mode || "",
+            description: row.description || "",
+            file: row.file_url ? "Yes" : "-",
+          };
+        });
+
+        // Main Bill Settlement data table - start after header
+        doc.autoTable({
+          startY: doc.lastAutoTable.finalY + 10,
+          columns,
+          body: billSettlementRows,
+          styles: {
+            fontSize: 8,
+            cellPadding: 4,
+            overflow: "linebreak",
+            lineWidth: 0.5,
+            lineColor: [0, 0, 0],
+            fillColor: null,
+            minCellHeight: 20
+          },
+          headStyles: {
+            fillColor: null,
+            textColor: 0,
+            fontStyle: 'bold',
+            lineWidth: 0.5,
+            lineColor: [0, 0, 0]
+          },
+          alternateRowStyles: { fillColor: null },
+          columnStyles: {
+            sno: { cellWidth: 28 },
+            date: { cellWidth: 50 },
+            cv: { cellWidth: 90 },
+            project: { cellWidth: 115 },
+            advance: { cellWidth: 45, halign: 'right' },
+            bill: { cellWidth: 40, halign: 'right' },
+            refund: { cellWidth: 40, halign: 'right' },
+            transfer: { cellWidth: 115 },
+            type: { cellWidth: 60 },
+            mode: { cellWidth: 50 },
+            description: { cellWidth: 75 },
+            file: { cellWidth: 35 },
+          }
+        });
+      }
+    }
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
+    doc.save(`AdvanceReport_${fromDate.replace(/\//g, "-")}_to_${toDate.replace(/\//g, "-")}_${timestamp}.pdf`);
   };
 
   // Export Excel using xlsx
@@ -710,11 +863,125 @@ const AdvanceReport = () => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "AdvanceReport");
 
+    // Add second sheet with Bill Settlement data filtered by selected week using timestamp
+    if (week && year) {
+      const selectedWeekNum = parseInt(week.replace("Week ", ""), 10);
+      const selectedYear = parseInt(year, 10);
+      
+      // Filter Bill Settlement data for the selected week using timestamp (not date)
+      const billSettlementData = advanceData.filter((item) => {
+        // Use timestamp field if available, otherwise fall back to date
+        const itemTimestamp = item.timestamp ? new Date(item.timestamp) : new Date(item.date);
+        const itemWeek = getWeekNumberFromDate(itemTimestamp);
+        const itemYear = itemTimestamp.getFullYear();
+        const itemType = normStr(item.type);
+        return itemYear === selectedYear && 
+               itemWeek === selectedWeekNum && 
+               itemType === "bill settlement";
+      });
+
+      if (billSettlementData.length > 0) {
+        // Sort Bill Settlement data using timestamp
+        const sortedBillSettlement = [...billSettlementData].sort((a, b) => {
+          const modeA = normStr(a.payment_mode), modeB = normStr(b.payment_mode);
+          if (modeA !== modeB) return modeA.localeCompare(modeB);
+          // Use timestamp for sorting if available
+          const timestampA = a.timestamp ? new Date(a.timestamp).getTime() : dateKey(a.date);
+          const timestampB = b.timestamp ? new Date(b.timestamp).getTime() : dateKey(b.date);
+          return timestampA - timestampB;
+        });
+
+        // Calculate totals for Bill Settlement using timestamp
+        const billSettlementFromDate = sortedBillSettlement.length
+          ? new Date(Math.min(...sortedBillSettlement.map((r) => {
+              return r.timestamp ? new Date(r.timestamp) : new Date(r.date);
+            }))).toLocaleDateString("en-GB")
+          : "-";
+        const billSettlementToDate = sortedBillSettlement.length
+          ? new Date(Math.max(...sortedBillSettlement.map((r) => {
+              return r.timestamp ? new Date(r.timestamp) : new Date(r.date);
+            }))).toLocaleDateString("en-GB")
+          : "-";
+        const totalBillAmount = sortedBillSettlement
+          .reduce((sum, row) => sum + (parseFloat(row.bill_amount) || 0), 0);
+
+        // Add timestamp
+        const timestamp = new Date().toLocaleString("en-GB", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit"
+        });
+
+        // Bill Settlement header
+        const billSettlementHeader = [
+          "S.No",
+          "Date",
+          "Contractor/Vendor",
+          "Project Name",
+          "Advance",
+          "Bill Amount",
+          "Refund Amount",
+          "Transfer",
+          "Type",
+          "Mode",
+          "Description",
+          "Attached file",
+        ];
+
+        // Bill Settlement summary rows with timestamp
+        const billSettlementSummaryRows = [
+          ["Bill Settlement Report", "", "", "", "", "", "", "", "", "", "", ""],
+          [`Generated: ${timestamp}`, "", "", "", "", "", "", "", "", "", "", ""],
+          ["", "", "", "", "", "", "", "", "", "", "", ""],
+          ["Start Date", billSettlementFromDate, "End Date", billSettlementToDate, "Total Bill Amount", totalBillAmount.toLocaleString("en-IN"), "", "", "", "", "", ""],
+          ["", "", "", "", "", "", "", "", "", "", "", ""],
+        ];
+
+        // Bill Settlement data rows - use timestamp for date
+        const billSettlementRows = sortedBillSettlement.map((row, idx) => {
+          const contractor = contractorOptions.find((c) => c.id === row.contractor_id)?.label;
+          const vendor = vendorOptions.find((v) => v.id === row.vendor_id)?.label;
+          const project = siteOptions.find((s) => s.id === row.project_id)?.label;
+          const transferSite = siteOptions.find((s) => s.id === row.transfer_site_id)?.label;
+          
+          // Use timestamp if available, otherwise use date
+          const rowDate = row.timestamp ? new Date(row.timestamp) : new Date(row.date);
+
+          return [
+            idx + 1,
+            rowDate.toLocaleDateString("en-GB"),
+            contractor || vendor || "",
+            project || "",
+            (row.amount ?? 0).toLocaleString("en-IN"),
+            (row.bill_amount ?? 0).toLocaleString("en-IN"),
+            (row.refund_amount ?? 0).toLocaleString("en-IN"),
+            transferSite || "",
+            row.type || "",
+            row.payment_mode || "",
+            row.description || "",
+            row.file_url ? "Yes" : "-",
+          ];
+        });
+
+        const billSettlementAoa = [
+          ...billSettlementSummaryRows,
+          billSettlementHeader,
+          ...billSettlementRows
+        ];
+        const billSettlementWs = XLSX.utils.aoa_to_sheet(billSettlementAoa);
+        XLSX.utils.book_append_sheet(wb, billSettlementWs, "Bill Settlement");
+      }
+    }
+
     const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
 
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
     saveAs(
       new Blob([wbout], { type: "application/octet-stream" }),
-      `AdvanceReport_${fromDate.replace(/\//g, "-")}_to_${toDate.replace(/\//g, "-")}.xlsx`
+      `AdvanceReport_${fromDate.replace(/\//g, "-")}_to_${toDate.replace(/\//g, "-")}_${timestamp}.xlsx`
     );
   };
 

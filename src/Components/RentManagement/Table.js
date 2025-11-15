@@ -24,8 +24,8 @@ const Table = () => {
     const [formType, setFormType] = useState('');
     const [eno, setEno] = useState('');
     const [selectedRentMonth, setSelectedRentMonth] = useState('');
-    // New state variables for properties and tenants data
-    const [properties, setProperties] = useState([]);
+    // New state variables for projects and tenants data
+    const [projects, setProjects] = useState([]);
     const [tenantShopData, setTenantShopData] = useState([]);
     const [shopNoIdToShopNoMap, setShopNoIdToShopNoMap] = useState({});
     const [tenantNameIdToTenantNameMap, setTenantNameIdToTenantNameMap] = useState({});
@@ -95,42 +95,54 @@ const Table = () => {
     };
     const [allShops, setAllShops] = useState([]);
     useEffect(() => {
-        fetchProperties();
+        fetchProjects();
         fetchTenants();
     }, []);
     
-    // Fetch properties for allShops
-    const fetchProperties = async () => {
+    // Fetch projects for allShops
+    const fetchProjects = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/properties/all');
+            const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
             if (response.ok) {
                 const data = await response.json();
-                setProperties(data);
-                // Extract property names
+                // Filter for "own project" category
+                const ownProjects = Array.isArray(data)
+                    ? data.filter(p => (p.projectCategory || '').toLowerCase() === 'own project')
+                    : [];
+                setProjects(ownProjects);
+                console.log('Fetched projects:', ownProjects.length, 'projects');
+                // Extract shop data from projects
                 const extractedShops = [];
-                data.forEach(property => {
-                    property.propertyDetailsList?.forEach(shop => {
-                        if (shop.shopNo) {
-                            extractedShops.push({
-                                shopNo: shop.shopNo,
-                                doorNo: shop.doorNo || '',
-                                propertyName: property.propertyName || '',
-                                advance: null,
-                                tenantName: null,
-                                tenantId: null,
-                                shopId: shop.id,
-                                active: false
-                            });
-                        }
+                ownProjects
+                    .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
+                    .forEach(project => {
+                        // Convert Set to Array if needed
+                        const propertyDetailsArray = Array.isArray(project.propertyDetails) 
+                            ? project.propertyDetails 
+                            : Array.from(project.propertyDetails || []);
+                        
+                        propertyDetailsArray.forEach(shop => {
+                            if (shop.shopNo) {
+                                extractedShops.push({
+                                    shopNo: shop.shopNo,
+                                    doorNo: shop.doorNo || '',
+                                    propertyName: project.projectReferenceName || '', // Use projectReferenceName
+                                    advance: null,
+                                    tenantName: null,
+                                    tenantId: null,
+                                    shopId: shop.id,
+                                    active: false
+                                });
+                            }
+                        });
                     });
-                });
                 setAllShops(extractedShops);
             } else {
-                console.log('Error fetching properties.');
+                console.log('Error fetching projects.');
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching properties.');
+            console.log('Error fetching projects.');
         }
     };
     
@@ -152,15 +164,22 @@ const Table = () => {
     
     // Build mapping from IDs to actual values
     useEffect(() => {
-        // Build shopNoId -> shopNo mapping from properties
+        // Build shopNoId -> shopNo mapping from projects (project management)
         const shopNoIdMap = {};
-        properties.forEach(property => {
-            property.propertyDetailsList?.forEach(detail => {
-                if (detail.id && detail.shopNo) {
-                    shopNoIdMap[detail.id] = detail.shopNo;
-                }
+        projects
+            .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
+            .forEach(project => {
+                // Convert Set to Array if needed
+                const propertyDetailsArray = Array.isArray(project.propertyDetails) 
+                    ? project.propertyDetails 
+                    : Array.from(project.propertyDetails || []);
+                
+                propertyDetailsArray.forEach(detail => {
+                    if (detail.id && detail.shopNo) {
+                        shopNoIdMap[detail.id] = detail.shopNo;
+                    }
+                });
             });
-        });
         setShopNoIdToShopNoMap(shopNoIdMap);
         
         // Build tenantNameId -> tenantName mapping from tenantShopData
@@ -171,7 +190,7 @@ const Table = () => {
             }
         });
         setTenantNameIdToTenantNameMap(tenantNameIdMap);
-    }, [properties, tenantShopData]);
+    }, [projects, tenantShopData]);
     const sortedItems = sortField
         ? [...currentItems].sort((a, b) => {
             const valA = a[sortField];
@@ -308,11 +327,9 @@ const Table = () => {
             rent.paymentMode,
             rent.formType
         ]);
-
         const csvContent = [headers, ...rows]
             .map(row => row.map(value => `"${value}"`).join(","))
             .join("\n");
-
         const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
         const link = document.createElement("a");
         const url = URL.createObjectURL(blob);
@@ -322,22 +339,16 @@ const Table = () => {
         link.click();
         document.body.removeChild(link);
     };
-
-
     const handleExportPDF = () => {
-        // If filtered and full data are the same length, no filter is applied
         if (filteredRentForm.length === 0 || filteredRentForm.length === rentForms.length) {
             alert("No data filtered for export.");
             return;
         }
-
         const doc = new jsPDF();
         doc.setFontSize(16);
         doc.text("Filtered Rent Report", 14, 20);
-
         const tableColumn = ["Shop No", "Tenant Name", "Amount", "Paid On", "For the Month Of", "Payment Mode", "Type", "E No"];
         const tableRows = [];
-
         filteredRentForm.forEach((rent) => {
             const row = [
                 rent.shopNoId && shopNoIdToShopNoMap[rent.shopNoId] ? shopNoIdToShopNoMap[rent.shopNoId] : rent.shopNo,
@@ -359,60 +370,105 @@ const Table = () => {
             ];
             tableRows.push(row);
         });
-
         doc.autoTable({
             startY: 30,
             head: [tableColumn],
             body: tableRows,
-            theme: "grid", // ✅ full borders for all cells
+            theme: "grid",
             styles: {
                 fontSize: 10,
                 fontStyle: 'normal',
-                textColor: [100, 100, 100], // black text
-                lineColor: [100, 100, 100], // black border
-                lineWidth: 0.1,        // thin borders
+                textColor: [100, 100, 100], 
+                lineColor: [100, 100, 100],
+                lineWidth: 0.1,   
             },
             headStyles: {
-                fontStyle: 'bold',     // ✅ bold headers
-                fillColor: false,      // ✅ no background color in header
-                textColor: [0, 0, 0],  // black text
-                lineColor: [0, 0, 0],  // header borders
+                fontStyle: 'bold', 
+                fillColor: false, 
+                textColor: [0, 0, 0], 
+                lineColor: [0, 0, 0], 
                 lineWidth: 0.1,
             },
         });
-
         doc.save("FilteredRentReport.pdf");
     };
     const handlePrint = (rent) => {
         const displayShopNo = rent.shopNoId && shopNoIdToShopNoMap[rent.shopNoId] ? shopNoIdToShopNoMap[rent.shopNoId] : rent.shopNo;
         const displayTenantName = rent.tenantNameId && tenantNameIdToTenantNameMap[rent.tenantNameId] ? tenantNameIdToTenantNameMap[rent.tenantNameId] : rent.tenantName;
         const matchingShop = allShops.find(shop => shop.shopNo === displayShopNo);
-        const propertyName = matchingShop?.propertyName || 'N/A';
-
-        // Replace this with your actual QR code URL or base64 image
+        const projectReferenceName = matchingShop?.propertyName || 'N/A'; // propertyName stores projectReferenceName
         const qrCodeImage = QRCode;
-
         const receiptHtml = `
     <html>
     <head>
         <title>Receipt</title>
         <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            h2 { text-align: center; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            td, th { padding: 8px; border: 1px solid #ccc; }
-            .label { font-weight: bold; width: 40%; }
-            .signature { margin-top: 40px; }
-            .bank-details-table { margin-top: 60px; }
-            .qr { text-align: center; margin-top: 20px; }
+            @media print {
+                @page { 
+                    size: A4; 
+                    margin: 10mm;
+                }
+                body { 
+                    margin: 0;
+                    padding: 10px;
+                }
+                .no-break {
+                    page-break-inside: avoid;
+                    break-inside: avoid;
+                }
+            }
+            body { 
+                font-family: Arial, sans-serif; 
+                padding: 15px; 
+                margin: 0;
+                font-size: 12px;
+            }
+            h2 { 
+                text-align: center; 
+                margin: 10px 0;
+                font-size: 18px;
+            }
+            h3 {
+                margin: 10px 0 5px 0;
+                font-size: 14px;
+            }
+            table { 
+                width: 100%; 
+                border-collapse: collapse; 
+                margin-top: 10px;
+                font-size: 11px;
+            }
+            td, th { 
+                padding: 5px; 
+                border: 1px solid #ccc; 
+            }
+            .label { 
+                font-weight: bold; 
+                width: 40%; 
+            }
+            .signature { 
+                margin-top: 15px;
+                font-size: 11px;
+            }
+            .bank-details-table { 
+                margin-top: 15px;
+            }
+            .qr { 
+                text-align: center; 
+                margin-top: 15px;
+            }
+            .qr img {
+                width: 150px;
+                height: 150px;
+            }
         </style>
     </head>
     <body>
         <h2>Rent Payment Receipt</h2>
-        <table>
+        <table class="no-break">
             <tr><td class="label">Shop No</td><td>${displayShopNo}</td></tr>
             <tr><td class="label">Tenant Name</td><td>${displayTenantName}</td></tr>
-            <tr><td class="label">Property Name</td><td>${propertyName}</td></tr>
+            <tr><td class="label">Project Reference Name</td><td>${projectReferenceName}</td></tr>
             <tr><td class="label">Amount Paid</td><td>₹${Number(rent.refundAmount || rent.amount).toLocaleString('en-IN', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
@@ -429,26 +485,28 @@ const Table = () => {
             <tr><td class="label">Type</td><td>${rent.formType}</td></tr>
         </table>
 
-        <div class="signature">
-            <p>Signature: __________________________</p>
-        </div>
+        <div class="no-break">
+            <div class="signature">
+                <p>Signature: __________________________</p>
+            </div>
 
-        <div class="bank-details-table">
-            <h3>Bank Details</h3>
-            <table>
-                <tr><td class="label">Bank</td><td>KVB</td></tr>
-                <tr><td class="label">Name</td><td>AA Builders</td></tr>
-                <tr><td class="label">Account Number</td><td>1804155000040012</td></tr>
-                <tr><td class="label">IFSC Code</td><td>KVBL0001804</td></tr>
-                <tr><td class="label">Branch</td><td>Srivilliputtur</td></tr>
-                <tr><td class="label">UPI ID</td><td>office.aabuilders@okhdfcbank</td></tr>
-                <tr><td class="label">GPay Number</td><td>93634 11241</td></tr>
-            </table>
-        </div>
+            <div class="bank-details-table">
+                <h3>Bank Details</h3>
+                <table>
+                    <tr><td class="label">Bank</td><td>KVB</td></tr>
+                    <tr><td class="label">Name</td><td>AA Builders</td></tr>
+                    <tr><td class="label">Account Number</td><td>1804155000040012</td></tr>
+                    <tr><td class="label">IFSC Code</td><td>KVBL0001804</td></tr>
+                    <tr><td class="label">Branch</td><td>Srivilliputtur</td></tr>
+                    <tr><td class="label">UPI ID</td><td>office.aabuilders@okhdfcbank</td></tr>
+                    <tr><td class="label">GPay Number</td><td>93634 11241</td></tr>
+                </table>
+            </div>
 
-        <div class="qr">
-            <p><strong>Scan to Pay</strong></p>
-            <img src="${qrCodeImage}" alt="QR Code" width="200" height="200" />
+            <div class="qr">
+                <p><strong>Scan to Pay</strong></p>
+                <img src="${qrCodeImage}" alt="QR Code" />
+            </div>
         </div>
 
         <script>
@@ -486,10 +544,8 @@ const Table = () => {
                 cancelMomentum();
             }
         };
-
         animationFrame.current = requestAnimationFrame(step);
     };
-
     useEffect(() => {
         axios
             .get('https://backendaab.in/aabuildersDash/api/rental_forms/getAll')
@@ -497,7 +553,7 @@ const Table = () => {
                 const sortedExpenses = response.data.sort((a, b) => {
                     const enoA = parseInt(a.id, 10);
                     const enoB = parseInt(b.id, 10);
-                    return enoB - enoA; // descending order
+                    return enoB - enoA; 
                 });
                 setRentForms(sortedExpenses);
                 setFilteredRentForm(sortedExpenses);
@@ -512,15 +568,12 @@ const Table = () => {
                 setTenantNameOption(uniqueTenantName);
                 setPaymentModeOption(uniquePaymentMode);
                 setFormTypeOptions(uniqueFormType);
-                uniqueForTheMonthOf.sort(); // optional: sorts chronologically
-                // Format into "Month Year" (e.g., "February 2025")
+                uniqueForTheMonthOf.sort(); 
                 const formattedMonths = uniqueForTheMonthOf.map(monthStr => {
                     const [year, month] = monthStr.split('-');
-                    const date = new Date(year, parseInt(month) - 1); // months are 0-based
+                    const date = new Date(year, parseInt(month) - 1); 
                     return date.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
                 });
-
-                // Set the formatted options
                 setMonthOptions(formattedMonths);
                 console.log(formattedMonths);
             })
@@ -553,19 +606,14 @@ const Table = () => {
                 matchesENo
             );
         });
-
         setFilteredRentForm(filtered);
-
-        // 👇 Extract filter options from filtered data only
         const getUnique = (key) => [...new Set(filtered.map(item => item[key]).filter(Boolean))];
-
         setShopNoOption(getUnique('shopNo'));
         setTenantNameOption(getUnique('tenantName'));
         setPaymentModeOption(getUnique('paymentMode'));
         setFormTypeOptions(getUnique('formType'));
         setEnoOption(getUnique('eno'));
-
-        const uniqueMonths = getUnique('forTheMonthOf').sort(); // 'YYYY-MM'
+        const uniqueMonths = getUnique('forTheMonthOf').sort(); 
         const formattedMonths = uniqueMonths.map(monthStr => {
             const [year, month] = monthStr.split('-');
             const date = new Date(year, parseInt(month) - 1);
@@ -689,45 +737,38 @@ const Table = () => {
                             <table className="table-auto min-w-[1165px] w-full border-collapse">
                                 <thead>
                                     <tr className="bg-[#FAF6ED] text-left">
-                                        <th
-                                            className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm"
+                                        <th className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm"
                                             onClick={() => handleSort('shopNo')}
                                         >
                                             Shop No {sortField === 'shopNo' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
-                                        <th
-                                            className="px-2 sm:px-4 py-2 font-bold text-xs sm:text-sm"
+                                        <th className="px-2 sm:px-4 py-2 font-bold text-xs sm:text-sm"
                                             onClick={() => handleSort('tenantName')}>
                                             Tenant Name {sortField === 'tenantName' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
                                         <th className="px-2 sm:px-4 py-2 font-bold text-xs sm:text-sm">Amount</th>
-                                        <th
-                                            className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm"
+                                        <th className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm"
                                             onClick={() => handleSort('paidOnDate')}
                                         >
                                             Paid on {sortField === 'paidOnDate' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
-                                        <th
-                                            className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm"
+                                        <th className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm"
                                             onClick={() => handleSort('eno')}
                                         >
                                             E No {sortField === 'eno' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
 
-                                        <th
-                                            className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm"
+                                        <th className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm"
                                             onClick={() => handleSort('forTheMonthOf')}
                                         >
                                             For the month of {sortField === 'forTheMonthOf' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
-                                        <th
-                                            className="px-2 sm:px-4 py-2 font-bold text-xs sm:text-sm"
+                                        <th className="px-2 sm:px-4 py-2 font-bold text-xs sm:text-sm"
                                             onClick={() => handleSort('paymentMode')}
                                         >
                                             Payment mode {sortField === 'paymentMode' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
-                                        <th
-                                            className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm"
+                                        <th className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm"
                                             onClick={() => handleSort('formType')}
                                         >
                                             Type {sortField === 'formType' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}

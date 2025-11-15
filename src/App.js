@@ -32,6 +32,7 @@ import UtilityHeading from './Components/UtilityHub/UtilityHeading';
 import BankRegisterHeading from './Components/Bank Register/BankRegisterHeading';
 import QuotationHeading from './Components/Quotation/QuotationHeading';
 import DirectoryHeading from './Components/Directory/DirectoryHeading';
+import ToolsTrackerHeading from './Components/ToolsTracker/ToolsTrackerHeading';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -92,6 +93,7 @@ function App() {
             <Route path="/bank-register" element={<BankRegisterHeading username={user.username} userRoles={user?.userRoles || []} />} />
             <Route path="/quotation/*" element={<QuotationHeading username={user.username} userRoles={user?.userRoles || []} />} />
             <Route path="/directory/*" element={<DirectoryHeading username={user.username} userRoles={user?.userRoles || []} />} />
+            <Route path="/toolsTracker/*" element={<ToolsTrackerHeading username={user.username} userRoles={user?.userRoles || []} />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </div>

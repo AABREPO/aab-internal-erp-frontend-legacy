@@ -9,7 +9,7 @@ const Ebno = () => {
 
     const [rentForms, setRentForms] = useState([]);
     const [ebtenantShopData, setEbTenantShopData] = useState([]);
-    const [ebproperties, setEbProperties] = useState([]);
+    const [ebprojects, setEbProjects] = useState([]);
     const [selectedEbShopNo, setSelectedEbShopNo] = useState('');
     const [selectedEbDoorNo, setSelectedEbDoorNo] = useState('');
     const [selectedEbNo, setSelectedEbNo] = useState('');
@@ -21,19 +21,31 @@ const Ebno = () => {
     const [sortOrder, setSortOrder] = useState('asc');
 
     useEffect(() => {
-        fetchProperties();
+        fetchProjects();
     }, []);
 
-    const fetchProperties = async () => {
+    const fetchProjects = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/properties/all');
+            const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
             if (response.ok) {
                 const data = await response.json();
-                setEbProperties(data);
-                console.log("✅ Full property :", data);
-                // 🧠 Flatten all propertyDetailsList and extract unique ebNos
-                const ebNos = data
-                    .flatMap(property => property.propertyDetailsList || [])
+                // Filter for "own project" category
+                const ownProjects = Array.isArray(data)
+                    ? data.filter(p => (p.projectCategory || '').toLowerCase() === 'own project')
+                    : [];
+                setEbProjects(ownProjects);
+                console.log("✅ Full projects :", ownProjects);
+                // 🧠 Flatten all propertyDetails and extract unique ebNos
+                // Only include projects with projectReferenceName
+                const ebNos = ownProjects
+                    .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
+                    .flatMap(project => {
+                        // Convert Set to Array if needed
+                        const propertyDetailsArray = Array.isArray(project.propertyDetails) 
+                            ? project.propertyDetails 
+                            : Array.from(project.propertyDetails || []);
+                        return propertyDetailsArray;
+                    })
                     .map(detail => detail.ebNo)
                     .filter(eb => !!eb); // Remove undefined/null/empty
 
@@ -42,7 +54,7 @@ const Ebno = () => {
 
                 console.log("✅ EB Options:", uniqueEbNos);
             } else {
-                console.log('❌ Error fetching properties.');
+                console.log('❌ Error fetching projects.');
             }
         } catch (error) {
             console.error('❌ Fetch error:', error);
@@ -72,7 +84,7 @@ const Ebno = () => {
                 if (shop.shopNo) {
                     shopInfoMap[shop.shopNo] = {
                         doorNo: shop.doorNo || '',
-                        propertyName: property.propertyName || '',
+                        projectReferenceName: property.propertyName || '', // propertyName stores projectReferenceName
                         advanceAmount: shop.advanceAmount || '',
                         monthlyRent: shop.monthlyRent || '',
                         tenantId: tenant.id,     // ← Add tenant ID
@@ -93,23 +105,30 @@ const Ebno = () => {
     };
     useEffect(() => {
         const allShops = [];
-        // 1. Collect all shop data from properties
-        ebproperties.forEach(property => {
-            property.propertyDetailsList?.forEach(shop => {
-                if (shop.shopNo) {
-                    allShops.push({
-                        shopNo: shop.shopNo,
-                        doorNo: shop.doorNo || '',
-                        propertyName: property.propertyName || '',
-                        advance: null,
-                        tenantName: null,
-                        tenantId: null,
-                        shopId: shop.id,
-                        active: false
-                    });
-                }
+        // 1. Collect all shop data from projects (project management)
+        ebprojects
+            .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
+            .forEach(project => {
+                // Convert Set to Array if needed
+                const propertyDetailsArray = Array.isArray(project.propertyDetails) 
+                    ? project.propertyDetails 
+                    : Array.from(project.propertyDetails || []);
+                
+                propertyDetailsArray.forEach(shop => {
+                    if (shop.shopNo) {
+                        allShops.push({
+                            shopNo: shop.shopNo,
+                            doorNo: shop.doorNo || '',
+                            propertyName: project.projectReferenceName || '', // Use projectReferenceName
+                            advance: null,
+                            tenantName: null,
+                            tenantId: null,
+                            shopId: shop.id,
+                            active: false
+                        });
+                    }
+                });
             });
-        });
         // 2. Merge tenant data (excluding advance)
         ebtenantShopData.forEach(tenant => {
             tenant.property?.forEach(property => {
@@ -211,12 +230,14 @@ const Ebno = () => {
             }
         });
         setEbTableData(finalTableData);
-    }, [rentForms, ebtenantShopData, ebproperties]);
+    }, [rentForms, ebtenantShopData, ebprojects]);
 
-    const options = ebproperties.map((property) => ({
-        value: property.propertyName,
-        label: property.propertyName,
-    }));
+    const options = ebprojects
+        .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
+        .map((project) => ({
+            value: project.projectReferenceName,
+            label: project.projectReferenceName,
+        }));
 
     const shopOptions = [...new Set(ebtableData.map(shop => shop.shopNo))].map(no => ({ value: no, label: no }));
     const filteredByShop = selectedEbShopNo
@@ -237,22 +258,74 @@ const Ebno = () => {
         p.shops?.map(shop => shop.shopNo)
     ) || [];
 
-    const filteredEbProperties = ebproperties.flatMap(property => {
-        const owner = property.ownerDetailsList?.[0] || {};
+    const filteredEbProperties = ebprojects
+        .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
+        .flatMap(project => {
+            // Convert Set to Array if needed for ownerDetails
+            const ownerDetailsArray = Array.isArray(project.ownerDetails) 
+                ? project.ownerDetails 
+                : Array.from(project.ownerDetails || []);
+            const owner = ownerDetailsArray[0] || {};
 
-        return (property.propertyDetailsList || [])
-            .filter(detail => {
-                const matchesTenant = !selectedEbTenantName || tenantShopNos.includes(detail.shopNo);
+            // Convert Set to Array if needed for propertyDetails
+            const propertyDetailsArray = Array.isArray(project.propertyDetails) 
+                ? project.propertyDetails 
+                : Array.from(project.propertyDetails || []);
 
-                return (
-                    (!selectedEbNo || detail.ebNo === selectedEbNo) &&
-                    (!selectedEbShopNo || detail.shopNo === selectedEbShopNo) &&
-                    (!selectedEbDoorNo || detail.doorNo === selectedEbDoorNo) &&
-                    matchesTenant &&
-                    (!selectedEbProperty || selectedEbProperty.value === property.propertyName)
-                );
-            })
-            .map(detail => {
+            return propertyDetailsArray
+                .filter(detail => {
+                    const matchesTenant = !selectedEbTenantName || tenantShopNos.includes(detail.shopNo);
+
+                    return (
+                        (!selectedEbNo || detail.ebNo === selectedEbNo) &&
+                        (!selectedEbShopNo || detail.shopNo === selectedEbShopNo) &&
+                        (!selectedEbDoorNo || detail.doorNo === selectedEbDoorNo) &&
+                        matchesTenant &&
+                        (!selectedEbProperty || selectedEbProperty.value === project.projectReferenceName)
+                    );
+                })
+                .map(detail => {
+                    let matchedTenantName = '';
+                    let matchedTenantRent = null;
+                    for (const tenant of ebtenantShopData) {
+                        for (const prop of tenant.property || []) {
+                            for (const shop of prop.shops || []) {
+                                if (shop.shopNo === detail.shopNo && shop.doorNo === detail.doorNo) {
+                                    matchedTenantName = tenant.tenantName;
+                                    matchedTenantRent = shop.monthlyRent;
+                                    break;
+                                }
+                            }
+                        }
+                        if (matchedTenantName) break;
+                    }
+                    return {
+                        property: project, // Store the full project object
+                        owner,
+                        detail,
+                        tenantName: matchedTenantName,
+                        rent: matchedTenantRent
+                    };
+                });
+        });
+    console.log("✅ Filtered EB Properties:", filteredEbProperties);
+    
+    // ✅ All EB Properties (unfiltered) for PDF/CSV export
+    const allEbProperties = ebprojects
+        .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
+        .flatMap(project => {
+            // Convert Set to Array if needed for ownerDetails
+            const ownerDetailsArray = Array.isArray(project.ownerDetails) 
+                ? project.ownerDetails 
+                : Array.from(project.ownerDetails || []);
+            const owner = ownerDetailsArray[0] || {};
+
+            // Convert Set to Array if needed for propertyDetails
+            const propertyDetailsArray = Array.isArray(project.propertyDetails) 
+                ? project.propertyDetails 
+                : Array.from(project.propertyDetails || []);
+
+            return propertyDetailsArray.map(detail => {
                 let matchedTenantName = '';
                 let matchedTenantRent = null;
                 for (const tenant of ebtenantShopData) {
@@ -267,16 +340,16 @@ const Ebno = () => {
                     }
                     if (matchedTenantName) break;
                 }
-
                 return {
-                    property,
+                    property: project, // Store the full project object
                     owner,
                     detail,
                     tenantName: matchedTenantName,
                     rent: matchedTenantRent
                 };
             });
-    });
+        });
+    
     const handleSort = (field) => {
         if (sortField === field) {
             setSortOrder((prevOrder) => (prevOrder === 'asc' ? 'desc' : 'asc'));
@@ -288,8 +361,10 @@ const Ebno = () => {
     const sortedEbProperties = [...filteredEbProperties].sort((a, b) => {
         const getValue = (obj) => {
             if (!sortField) return '';
-            if (sortField === 'propertyName') return obj.property.propertyName || '';
-            if (sortField === 'ownerName') return obj.owner.ownerName || '';
+            if (sortField === 'propertyName') return obj.property.projectReferenceName || '';
+            if (sortField === 'ownerName') return obj.owner.clientName || ''; // Use clientName from ownerDetails
+            // Handle projectType mapping
+            if (sortField === 'propertyType') return obj.detail.projectType || '';
             return obj.detail[sortField] || '';
         };
 
@@ -313,7 +388,7 @@ const Ebno = () => {
         doc.text("EB Property List", 14, 15);
 
         const tableColumn = [
-            "Property Name",
+            "Project Reference Name",
             "Owner Name",
             "Property Type",
             "Floor Name",
@@ -324,9 +399,9 @@ const Ebno = () => {
         ];
 
         const tableRows = filteredEbProperties.map(({ property, owner, detail }) => [
-            property.propertyName || " - ",
-            owner.ownerName || " - ",
-            detail.propertyType || " - ",
+            property.projectReferenceName || " - ",
+            owner.clientName || " - ", // Use clientName from ownerDetails
+            detail.projectType || " - ", // Use projectType
             detail.floorName || " - ",
             detail.shopNo || " - ",
             detail.doorNo || " - ",
@@ -363,10 +438,6 @@ const Ebno = () => {
     };
     // ✅ Common helper to filter, sort and prepare rows
     const prepareEbRows = (filteredEbProperties) => {
-        // Exclude owner Rajendran
-        const filteredRows = filteredEbProperties.filter(
-            ({ owner }) => owner.ownerName !== "Rajendran"
-        );
         // ✅ Parse shopNo into { prefix, num, suffix }
         const parseShopNo = (shopNo) => {
             if (!shopNo) return { prefix: "", num: NaN, suffix: "" };
@@ -382,9 +453,9 @@ const Ebno = () => {
             // If no number at all → treat whole as prefix
             return { prefix: shopNo.trim(), num: NaN, suffix: "" };
         };
-        // ✅ Sorting logic: propertyName → shopNo
-        const sortedRows = filteredRows.sort((a, b) => {
-            if (a.property.propertyName === b.property.propertyName) {
+        // ✅ Sorting logic: projectReferenceName → shopNo
+        const sortedRows = filteredEbProperties.sort((a, b) => {
+            if (a.property.projectReferenceName === b.property.projectReferenceName) {
                 const aParsed = parseShopNo(a.detail.shopNo);
                 const bParsed = parseShopNo(b.detail.shopNo);
                 // Compare prefixes (M, TA, TC-B, etc.)
@@ -404,13 +475,13 @@ const Ebno = () => {
                 // One has no number → fallback to string compare
                 return (a.detail.shopNo || "").localeCompare(b.detail.shopNo || "");
             }
-            return a.property.propertyName.localeCompare(b.property.propertyName);
+            return (a.property.projectReferenceName || "").localeCompare(b.property.projectReferenceName || "");
         });
         // ✅ Prepare table rows for PDF/CSV
         const tableRows = sortedRows.map(({ property, owner, detail, rent }) => [
-            property.propertyName || "-",
-            owner.ownerName || "-",
-            detail.propertyType || "-",
+            property.projectReferenceName || "-",
+            owner.clientName || "-", // Use clientName from ownerDetails
+            detail.projectType || "-", // Use projectType
             detail.shopNo || "-",
             detail.floorName || "-",
             detail.doorNo || "-",
@@ -432,7 +503,7 @@ const Ebno = () => {
         doc.setFont("helvetica", "bold");
         doc.text("EB Property List", 14, 15);
         const tableColumn = [
-            "Property Name",
+            "Project Reference Name",
             "Owner Name",
             "Property",
             "Shop No",
@@ -442,7 +513,7 @@ const Ebno = () => {
             "EB.No",
             "Rent"
         ];
-        const { tableRows, totalRent } = prepareEbRows(filteredEbProperties);
+        const { tableRows, totalRent } = prepareEbRows(allEbProperties);
         // Show total top-right
         doc.setFontSize(12);
         doc.setFont("helvetica", "normal");
@@ -480,7 +551,7 @@ const Ebno = () => {
     // ✅ Generate CSV
     const generateCsvWithRent = () => {
         const headers = [
-            "Property Name",
+            "Project Reference Name",
             "Owner Name",
             "Property",
             "Shop No",
@@ -490,7 +561,7 @@ const Ebno = () => {
             "EB.No",
             "Rent"
         ];
-        const { tableRows, totalRent } = prepareEbRows(filteredEbProperties);
+        const { tableRows, totalRent } = prepareEbRows(allEbProperties);
         // Add total row
         tableRows.push([
             "TOTAL", "", "", "", "", "", "", "",
@@ -692,7 +763,6 @@ const Ebno = () => {
                             }}
                         />
                     </div>
-
                 </div>
             </div>
             <div className='lg:w-[1750px] p-4 lg:pl-8 mt-6 bg-white lg:ml-10 mr-10 rounded-md'>
@@ -719,7 +789,7 @@ const Ebno = () => {
                             <tr className="bg-[#FAF6ED]">
                                 <th className="pl-3">S.No</th>
                                 <th onClick={() => handleSort('propertyName')} className="cursor-pointer px-4 py-2 font-semibold">
-                                    Property Name {sortField === 'propertyName' && (sortOrder === 'asc' ? '↑' : '↓')}
+                                    Project Reference Name {sortField === 'propertyName' && (sortOrder === 'asc' ? '↑' : '↓')}
                                 </th>
                                 <th onClick={() => handleSort('shopNo')} className="cursor-pointer  font-semibold">
                                     Shop No {sortField === 'shopNo' && (sortOrder === 'asc' ? '↑' : '↓')}
@@ -747,15 +817,15 @@ const Ebno = () => {
                             {sortedEbProperties.map(({ property, owner, detail, tenantName }, index) => (
                                 <tr key={`${property.id}-${detail.id}-${index}`} className="border-b border-gray-200 odd:bg-white even:bg-[#FAF6ED]">
                                     <td className="pl-5 py-2">{index + 1}.</td>
-                                    <td className="pl-2">{property.propertyName || '-'}</td>
+                                    <td className="pl-2">{property.projectReferenceName || '-'}</td>
                                     <td>{detail.shopNo || '-'}</td>
                                     <td>{detail.doorNo || '-'}</td>
-                                    <td>{owner.ownerName || '-'}</td>
-                                    <td>{detail.propertyType || '-'}</td>
+                                    <td>{owner.clientName || '-'}</td>
+                                    <td>{detail.projectType || '-'}</td>
                                     <td>{detail.floorName || '-'}</td>
                                     <td>{detail.area || '-'}</td>
                                     <td>{detail.ebNo || '-'}</td>
-                                    <td>{tenantName || '-'}</td> {/* New column */}
+                                    <td>{tenantName || '-'}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -765,5 +835,4 @@ const Ebno = () => {
         </div>
     )
 }
-
 export default Ebno

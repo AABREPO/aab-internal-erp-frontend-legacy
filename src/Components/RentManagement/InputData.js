@@ -10,6 +10,13 @@ import attach from '../Images/Attachfile.svg';
 import CreatableSelect from 'react-select/creatable';
 import axios from 'axios';
 const InputData = ({ username, userRoles = [] }) => {
+  const [tenantNameSearch, setTenantNameSearch] = useState("");
+  const [paymentModeSearch, setPaymentModeSearch] = useState("");
+  const [tenantLinkSearch, setTenantLinkSearch] = useState("");
+  const [tenantLinkList, setTenantLinkList] = useState([]);
+  const [isTenantLinkOpen, setIsTenantLinkOpen] = useState(false);
+  const [isTenantLinkEditOpen, setIsTenantLinkEditOpen] = useState(false);
+  const [selectedTenantLinkId, setSelectedTenantLinkId] = useState(null);
   const [tenantshoplink, setTenantshoplink] = useState(false);
   const [isPropertyOpen, setIsPropertyOpen] = useState(false);
   const [isPaymentModeOpen, setIsPaymentModeOpen] = useState(false);
@@ -19,15 +26,13 @@ const InputData = ({ username, userRoles = [] }) => {
   const [tenantList, setTenantList] = useState([]);
   const [editPaymentModeOpen, setEditPaymentModeopen] = useState(false);
   const [propertyNames, setPropertyNames] = useState([]);
-  const [shopNoOptions, setShopNo] = useState([]);
-  const [floorOptions, setFloorOptions] = useState([]);
   const [editFloorOptions, setEditFloorOptions] = useState([]);
   const [editShopNoOptions, setEditShopNoOptions] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [selectedPropertyEdit, setSelectedPropertyEdit] = useState(null);
   const [usedShopNos, setUsedShopNos] = useState(new Set());
+  const [shopsWithClosureDate, setShopsWithClosureDate] = useState(new Set());
   const [userPermissions, setUserPermissions] = useState([]);
-  const [shouldCollectAdvance, setShouldCollectAdvance] = useState(true); // default is Yes
   const [isProjectManagementOpen, setIsProjectManagementOpen] = useState(false);
   const [isProjectEditOpen, setIsProjectEditOpen] = useState(false);
   const [projects, setProjects] = useState([]);
@@ -115,12 +120,15 @@ const InputData = ({ username, userRoles = [] }) => {
       if (response.ok) {
         const data = await response.json();
         const ownProjects = Array.isArray(data)
-          ? data.filter(p => (p.projectCategory || '').toLowerCase() === 'own project')
+          ? data.filter(p =>
+            (p.projectCategory || '').toLowerCase() === 'own project' &&
+            p.projectReferenceName
+          )
           : [];
         setProjects(ownProjects);
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error fetching projects:', error);
     }
   };
   useEffect(() => {
@@ -137,12 +145,191 @@ const InputData = ({ username, userRoles = [] }) => {
     value: name,
     label: name
   }));
+  const projectOptions = projects
+    .filter(project => project.projectReferenceName) 
+    .map(project => ({
+      value: project.projectReferenceName,
+      label: project.projectReferenceName,
+      project: project 
+    }));
   const [newProperty, setNewProperty] = useState({
     propertyName: "",
     propertyAddress: "",
     ownerDetailsList: [{ ownerName: "", fatherName: "", mobile: "", age: "", ownerAddress: "" }],
     propertyDetailsList: [{ propertyType: "", floorName: "", doorNo: "", area: "", ebNo: "" }],
   });
+  const getShopOptionsForProperty = (projectRefName, propertyType, includeCurrentShops = []) => {
+    if (!projectRefName || !propertyType) return [];
+    const matchedProject = projects.find(
+      (p) => p.projectReferenceName === projectRefName
+    );
+
+    if (!matchedProject) {
+      console.log('No matched project found for:', projectRefName);
+      return [];
+    }
+
+    if (!matchedProject.propertyDetails) {
+      console.log('No propertyDetails found for project:', matchedProject);
+      return [];
+    }
+
+    const propertyDetailsArray = Array.isArray(matchedProject.propertyDetails)
+      ? matchedProject.propertyDetails
+      : Array.from(matchedProject.propertyDetails || []);
+
+    if (propertyDetailsArray.length === 0) {
+      console.log('propertyDetailsArray is empty for project:', projectRefName);
+      return [];
+    }
+    const filteredByType = propertyDetailsArray.filter((detail) =>
+      detail.projectType === propertyType
+    );
+    if (filteredByType.length === 0) {
+      console.log(`No propertyDetails found for projectType: ${propertyType} in project: ${projectRefName}`);
+      return [];
+    }
+    const shopNos = filteredByType
+      .map((detail) => detail.shopNo)
+      .filter((shopNo) => shopNo !== null && shopNo !== undefined && shopNo !== '')
+      .map((shopNo) => String(shopNo).trim())
+      .filter((shopNo) => shopNo !== '') 
+      .filter((shopNo, i, arr) => arr.indexOf(shopNo) === i); 
+    const currentShopNosSet = new Set(includeCurrentShops.map(s => String(s)));
+    const availableShopNos = shopNos.filter((shopNo) => {
+      const isMapped = usedShopNos.has(shopNo);
+      const hasClosureDate = shopsWithClosureDate.has(shopNo);
+      const isCurrentShop = currentShopNosSet.has(shopNo);
+      return !isMapped || hasClosureDate || isCurrentShop;
+    });
+    return availableShopNos.map((d) => ({
+      value: d,
+      label: d,
+    }));
+  };
+  const getFloorOptionsForProperty = (projectRefName, propertyType) => {
+    if (!projectRefName || !propertyType) return [];
+    const matchedProject = projects.find(
+      (p) => p.projectReferenceName === projectRefName
+    );
+    if (!matchedProject || !matchedProject.propertyDetails) return [];
+    const propertyDetailsArray = Array.isArray(matchedProject.propertyDetails)
+      ? matchedProject.propertyDetails
+      : Array.from(matchedProject.propertyDetails || []);
+    const floorNames = propertyDetailsArray
+      .filter((detail) => detail.projectType === propertyType)
+      .map((detail) => detail.floorName)
+      .filter((v) => v && v.trim() !== '')
+      .filter((v, i, arr) => arr.indexOf(v) === i);
+    return floorNames.map((f) => ({
+      value: f,
+      label: f,
+    }));
+  };
+  const getAllShopNumbersUnfiltered = () => {
+    const shopMap = new Map(); 
+    projects.forEach((project) => {
+      if (!project || !project.propertyDetails) return;
+      const propertyDetailsArray = Array.isArray(project.propertyDetails)
+        ? project.propertyDetails
+        : Array.from(project.propertyDetails || []);
+      propertyDetailsArray.forEach((detail) => {
+        if (detail && detail.shopNo && detail.shopNo !== null && detail.shopNo !== undefined && detail.shopNo !== '') {
+          const shopNoStr = String(detail.shopNo).trim();
+          if (shopNoStr !== '' && !shopMap.has(shopNoStr)) {
+            const shopId = detail.id || detail.shopNo;
+            shopMap.set(shopNoStr, {
+              value: shopId,
+              label: shopNoStr,
+              shopNo: shopNoStr,
+              id: shopId,
+              projectReferenceName: project.projectReferenceName || '',
+              doorNo: detail.doorNo || ''
+            });
+          }
+        }
+      });
+    });
+    return Array.from(shopMap.values()).sort((a, b) => {
+      const aNum = parseInt(a.shopNo);
+      const bNum = parseInt(b.shopNo);
+      if (!isNaN(aNum) && !isNaN(bNum)) {
+        return aNum - bNum;
+      }
+      return a.shopNo.localeCompare(b.shopNo);
+    });
+  };
+  const getAllShopNumbers = () => {
+    const activeLinkedShopNoIds = new Set();
+    if (tenantLinkList && Array.isArray(tenantLinkList)) {
+      tenantLinkList.forEach((tenantLink) => {
+        if (tenantLink && tenantLink.shopNos && Array.isArray(tenantLink.shopNos)) {
+          tenantLink.shopNos.forEach((shop) => {
+            if (shop && shop.shopNoId != null && shop.active === true) {
+              const shopIdStr = String(shop.shopNoId).trim();
+              activeLinkedShopNoIds.add(shopIdStr);
+            }
+          });
+        }
+      });
+    }
+    const shopMap = new Map();
+    projects.forEach((project) => {
+      if (!project || !project.propertyDetails) return;
+      const propertyDetailsArray = Array.isArray(project.propertyDetails)
+        ? project.propertyDetails
+        : Array.from(project.propertyDetails || []);
+      propertyDetailsArray.forEach((detail) => {
+        if (detail && detail.shopNo && detail.shopNo !== null && detail.shopNo !== undefined && detail.shopNo !== '') {
+          const shopNoStr = String(detail.shopNo).trim();
+          if (shopNoStr !== '') {
+            const shopId = detail.id || detail.shopNo;
+            const shopIdStr = String(shopId).trim();
+            const isActiveLinked = activeLinkedShopNoIds.has(shopIdStr);
+            if (!shopMap.has(shopNoStr) && !isActiveLinked) {
+              shopMap.set(shopNoStr, {
+                value: shopId,
+                label: shopNoStr,
+                shopNo: shopNoStr,
+                id: shopId,
+                projectReferenceName: project.projectReferenceName || '',
+                doorNo: detail.doorNo || ''
+              });
+            }
+          }
+        }
+      });
+    });
+    return Array.from(shopMap.values()).sort((a, b) => {
+      const aNum = parseInt(a.shopNo);
+      const bNum = parseInt(b.shopNo);
+      if (!isNaN(aNum) && !isNaN(bNum)) {
+        return aNum - bNum;
+      }
+      return a.shopNo.localeCompare(b.shopNo);
+    });
+  };
+  const getShopDetailsById = (shopNoId) => {
+    if (!shopNoId) return null;
+    for (const project of projects) {
+      if (!project.propertyDetails) continue;
+      const propertyDetailsArray = Array.isArray(project.propertyDetails)
+        ? project.propertyDetails
+        : Array.from(project.propertyDetails || []);
+      const detail = propertyDetailsArray.find(d =>
+        (d.id && d.id.toString() === shopNoId.toString()) ||
+        (d.shopNo && d.shopNo.toString() === shopNoId.toString())
+      );
+      if (detail) {
+        return {
+          projectReferenceName: project.projectReferenceName || '',
+          doorNo: detail.doorNo || ''
+        };
+      }
+    }
+    return null;
+  };
+
   const [formData, setFormData] = useState({
     tenantName: '',
     fullName: '',
@@ -194,7 +381,6 @@ const InputData = ({ username, userRoles = [] }) => {
     ]
   })
 
-  // Edit form handler functions
   const handleEditOwnerChange = (index, field, value) => {
     const updatedOwners = [...editProject.ownerDetailsList];
     updatedOwners[index][field] = value;
@@ -206,7 +392,7 @@ const InputData = ({ username, userRoles = [] }) => {
     updatedDetails[index][field] = value;
     setEditProject((prev) => ({ ...prev, propertyDetailsList: updatedDetails }));
   };
-const addEditOwner = () => {
+  const addEditOwner = () => {
     setEditProject((prev) => ({
       ...prev,
       ownerDetailsList: [...prev.ownerDetailsList, {
@@ -276,7 +462,6 @@ const addEditOwner = () => {
   };
   const handleShopeditChange = (propertyIndex, shopIndex, e) => {
     const { name, type, checked, value } = e.target;
-
     setEditformData(prev => {
       const updatedProperties = [...prev.property];
       const updatedShops = [...updatedProperties[propertyIndex].shops];
@@ -436,9 +621,44 @@ const addEditOwner = () => {
   };
   const openPropertyPopup = () => setIsPropertyOpen(true);
   const closePropertyPopup = () => setIsPropertyOpen(false);
-  const [propertySearch, setPropertySearch] = useState("");
-  const [tenantNameSearch, setTenantNameSearch] = useState("");
-  const [paymentModeSearch, setPaymentModeSearch] = useState("");
+  const [tenantLinkFormData, setTenantLinkFormData] = useState({
+    tenantName: '',
+    fullName: '',
+    tenantFatherName: '',
+    age: '',
+    mobileNumber: '',
+    tenantAddress: '',
+    shopNos: [
+      {
+        shopNoId: '',
+        monthlyRent: '',
+        advanceAmount: '',
+        startingDate: '',
+        shouldCollectAdvance: true
+      }
+    ]
+  });
+  const [editTenantLinkFormData, setEditTenantLinkFormData] = useState({
+    tenantName: '',
+    fullName: '',
+    tenantFatherName: '',
+    age: '',
+    mobileNumber: '',
+    tenantAddress: '',
+    shopNos: [
+      {
+        shopNoId: '',
+        monthlyRent: '',
+        advanceAmount: '',
+        startingDate: '',
+        rentIncreaseYear: '',
+        rentIncreasePercentage: '',
+        rentAssignDate: '',
+        shouldCollectAdvance: true,
+        shopClosureDate: ''
+      }
+    ]
+  });
   const [accountType, setAccountType] = useState('');
   const [modeOfPayment, setModeOfPayment] = useState('');
   const [paymentMode, setPaymentMode] = useState([]);
@@ -448,7 +668,6 @@ const addEditOwner = () => {
   const [message, setMessage] = useState('');
   const [selectedPdf, setSelectedPdf] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [expandedGroupIndex, setExpandedGroupIndex] = useState(null);
   const [selectedPaymentModeId, setSelectedPaymentModeId] = useState('');
   const [editModeOfPayment, setEditModeOfPayment] = useState('');
   const handleTenantClick = (aadhaarFile) => {
@@ -461,13 +680,13 @@ const addEditOwner = () => {
     { value: 'Shop', label: 'Shop' },
     { value: 'House', label: 'House' },
     { value: 'Land', label: 'Land' },
-    { value: 'Flat', label: 'Flat' }, // Add Flat here too
+    { value: 'Flat', label: 'Flat' }, 
   ];
   const propertyTypeEditOptions = [
     { value: 'Shop', label: 'Shop' },
     { value: 'House', label: 'House' },
     { value: 'Land', label: 'Land' },
-    { value: 'Flat', label: 'Flat' }, // Add Flat here too
+    { value: 'Flat', label: 'Flat' },
   ];
   const closeModal = () => {
     setIsModalOpen(false);
@@ -495,7 +714,7 @@ const addEditOwner = () => {
   const openEditPropertyPopup = (item) => {
     setEditProperties({
       ...item,
-      propertyDetailsList: [...item.propertyDetailsList], // preserve original order
+      propertyDetailsList: [...item.propertyDetailsList],
     });
     setSelectedPropertyId(item.id);
     setIsPropertyEditOpen(true);
@@ -542,7 +761,6 @@ const addEditOwner = () => {
       if (response.ok) {
         const data = await response.json();
         setProperties(data);
-        // Extract property names
         const propertyNamesList = data.map((item) => item.propertyName);
         setPropertyNames(propertyNamesList);
       } else {
@@ -617,7 +835,6 @@ const addEditOwner = () => {
               aadhaarImageUrl: `data:image/jpeg;base64,${tenant.aadhaarFile}`,
             };
           }
-
           return tenant;
         });
       } catch (error) {
@@ -632,19 +849,39 @@ const addEditOwner = () => {
         const response = await axios.get('https://backendaab.in/aabuildersDash/api/tenantShop/getAll');
         const updatedTenants = response.data
         setTenantList(updatedTenants);
-        console.log(updatedTenants);
         const usedShopsArray = updatedTenants.flatMap((tenant) =>
           tenant.property?.flatMap((prop) =>
             prop.shops?.map((shop) => shop.shopNo).filter(Boolean)
           ) || []
         );
-        const usedShops = new Set(usedShopsArray);
+        const usedShops = new Set(usedShopsArray.map(s => String(s)));
         setUsedShopNos(usedShops);
+        const shopsWithClosureArray = updatedTenants.flatMap((tenant) =>
+          tenant.property?.flatMap((prop) =>
+            prop.shops
+              ?.filter((shop) => shop.shopNo && shop.shopClosureDate)
+              .map((shop) => shop.shopNo)
+              .filter(Boolean)
+          ) || []
+        );
+        const shopsWithClosure = new Set(shopsWithClosureArray.map(s => String(s)));
+        setShopsWithClosureDate(shopsWithClosure);
       } catch (error) {
         console.error('Error fetching tenants:', error);
       }
     };
     fetchTenantsWithShop();
+  }, []);
+  useEffect(() => {
+    const fetchTenantLinkWithShop = async () => {
+      try {
+        const response = await axios.get('https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll');
+        setTenantLinkList(response.data);
+      } catch (error) {
+        console.error('Error fetching tenant link with shop:', error);
+      }
+    };
+    fetchTenantLinkWithShop();
   }, []);
   const handleAllProperties = async () => {
     const confirmed = window.confirm("Are you sure you want to delete all Properties ?");
@@ -893,6 +1130,309 @@ const addEditOwner = () => {
       console.log("Cancelled");
     }
   };
+  const openTenantLinkPopup = () => {
+    setTenantLinkFormData({
+      tenantName: '',
+      fullName: '',
+      tenantFatherName: '',
+      age: '',
+      mobileNumber: '',
+      tenantAddress: '',
+      shopNos: [
+        {
+          shopNoId: '',
+          monthlyRent: '',
+          advanceAmount: '',
+          startingDate: '',
+          shouldCollectAdvance: true
+        }
+      ]
+    });
+    setIsTenantLinkOpen(true);
+  };
+  const closeTenantLinkPopup = () => {
+    setIsTenantLinkOpen(false);
+    setTenantLinkFormData({
+      tenantName: '',
+      fullName: '',
+      tenantFatherName: '',
+      age: '',
+      mobileNumber: '',
+      tenantAddress: '',
+      shopNos: [
+        {
+          shopNoId: '',
+          monthlyRent: '',
+          advanceAmount: '',
+          startingDate: '',
+          shouldCollectAdvance: true
+        }
+      ]
+    });
+  };
+  const openEditTenantLink = (item) => {
+    setSelectedTenantLinkId(item.id);
+    setEditTenantLinkFormData({
+      tenantName: item.tenantName || '',
+      fullName: item.fullName || '',
+      tenantFatherName: item.tenantFatherName || '',
+      age: item.age || '',
+      mobileNumber: item.mobileNumber || '',
+      tenantAddress: item.tenantAddress || '',
+      shopNos: item.shopNos && item.shopNos.length > 0 ? item.shopNos.map(shop => ({
+        id: shop.id,
+        shopNoId: shop.shopNoId || '',
+        monthlyRent: shop.monthlyRent || '',
+        advanceAmount: shop.advanceAmount || '',
+        startingDate: shop.startingDate || '',
+        rentIncreaseYear: shop.rentIncreaseYear || '',
+        rentIncreasePercentage: shop.rentIncreasePercentage || '',
+        rentAssignDate: shop.rentAssignDate || '',
+        shouldCollectAdvance: shop.shouldCollectAdvance !== undefined ? shop.shouldCollectAdvance : true,
+        shopClosureDate: shop.shopClosureDate || ''
+      })) : [{
+        shopNoId: '',
+        monthlyRent: '',
+        advanceAmount: '',
+        startingDate: '',
+        rentIncreaseYear: '',
+        rentIncreasePercentage: '',
+        rentAssignDate: '',
+        shouldCollectAdvance: true,
+        shopClosureDate: ''
+      }]
+    });
+    setIsTenantLinkEditOpen(true);
+  };
+  const closeEditTenantLink = () => {
+    setIsTenantLinkEditOpen(false);
+    setSelectedTenantLinkId(null);
+    setEditTenantLinkFormData({
+      tenantName: '',
+      fullName: '',
+      tenantFatherName: '',
+      age: '',
+      mobileNumber: '',
+      tenantAddress: '',
+      shopNos: [
+        {
+          shopNoId: '',
+          monthlyRent: '',
+          advanceAmount: '',
+          startingDate: '',
+          rentIncreaseYear: '',
+          rentIncreasePercentage: '',
+          rentAssignDate: '',
+          shouldCollectAdvance: true,
+          shopClosureDate: ''
+        }
+      ]
+    });
+  };
+  const handleTenantLinkDelete = async (id) => {
+    const confirmed = window.confirm("Are you sure you want to delete This Tenant Link?");
+    if (confirmed) {
+      try {
+        const response = await fetch(`https://backendaab.in/aabuildersDash/api/tenant_link_shop/delete/${id}`, {
+          method: 'DELETE',
+        });
+        if (response.ok) {
+          alert("Tenant Link deleted successfully!!!");
+          window.location.reload();
+        } else {
+          console.error("Failed to delete the Tenant Link. Status:", response.status);
+          alert("Error deleting the Tenant Link. Please try again.");
+        }
+      } catch (error) {
+        console.error("Error:", error);
+        alert("An error occurred while deleting the Tenant Link.");
+      }
+    }
+  };
+  const handleAllTenantLinkDelete = async () => {
+    const confirmed = window.confirm("Are you sure you want to delete all Tenant Links?");
+    if (confirmed) {
+      try {
+        const response = await fetch("https://backendaab.in/aabuildersDash/api/tenant_link_shop/deleteAll", {
+          method: "DELETE",
+        });
+        if (response.ok) {
+          alert("All Tenant Links have been deleted successfully.");
+          window.location.reload();
+        } else {
+          console.error("Failed to delete all Tenant Links. Status:", response.status);
+          alert("Error deleting the Tenant Links. Please try again.");
+        }
+      } catch (error) {
+        console.error("Error deleting all Tenant Links:", error);
+        alert("An error occurred while deleting all Tenant Links.");
+      }
+    }
+  };
+
+  // Tenant Link Form Handlers
+  const handleTenantLinkChange = (e) => {
+    const { name, value } = e.target;
+    setTenantLinkFormData((prev) => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleEditTenantLinkChange = (e) => {
+    const { name, value } = e.target;
+    setEditTenantLinkFormData((prev) => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleTenantLinkShopChange = (sIndex, e) => {
+    const { name, type, checked, value } = e.target;
+    const updated = [...tenantLinkFormData.shopNos];
+    updated[sIndex][name] = type === 'checkbox' ? checked : value;
+    setTenantLinkFormData({ ...tenantLinkFormData, shopNos: updated });
+  };
+
+  const handleEditTenantLinkShopChange = (sIndex, e) => {
+    const { name, type, checked, value } = e.target;
+    const updated = [...editTenantLinkFormData.shopNos];
+    updated[sIndex][name] = type === 'checkbox' ? checked : value;
+    setEditTenantLinkFormData({ ...editTenantLinkFormData, shopNos: updated });
+  };
+
+  const addTenantLinkShop = () => {
+    setTenantLinkFormData({
+      ...tenantLinkFormData,
+      shopNos: [
+        ...tenantLinkFormData.shopNos,
+        {
+          shopNoId: '',
+          monthlyRent: '',
+          advanceAmount: '',
+          startingDate: '',
+          shouldCollectAdvance: true
+        }
+      ]
+    });
+  };
+
+  const addEditTenantLinkShop = () => {
+    setEditTenantLinkFormData({
+      ...editTenantLinkFormData,
+      shopNos: [
+        ...editTenantLinkFormData.shopNos,
+        {
+          shopNoId: '',
+          monthlyRent: '',
+          advanceAmount: '',
+          startingDate: '',
+          shouldCollectAdvance: true
+        }
+      ]
+    });
+  };
+
+  const removeTenantLinkShop = (sIndex) => {
+    const updated = [...tenantLinkFormData.shopNos];
+    updated.splice(sIndex, 1);
+    setTenantLinkFormData({ ...tenantLinkFormData, shopNos: updated });
+  };
+
+  const removeEditTenantLinkShop = (sIndex) => {
+    const updated = [...editTenantLinkFormData.shopNos];
+    updated.splice(sIndex, 1);
+    setEditTenantLinkFormData({ ...editTenantLinkFormData, shopNos: updated });
+  };
+
+  const handleTenantLinkSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        tenantName: tenantLinkFormData.tenantName,
+        fullName: tenantLinkFormData.fullName,
+        tenantFatherName: tenantLinkFormData.tenantFatherName,
+        age: tenantLinkFormData.age,
+        mobileNumber: tenantLinkFormData.mobileNumber,
+        tenantAddress: tenantLinkFormData.tenantAddress,
+        shopNos: tenantLinkFormData.shopNos.map((shop) => ({
+          shopNoId: shop.shopNoId ? parseInt(shop.shopNoId) : null,
+          monthlyRent: shop.monthlyRent || '',
+          advanceAmount: shop.advanceAmount || '',
+          startingDate: shop.startingDate || '',
+          shouldCollectAdvance: shop.shouldCollectAdvance !== undefined ? shop.shouldCollectAdvance : true
+        }))
+      };
+
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/tenant_link_shop/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        alert("Tenant Link saved successfully!");
+        closeTenantLinkPopup();
+        window.location.reload();
+      } else {
+        const error = await response.json();
+        console.error('Save failed:', error);
+        alert("Failed to save Tenant Link. Please check the data.");
+      }
+    } catch (err) {
+      console.error('Network error:', err);
+      alert("Network error. Please try again.");
+    }
+  };
+
+  const handleEditTenantLinkSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        tenantName: editTenantLinkFormData.tenantName,
+        fullName: editTenantLinkFormData.fullName,
+        tenantFatherName: editTenantLinkFormData.tenantFatherName,
+        age: editTenantLinkFormData.age,
+        mobileNumber: editTenantLinkFormData.mobileNumber,
+        tenantAddress: editTenantLinkFormData.tenantAddress,
+        shopNos: editTenantLinkFormData.shopNos.map((shop) => ({
+          id: shop.id,
+          shopNoId: shop.shopNoId ? parseInt(shop.shopNoId) : null,
+          monthlyRent: shop.monthlyRent || '',
+          advanceAmount: shop.advanceAmount || '',
+          startingDate: shop.startingDate || '',
+          rentIncreaseYear: shop.rentIncreaseYear || '',
+          rentIncreasePercentage: shop.rentIncreasePercentage || '',
+          rentAssignDate: shop.rentAssignDate || '',
+          shouldCollectAdvance: shop.shouldCollectAdvance !== undefined ? shop.shouldCollectAdvance : true,
+          shopClosureDate: shop.shopClosureDate || ''
+        }))
+      };
+
+      const response = await fetch(`https://backendaab.in/aabuildersDash/api/tenant_link_shop/edit/${selectedTenantLinkId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        alert("Tenant Link updated successfully!");
+        closeEditTenantLink();
+        window.location.reload();
+      } else {
+        const error = await response.json();
+        console.error('Update failed:', error);
+        alert("Failed to update Tenant Link. Please check the data.");
+      }
+    } catch (err) {
+      console.error('Network error:', err);
+      alert("Network error. Please try again.");
+    }
+  };
   const handleSubmitEditPaymentMode = async (e) => {
     e.preventDefault();
     try {
@@ -968,7 +1508,6 @@ const addEditOwner = () => {
           advanceAmount: shop.advanceAmount,
           doorNo: shop.doorNo,
           startingDate: shop.startingDate,
-          shouldCollectAdvance,
         }))
       }))
     };
@@ -1012,50 +1551,39 @@ const addEditOwner = () => {
       console.error('Submission Error:', error);
     }
   };
-  const filteredProperties = properties.filter((item) =>
-    item.propertyName.toLowerCase().includes(propertySearch.toLowerCase())
-  );
+
   const filteredPaymentMode = paymentMode.filter((item) =>
     item.modeOfPayment.toLowerCase().includes(paymentModeSearch.toLowerCase())
   );
   const filteredTenantName = tenantList.filter((item) =>
     item.tenantName.toLowerCase().includes(tenantNameSearch.toLowerCase())
   );
+  const filteredTenantLink = tenantLinkList.filter((item) =>
+    item.tenantName?.toLowerCase().includes(tenantLinkSearch.toLowerCase())
+  );
   useEffect(() => {
     if (!editformData || !editformData.property) return;
+    // Get all current shop numbers from the tenant being edited
+    const currentShops = editformData.property.flatMap((prop) =>
+      prop.shops?.map((shop) => shop.shopNo).filter(Boolean) || []
+    );
+
     editformData.property.forEach((property) => {
       const selectedProperty = property.propertyName;
       const shops = property.shops || [];
       shops.forEach((shop) => {
         const selectedType = shop.propertyType;
         if (selectedProperty && selectedType) {
-          const matchedProperty = properties.find(
-            (p) => p.propertyName === selectedProperty
-          );
-          if (matchedProperty) {
-            const floorNames = matchedProperty.propertyDetailsList
-              .filter((detail) => detail.propertyType === selectedType)
-              .map((detail) => detail.floorName)
-              .filter((v, i, arr) => v && arr.indexOf(v) === i);
-            const shopNos = matchedProperty.propertyDetailsList
-              .filter((detail) => detail.propertyType === selectedType)
-              .map((detail) => detail.shopNo)
-              .filter((v, i, arr) => v && arr.indexOf(v) === i);
-            const floorOptions = floorNames.map((f) => ({
-              value: f,
-              label: f,
-            }));
-            const shopNoOptions = shopNos.map((d) => ({
-              value: d,
-              label: d,
-            }));
-            setEditFloorOptions(floorOptions);
-            setEditShopNoOptions(shopNoOptions);
-          }
+          // Use the helper function with current shops included
+          const shopOptions = getShopOptionsForProperty(selectedProperty, selectedType, currentShops);
+          const floorOptions = getFloorOptionsForProperty(selectedProperty, selectedType);
+
+          setEditFloorOptions(floorOptions);
+          setEditShopNoOptions(shopOptions);
         }
       });
     });
-  }, [editformData, properties]);
+  }, [editformData, projects, usedShopNos, shopsWithClosureDate]);
   const handleEditProject = (item) => {
     setSelectedProjectId(item.id);
     setEditProject({
@@ -1251,9 +1779,7 @@ const addEditOwner = () => {
   };
   const handleSubmitProject = async (e) => {
     e.preventDefault();
-
     try {
-      // Map frontend state to backend field names
       const payload = {
         projectName: newProject.projectName,
         projectAddress: newProject.projectAddress,
@@ -1263,52 +1789,40 @@ const addEditOwner = () => {
         ownerDetails: newProject.ownerDetailsList,      // map to backend
         propertyDetails: newProject.propertyDetailsList // map to backend
       };
-
       const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-
       if (response.ok) {
-        // Sync with Project Names API
         try {
-          // Check if a Project Names record exists with the same projectId (as siteNo)
           const existingSiteName = siteNames.find(site => site.siteNo === newProject.projectId.toString());
-
           const siteNamePayload = {
             siteName: newProject.projectName,
             siteNo: newProject.projectId
           };
-
           if (existingSiteName) {
-            // Update existing Project Names record
             const siteNameResponse = await fetch(`https://backendaab.in/aabuilderDash/api/project_Names/edit/${existingSiteName.id}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(siteNamePayload),
             });
-
             if (siteNameResponse.ok) {
-              fetchSiteNames(); // Refresh site names list
+              fetchSiteNames(); 
             }
           } else {
-            // Create new Project Names record
             const siteNameResponse = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/save', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(siteNamePayload),
             });
-
             if (siteNameResponse.ok) {
-              fetchSiteNames(); // Refresh site names list
+              fetchSiteNames(); 
             }
           }
         } catch (syncError) {
           console.error('Error syncing with Project Names:', syncError);
-          // Don't fail the main operation if sync fails
         }
-
         setMessage('Project saved successfully!');
         closeProjectManagement();
         fetchProjects();
@@ -1335,7 +1849,7 @@ const addEditOwner = () => {
       if (response.ok) {
         const result = await response.text();
         setMessage(`Project Management bulk upload successful! ${result}`);
-        fetchProjects(); // Refresh the project list
+        fetchProjects();
       } else {
         const errorData = await response.text();
         setMessage(`Project Management bulk upload failed: ${errorData}`);
@@ -1344,7 +1858,6 @@ const addEditOwner = () => {
       console.error('Project Management bulk upload error:', error);
       setMessage(`Project Management bulk upload failed: ${error.message}`);
     }
-    // Reset the file input
     e.target.value = '';
   };
   return (
@@ -1457,70 +1970,6 @@ const addEditOwner = () => {
             <input
               type="text"
               className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
-              placeholder="Search Property Name.."
-              value={propertySearch}
-              onChange={(e) => setPropertySearch(e.target.value)}
-            />
-            <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
-              <img src={search} alt='search' className=' w-5 h-5' />
-            </button>
-            <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
-              onClick={openPropertyPopup}>
-              + Add
-            </button>
-          </div>
-          <button className="text-[#E4572E] -mb-4 flex"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' /><h1 className='mt-1.5 text-sm'>Import file</h1></button>
-          <div className={`${userPermissions.includes("Delete") ? '' : 'mt-5'}`}>
-            {userPermissions.includes("Delete") && (
-              <button onClick={handleAllProperties}>
-                <img src={deleteIcon} alt='del' className='-mb-14 mt-5 ml-[15rem]' />
-              </button>
-            )}
-          </div>
-          <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
-            <div className="bg-[#FAF6ED]">
-              <table className="table-auto w-72 ">
-                <thead className='bg-[#FAF6ED]'>
-                  <tr className="border-b">
-                    <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left w-72 text-xl font-bold">Property Name</th>
-                  </tr>
-                </thead>
-              </table>
-            </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto w-72">
-                <tbody>
-                  {filteredProperties.map((item, index) => (
-                    <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold">{(properties.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
-                      <td className="p-2 text-left group flex font-semibold">
-                        <div className="flex flex-grow">
-                          {item.propertyName}
-                        </div>
-                        <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
-                          <button type="button" >
-                            <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditPropertyPopup(item)} />
-                          </button>
-                          {userPermissions.includes("Delete") && (
-                            <button >
-                              <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handlePropertiesDelete(item.id)} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-        <div>
-          <div className="flex items-center mb-2 lg:mt-0 mt-3">
-            <input
-              type="text"
-              className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
               placeholder="Search Mode..."
               value={paymentModeSearch}
               onChange={(e) => setPaymentModeSearch(e.target.value)}
@@ -1623,7 +2072,7 @@ const addEditOwner = () => {
                 <thead className='bg-[#FAF6ED]'>
                   <tr className="border-b">
                     <th className="p-2 text-left lg:w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left lg:w-52 text-xl font-bold">Project Name</th>
+                    <th className="p-2 text-left lg:w-52 text-xl font-bold">Property Name</th>
                   </tr>
                 </thead>
               </table>
@@ -1632,9 +2081,11 @@ const addEditOwner = () => {
               <table className="table-auto lg:w-full w-full">
                 <tbody>
                   {projects.filter(project =>
-                    project.projectName?.toLowerCase().includes(projectManagementSearch.toLowerCase()) ||
-                    project.projectAddress?.toLowerCase().includes(projectManagementSearch.toLowerCase()) ||
-                    project.projectId?.toLowerCase().includes(projectManagementSearch.toLowerCase())
+                    (project.projectCategory || '').toLowerCase() === 'own project' &&
+                    project.projectReferenceName &&
+                    (project.projectName?.toLowerCase().includes(projectManagementSearch.toLowerCase()) ||
+                      project.projectAddress?.toLowerCase().includes(projectManagementSearch.toLowerCase()) ||
+                      project.projectId?.toLowerCase().includes(projectManagementSearch.toLowerCase()))
                   ).map((item, index) => (
                     <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
                       <td className="p-2 text-left font-semibold">
@@ -1642,7 +2093,7 @@ const addEditOwner = () => {
                       </td>
                       <td className="p-2 text-left group flex font-semibold">
                         <div className="flex flex-grow">
-                          {item.projectName || ''}
+                          {item.projectReferenceName || ''}
                         </div>
                         <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                           <button onClick={() => handleEditProject(item)} className="text-blue-600 hover:text-blue-800" title="Edit" >
@@ -1651,6 +2102,70 @@ const addEditOwner = () => {
                           <button onClick={() => handleDeleteProject(item.id)} className="text-red-600 hover:text-red-800" title="Delete" >
                             <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
                           </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div className="flex items-center mb-2 lg:mt-0 mt-3">
+            <input
+              type="text"
+              className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
+              placeholder="Search Tenant Link.."
+              value={tenantLinkSearch}
+              onChange={(e) => setTenantLinkSearch(e.target.value)}
+            />
+            <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
+              <img src={search} alt='search' className=' w-5 h-5' />
+            </button>
+            <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
+              onClick={openTenantLinkPopup}>
+              + Add
+            </button>
+          </div>
+          <button className="text-[#E4572E] -mb-4 flex"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' /><h1 className='mt-1.5 text-sm'>Import file</h1></button>
+          <div className={`${userPermissions.includes("Delete") ? '' : 'mt-5'}`}>
+            {userPermissions.includes("Delete") && (
+              <button onClick={handleAllTenantLinkDelete}>
+                <img src={deleteIcon} alt='del' className='-mb-14 mt-5 ml-[15rem]' />
+              </button>
+            )}
+          </div>
+          <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
+            <div className="bg-[#FAF6ED]">
+              <table className="table-auto w-96">
+                <thead className='bg-[#FAF6ED]'>
+                  <tr className="border-b">
+                    <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
+                    <th className="p-2 text-left text-xl font-bold">Tenant Link</th>
+                  </tr>
+                </thead>
+              </table>
+            </div>
+            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+              <table className="table-auto w-96">
+                <tbody>
+                  {filteredTenantLink.map((item, index) => (
+                    <tr key={item.id} className="border-b bg-white hover:bg-gray-50 cursor-pointer" >
+                      <td className="p-2 align-top">{index + 1}</td>
+                      <td className="py-2 pl-9 font-semibold group flex text-left ">
+                        <div className="flex flex-grow">
+                          {item.tenantName || 'N/A'}
+                        </div>
+                        <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
+                          <button type="button" onClick={() => openEditTenantLink(item)}>
+                            <img src={edit} alt="add" className="w-4 h-4" type="button" />
+                          </button>
+                          {userPermissions.includes("Delete") && (
+                            <button >
+                              <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleTenantLinkDelete(item.id)} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1943,7 +2458,7 @@ const addEditOwner = () => {
                   </div>
                 </div>
               </div>
-              <h2 className="text-2xl font-bold">Property Details</h2>
+              <h2 className="text-2xl font-bold">Project Details</h2>
               {formData.properties.map((property, pIndex) => (
                 <div key={pIndex} className="bg-gray-50 p-4 rounded-lg shadow-md mb-6 text-left w-[1150px]">
                   <div>
@@ -1956,21 +2471,24 @@ const addEditOwner = () => {
                     </button>
                   </div>
                   <div>
-                    <label className='font-semibold'>Property Name</label>
+                    <label className='font-semibold'>Project Reference Name</label>
                     <Select
                       name="propertyName"
-                      options={propertyOptions}
-                      value={propertyOptions.find(opt => opt.value === property.propertyName)}
+                      options={projectOptions}
+                      value={projectOptions.find(opt => opt.value === property.propertyName)}
                       onChange={(selectedOption) => {
-                        setSelectedProperty(selectedOption?.value);
+                        const selectedProjectRefName = selectedOption?.value || '';
+                        setSelectedProperty(selectedProjectRefName);
                         handlePropertyChange(pIndex, {
                           target: {
                             name: 'propertyName',
-                            value: selectedOption?.value || ''
+                            value: selectedProjectRefName
                           }
                         });
+                        // Options are now computed dynamically via helper functions
+                        // They will update automatically when propertyName changes
                       }}
-                      placeholder="Select Property Name"
+                      placeholder="Select Project Reference Name"
                       className="w-[970px] mb-3"
                       isClearable
                       menuPortalTarget={document.body}
@@ -2025,36 +2543,6 @@ const addEditOwner = () => {
                         value={propertyTypeOptions.find(option => option.value === shop.propertyType)}
                         onChange={(selectedOption) => {
                           const newType = selectedOption?.value || '';
-                          if (selectedProperty && newType) {
-                            const matchedProperty = properties.find(
-                              (p) => p.propertyName === selectedProperty
-                            );
-                            if (matchedProperty) {
-                              const floorNames = matchedProperty.propertyDetailsList
-                                .filter((detail) => detail.propertyType === newType)
-                                .map((detail) => detail.floorName)
-                                .filter((v, i, arr) => v && arr.indexOf(v) === i);
-                              const shopNos = matchedProperty.propertyDetailsList
-                                .filter((detail) => detail.propertyType === newType)
-                                .map((detail) => detail.shopNo)
-                                .filter((shopNo, i, arr) =>
-                                  shopNo &&
-                                  arr.indexOf(shopNo) === i &&        // unique
-                                  !usedShopNos.has(shopNo)            // ✅ remove linked ones
-                                );
-                              const floorOptions = floorNames.map((f) => ({
-                                value: f,
-                                label: f,
-                              }));
-                              const shopNoOptions = shopNos.map((d) => ({
-                                value: d,
-                                label: d,
-                              }));
-
-                              setFloorOptions(floorOptions);
-                              setShopNo(shopNoOptions);
-                            }
-                          }
                           handleShopChange(pIndex, sIndex, {
                             target: {
                               name: 'propertyType',
@@ -2071,7 +2559,7 @@ const addEditOwner = () => {
                         styles={{
                           control: (provided, state) => ({
                             ...provided,
-                            height: '44px', // ✅ Set manual height here
+                            height: '44px',
                             minHeight: '44px',
                             backgroundColor: 'transparent',
                             borderWidth: '2.5px',
@@ -2115,7 +2603,7 @@ const addEditOwner = () => {
                       />
                       <CreatableSelect
                         name="floorName"
-                        value={floorOptions.find(option => option.value === shop.floorName)}
+                        value={getFloorOptionsForProperty(property.propertyName, shop.propertyType).find(option => option.value === shop.floorName)}
                         onChange={(selectedOption) => {
                           handleShopChange(pIndex, sIndex, {
                             target: {
@@ -2124,7 +2612,7 @@ const addEditOwner = () => {
                             },
                           });
                         }}
-                        options={floorOptions}
+                        options={getFloorOptionsForProperty(property.propertyName, shop.propertyType)}
                         placeholder="Floor"
                         isClearable
                         className="w-36"
@@ -2166,20 +2654,28 @@ const addEditOwner = () => {
                       />
                       <Select
                         name="shopNo"
-                        value={shopNoOptions.find(option => option.value === shop.shopNo)}
+                        value={getShopOptionsForProperty(property.propertyName, shop.propertyType).find(option =>
+                          String(option.value) === String(shop.shopNo) || option.value === shop.shopNo
+                        )}
                         onChange={(selectedOption) => {
                           const selectedShopNo = selectedOption ? selectedOption.value : '';
+                          const currentPropertyName = formData.properties[pIndex]?.propertyName;
 
                           let doorNo = '';
-                          if (selectedProperty && selectedShopNo) {
-                            const matchedProperty = properties.find(
-                              (p) => p.propertyName === selectedProperty
+                          if (currentPropertyName && selectedShopNo) {
+                            const matchedProject = projects.find(
+                              (p) => p.projectReferenceName === currentPropertyName
                             );
-                            if (matchedProperty) {
-                              const matchedDetail = matchedProperty.propertyDetailsList.find(
+                            if (matchedProject && matchedProject.propertyDetails) {
+                              // Convert Set to Array if needed, or handle as array
+                              const propertyDetailsArray = Array.isArray(matchedProject.propertyDetails)
+                                ? matchedProject.propertyDetails
+                                : Array.from(matchedProject.propertyDetails || []);
+
+                              const matchedDetail = propertyDetailsArray.find(
                                 (detail) =>
-                                  detail.propertyType === shop.propertyType &&
-                                  detail.shopNo === selectedShopNo
+                                  detail.projectType === shop.propertyType &&
+                                  (String(detail.shopNo) === String(selectedShopNo) || detail.shopNo === selectedShopNo)
                               );
                               if (matchedDetail) {
                                 doorNo = matchedDetail.doorNo || '';
@@ -2201,7 +2697,7 @@ const addEditOwner = () => {
                             },
                           });
                         }}
-                        options={shopNoOptions}
+                        options={getShopOptionsForProperty(property.propertyName, shop.propertyType)}
                         placeholder="Shop No"
                         isSearchable
                         isClearable
@@ -2440,24 +2936,24 @@ const addEditOwner = () => {
                   </div>
                 </div>
               </div>
-              <h2 className="text-2xl font-bold">Property Details</h2>
+              <h2 className="text-2xl font-bold">Project Details</h2>
               {editformData.property.map((property, pIndex) => (
                 <div key={pIndex} className="bg-gray-50 p-4 rounded-lg shadow-md ml-[-90px] mb-6 text-left w-[1200px]">
                   <div>
                     <button
                       type="button"
-                      onClick={() => removePropertyEdit(pIndex)} // ← attach function here
+                      onClick={() => removePropertyEdit(pIndex)}
                       className="ml-[1100px] text-red-500 font-bold"
                     >
                       ✕
                     </button>
                   </div>
                   <div>
-                    <label className='font-semibold'>Property Name</label>
+                    <label className='font-semibold'>Project Reference Name</label>
                     <Select
                       name="propertyName"
-                      options={propertyOptions}
-                      value={propertyOptions.find(opt => opt.value === property.propertyName)}
+                      options={projectOptions}
+                      value={projectOptions.find(opt => opt.value === property.propertyName)}
                       onChange={(selectedOption) => {
                         setSelectedPropertyEdit(selectedOption?.value);
                         handlePropertyeditChange(pIndex, {
@@ -2467,7 +2963,7 @@ const addEditOwner = () => {
                           }
                         });
                       }}
-                      placeholder="Select Property Name"
+                      placeholder="Select Project Reference Name"
                       className="w-[970px] mb-3"
                       isClearable
                       menuPortalTarget={document.body}
@@ -2522,34 +3018,19 @@ const addEditOwner = () => {
                         value={propertyTypeEditOptions.find(option => option.value === shop.propertyType)}
                         onChange={(selectedOption) => {
                           const newType = selectedOption?.value || '';
-                          if (selectedPropertyEdit && newType) {
-                            const matchedProperty = properties.find(
-                              (p) => p.propertyName === selectedPropertyEdit
+                          const currentPropertyName = editformData.property[pIndex]?.propertyName;
+                          if (currentPropertyName && newType) {
+                            // Get all current shop numbers from the tenant being edited
+                            const currentShops = editformData.property.flatMap((prop) =>
+                              prop.shops?.map((shop) => shop.shopNo).filter(Boolean) || []
                             );
-                            if (matchedProperty) {
-                              const floorNames = matchedProperty.propertyDetailsList
-                                .filter((detail) => detail.propertyType === newType)
-                                .map((detail) => detail.floorName)
-                                .filter((v, i, arr) => v && arr.indexOf(v) === i);
-                              const shopNos = matchedProperty.propertyDetailsList
-                                .filter((detail) => detail.propertyType === newType)
-                                .map((detail) => detail.shopNo)
-                                .filter((shopNo, i, arr) =>
-                                  shopNo &&
-                                  arr.indexOf(shopNo) === i &&        // unique
-                                  !usedShopNos.has(shopNo)            // ✅ remove linked ones
-                                );
-                              const floorOptions = floorNames.map((f) => ({
-                                value: f,
-                                label: f,
-                              }));
-                              const shopNoOptions = shopNos.map((d) => ({
-                                value: d,
-                                label: d,
-                              }));
-                              setEditFloorOptions(floorOptions);
-                              setEditShopNoOptions(shopNoOptions);
-                            }
+
+                            // Use the helper function with current shops included
+                            const shopOptions = getShopOptionsForProperty(currentPropertyName, newType, currentShops);
+                            const floorOptions = getFloorOptionsForProperty(currentPropertyName, newType);
+
+                            setEditFloorOptions(floorOptions);
+                            setEditShopNoOptions(shopOptions);
                           }
                           handleShopeditChange(pIndex, sIndex, {
                             target: {
@@ -2662,19 +3143,33 @@ const addEditOwner = () => {
                       />
                       <Select
                         name="shopNo"
-                        value={editShopNoOptions.find(option => option.value === shop.shopNo)}
+                        value={getShopOptionsForProperty(
+                          property.propertyName,
+                          shop.propertyType,
+                          editformData.property.flatMap((prop) =>
+                            prop.shops?.map((s) => s.shopNo).filter(Boolean) || []
+                          )
+                        ).find(option =>
+                          String(option.value) === String(shop.shopNo) || option.value === shop.shopNo
+                        )}
                         onChange={(selectedOption) => {
                           const selectedShopNo = selectedOption ? selectedOption.value : '';
+                          const currentPropertyName = editformData.property[pIndex]?.propertyName;
                           let doorNo = '';
-                          if (selectedPropertyEdit && selectedShopNo) {
-                            const matchedProperty = properties.find(
-                              (p) => p.propertyName === selectedPropertyEdit
+                          if (currentPropertyName && selectedShopNo) {
+                            const matchedProject = projects.find(
+                              (p) => p.projectReferenceName === currentPropertyName
                             );
-                            if (matchedProperty) {
-                              const matchedDetail = matchedProperty.propertyDetailsList.find(
+                            if (matchedProject && matchedProject.propertyDetails) {
+                              // Convert Set to Array if needed, or handle as array
+                              const propertyDetailsArray = Array.isArray(matchedProject.propertyDetails)
+                                ? matchedProject.propertyDetails
+                                : Array.from(matchedProject.propertyDetails || []);
+
+                              const matchedDetail = propertyDetailsArray.find(
                                 (detail) =>
-                                  detail.propertyType === shop.propertyType &&
-                                  detail.shopNo === selectedShopNo
+                                  detail.projectType === shop.propertyType &&
+                                  (String(detail.shopNo) === String(selectedShopNo) || detail.shopNo === selectedShopNo)
                               );
                               if (matchedDetail) {
                                 doorNo = matchedDetail.doorNo || '';
@@ -2694,7 +3189,13 @@ const addEditOwner = () => {
                             },
                           });
                         }}
-                        options={editShopNoOptions}
+                        options={getShopOptionsForProperty(
+                          property.propertyName,
+                          shop.propertyType,
+                          editformData.property.flatMap((prop) =>
+                            prop.shops?.map((s) => s.shopNo).filter(Boolean) || []
+                          )
+                        )}
                         placeholder="Shop No"
                         isSearchable
                         isClearable
@@ -3172,7 +3673,7 @@ const addEditOwner = () => {
       {isProjectManagementOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
           <div className="bg-white rounded-md w-[95rem] h-[40rem] text-left overflow-y-auto pl-20">
-            <div className='flex justify-end mt-4'>
+            <div className='flex justify-end mr-16 mt-4'>
               <div>
                 <button className="text-red-500 " onClick={closeProjectManagement}>
                   <img src={cross} alt="close" className="w-5 h-5" />
@@ -3180,260 +3681,262 @@ const addEditOwner = () => {
               </div>
             </div>
             <form onSubmit={handleSubmitProject}>
-              <div className="flex gap-4">
-                <div className="mb-4 pl-5">
-                  <label className="block text-lg font-medium mb-2">Project Name</label>
-                  <input
-                    type="text"
-                    value={newProject.projectName}
-                    onChange={(e) =>
-                      setNewProject((prev) => ({ ...prev, projectName: e.target.value }))
-                    }
-                    className="w-[35rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                    placeholder="Enter Project Name"
-                    required
-                  />
+              <div className='overflow-y-auto h-[500px]'>
+                <div className="flex gap-4">
+                  <div className="mb-4 pl-5">
+                    <label className="block text-lg font-medium mb-2">Project Name</label>
+                    <input
+                      type="text"
+                      value={newProject.projectName}
+                      onChange={(e) =>
+                        setNewProject((prev) => ({ ...prev, projectName: e.target.value }))
+                      }
+                      className="w-[35rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                      placeholder="Enter Project Name"
+                      required
+                    />
+                  </div>
+                  <div className="mb-4 pl-5">
+                    <label className="block text-lg font-medium mb-2">Project ID</label>
+                    <input className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                      placeholder="Enter Project ID"
+                      type="text"
+                      value={newProject.projectId}
+                      onChange={(e) =>
+                        setNewProject((prev) => ({ ...prev, projectId: e.target.value }))
+                      }></input>
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <div className="mb-4 pl-5">
+                    <label className="block text-lg font-medium mb-2">Project Reference Name</label>
+                    <input className="w-[35rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                      placeholder="Enter Project Reference Name"
+                      type="text"
+                      value={newProject.projectReferenceName}
+                      onChange={(e) =>
+                        setNewProject((prev) => ({ ...prev, projectReferenceName: e.target.value }))
+                      }></input>
+                  </div>
+                  <div className="mb-4 pl-5">
+                    <label className="block text-lg font-medium mb-2">Project Category</label>
+                    <select className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                      value={newProject.projectCategory}
+                      onChange={(e) =>
+                        setNewProject((prev) => ({ ...prev, projectCategory: e.target.value }))
+                      }>
+                      <option value="">Select Project Category</option>
+                      <option value="Client Project">Client Project</option>
+                      <option value="Own Project">Own Project</option>
+                    </select>
+                  </div>
                 </div>
                 <div className="mb-4 pl-5">
-                  <label className="block text-lg font-medium mb-2">Project ID</label>
-                  <input className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                    placeholder="Enter Project ID"
+                  <label className="block text-lg font-medium mb-2">Project Address</label>
+                  <input className="w-[62rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    placeholder="Enter Project Address"
                     type="text"
-                    value={newProject.projectId}
+                    value={newProject.projectAddress}
                     onChange={(e) =>
-                      setNewProject((prev) => ({ ...prev, projectId: e.target.value }))
+                      setNewProject((prev) => ({ ...prev, projectAddress: e.target.value }))
                     }></input>
                 </div>
-              </div>
-              <div className="flex gap-4">
-                <div className="mb-4 pl-5">
-                  <label className="block text-lg font-medium mb-2">Project Reference Name</label>
-                  <input className="w-[35rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                    placeholder="Enter Project Reference Name"
-                    type="text"
-                    value={newProject.projectReferenceName}
-                    onChange={(e) =>
-                      setNewProject((prev) => ({ ...prev, projectReferenceName: e.target.value }))
-                    }></input>
-                </div>
-                <div className="mb-4 pl-5">
-                  <label className="block text-lg font-medium mb-2">Project Category</label>
-                  <select className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                    value={newProject.projectCategory}
-                    onChange={(e) =>
-                      setNewProject((prev) => ({ ...prev, projectCategory: e.target.value }))
-                    }>
-                    <option value="">Select Project Category</option>
-                    <option value="Client Project">Client Project</option>
-                    <option value="Own Project">Own Project</option>
-                  </select>
-                </div>
-              </div>
-              <div className="mb-4 pl-5">
-                <label className="block text-lg font-medium mb-2">Project Address</label>
-                <input className="w-[62rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                  placeholder="Enter Project Address"
-                  type="text"
-                  value={newProject.projectAddress}
-                  onChange={(e) =>
-                    setNewProject((prev) => ({ ...prev, projectAddress: e.target.value }))
-                  }></input>
-              </div>
-              {newProject.ownerDetailsList.map((owner, index) => (
-                <div key={index} className="mb-2">
-                  <div className="flex mb-2 ">
-                    <div className="mt-12 mr-4">
+                {newProject.ownerDetailsList.map((owner, index) => (
+                  <div key={index} className="mb-2">
+                    <div className="flex mb-2 ">
+                      <div className="mt-12 mr-4">
+                        {index + 1}.
+                      </div>
+                      <div className='flex mb-2 gap-5'>
+                        <div className="flex flex-col">
+                          <label className="mb-1 text-lg font-medium">Client Name</label>
+                          <input
+                            type="text"
+                            value={owner.clientName}
+                            onChange={(e) => handleNewOwnerChange(index, 'clientName', e.target.value)}
+                            placeholder="Client Name"
+                            className="w-80 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                          />
+                        </div>
+                        <div className="flex flex-col">
+                          <label className="mb-1 text-lg font-medium">Father Name</label>
+                          <input
+                            type="text"
+                            value={owner.fatherName}
+                            onChange={(e) => handleNewOwnerChange(index, 'fatherName', e.target.value)}
+                            placeholder="Father Name"
+                            className="w-72 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                          />
+                        </div>
+                        <div className="flex flex-col">
+                          <label className="mb-1 text-lg font-medium">Mobile</label>
+                          <input
+                            type="text"
+                            value={owner.mobile}
+                            onChange={(e) => handleNewOwnerChange(index, 'mobile', e.target.value)}
+                            placeholder="Mobile"
+                            className="w-60 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                          />
+                        </div>
+                        <div className="flex flex-col">
+                          <label className="mb-1 text-lg font-medium">Age</label>
+                          <input
+                            type="text"
+                            value={owner.age}
+                            onChange={(e) => handleNewOwnerChange(index, 'age', e.target.value)}
+                            placeholder="Age"
+                            className="w-20 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className=" relative pl-4">
+                      <label className="block text-lg font-medium ">Client Address</label>
+                      <input
+                        type="text"
+                        value={owner.clientAddress}
+                        onChange={(e) => handleNewOwnerChange(index, 'clientAddress', e.target.value)}
+                        placeholder="Client Address"
+                        className="w-[62rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updatedOwners = [...newProject.ownerDetailsList];
+                          updatedOwners.splice(index, 1);
+                          setNewProject((prev) => ({
+                            ...prev,
+                            ownerDetailsList: updatedOwners,
+                          }));
+                        }}
+                        className="absolute ml-2 mt-3 text-red-500 font-bold text-xl"
+                        title="Remove this owner"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                <button type="button" className="text-[#E4572E] font-bold ml-4 px-1 border-dashed border-b-2 border-[#BF9853]" onClick={addNewOwner}>+ Add Another Owner</button>
+                {newProject.propertyDetailsList.map((detail, index) => (
+                  <div className="flex mb-2 gap-5" key={index}>
+                    <div className="mt-12">
                       {index + 1}.
                     </div>
-                    <div className='flex mb-2 gap-5'>
-                      <div className="flex flex-col">
-                        <label className="mb-1 text-lg font-medium">Client Name</label>
-                        <input
-                          type="text"
-                          value={owner.clientName}
-                          onChange={(e) => handleNewOwnerChange(index, 'clientName', e.target.value)}
-                          placeholder="Client Name"
-                          className="w-80 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <label className="mb-1 text-lg font-medium">Father Name</label>
-                        <input
-                          type="text"
-                          value={owner.fatherName}
-                          onChange={(e) => handleNewOwnerChange(index, 'fatherName', e.target.value)}
-                          placeholder="Father Name"
-                          className="w-72 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <label className="mb-1 text-lg font-medium">Mobile</label>
-                        <input
-                          type="text"
-                          value={owner.mobile}
-                          onChange={(e) => handleNewOwnerChange(index, 'mobile', e.target.value)}
-                          placeholder="Mobile"
-                          className="w-60 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <label className="mb-1 text-lg font-medium">Age</label>
-                        <input
-                          type="text"
-                          value={owner.age}
-                          onChange={(e) => handleNewOwnerChange(index, 'age', e.target.value)}
-                          placeholder="Age"
-                          className="w-20 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
-                        />
-                      </div>
+                    <div className="">
+                      <label className="block mb-1 text-lg font-medium">Project Type</label>
+                      <select
+                        value={detail.projectType}
+                        onChange={(e) => handleNewDetailChange(index, 'projectType', e.target.value)}
+                        className="w-40  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                      >
+                        <option value="">Select Type</option>
+                        <option value="Shop">Shop</option>
+                        <option value="House">House</option>
+                        <option value="Land">Land</option>
+                      </select>
                     </div>
-                  </div>
-                  <div className=" relative pl-4">
-                    <label className="block text-lg font-medium ">Client Address</label>
-                    <input
-                      type="text"
-                      value={owner.clientAddress}
-                      onChange={(e) => handleNewOwnerChange(index, 'clientAddress', e.target.value)}
-                      placeholder="Client Address"
-                      className="w-[62rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const updatedOwners = [...newProject.ownerDetailsList];
-                        updatedOwners.splice(index, 1);
-                        setNewProject((prev) => ({
-                          ...prev,
-                          ownerDetailsList: updatedOwners,
-                        }));
-                      }}
-                      className="absolute ml-2 mt-3 text-red-500 font-bold text-xl"
-                      title="Remove this owner"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              ))}
-              <button type="button" className="text-[#E4572E] font-bold ml-4 px-1 border-dashed border-b-2 border-[#BF9853]" onClick={addNewOwner}>+ Add Another Owner</button>
-              {newProject.propertyDetailsList.map((detail, index) => (
-                <div className="flex mb-2 gap-5" key={index}>
-                  <div className="mt-12">
-                    {index + 1}.
-                  </div>
-                  <div className="">
-                    <label className="block mb-1 text-lg font-medium">Project Type</label>
-                    <select
-                      value={detail.projectType}
-                      onChange={(e) => handleNewDetailChange(index, 'projectType', e.target.value)}
-                      className="w-40  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
-                    >
-                      <option value="">Select Type</option>
-                      <option value="Shop">Shop</option>
-                      <option value="House">House</option>
-                      <option value="Land">Land</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block mb-1 text-lg font-medium">Floor Name</label>
-                    <select
-                      value={detail.floorName}
-                      onChange={(e) => handleNewDetailChange(index, 'floorName', e.target.value)}
-                      className="w-36  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
-                    >
-                      <option value="">Select Floor</option>
-                      <option value="Ground Floor">Ground Floor</option>
-                      <option value="First Floor">First Floor</option>
-                      <option value="Second Floor">Second Floor</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block mb-1 text-lg font-medium">Shop No</label>
-                    <input
-                      type="text"
-                      value={detail.shopNo}
-                      onChange={(e) => handleNewDetailChange(index, 'shopNo', e.target.value)}
-                      placeholder="Shop No"
-                      className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
-                    />
-                  </div>
-                  <div>
-                    <label className="block mb-1 text-lg font-medium">Door No</label>
-                    <input
-                      type="text"
-                      value={detail.doorNo}
-                      onChange={(e) => handleNewDetailChange(index, 'doorNo', e.target.value)}
-                      placeholder="Door No"
-                      className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
-                    />
-                  </div>
-                  <div>
-                    <label className="block mb-1 text-lg font-medium">Area</label>
-                    <input
-                      type="text"
-                      value={detail.area}
-                      onChange={(e) => handleNewDetailChange(index, 'area', e.target.value)}
-                      placeholder="Area"
-                      className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
-                    />
-                  </div>
-                  <div className="relative">
-                    <label className='block mb-1 text-lg font-medium '>EB.NO</label>
-                    <div className="flex">
+                    <div>
+                      <label className="block mb-1 text-lg font-medium">Floor Name</label>
+                      <select
+                        value={detail.floorName}
+                        onChange={(e) => handleNewDetailChange(index, 'floorName', e.target.value)}
+                        className="w-36  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                      >
+                        <option value="">Select Floor</option>
+                        <option value="Ground Floor">Ground Floor</option>
+                        <option value="First Floor">First Floor</option>
+                        <option value="Second Floor">Second Floor</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block mb-1 text-lg font-medium">Shop No</label>
                       <input
-                        type='text'
-                        value={detail.ebNo}
-                        onChange={(e) => handleNewDetailChange(index, 'ebNo', e.target.value)}
-                        placeholder='EB NO'
-                        className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                        type="text"
+                        value={detail.shopNo}
+                        onChange={(e) => handleNewDetailChange(index, 'shopNo', e.target.value)}
+                        placeholder="Shop No"
+                        className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
                       />
                     </div>
-                  </div>
-                  <div className="relative">
-                    <label className='block mb-1 text-lg font-medium '>Property Tax No</label>
-                    <div className="flex">
+                    <div>
+                      <label className="block mb-1 text-lg font-medium">Door No</label>
                       <input
-                        type='text'
-                        value={detail.propertyTaxNo}
-                        onChange={(e) => handleNewDetailChange(index, 'propertyTaxNo', e.target.value)}
-                        placeholder='Property Tax No'
-                        className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                        type="text"
+                        value={detail.doorNo}
+                        onChange={(e) => handleNewDetailChange(index, 'doorNo', e.target.value)}
+                        placeholder="Door No"
+                        className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
                       />
                     </div>
-                  </div>
-                  <div className="relative">
-                    <label className='block mb-1 text-lg font-medium '>Water Tax No</label>
-                    <div className="flex">
+                    <div>
+                      <label className="block mb-1 text-lg font-medium">Area</label>
                       <input
-                        type='text'
-                        value={detail.waterTaxNo}
-                        onChange={(e) => handleNewDetailChange(index, 'waterTaxNo', e.target.value)}
-                        placeholder='Water Tax No'
-                        className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                        type="text"
+                        value={detail.area}
+                        onChange={(e) => handleNewDetailChange(index, 'area', e.target.value)}
+                        placeholder="Area"
+                        className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
                       />
                     </div>
+                    <div className="relative">
+                      <label className='block mb-1 text-lg font-medium '>EB.NO</label>
+                      <div className="flex">
+                        <input
+                          type='text'
+                          value={detail.ebNo}
+                          onChange={(e) => handleNewDetailChange(index, 'ebNo', e.target.value)}
+                          placeholder='EB NO'
+                          className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                        />
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <label className='block mb-1 text-lg font-medium '>Property Tax No</label>
+                      <div className="flex">
+                        <input
+                          type='text'
+                          value={detail.propertyTaxNo}
+                          onChange={(e) => handleNewDetailChange(index, 'propertyTaxNo', e.target.value)}
+                          placeholder='Property Tax No'
+                          className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                        />
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <label className='block mb-1 text-lg font-medium '>Water Tax No</label>
+                      <div className="flex">
+                        <input
+                          type='text'
+                          value={detail.waterTaxNo}
+                          onChange={(e) => handleNewDetailChange(index, 'waterTaxNo', e.target.value)}
+                          placeholder='Water Tax No'
+                          className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-end mb-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updatedList = [...newProject.propertyDetailsList];
+                          updatedList.splice(index, 1);
+                          setNewProject(prev => ({
+                            ...prev,
+                            propertyDetailsList: updatedList,
+                          }));
+                        }}
+                        className="text-red-500 font-bold text-xl hover:text-red-700"
+                        title="Remove this row"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-end mb-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const updatedList = [...newProject.propertyDetailsList];
-                        updatedList.splice(index, 1);
-                        setNewProject(prev => ({
-                          ...prev,
-                          propertyDetailsList: updatedList,
-                        }));
-                      }}
-                      className="text-red-500 font-bold text-xl hover:text-red-700"
-                      title="Remove this row"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              ))}
-              <button type="button" className="text-[#E4572E] font-bold px-1 ml-3 border-dashed border-b-2 border-[#BF9853] " onClick={addNewPropertyDetail}>+ Add on</button>
-              <div className="flex space-x-2 mt-6 mb-4 ml-5">
+                ))}
+                <button type="button" className="text-[#E4572E] font-bold px-1 ml-3 border-dashed border-b-2 border-[#BF9853] " onClick={addNewPropertyDetail}>+ Add on</button>
+              </div>
+              <div className="flex justify-end space-x-2 mt-6 mb-4 mr-5">
                 <button
                   type="submit"
                   className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
@@ -3455,266 +3958,268 @@ const addEditOwner = () => {
       {isProjectEditOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
           <div className="bg-white rounded-md w-[95rem] h-[40rem] text-left overflow-y-auto pl-20">
-            <div>
-              <button className="text-red-500 ml-[95%]" onClick={() => setIsProjectEditOpen(false)}>
+            <div className='flex justify-end mr-16 mt-4'>
+              <button className="text-red-500" onClick={() => setIsProjectEditOpen(false)}>
                 <img src={cross} alt="close" className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleSubmitEditProject}>
-              <div className="flex gap-4">
-                <div className="mb-4 pl-5">
-                  <label className="block text-lg font-medium mb-2">Project Name</label>
-                  <input
-                    type="text"
-                    value={editProject.projectName}
-                    onChange={(e) =>
-                      setEditProject((prev) => ({ ...prev, projectName: e.target.value }))
-                    }
-                    className="w-[35rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                    placeholder="Enter Project Name"
-                    required
-                  />
+              <div className="overflow-y-auto h-[500px]">
+                <div className="flex gap-4">
+                  <div className="mb-4 pl-5">
+                    <label className="block text-lg font-medium mb-2">Project Name</label>
+                    <input
+                      type="text"
+                      value={editProject.projectName}
+                      onChange={(e) =>
+                        setEditProject((prev) => ({ ...prev, projectName: e.target.value }))
+                      }
+                      className="w-[35rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                      placeholder="Enter Project Name"
+                      required
+                    />
+                  </div>
+                  <div className="mb-4 pl-5">
+                    <label className="block text-lg font-medium mb-2">Project ID</label>
+                    <input className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                      placeholder="Enter Project ID"
+                      type="text"
+                      value={editProject.projectId}
+                      onChange={(e) =>
+                        setEditProject((prev) => ({ ...prev, projectId: e.target.value }))
+                      }></input>
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <div className="mb-4 pl-5">
+                    <label className="block text-lg font-medium mb-2">Project Reference Name</label>
+                    <input className="w-[35rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                      placeholder="Enter Project Reference Name"
+                      type="text"
+                      value={editProject.projectReferenceName}
+                      onChange={(e) =>
+                        setEditProject((prev) => ({ ...prev, projectReferenceName: e.target.value }))
+                      }></input>
+                  </div>
+                  <div className="mb-4 pl-5">
+                    <label className="block text-lg font-medium mb-2">Project Category</label>
+                    <select className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                      value={editProject.projectCategory}
+                      onChange={(e) =>
+                        setEditProject((prev) => ({ ...prev, projectCategory: e.target.value }))
+                      }>
+                      <option value="">Select Project Category</option>
+                      <option value="Client Project">Client Project</option>
+                      <option value="Own Project">Own Project</option>
+                    </select>
+                  </div>
                 </div>
                 <div className="mb-4 pl-5">
-                  <label className="block text-lg font-medium mb-2">Project ID</label>
-                  <input className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                    placeholder="Enter Project ID"
+                  <label className="block text-lg font-medium mb-2">Project Address</label>
+                  <input className="w-[62rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    placeholder="Enter Project Address"
                     type="text"
-                    value={editProject.projectId}
+                    value={editProject.projectAddress}
                     onChange={(e) =>
-                      setEditProject((prev) => ({ ...prev, projectId: e.target.value }))
+                      setEditProject((prev) => ({ ...prev, projectAddress: e.target.value }))
                     }></input>
                 </div>
-              </div>
-              <div className="flex gap-4">
-                <div className="mb-4 pl-5">
-                  <label className="block text-lg font-medium mb-2">Project Reference Name</label>
-                  <input className="w-[35rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                    placeholder="Enter Project Reference Name"
-                    type="text"
-                    value={editProject.projectReferenceName}
-                    onChange={(e) =>
-                      setEditProject((prev) => ({ ...prev, projectReferenceName: e.target.value }))
-                    }></input>
-                </div>
-                <div className="mb-4 pl-5">
-                  <label className="block text-lg font-medium mb-2">Project Category</label>
-                  <select className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                    value={editProject.projectCategory}
-                    onChange={(e) =>
-                      setEditProject((prev) => ({ ...prev, projectCategory: e.target.value }))
-                    }>
-                    <option value="">Select Project Category</option>
-                    <option value="Client Project">Client Project</option>
-                    <option value="Own Project">Own Project</option>
-                  </select>
-                </div>
-              </div>
-              <div className="mb-4 pl-5">
-                <label className="block text-lg font-medium mb-2">Project Address</label>
-                <input className="w-[62rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                  placeholder="Enter Project Address"
-                  type="text"
-                  value={editProject.projectAddress}
-                  onChange={(e) =>
-                    setEditProject((prev) => ({ ...prev, projectAddress: e.target.value }))
-                  }></input>
-              </div>
-              {editProject.ownerDetailsList.map((owner, index) => (
-                <div key={index} className="mb-2">
-                  <div className="flex mb-2 ">
-                    <div className="mt-12 mr-4">
+                {editProject.ownerDetailsList.map((owner, index) => (
+                  <div key={index} className="mb-2">
+                    <div className="flex mb-2 ">
+                      <div className="mt-12 mr-4">
+                        {index + 1}.
+                      </div>
+                      <div className='flex mb-2 gap-5'>
+                        <div className="flex flex-col">
+                          <label className="mb-1 text-lg font-medium">Client Name</label>
+                          <input
+                            type="text"
+                            value={owner.clientName}
+                            onChange={(e) => handleEditOwnerChange(index, 'clientName', e.target.value)}
+                            placeholder="Client Name"
+                            className="w-80 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                          />
+                        </div>
+                        <div className="flex flex-col">
+                          <label className="mb-1 text-lg font-medium">Father Name</label>
+                          <input
+                            type="text"
+                            value={owner.fatherName}
+                            onChange={(e) => handleEditOwnerChange(index, 'fatherName', e.target.value)}
+                            placeholder="Father Name"
+                            className="w-72 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                          />
+                        </div>
+                        <div className="flex flex-col">
+                          <label className="mb-1 text-lg font-medium">Mobile</label>
+                          <input
+                            type="text"
+                            value={owner.mobile}
+                            onChange={(e) => handleEditOwnerChange(index, 'mobile', e.target.value)}
+                            placeholder="Mobile"
+                            className="w-60 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                          />
+                        </div>
+                        <div className="flex flex-col">
+                          <label className="mb-1 text-lg font-medium">Age</label>
+                          <input
+                            type="text"
+                            value={owner.age}
+                            onChange={(e) => handleEditOwnerChange(index, 'age', e.target.value)}
+                            placeholder="Age"
+                            className="w-20 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className=" relative pl-4">
+                      <label className="block text-lg font-medium ">Client Address</label>
+                      <input
+                        type="text"
+                        value={owner.clientAddress}
+                        onChange={(e) => handleEditOwnerChange(index, 'clientAddress', e.target.value)}
+                        placeholder="Client Address"
+                        className="w-[62rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updatedOwners = [...editProject.ownerDetailsList];
+                          updatedOwners.splice(index, 1);
+                          setEditProject((prev) => ({
+                            ...prev,
+                            ownerDetailsList: updatedOwners,
+                          }));
+                        }}
+                        className="absolute ml-2 mt-3 text-red-500 font-bold text-xl"
+                        title="Remove this owner"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                <button type="button" className="text-[#E4572E] font-bold ml-4 px-1 border-dashed border-b-2 border-[#BF9853]" onClick={addEditOwner}>+ Add Another Owner</button>
+                {editProject.propertyDetailsList.map((detail, index) => (
+                  <div className="flex mb-2 gap-5" key={index}>
+                    <div className="mt-12">
                       {index + 1}.
                     </div>
-                    <div className='flex mb-2 gap-5'>
-                      <div className="flex flex-col">
-                        <label className="mb-1 text-lg font-medium">Client Name</label>
-                        <input
-                          type="text"
-                          value={owner.clientName}
-                          onChange={(e) => handleEditOwnerChange(index, 'clientName', e.target.value)}
-                          placeholder="Client Name"
-                          className="w-80 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <label className="mb-1 text-lg font-medium">Father Name</label>
-                        <input
-                          type="text"
-                          value={owner.fatherName}
-                          onChange={(e) => handleEditOwnerChange(index, 'fatherName', e.target.value)}
-                          placeholder="Father Name"
-                          className="w-72 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <label className="mb-1 text-lg font-medium">Mobile</label>
-                        <input
-                          type="text"
-                          value={owner.mobile}
-                          onChange={(e) => handleEditOwnerChange(index, 'mobile', e.target.value)}
-                          placeholder="Mobile"
-                          className="w-60 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <label className="mb-1 text-lg font-medium">Age</label>
-                        <input
-                          type="text"
-                          value={owner.age}
-                          onChange={(e) => handleEditOwnerChange(index, 'age', e.target.value)}
-                          placeholder="Age"
-                          className="w-20 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
-                        />
-                      </div>
+                    <div className="">
+                      <label className="block mb-1 text-lg font-medium">Project Type</label>
+                      <select
+                        value={detail.projectType}
+                        onChange={(e) => handleEditDetailChange(index, 'projectType', e.target.value)}
+                        className="w-40  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                      >
+                        <option value="">Select Type</option>
+                        <option value="Shop">Shop</option>
+                        <option value="House">House</option>
+                        <option value="Land">Land</option>
+                      </select>
                     </div>
-                  </div>
-                  <div className=" relative pl-4">
-                    <label className="block text-lg font-medium ">Client Address</label>
-                    <input
-                      type="text"
-                      value={owner.clientAddress}
-                      onChange={(e) => handleEditOwnerChange(index, 'clientAddress', e.target.value)}
-                      placeholder="Client Address"
-                      className="w-[62rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const updatedOwners = [...editProject.ownerDetailsList];
-                        updatedOwners.splice(index, 1);
-                        setEditProject((prev) => ({
-                          ...prev,
-                          ownerDetailsList: updatedOwners,
-                        }));
-                      }}
-                      className="absolute ml-2 mt-3 text-red-500 font-bold text-xl"
-                      title="Remove this owner"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              ))}
-              <button type="button" className="text-[#E4572E] font-bold ml-4 px-1 border-dashed border-b-2 border-[#BF9853]" onClick={addEditOwner}>+ Add Another Owner</button>
-              {editProject.propertyDetailsList.map((detail, index) => (
-                <div className="flex mb-2 gap-5" key={index}>
-                  <div className="mt-12">
-                    {index + 1}.
-                  </div>
-                  <div className="">
-                    <label className="block mb-1 text-lg font-medium">Project Type</label>
-                    <select
-                      value={detail.projectType}
-                      onChange={(e) => handleEditDetailChange(index, 'projectType', e.target.value)}
-                      className="w-40  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
-                    >
-                      <option value="">Select Type</option>
-                      <option value="Shop">Shop</option>
-                      <option value="House">House</option>
-                      <option value="Land">Land</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block mb-1 text-lg font-medium">Floor Name</label>
-                    <select
-                      value={detail.floorName}
-                      onChange={(e) => handleEditDetailChange(index, 'floorName', e.target.value)}
-                      className="w-36  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
-                    >
-                      <option value="">Select Floor</option>
-                      <option value="Ground Floor">Ground Floor</option>
-                      <option value="First Floor">First Floor</option>
-                      <option value="Second Floor">Second Floor</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block mb-1 text-lg font-medium">Shop No</label>
-                    <input
-                      type="text"
-                      value={detail.shopNo}
-                      onChange={(e) => handleEditDetailChange(index, 'shopNo', e.target.value)}
-                      placeholder="Shop No"
-                      className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
-                    />
-                  </div>
-                  <div>
-                    <label className="block mb-1 text-lg font-medium">Door No</label>
-                    <input
-                      type="text"
-                      value={detail.doorNo}
-                      onChange={(e) => handleEditDetailChange(index, 'doorNo', e.target.value)}
-                      placeholder="Door No"
-                      className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
-                    />
-                  </div>
-                  <div>
-                    <label className="block mb-1 text-lg font-medium">Area</label>
-                    <input
-                      type="text"
-                      value={detail.area}
-                      onChange={(e) => handleEditDetailChange(index, 'area', e.target.value)}
-                      placeholder="Area"
-                      className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
-                    />
-                  </div>
-                  <div className="relative">
-                    <label className='block mb-1 text-lg font-medium '>EB.NO</label>
-                    <div className="flex">
+                    <div>
+                      <label className="block mb-1 text-lg font-medium">Floor Name</label>
+                      <select
+                        value={detail.floorName}
+                        onChange={(e) => handleEditDetailChange(index, 'floorName', e.target.value)}
+                        className="w-36  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                      >
+                        <option value="">Select Floor</option>
+                        <option value="Ground Floor">Ground Floor</option>
+                        <option value="First Floor">First Floor</option>
+                        <option value="Second Floor">Second Floor</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block mb-1 text-lg font-medium">Shop No</label>
                       <input
-                        type='text'
-                        value={detail.ebNo}
-                        onChange={(e) => handleEditDetailChange(index, 'ebNo', e.target.value)}
-                        placeholder='EB NO'
-                        className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                        type="text"
+                        value={detail.shopNo}
+                        onChange={(e) => handleEditDetailChange(index, 'shopNo', e.target.value)}
+                        placeholder="Shop No"
+                        className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
                       />
                     </div>
-                  </div>
-                  <div className="relative">
-                    <label className='block mb-1 text-lg font-medium '>Property Tax No</label>
-                    <div className="flex">
+                    <div>
+                      <label className="block mb-1 text-lg font-medium">Door No</label>
                       <input
-                        type='text'
-                        value={detail.propertyTaxNo}
-                        onChange={(e) => handleEditDetailChange(index, 'propertyTaxNo', e.target.value)}
-                        placeholder='Property Tax No'
-                        className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                        type="text"
+                        value={detail.doorNo}
+                        onChange={(e) => handleEditDetailChange(index, 'doorNo', e.target.value)}
+                        placeholder="Door No"
+                        className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
                       />
                     </div>
-                  </div>
-                  <div className="relative">
-                    <label className='block mb-1 text-lg font-medium '>Water Tax No</label>
-                    <div className="flex">
+                    <div>
+                      <label className="block mb-1 text-lg font-medium">Area</label>
                       <input
-                        type='text'
-                        value={detail.waterTaxNo}
-                        onChange={(e) => handleEditDetailChange(index, 'waterTaxNo', e.target.value)}
-                        placeholder='Water Tax No'
-                        className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                        type="text"
+                        value={detail.area}
+                        onChange={(e) => handleEditDetailChange(index, 'area', e.target.value)}
+                        placeholder="Area"
+                        className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
                       />
                     </div>
+                    <div className="relative">
+                      <label className='block mb-1 text-lg font-medium '>EB.NO</label>
+                      <div className="flex">
+                        <input
+                          type='text'
+                          value={detail.ebNo}
+                          onChange={(e) => handleEditDetailChange(index, 'ebNo', e.target.value)}
+                          placeholder='EB NO'
+                          className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                        />
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <label className='block mb-1 text-lg font-medium '>Property Tax No</label>
+                      <div className="flex">
+                        <input
+                          type='text'
+                          value={detail.propertyTaxNo}
+                          onChange={(e) => handleEditDetailChange(index, 'propertyTaxNo', e.target.value)}
+                          placeholder='Property Tax No'
+                          className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                        />
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <label className='block mb-1 text-lg font-medium '>Water Tax No</label>
+                      <div className="flex">
+                        <input
+                          type='text'
+                          value={detail.waterTaxNo}
+                          onChange={(e) => handleEditDetailChange(index, 'waterTaxNo', e.target.value)}
+                          placeholder='Water Tax No'
+                          className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-end mb-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updatedList = [...editProject.propertyDetailsList];
+                          updatedList.splice(index, 1);
+                          setEditProject(prev => ({
+                            ...prev,
+                            propertyDetailsList: updatedList,
+                          }));
+                        }}
+                        className="text-red-500 font-bold text-xl hover:text-red-700"
+                        title="Remove this row"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-end mb-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const updatedList = [...editProject.propertyDetailsList];
-                        updatedList.splice(index, 1);
-                        setEditProject(prev => ({
-                          ...prev,
-                          propertyDetailsList: updatedList,
-                        }));
-                      }}
-                      className="text-red-500 font-bold text-xl hover:text-red-700"
-                      title="Remove this row"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              ))}
-              <button type="button" className="text-[#E4572E] font-bold px-1 ml-3 border-dashed border-b-2 border-[#BF9853] " onClick={addEditPropertyDetail}>+ Add on</button>
-              <div className="flex space-x-2 mt-6 mb-4 ml-5">
+                ))}
+                <button type="button" className="text-[#E4572E] font-bold px-1 ml-3 border-dashed border-b-2 border-[#BF9853] " onClick={addEditPropertyDetail}>+ Add on</button>
+              </div>
+              <div className="flex justify-end space-x-2 mt-6 mb-4 mr-5">
                 <button
                   type="submit"
                   className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
@@ -3726,6 +4231,661 @@ const addEditOwner = () => {
                   className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
                   onClick={() => setIsProjectEditOpen(false)}
                 >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {isTenantLinkOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
+          <div className="bg-white rounded-md w-[85rem] h-[44rem] px-2 py-2 overflow-y-auto">
+            <div>
+              <button className="text-red-500 ml-[95%]" onClick={closeTenantLinkPopup}>
+                <img src={cross} alt='cross' className='w-5 h-5' />
+              </button>
+            </div>
+            <form onSubmit={handleTenantLinkSubmit} className="max-w-5xl mx-auto space-y-2">
+              <h2 className="text-2xl font-bold">Tenant Details</h2>
+              <div className='text-left mb-2'>
+                <div className='flex gap-10'>
+                  <div className='mt-3'>
+                    <label className='block font-semibold'>Tenant Name</label>
+                    <input
+                      type="text"
+                      name="tenantName"
+                      value={tenantLinkFormData.tenantName}
+                      onChange={handleTenantLinkChange}
+                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                      placeholder="Tenant Name"
+                    />
+                  </div>
+                  <div className='mt-3'>
+                    <label className='block font-semibold'>Tenant FullName</label>
+                    <input
+                      type="text"
+                      name="fullName"
+                      value={tenantLinkFormData.fullName}
+                      onChange={handleTenantLinkChange}
+                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                      placeholder="Full Name"
+                    />
+                  </div>
+                </div>
+                <div className='flex gap-10'>
+                  <div className='mt-3'>
+                    <label className='block font-semibold'>Tenant FatherName</label>
+                    <input
+                      type="text"
+                      name="tenantFatherName"
+                      value={tenantLinkFormData.tenantFatherName}
+                      onChange={handleTenantLinkChange}
+                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                      placeholder="Father Name"
+                    />
+                  </div>
+                  <div className='mt-3'>
+                    <label className='block font-semibold'>Tenant Age</label>
+                    <input
+                      type="text"
+                      name="age"
+                      value={tenantLinkFormData.age}
+                      onChange={handleTenantLinkChange}
+                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                      placeholder="Age"
+                    />
+                  </div>
+                </div>
+                <div className='flex gap-10'>
+                  <div className='mt-3'>
+                    <label className='block font-semibold'>Mobile Number</label>
+                    <input
+                      type="text"
+                      name="mobileNumber"
+                      value={tenantLinkFormData.mobileNumber}
+                      onChange={handleTenantLinkChange}
+                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                      placeholder="Mobile Number"
+                    />
+                  </div>
+                  <div className='mt-3'>
+                    <label className='block font-semibold'>Tenant Address</label>
+                    <input
+                      type="text"
+                      name="tenantAddress"
+                      value={tenantLinkFormData.tenantAddress}
+                      onChange={handleTenantLinkChange}
+                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                      placeholder="Tenant Address"
+                    />
+                  </div>
+                </div>
+              </div>
+              <h2 className="text-2xl font-bold">Shop Details</h2>
+              {(() => {
+                const projectRefNames = tenantLinkFormData.shopNos
+                  .map(shop => {
+                    const details = getShopDetailsById(shop.shopNoId);
+                    return details?.projectReferenceName;
+                  })
+                  .filter(name => name && name !== '')
+                  .filter((name, index, self) => self.indexOf(name) === index);
+                const showProjectAtTop = projectRefNames.length === 1 && projectRefNames[0];
+                return (
+                  <>
+                    {showProjectAtTop && (
+                      <div className="mb-2 text-sm text-gray-600">
+                        <span className="font-semibold">Project: </span>{projectRefNames[0]}
+                      </div>
+                    )}
+                    {tenantLinkFormData.shopNos.map((shop, sIndex) => {
+                      const shopDetails = getShopDetailsById(shop.shopNoId);
+                      const selectedShopOption = getAllShopNumbers().find(option =>
+                        option.value === shop.shopNoId || option.id === shop.shopNoId ||
+                        String(option.value) === String(shop.shopNoId) || String(option.id) === String(shop.shopNoId)
+                      );
+                      const showProjectPerShop = !showProjectAtTop && shopDetails?.projectReferenceName;
+                      return (
+                        <div key={sIndex} className="bg-gray-50 p-4 rounded-lg shadow-md mb-6 text-left w-[1150px]">
+                          {showProjectPerShop && (
+                            <div className="mb-2">
+                              <div className="mb-2 text-sm text-gray-600">
+                                <span className="font-semibold">Project: </span>{shopDetails.projectReferenceName || 'N/A'}
+                              </div>
+                            </div>
+                          )}
+                          <div className="grid grid-cols-6 mb-2 ">
+                            <Select
+                              name="shopNo"
+                              options={getAllShopNumbers()}
+                              value={selectedShopOption}
+                              menuPlacement="auto"
+                              onMenuOpen={() => {
+                                if (selectedShopOption) {
+                                  setTimeout(() => {
+                                    const menu = document.querySelector('.select__menu');
+                                    if (menu) {
+                                      const menuList = menu.querySelector('.select__menu-list');
+                                      if (menuList) {
+                                        const options = menuList.querySelectorAll('.select__option');
+                                        options.forEach((option) => {
+                                          if (option.textContent === selectedShopOption.label ||
+                                            option.textContent === String(selectedShopOption.shopNo)) {
+                                            option.scrollIntoView({ block: 'center', behavior: 'auto' });
+                                          }
+                                        });
+                                      }
+                                    }
+                                  }, 50);
+                                }
+                              }}
+                              onChange={(selectedOption) => {
+                                if (selectedOption) {
+                                  handleTenantLinkShopChange(sIndex, {
+                                    target: {
+                                      name: 'shopNoId',
+                                      value: selectedOption.value || selectedOption.id
+                                    }
+                                  });
+                                } else {
+                                  // Handle clear
+                                  handleTenantLinkShopChange(sIndex, {
+                                    target: {
+                                      name: 'shopNoId',
+                                      value: ''
+                                    }
+                                  });
+                                }
+                              }}
+                              placeholder="Shop No"
+                              isSearchable
+                              isClearable
+                              className="w-44"
+                              classNamePrefix="select"
+                              menuPortalTarget={document.body}
+                              styles={{
+                                control: (provided, state) => ({
+                                  ...provided,
+                                  height: '44px',
+                                  minHeight: '44px',
+                                  backgroundColor: 'transparent',
+                                  borderWidth: '2px',
+                                  borderColor: state.isFocused
+                                    ? 'rgba(191, 152, 83, 0.5)'
+                                    : 'rgba(191, 152, 83, 0.25)',
+                                  borderRadius: '8px',
+                                  boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                  '&:hover': {
+                                    borderColor: 'rgba(191, 152, 83, 0.4)',
+                                  },
+                                }),
+                                menuPortal: (base) => ({
+                                  ...base,
+                                  zIndex: 9999,
+                                }),
+                                menu: (provided) => ({
+                                  ...provided,
+                                  zIndex: 9999,
+                                }),
+                                option: (provided, state) => ({
+                                  ...provided,
+                                  backgroundColor: state.isSelected
+                                    ? 'rgba(191, 152, 83, 0.3)'
+                                    : state.isFocused
+                                      ? 'rgba(191, 152, 83, 0.1)'
+                                      : 'white',
+                                  color: 'black',
+                                  fontWeight: state.isSelected ? 'bold' : 'normal',
+                                }),
+                                singleValue: (provided) => ({
+                                  ...provided,
+                                  color: 'black',
+                                }),
+                                placeholder: (provided) => ({
+                                  ...provided,
+                                  color: '#999',
+                                }),
+                              }}
+                            />
+                            <input
+                              type="text"
+                              name="doorNo"
+                              value={shopDetails?.doorNo || ''}
+                              readOnly
+                              className="border-2 border-[#BF9853] w-28 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
+                              placeholder="Door No"
+                            />
+                            <div className='flex gap-1'>
+                              <input
+                                type="text"
+                                name="monthlyRent"
+                                value={formatINR(shop.monthlyRent)}
+                                onChange={(e) => {
+                                  const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                                  handleTenantLinkShopChange(sIndex, {
+                                    target: {
+                                      name: 'monthlyRent',
+                                      value: rawValue,
+                                    },
+                                  });
+                                }}
+                                className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
+                                placeholder="Rent"
+                              />
+                              <input
+                                type="checkbox"
+                                name="shouldCollectAdvance"
+                                checked={shop.shouldCollectAdvance}
+                                onChange={(e) => handleTenantLinkShopChange(sIndex, e)}
+                                className="custom-checkbox cursor-pointer appearance-none w-4 h-4 mt-3 -ml-1 rounded bg-slate-200 checked:bg-[#E2F9E1] checked:border-[#034638] "
+                              />
+                            </div>
+                            <input
+                              type="text"
+                              name="advanceAmount"
+                              value={formatINR(shop.advanceAmount)}
+                              onChange={(e) => {
+                                const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                                handleTenantLinkShopChange(sIndex, {
+                                  target: {
+                                    name: 'advanceAmount',
+                                    value: rawValue,
+                                  },
+                                });
+                              }}
+                              className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
+                              placeholder="Advance"
+                            />
+                            <div className="relative flex">
+                              <input
+                                type="date"
+                                name="startingDate"
+                                value={shop.startingDate}
+                                onChange={(e) => {
+                                  const rawValue = e.target.value;
+                                  handleTenantLinkShopChange(sIndex, {
+                                    target: {
+                                      name: 'startingDate',
+                                      value: rawValue,
+                                    },
+                                  });
+                                }}
+                                className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
+                                placeholder="Advance"
+                              />
+                              {tenantLinkFormData.shopNos.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeTenantLinkShop(sIndex)}
+                                  className=" text-red-500 font-bold ml-3"
+                                >
+                                  <img src={cross} alt='cross' className='w-5 h-5' />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </>
+                );
+              })()}
+              <div className='text-left'>
+                <button
+                  type="button"
+                  onClick={addTenantLinkShop}
+                  className='text-[#E4572E] font-bold px-1  border-dashed border-b-2 border-[#BF9853]'
+                >
+                  + Add On
+                </button>
+              </div>
+              <div className="flex space-x-2 mt-6 mb-4">
+                <button
+                  type="submit"
+                  className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
+                >
+                  Submit
+                </button>
+                <button
+                  type="button"
+                  className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
+                  onClick={closeTenantLinkPopup}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {isTenantLinkEditOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
+          <div className="bg-white rounded-md w-[85rem] h-[44rem] px-2 py-2 overflow-y-auto">
+            <div>
+              <button className="text-red-500 ml-[95%]" onClick={closeEditTenantLink}>
+                <img src={cross} alt='cross' className='w-5 h-5' />
+              </button>
+            </div>
+            <form className="max-w-5xl mx-auto space-y-2" onSubmit={handleEditTenantLinkSubmit}>
+              <h2 className="text-2xl font-bold">Tenant Details</h2>
+              <div className='text-left'>
+                <div className='flex gap-10'>
+                  <div className='mt-3'>
+                    <label className='block font-semibold'>Tenant Name</label>
+                    <input
+                      type="text"
+                      name="tenantName"
+                      value={editTenantLinkFormData.tenantName}
+                      onChange={handleEditTenantLinkChange}
+                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                      placeholder="Tenant Name"
+                    />
+                  </div>
+                  <div className='mt-3'>
+                    <label className='block font-semibold'>Tenant FullName</label>
+                    <input
+                      type="text"
+                      name="fullName"
+                      value={editTenantLinkFormData.fullName}
+                      onChange={handleEditTenantLinkChange}
+                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                      placeholder="Full Name"
+                    />
+                  </div>
+                </div>
+                <div className='flex gap-10'>
+                  <div className='mt-3'>
+                    <label className='block font-semibold'>Tenant FatherName</label>
+                    <input
+                      type="text"
+                      name="tenantFatherName"
+                      value={editTenantLinkFormData.tenantFatherName}
+                      onChange={handleEditTenantLinkChange}
+                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                      placeholder="Father Name"
+                    />
+                  </div>
+                  <div className='mt-3'>
+                    <label className='block font-semibold'>Tenant Age</label>
+                    <input
+                      type="text"
+                      name="age"
+                      value={editTenantLinkFormData.age}
+                      onChange={handleEditTenantLinkChange}
+                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                      placeholder="Age"
+                    />
+                  </div>
+                </div>
+                <div className='flex gap-10'>
+                  <div className='mt-3'>
+                    <label className='block font-semibold'>Mobile Number</label>
+                    <input
+                      type="text"
+                      name="mobileNumber"
+                      value={editTenantLinkFormData.mobileNumber}
+                      onChange={handleEditTenantLinkChange}
+                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                      placeholder="Mobile Number"
+                    />
+                  </div>
+                  <div className='mt-3'>
+                    <label className='block font-semibold'>Tenant Address</label>
+                    <input
+                      type="text"
+                      name="tenantAddress"
+                      value={editTenantLinkFormData.tenantAddress}
+                      onChange={handleEditTenantLinkChange}
+                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                      placeholder="Tenant Address"
+                    />
+                  </div>
+                </div>
+              </div>
+              <h2 className="text-2xl font-bold">Shop Details</h2>
+              {(() => {
+                const projectRefNames = editTenantLinkFormData.shopNos
+                  .map(shop => {
+                    const details = getShopDetailsById(shop.shopNoId);
+                    return details?.projectReferenceName;
+                  })
+                  .filter(name => name && name !== '')
+                  .filter((name, index, self) => self.indexOf(name) === index);
+                const showProjectAtTop = projectRefNames.length === 1 && projectRefNames[0];
+                return (
+                  <>
+                    {showProjectAtTop && (
+                      <div className="mb-2 text-sm text-gray-600">
+                        <span className="font-semibold">Project: </span>{projectRefNames[0]}
+                      </div>
+                    )}
+                    {editTenantLinkFormData.shopNos.map((shop, sIndex) => {
+                      const shopDetails = getShopDetailsById(shop.shopNoId);
+                      const allShopOptions = getAllShopNumbersUnfiltered();
+                      const selectedShopOption = allShopOptions.find(option =>
+                        option.value === shop.shopNoId || option.id === shop.shopNoId ||
+                        String(option.value) === String(shop.shopNoId) || String(option.id) === String(shop.shopNoId)
+                      );
+                      const showProjectPerShop = !showProjectAtTop && shopDetails?.projectReferenceName;
+                      return (
+                        <div key={sIndex} className="bg-gray-50 p-4 rounded-lg shadow-md mb-6 text-left w-[1150px]">
+                          {showProjectPerShop && (
+                            <div className="mb-2">
+                              <div className="mb-2 text-sm text-gray-600">
+                                <span className="font-semibold">Project: </span>{shopDetails.projectReferenceName || 'N/A'}
+                              </div>
+                            </div>
+                          )}
+                          <div className="grid grid-cols-6 mb-2 ">
+                            <Select
+                              name="shopNo"
+                              options={allShopOptions}
+                              value={selectedShopOption}
+                              menuPlacement="auto"
+                              onMenuOpen={() => {
+                                setTimeout(() => {
+                                  const menu = document.querySelector('.select__menu');
+                                  if (menu && selectedShopOption) {
+                                    const menuList = menu.querySelector('.select__menu-list');
+                                    if (menuList) {
+                                      const options = menuList.querySelectorAll('.select__option');
+                                      options.forEach((option) => {
+                                        if (option.textContent === selectedShopOption.label ||
+                                          option.textContent === String(selectedShopOption.shopNo)) {
+                                          option.scrollIntoView({ block: 'center', behavior: 'auto' });
+                                        }
+                                      });
+                                    }
+                                  }
+                                }, 50);
+                              }}
+                              onChange={(selectedOption) => {
+                                if (selectedOption) {
+                                  const shopDetails = getShopDetailsById(selectedOption.value || selectedOption.id);
+                                  handleEditTenantLinkShopChange(sIndex, {
+                                    target: {
+                                      name: 'shopNoId',
+                                      value: selectedOption.value || selectedOption.id
+                                    }
+                                  });
+                                } else {
+                                  handleEditTenantLinkShopChange(sIndex, {
+                                    target: {
+                                      name: 'shopNoId',
+                                      value: ''
+                                    }
+                                  });
+                                }
+                              }}
+                              placeholder="Shop No"
+                              isSearchable
+                              isClearable
+                              className="w-44"
+                              classNamePrefix="select"
+                              menuPortalTarget={document.body}
+                              styles={{
+                                control: (provided, state) => ({
+                                  ...provided,
+                                  height: '44px',
+                                  minHeight: '44px',
+                                  backgroundColor: 'transparent',
+                                  borderWidth: '2px',
+                                  borderColor: state.isFocused
+                                    ? 'rgba(191, 152, 83, 0.5)'
+                                    : 'rgba(191, 152, 83, 0.25)',
+                                  borderRadius: '8px',
+                                  boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                  '&:hover': {
+                                    borderColor: 'rgba(191, 152, 83, 0.4)',
+                                  },
+                                }),
+                                menuPortal: (base) => ({
+                                  ...base,
+                                  zIndex: 9999,
+                                }),
+                                menu: (provided) => ({
+                                  ...provided,
+                                  zIndex: 9999,
+                                }),
+                                option: (provided, state) => ({
+                                  ...provided,
+                                  backgroundColor: state.isSelected
+                                    ? 'rgba(191, 152, 83, 0.3)'
+                                    : state.isFocused
+                                      ? 'rgba(191, 152, 83, 0.1)'
+                                      : 'white',
+                                  color: 'black',
+                                  fontWeight: state.isSelected ? 'bold' : 'normal',
+                                }),
+                                singleValue: (provided) => ({
+                                  ...provided,
+                                  color: 'black',
+                                }),
+                                placeholder: (provided) => ({
+                                  ...provided,
+                                  color: '#999',
+                                }),
+                              }}
+                            />
+                            <input
+                              type="text"
+                              name="doorNo"
+                              value={shopDetails?.doorNo || ''}
+                              readOnly
+                              className="border-2 ml-4 border-[#BF9853] w-28 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
+                              placeholder="Door No"
+                            />
+                            <div className='flex gap-1'>
+                              <input
+                                type="text"
+                                name="monthlyRent"
+                                value={formatINR(shop.monthlyRent)}
+                                onChange={(e) => {
+                                  const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                                  handleEditTenantLinkShopChange(sIndex, {
+                                    target: {
+                                      name: 'monthlyRent',
+                                      value: rawValue,
+                                    },
+                                  });
+                                }}
+                                className="border-2 border-[#BF9853] w-32 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
+                                placeholder="Rent"
+                              />
+                              <input
+                                type="checkbox"
+                                name="shouldCollectAdvance"
+                                checked={shop.shouldCollectAdvance}
+                                onChange={(e) => handleEditTenantLinkShopChange(sIndex, e)}
+                                className="custom-checkbox cursor-pointer appearance-none w-4 h-4 mt-3 -ml-1 rounded bg-slate-200 checked:bg-[#E2F9E1] checked:border-[#034638]"
+                              />
+                            </div>
+                            <input
+                              type="text"
+                              name="advanceAmount"
+                              value={formatINR(shop.advanceAmount)}
+                              onChange={(e) => {
+                                const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                                handleEditTenantLinkShopChange(sIndex, {
+                                  target: {
+                                    name: 'advanceAmount',
+                                    value: rawValue,
+                                  },
+                                });
+                              }}
+                              className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
+                              placeholder="Advance"
+                            />
+                            <input
+                              type="date"
+                              name="startingDate"
+                              value={shop.startingDate}
+                              onChange={(e) => {
+                                const rawValue = e.target.value;
+                                handleEditTenantLinkShopChange(sIndex, {
+                                  target: {
+                                    name: 'startingDate',
+                                    value: rawValue,
+                                  },
+                                });
+                              }}
+                              className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
+                              placeholder="Advance"
+                            />
+                            <div className="relative flex">
+                              <input
+                                type="date"
+                                name="shopClosureDate"
+                                value={shop.shopClosureDate || ''}
+                                onChange={(e) => {
+                                  const rawValue = e.target.value;
+                                  handleEditTenantLinkShopChange(sIndex, {
+                                    target: {
+                                      name: 'shopClosureDate',
+                                      value: rawValue,
+                                    },
+                                  });
+                                }}
+                                className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
+                                placeholder="Closure Date"
+                              />
+                              {editTenantLinkFormData.shopNos.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeEditTenantLinkShop(sIndex)}
+                                  className=" text-red-500 font-bold ml-3"
+                                >
+                                  <img src={cross} alt='cross' className='w-5 h-5' />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </>
+                );
+              })()}
+              <div className='text-left'>
+                <button
+                  type="button"
+                  onClick={addEditTenantLinkShop}
+                  className='text-[#E4572E] font-bold px-1  border-dashed border-b-2 border-[#BF9853]'
+                >
+                  + Add On
+                </button>
+              </div>
+              <div className="flex space-x-2 mt-6 mb-4">
+                <button
+                  type="submit"
+                  className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
+                >
+                  Submit
+                </button>
+                <button
+                  type="button"
+                  className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
+                  onClick={closeEditTenantLink}>
                   Cancel
                 </button>
               </div>

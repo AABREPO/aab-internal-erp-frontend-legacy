@@ -714,9 +714,7 @@ const AdvanceReport = () => {
           }
         });
 
-        // Bill Settlement data rows - use timestamp for date
         const billSettlementRows = sortedBillSettlement.map((row, index) => {
-          // Use timestamp if available, otherwise use date
           const rowDate = row.timestamp ? new Date(row.timestamp) : new Date(row.date);
           return {
             sno: index + 1,
@@ -735,8 +733,6 @@ const AdvanceReport = () => {
             file: row.file_url ? "Yes" : "-",
           };
         });
-
-        // Main Bill Settlement data table - start after header
         doc.autoTable({
           startY: doc.lastAutoTable.finalY + 10,
           columns,
@@ -946,10 +942,7 @@ const AdvanceReport = () => {
           const vendor = vendorOptions.find((v) => v.id === row.vendor_id)?.label;
           const project = siteOptions.find((s) => s.id === row.project_id)?.label;
           const transferSite = siteOptions.find((s) => s.id === row.transfer_site_id)?.label;
-          
-          // Use timestamp if available, otherwise use date
           const rowDate = row.timestamp ? new Date(row.timestamp) : new Date(row.date);
-
           return [
             idx + 1,
             rowDate.toLocaleDateString("en-GB"),

@@ -150,44 +150,56 @@ const RentDatabase = ({ username, userRoles = [] }) => {
         console.log('Current items:', currentItems);
     }, [sortField, sortOrder, currentItems]);
     const [allShops, setAllShops] = useState([]);
-    const [properties, setProperties] = useState([]);
+    const [projects, setProjects] = useState([]);
     const [tenantShopData, setTenantShopData] = useState([]);
     const [shopNoIdToShopNoMap, setShopNoIdToShopNoMap] = useState({});
     const [tenantNameIdToTenantNameMap, setTenantNameIdToTenantNameMap] = useState({});
     useEffect(() => {
-        fetchProperties();
+        fetchProjects();
     }, []);
-    const fetchProperties = async () => {
+    const fetchProjects = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/properties/all');
+            const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
             if (response.ok) {
                 const data = await response.json();
-                setProperties(data);
-                // Extract property names
+                // Filter for "own project" category
+                const ownProjects = Array.isArray(data)
+                    ? data.filter(p => (p.projectCategory || '').toLowerCase() === 'own project')
+                    : [];
+                setProjects(ownProjects);
+                // Extract shop data from projects (only include projects with projectReferenceName)
                 const extractedShops = [];
-                data.forEach(property => {
-                    property.propertyDetailsList?.forEach(shop => {
-                        if (shop.shopNo) {
-                            extractedShops.push({
-                                shopNo: shop.shopNo,
-                                doorNo: shop.doorNo || '',
-                                propertyName: property.propertyName || '',
-                                advance: null,
-                                tenantName: null,
-                                tenantId: null,
-                                shopId: shop.id,
-                                active: false
-                            });
-                        }
+                ownProjects
+                    .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
+                    .forEach(project => {
+                        // Convert Set to Array if needed
+                        const propertyDetailsArray = Array.isArray(project.propertyDetails) 
+                            ? project.propertyDetails 
+                            : Array.from(project.propertyDetails || []);
+                        
+                        propertyDetailsArray.forEach(shop => {
+                            if (shop.shopNo) {
+                                extractedShops.push({
+                                    shopNo: shop.shopNo,
+                                    doorNo: shop.doorNo || '',
+                                    propertyName: project.projectReferenceName || '', // Use projectReferenceName
+                                    advance: null,
+                                    tenantName: null,
+                                    tenantId: null,
+                                    shopId: shop.id,
+                                    active: false
+                                });
+                            }
+                        });
                     });
-                });
                 setAllShops(extractedShops);
+                console.log('Fetched projects:', ownProjects.length, 'projects');
             } else {
-                console.log('Error fetching properties.');
+                console.log('Error fetching projects.');
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching properties.');
+            console.log('Error fetching projects.');
         }
     };
     const moduleName = "Rent Management";
@@ -213,6 +225,10 @@ const RentDatabase = ({ username, userRoles = [] }) => {
         }
     }, [userRoles]);
     const handleEditClick = (rent) => {
+        // Prevent editing Shop Closure or Refund forms
+        if (rent.formType === 'Shop Closure' || rent.formType === 'Refund') {
+            return;
+        }
         setEditId(rent.id);
         setRentFormData(rent);
         setModalIsOpen(true);
@@ -294,29 +310,79 @@ const RentDatabase = ({ username, userRoles = [] }) => {
         const displayShopNo = rent.shopNoId && shopNoIdToShopNoMap[rent.shopNoId] ? shopNoIdToShopNoMap[rent.shopNoId] : rent.shopNo;
         const displayTenantName = rent.tenantNameId && tenantNameIdToTenantNameMap[rent.tenantNameId] ? tenantNameIdToTenantNameMap[rent.tenantNameId] : rent.tenantName;
         const matchingShop = allShops.find(shop => shop.shopNo === displayShopNo);
-        const propertyName = matchingShop?.propertyName || 'N/A';
+        const projectReferenceName = matchingShop?.propertyName || 'N/A'; // propertyName stores projectReferenceName
         const qrCodeImage = QRCode;
         const receiptHtml = `
     <html>
     <head>
         <title>Receipt</title>
         <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            h2 { text-align: center; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            td, th { padding: 8px; border: 1px solid #ccc; }
-            .label { font-weight: bold; width: 40%; }
-            .signature { margin-top: 40px; }
-            .bank-details-table { margin-top: 60px; }
-            .qr { text-align: center; margin-top: 20px; }
+            @media print {
+                @page { 
+                    size: A4; 
+                    margin: 10mm;
+                }
+                body { 
+                    margin: 0;
+                    padding: 10px;
+                }
+                .no-break {
+                    page-break-inside: avoid;
+                    break-inside: avoid;
+                }
+            }
+            body { 
+                font-family: Arial, sans-serif; 
+                padding: 15px; 
+                margin: 0;
+                font-size: 12px;
+            }
+            h2 { 
+                text-align: center; 
+                margin: 10px 0;
+                font-size: 18px;
+            }
+            h3 {
+                margin: 10px 0 5px 0;
+                font-size: 14px;
+            }
+            table { 
+                width: 100%; 
+                border-collapse: collapse; 
+                margin-top: 10px;
+                font-size: 11px;
+            }
+            td, th { 
+                padding: 5px; 
+                border: 1px solid #ccc; 
+            }
+            .label { 
+                font-weight: bold; 
+                width: 40%; 
+            }
+            .signature { 
+                margin-top: 15px;
+                font-size: 11px;
+            }
+            .bank-details-table { 
+                margin-top: 15px;
+            }
+            .qr { 
+                text-align: center; 
+                margin-top: 20px;
+            }
+            .qr img {
+                width: 200px;
+                height: 200px;
+            }
         </style>
     </head>
     <body>
         <h2>Rent Payment Receipt</h2>
-        <table>
+        <table class="no-break">
             <tr><td class="label">Shop No</td><td>${displayShopNo}</td></tr>
             <tr><td class="label">Tenant Name</td><td>${displayTenantName}</td></tr>
-            <tr><td class="label">Property Name</td><td>${propertyName}</td></tr>
+            <tr><td class="label">Project Reference Name</td><td>${projectReferenceName}</td></tr>
             <tr><td class="label">Amount Paid</td><td>₹${Number(rent.refundAmount || rent.amount).toLocaleString('en-IN', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
@@ -333,26 +399,28 @@ const RentDatabase = ({ username, userRoles = [] }) => {
             <tr><td class="label">Type</td><td>${rent.formType}</td></tr>
         </table>
 
-        <div class="signature">
-            <p>Signature: __________________________</p>
-        </div>
+        <div class="no-break">
+            <div class="signature">
+                <p>Signature: __________________________</p>
+            </div>
 
-        <div class="bank-details-table">
-            <h3>Bank Details</h3>
-            <table>
-                <tr><td class="label">Bank</td><td>KVB</td></tr>
-                <tr><td class="label">Name</td><td>AA Builders</td></tr>
-                <tr><td class="label">Account Number</td><td>1804155000040012</td></tr>
-                <tr><td class="label">IFSC Code</td><td>KVBL0001804</td></tr>
-                <tr><td class="label">Branch</td><td>Srivilliputtur</td></tr>
-                <tr><td class="label">UPI ID</td><td>office.aabuilders@okhdfcbank</td></tr>
-                <tr><td class="label">GPay Number</td><td>93634 11241</td></tr>
-            </table>
-        </div>
+            <div class="bank-details-table">
+                <h3>Bank Details</h3>
+                <table>
+                    <tr><td class="label">Bank</td><td>KVB</td></tr>
+                    <tr><td class="label">Name</td><td>AA Builders</td></tr>
+                    <tr><td class="label">Account Number</td><td>1804155000040012</td></tr>
+                    <tr><td class="label">IFSC Code</td><td>KVBL0001804</td></tr>
+                    <tr><td class="label">Branch</td><td>Srivilliputtur</td></tr>
+                    <tr><td class="label">UPI ID</td><td>office.aabuilders@okhdfcbank</td></tr>
+                    <tr><td class="label">GPay Number</td><td>93634 11241</td></tr>
+                </table>
+            </div>
 
-        <div class="qr">
-            <p><strong>Scan to Pay</strong></p>
-            <img src="${qrCodeImage}" alt="QR Code" width="200" height="200" />
+            <div class="qr">
+                <p><strong>Scan to Pay</strong></p>
+                <img src="${qrCodeImage}" alt="QR Code" />
+            </div>
         </div>
 
         <script>
@@ -468,22 +536,29 @@ const RentDatabase = ({ username, userRoles = [] }) => {
     };
     useEffect(() => {
         fetchTenants();
-    }, [properties]);
+    }, [projects]);
     const fetchTenants = async () => {
         try {
             const response = await fetch('https://backendaab.in/aabuildersDash/api/tenantShop/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setTenantShopData(data);
-                // Build mapping from shopNo to shopNoId from properties
+                // Build mapping from shopNo to shopNoId from projects (project management)
                 const shopNoToIdMap = {};
-                properties.forEach(property => {
-                    property.propertyDetailsList?.forEach(detail => {
-                        if (detail.shopNo && detail.id) {
-                            shopNoToIdMap[detail.shopNo] = detail.id;
-                        }
+                projects
+                    .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
+                    .forEach(project => {
+                        // Convert Set to Array if needed
+                        const propertyDetailsArray = Array.isArray(project.propertyDetails) 
+                            ? project.propertyDetails 
+                            : Array.from(project.propertyDetails || []);
+                        
+                        propertyDetailsArray.forEach(detail => {
+                            if (detail.shopNo && detail.id) {
+                                shopNoToIdMap[detail.shopNo] = detail.id;
+                            }
+                        });
                     });
-                });
                 
                 const activeTenants = data.filter(t =>
                     t.property?.some(p =>
@@ -526,21 +601,28 @@ const RentDatabase = ({ username, userRoles = [] }) => {
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching properties.');
+            console.log('Error fetching tenants.');
         }
     };
     
     // Build mapping from IDs to actual values
     useEffect(() => {
-        // Build shopNoId -> shopNo mapping from properties
+        // Build shopNoId -> shopNo mapping from projects (project management)
         const shopNoIdMap = {};
-        properties.forEach(property => {
-            property.propertyDetailsList?.forEach(detail => {
-                if (detail.id && detail.shopNo) {
-                    shopNoIdMap[detail.id] = detail.shopNo;
-                }
+        projects
+            .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
+            .forEach(project => {
+                // Convert Set to Array if needed
+                const propertyDetailsArray = Array.isArray(project.propertyDetails) 
+                    ? project.propertyDetails 
+                    : Array.from(project.propertyDetails || []);
+                
+                propertyDetailsArray.forEach(detail => {
+                    if (detail.id && detail.shopNo) {
+                        shopNoIdMap[detail.id] = detail.shopNo;
+                    }
+                });
             });
-        });
         setShopNoIdToShopNoMap(shopNoIdMap);
         
         // Build tenantNameId -> tenantName mapping from tenantShopData
@@ -551,7 +633,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
             }
         });
         setTenantNameIdToTenantNameMap(tenantNameIdMap);
-    }, [properties, tenantShopData]);
+    }, [projects, tenantShopData]);
     const handleChange = (e) => {
         const { name, type, value, files } = e.target;
         // Prevent clearing the date field
@@ -1311,11 +1393,26 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                                             <td className=" text-sm text-left px-4 font-semibold">{rent.paymentMode}</td>
                                             <td className=" text-sm text-left px-4 font-semibold">{rent.formType}</td>
                                             <td className=" flex w-[100px] justify-between py-2">
-                                                <button onClick={() => handleEditClick(rent)} className="rounded-full transition duration-200 ml-2 mr-3">
+                                                <button 
+                                                    onClick={() => handleEditClick(rent)} 
+                                                    disabled={rent.formType === 'Shop Closure' || rent.formType === 'Refund'}
+                                                    className={`rounded-full transition duration-200 ml-2 mr-3 ${
+                                                        rent.formType === 'Shop Closure' || rent.formType === 'Refund' 
+                                                            ? 'opacity-50 cursor-not-allowed' 
+                                                            : ''
+                                                    }`}
+                                                    title={rent.formType === 'Shop Closure' || rent.formType === 'Refund' 
+                                                        ? 'Cannot edit Shop Closure or Refund forms' 
+                                                        : ''}
+                                                >
                                                     <img
                                                         src={edit}
                                                         alt="Edit"
-                                                        className=" w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200 "
+                                                        className={`w-4 h-6 transition duration-200 ${
+                                                            rent.formType === 'Shop Closure' || rent.formType === 'Refund' 
+                                                                ? '' 
+                                                                : 'transform hover:scale-110 hover:brightness-110'
+                                                        }`}
                                                     />
                                                 </button>
                                                 {userPermissions.includes("Delete") && (

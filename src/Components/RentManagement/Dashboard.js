@@ -21,7 +21,7 @@ const Dashboard = () => {
     const [selectedShop, setSelectedShop] = useState(null);
     const [showConfirm, setShowConfirm] = useState(false);
     const [showEditPopup, setShowEditPopup] = useState(false);
-    const [properties, setProperties] = useState([]);
+    const [projects, setProjects] = useState([]);
     const [showVacantPopup, setShowVacantPopup] = useState(false);
     const [sortField, setSortField] = useState('tenantName'); // or 'shopNo'
     const [sortOrder, setSortOrder] = useState('asc'); // or 'desc'
@@ -168,21 +168,25 @@ const Dashboard = () => {
         );
     }, [tableData]);
     useEffect(() => {
-        fetchProperties();
+        fetchProjects();
     }, []);
-    const fetchProperties = async () => {
+    const fetchProjects = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/properties/all');
+            const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
             if (response.ok) {
                 const data = await response.json();
-                setProperties(data);
-                // Extract property names
+                // Filter for "own project" category
+                const ownProjects = Array.isArray(data)
+                    ? data.filter(p => (p.projectCategory || '').toLowerCase() === 'own project')
+                    : [];
+                setProjects(ownProjects);
+                console.log('Fetched projects:', ownProjects.length, 'projects');
             } else {
-                console.log('Error fetching properties.');
+                console.log('Error fetching projects.');
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching properties.');
+            console.log('Error fetching projects.');
         }
     };
     useEffect(() => {
@@ -233,12 +237,13 @@ const Dashboard = () => {
                 if (shop.shopNo) {
                     shopInfoMap[shop.shopNo] = {
                         doorNo: shop.doorNo || '',
-                        propertyName: property.propertyName || '',
+                        projectReferenceName: property.propertyName || '', // propertyName stores projectReferenceName
                         advanceAmount: shop.advanceAmount || '',
                         monthlyRent: shop.monthlyRent || '',
                         tenantId: tenant.id,     // ← Add tenant ID
                         shopId: shop.id,          // ← Add shop ID
                         startingDate: shop.startingDate,
+                        shopClosureDate: shop.shopClosureDate,
                         shouldCollectAdvance: shop.shouldCollectAdvance
                     };
                 }
@@ -254,23 +259,31 @@ const Dashboard = () => {
     };
     useEffect(() => {
         const allShops = [];
-        // 1. Collect all shop data from properties
-        properties.forEach(property => {
-            property.propertyDetailsList?.forEach(shop => {
-                if (shop.shopNo) {
-                    allShops.push({
-                        shopNo: shop.shopNo,
-                        doorNo: shop.doorNo || '',
-                        propertyName: property.propertyName || '',
-                        advance: null,
-                        tenantName: null,
-                        tenantId: null,
-                        shopId: shop.id,
-                        active: false
-                    });
-                }
+        // 1. Collect all shop data from projects (project management)
+        // Only include projects with projectReferenceName
+        projects
+            .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
+            .forEach(project => {
+                // Convert Set to Array if needed, or handle as array
+                const propertyDetailsArray = Array.isArray(project.propertyDetails) 
+                    ? project.propertyDetails 
+                    : Array.from(project.propertyDetails || []);
+                
+                propertyDetailsArray.forEach(shop => {
+                    if (shop.shopNo) {
+                        allShops.push({
+                            shopNo: shop.shopNo,
+                            doorNo: shop.doorNo || '',
+                            propertyName: project.projectReferenceName || '', // Use projectReferenceName
+                            advance: null,
+                            tenantName: null,
+                            tenantId: null,
+                            shopId: shop.id,
+                            active: false
+                        });
+                    }
+                });
             });
-        });
         // 2. Merge tenant data (excluding advance)
         tenantShopData.forEach(tenant => {
             tenant.property?.forEach(property => {
@@ -315,6 +328,7 @@ const Dashboard = () => {
         const advanceDetailsMap = {};
         const advanceAdjustmentDetailsMap = {};
         const shopClosureDetailsMap = {};
+        const refundDetailsMap = {};
         rentForms.forEach(entry => {
             if (entry.formType === 'Advance' && entry.shopNo) {
                 const amount = parseFloat(entry.amount || 0);
@@ -325,6 +339,7 @@ const Dashboard = () => {
                     advanceDetailsMap[shopKey] = [];
                     advanceAdjustmentDetailsMap[shopKey] = [];
                     shopClosureDetailsMap[shopKey] = [];
+                    refundDetailsMap[shopKey] = [];
                 }
                 advanceMap[shopKey] += amount;
                 advanceDetailsMap[shopKey].push(`${paidOn} - ₹${amount.toLocaleString()}`);
@@ -337,13 +352,21 @@ const Dashboard = () => {
                 }
                 advanceAdjustmentDetailsMap[shopKey].push(`${paidOn} - ₹${amount.toLocaleString()}`);
             } else if (entry.formType === 'Shop Closure' && entry.shopNo) {
-                const amount = parseFloat(entry.amount || 0);
+                const amount = parseFloat(entry.refundAmount || entry.amount || 0);
                 const paidOn = formatDateOnly(entry.paidOnDate) || '';
                 const shopKey = entry.shopNo;
                 if (!shopClosureDetailsMap[shopKey]) {
                     shopClosureDetailsMap[shopKey] = [];
                 }
                 shopClosureDetailsMap[shopKey].push(`${paidOn} - ₹${amount.toLocaleString()}`);
+            } else if (entry.formType === 'Refund' && entry.shopNo) {
+                const amount = parseFloat(entry.refundAmount || entry.amount || 0);
+                const paidOn = formatDateOnly(entry.paidOnDate) || '';
+                const shopKey = entry.shopNo;
+                if (!refundDetailsMap[shopKey]) {
+                    refundDetailsMap[shopKey] = [];
+                }
+                refundDetailsMap[shopKey].push(`${paidOn} - ₹${amount.toLocaleString()}`);
             }
         });
         // 6. Final table data
@@ -355,6 +378,7 @@ const Dashboard = () => {
             const advanceDetails = advanceDetailsMap[shop.shopNo] || [];
             const advanceAdjustmentDetails = advanceAdjustmentDetailsMap[shop.shopNo] || [];
             const shopClosureDetails = shopClosureDetailsMap[shop.shopNo] || [];
+            const refundDetails = refundDetailsMap[shop.shopNo] || [];
             const totalRentPaid = rentForms
                 .filter(entry =>
                     entry.shopNo === shop.shopNo &&
@@ -369,10 +393,19 @@ const Dashboard = () => {
                     entry.shopNo === shop.shopNo &&
                     entry.formType === 'Shop Closure'
                 )
-                .reduce((sum, entry) => sum + parseFloat(entry.refundAmount || 0), 0);
-            console.log("Shop Closure:",totalShopClosurePaid);
+                .reduce((sum, entry) => sum + parseFloat(entry.refundAmount || entry.amount || 0), 0);
             
-            const remainingAdvance = Math.max(0, advanceAmount - totalRentPaid - totalShopClosurePaid);
+            // Calculate Refund payments that should be subtracted from advance
+            const totalRefundPaid = rentForms
+                .filter(entry =>
+                    entry.shopNo === shop.shopNo &&
+                    entry.formType === 'Refund'
+                )
+                .reduce((sum, entry) => sum + parseFloat(entry.refundAmount || entry.amount || 0), 0);
+            console.log("Shop Closure:",totalShopClosurePaid);
+            console.log("Refund:",totalRefundPaid);
+            
+            const remainingAdvance = Math.max(0, advanceAmount - totalRentPaid - totalShopClosurePaid - totalRefundPaid);
 
             const wasActiveThisYear = months.some(monthArr => monthArr.length > 0);
             const row = {
@@ -384,11 +417,13 @@ const Dashboard = () => {
                 advanceDetails: shop.active ? advanceDetails : [],
                 advanceAdjustmentDetails: shop.active ? advanceAdjustmentDetails : [],
                 shopClosureDetails: shop.active ? shopClosureDetails : [],
+                refundDetails: shop.active ? refundDetails : [],
                 months,
                 rentDetails,
                 propertyName: shop.propertyName,
                 vacated: !shop.active && wasActiveThisYear,
-                startingDate: shop.active ? shopInfoMap[shop.shopNo]?.startingDate : null,
+                startingDate: shopInfoMap[shop.shopNo]?.startingDate || null,
+                shopClosureDate: shop.active ? null : shopInfoMap[shop.shopNo]?.shopClosureDate || null,
                 shouldCollectAdvance: shopInfoMap[shop.shopNo]?.shouldCollectAdvance ?? true
             };
             if (!shop.active && wasActiveThisYear) {
@@ -418,7 +453,7 @@ const Dashboard = () => {
             }
         });
         setTableData(finalTableData);
-    }, [rentForms, tenantShopData, properties, selectedYear]);
+    }, [rentForms, tenantShopData, projects, selectedYear]);
     const formatINR = (value) => {
         const numericValue = value.replace(/[^0-9]/g, '');
         if (!numericValue) return '';
@@ -540,11 +575,29 @@ const Dashboard = () => {
             const valA = normalize(a[sortField]?.split(',')[0]);
             const valB = normalize(b[sortField]?.split(',')[0]);
             if (sortField === 'shopNo') {
-                // Sort by first character only
-                const firstCharA = valA.charAt(0) || '';
-                const firstCharB = valB.charAt(0) || '';
-                if (firstCharA < firstCharB) return sortOrder === 'asc' ? -1 : 1;
-                if (firstCharA > firstCharB) return sortOrder === 'asc' ? 1 : -1;
+                // Parse shop number: extract first two letters and numeric part
+                const parseShopNo = (str) => {
+                    if (!str) return { letters: '', number: 0 };
+                    // Extract first two letters (or one if only one exists)
+                    const letterMatch = str.match(/^([A-Z]{1,2})/);
+                    const letters = letterMatch ? letterMatch[1] : '';
+                    // Extract numeric part
+                    const numberMatch = str.match(/(\d+)/);
+                    const number = numberMatch ? parseInt(numberMatch[1], 10) : 0;
+                    return { letters, number };
+                };
+                
+                const parsedA = parseShopNo(valA);
+                const parsedB = parseShopNo(valB);
+                
+                // Compare letters first
+                if (parsedA.letters < parsedB.letters) return sortOrder === 'asc' ? -1 : 1;
+                if (parsedA.letters > parsedB.letters) return sortOrder === 'asc' ? 1 : -1;
+                
+                // If letters are same, compare numbers numerically
+                if (parsedA.number < parsedB.number) return sortOrder === 'asc' ? -1 : 1;
+                if (parsedA.number > parsedB.number) return sortOrder === 'asc' ? 1 : -1;
+                
                 return 0;
             }
             // Default sorting for other fields
@@ -554,10 +607,12 @@ const Dashboard = () => {
         });
     }, [filteredTableData, sortField, sortOrder]);
 
-    const options = properties.map((property) => ({
-        value: property.propertyName,
-        label: property.propertyName,
-    }));
+    const options = projects
+        .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
+        .map((project) => ({
+            value: project.projectReferenceName,
+            label: project.projectReferenceName,
+        }));
 
     const shopOptions = [...new Set(tableData.map(shop => shop.shopNo))].map(no => ({ value: no, label: no }));
     const filteredByShop = selectedShopNo
@@ -598,12 +653,17 @@ const Dashboard = () => {
                     selectedYear > now.getFullYear() ||
                     (selectedYear === now.getFullYear() && i >= now.getMonth());
                 const shopStartDate = shop.startingDate ? new Date(shop.startingDate) : null;
+                const shopClosureDate = shop.shopClosureDate ? new Date(shop.shopClosureDate) : null;
                 const isBeforeStart = shopStartDate
                     ? (selectedYear < shopStartDate.getFullYear() ||
                         (selectedYear === shopStartDate.getFullYear() && i < shopStartDate.getMonth()))
                     : false;
+                const isAfterClosure = shopClosureDate && isVacated
+                    ? (selectedYear > shopClosureDate.getFullYear() ||
+                        (selectedYear === shopClosureDate.getFullYear() && i > shopClosureDate.getMonth()))
+                    : false;
                 const totalAmount = amounts.reduce((a, b) => a + b, 0);
-                if (isVacant || isBeforeStart) return "-";
+                if (isVacant || isBeforeStart || isAfterClosure) return "-";
                 if (totalAmount > 0) return totalAmount.toLocaleString();
                 if (isFutureMonth) return "-";
                 return "0";
@@ -667,12 +727,12 @@ const Dashboard = () => {
     };
     const handleExportVacantPDF = () => {
         const doc = new jsPDF();
-        const tableColumn = ["S.No", "Shop No", "Door No", "Property Name"];
+        const tableColumn = ["S.No", "Shop No", "Door No", "Project Reference Name"];
         const tableRows = filteredVacantShops.map((shop, index) => [
             index + 1,
             shop.shopNo,
             shop.doorNo || 'N/A',
-            shop.propertyName || 'N/A'
+            shop.propertyName || 'N/A' // propertyName stores projectReferenceName
         ]);
 
         doc.text("Vacant Shop Details", 14, 10);
@@ -776,10 +836,10 @@ const Dashboard = () => {
 
     return (
         <div className="w-full overflow-x-auto">
-            <div className='mx-auto lg:w-[1750px] p-4 lg:pl-8 bg-white lg:ml-12 lg:mr-6 rounded-md text-left'>
-                <div className="flex flex-col lg:flex-row lg:items-end gap-4 lg:gap-6">
-                    <div className="flex-shrink-0">
-                        <h1 className='font-semibold mb-3'>Select Year</h1>
+            <div className='mx-auto lg:w-[1750px] p-4 lg:pl-4 bg-white lg:ml-12 lg:mr-6 rounded-md text-left'>
+                <div className="flex flex-col lg:flex-row lg:items-end gap-4 lg:gap-3 p-4">
+                    <div className="flex-shrink-0 mr-3">
+                        <h1 className='font-semibold mb-2'>Select Year</h1>
                         <input
                             type="month"
                             value={selectedMonthYear}
@@ -787,12 +847,14 @@ const Dashboard = () => {
                             className="border-2 border-[#BF9853] rounded-lg p-2 w-full lg:w-[180px] h-[45px] focus:outline-none"
                         />
                     </div>
-                    <div className="flex flex-col sm:flex-row gap-4 mt-0 lg:mt-9 lg:ml-3.5 w-full flex-wrap">
+                    <div className="flex  sm:flex-row w-full flex-wrap">
                         <div className="w-full sm:w-auto sm:min-w-[200px]">
+                            <label className="block font-semibold mb-2 text-sm sm:text-base">Shop No</label>
                             <Select
                                 options={shopOptions}
                                 isClearable
-                                placeholder="Select Shop No"
+                                placeholder="Select"
+                                className="w-full lg:w-[180px]"
                                 value={shopOptions.find(o => o.value === selectedShopNo) || null}
                                 onChange={(option) => {
                                     const value = option?.value || '';
@@ -834,11 +896,12 @@ const Dashboard = () => {
                                 }}
                             />
                         </div>
-                        <div className="w-full sm:w-auto sm:min-w-[200px]">
+                        <div className="w-full sm:w-auto sm:min-w-[200px] mr-5">
+                            <label className="block font-semibold mb-2 text-sm sm:text-base">Tenant Name</label>
                             <Select
                                 options={tenantOptions}
                                 isClearable
-                                placeholder="Select Tenant Name"
+                                placeholder="Select"
                                 value={tenantOptions.find(o => o.value === selectedTenantName) || null}
                                 onChange={(option) => {
                                     const value = option?.value || '';
@@ -880,10 +943,12 @@ const Dashboard = () => {
                             />
                         </div>
                         <div className="w-full sm:w-auto sm:min-w-[200px]">
+                            <label className="block font-semibold mb-2 text-sm sm:text-base">Door No</label>
                             <Select
                                 options={doorOptions}
-                                placeholder="Select Door No"
+                                placeholder="Select"
                                 isClearable
+                                className="w-full lg:w-[180px]"
                                 value={doorOptions.find(o => o.value === selectedDoorNo) || null}
                                 onChange={(option) => {
                                     const value = option?.value || '';
@@ -924,8 +989,9 @@ const Dashboard = () => {
                             />
                         </div>
                         <div className="w-full sm:w-auto sm:min-w-[200px]">
+                            <label className="block font-semibold mb-2 text-sm sm:text-base">Payment Status</label>
                             <select
-                                className='w-full h-[45px] border-2 border-[#BF9853] rounded-lg pl-3 focus:outline-none'
+                                className='w-full lg:w-[180px] h-[45px] border-2 border-[#BF9853] rounded-lg pl-3 focus:outline-none'
                                 value={paymentStatus}
                                 onChange={(e) => {
                                     const value = e.target.value;
@@ -938,12 +1004,13 @@ const Dashboard = () => {
                                     }
                                 }}
                             >
-                                <option value="">Select Status</option>
+                                <option value="">Select</option>
                                 <option value="paid">Paid</option>
                                 <option value="unpaid">Unpaid</option>
                             </select>
                         </div>
-                        <div className="w-full sm:w-auto sm:min-w-[200px]">
+                        <div className="w-full sm:w-auto sm:min-w-[200px] mr-5">
+                            <label className="block font-semibold mb-2 text-sm sm:text-base">Project Reference Name</label>
                             <Select
                                 options={options}
                                 value={selectedProperty}
@@ -956,7 +1023,7 @@ const Dashboard = () => {
                                         sessionStorage.removeItem('selectedProperty');
                                     }
                                 }}
-                                placeholder="Select Property"
+                                placeholder="Select"
                                 isSearchable
                                 styles={{
                                     control: (provided, state) => ({
@@ -986,8 +1053,9 @@ const Dashboard = () => {
                             />
                         </div>
                         <div className="w-full sm:w-auto sm:min-w-[200px]">
+                            <label className="block font-semibold mb-2 text-sm sm:text-base">Occupancy Status</label>
                             <select
-                                className='w-full h-[45px] border-2 border-[#BF9853] rounded-lg pl-3 focus:outline-none'
+                                className='w-full lg:w-[180px] h-[45px] border-2 border-[#BF9853] rounded-lg pl-3 focus:outline-none'
                                 value={selectedOccupancyStatus}
                                 onChange={(e) => {
                                     const value = e.target.value;
@@ -999,7 +1067,7 @@ const Dashboard = () => {
                                     }
                                 }}
                             >
-                                <option value="">Select Occupancy Status</option>
+                                <option value="">Select</option>
                                 <option value="occupied">Occupied Shop</option>
                                 <option value="vacant">Vacant Shop</option>
                                 <option value="vacated">Vacated Shop</option>
@@ -1106,7 +1174,8 @@ const Dashboard = () => {
                                         <td className="px-4 py-2" title={(() => {
                                             const advanceDetails = shop.advanceDetails || [];
                                             const adjustmentDetails = shop.advanceAdjustmentDetails || [];
-                                            const shopClosureDetails = shop.shopClosureDetails || [];                                            
+                                            const shopClosureDetails = shop.shopClosureDetails || [];
+                                            const refundDetails = shop.refundDetails || [];                                            
                                             let tooltip = [];                                            
                                             // Add advance payments
                                             advanceDetails.forEach(detail => {
@@ -1119,6 +1188,11 @@ const Dashboard = () => {
                                             // Add shop closure payments with clear labeling
                                             shopClosureDetails.forEach(detail => {
                                                 tooltip.push(detail + ' (Shop Closure)');
+                                            });
+                                            
+                                            // Add refund payments with clear labeling
+                                            refundDetails.forEach(detail => {
+                                                tooltip.push(detail + ' (Refund)');
                                             });                                            
                                             // Add note for vacated shops
                                             if (shop.vacated && shop.advance > 0) {
@@ -1144,13 +1218,18 @@ const Dashboard = () => {
                                             const totalAmount = amounts.reduce((a, b) => a + b, 0);
                                             const hoverText = shop.rentDetails?.[i]?.join('\n') || "";
                                             const shopStartDate = shop.startingDate ? new Date(shop.startingDate) : null;
+                                            const shopClosureDate = shop.shopClosureDate ? new Date(shop.shopClosureDate) : null;
                                             const isBeforeStart = shopStartDate
                                                 ? (selectedYear < shopStartDate.getFullYear() ||
                                                     (selectedYear === shopStartDate.getFullYear() && i < shopStartDate.getMonth()))
                                                 : false;
+                                            const isAfterClosure = shopClosureDate && shop.vacated
+                                                ? (selectedYear > shopClosureDate.getFullYear() ||
+                                                    (selectedYear === shopClosureDate.getFullYear() && i > shopClosureDate.getMonth()))
+                                                : false;
                                             return (
                                                 <td key={i} className="px-4 py-2 text-center" title={hoverText}>
-                                                    {isVacant || isBeforeStart ? (
+                                                    {isVacant || isBeforeStart || isAfterClosure ? (
                                                         <span className="text-gray-400 font-medium">-</span>
                                                     ) : totalAmount > 0 ? (
                                                         <span className="text-green-600 font-semibold">{totalAmount.toLocaleString()}</span>
@@ -1323,7 +1402,7 @@ const Dashboard = () => {
                                             <th className="px-2 py-2 text-left">S.No</th>
                                             <th className="px-2 py-2 text-left">Shop No</th>
                                             <th className="px-2 py-2 text-left">Door No</th>
-                                            <th className="px-2 py-2 text-left">Property Name</th>
+                                            <th className="px-2 py-2 text-left">Project Reference Name</th>
                                         </tr>
                                     </thead>
                                     <tbody>

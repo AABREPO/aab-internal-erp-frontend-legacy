@@ -73,6 +73,21 @@ const PurchaseInputData = () => {
   const [poItemNameId, setPoItemNameId] = useState('');
   const [siteInchargeId, setSiteInchargeId] = useState('');
   const [isItemNameEditPopupOpen, setIsItemNameEditPopupOpen] = useState(false);
+  const [expandedTables, setExpandedTables] = useState({
+    itemName: false,
+    model: false,
+    brand: false,
+    type: false,
+    category: false,
+    siteIncharge: false,
+    groupName: false
+  });
+  const toggleTable = (tableName) => {
+    setExpandedTables(prev => ({
+      ...prev,
+      [tableName]: !prev[tableName]
+    }));
+  };
   const closeModelUpload = () => setIsModelUploadOpens(false);
   const openModelUpload = () => setIsModelUploadOpens(true);
   const closeBrandUpload = () => setIsBrandUploadOpens(false);
@@ -1281,26 +1296,38 @@ const PurchaseInputData = () => {
               + Add
             </button>
           </div>
-          <button onClick={openItemNameUpload} className="text-[#E4572E] -mb-4 flex ">
+          <button onClick={openItemNameUpload} className="text-[#E4572E] flex mb-6">
             <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' />
             <h1 className='mt-1.5 text-sm'>Import file</h1>
           </button>
-          <button>
-            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 lg:ml-[23rem] ml-[15rem]' />
+          <button className="lg:block hidden">
+            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 lg:ml-[20rem] ml-[15rem]' />
           </button>
           <div className="rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]">
             <div className="bg-[#FAF6ED]">
-              <table className="table-auto lg:w-[355px] w-72">
+              <table className="table-auto lg:w-[355px] w-full">
                 <thead className="bg-[#FAF6ED]">
                   <tr className="border-b">
                     <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
                     <th className="p-2 text-left w-72 text-xl font-bold">Item Name</th>
+                    <th className="p-2 text-right lg:hidden">
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => toggleTable('itemName')} className="text-gray-700">
+                          <span className="text-xl font-bold">
+                            {expandedTables.itemName ? '↑' : '↓'}
+                          </span>
+                        </button>
+                        <button>
+                          <img src={deleteIcon} alt='del' className='w-4 h-4' />
+                        </button>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
               </table>
             </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto lg:w-96 w-72">
+            <div className={`overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 lg:block ${expandedTables.itemName ? 'block' : 'hidden'}`}>
+              <table className="table-auto w-full">
                 <tbody>
                   {filteredPoItemName.map((item, index) => (
                     <tr className="border-b odd:bg-white even:bg-[#FAF6ED]">
@@ -1349,23 +1376,38 @@ const PurchaseInputData = () => {
               + Add
             </button>
           </div>
-          <button onClick={openModelUpload} className="text-[#E4572E] -mb-4 flex"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' /><h1 className='mt-1.5 text-sm'>Import file</h1></button>
-          <button>
-            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 lg:ml-[19rem] ml-[12rem]' />
+          <button onClick={openModelUpload} className="text-[#E4572E] flex mb-6">
+            <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' />
+            <h1 className='mt-1.5 text-sm'>Import file</h1>
+            </button>
+          <button className="lg:block hidden">
+            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 lg:ml-[15rem] ml-[12rem]' />
           </button>
           <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
             <div className="bg-[#FAF6ED]">
-              <table className="table-auto lg:w-[249px] w-64">
+              <table className="table-auto lg:w-[249px] w-full">
                 <thead className='bg-[#FAF6ED]'>
                   <tr className="border-b">
                     <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
                     <th className="p-2 text-left w-72 text-xl font-bold">Model</th>
+                    <th className="p-2 text-right lg:hidden">
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => toggleTable('model')} className="text-gray-700">
+                          <span className="text-xl font-bold">
+                            {expandedTables.model ? '↑' : '↓'}
+                          </span>
+                        </button>
+                        <button>
+                          <img src={deleteIcon} alt='del' className='w-4 h-4' />
+                        </button>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
               </table>
             </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto lg:w-80 w-64">
+            <div className={`overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 lg:block ${expandedTables.model ? 'block' : 'hidden'}`}>
+              <table className="table-auto w-full">
                 <tbody>
                   {filteredPoModel.map((modelItem, index) => {
                     const itemNamesForThisModel = getItemNamesForModel(modelItem.model);
@@ -1426,23 +1468,35 @@ const PurchaseInputData = () => {
               + Add
             </button>
           </div>
-          <button onClick={openBrandUpload} className="text-[#E4572E] -mb-4 flex "><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' /><h1 className='mt-1.5 text-sm'>Import file</h1></button>
-          <button>
+          <button onClick={openBrandUpload} className="text-[#E4572E] flex mb-6"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' /><h1 className='mt-1.5 text-sm'>Import file</h1></button>
+          <button className="lg:block hidden">
             <img src={deleteIcon} alt='del' className='-mb-14 mt-5 ml-[17rem]' />
           </button>
           <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
             <div className="bg-[#FAF6ED]">
-              <table className="table-auto lg:w-[323px] w-80">
+              <table className="table-auto lg:w-[323px] w-full">
                 <thead className='bg-[#FAF6ED]'>
                   <tr className="border-b">
                     <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
                     <th className="p-2 text-left w-72 text-xl font-bold">Brand</th>
+                    <th className="p-2 text-right lg:hidden">
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => toggleTable('brand')} className="text-gray-700">
+                          <span className="text-xl font-bold">
+                            {expandedTables.brand ? '↑' : '↓'}
+                          </span>
+                        </button>
+                        <button>
+                          <img src={deleteIcon} alt='del' className='w-4 h-4' />
+                        </button>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
               </table>
             </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto lg:w-80 w-80">
+            <div className={`overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 lg:block ${expandedTables.brand ? 'block' : 'hidden'}`}>
+              <table className="table-auto w-full">
                 <tbody>
                   {filteredPoBrand.map((item, index) => (
                     <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
@@ -1486,23 +1540,35 @@ const PurchaseInputData = () => {
               + Add
             </button>
           </div>
-          <button onClick={openTypeUpload} className="text-[#E4572E] -mb-4 flex"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' /><h1 className='mt-1.5 text-sm'>Import file</h1></button>
-          <button>
-            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 ml-[15rem]' />
+          <button onClick={openTypeUpload} className="text-[#E4572E] flex mb-6"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' /><h1 className='mt-1.5 text-sm'>Import file</h1></button>
+          <button className="lg:block hidden">
+            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 ml-[13rem]' />
           </button>
           <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
             <div className="bg-[#FAF6ED]">
-              <table className="table-auto lg:w-[249px] w-72">
+              <table className="table-auto lg:w-[249px] w-full">
                 <thead className='bg-[#FAF6ED]'>
                   <tr className="border-b">
                     <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
                     <th className="p-2 text-left w-auto text-xl font-bold">Type</th>
+                    <th className="p-2 text-right lg:hidden">
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => toggleTable('type')} className="text-gray-700">
+                          <span className="text-xl font-bold">
+                            {expandedTables.type ? '↑' : '↓'}
+                          </span>
+                        </button>
+                        <button>
+                          <img src={deleteIcon} alt='del' className='w-4 h-4' />
+                        </button>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
               </table>
             </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto lg:w-72 w-72">
+            <div className={`overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 lg:block ${expandedTables.type ? 'block' : 'hidden'}`}>
+              <table className="table-auto w-full">
                 <tbody>
                   {filteredPoTypeColor.map((item, index) => (
                     <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
@@ -1528,7 +1594,7 @@ const PurchaseInputData = () => {
           </div>
         </div>
         <div>
-          <div className="flex items-center mb-2">
+          <div className="flex items-center mb-2 mt-3">
             <input
               type="text"
               className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-[250px] h-12 focus:outline-none"
@@ -1546,26 +1612,38 @@ const PurchaseInputData = () => {
               + Add
             </button>
           </div>
-          <button className="text-[#E4572E] -mb-4 flex ">
+          <button className="text-[#E4572E] flex ">
             <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' />
             <h1 className='mt-1.5 text-sm'>Import file</h1>
           </button>
-          <button>
-            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 lg:ml-[23rem] ml-[15rem]' />
+          <button className="lg:block hidden">
+            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 lg:ml-[20rem] ml-[15rem]' />
           </button>
           <div className="rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]">
             <div className="bg-[#FAF6ED]">
-              <table className="table-auto lg:w-[355px] w-72">
+              <table className="table-auto lg:w-[355px] w-full">
                 <thead className="bg-[#FAF6ED]">
                   <tr className="border-b">
                     <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
                     <th className="p-2 text-left w-72 text-xl font-bold">Category</th>
+                    <th className="p-2 text-right lg:hidden">
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => toggleTable('category')} className="text-gray-700">
+                          <span className="text-xl font-bold">
+                            {expandedTables.category ? '↑' : '↓'}
+                          </span>
+                        </button>
+                        <button>
+                          <img src={deleteIcon} alt='del' className='w-4 h-4' />
+                        </button>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
               </table>
             </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto lg:w-96 w-72">
+            <div className={`overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 lg:block ${expandedTables.category ? 'block' : 'hidden'}`}>
+              <table className="table-auto w-full">
                 <tbody>
                   {filteredPocategory.map((item, index) => (
                     <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
@@ -1591,7 +1669,7 @@ const PurchaseInputData = () => {
           </div>
         </div>
         <div>
-          <div className="flex items-center mb-2">
+          <div className="flex items-center mb-2 mt-3">
             <input
               type="text"
               className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-[250px] h-12 focus:outline-none"
@@ -1606,26 +1684,38 @@ const PurchaseInputData = () => {
               + Add
             </button>
           </div>
-          <button className="text-[#E4572E] -mb-4 flex ">
+          <button className="text-[#E4572E] flex ">
             <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' />
             <h1 className='mt-1.5 text-sm'>Import file</h1>
           </button>
-          <button>
-            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 lg:ml-[23rem] ml-[15rem]' />
+          <button className="lg:block hidden">
+            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 lg:ml-[20rem] ml-[15rem]' />
           </button>
           <div className="rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]">
             <div className="bg-[#FAF6ED]">
-              <table className="table-auto lg:w-[355px] w-72">
+              <table className="table-auto lg:w-[355px] w-full">
                 <thead className="bg-[#FAF6ED]">
                   <tr className="border-b">
                     <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
                     <th className="p-2 text-left w-72 text-xl font-bold">Site Incharge</th>
+                    <th className="p-2 text-right lg:hidden">
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => toggleTable('siteIncharge')} className="text-gray-700">
+                          <span className="text-xl font-bold">
+                            {expandedTables.siteIncharge ? '↑' : '↓'}
+                          </span>
+                        </button>
+                        <button>
+                          <img src={deleteIcon} alt='del' className='w-4 h-4' />
+                        </button>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
               </table>
             </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto lg:w-96 w-72">
+            <div className={`overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 lg:block ${expandedTables.siteIncharge ? 'block' : 'hidden'}`}>
+              <table className="table-auto w-full">
                 <tbody>
                   {filteredSiteIncharge.map((item, index) => (
                     <tr className="border-b odd:bg-white even:bg-[#FAF6ED]">
@@ -1652,7 +1742,7 @@ const PurchaseInputData = () => {
           </div>
         </div>
         <div>
-          <div className="flex items-center mb-2">
+          <div className="flex items-center mb-2 mt-3">
             <input
               type="text"
               value={groupNameSearch}
@@ -1667,26 +1757,38 @@ const PurchaseInputData = () => {
               + Add
             </button>
           </div>
-          <button className="text-[#E4572E] -mb-4 flex ">
+          <button className="text-[#E4572E] flex ">
             <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' />
             <h1 className='mt-1.5 text-sm'>Import file</h1>
           </button>
-          <button>
-            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 lg:ml-[23rem] ml-[15rem]' />
+          <button className="lg:block hidden">
+            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 lg:ml-[20rem] ml-[15rem]' />
           </button>
           <div className="rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]">
             <div className="bg-[#FAF6ED]">
-              <table className="table-auto lg:w-[355px] w-72">
+              <table className="table-auto lg:w-[355px] w-full">
                 <thead className="bg-[#FAF6ED]">
                   <tr className="border-b">
                     <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
                     <th className="p-2 text-left w-72 text-xl font-bold">Group Name</th>
+                    <th className="p-2 text-right lg:hidden">
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => toggleTable('groupName')} className="text-gray-700">
+                          <span className="text-xl font-bold">
+                            {expandedTables.groupName ? '↑' : '↓'}
+                          </span>
+                        </button>
+                        <button>
+                          <img src={deleteIcon} alt='del' className='w-4 h-4' />
+                        </button>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
               </table>
             </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto lg:w-96 w-72">
+            <div className={`overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 lg:block ${expandedTables.groupName ? 'block' : 'hidden'}`}>
+              <table className="table-auto w-full">
                 <tbody>
                   {filteredGroupName.map((item, index) => (
                     <tr className="border-b odd:bg-white even:bg-[#FAF6ED]">

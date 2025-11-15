@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import Select from 'react-select';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import edit from '../Images/Edit.svg';
 
 const ElectricityTab = ({ username, userRoles = [] }) => {
@@ -101,45 +104,77 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         fetchVendorNames();
     }, []);
     useEffect(() => {
-        let filtered = projects;
-        if (selectedCategory) {
-            filtered = filtered.filter(project =>
-                project.projectCategory === selectedCategory
-            );
-        }
-        if (filters.projectName) {
-            filtered = filtered.filter(project =>
-                project.projectName.toLowerCase().includes(filters.projectName.toLowerCase())
-            );
-        }
-        if (filters.doorNo) {
-            filtered = filtered.filter(project =>
-                project.propertyDetails.some(property =>
-                    property.doorNo && property.doorNo.toLowerCase().includes(filters.doorNo.toLowerCase())
-                )
-            );
-        }
-        if (filters.shop) {
-            filtered = filtered.filter(project =>
-                project.propertyDetails.some(property =>
-                    property.shopNo && property.shopNo.toLowerCase().includes(filters.shop.toLowerCase())
-                )
-            );
-        }
-        if (filters.projectType) {
-            filtered = filtered.filter(project =>
-                project.propertyDetails.some(property =>
-                    property.projectType && property.projectType.toLowerCase().includes(filters.projectType.toLowerCase())
-                )
-            );
-        }
-        if (filters.service) {
-            filtered = filtered.filter(project =>
-                project.propertyDetails.some(property =>
-                    property.ebNo && property.ebNo.toLowerCase().includes(filters.service.toLowerCase())
-                )
-            );
-        }
+        const toLower = (value) => (value ? value.toString().toLowerCase() : '');
+        const vendorFilter = toLower(filters.vendor);
+        const doorFilter = toLower(filters.doorNo);
+        const shopFilter = toLower(filters.shop);
+        const projectTypeFilter = toLower(filters.projectType);
+        const serviceFilter = toLower(filters.service);
+        const tenantFilter = toLower(filters.tenant);
+        const projectNameFilter = toLower(filters.projectName);
+
+        const filtered = projects.reduce((acc, project) => {
+            if (selectedCategory && project.projectCategory !== selectedCategory) {
+                return acc;
+            }
+            if (projectNameFilter && !toLower(project.projectName).includes(projectNameFilter)) {
+                return acc;
+            }
+
+            const filteredProperties = (project.propertyDetails || []).filter(property => {
+                if (!property || !property.ebNo || !property.ebNo.trim()) {
+                    return false;
+                }
+
+                if (doorFilter && !toLower(property.doorNo).includes(doorFilter)) {
+                    return false;
+                }
+                if (shopFilter && !toLower(property.shopNo).includes(shopFilter)) {
+                    return false;
+                }
+                if (projectTypeFilter && !toLower(property.projectType).includes(projectTypeFilter)) {
+                    return false;
+                }
+                if (serviceFilter && !toLower(property.ebNo).includes(serviceFilter)) {
+                    return false;
+                }
+                if (tenantFilter) {
+                    const tenantValue = toLower(
+                        property.tenantName ||
+                        property.tenant ||
+                        (property.tenantDetails && property.tenantDetails.tenantName)
+                    );
+                    if (!tenantValue || !tenantValue.includes(tenantFilter)) {
+                        return false;
+                    }
+                }
+                if (vendorFilter) {
+                    const vendorValue = toLower(
+                        property.vendorName ||
+                        property.vendor ||
+                        project.vendorName ||
+                        project.vendor
+                    );
+                    if (!vendorValue || !vendorValue.includes(vendorFilter)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+
+            if (filteredProperties.length === 0) {
+                return acc;
+            }
+
+            acc.push({
+                ...project,
+                propertyDetails: filteredProperties
+            });
+
+            return acc;
+        }, []);
+
         setFilteredProjects(filtered);
     }, [filters, projects, selectedCategory, electricityPayments]);
     const handleFilterChange = (filterType, selectedOption) => {
@@ -320,6 +355,114 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         });
         return unpaidCount;
     };
+
+    const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    const buildExportRows = () => {
+        const rows = [];
+        let rowNumber = 0;
+
+        filteredProjects.forEach(project => {
+            const properties = Array.isArray(project.propertyDetails) ? project.propertyDetails : [];
+
+            properties
+                .filter(property => property.ebNo && property.ebNo.trim() !== '')
+                .forEach(property => {
+                    rowNumber += 1;
+                    const row = {
+                        slNo: rowNumber,
+                        pid: project.projectId || '-',
+                        projectName: project.projectName || '-',
+                        category: property.projectType || project.projectCategory || '-',
+                        doorNo: property.doorNo || '-',
+                        serviceNo: property.ebNo || '-'
+                    };
+
+                    monthLabels.forEach(month => {
+                        const paymentData = getPaymentData(property.ebNo, month, property.id);
+                        row[month] = paymentData && paymentData.amount !== undefined ? paymentData.amount : '-';
+                    });
+
+                    row.unpaid = getUnpaidCount(property.ebNo, property.id);
+                    rows.push(row);
+                });
+        });
+
+        return rows;
+    };
+
+    const handleExportPDF = () => {
+        const rows = buildExportRows();
+        if (!rows.length) return;
+
+        const doc = new jsPDF({ orientation: 'landscape' });
+        doc.setFontSize(14);
+        doc.text('Electricity Projects Overview', 14, 20);
+
+        const headers = ['Sl.No', 'PID', 'Project Name', 'Category', 'Door No', 'Service No', ...monthLabels, 'Unpaid'];
+        const body = rows.map(row => [
+            row.slNo,
+            row.pid,
+            row.projectName,
+            row.category,
+            row.doorNo,
+            row.serviceNo,
+            ...monthLabels.map(month => row[month]),
+            row.unpaid
+        ]);
+
+        doc.autoTable({
+            head: [headers],
+            body,
+            startY: 28,
+            styles: {
+                fontSize: 7,
+                cellPadding: 2
+            },
+            headStyles: {
+                fillColor: [191, 152, 83]
+            },
+            margin: {
+                left: 10,
+                right: 10
+            }
+        });
+
+        doc.save('ElectricityProjects.pdf');
+    };
+
+    const handleExportExcel = () => {
+        const rows = buildExportRows();
+        if (!rows.length) return;
+
+        const worksheetData = rows.map(row => {
+            const base = {
+                'Sl.No': row.slNo,
+                PID: row.pid,
+                'Project Name': row.projectName,
+                Category: row.category,
+                'Door No': row.doorNo,
+                'Service No': row.serviceNo
+            };
+
+            monthLabels.forEach(month => {
+                base[month] = row[month];
+            });
+
+            base['Unpaid'] = row.unpaid;
+            return base;
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'ElectricityProjects');
+        XLSX.writeFile(workbook, 'ElectricityProjects.xlsx');
+    };
+
+    const hasExportableData = filteredProjects.some(project =>
+        Array.isArray(project.propertyDetails) &&
+        project.propertyDetails.some(property => property.ebNo && property.ebNo.trim() !== '')
+    );
     const toggleProjectHideStatus = async (projectId, isHide) => {
         try {
             const response = await axios.put(`https://backendaab.in/aabuilderDash/api/projects/hide/${projectId}`, null, {
@@ -551,13 +694,23 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                             </button>
                         </div>
                         <div className="flex items-center gap-4 text-sm text-black">
-                            <button className="flex items-center font-semibold gap-2 hover:text-blue-600">
+                            <button
+                                type="button"
+                                onClick={handleExportPDF}
+                                disabled={loading || !hasExportableData}
+                                className="flex items-center font-semibold gap-2 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-current"
+                            >
                                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
                                 </svg>
                                 Export PDF
                             </button>
-                            <button className="flex items-center font-semibold gap-2 hover:text-green-600">
+                            <button
+                                type="button"
+                                onClick={handleExportExcel}
+                                disabled={loading || !hasExportableData}
+                                className="flex items-center font-semibold gap-2 hover:text-green-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-current"
+                            >
                                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
                                 </svg>

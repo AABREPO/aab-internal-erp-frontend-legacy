@@ -157,11 +157,11 @@ const DesignTool = () => {
     useEffect(() => {
         return () => cancelMomentum();
     }, []);
-    const calculateSkirtingArea = (tile, areaName) => {
+    const calculateSkirtingArea = (tile, areaName, skirtingValue = null) => {
         const length = parseFeetInches(tile.length);
         const breadth = parseFeetInches(tile.breadth);
         const height = parseFeetInches(tile.height);
-        const selectedSkirtingArea = selectSkirtingArea;
+        const selectedSkirtingArea = skirtingValue !== null ? skirtingValue : selectSkirtingArea;
         // Skip skirting if areaName contains "bath" or "toilet" (case-insensitive)
         const name = areaName?.toLowerCase() || '';
         if (name.includes('bath') || name.includes('toilet')) {
@@ -171,7 +171,7 @@ const DesignTool = () => {
         let skirtingArea = 0;
         if (tile.type === "Floor Tile") {
             const perimeter = (2 * length) + (2 * breadth);
-            const skirtingHeight = (selectedSkirtingArea / 12).toFixed(2); // inches to feet
+            const skirtingHeight = parseFloat(selectedSkirtingArea) / 12; // inches to feet
             skirtingArea = perimeter * skirtingHeight;
         }
         return skirtingArea;
@@ -225,7 +225,14 @@ const DesignTool = () => {
     const currentDate = new Date().toLocaleDateString();
     const [selectedFile, setSelectedFile] = useState(null);
     const [fileOptions, setFileOptions] = useState([]);
+    const [isImportPopup, setIsImportPopup] = useState(false);
+    const [selectedFiles, setSelectedFiles] = useState(null);
+    const [fileOption, setFileOption] = useState([]);
+    const [selectedModule, setSelectedModule] = useState("");
+    const [fullDatas, setFullDatas] = useState([]);
     const inputRef = useRef(null);
+    const closeImportPopup = () => setIsImportPopup(false);
+    const openImportPopup = () => setIsImportPopup(true);
     const evaluateExpression = (expression) => {
         try {
             const sanitizedExpression = expression.replace(/x|X/g, '*').replace(/[^\d+\-*/().\s]/g, '');
@@ -813,6 +820,44 @@ const DesignTool = () => {
     useEffect(() => {
         fetchCalculations();
     }, []);
+    const fetchPaintCalculation = async () => {
+        try {
+            const response = await fetch('https://backendaab.in/aabuilderDash/api/paint_calculation/all/paints');
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            const data = await response.json();
+            setFullDatas(data);
+        } catch (error) {
+            console.error('Error fetching paint calculations:', error);
+        }
+    };
+    useEffect(() => {
+        fetchPaintCalculation();
+    }, []);
+    useEffect(() => {
+        if (!clientName) {
+            setFileOption([]);
+            return;
+        }
+        let filteredOptions = [];
+        if (selectedModule === "Tile Calculation") {
+            filteredOptions = fullData.filter(calculation => calculation.clientName === clientName.value);
+            filteredOptions = filteredOptions.map(calculation => ({
+                value: calculation.id,
+                label: calculation.fileName,
+            }));
+        } else if (selectedModule === "Paint Calculation") {
+            filteredOptions = fullDatas.filter(calculation => calculation.clientName === clientName.value);
+            filteredOptions = filteredOptions.map(calculation => ({
+                value: calculation.id,
+                label: calculation.fileName,
+            }));
+        } else {
+            filteredOptions = [];
+        }
+        setFileOption(filteredOptions);
+    }, [clientName, fullData, fullDatas, selectedModule]);
     const parseFeetInches = (value) => {
         if (!value || typeof value !== "string") return 0;
         const feetInchMatch = value.match(/^(\d+)'(\d+)"?$/);
@@ -2701,7 +2746,7 @@ const DesignTool = () => {
         setDeductionPopupState({});
         if (selectedClientData) {
             const { commonWastage, skirting, rate, commonVendors } = selectedClientData;
-            setSelectSkiritingArea(skirting);
+            setSelectSkiritingArea(skirting || 4);
             setWastagePercentage(commonWastage);
             setCommonRate(rate);
             setSelectedClientData(selectedClientData);
@@ -2789,6 +2834,289 @@ const DesignTool = () => {
             setFloors(newFloorsData);
         } else {
             setSelectedClientData({ calculations: [] });
+            setFloors([]);
+        }
+    };
+    const handleFileNameSelect = (e) => {
+        e.preventDefault();
+        if (!selectedFiles) {
+            alert("Please select a file before submitting.");
+            return;
+        }
+        if (!selectedModule) {
+            alert("Please select a module before submitting.");
+            return;
+        }
+        handleFileChanges(selectedFiles);
+        closeImportPopup();
+    };
+    const handleFileChanges = (selected) => {
+        if (!selected) {
+            setSelectedFiles(null);
+            setFloors([]);
+            return;
+        }
+        let selectedClientDatas = null;
+        if (selectedModule === "Tile Calculation") {
+            selectedClientDatas = fullData.find(calculation => calculation.id === selected.value);
+        } else if (selectedModule === "Paint Calculation") {
+            selectedClientDatas = fullDatas.find(calculation => calculation.id === selected.value);
+        }
+        setSelectedFiles(selected);
+        setDeductionPopupData({});
+        setDeductionPopupState({});
+        if (selectedClientDatas) {
+            // Check if it's a Tile Calculation file (has 'calculations' property)
+            if (selectedClientDatas.calculations && Array.isArray(selectedClientDatas.calculations)) {
+                const { commonWastage, skirting, rate, commonVendors } = selectedClientDatas;
+                setSelectSkiritingArea(skirting || 4);
+                setWastagePercentage(commonWastage);
+                setCommonRate(rate);
+                setSelectedClientData(selectedClientDatas);
+                setCommonVendor(commonVendors);
+                const seenFloors = new Set();
+                let deductionData = {};
+                const newFloorsData = selectedClientDatas.calculations.map((calc, floorIndex) => {
+                const floorName = calc.floorName || 'No floor name available';
+                const areaName = calc.areaName || 'No area name available';
+                const floorVisible = !seenFloors.has(floorName);
+                seenFloors.add(floorName);
+                return {
+                    floorName: floorVisible ? floorName : null,
+                    areaName: areaName,
+                    tiles: calc.tiles.map((tile, tileIndex) => {
+                        const deductions = [
+                            tile.deduction1, tile.deduction2, tile.deduction3, tile.deduction4,
+                            tile.deduction5, tile.deduction6, tile.deduction7, tile.deduction8,
+                            tile.deduction9, tile.deduction10, tile.deduction11, tile.deduction12,
+                            tile.deduction13, tile.deduction14, tile.deduction15, tile.deduction16
+                        ];
+                        const processedDeductions = deductions.map((deduction) => {
+                            if (deduction) {
+                                const splitData = deduction.split(',').map((val) => val.trim());
+                                return {
+                                    type: splitData[0] || '',
+                                    measurement: splitData[1] || '',
+                                    qty: splitData[2] || '',
+                                    location: splitData[3] || '',
+                                    thickness: splitData[4] || '',
+                                    deductionThickness: splitData[5] || '',
+                                    output: splitData[6] || ''
+                                };
+                            }
+                            return null;
+                        }).filter(row => row !== null);
+                        if (processedDeductions.length > 0) {
+                            deductionData[`${floorIndex}-${tileIndex}`] = processedDeductions;
+                        }
+                        const selectedTile = tileList.find(t => t.tileSize === tile.tileSize);
+                        const tileType = tile.type || "Floor Tile";
+                        const tempTile = {
+                            type: tileType,
+                            length: tile.length,
+                            breadth: tile.breadth,
+                            height: tile.height,
+                        };
+                        const calculatedSkirtingArea = tileType === "Floor Tile" ? calculateSkirtingArea(tempTile, areaName, skirting) : (tile.skirtingArea || "");
+                        return {
+                            type: tileType,
+                            length: tile.length,
+                            breadth: tile.breadth,
+                            height: tile.height,
+                            lengthInput: tile.lengthInput || "No Input",
+                            breadthInput: tile.breadthInput || "No Input",
+                            heightInput: tile.heightInput || "No Input",
+                            deduction1: tile.deduction1 || "",
+                            deduction2: tile.deduction2 || "",
+                            deduction3: tile.deduction3 || "",
+                            deduction4: tile.deduction4 || "",
+                            deduction5: tile.deduction5 || "",
+                            deduction6: tile.deduction6 || "",
+                            deduction7: tile.deduction7 || "",
+                            deduction8: tile.deduction8 || "",
+                            deduction9: tile.deduction9 || "",
+                            deduction10: tile.deduction10 || "",
+                            deduction11: tile.deduction11 || "",
+                            deduction12: tile.deduction12 || "",
+                            deduction13: tile.deduction13 || "",
+                            deduction14: tile.deduction14 || "",
+                            deduction15: tile.deduction15 || "",
+                            deduction16: tile.deduction16 || "",
+                            deductionArea: tile.deductionArea || 0,
+                            deductionInput: tile.deductionInput || "",
+                            skirtingArea: calculatedSkirtingArea,
+                            areaTile: tile.areaInSqft || '',
+                            quantityBox: tile.qtyPerBox || '',
+                            tileName: tile.tileName,
+                            tileSize: tile.tileSize,
+                            size: tile.size,
+                            rate: tile.rate,
+                            vendor: tile.vendors,
+                            actualQuantity: tile.actualQuantity,
+                            noOfBoxes: tile.noOfBoxes,
+                            wastagePercentage: tile.wastagePercentage,
+                            isUserChanged: false,
+                            directValue: calculatedSkirtingArea,
+                            defaultSize: selectedTile ? selectedTile.tileSize : tile.tileSize || '',
+                            correctQuantityBox: tile.correctQuantityBox,
+                            hasSizeChanged: selectedTile && tile.size !== selectedTile.tileSize,
+                        };
+                    }),
+                };
+            });
+                setFloors(newFloorsData);
+                if (Object.keys(deductionData).length > 0) {
+                    setDeductionPopupData(deductionData);
+                }
+                // Recalculate skirting areas after setting floors
+                setTimeout(() => {
+                    setFloors((prevFloors) =>
+                        prevFloors.map((floor) => {
+                            const updatedTiles = floor.tiles.map((tile) => {
+                                if (tile.type === "Floor Tile" && !tile.isUserChanged) {
+                                    const newSkirtingArea = calculateSkirtingArea(tile, floor.areaName, skirting);
+                                    return {
+                                        ...tile,
+                                        skirtingArea: newSkirtingArea,
+                                        directValue: newSkirtingArea,
+                                    };
+                                }
+                                return tile;
+                            });
+                            return {
+                                ...floor,
+                                tiles: updatedTiles,
+                            };
+                        })
+                    );
+                }, 0);
+            } else if (selectedClientDatas.paintCalculations && Array.isArray(selectedClientDatas.paintCalculations)) {
+                // Handle Paint Calculation files - convert paintCalculations structure to calculations structure
+                const paintSkirtingValue = selectedClientDatas.skirting || 4;
+                setSelectSkiritingArea(paintSkirtingValue);
+                const seenFloors = new Set();
+                let deductionData = {};
+                const newFloorsData = selectedClientDatas.paintCalculations.map((calc, floorIndex) => {
+                    const floorName = calc.floorName || 'No floor name available';
+                    const areaName = calc.areaName || 'No area name available';
+                    const floorVisible = !seenFloors.has(floorName);
+                    seenFloors.add(floorName);
+                    return {
+                        floorName: floorVisible ? floorName : null,
+                        areaName: areaName,
+                        tiles: (calc.paintTiles || []).map((tile, tileIndex) => {
+                            const deductions = [
+                                tile.deduction1, tile.deduction2, tile.deduction3, tile.deduction4,
+                                tile.deduction5, tile.deduction6, tile.deduction7, tile.deduction8,
+                                tile.deduction9, tile.deduction10, tile.deduction11, tile.deduction12,
+                                tile.deduction13, tile.deduction14, tile.deduction15, tile.deduction16
+                            ];
+                            const processedDeductions = deductions.map((deduction) => {
+                                if (deduction) {
+                                    const splitData = deduction.split(',').map((val) => val.trim());
+                                    return {
+                                        type: splitData[0] || '',
+                                        measurement: splitData[1] || '',
+                                        qty: splitData[2] || '',
+                                        location: splitData[3] || '',
+                                        thickness: splitData[4] || '',
+                                        deductionThickness: splitData[5] || '',
+                                        output: splitData[6] || ''
+                                    };
+                                }
+                                return null;
+                            }).filter(row => row !== null);
+                            if (processedDeductions.length > 0) {
+                                deductionData[`${floorIndex}-${tileIndex}`] = processedDeductions;
+                            }
+                            const selectedTile = tileList.find(t => t.tileSize === tile.tileSize);
+                            const tileType = "Floor Tile";
+                            const tempTile = {
+                                type: tileType,
+                                length: tile.length || "",
+                                breadth: tile.breadth || "",
+                                height: tile.height || "",
+                            };
+                            // For Paint Calculation files, use default skirting value or current state
+                            const calculatedSkirtingArea = calculateSkirtingArea(tempTile, areaName, paintSkirtingValue);
+                            return {
+                                type: tileType,
+                                length: tile.length || "",
+                                breadth: tile.breadth || "",
+                                height: tile.height || "",
+                                lengthInput: tile.lengthInput || "No Input",
+                                breadthInput: tile.breadthInput || "No Input",
+                                heightInput: tile.heightInput || "No Input",
+                                deduction1: tile.deduction1 || "",
+                                deduction2: tile.deduction2 || "",
+                                deduction3: tile.deduction3 || "",
+                                deduction4: tile.deduction4 || "",
+                                deduction5: tile.deduction5 || "",
+                                deduction6: tile.deduction6 || "",
+                                deduction7: tile.deduction7 || "",
+                                deduction8: tile.deduction8 || "",
+                                deduction9: tile.deduction9 || "",
+                                deduction10: tile.deduction10 || "",
+                                deduction11: tile.deduction11 || "",
+                                deduction12: tile.deduction12 || "",
+                                deduction13: tile.deduction13 || "",
+                                deduction14: tile.deduction14 || "",
+                                deduction15: tile.deduction15 || "",
+                                deduction16: tile.deduction16 || "",
+                                deductionArea: tile.deductionArea || 0,
+                                deductionInput: tile.deductionInput || "",
+                                skirtingArea: calculatedSkirtingArea,
+                                areaTile: tile.areaInSqft || '',
+                                quantityBox: tile.qtyPerBox || '',
+                                tileName: tile.tileName || '',
+                                tileSize: tile.tileSize || '',
+                                size: tile.size || '',
+                                rate: tile.rate || '',
+                                vendor: tile.vendors || '',
+                                actualQuantity: tile.actualQuantity || '',
+                                noOfBoxes: tile.noOfBoxes || '',
+                                wastagePercentage: tile.wastagePercentage || "0",
+                                isUserChanged: false,
+                                directValue: calculatedSkirtingArea,
+                                defaultSize: selectedTile ? selectedTile.tileSize : tile.tileSize || '',
+                                correctQuantityBox: tile.correctQuantityBox || '',
+                                hasSizeChanged: selectedTile && tile.size !== selectedTile.tileSize,
+                            };
+                        }),
+                    };
+                });
+                setFloors(newFloorsData);
+                if (Object.keys(deductionData).length > 0) {
+                    setDeductionPopupData(deductionData);
+                }
+                // Recalculate skirting areas after setting floors for Paint Calculation files
+                const finalSkirtingValue = paintSkirtingValue;
+                setTimeout(() => {
+                    setFloors((prevFloors) =>
+                        prevFloors.map((floor) => {
+                            const updatedTiles = floor.tiles.map((tile) => {
+                                if (tile.type === "Floor Tile" && !tile.isUserChanged) {
+                                    const newSkirtingArea = calculateSkirtingArea(tile, floor.areaName, finalSkirtingValue);
+                                    return {
+                                        ...tile,
+                                        skirtingArea: newSkirtingArea,
+                                        directValue: newSkirtingArea,
+                                    };
+                                }
+                                return tile;
+                            });
+                            return {
+                                ...floor,
+                                tiles: updatedTiles,
+                            };
+                        })
+                    );
+                }, 0);
+            } else {
+                // If file structure doesn't match either format, set empty floors
+                setFloors([]);
+            }
+        } else {
             setFloors([]);
         }
     };
@@ -5021,6 +5349,14 @@ const DesignTool = () => {
                             />
                         </div>
                     </div>
+                    <div className="flex justify-end items-center w-full lg:-mt-20 -mt-12 pr-4">
+                        <button
+                            className="bg-[#007233] lg:w-28 w-16 h-[36px] rounded-md text-white"
+                            onClick={openImportPopup}
+                        >
+                            + Import
+                        </button>
+                    </div>
                 </div>
             </div>
             <div className={`p-6 bg-[#FFFFFF] mt-6 ml-6 mr-6 rounded-lg overflow-x-auto select-none`}
@@ -6358,6 +6694,57 @@ const DesignTool = () => {
                                 Confirm
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+            {isImportPopup && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+                    <div className="bg-white rounded-md w-[32rem] px-2 py-2">
+                        <div>
+                            <button className="text-red-500 ml-[95%]" onClick={closeImportPopup}>
+                                <img src={cross} alt="close" className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleFileNameSelect}>
+                            <div className="flex">
+                                <div>
+                                    <label className="block -ml-16 text-lg font-medium mb-2">Module Name</label>
+                                    <select
+                                        className="w-52 ml-6 rounded-lg border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 h-12 focus:outline-none"
+                                        value={selectedModule}
+                                        onChange={(e) => setSelectedModule(e.target.value)}
+                                    >
+                                        <option value="" disabled>Select Module...</option>
+                                        <option value="Tile Calculation">Tile Calculation</option>
+                                        <option value="Paint Calculation">Paint Calculation</option>
+                                    </select>
+                                </div>
+                                <div className="ml-4">
+                                    <label className="block text-lg font-medium mb-2 -ml-32">Revision</label>
+                                    <Select
+                                        placeholder="Select the file..."
+                                        className="border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] rounded-lg w-60 h-12"
+                                        styles={customSelectStyles}
+                                        options={fileOption}
+                                        isClearable
+                                        value={selectedFiles}
+                                        onChange={(option) => setSelectedFiles(option)}
+                                        isDisabled={!clientName}
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex space-x-2 mt-6 ml-6 mb-5">
+                                <button type="submit" className="bg-[#BF9853] text-white px-8 py-2 rounded-lg font-semibold">
+                                    Save
+                                </button>
+                                <button
+                                    type="button"
+                                    className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
+                                    onClick={closeImportPopup}>
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

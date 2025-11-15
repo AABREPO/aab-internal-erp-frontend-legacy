@@ -13,27 +13,19 @@ import file from '../Images/file.png';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-// Helper function to clean URL by removing surrounding quotes and parsing JSON if needed
 function cleanUrl(url) {
     if (!url) return url;
-    
-    // First remove surrounding quotes if they exist
     let cleanedUrl = url.replace(/^["']|["']$/g, '');
-    
-    // Check if the URL contains JSON structure (starts with { and contains billCopyUrl)
     if (cleanedUrl.includes('{') && cleanedUrl.includes('billCopyUrl')) {
         try {
-            // Try to parse as JSON and extract the billCopyUrl
             const parsed = JSON.parse(cleanedUrl);
             if (parsed.billCopyUrl) {
                 return parsed.billCopyUrl;
             }
         } catch (e) {
-            // If JSON parsing fails, return the original cleaned URL
             console.warn('Failed to parse URL as JSON:', cleanedUrl);
         }
     }
-    
     return cleanedUrl;
 }
 
@@ -61,10 +53,8 @@ const History = ({ username, userRoles = [] }) => {
     const [year, setYear] = useState(new Date().getFullYear().toString());
     const [weeklyTypes, setWeeklyTypes] = useState([]);
     const currentYear = new Date().getFullYear();
-    const startYear = 2000; // Change if needed
+    const startYear = 2000;
     const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i);
-
-    // Payment popup states for Project Advance and Staff Advance
     const [showPaymentPopup, setShowPaymentPopup] = useState(false);
     const [paymentPopupData, setPaymentPopupData] = useState({
         date: new Date().toISOString().split('T')[0],
@@ -77,6 +67,7 @@ const History = ({ username, userRoles = [] }) => {
     });
     const [currentProjectAdvanceRow, setCurrentProjectAdvanceRow] = useState(null);
     const [weeklyPaymentBills, setWeeklyPaymentBills] = useState([]);
+    const [nextWeekDiscountInfo, setNextWeekDiscountInfo] = useState(null);
     const [previousPayments, setPreviousPayments] = useState([]);
     const [accountDetails, setAccountDetails] = useState([]);
     const [fileUploadPopup, setFileUploadPopup] = useState(false);
@@ -88,7 +79,6 @@ const History = ({ username, userRoles = [] }) => {
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [isConfirmingCategory, setIsConfirmingCategory] = useState(false);
     const [popup, setPopup] = useState({ show: false, message: "", type: "", dateStr: "" });
-
     // Description functionality
     const [showPopups, setShowPopups] = useState(false);
     const [currentRow, setCurrentRow] = useState(null);
@@ -105,7 +95,6 @@ const History = ({ username, userRoles = [] }) => {
         staff_advance_portal_id: "",
         description: "",
     });
-
     // Click and drag scrolling functionality
     const scrollRef = useRef(null);
     const paymentsScrollRef = useRef(null);
@@ -115,7 +104,6 @@ const History = ({ username, userRoles = [] }) => {
     const velocity = useRef({ x: 0, y: 0 });
     const animationFrame = useRef(null);
     const lastMove = useRef({ time: 0, x: 0, y: 0 });
-
     const handleMouseDown = (e, ref) => {
         if (!ref.current) return;
         isDragging.current = true;
@@ -133,7 +121,6 @@ const History = ({ username, userRoles = [] }) => {
         ref.current.style.userSelect = 'none';
         cancelMomentum();
     };
-
     const handleMouseMove = (e, ref) => {
         if (!isDragging.current || !ref.current) return;
         const dx = e.clientX - start.current.x;
@@ -152,7 +139,6 @@ const History = ({ username, userRoles = [] }) => {
             y: e.clientY,
         };
     };
-
     const handleMouseUp = (ref) => {
         if (!isDragging.current || !ref.current) return;
         isDragging.current = false;
@@ -160,14 +146,12 @@ const History = ({ username, userRoles = [] }) => {
         ref.current.style.userSelect = '';
         applyMomentum();
     };
-
     const cancelMomentum = () => {
         if (animationFrame.current) {
             cancelAnimationFrame(animationFrame.current);
             animationFrame.current = null;
         }
     };
-
     const applyMomentum = () => {
         if (!scrollRef.current && !paymentsScrollRef.current) return;
         const friction = 0.95;
@@ -188,23 +172,19 @@ const History = ({ username, userRoles = [] }) => {
         };
         animationFrame.current = requestAnimationFrame(step);
     };
-
     // Filter state variables
     const [showFilters, setShowFilters] = useState(false);
     const [selectDate, setSelectDate] = useState('');
     const [selectContractororVendorName, setSelectContractororVendorName] = useState('');
     const [selectProjectName, setSelectProjectName] = useState('');
     const [selectType, setSelectType] = useState('');
-
     function getStartAndEndDateOfWeek(weekNumber, year) {
         const simple = new Date(year, 0, 1 + (weekNumber - 1) * 7);
         const dayOfWeek = simple.getDay();
         const ISOWeekStart = new Date(simple);
         ISOWeekStart.setDate(simple.getDate() - ((dayOfWeek + 7) % 9)); // Monday
-
         const ISOWeekEnd = new Date(ISOWeekStart);
         ISOWeekEnd.setDate(ISOWeekStart.getDate() + 6); // Saturday (not Sunday)
-
         return {
             number: weekNumber,
             start: ISOWeekStart.toISOString().split("T")[0],
@@ -414,6 +394,52 @@ const History = ({ username, userRoles = [] }) => {
             return [];
         }
     };
+
+    useEffect(() => {
+        const fetchNextWeekDiscount = async () => {
+            if (!selectedWeek) {
+                setNextWeekDiscountInfo(null);
+                return;
+            }
+
+            const nextWeekNumber = Number(selectedWeek) + 1;
+            if (!Number.isFinite(nextWeekNumber)) {
+                setNextWeekDiscountInfo(null);
+                return;
+            }
+
+            try {
+                const response = await axios.get(`https://backendaab.in/aabuildersDash/api/payments-received/week/${nextWeekNumber}`);
+                const nextWeekPayments = Array.isArray(response.data) ? response.data : [];
+
+                const discountSum = nextWeekPayments.reduce((sum, payment) => {
+                    const discount = Number(payment.discount_amount) || 0;
+                    return discount > 0 ? sum + discount : sum;
+                }, 0);
+
+                console.log("Next Week Discount Info:", {
+                    selectedWeek: Number(selectedWeek),
+                    nextWeekNumber,
+                    discountSum,
+                    nextWeekPayments,
+                });
+
+                if (discountSum > 0) {
+                    setNextWeekDiscountInfo({
+                        weekNumber: nextWeekNumber,
+                        amount: discountSum,
+                    });
+                } else {
+                    setNextWeekDiscountInfo(null);
+                }
+            } catch (error) {
+                console.error("Error fetching next week payments:", error);
+                setNextWeekDiscountInfo(null);
+            }
+        };
+
+        fetchNextWeekDiscount();
+    }, [selectedWeek]);
 
     useEffect(() => {
         fetchWeeklyPaymentBills();
@@ -1352,15 +1378,15 @@ const History = ({ username, userRoles = [] }) => {
         const diwaliBonusEntries = filteredExpenses.filter(e => e.type === "Diwali Bonus");
         const diwaliBonusCount = diwaliBonusEntries.length;
         const diwaliBonusTotal = diwaliBonusEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-        
+
         // Position Diwali Bonus table below Staff Salary table with proper spacing
         const diwaliBonusY = newTableY + 30; // Add extra spacing to avoid overlap
-        
+
         // Add heading for Diwali Bonus table
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.text("DIWALI BONUS", newTableX, diwaliBonusY - 25);
-        
+
         const diwaliBonusHead = [[
             String(diwaliBonusCount || "0"),
             "NAME",
@@ -1609,9 +1635,9 @@ const History = ({ username, userRoles = [] }) => {
                     </button>
                 </div>
             </div>
-            <div className="mt-4 flex justify-end mr-6">
+            <div className="flex justify-end mr-6 mt-2">
                 <h1 className="font-bold text-xl">
-                    Balance: <span style={{ color: "#E4572E" }}>
+                    Balance: <span style={{ color: "#E4572E" }} className="inline-block text-right min-w-[120px]">
                         {(
                             payments.reduce((total, row) => total + Number(row.amount || 0), 0) -
                             filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)
@@ -1620,7 +1646,7 @@ const History = ({ username, userRoles = [] }) => {
                 </h1>
             </div>
             <div className="mx-auto w-auto p-3 sm:p-6 border-collapse bg-[#FFFFFF] ml-[15px] sm:ml-[30px] mr-3 sm:mr-6 rounded-md">
-                <div className="text-left mb-4">
+                <div className="text-left mb-4 flex justify-between ">
                     <button onClick={() => setShowFilters(!showFilters)}>
                         <img
                             src={Filter}
@@ -1628,6 +1654,19 @@ const History = ({ username, userRoles = [] }) => {
                             className="w-7 h-7 border border-[#BF9853] rounded-md"
                         />
                     </button>
+                    {nextWeekDiscountInfo && (
+                        <div className="flex justify-end -mr-6 -mt-7">
+                            <h2 className="font-semibold text-base">
+                                Discount :{" "}
+                                <span className="inline-block text-right min-w-[120px] text-xl">
+                                    {nextWeekDiscountInfo.amount.toLocaleString('en-IN', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    })}
+                                </span>
+                            </h2>
+                        </div>
+                    )}
                 </div>
                 <div className="flex flex-col xl:flex-row gap-6">
                     <div className="w-full xl:flex-[6] xl:min-w-0">

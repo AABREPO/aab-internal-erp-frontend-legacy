@@ -12,7 +12,7 @@ const Form = () => {
     };
     const [startingDate, setStartingDate] = useState('');
     const [calculatedRent, setCalculatedRent] = useState('');
-    const [properties, setProperties] = useState([]);
+    const [projects, setProjects] = useState([]);
     const [formTenantName, setFormTenantName] = useState('');
     const [formShopNo, setFormShopNo] = useState('');
     const [tenantOptions, setTenantOptions] = useState([]);
@@ -45,7 +45,7 @@ const Form = () => {
     const [rentHistoryData, setRentHistoryData] = useState([]);
     const [shopClosureToggle, setShopClosureToggle] = useState(false);
     const [accountDetails, setAccountDetails] = useState([]);
-    
+
     // Weekly Payment Bills popup state
     const [showWeeklyPaymentPopup, setShowWeeklyPaymentPopup] = useState(false);
     const [weeklyPaymentData, setWeeklyPaymentData] = useState({
@@ -57,7 +57,7 @@ const Form = () => {
         transactionNumber: "",
         accountNumber: ""
     });
-    
+
     // Function to get current week number
     const getCurrentWeekNumber = () => {
         const now = new Date();
@@ -125,19 +125,25 @@ const Form = () => {
         e.target.value = '';
     };
     useEffect(() => {
-        fetchProperties();
+        fetchProjects();
     }, []);
-    const fetchProperties = async () => {
+    const fetchProjects = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/properties/all');
+            const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
             if (response.ok) {
                 const data = await response.json();
-                setProperties(data);
-                setMessage('Error fetching properties.');
+                // Filter for "own project" category
+                const ownProjects = Array.isArray(data)
+                    ? data.filter(p => (p.projectCategory || '').toLowerCase() === 'own project')
+                    : [];
+                setProjects(ownProjects);
+                console.log('Fetched projects:', ownProjects.length, 'projects');
+            } else {
+                setMessage('Error fetching projects.');
             }
         } catch (error) {
             console.error('Error:', error);
-            setMessage('Error fetching properties.');
+            setMessage('Error fetching projects.');
         }
     };
     useEffect(() => {
@@ -149,16 +155,38 @@ const Form = () => {
             if (response.ok) {
                 const data = await response.json();
                 setTenantShopData(data);
-                if (selectedRentType !== "Pending Rent") {
+                if (selectedRentType === "Refund") {
+                    const vacatedTenants = data.filter(t =>
+                        t.property?.some(p =>
+                            p.shops?.some(shop => !shop.active || !!shop.shopClosureDate)
+                        )
+                    );
+                    const options = vacatedTenants.flatMap(t =>
+                        t.property?.flatMap(p =>
+                            p.shops
+                                ?.filter(shop => !shop.active || !!shop.shopClosureDate)
+                                .map(shop => ({
+                                    label: t.tenantName,
+                                    value: t.tenantName,
+                                    tenantId: t.id,
+                                    shopNo: shop.shopNo
+                                })) || []
+                        ) || []
+                    );
+                    const tenantOptionsUnique = options.filter(
+                        (t, i, arr) => t.label && arr.findIndex(x => x.value === t.value) === i
+                    );
+                    setTenantOptions(tenantOptionsUnique);
+                } else if (selectedRentType !== "Pending Rent") {
                     const activeTenants = data.filter(t =>
                         t.property?.some(p =>
-                            p.shops?.some(shop => shop.active)
+                            p.shops?.some(shop => shop.active && !shop.shopClosureDate)
                         )
                     );
                     const options = activeTenants.flatMap(t =>
                         t.property.flatMap(p =>
                             p.shops
-                                .filter(shop => shop.active)
+                                .filter(shop => shop.active && !shop.shopClosureDate)
                                 .map(shop => ({
                                     label: t.tenantName,
                                     value: t.tenantName,
@@ -203,21 +231,28 @@ const Form = () => {
             }
         } catch (error) {
             console.error('Error:', error);
-            setMessage('Error fetching properties.');
+            setMessage('Error fetching tenants.');
         }
     };
     const [shopInfoMap, setShopInfoMap] = useState({});
     useEffect(() => {
         const newShopInfoMap = {};
-        // First, build a mapping from shopNo to shopNoId from properties data
+        // First, build a mapping from shopNo to shopNoId from projects data (project management)
         const shopNoToIdMap = {};
-        properties.forEach(property => {
-            property.propertyDetailsList?.forEach(detail => {
-                if (detail.shopNo && detail.id) {
-                    shopNoToIdMap[detail.shopNo] = detail.id;
-                }
+        projects
+            .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
+            .forEach(project => {
+                // Convert Set to Array if needed
+                const propertyDetailsArray = Array.isArray(project.propertyDetails) 
+                    ? project.propertyDetails 
+                    : Array.from(project.propertyDetails || []);
+                
+                propertyDetailsArray.forEach(detail => {
+                    if (detail.shopNo && detail.id) {
+                        shopNoToIdMap[detail.shopNo] = detail.id;
+                    }
+                });
             });
-        });
 
         tenantShopData.forEach(tenant => {
             tenant.property?.forEach(property => {
@@ -225,19 +260,21 @@ const Form = () => {
                     if (shop.shopNo) {
                         newShopInfoMap[shop.shopNo] = {
                             doorNo: shop.doorNo || '',
-                            propertyName: property.propertyName || '',
+                            projectReferenceName: property.propertyName || '', // propertyName stores projectReferenceName
                             advanceAmount: shop.advanceAmount || '',
                             monthlyRent: shop.monthlyRent || '',
                             startingDate: shop.startingDate,
                             tenantNameId: tenant.id,
-                            shopNoId: shopNoToIdMap[shop.shopNo] || null
+                            shopNoId: shopNoToIdMap[shop.shopNo] || null,
+                            shopClosureDate: shop.shopClosureDate || '',
+                            isActive: typeof shop.active === "boolean" ? shop.active : true
                         };
                     }
                 });
             });
         });
         setShopInfoMap(newShopInfoMap);
-    }, [tenantShopData, properties]);
+    }, [tenantShopData, projects]);
     const formatINR = (value) => {
         const numericValue = value.replace(/[^0-9]/g, '');
         if (!numericValue) return '';
@@ -353,6 +390,9 @@ const Form = () => {
                 const adjustmentAmount = parseFloat(form.amount) || 0;
                 totalAdvance -= adjustmentAmount;
             } else if (form.formType === 'Shop Closure' && form.refundAmount) {
+                const refundAmount = parseFloat(form.refundAmount) || 0;
+                totalAdvance -= refundAmount;
+            } else if (form.formType === 'Refund' && form.refundAmount) {
                 const refundAmount = parseFloat(form.refundAmount) || 0;
                 totalAdvance -= refundAmount;
             }
@@ -596,6 +636,14 @@ const Form = () => {
     };
     // Validate amount input for Advance Adjustment and Shop Closure
     const validateAmount = (inputAmount) => {
+        if (inputAmount === null || inputAmount === undefined) {
+            setAmountError('');
+            return true;
+        }
+        if (typeof inputAmount === "string" && inputAmount.trim() === "") {
+            setAmountError('');
+            return true;
+        }
         // Validation for Rent type with Advance Adjustment payment mode
         if ((selectedRentType === "Rent" || selectedRentType === "Pending Rent") && formPaymentMode && formPaymentMode.trim() === "Advance Adjustment") {
             const numericAmount = parseFloat(inputAmount.replace(/[^0-9.]/g, ""));
@@ -607,6 +655,21 @@ const Form = () => {
                 setAmountError('');
                 return true;
             }
+        }
+        if (selectedRentType === "Refund") {
+            const numericAmount = parseFloat(inputAmount.replace(/[^0-9.]/g, ""));
+            if (numericAmount > advanceAmount) {
+                const errorMsg = `Refund amount cannot exceed remaining advance amount of ₹ ${advanceAmount.toLocaleString('en-IN')}`;
+                setAmountError(errorMsg);
+                return false;
+            }
+            if (numericAmount <= 0 || Number.isNaN(numericAmount)) {
+                const errorMsg = `Refund amount must be greater than 0.`;
+                setAmountError(errorMsg);
+                return false;
+            }
+            setAmountError('');
+            return true;
         }
         // Validation for Shop Closure type - refund amount cannot exceed remaining advance
         if (selectedRentType === "Shop Closure") {
@@ -626,6 +689,47 @@ const Form = () => {
     const handleSubmit = async () => {
         const cleanedAmount = parseFloat((amount || "").replace(/[^0-9.]/g, ""));
         const isShopClosureWithNoRefund = selectedRentType === "Shop Closure" && (isNaN(cleanedAmount) || cleanedAmount === 0);
+        const shopDetails = shopInfoMap[formShopNo] || null;
+
+        if (selectedRentType === "Shop Closure" && shopDetails && (shopDetails.shopClosureDate || shopDetails.isActive === false)) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Shop Already Closed',
+                text: 'This shop already has a closure date or is vacated. Shop closure cannot be submitted again.',
+                confirmButtonColor: '#bf9853'
+            });
+            return;
+        }
+
+        if (selectedRentType === "Refund") {
+            if (!shopDetails || (shopDetails.isActive && !shopDetails.shopClosureDate)) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Refund Not Allowed',
+                    text: 'Refunds are allowed only for shops that are already vacated.',
+                    confirmButtonColor: '#bf9853'
+                });
+                return;
+            }
+            if (isNaN(cleanedAmount) || cleanedAmount <= 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Invalid Refund Amount',
+                    text: 'Please enter a refund amount greater than 0.',
+                    confirmButtonColor: '#bf9853'
+                });
+                return;
+            }
+            if (!advanceAmount || advanceAmount <= 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'No Advance Balance',
+                    text: 'There is no remaining advance amount to refund for this shop.',
+                    confirmButtonColor: '#bf9853'
+                });
+                return;
+            }
+        }
         if (!formPaymentMode && !isShopClosureWithNoRefund) {
             Swal.fire({
                 icon: 'warning',
@@ -703,7 +807,9 @@ const Form = () => {
             const submittedFormIds = await submitRentalForm();
             // Determine the type based on rent type and refund amount
             const isShopClosureWithRefund = selectedRentType === "Shop Closure" && weeklyPaymentData.amount && parseFloat(weeklyPaymentData.amount) > 0;
-            const paymentType = isShopClosureWithRefund ? "Rent Payment Refund" : "Rent Payment";            
+            const isRefundPayment = selectedRentType === "Refund" && weeklyPaymentData.amount && parseFloat(weeklyPaymentData.amount) > 0;
+            const isRefundFlow = isShopClosureWithRefund || isRefundPayment;
+            const paymentType = isRefundFlow ? "Rent Payment Refund" : "Rent Payment";
             // Then submit to weekly payment bills with the rental form ID
             const weeklyPaymentBillPayload = {
                 date: weeklyPaymentData.date,
@@ -727,7 +833,7 @@ const Form = () => {
                 account_number: weeklyPaymentData.accountNumber || null,
                 rent_management_id: submittedFormIds.length > 0 ? submittedFormIds[0] : null,
                 tenant_id: selectedTenantId || null,
-                tenant_complex_name: shopInfoMap[formShopNo]?.propertyName || null,                
+                tenant_complex_name: shopInfoMap[formShopNo]?.projectReferenceName || null,
             };
             const weeklyPaymentBillResponse = await fetch(
                 "https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save",
@@ -745,8 +851,8 @@ const Form = () => {
             Swal.fire({
                 icon: 'success',
                 title: 'Success',
-                text: isShopClosureWithRefund 
-                    ? 'Rent refund saved successfully and added to Weekly Payment Bills!' 
+                text: isRefundFlow
+                    ? 'Rent refund saved successfully and added to Weekly Payment Bills!'
                     : 'Rent payment saved successfully and added to Weekly Payment Bills!',
                 confirmButtonColor: '#bf9853'
             });
@@ -794,6 +900,9 @@ const Form = () => {
         }
         const tenantInfo = shopInfoMap[formShopNo];
         const baseMonthlyRent = parseFloat(tenantInfo?.monthlyRent || 0);
+        const closureValueForForm = selectedRentType === "Shop Closure"
+            ? (closureDate || "")
+            : (tenantInfo?.shopClosureDate || "");
         const isStartingMonth = (dateObj) => {
             const start = new Date(startingDate);
             return (
@@ -882,7 +991,7 @@ const Form = () => {
                     paidOnDate,
                     forTheMonthOf: currentMonthStr,
                     attachedFile: pdfUrl,
-                    shopClosureDate: closureDate || "",
+                    shopClosureDate: closureValueForForm,
                 };
                 submissions.push(rentalForm);
                 remainingAmount -= amountToPay;
@@ -891,8 +1000,9 @@ const Form = () => {
         }
         else {
             const isClosure = selectedRentType === "Shop Closure";
-            const paymentMode = isClosure && shopClosureToggle 
-                ? formPaymentMode + " From Cash Register" 
+            const isRefund = selectedRentType === "Refund";
+            const paymentMode = isClosure && shopClosureToggle
+                ? formPaymentMode + " From Cash Register"
                 : formPaymentMode;
             const form = {
                 formType: selectedRentType,
@@ -901,13 +1011,13 @@ const Form = () => {
                 eno,
                 tenantName: formTenantName,
                 tenantNameId: tenantInfo?.tenantNameId || null,
-                amount: isClosure ? "" : cleanedAmount,
-                refundAmount: isClosure ? cleanedAmount : "",
+                amount: (isClosure || isRefund) ? "" : cleanedAmount,
+                refundAmount: (isClosure || isRefund) ? cleanedAmount : "",
                 paymentMode: paymentMode,
                 paidOnDate,
                 forTheMonthOf: selectedRentType === "Rent" || selectedRentType === "Pending Rent" ? selectedMonth : "",
                 attachedFile: pdfUrl,
-                shopClosureDate: closureDate || "",
+                shopClosureDate: closureValueForForm,
             };
             submissions.push(form);
         }
@@ -936,7 +1046,7 @@ const Form = () => {
                     console.log("✅ Form submitted (could not parse response)");
                 }
             }
-        }        
+        }
         // If we couldn't get IDs from the response, fetch the latest forms to get the IDs
         if (submittedFormIds.length === 0 && submissions.length > 0) {
             try {
@@ -944,9 +1054,9 @@ const Form = () => {
                 if (allFormsRes.ok) {
                     const allForms = await allFormsRes.json();
                     // Get the forms that match our submission criteria
-                    const matchingForms = allForms.filter(f => 
-                        f.eno === eno && 
-                        f.tenantName === formTenantName && 
+                    const matchingForms = allForms.filter(f =>
+                        f.eno === eno &&
+                        f.tenantName === formTenantName &&
                         f.shopNo === formShopNo &&
                         f.paidOnDate === paidOnDate
                     );
@@ -970,13 +1080,13 @@ const Form = () => {
                 weekly_number: getCurrentWeekNumber(),
                 status: false,
                 created_at: new Date().toISOString(),
-            };                
+            };
             try {
                 const weeklyExpenseResponse = await fetch("https://backendaab.in/aabuildersDash/api/weekly-expenses/save", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(weeklyExpenseData),
-                });                    
+                });
                 if (!weeklyExpenseResponse.ok) {
                     console.error("❌ Weekly expense submission failed");
                 } else {
@@ -1101,7 +1211,7 @@ const Form = () => {
             if (selectedRentType === "Rent" && formPaymentMode && formPaymentMode.trim() === "Advance Adjustment") {
                 validateAmount(amount);
             }
-            else if (selectedRentType === "Shop Closure") {
+            else if (selectedRentType === "Shop Closure" || selectedRentType === "Refund") {
                 validateAmount(amount);
             }
         }
@@ -1168,8 +1278,10 @@ const Form = () => {
         if (formTenantName) {
             const tenant = tenantShopData.find(t => t.tenantName === formTenantName);
             let shops;
-            if (selectedRentType !== "Pending Rent") {
-                shops = tenant?.property?.flatMap(p => p.shops)?.filter(shop => shop.active) || [];
+            if (selectedRentType === "Refund") {
+                shops = tenant?.property?.flatMap(p => p.shops)?.filter(shop => !shop.active || !!shop.shopClosureDate) || [];
+            } else if (selectedRentType !== "Pending Rent") {
+                shops = tenant?.property?.flatMap(p => p.shops)?.filter(shop => shop.active && !shop.shopClosureDate) || [];
             } else {
                 shops = tenant?.property?.flatMap(p => p.shops) || [];
             }
@@ -1179,9 +1291,17 @@ const Form = () => {
             }));
             setFilteredShopNoOptions(filtered);
         } else {
-            setFilteredShopNoOptions(shopNoOptions);
+            if (selectedRentType === "Refund") {
+                const vacatedShops = shopNoOptions.filter(option => {
+                    const details = shopInfoMap[option.value || option.label];
+                    return details && (details.isActive === false || !!details.shopClosureDate);
+                });
+                setFilteredShopNoOptions(vacatedShops);
+            } else {
+                setFilteredShopNoOptions(shopNoOptions);
+            }
         }
-    }, [formTenantName, tenantShopData, shopNoOptions, selectedRentType]);
+    }, [formTenantName, tenantShopData, shopNoOptions, selectedRentType, shopInfoMap]);
     return (
         <div className="p-3 sm:p-4 md:p-6 bg-[#FFFFFF] w-full max-w-[1830px] min-h-[700px] ml-10 mr-12 text-left">
             <div className="flex  sm:flex-row sm:items-center gap-6">
@@ -1192,6 +1312,7 @@ const Form = () => {
                         <option value="Rent">Rent</option>
                         <option value="Advance">Advance</option>
                         <option value="Shop Closure">Shop Closure</option>
+                        <option value="Refund">Refund</option>
                         <option value="Pending Rent">Pending Rent</option>
                     </select>
                 </div>
@@ -1210,13 +1331,32 @@ const Form = () => {
                                 if (selectedRentType !== "Pending Rent") {
                                     const matchingTenant = [...tenantShopData].reverse().find(t =>
                                         t.property?.some(p =>
-                                            p.shops?.some(shop => shop.shopNo === selectedShopNo && shop.active)
+                                            p.shops?.some(shop => {
+                                                if (!shop || shop.shopNo !== selectedShopNo) return false;
+                                                if (selectedRentType === "Refund") {
+                                                    return !shop.active || !!shop.shopClosureDate;
+                                                }
+                                                return shop.active && !shop.shopClosureDate;
+                                            })
                                         )
                                     );
                                     if (matchingTenant) {
                                         setFormTenantName(matchingTenant.tenantName);
                                         setSelectedTenantId(matchingTenant.id);
                                         const shopData = shopInfoMap[selectedShopNo];
+                                        if (selectedRentType === "Shop Closure" && shopData && (shopData.shopClosureDate || shopData.isActive === false)) {
+                                            Swal.fire({
+                                                icon: 'warning',
+                                                title: 'Shop Already Closed',
+                                                text: 'This shop is already vacated or has a closure date. Please choose a different shop.',
+                                                confirmButtonColor: '#bf9853'
+                                            });
+                                            setFormShopNo('');
+                                            setFormTenantName('');
+                                            setSelectedTenantId('');
+                                            setStartingDate('');
+                                            return;
+                                        }
                                         if (shopData) {
                                             setStartingDate(shopData.startingDate);
                                         }
@@ -1370,7 +1510,13 @@ const Form = () => {
                                 setSelectedTenantId(selectedOption.tenantId);
                                 if (selectedRentType !== "Pending Rent") {
                                     const tenantMatch = tenantShopData.find(t => t.tenantName === selectedOption.value);
-                                    const tenantShops = tenantMatch?.property?.flatMap(p => p.shops)?.filter(shop => shop.active) || [];
+                                    const tenantShops = tenantMatch?.property?.flatMap(p => p.shops)?.filter(shop => {
+                                        if (!shop) return false;
+                                        if (selectedRentType === "Refund") {
+                                            return !shop.active || !!shop.shopClosureDate;
+                                        }
+                                        return shop.active && !shop.shopClosureDate;
+                                    }) || [];
                                     const newShopOptions = tenantShops.map(shop => ({
                                         value: shop.shopNo,
                                         label: shop.shopNo
@@ -1449,7 +1595,7 @@ const Form = () => {
             <div className="mt-4 flex flex-col lg:flex-row gap-4 lg:gap-8">
                 <div className="w-full lg:w-auto">
                     <label className="block font-semibold mb-2 text-sm sm:text-base">
-                        {selectedRentType === "Shop Closure" ? "Refund Amount" : "Amount"}
+                        {(selectedRentType === "Shop Closure" || selectedRentType === "Refund") ? "Refund Amount" : "Amount"}
                     </label>
                     <input
                         className={`border-2 border-opacity-[0.18] focus:outline-none rounded-lg p-2 w-full sm:w-[170px] h-[45px] ${amountError ? 'border-red-500' : 'border-[#BF9853]'
@@ -1461,6 +1607,7 @@ const Form = () => {
                             validateAmount(e.target.value);
                         }}
                     />
+
                 </div>
                 <div className="w-full lg:w-auto">
                     <label className="block font-semibold mb-2 text-sm sm:text-base">Payment Mode</label>
@@ -1486,6 +1633,11 @@ const Form = () => {
                             ))}
                     </select>
                 </div>
+            </div>
+            <div className="h-5 mt-1">
+                {amountError && (
+                    <p className="text-red-500 text-xs mt-1">{amountError}</p>
+                )}
             </div>
             <div className="mt-4 flex flex-col lg:flex-row gap-4 lg:gap-8">
                 <div className="w-full lg:w-auto">
@@ -1514,8 +1666,8 @@ const Form = () => {
                             type="button"
                             onClick={() => setShopClosureToggle(!shopClosureToggle)}
                             className={`px-4 py-2 rounded-lg font-semibold text-sm sm:text-base transition-colors duration-200 border-2 ${shopClosureToggle
-                                    ? 'border-green-500 text-green-500 hover:border-green-600 hover:text-green-600'
-                                    : 'border-red-500 text-red-500 hover:border-red-600 hover:text-red-600'
+                                ? 'border-green-500 text-green-500 hover:border-green-600 hover:text-green-600'
+                                : 'border-red-500 text-red-500 hover:border-red-600 hover:text-red-600'
                                 }`}
                         >
                             Source From CR
@@ -1588,64 +1740,64 @@ const Form = () => {
                                         </div>
                                     </div>
                                 </div>
-                                
+
                                 {(weeklyPaymentData.paymentMode === "Gpay" || weeklyPaymentData.paymentMode === "PhonePe" ||
                                     weeklyPaymentData.paymentMode === "Net Banking" || weeklyPaymentData.paymentMode === "Cheque") && (
-                                    <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
-                                        <div className="space-y-4">
-                                            {weeklyPaymentData.paymentMode === "Cheque" && (
+                                        <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
+                                            <div className="space-y-4">
+                                                {weeklyPaymentData.paymentMode === "Cheque" && (
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No<span className="text-red-500">*</span></label>
+                                                            <input
+                                                                type="text"
+                                                                value={weeklyPaymentData.chequeNo}
+                                                                onChange={(e) => setWeeklyPaymentData(prev => ({ ...prev, chequeNo: e.target.value }))}
+                                                                placeholder="Enter cheque number"
+                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date<span className="text-red-500">*</span></label>
+                                                            <input
+                                                                type="date"
+                                                                value={weeklyPaymentData.chequeDate}
+                                                                onChange={(e) => setWeeklyPaymentData(prev => ({ ...prev, chequeDate: e.target.value }))}
+                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div>
-                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No<span className="text-red-500">*</span></label>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number<span className="text-red-500">*</span></label>
                                                         <input
                                                             type="text"
-                                                            value={weeklyPaymentData.chequeNo}
-                                                            onChange={(e) => setWeeklyPaymentData(prev => ({ ...prev, chequeNo: e.target.value }))}
-                                                            placeholder="Enter cheque number"
+                                                            value={weeklyPaymentData.transactionNumber}
+                                                            onChange={(e) => setWeeklyPaymentData(prev => ({ ...prev, transactionNumber: e.target.value }))}
+                                                            placeholder="Enter transaction number"
                                                             className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date<span className="text-red-500">*</span></label>
-                                                        <input
-                                                            type="date"
-                                                            value={weeklyPaymentData.chequeDate}
-                                                            onChange={(e) => setWeeklyPaymentData(prev => ({ ...prev, chequeDate: e.target.value }))}
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Account Number<span className="text-red-500">*</span></label>
+                                                        <select
+                                                            value={weeklyPaymentData.accountNumber}
+                                                            onChange={(e) => setWeeklyPaymentData(prev => ({ ...prev, accountNumber: e.target.value }))}
                                                             className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                                                        />
+                                                        >
+                                                            <option value="">Select Account</option>
+                                                            {accountDetails.map((account) => (
+                                                                <option key={account.id} value={account.account_number}>
+                                                                    {account.account_number}
+                                                                </option>
+                                                            ))}
+                                                        </select>
                                                     </div>
-                                                </div>
-                                            )}
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number<span className="text-red-500">*</span></label>
-                                                    <input
-                                                        type="text"
-                                                        value={weeklyPaymentData.transactionNumber}
-                                                        onChange={(e) => setWeeklyPaymentData(prev => ({ ...prev, transactionNumber: e.target.value }))}
-                                                        placeholder="Enter transaction number"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Account Number<span className="text-red-500">*</span></label>
-                                                    <select
-                                                        value={weeklyPaymentData.accountNumber}
-                                                        onChange={(e) => setWeeklyPaymentData(prev => ({ ...prev, accountNumber: e.target.value }))}
-                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                                                    >
-                                                        <option value="">Select Account</option>
-                                                        {accountDetails.map((account) => (
-                                                            <option key={account.id} value={account.account_number}>
-                                                                {account.account_number}
-                                                            </option>
-                                                        ))}
-                                                    </select>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
                             </div>
                         </div>
                         <div className="flex justify-end gap-3 mt-6 p-4 bg-white">

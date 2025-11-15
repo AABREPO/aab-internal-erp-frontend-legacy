@@ -111,7 +111,7 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
           </div>
         </div>
       </nav>
-      <Sidebar isVisible={isSidebarVisible} sidebarRef={sidebarRef} userRoles={userRoles}/>
+      <Sidebar isVisible={isSidebarVisible} sidebarRef={sidebarRef} userRoles={userRoles} onCloseSidebar={() => setIsSidebarVisible(false)}/>
     </>
   );
 };

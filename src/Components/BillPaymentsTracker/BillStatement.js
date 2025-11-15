@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import Select from 'react-select';
 import axios from "axios";
 import jsPDF from "jspdf";
@@ -19,6 +19,22 @@ const BillStatement = ({ username, userRoles = [] }) => {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [fromPaymentDate, setFromPaymentDate] = useState('')
+  const [selectedPaymentMode, setSelectedPaymentMode] = useState(null)
+  const paymentModeOptions = useMemo(() => {
+    const modes = new Set()
+    Object.values(paymentInfo || {}).forEach(payments => {
+      if (!Array.isArray(payments)) return
+      payments.forEach(payment => {
+        const mode = (payment?.mode || '').trim()
+        if (mode && mode !== '-') {
+          modes.add(mode)
+        }
+      })
+    })
+    return Array.from(modes)
+      .sort((a, b) => a.localeCompare(b))
+      .map(mode => ({ value: mode, label: mode }))
+  }, [paymentInfo])
   // Sort state
   const [sortConfig, setSortConfig] = useState({
     key: null,
@@ -331,6 +347,18 @@ const BillStatement = ({ username, userRoles = [] }) => {
         });
       });
     }
+    if (selectedPaymentMode?.value) {
+      filtered = filtered.filter(item => {
+        const payments = paymentInfo[item.id] || []
+        if (payments.length === 0) {
+          return false
+        }
+        return payments.some(payment => {
+          const modeToCheck = (payment.mode || '').trim().toLowerCase()
+          return modeToCheck === selectedPaymentMode.value.trim().toLowerCase()
+        })
+      })
+    }
     const sorted = applySorting(filtered);
     setFilteredData(sorted);
   };
@@ -340,6 +368,7 @@ const BillStatement = ({ username, userRoles = [] }) => {
     setFromDate('');
     setToDate('');
     setFromPaymentDate('');
+    setSelectedPaymentMode(null);
     setFilteredData(apiData);
   };
 
@@ -479,6 +508,9 @@ const BillStatement = ({ username, userRoles = [] }) => {
     if (fromPaymentDate) {
       filterText.push(`Payment Date: ${new Date(fromPaymentDate).toLocaleDateString('en-GB')}`);
     }
+    if (selectedPaymentMode?.label) {
+      filterText.push(`Payment Mode: ${selectedPaymentMode.label}`);
+    }
 
     let yPosition = 20;
     if (filterText.length > 0) {
@@ -604,6 +636,7 @@ const BillStatement = ({ username, userRoles = [] }) => {
       borderWidth: '2px',
       height: '45px',
       borderRadius: '8px',
+      textAlign: 'left',
       borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'rgba(191, 152, 83, 0.2)',
       boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
       '&:hover': {
@@ -622,7 +655,7 @@ const BillStatement = ({ username, userRoles = [] }) => {
   }, [vendorOptions, contractorOptions]);
   useEffect(() => {
     applyFilters();
-  }, [selectedVendor, fromDate, toDate, fromPaymentDate, apiData, paymentInfo, sortConfig]);
+  }, [selectedVendor, fromDate, toDate, fromPaymentDate, selectedPaymentMode, apiData, paymentInfo, sortConfig]);
   useEffect(() => {
     if (apiData.length > 0) {
       loadPaymentInfo();
@@ -674,6 +707,19 @@ const BillStatement = ({ username, userRoles = [] }) => {
                 onChange={(e) => setFromPaymentDate(e.target.value)}
                 className="w-full h-[45px] px-3 py-2 border-2 border-[#BF9853] border-opacity-30 rounded-lg text-sm focus:outline-none"
                 placeholder="Select Payment Date"
+              />
+            </div>
+            <div className="text-left">
+              <label className="block font-semibold mb-1">Payment Mode</label>
+              <Select
+                options={paymentModeOptions}
+                value={selectedPaymentMode}
+                onChange={setSelectedPaymentMode}
+                placeholder="Select Payment Mode "
+                styles={customStyles}
+                isClearable
+                menuPortalTarget={document.body}
+                className="w-[230px] "
               />
             </div>
           </div>

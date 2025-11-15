@@ -9,6 +9,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
     const [showModal, setShowModal] = useState(false)
     const [selectedBill, setSelectedBill] = useState(null)
     const [poNumbers, setPoNumbers] = useState([])
+    const [rangeStart, setRangeStart] = useState('')
+    const [rangeEnd, setRangeEnd] = useState('')
     const [showEntryModal, setShowEntryModal] = useState(false)
     const [selectedEntryBill, setSelectedEntryBill] = useState(null)
     const [vendorId, setVendorId] = useState(null)
@@ -32,6 +34,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
             id: 1,
             date: '',
             amount: '',
+            amountDisplay: '',
             mode: '',
             attachedFile: null,
             chequeNo: '',
@@ -615,6 +618,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
         }
         setIsEditMode(false)
         setValidationResults({})
+        setRangeStart('')
+        setRangeEnd('')
         setCheckedBills({}) // Reset checked bills state for new verification
         setShowModal(true)
     }
@@ -657,6 +662,102 @@ const PendingBill = ({ username, userRoles = [] }) => {
             delete newValidationResults[index]
             return newValidationResults
         })
+    }
+    const handleFillPoRange = () => {
+        if (!selectedBill) {
+            alert('Please select a bill before filling PO numbers')
+            return
+        }
+        const sanitizedStart = rangeStart.trim()
+        const sanitizedEnd = rangeEnd.trim()
+        if (!sanitizedStart || !sanitizedEnd) {
+            alert('Please enter both start and end values')
+            return
+        }
+        const start = parseInt(sanitizedStart, 10)
+        const end = parseInt(sanitizedEnd, 10)
+        if (Number.isNaN(start) || Number.isNaN(end)) {
+            alert('Start and end values must be numbers')
+            return
+        }
+        if (start > end) {
+            alert('Start value should be less than or equal to the end value')
+            return
+        }
+        const maxBills = selectedBill.noOfBills || selectedBill.no_of_bills || poNumbers.length || 0
+        if (maxBills === 0) {
+            alert('No PO input fields available to fill')
+            return
+        }
+        const totalValues = end - start + 1
+        const fillCount = Math.min(totalValues, maxBills)
+        if (fillCount <= 0) {
+            alert('Provided range does not produce any values')
+            return
+        }
+        const padLength = /^\d+$/.test(sanitizedStart) ? sanitizedStart.length : 0
+        const newPoNumbers = [...poNumbers]
+        if (newPoNumbers.length < maxBills) {
+            for (let i = newPoNumbers.length; i < maxBills; i++) {
+                newPoNumbers.push('')
+            }
+        }
+        for (let i = 0; i < fillCount; i++) {
+            let value = String(start + i)
+            if (padLength > 1) {
+                value = value.padStart(padLength, '0')
+            }
+            newPoNumbers[i] = value
+        }
+        setPoNumbers(newPoNumbers)
+        if (totalValues > maxBills) {
+            alert(`Only the first ${fillCount} numbers were applied because there are only ${maxBills} input fields`)
+        }
+        setNoPoSelections(prev => {
+            const updated = { ...prev }
+            for (let i = 0; i < fillCount; i++) {
+                if (updated[i]) {
+                    updated[i] = false
+                }
+            }
+            return updated
+        })
+        setValidationResults(prev => {
+            const updated = { ...prev }
+            for (let i = 0; i < fillCount; i++) {
+                if (updated[i]) {
+                    delete updated[i]
+                }
+            }
+            return updated
+        })
+        setCheckedBills(prev => {
+            const updated = { ...prev }
+            for (let i = 0; i < fillCount; i++) {
+                if (updated[i]) {
+                    delete updated[i]
+                }
+            }
+            return updated
+        })
+        setVerifiedBills(prev => {
+            const updated = { ...prev }
+            for (let i = 0; i < fillCount; i++) {
+                if (updated[i]) {
+                    delete updated[i]
+                }
+            }
+            return updated
+        })
+    }
+    const isRangeFillDisabled = () => {
+        if (!selectedBill) {
+            return true
+        }
+        if (isEditMode) {
+            return false
+        }
+        return selectedBill.billVerifications && selectedBill.billVerifications.length > 0
     }
     const handleVerifiedChange = (index, checked) => {
         setVerifiedBills(prev => ({ ...prev, [index]: checked }))
@@ -881,6 +982,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
             setShowModal(false)
             setSelectedBill(null)
             setPoNumbers([])
+            setRangeStart('')
+            setRangeEnd('')
             window.location.reload()
         } catch (error) {
             alert(`Error saving bills: ${error.message}`)
@@ -898,6 +1001,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
         setHasBeenSubmitted(false)
         setOriginalData(null)
         setEditModeStartData(null)
+        setRangeStart('')
+        setRangeEnd('')
     }
     const handleEditClick = (item) => {
         setSelectedEditItem(item)
@@ -1194,6 +1299,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
             setShowModal(false)
             setSelectedBill(null)
             setPoNumbers([])
+            setRangeStart('')
+            setRangeEnd('')
             setValidationResults({})
             setIsEditMode(false)
             setVerifiedBills({})
@@ -1416,6 +1523,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
             setShowModal(false)
             setSelectedBill(null)
             setPoNumbers([])
+            setRangeStart('')
+            setRangeEnd('')
             setValidationResults({})
             setIsEditMode(false)
             setVerifiedBills({})
@@ -1424,6 +1533,63 @@ const PendingBill = ({ username, userRoles = [] }) => {
             window.location.reload()
         } catch (error) {
             alert(`Error approving request: ${error.message}`)
+        }
+    }
+    const handleRevokeApproval = async () => {
+        try {
+            const trackerId = selectedBill?.id
+            if (!trackerId) {
+                alert('Tracker ID not found')
+                return
+            }
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/vendor-payments/tracker/${trackerId}/approve-request?requestApproved=false`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            if (!response.ok) {
+                throw new Error(`Failed to revoke approval: ${response.statusText}`)
+            }
+            const existingBills = selectedBill?.billVerifications || []
+            if (existingBills.length > 0) {
+                const revokeBillsPayload = existingBills.map((bill) => ({
+                    id: bill.id,
+                    bill_number: bill.bill_number || bill.billNumber || '',
+                    status: 'NOT_VERIFIED',
+                    is_verified: false,
+                    verified_date: null
+                }))
+                const billResponse = await fetch(`https://backendaab.in/aabuildersDash/api/vendor-payments/tracker/${trackerId}/bills`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(revokeBillsPayload)
+                })
+                if (!billResponse.ok) {
+                    throw new Error(`Failed to revoke bill verifications: ${billResponse.statusText}`)
+                }
+            }
+            alert('Approval revoked successfully!')
+            await fetchTrackerData()
+            setSelectedBill(prev => prev ? {
+                ...prev,
+                request_approved: false,
+                billVerifications: prev.billVerifications ? prev.billVerifications.map(bill => ({
+                    ...bill,
+                    status: 'NOT_VERIFIED',
+                    is_verified: false,
+                    verified_date: null
+                })) : prev.billVerifications || []
+            } : prev)
+            setVerifiedBills({})
+            setCheckedBills({})
+            setValidationResults({})
+            setHasBeenSubmitted(false)
+            setOriginalData(null)
+        } catch (error) {
+            alert(`Error revoking approval: ${error.message}`)
         }
     }
     const handleRejectRequest = async () => {
@@ -1447,6 +1613,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
             setShowModal(false)
             setSelectedBill(null)
             setPoNumbers([])
+            setRangeStart('')
+            setRangeEnd('')
             setValidationResults({})
             setIsEditMode(false)
             setVerifiedBills({})
@@ -1868,6 +2036,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 id: 1,
                 date: '',
                 amount: '',
+                amountDisplay: '',
                 mode: '',
                 attachedFile: null,
                 chequeNo: '',
@@ -1892,6 +2061,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
             id: Date.now(),
             date: '',
             amount: '',
+            amountDisplay: '',
             mode: '',
             attachedFile: null,
             chequeNo: '',
@@ -1901,28 +2071,177 @@ const PendingBill = ({ username, userRoles = [] }) => {
         }
         setPaymentEntries(prev => [...prev, newEntry])
     }
-    const handlePaymentEntryChange = (entryId, field, value) => {
-        setPaymentEntries(prev => prev.map(entry =>
-            entry.id === entryId ? { ...entry, [field]: value } : entry
-        ))
+    const sanitizeAmountInput = (input) => {
+        if (!input) return ''
+        const cleaned = input.replace(/[^\d.]/g, '')
+        if (!cleaned) return ''
+        const parts = cleaned.split('.')
+        const integerPart = parts[0] || ''
+        const decimalPart = parts[1] ? parts[1].slice(0, 2) : ''
+        return decimalPart ? `${integerPart}.${decimalPart}` : integerPart
     }
-    const handleFileAttachment = (entryId, file) => {
-        setPaymentEntries(prev => prev.map(entry =>
-            entry.id === entryId ? { ...entry, attachedFile: file } : entry
-        ))
+    const handlePaymentEntryChange = (entryId, field, value) => {
+        setPaymentEntries(prev => prev.map(entry => {
+            if (entry.id !== entryId) {
+                return entry
+            }
+            if (field === 'amount') {
+                const sanitized = sanitizeAmountInput(value)
+                if (!sanitized) {
+                    return {
+                        ...entry,
+                        amount: '',
+                        amountDisplay: ''
+                    }
+                }
+                const numericAmount = parseFloat(sanitized)
+                const displayValue = Number.isNaN(numericAmount) ? '' : formatIndianCurrency(numericAmount)
+                return {
+                    ...entry,
+                    amount: sanitized,
+                    amountDisplay: displayValue
+                }
+            }
+            return { ...entry, [field]: value }
+        }))
+    }
+    // Helper function to convert image to PDF
+    const convertImageToPdf = (file) => {
+        return new Promise((resolve, reject) => {
+            // Check if file is an image
+            const imageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/webp'];
+            if (!imageTypes.includes(file.type)) {
+                // If it's already a PDF, return as is
+                resolve(file);
+                return;
+            }
+
+            // Create an image element to load the file
+            const img = new Image();
+            const reader = new FileReader();
+
+            reader.onload = (e) => {
+                img.onload = () => {
+                    try {
+                        // Calculate dimensions to fit A4 page (in mm)
+                        const pdfWidth = 210; // A4 width in mm
+                        const pdfHeight = 297; // A4 height in mm
+                        const imgWidth = img.width;
+                        const imgHeight = img.height;
+                        
+                        // Calculate aspect ratio
+                        const imgAspectRatio = imgWidth / imgHeight;
+                        const pdfAspectRatio = pdfWidth / pdfHeight;
+                        
+                        // Determine orientation
+                        const orientation = imgWidth > imgHeight ? 'landscape' : 'portrait';
+                        let finalWidth, finalHeight;
+                        
+                        if (orientation === 'landscape') {
+                            // Use landscape dimensions
+                            if (imgAspectRatio > pdfAspectRatio) {
+                                // Image is wider, fit to width
+                                finalWidth = pdfWidth;
+                                finalHeight = pdfWidth / imgAspectRatio;
+                            } else {
+                                // Image is taller, fit to height
+                                finalHeight = pdfHeight;
+                                finalWidth = pdfHeight * imgAspectRatio;
+                            }
+                        } else {
+                            // Use portrait dimensions
+                            if (imgAspectRatio > pdfAspectRatio) {
+                                // Image is wider, fit to width
+                                finalWidth = pdfWidth;
+                                finalHeight = pdfWidth / imgAspectRatio;
+                            } else {
+                                // Image is taller, fit to height
+                                finalHeight = pdfHeight;
+                                finalWidth = pdfHeight * imgAspectRatio;
+                            }
+                        }
+                        
+                        // Center the image on the page
+                        const xOffset = (pdfWidth - finalWidth) / 2;
+                        const yOffset = (pdfHeight - finalHeight) / 2;
+
+                        // Create a new PDF document
+                        const pdf = new jsPDF({
+                            orientation: orientation,
+                            unit: 'mm',
+                            format: 'a4'
+                        });
+
+                        // Determine image format for PDF
+                        let imgFormat = 'JPEG';
+                        if (file.type === 'image/png') {
+                            imgFormat = 'PNG';
+                        } else if (file.type === 'image/gif') {
+                            imgFormat = 'GIF';
+                        }
+
+                        // Add the image to PDF
+                        pdf.addImage(img, imgFormat, xOffset, yOffset, finalWidth, finalHeight);
+
+                        // Convert PDF to blob
+                        const pdfBlob = pdf.output('blob');
+                        
+                        // Create a File object from the blob with .pdf extension
+                        const pdfFile = new File([pdfBlob], file.name.replace(/\.[^/.]+$/, '') + '.pdf', {
+                            type: 'application/pdf',
+                            lastModified: Date.now()
+                        });
+
+                        resolve(pdfFile);
+                    } catch (error) {
+                        console.error('Error converting image to PDF:', error);
+                        reject(error);
+                    }
+                };
+
+                img.onerror = () => {
+                    reject(new Error('Failed to load image'));
+                };
+
+                img.src = e.target.result;
+            };
+
+            reader.onerror = () => {
+                reject(new Error('Failed to read file'));
+            };
+
+            reader.readAsDataURL(file);
+        });
+    };
+
+    const handleFileAttachment = async (entryId, file) => {
+        if (!file) return;
+        try {
+            // Convert image to PDF if it's an image
+            const processedFile = await convertImageToPdf(file);
+            setPaymentEntries(prev => prev.map(entry =>
+                entry.id === entryId ? { ...entry, attachedFile: processedFile } : entry
+            ));
+        } catch (error) {
+            console.error('Error processing file:', error);
+            alert('Error processing file. Please try again.');
+        }
     }
     const handleExistingPaymentFileUpload = async (paymentId, file) => {
         if (!file) return;
 
         try {
+            // Convert image to PDF if it's an image
+            const processedFile = await convertImageToPdf(file);
+            
             // Find the payment details to generate a proper filename
             const payment = existingPaymentDetails?.find(p => p.id === paymentId);
             const formData = new FormData();
             const vendorName = getVendorNameById(selectedPaymentBill?.vendor_id);
             const finalName = payment
                 ? `${payment.date} ${vendorName !== '-' ? vendorName : 'Payment'} ${payment.vendor_bill_payment_mode || ''}`
-                : file.name;
-            formData.append('file', file);
+                : processedFile.name;
+            formData.append('file', processedFile);
             formData.append('file_name', finalName);
             const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
                 method: "POST",
@@ -1981,10 +2300,13 @@ const PendingBill = ({ username, userRoles = [] }) => {
             return;
         }
 
-        setOverallPaymentPdfFile(file);
         setUploadingOverallPdf(true);
 
         try {
+            // Convert image to PDF if it's an image
+            const processedFile = await convertImageToPdf(file);
+            setOverallPaymentPdfFile(processedFile);
+            
             // Upload file to Google Drive
             const formData = new FormData();
             const vendorName = getVendorNameById(selectedPaymentBill?.vendor_id);
@@ -1994,7 +2316,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
             const formattedDate = `${String(dateObj.getDate()).padStart(2, '0')}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${dateObj.getFullYear()}`;
             const displayVendorName = vendorName !== '-' ? vendorName : 'Overall Payment';
             const fileName = `${formattedDate} ${displayVendorName} - summary bill.pdf`;
-            formData.append('file', file);
+            formData.append('file', processedFile);
             formData.append('file_name', fileName);
 
             const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
@@ -2256,6 +2578,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     id: 1,
                     date: '',
                     amount: '',
+                    amountDisplay: '',
                     mode: '',
                     attachedFile: null,
                     chequeNo: '',
@@ -2693,6 +3016,26 @@ const PendingBill = ({ username, userRoles = [] }) => {
         }),
         singleValue: (provided) => ({ ...provided, textAlign: 'left', color: 'black' }),
     };
+    const draftPaymentTotal = paymentEntries.reduce((sum, entry) => {
+        const rawAmount = typeof entry.amount === 'string' ? entry.amount.replace(/,/g, '') : entry.amount
+        const numericAmount = parseFloat(rawAmount)
+        if (Number.isNaN(numericAmount)) {
+            return sum
+        }
+        return sum + numericAmount
+    }, 0)
+    const existingReceivedAmount = Math.max(0, actualAmount - remainingAmount)
+    const liveReceivedAmount = Math.max(0, existingReceivedAmount + draftPaymentTotal)
+    const projectedRemainingAmount = Math.max(0, remainingAmount - draftPaymentTotal)
+    const normalizedDiscount = (() => {
+        if (typeof discount === 'string') {
+            const cleaned = discount.replace(/,/g, '')
+            const numeric = parseFloat(cleaned)
+            return Number.isNaN(numeric) ? 0 : numeric
+        }
+        return Number.isFinite(discount) ? discount : 0
+    })()
+    const projectedNetPayable = Math.max(0, projectedRemainingAmount - normalizedDiscount)
     const handleSubmitTracker = async () => {
         if (!formData.billArrivalDate) {
             alert('Please select a bill arrival date');
@@ -3129,7 +3472,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
             </div>
             {showModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] shadow-lg flex flex-col">
+                    <div className="bg-white rounded-lg w-full max-w-5xl max-h-[90vh] shadow-lg flex flex-col">
                         <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
                             <div className="flex justify-between items-center">
                                 <div>
@@ -3172,6 +3515,39 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                             </>
                                         )}
                                     </p>
+                                    {selectedBill && (
+                                        <div className="mt-3 flex flex-wrap items-end gap-3">
+                                            <div>
+                                                <input
+                                                    type="text"
+                                                    value={rangeStart}
+                                                    onChange={(e) => setRangeStart(e.target.value.replace(/[^0-9]/g, ''))}
+                                                    placeholder="Start PO"
+                                                    disabled={isRangeFillDisabled()}
+                                                    className={`w-24 h-10 px-3 py-2 border-2 rounded-md text-sm focus:outline-none ${isRangeFillDisabled() ? 'border-gray-200 bg-gray-100 cursor-not-allowed text-gray-500' : 'border-[#BF9853] border-opacity-30'}`}
+                                                />
+                                            </div>
+                                            <div>
+                                                <input
+                                                    type="text"
+                                                    value={rangeEnd}
+                                                    onChange={(e) => setRangeEnd(e.target.value.replace(/[^0-9]/g, ''))}
+                                                    placeholder="End PO"
+                                                    disabled={isRangeFillDisabled()}
+                                                    className={`w-24 h-10 px-3 py-2 border-2 rounded-md text-sm focus:outline-none ${isRangeFillDisabled() ? 'border-gray-200 bg-gray-100 cursor-not-allowed text-gray-500' : 'border-[#BF9853] border-opacity-30'}`}
+                                                />
+                                            </div>
+                                            <div className="pb-1 flex items-end">
+                                                <button
+                                                    className={`px-4 py-2 rounded text-sm font-medium transition-colors duration-200 ${isRangeFillDisabled() || !rangeStart || !rangeEnd ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#BF9853] text-white hover:bg-[#a67c3a]'}`}
+                                                    onClick={handleFillPoRange}
+                                                    disabled={isRangeFillDisabled() || !rangeStart || !rangeEnd}
+                                                >
+                                                    Fill Range
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                                 <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl"
                                     onClick={handleCancel}
@@ -3245,6 +3621,14 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                         <div className="flex items-center px-4 py-2 bg-blue-100 text-blue-800 rounded font-medium">
                                             <span className="text-sm">✓ All Bills Verified</span>
                                         </div>
+                                    )}
+                                    {selectedBill?.request_approved && isAdminUser() && (
+                                        <button
+                                            className="px-4 py-2 bg-red-600 text-white rounded font-medium hover:bg-red-700 transition-colors duration-200"
+                                            onClick={handleRevokeApproval}
+                                        >
+                                            Revoke Approval
+                                        </button>
                                     )}
                                 </div>
                                 <div className="flex gap-3">
@@ -3511,7 +3895,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                                 <input
                                                                     type="text"
                                                                     placeholder="Enter Amount"
-                                                                    value={entry.amount}
+                                                                    value={entry.amountDisplay || ''}
                                                                     onChange={(e) => handlePaymentEntryChange(entry.id, 'amount', e.target.value)}
                                                                     disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
                                                                     className={`w-[150px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
@@ -3545,6 +3929,11 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                                         className="hidden"
                                                                         onChange={(e) => handleFileAttachment(entry.id, e.target.files[0])}
                                                                     />
+                                                                    {entry.attachedFile && (
+                                                                        <div className="mt-1 text-xs text-gray-600">
+                                                                            {entry.attachedFile.name}
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -3643,7 +4032,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                                     <label className="block font-semibold mb-1 text-sm">Amount</label>
                                                                     <input
                                                                         type="text"
-                                                                        value={payment.amount?.toLocaleString() || ''}
+                                                                    value={payment.amount ? formatIndianCurrency(payment.amount) : ''}
                                                                         readOnly
                                                                         className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm "
                                                                     />
@@ -3767,7 +4156,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                 </div>
                                                 <div className="flex justify-between">
                                                     <span className="text-gray-600">Received Amount:</span>
-                                                    <span className="font-semibold">{formatIndianCurrency(actualAmount - remainingAmount)}</span>
+                                                    <span className="font-semibold">{formatIndianCurrency(liveReceivedAmount)}</span>
                                                 </div>
                                                 <div className="flex justify-between">
                                                     <span className="text-gray-600">Carry Forward:</span>
@@ -3776,7 +4165,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                 <hr className="border-gray-300" />
                                                 <div className="flex justify-between">
                                                     <span className="text-gray-600">Total Amount:</span>
-                                                    <span className="font-semibold">{formatIndianCurrency(remainingAmount)}</span>
+                                                    <span className="font-semibold">{formatIndianCurrency(projectedRemainingAmount)}</span>
                                                 </div>
                                                 <div className="flex justify-between">
                                                     <span className="text-gray-600">Discount:</span>
@@ -3813,8 +4202,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                 <hr className="border-gray-300" />
                                                 <div className="flex justify-between">
                                                     <span className="text-gray-600">Net Payable:</span>
-                                                    <span className={`font-bold ${(remainingAmount - discount) <= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                        {formatIndianCurrency(Math.max(0, remainingAmount - discount))}
+                                                    <span className={`font-bold ${projectedNetPayable <= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                        {formatIndianCurrency(projectedNetPayable)}
                                                     </span>
                                                 </div>
                                             </div>

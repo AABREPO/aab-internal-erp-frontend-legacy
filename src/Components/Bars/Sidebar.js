@@ -15,7 +15,11 @@ import designtools from '../Images/Design Tools.svg';
 import designtoolsWhite from '../Images/Design Tools1.svg';
 import hr from '../Images/HR.svg';
 import hrWhite from '../Images/HR1.svg';
-function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
+import sidesaving from '../Images/Master Data Black.svg'
+import sidesetting from '../Images/Utility Hub Black.svg'
+import sideMasterData from '../Images/Master Data White.svg'
+import sideUtilityHub from '../Images/Utility Hub White.svg'
+function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
   const [activeMenu, setActiveMenu] = useState('');
   const [activeSubmenuItem, setActiveSubmenuItem] = useState('');
   const [roleModels, setRoleModels] = useState([]);
@@ -95,7 +99,8 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
       '/master-data': { menu: 'masterdata', submenu: 'Master Data' },
 
       // Utility Hub routes
-      '/utility/dashboard': { menu: 'utility', submenu: 'Dashboard' }
+      '/utility/dashboard': { menu: 'utility', submenu: 'Dashboard' },
+      '/directory': { menu: 'utility', submenu: 'Directory' }
     };
 
     // Find matching route
@@ -131,18 +136,22 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
       className={`fixed  h-screen w-[250px] bg-[#FFFFFF] mt-14 z-20 overflow-y-auto transition-transform duration-1000 ease-in-out transform ${isVisible ? 'translate-x-0' : '-translate-x-full'
         }`}>
       <nav className="h-full flex flex-col">
-        <div
+        <Link
+          to="/"
           className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'home' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
-          onClick={() => handleMenuClick('home')}>
+          onClick={() => {
+            handleMenuClick('home');
+            if (onCloseSidebar) onCloseSidebar();
+          }}>
           <img src={activeMenu === 'home' ? homeWhite : home}
             alt="home" className="h-4 w-4" />
-          <p className="text-[12px] leading-[15px] font-medium text-base bg-brown-500 w-[190px] -ml-[33%]">Home</p>
-        </div>
+          <p className="text-[12px] leading-[15px] font-medium text-base">Home</p>
+        </Link>
         <div className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'billing' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('billing')} >
           <img src={activeMenu === 'billing' ? billingWhite : billing}
             alt="billing" className="h-4 w-4" />
-          <p className="text-[12px] leading-[15px] font-medium text-base bg-brown-500 w-[190px] -ml-[33%]">Billing</p>
+          <p className="text-[12px] leading-[15px] font-medium text-base">Billing</p>
         </div>
         {activeMenu === 'billing' && (
           <div className="ml-6">
@@ -156,6 +165,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('Bill Payments Tracker');
+                if (onCloseSidebar) onCloseSidebar();
               }}
             >
               <p className="text-sm cursor-pointer"><li>Bill Payments Tracker</li></p>
@@ -170,6 +180,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('Bill Entry Checklist');
+                if (onCloseSidebar) onCloseSidebar();
               }}
             >
               <p className="text-sm cursor-pointer"><li>Bill Entry Checklist</li></p>
@@ -183,7 +194,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('Invoice');
-
+                if (onCloseSidebar) onCloseSidebar();
               }}>
               <p className="text-sm cursor-pointer"><li>Invoice</li></p>
             </Link>
@@ -196,6 +207,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('Quotation');
+                if (onCloseSidebar) onCloseSidebar();
               }}>
               <p className="text-sm cursor-pointer"><li>Quotation</li></p>
             </Link>
@@ -208,12 +220,14 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('Change Order');
+                if (onCloseSidebar) onCloseSidebar();
               }}>
               <p className="text-sm cursor-pointer"><li>Change Order</li></p>
             </Link>
           </div>
         )}
-        <div className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'crm' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+        <div
+          className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'crm' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('crm')}
         >
           <img src={activeMenu === 'crm' ? crmWhite : crm} alt="crm" className="h-4 w-4" />
@@ -230,6 +244,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('Enquiry');
+                if (onCloseSidebar) onCloseSidebar();
               }}>
               <p className="text-sm cursor-pointer"><li>Enquiry</li></p>
             </Link>
@@ -242,6 +257,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('Projects');
+                if (onCloseSidebar) onCloseSidebar();
               }}>
               <p className="text-sm cursor-pointer"><li>Projects</li></p>
             </Link>
@@ -265,6 +281,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('Vendor Payments Tracker');
+                if (onCloseSidebar) onCloseSidebar();
               }}>
               <p className="text-sm cursor-pointer"><li>Vendor Payments Tracker</li></p>
             </Link>
@@ -277,6 +294,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('Advance Portal');
+                if (onCloseSidebar) onCloseSidebar();
               }}>
               <p className="text-sm cursor-pointer"><li>Advance Portal</li></p>
             </Link>
@@ -289,6 +307,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('Loan Portal');
+                if (onCloseSidebar) onCloseSidebar();
               }}>
               <p className="text-sm cursor-pointer"><li>Loan Portal</li></p>
             </Link>
@@ -301,6 +320,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('Payment Receipt');
+                if (onCloseSidebar) onCloseSidebar();
               }}>
               <p className="text-sm cursor-pointer"><li>Payment Receipt</li></p>
             </Link>
@@ -313,6 +333,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('Rent Management');
+                if (onCloseSidebar) onCloseSidebar();
               }}>
               <p className="text-sm cursor-pointer"><li>Rent Management</li></p>
             </Link>
@@ -325,6 +346,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                     return;
                   }
                   handleSubmenuItemClick('Claim Payments');
+                  if (onCloseSidebar) onCloseSidebar();
                 }}>
               <p className="text-sm cursor-pointer"><li>Claim Payments</li></p>
             </Link>
@@ -338,6 +360,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('Weekly Payment Register');
+                if (onCloseSidebar) onCloseSidebar();
               }}>
               <p className="text-sm cursor-pointer"><li>Cash Register</li></p>
             </Link>
@@ -351,6 +374,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('Bank Register');
+                if (onCloseSidebar) onCloseSidebar();
               }}>
               <p className="text-sm cursor-pointer"><li>Bank Register</li></p>
             </Link>
@@ -364,6 +388,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('Expense Entry');
+                if (onCloseSidebar) onCloseSidebar();
               }}
             >
               <p className="text-sm cursor-pointer"><li>Expense Entry</li></p>
@@ -377,19 +402,24 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('Expense Dashboard');
+                if (onCloseSidebar) onCloseSidebar();
               }}>
               <p className="text-sm cursor-pointer"><li>Expense Dashboard</li></p>
             </Link>
             <Link
               to="/bankreconciliation"
               className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Bank Reconciliation' ? 'text-red-500' : ''}`}
-              onClick={() => handleSubmenuItemClick('Bank Reconciliation')}
+              onClick={() => {
+                handleSubmenuItemClick('Bank Reconciliation');
+                if (onCloseSidebar) onCloseSidebar();
+              }}
             >
               <p className="text-sm cursor-pointer"><li>Bank Reconciliation</li></p>
             </Link>
           </div>
         )}
-        <div className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'procurement' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+        <div
+          className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'procurement' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('procurement')}
         >
           <img src={activeMenu === 'procurement' ? procurementWhite : procurement} alt="procurement" className="h-4 w-4" />
@@ -406,6 +436,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('Purchase Order');
+                if (onCloseSidebar) onCloseSidebar();
               }}>
               <p className="text-sm cursor-pointer"><li>Purchase Order</li></p>
             </Link>
@@ -417,6 +448,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('Inventory');
+                if (onCloseSidebar) onCloseSidebar();
               }}>
               <p className="text-sm cursor-pointer"><li>Inventory</li></p>
             </Link>
@@ -428,12 +460,14 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('Tools Tracker');
+                if (onCloseSidebar) onCloseSidebar();
               }}>
               <p className="text-sm cursor-pointer"><li>Tools Tracker</li></p>
             </Link>
           </div>
         )}
-        <div className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'designtools' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+        <div
+          className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'designtools' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('designtools')}
         >
           <img src={activeMenu === 'designtools' ? designtoolsWhite : designtools} alt="designtools" className="h-4 w-4" />
@@ -450,6 +484,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('Tile Calculator');
+                if (onCloseSidebar) onCloseSidebar();
               }}>
               <p className="text-sm cursor-pointer"><li>Tile Calculator</li></p>
             </Link>
@@ -462,6 +497,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                     return;
                   }
                   handleSubmenuItemClick('Paint Calculator');
+                  if (onCloseSidebar) onCloseSidebar();
                 }}>
               <p className="text-sm cursor-pointer"><li>Paint Calculator</li></p>
             </Link>
@@ -474,6 +510,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                     return;
                   }
                   handleSubmenuItemClick('Bath Fixtures Matrix');
+                  if (onCloseSidebar) onCloseSidebar();
                 }}>
               <p className="text-sm cursor-pointer"><li>Bath Fixtures Matrix</li></p>
             </Link>
@@ -486,6 +523,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('RCC Calculation');
+                if (onCloseSidebar) onCloseSidebar();
               }}>
               <p className=" text-sm cursor-pointer"><li>RCC Calculation</li></p>
             </Link>
@@ -497,6 +535,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('Switch Matrix');
+                if (onCloseSidebar) onCloseSidebar();
               }}>
               <p className=" text-sm cursor-pointer"><li>Switch Matrix</li></p>
             </Link>
@@ -508,6 +547,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('Masonary Calculator');
+                if (onCloseSidebar) onCloseSidebar();
               }}>
               <p className=" text-sm cursor-pointer"><li>Masonary Calculator</li></p>
             </Link>
@@ -519,12 +559,14 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('Carpentry Calculator');
+                if (onCloseSidebar) onCloseSidebar();
               }}>
               <p className=" text-sm cursor-pointer"><li>Carpentry Calculator</li></p>
             </Link>
           </div>
         )}
-        <div className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'hr' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+        <div
+          className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'hr' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('hr')}
         >
           <img src={activeMenu === 'hr' ? hrWhite : hr} alt="hr" className="h-4 w-4" />
@@ -533,15 +575,24 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
         {activeMenu === 'hr' && (
           <div className="ml-6">
             <Link to="billView" className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'onboarding' ? 'text-red-500' : ''}`}
-              onClick={() => handleSubmenuItemClick('onboarding')}>
+              onClick={() => {
+                handleSubmenuItemClick('onboarding');
+                if (onCloseSidebar) onCloseSidebar();
+              }}>
               <p className="text-sm cursor-pointer"><li>Onboarding</li></p>
             </Link>
             <Link to="/attendance" className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Attendance' ? 'text-red-500' : ''}`}
-              onClick={() => handleSubmenuItemClick('Attendance')}>
+              onClick={() => {
+                handleSubmenuItemClick('Attendance');
+                if (onCloseSidebar) onCloseSidebar();
+              }}>
               <p className="text-sm cursor-pointer"><li>Attendance</li></p>
             </Link>
             <Link to="/staffadvance/staffAdvance" className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Staff Advance' ? 'text-red-500' : ''}`}
-              onClick={() => handleSubmenuItemClick('Staff Advance')}>
+              onClick={() => {
+                handleSubmenuItemClick('Staff Advance');
+                if (onCloseSidebar) onCloseSidebar();
+              }}>
               <p className="text-sm cursor-pointer"><li>Staff Advance</li></p>
             </Link>
             <Link to={hasAccessToModel('Manage User') ? 'user_manage' : '#'}
@@ -553,14 +604,17 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
                   return;
                 }
                 handleSubmenuItemClick('Manage User');
+                if (onCloseSidebar) onCloseSidebar();
               }}>
               <p className="text-sm cursor-pointer"><li>Manage User</li></p>
             </Link>
           </div>
         )}
-        <div className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'utility' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+        <div
+          className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'utility' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('utility')}
         >
+          <img src={activeMenu === 'utility' ? sideUtilityHub : sidesetting} alt="utility" className="h-4 w-4" />
           <p className="text-[12px] leading-[15px] font-medium text-base">Utility Hub</p>
         </div>
         {activeMenu === 'utility' && (
@@ -568,22 +622,30 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
             <Link
               to="utility/dashboard"
               className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Dashboard' ? 'text-red-500' : ''}`}
-              onClick={() => handleSubmenuItemClick('Dashboard')}
+              onClick={() => {
+                handleSubmenuItemClick('Dashboard');
+                if (onCloseSidebar) onCloseSidebar();
+              }}
             >
               <p className="text-sm cursor-pointer"><li>Dashboard</li></p>
             </Link>
             <Link
               to="/directory"
               className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Directory' ? 'text-red-500' : ''}`}
-              onClick={() => handleSubmenuItemClick('Directory')}
+              onClick={() => {
+                handleSubmenuItemClick('Directory');
+                if (onCloseSidebar) onCloseSidebar();
+              }}
             >
               <p className="text-sm cursor-pointer"><li>Directory</li></p>
             </Link>
           </div>
         )}
-        <div className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'masterdata' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+        <div
+          className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'masterdata' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('masterdata')}
         >
+          <img src={activeMenu === 'masterdata' ? sideMasterData : sidesaving} alt="masterdata" className="h-4 w-4" />
           <p className="text-[12px] leading-[15px] font-medium text-base">Master Data</p>
         </div>
         {activeMenu === 'masterdata' && (
@@ -591,12 +653,16 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [] }) {
             <Link
               to="/master-data"
               className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Master Data' ? 'text-red-500' : ''}`}
-              onClick={() => handleSubmenuItemClick('Master Data')}
+              onClick={() => {
+                handleSubmenuItemClick('Master Data');
+                if (onCloseSidebar) onCloseSidebar();
+              }}
             >
               <p className="text-sm cursor-pointer"><li>Master Data</li></p>
             </Link>
           </div>
         )}
+
         <div className="mt-[6rem] ml-4 w-44">
           <p style={{ fontSize: '16px', marginTop: '1rem' }}>
             <span className="font-semibold">Last Updated:</span>{' '}

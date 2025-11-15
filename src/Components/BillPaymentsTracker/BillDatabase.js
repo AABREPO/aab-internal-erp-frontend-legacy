@@ -1604,6 +1604,15 @@ const BillDatabase = ({ username, userRoles = [] }) => {
         return [...data].sort((a, b) => {
             let aValue, bValue
             switch (sortConfig.key) {
+                case 'timestamp': {
+                    const getTimestampValue = (item) => {
+                        const timestampValue = item.created_at || item.createdAt || item.timestamp
+                        return timestampValue ? new Date(timestampValue) : new Date(0)
+                    }
+                    aValue = getTimestampValue(a)
+                    bValue = getTimestampValue(b)
+                    break
+                }
                 case 'bill_arrival_date':
                     aValue = new Date(a.bill_arrival_date || 0)
                     bValue = new Date(b.bill_arrival_date || 0)
@@ -1980,7 +1989,18 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                             <thead className="bg-[#FAF6ED]">
                                 <tr>
                                     <th className="px-2 py-3 text-left font-semibold">SI.No</th>
-                                    <th className="px-2 py-3 text-left font-semibold">Time Stamp</th>
+                                    <th className="px-2 py-3 text-left font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200"
+                                        onClick={() => handleSort('timestamp')}
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            Time Stamp
+                                            {sortConfig.key === 'timestamp' && (
+                                                <span className="text-xs">
+                                                    {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </th>
                                     <th className="px-2 py-3 text-left font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200"
                                         onClick={() => handleSort('bill_arrival_date')}
                                     >
@@ -2334,7 +2354,6 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
             )}
-
             {showEntryModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg w-[584px]">
@@ -2536,13 +2555,14 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
             )}
-
             {showPaymentModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg w-[1100px] h-[780px] overflow-auto shadow-lg flex flex-col">
                         <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
                             <div className="flex justify-between items-center">
-                                <h3 className="text-lg font-semibold text-center flex-1">Entry Payment Details</h3>
+                                <h3 className="text-lg font-semibold text-left flex-1">
+                                    Payment Report : {existingPaymentDetails?.length || 0}
+                                </h3>
                                 <button
                                     className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl font-bold"
                                     onClick={handlePaymentCancel}
@@ -2562,9 +2582,15 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                     {paymentStatuses[selectedPaymentBill?.id] !== '✓ Paid' && (
                                         <>
                                             <div className="flex-1 overflow-y-auto p-4">
-                                                {paymentEntries.map((entry, index) => (
-                                                    <div key={entry.id} className="text-left p-4 shadow-lg rounded-lg">
-                                                        <div className={`flex gap-4 border border-[#BF9853] border-opacity-35 rounded-md p-4 ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-50' : ''}`}>
+                                                {paymentEntries.map((entry, index) => {
+                                                    const existingPaymentCount = existingPaymentDetails?.length || 0;
+                                                    const paymentNumber = existingPaymentCount + index + 1;
+                                                    return (
+                                                        <div key={entry.id} className="text-left p- shadow-lg rounded-lg">
+                                                            <div className="mb-2">
+                                                                <span className="text-sm font-bold text-gray-700">Payment - {paymentNumber}</span>
+                                                            </div>
+                                                            <div className={`flex gap-4 border border-[#BF9853] border-opacity-35 rounded-md p-4 ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-50' : ''}`}>
                                                             <div className="flex-1">
                                                                 <label className="block font-semibold mb-1 text-sm">Date</label>
                                                                 <input
@@ -2678,7 +2704,8 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                                             </div>
                                                         )}
                                                     </div>
-                                                ))}
+                                                );
+                                                })}
                                                 {paymentStatuses[selectedPaymentBill?.id] !== '✓ Paid' && (
                                                     <div className="flex py-3">
                                                         <button
@@ -2693,11 +2720,17 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                         </>
                                     )}
                                     {existingPaymentDetails && existingPaymentDetails.length > 0 && (
-                                        <div className="p-w overflow-auto h-[300px] mb-8">
-                                            <h4 className="text-sm font-semibold text-gray-700">Previous Payment Details:</h4>
+                                        <div className="p-w pl-4 overflow-auto h-[700px] mb-2">
+                                            <h4 className="text-sm font-semibold text-gray-700 mt-2">Previous Payment Details:</h4>
                                             <div className="space-y-4">
-                                                {existingPaymentDetails.map((payment, index) => (
+                                                {[...existingPaymentDetails].reverse().map((payment, index) => {
+                                                    const totalPayments = existingPaymentDetails.length;
+                                                    const paymentNumber = totalPayments - index;
+                                                    return (
                                                     <div key={payment.id || index} className="text-left p-4 shadow-lg rounded-lg mb-4">
+                                                        <div className="mb-2">
+                                                            <span className="text-sm font-bold text-gray-700">Payment - {paymentNumber}</span>
+                                                        </div>
                                                         <div className=" border border-[#BF9853] border-opacity-35 rounded-md p-4">
                                                             <div className='grid grid-cols-3 gap-4'>
                                                                 <div>
@@ -2808,7 +2841,8 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                                             </div>
                                                         </div>
                                                     </div>
-                                                ))}
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     )}

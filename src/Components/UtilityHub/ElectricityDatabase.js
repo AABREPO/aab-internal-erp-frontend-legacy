@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import Select from 'react-select';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 const ElectricityDatabase = ({ username, userRoles = [] }) => {
     const [electricityData, setElectricityData] = useState([]);
@@ -75,6 +78,145 @@ const ElectricityDatabase = ({ username, userRoles = [] }) => {
             ...prev,
             [filterType]: value
         }));
+    };
+
+    const formatTimestamp = (timestamp) => {
+        if (!timestamp) return '-';
+
+        try {
+            const date = new Date(timestamp);
+            const formattedDate = date.toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+            const formattedTime = date.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            });
+
+            return `${formattedDate} ${formattedTime}`;
+        } catch (error) {
+            return '-';
+        }
+    };
+
+    const formatDate = (dateValue) => {
+        if (!dateValue) return '-';
+
+        try {
+            return new Date(dateValue).toLocaleDateString('en-GB');
+        } catch (error) {
+            return '-';
+        }
+    };
+
+    const formatAmountDisplay = (value) => {
+        if (value === null || value === undefined || value === '') {
+            return '₹0';
+        }
+
+        const amountNumber = Number(value);
+
+        if (Number.isFinite(amountNumber)) {
+            return `₹${amountNumber.toLocaleString()}`;
+        }
+
+        return `₹${value}`;
+    };
+
+    const getAmountExportValue = (value) => {
+        if (value === null || value === undefined || value === '') {
+            return 0;
+        }
+
+        const amountNumber = Number(value);
+
+        if (Number.isFinite(amountNumber)) {
+            return amountNumber;
+        }
+
+        return value;
+    };
+
+    const handleExportPDF = () => {
+        if (!filteredData.length) return;
+
+        const doc = new jsPDF({ orientation: 'landscape' });
+        doc.setFontSize(14);
+        doc.text('Electricity Expenses', 14, 20);
+
+        const tableColumn = [
+            'Sl.No',
+            'Timestamp',
+            'Date',
+            'Site Name',
+            'Vendor',
+            'Contractor',
+            'Electricity Number',
+            'Category',
+            'Amount',
+            'Payment Mode',
+            'For The Month',
+            'ENo',
+            'Bill Copy'
+        ];
+
+        const tableRows = filteredData.map((item, index) => [
+            index + 1,
+            formatTimestamp(item.timestamp),
+            formatDate(item.date),
+            item.siteName || '-',
+            item.vendor || '-',
+            item.contractor || '-',
+            item.utilityTypeNumber || '-',
+            item.category || '-',
+            formatAmountDisplay(item.amount),
+            item.paymentMode || '-',
+            formatUtilityMonth(item.utilityForTheMonth),
+            item.eno || '-',
+            item.billCopy ? 'Available' : '-'
+        ]);
+
+        doc.autoTable({
+            head: [tableColumn],
+            body: tableRows,
+            startY: 28,
+            styles: {
+                fontSize: 8
+            },
+            headStyles: {
+                fillColor: [191, 152, 83]
+            }
+        });
+
+        doc.save('ElectricityExpenses.pdf');
+    };
+
+    const handleExportExcel = () => {
+        if (!filteredData.length) return;
+
+        const worksheetData = filteredData.map((item, index) => ({
+            'Sl.No': index + 1,
+            Timestamp: formatTimestamp(item.timestamp),
+            Date: formatDate(item.date),
+            'Site Name': item.siteName || '-',
+            Vendor: item.vendor || '-',
+            Contractor: item.contractor || '-',
+            'Electricity Number': item.utilityTypeNumber || '-',
+            Category: item.category || '-',
+            Amount: getAmountExportValue(item.amount),
+            'Payment Mode': item.paymentMode || '-',
+            'For The Month': formatUtilityMonth(item.utilityForTheMonth),
+            ENo: item.eno || '-',
+            'Bill Copy URL': item.billCopy || '-'
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'ElectricityExpenses');
+        XLSX.writeFile(workbook, 'ElectricityExpenses.xlsx');
     };
 
     // Custom styles for react-select
@@ -245,13 +387,23 @@ const ElectricityDatabase = ({ username, userRoles = [] }) => {
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-semibold text-gray-800">Electricity Expenses</h3>
                     <div className="flex items-center gap-4 text-sm text-black">
-                        <button className="flex items-center font-semibold gap-2 hover:text-blue-600">
+                        <button
+                            type="button"
+                            onClick={handleExportPDF}
+                            disabled={!filteredData.length}
+                            className="flex items-center font-semibold gap-2 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-current"
+                        >
                             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
                             </svg>
                             Export PDF
                         </button>
-                        <button className="flex items-center font-semibold gap-2 hover:text-green-600">
+                        <button
+                            type="button"
+                            onClick={handleExportExcel}
+                            disabled={!filteredData.length}
+                            className="flex items-center font-semibold gap-2 hover:text-green-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-current"
+                        >
                             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
                             </svg>
@@ -328,7 +480,7 @@ const ElectricityDatabase = ({ username, userRoles = [] }) => {
                                             </td>
                                             <td className="px-4 py-2 text-right">
                                                 <span className="font-semibold text-green-600">
-                                                    ₹{item.amount ? item.amount.toLocaleString() : '0'}
+                                                    {formatAmountDisplay(item.amount)}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-2">

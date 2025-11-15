@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import search from '../Images/search.png';
 import imports from '../Images/Import.svg';
@@ -247,6 +247,15 @@ const MasterData = ({ username, userRoles = [] }) => {
     }]
   });
   const [projects, setProjects] = useState([]);
+  const projectCategoryOptions = useMemo(() => {
+    const categories = new Set();
+    projects.forEach(project => {
+      if (project?.projectCategory) {
+        categories.add(project.projectCategory);
+      }
+    });
+    return Array.from(categories);
+  }, [projects]);
   const [isProjectEditOpen, setIsProjectEditOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [editProject, setEditProject] = useState({
@@ -289,6 +298,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const [exportType, setExportType] = useState(''); // 'pdf' or 'excel'
   const [exportDataType, setExportDataType] = useState(''); // 'vendor' or 'contractor'
   const [exportSearchTerm, setExportSearchTerm] = useState('');
+  const [exportProjectCategory, setExportProjectCategory] = useState('');
   const [selectedExportItems, setSelectedExportItems] = useState([]);
 
   // State for Master Table functionality
@@ -2378,6 +2388,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   // Export functionality handlers
   const handleDownloadIconClick = (dataType) => {
     setExportDataType(dataType);
+    setExportProjectCategory('');
     setIsExportTypeModalOpen(true);
   };
 
@@ -2387,6 +2398,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     setIsExportSelectionModalOpen(true);
     setSelectedExportItems([]);
     setExportSearchTerm('');
+    setExportProjectCategory('');
   };
 
   const handleExportItemToggle = (itemId) => {
@@ -2407,6 +2419,10 @@ const MasterData = ({ username, userRoles = [] }) => {
       dataList = filteredExportContractors;
     } else if (exportDataType === 'employee') {
       dataList = getFilteredExportData();
+    } else if (exportDataType === 'project') {
+      dataList = filteredExportProjects;
+    } else if (exportDataType === 'ebServiceLink') {
+      dataList = filteredExportEbServiceLinks;
     }
     const allIds = dataList.map(item => item.id);
     setSelectedExportItems(allIds);
@@ -2431,6 +2447,17 @@ const MasterData = ({ username, userRoles = [] }) => {
         (item.employee_mobile_number || '').toLowerCase().includes(exportSearchTerm.toLowerCase()) ||
         (item.role_of_employee || '').toLowerCase().includes(exportSearchTerm.toLowerCase())
       );
+    } else if (exportDataType === 'project') {
+      const search = exportSearchTerm.toLowerCase();
+      return projects.filter(item => {
+        const matchesSearch =
+          (item.projectName || '').toLowerCase().includes(search) ||
+          (item.projectId || '').toString().toLowerCase().includes(search) ||
+          (item.projectReferenceName || '').toLowerCase().includes(search);
+        const matchesCategory = !exportProjectCategory ||
+          (item.projectCategory || '').toLowerCase() === exportProjectCategory.toLowerCase();
+        return matchesSearch && matchesCategory;
+      });
     } else if (exportDataType === 'ebServiceLink') {
       return ebServiceLinks.filter(item =>
         (item.project_id?.toString() || '').toLowerCase().includes(exportSearchTerm.toLowerCase()) ||
@@ -2443,6 +2470,7 @@ const MasterData = ({ username, userRoles = [] }) => {
 
   const filteredExportVendors = exportDataType === 'vendor' ? getFilteredExportData() : [];
   const filteredExportContractors = exportDataType === 'contractor' ? getFilteredExportData() : [];
+  const filteredExportProjects = exportDataType === 'project' ? getFilteredExportData() : [];
   const filteredExportEbServiceLinks = exportDataType === 'ebServiceLink' ? getFilteredExportData() : [];
 
   const handleExportToPDF = () => {
@@ -2453,6 +2481,8 @@ const MasterData = ({ username, userRoles = [] }) => {
       selectedData = contractorNames.filter(item => selectedExportItems.includes(item.id));
     } else if (exportDataType === 'employee') {
       selectedData = employeeList.filter(item => selectedExportItems.includes(item.id));
+    } else if (exportDataType === 'project') {
+      selectedData = projects.filter(item => selectedExportItems.includes(item.id));
     } else {
       selectedData = ebServiceLinks.filter(item => selectedExportItems.includes(item.id));
     }
@@ -2461,6 +2491,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       alert('Please select at least one item to export');
       return;
     }
+
     const doc = new jsPDF('landscape');
     let title = 'Export List';
     if (exportDataType === 'vendor') {
@@ -2469,29 +2500,64 @@ const MasterData = ({ username, userRoles = [] }) => {
       title = 'Contractor List';
     } else if (exportDataType === 'employee') {
       title = 'Employee List';
+    } else if (exportDataType === 'project') {
+      title = 'Project List';
     } else {
       title = 'EB Service Link List';
     }
+
     doc.setFontSize(20);
     doc.setTextColor(191, 152, 83);
     doc.text(title, doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
 
-    // Helper function to format ID with prefix and padding
     const formatId = (id, prefix) => {
       if (!id) return '';
       const paddedId = id.toString().padStart(4, '0');
       return `${prefix}${paddedId}`;
     };
 
-    const tableData = selectedData.map((item) => {
-      if (exportDataType === 'ebServiceLink') {
-        return [
-          item.id || '',
-          item.project_id || '',
-          item.door_no || '',
-          item.eb_service_no || ''
-        ];
-      } else if (exportDataType === 'employee') {
+    let tableHead = [];
+    let tableData = [];
+    let columnStyles = {};
+    let projectCount = 0;
+    let rowCounter = 1;
+
+    if (exportDataType === 'ebServiceLink') {
+      tableHead = [[
+        'ID',
+        'Project ID',
+        'Door No',
+        'EB Service No'
+      ]];
+      tableData = selectedData.map(item => ([
+        item.id || '',
+        item.project_id || '',
+        item.door_no || '',
+        item.eb_service_no || ''
+      ]));
+      columnStyles = {
+        0: { cellWidth: 18 },
+        1: { cellWidth: 25 },
+        2: { cellWidth: 25 },
+        3: { cellWidth: 30 }
+      };
+    } else if (exportDataType === 'employee') {
+      tableHead = [[
+        'Customer ID',
+        'Beneficiary Code',
+        'Beneficiary Name',
+        'Account Number',
+        'IFSC Code',
+        'Account Type',
+        'Mobile Number',
+        'Email ID',
+        'Address 1',
+        'Address 2',
+        'Address 3',
+        'Address 4',
+        'ZIP Code'
+      ]];
+      tableData = selectedData.map(item => {
         const prefix = 'E';
         return [
           '149985391',
@@ -2508,7 +2574,96 @@ const MasterData = ({ username, userRoles = [] }) => {
           '',
           ''
         ];
-      } else {
+      });
+      columnStyles = {
+        0: { cellWidth: 18 },
+        1: { cellWidth: 25 },
+        2: { cellWidth: 25 },
+        3: { cellWidth: 25 },
+        4: { cellWidth: 20 },
+        5: { cellWidth: 18 },
+        6: { cellWidth: 22 },
+        7: { cellWidth: 25 },
+        8: { cellWidth: 15 },
+        9: { cellWidth: 15 },
+        10: { cellWidth: 15 },
+        11: { cellWidth: 15 },
+        12: { cellWidth: 15 }
+      };
+    } else if (exportDataType === 'project') {
+      tableHead = [[
+        'S.No',
+        'P.ID',
+        'Project Name',
+        'Project Reference Name',
+        'Project Category',
+        'Project Type',
+        'Floor Name',
+        'Shop No',
+        'Door No',
+        'Area',
+        'EB No',
+        'Property Tax No',
+        'Water Tax No'
+      ]];
+      const uniqueProjectKeys = new Set(
+        selectedData.map(item => (item.id ?? item.projectId ?? item.projectName ?? '').toString())
+      );
+      projectCount = uniqueProjectKeys.size;
+      tableData = selectedData.flatMap(project => {
+        const propertyDetails = Array.isArray(project.propertyDetails) && project.propertyDetails.length > 0
+          ? project.propertyDetails
+          : Array.isArray(project.propertyDetailsList) && project.propertyDetailsList.length > 0
+            ? project.propertyDetailsList
+            : [null];
+        return propertyDetails.map(detail => ([
+          rowCounter++,
+          project.projectId || '',
+          project.projectName || '',
+          project.projectReferenceName || '',
+          project.projectCategory || '',
+          detail?.projectType || '',
+          detail?.floorName || '',
+          detail?.shopNo || '',
+          detail?.doorNo || '',
+          detail?.area || '',
+          detail?.ebNo || '',
+          detail?.propertyTaxNo || '',
+          detail?.waterTaxNo || ''
+        ]));
+      });
+      columnStyles = {
+        0: { cellWidth: 11 },
+        1: { cellWidth: 10 },
+        2: { cellWidth: 35 },
+        3: { cellWidth: 35 },
+        4: { cellWidth: 26 },
+        5: { cellWidth: 16 },
+        6: { cellWidth: 23 },
+        7: { cellWidth: 15 },
+        8: { cellWidth: 15 },
+        9: { cellWidth: 13 },
+        10: { cellWidth: 25 },
+        11: { cellWidth: 27 },
+        12: { cellWidth: 23 }
+      };
+    } else {
+      tableHead = [[
+        'Customer ID',
+        'Beneficiary Code',
+        'Beneficiary Name',
+        'Account Number',
+        'IFSC Code',
+        'Account Type',
+        'Mobile Number',
+        'Email ID',
+        'Address 1',
+        'Address 2',
+        'Address 3',
+        'Address 4',
+        'ZIP Code'
+      ]];
+      tableData = selectedData.map(item => {
         const prefix = exportDataType === 'vendor' ? 'V' : 'C';
         return [
           '149985391',
@@ -2525,34 +2680,39 @@ const MasterData = ({ username, userRoles = [] }) => {
           '',
           ''
         ];
-      }
-    });
+      });
+      columnStyles = {
+        0: { cellWidth: 18 },
+        1: { cellWidth: 25 },
+        2: { cellWidth: 25 },
+        3: { cellWidth: 25 },
+        4: { cellWidth: 20 },
+        5: { cellWidth: 18 },
+        6: { cellWidth: 22 },
+        7: { cellWidth: 25 },
+        8: { cellWidth: 15 },
+        9: { cellWidth: 15 },
+        10: { cellWidth: 15 },
+        11: { cellWidth: 15 },
+        12: { cellWidth: 15 }
+      };
+    }
+
+    if (exportDataType === 'project' && projectCount) {
+      doc.setFontSize(10);
+      doc.setTextColor(80, 80, 80);
+      doc.text(`Projects Count: ${projectCount}`, doc.internal.pageSize.getWidth() - 14, 26, { align: 'right' });
+      doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
+    }
+
     doc.autoTable({
       startY: 30,
-      head: exportDataType === 'ebServiceLink' ? [[
-        'ID',
-        'Project ID',
-        'Door No',
-        'EB Service No'
-      ]] : [[
-        'Customer ID',
-        'Beneficiary Code',
-        'Beneficiary Name',
-        'Account Number',
-        'IFSC Code',
-        'Account Type',
-        'Mobile Number',
-        'Email ID',
-        'Address 1',
-        'Address 2',
-        'Address 3',
-        'Address 4',
-        'ZIP Code'
-      ]],
+      head: tableHead,
       body: tableData,
       theme: 'grid',
       styles: {
-        fontSize: 7,
+        fontSize: exportDataType === 'project' ? 8 : 7,
         cellPadding: 2,
         overflow: 'linebreak',
         cellWidth: 'wrap'
@@ -2563,22 +2723,9 @@ const MasterData = ({ username, userRoles = [] }) => {
         fontSize: 8,
         halign: 'center'
       },
-      columnStyles: {
-        0: { cellWidth: 18 }, // Customer ID
-        1: { cellWidth: 25 }, // Beneficiary Code
-        2: { cellWidth: 25 }, // Beneficiary Name
-        3: { cellWidth: 25 }, // Account Number
-        4: { cellWidth: 20 }, // IFSC Code
-        5: { cellWidth: 18 }, // Account Type
-        6: { cellWidth: 22 }, // Mobile Number
-        7: { cellWidth: 25 }, // Email ID
-        8: { cellWidth: 15 }, // Address 1
-        9: { cellWidth: 15 }, // Address 2
-        10: { cellWidth: 15 }, // Address 3
-        11: { cellWidth: 15 }, // Address 4
-        12: { cellWidth: 15 }  // ZIP Code
-      }
+      columnStyles
     });
+
     doc.save(`${title.replace(' ', '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
     setIsExportSelectionModalOpen(false);
   };
@@ -2591,27 +2738,35 @@ const MasterData = ({ username, userRoles = [] }) => {
       selectedData = contractorNames.filter(item => selectedExportItems.includes(item.id));
     } else if (exportDataType === 'employee') {
       selectedData = employeeList.filter(item => selectedExportItems.includes(item.id));
+    } else if (exportDataType === 'project') {
+      selectedData = projects.filter(item => selectedExportItems.includes(item.id));
     } else {
       selectedData = ebServiceLinks.filter(item => selectedExportItems.includes(item.id));
     }
+
     if (selectedData.length === 0) {
       alert('Please select at least one item to export');
       return;
     }
+
     const formatId = (id, prefix) => {
       if (!id) return '';
       const paddedId = id.toString().padStart(4, '0');
       return `${prefix}${paddedId}`;
     };
-    const worksheetData = selectedData.map((item) => {
-      if (exportDataType === 'ebServiceLink') {
-        return {
-          'ID': item.id || '',
-          'Project ID': item.project_id || '',
-          'Door No': item.door_no || '',
-          'EB Service No': item.eb_service_no || ''
-        };
-      } else if (exportDataType === 'employee') {
+
+    let worksheetData = [];
+    let rowCounter = 1;
+    let projectCount = 0;
+    if (exportDataType === 'ebServiceLink') {
+      worksheetData = selectedData.map(item => ({
+        'ID': item.id || '',
+        'Project ID': item.project_id || '',
+        'Door No': item.door_no || '',
+        'EB Service No': item.eb_service_no || ''
+      }));
+    } else if (exportDataType === 'employee') {
+      worksheetData = selectedData.map(item => {
         const prefix = 'E';
         return {
           'Customer ID': '149985391',
@@ -2628,7 +2783,36 @@ const MasterData = ({ username, userRoles = [] }) => {
           'Address 4': '',
           'ZIP Code': ''
         };
-      } else {
+      });
+    } else if (exportDataType === 'project') {
+      const uniqueProjectKeys = new Set(
+        selectedData.map(item => (item.id ?? item.projectId ?? item.projectName ?? '').toString())
+      );
+      projectCount = uniqueProjectKeys.size;
+      worksheetData = selectedData.flatMap(project => {
+        const propertyDetails = Array.isArray(project.propertyDetails) && project.propertyDetails.length > 0
+          ? project.propertyDetails
+          : Array.isArray(project.propertyDetailsList) && project.propertyDetailsList.length > 0
+            ? project.propertyDetailsList
+            : [null];
+        return propertyDetails.map(detail => ({
+          'S.No': rowCounter++,
+          'Project ID': project.projectId || '',
+          'Project Name': project.projectName || '',
+          'Project Reference Name': project.projectReferenceName || '',
+          'Project Category': project.projectCategory || '',
+          'Project Type': detail?.projectType || '',
+          'Floor Name': detail?.floorName || '',
+          'Shop No': detail?.shopNo || '',
+          'Door No': detail?.doorNo || '',
+          'Area': detail?.area || '',
+          'EB No': detail?.ebNo || '',
+          'Property Tax No': detail?.propertyTaxNo || '',
+          'Water Tax No': detail?.waterTaxNo || ''
+        }));
+      });
+    } else {
+      worksheetData = selectedData.map(item => {
         const prefix = exportDataType === 'vendor' ? 'V' : 'C';
         return {
           'Customer ID': '149985391',
@@ -2645,14 +2829,37 @@ const MasterData = ({ username, userRoles = [] }) => {
           'Address 4': '',
           'ZIP Code': ''
         };
-      }
-    });
-    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+      });
+    }
+
+    const worksheet = exportDataType === 'project'
+      ? XLSX.utils.json_to_sheet(worksheetData, { origin: 'A3' })
+      : XLSX.utils.json_to_sheet(worksheetData);
+
+    if (exportDataType === 'project') {
+      XLSX.utils.sheet_add_aoa(worksheet, [['Total Projects', projectCount]], { origin: 'A1' });
+      XLSX.utils.sheet_add_aoa(worksheet, [['']], { origin: 'A2' });
+    }
+
     const columnWidths = exportDataType === 'ebServiceLink' ? [
       { wch: 10 },
       { wch: 15 },
       { wch: 15 },
       { wch: 20 }
+    ] : exportDataType === 'project' ? [
+      { wch: 8 },   // S.No
+      { wch: 15 },  // Project ID
+      { wch: 25 },  // Project Name
+      { wch: 30 },  // Project Reference Name
+      { wch: 22 },  // Project Category
+      { wch: 18 },  // Project Type
+      { wch: 18 },  // Floor Name
+      { wch: 12 },  // Shop No
+      { wch: 12 },  // Door No
+      { wch: 15 },  // Area
+      { wch: 20 },  // EB No
+      { wch: 22 },  // Property Tax No
+      { wch: 22 }   // Water Tax No
     ] : [
       { wch: 12 },
       { wch: 25 },
@@ -2669,6 +2876,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       { wch: 12 }
     ];
     worksheet['!cols'] = columnWidths;
+
     const workbook = XLSX.utils.book_new();
     let sheetName = 'Export';
     if (exportDataType === 'vendor') {
@@ -2677,9 +2885,12 @@ const MasterData = ({ username, userRoles = [] }) => {
       sheetName = 'Contractors';
     } else if (exportDataType === 'employee') {
       sheetName = 'Employees';
+    } else if (exportDataType === 'project') {
+      sheetName = 'Projects';
     } else {
       sheetName = 'EB Service Links';
     }
+
     XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
     const fileName = `${sheetName}_${new Date().toISOString().split('T')[0]}.xlsx`;
     XLSX.writeFile(workbook, fileName);
@@ -2764,7 +2975,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                       + Add
                     </button>
                   </div>
-                  <button className="flex items-center text-[#E4572E] font-bold px-1 ml-4 mt-2 mb-6"
+                  <button className="flex items-center text-[#E4572E] font-bold px-1 ml-4 mt-2"
                     onClick={() => document.getElementById('projectManagementFileInput').click()}>
                     <img src={imports} alt='import' className='w-4 h-4 mr-1' />
                     Import File
@@ -2776,13 +2987,21 @@ const MasterData = ({ username, userRoles = [] }) => {
                     style={{ display: 'none' }}
                     onChange={(e) => handleProjectManagementBulkUpload(e)}
                   />
-                  <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
+
+                  <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] mt-6'>
                     <div className="bg-[#FAF6ED]">
-                      <table className="table-auto lg:w-72">
+                      <table className="table-auto lg:w-[470px]">
                         <thead className='bg-[#FAF6ED]'>
                           <tr className="border-b">
                             <th className="p-2 text-left lg:w-16 text-xl font-bold">S.No</th>
                             <th className="p-2 text-left lg:w-72 text-xl font-bold">Project Name</th>
+                            <th>
+                              <div>
+                                <button onClick={() => handleDownloadIconClick('project')}>
+                                  <img src={DownloadIcon} alt='download' className=' cursor-pointer hover:opacity-75' />
+                                </button>
+                              </div>
+                            </th>
                           </tr>
                         </thead>
                       </table>
@@ -2795,28 +3014,40 @@ const MasterData = ({ username, userRoles = [] }) => {
                             project.projectAddress?.toLowerCase().includes(projectManagementSearch.toLowerCase()) ||
                             project.projectId?.toLowerCase().includes(projectManagementSearch.toLowerCase())
                           ).map((item, index) => (
-                            <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
+                            <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED] group">
                               <td className="p-2 text-left font-semibold">
                                 {(projects.findIndex(p => p.id === item.id) + 1).toString().padStart(2, '0')}
                               </td>
-                              <td className="p-2 text-left group flex font-semibold">
-                                <div className="flex flex-grow">
-                                  {item.projectName || ''}
-                                </div>
+                              <td className="p-2 text-left font-semibold">
+                                {item.projectName || ''}
+                              </td>
+                              <td className="p-2 text-left font-semibold">
+                                {item.projectCategory === 'Client Project' && (
+                                  <span className="text-xs font-semibold text-[#E4572E]  px-2 py-1 rounded">
+                                    Client
+                                  </span>
+                                )}
+                                {item.projectCategory === 'Own Project' && (
+                                  <span className="text-xs font-semibold text-[#007233] px-2 py-1 rounded">
+                                    Own
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-2 text-left font-semibold">
                                 <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                                   <button
                                     onClick={() => handleEditProject(item)}
                                     className="text-blue-600 hover:text-blue-800"
                                     title="Edit"
                                   >
-                                    <img src={edit} alt="Edit" className="w-4 h-4" />
+                                    <img src={edit} alt="Edit" className="w-6 h-6" />
                                   </button>
                                   <button
                                     onClick={() => handleDeleteProject(item.id)}
                                     className="text-red-600 hover:text-red-800"
                                     title="Delete"
                                   >
-                                    <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                    <img src={deleteIcon} alt="Delete" className="w-6 h-6" />
                                   </button>
                                 </div>
                               </td>
@@ -5722,6 +5953,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                       <option value="House">House</option>
                       <option value="Land">Land</option>
                       <option value="Office">Office</option>
+                      <option value="Construction">Construction</option>
                     </select>
                   </div>
                   <div>
@@ -6004,6 +6236,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                       <option value="House">House</option>
                       <option value="Land">Land</option>
                       <option value="Office">Office</option>
+                      <option value="Construction">Construction</option>
                     </select>
                   </div>
                   <div>
@@ -6887,7 +7120,8 @@ const MasterData = ({ username, userRoles = [] }) => {
                   exportDataType === 'vendor' ? 'Vendors' :
                     exportDataType === 'contractor' ? 'Contractors' :
                       exportDataType === 'employee' ? 'Employees' :
-                        'EB Service Links'
+                        exportDataType === 'project' ? 'Projects' :
+                          'EB Service Links'
                 } to Export
               </h2>
               <button onClick={() => setIsExportSelectionModalOpen(false)} className="text-red-500 hover:text-red-700">
@@ -6897,7 +7131,7 @@ const MasterData = ({ username, userRoles = [] }) => {
             <div className="flex gap-6 flex-1 overflow-hidden">
               <div className="flex-1 flex flex-col">
                 <h3 className="text-lg font-semibold text-gray-800 mb-3">
-                  Available {exportDataType === 'vendor' ? 'Vendors' : exportDataType === 'contractor' ? 'Contractors' : exportDataType === 'employee' ? 'Employees' : 'EB Service Links'}
+                  Available {exportDataType === 'vendor' ? 'Vendors' : exportDataType === 'contractor' ? 'Contractors' : exportDataType === 'employee' ? 'Employees' : exportDataType === 'project' ? 'Projects' : 'EB Service Links'}
                 </h3>
                 <div className="mb-4">
                   <div className="relative">
@@ -6907,7 +7141,8 @@ const MasterData = ({ username, userRoles = [] }) => {
                       placeholder={`Search ${exportDataType === 'vendor' ? 'vendor' :
                         exportDataType === 'contractor' ? 'contractor' :
                           exportDataType === 'employee' ? 'employee' :
-                            'EB service link'
+                            exportDataType === 'project' ? 'project' :
+                              'EB service link'
                         }...`}
                       value={exportSearchTerm}
                       onChange={(e) => setExportSearchTerm(e.target.value)}
@@ -6915,6 +7150,22 @@ const MasterData = ({ username, userRoles = [] }) => {
                     <img src={search} alt='search' className='absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5' />
                   </div>
                 </div>
+                {exportDataType === 'project' && (
+                  <div className="mb-4">
+                    <select
+                      className="w-full border-2 border-[#BF9853] border-opacity-35 rounded-lg p-3 focus:outline-none focus:border-[#BF9853]"
+                      value={exportProjectCategory}
+                      onChange={(e) => setExportProjectCategory(e.target.value)}
+                    >
+                      <option value="">All Categories</option>
+                      {projectCategoryOptions.map(category => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="flex space-x-3 mb-4">
                   <button onClick={handleSelectAllExportItems} className="px-4 py-2 bg-[#BF9853] text-white rounded-lg hover:bg-yellow-800 font-semibold text-sm transition-colors" >
                     Select All
@@ -6924,18 +7175,19 @@ const MasterData = ({ username, userRoles = [] }) => {
                   </button>
                 </div>
                 <div className="flex-1 overflow-y-auto border-2 border-[#BF9853] border-opacity-35 rounded-lg p-3">
-                  {(exportDataType === 'vendor' ? filteredExportVendors : exportDataType === 'contractor' ? filteredExportContractors : exportDataType === 'employee' ? getFilteredExportData() : filteredExportEbServiceLinks).length === 0 ? (
+                  {(exportDataType === 'vendor' ? filteredExportVendors : exportDataType === 'contractor' ? filteredExportContractors : exportDataType === 'employee' ? getFilteredExportData() : exportDataType === 'project' ? filteredExportProjects : filteredExportEbServiceLinks).length === 0 ? (
                     <div className="text-center text-gray-500 py-8">
                       No {
                         exportDataType === 'vendor' ? 'vendors' :
                           exportDataType === 'contractor' ? 'contractors' :
                             exportDataType === 'employee' ? 'employees' :
-                              'EB service links'
+                              exportDataType === 'project' ? 'projects' :
+                                'EB service links'
                       } found
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      {(exportDataType === 'vendor' ? filteredExportVendors : exportDataType === 'contractor' ? filteredExportContractors : exportDataType === 'employee' ? getFilteredExportData() : filteredExportEbServiceLinks).map((item) => (
+                      {(exportDataType === 'vendor' ? filteredExportVendors : exportDataType === 'contractor' ? filteredExportContractors : exportDataType === 'employee' ? getFilteredExportData() : exportDataType === 'project' ? filteredExportProjects : filteredExportEbServiceLinks).map((item) => (
                         <label key={item.id} className="flex items-center p-3 hover:bg-[#FAF6ED] rounded-lg cursor-pointer transition-colors" >
                           <input
                             type="checkbox"
@@ -6948,7 +7200,8 @@ const MasterData = ({ username, userRoles = [] }) => {
                               exportDataType === 'vendor' ? item.vendorName :
                                 exportDataType === 'contractor' ? item.contractorName :
                                   exportDataType === 'employee' ? item.employee_name :
-                                    `${item.projectId} - ${item.doorNo} - ${item.ebServiceNo}`
+                                    exportDataType === 'project' ? `${item.projectId || ''} - ${item.projectName || ''}` :
+                                      `${item.project_id || item.projectId || ''} - ${item.door_no || item.doorNo || ''} - ${item.eb_service_no || item.ebServiceNo || ''}`
                             }
                           </span>
                         </label>
@@ -6985,7 +7238,8 @@ const MasterData = ({ username, userRoles = [] }) => {
                                 exportDataType === 'vendor' ? 'Vendor Name' :
                                   exportDataType === 'contractor' ? 'Contractor Name' :
                                     exportDataType === 'employee' ? 'Employee Name' :
-                                      'EB Service Link'
+                                      exportDataType === 'project' ? 'Project' :
+                                        'EB Service Link'
                               }
                             </th>
                             <th className="p-3 text-center font-semibold text-sm w-20">Action</th>
@@ -7000,6 +7254,10 @@ const MasterData = ({ username, userRoles = [] }) => {
                               item = contractorNames.find(c => c.id === itemId);
                             } else if (exportDataType === 'employee') {
                               item = employeeList.find(e => e.id === itemId);
+                            } else if (exportDataType === 'project') {
+                              item = projects.find(p => p.id === itemId);
+                            } else if (exportDataType === 'ebServiceLink') {
+                              item = ebServiceLinks.find(link => link.id === itemId);
                             }
                             if (!item) return null;
                             return (
@@ -7016,7 +7274,8 @@ const MasterData = ({ username, userRoles = [] }) => {
                                     exportDataType === 'vendor' ? item.vendorName :
                                       exportDataType === 'contractor' ? item.contractorName :
                                         exportDataType === 'employee' ? item.employee_name :
-                                          `${item.projectId} - ${item.doorNo} - ${item.ebServiceNo}`
+                                          exportDataType === 'project' ? `${item.projectId || ''} - ${item.projectName || ''}` :
+                                            `${item.project_id || item.projectId || ''} - ${item.door_no || item.doorNo || ''} - ${item.eb_service_no || item.ebServiceNo || ''}`
                                   }
                                 </td>
                                 <td className="p-3 text-center">

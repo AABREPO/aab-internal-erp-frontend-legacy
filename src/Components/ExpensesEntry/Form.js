@@ -4,6 +4,7 @@ import Attach from '../Images/Attachfile.svg';
 import axios from "axios";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import jsPDF from 'jspdf';
 const Form = ({ username, userRoles = [] }) => {
     const [eno, setEno] = useState(null);
     const [date, setDate] = useState('');
@@ -449,10 +450,126 @@ const Form = ({ username, userRoles = [] }) => {
             setSelectedType("");
         }
     };
-    const handleFileChange = (e) => {
+    // Helper function to convert image to PDF
+    const convertImageToPdf = (file) => {
+        return new Promise((resolve, reject) => {
+            // Check if file is an image
+            const imageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/webp'];
+            if (!imageTypes.includes(file.type)) {
+                // If it's already a PDF, return as is
+                resolve(file);
+                return;
+            }
+
+            // Create an image element to load the file
+            const img = new Image();
+            const reader = new FileReader();
+
+            reader.onload = (e) => {
+                img.onload = () => {
+                    try {
+                        // Calculate dimensions to fit A4 page (in mm)
+                        const pdfWidth = 210; // A4 width in mm
+                        const pdfHeight = 297; // A4 height in mm
+                        const imgWidth = img.width;
+                        const imgHeight = img.height;
+                        
+                        // Calculate aspect ratio
+                        const imgAspectRatio = imgWidth / imgHeight;
+                        const pdfAspectRatio = pdfWidth / pdfHeight;
+                        
+                        // Determine orientation
+                        const orientation = imgWidth > imgHeight ? 'landscape' : 'portrait';
+                        let finalWidth, finalHeight;
+                        
+                        if (orientation === 'landscape') {
+                            // Use landscape dimensions
+                            if (imgAspectRatio > pdfAspectRatio) {
+                                // Image is wider, fit to width
+                                finalWidth = pdfWidth;
+                                finalHeight = pdfWidth / imgAspectRatio;
+                            } else {
+                                // Image is taller, fit to height
+                                finalHeight = pdfHeight;
+                                finalWidth = pdfHeight * imgAspectRatio;
+                            }
+                        } else {
+                            // Use portrait dimensions
+                            if (imgAspectRatio > pdfAspectRatio) {
+                                // Image is wider, fit to width
+                                finalWidth = pdfWidth;
+                                finalHeight = pdfWidth / imgAspectRatio;
+                            } else {
+                                // Image is taller, fit to height
+                                finalHeight = pdfHeight;
+                                finalWidth = pdfHeight * imgAspectRatio;
+                            }
+                        }
+                        
+                        // Center the image on the page
+                        const xOffset = (pdfWidth - finalWidth) / 2;
+                        const yOffset = (pdfHeight - finalHeight) / 2;
+
+                        // Create a new PDF document
+                        const pdf = new jsPDF({
+                            orientation: orientation,
+                            unit: 'mm',
+                            format: 'a4'
+                        });
+
+                        // Determine image format for PDF
+                        let imgFormat = 'JPEG';
+                        if (file.type === 'image/png') {
+                            imgFormat = 'PNG';
+                        } else if (file.type === 'image/gif') {
+                            imgFormat = 'GIF';
+                        }
+
+                        // Add the image to PDF
+                        pdf.addImage(img, imgFormat, xOffset, yOffset, finalWidth, finalHeight);
+
+                        // Convert PDF to blob
+                        const pdfBlob = pdf.output('blob');
+                        
+                        // Create a File object from the blob with .pdf extension
+                        const pdfFile = new File([pdfBlob], file.name.replace(/\.[^/.]+$/, '') + '.pdf', {
+                            type: 'application/pdf',
+                            lastModified: Date.now()
+                        });
+
+                        resolve(pdfFile);
+                    } catch (error) {
+                        console.error('Error converting image to PDF:', error);
+                        reject(error);
+                    }
+                };
+
+                img.onerror = () => {
+                    reject(new Error('Failed to load image'));
+                };
+
+                img.src = e.target.result;
+            };
+
+            reader.onerror = () => {
+                reject(new Error('Failed to read file'));
+            };
+
+            reader.readAsDataURL(file);
+        });
+    };
+
+    const handleFileChange = async (e) => {
         const file = e.target.files[0];
         if (file) {
-            setSelectedFile(file);
+            try {
+                // Convert image to PDF if it's an image
+                const processedFile = await convertImageToPdf(file);
+                setSelectedFile(processedFile);
+            } catch (error) {
+                console.error('Error processing file:', error);
+                alert('Error processing file. Please try again.');
+            }
         }
         e.target.value = '';
     };
@@ -513,6 +630,10 @@ const Form = ({ username, userRoles = [] }) => {
             alert('Please select a payment mode for this account type.');
             return;
         }
+        if (selectedAccountType === 'Bill Refund' && !selectedFile) {
+            alert('PDF file is required for Bill Refund.');
+            return;
+        }
         if ((selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills') && ["GPay", "PhonePe", "Net Banking", "Cheque"].includes(paymentMode)) {
             setPaymentModalData({
                 date: date,
@@ -533,7 +654,7 @@ const Form = ({ username, userRoles = [] }) => {
                 setIsSubmitting(false);
                 return;
             }
-            if (selectedAccountType !== 'Daily Wage' && selectedAccountType !== 'Utility Bills' && !selectedFile) {
+            if (selectedAccountType !== 'Daily Wage' && selectedAccountType !== 'Utility Bills' && selectedAccountType !== 'Bill Refund' && !selectedFile) {
                 alert('PDF file is required for this type.');
                 setIsSubmitting(false);
                 return;
@@ -583,7 +704,7 @@ const Form = ({ username, userRoles = [] }) => {
                 contractor: contractor,
                 contractorId: contractorId,
                 quantity: quantity,
-                amount: parseInt(amount),
+                amount: selectedAccountType === 'Bill Refund' ? -Math.abs(parseInt(amount)) : parseInt(amount),
                 category: selectedCategory ? selectedCategory.label : '',
                 comments: comments,
                 machineTools: selectedMachineTools ? selectedMachineTools.label : '',
@@ -673,7 +794,7 @@ const Form = ({ username, userRoles = [] }) => {
                     employee_id: null,
                     project_id: 10,
                     type: utilityType ,
-                    amount: parseFloat(amount),
+                    amount: selectedAccountType === 'Bill Refund' ? -Math.abs(parseFloat(amount)) : parseFloat(amount),
                     status: true,
                     weekly_number: getCurrentWeekNumber(),
                     advance_portal_id: null,
@@ -1170,9 +1291,9 @@ const Form = ({ username, userRoles = [] }) => {
                             <div className='flex'>
                                 <label htmlFor="fileInput" className="cursor-pointer flex items-center text-orange-600">
                                     <img className='w-5 h-4' alt='' src={Attach}></img>
-                                    Attach file {selectedAccountType === 'Utility Bills' && <span className="text-red-500 ml-1">*</span>}
+                                    Attach file {(selectedAccountType === 'Utility Bills' || selectedAccountType === 'Bill Refund') && <span className="text-red-500 ml-1">*</span>}
                                 </label>
-                                <input type="file" id="fileInput" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
+                                <input type="file" id="fileInput" ref={fileInputRef} className="hidden" onChange={handleFileChange} accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp,image/*,application/pdf" />
                             </div>
                             {selectedFile && <span className="text-gray-600 lg:-ml-[84rem] -ml-48">{selectedFile.name}</span>}
                         </div>

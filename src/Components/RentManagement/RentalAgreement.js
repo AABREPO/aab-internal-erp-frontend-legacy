@@ -6,9 +6,8 @@ import AttachIcon from '../Images/Attachfile.svg';
 import axios from 'axios';
 import loadingScreen from '../Images/AAlogoBlackSVG.svg';
 const RentalAgreement = () => {
-    const [properties, setProperties] = useState([]);
+    const [projects, setProjects] = useState([]);
     const [fullAgreementData, setFullAgreementData] = useState([]);
-    const [propertyNames, setPropertyNames] = useState([]);
     const [isRentPopupOpen, setIsRentPopupOpen] = useState(false);
     const [selectedProperty, setSelectedProperty] = useState(null);
     const [isWaiting, setIsWaiting] = useState(false);
@@ -200,7 +199,6 @@ const RentalAgreement = () => {
                 throw new Error("Failed to fetch agreements from the backend");
             }
             const clientData = await clientResponse.json();
-            // Compare against selectedProperty.value
             const matchingAgreements = clientData.filter(
                 (agreement) => agreement.propertyName === selectedProperty.value
             );
@@ -286,9 +284,9 @@ const RentalAgreement = () => {
         const agreementValidityInWords = numberToWords1(Number(Agreementvalidity));
         const propertyTypes = ownersProperty.map(o => o.propertyType);
         const propertyDoorNo = ownersProperty.map(o => o.doorNo);
-        const propertyAddress = properties.find(
-            p => p.propertyName === selectedProperty.value
-        )?.propertyAddress || "";
+        const propertyAddress = projects.find(
+            p => p.projectReferenceName === selectedProperty.value
+        )?.projectAddress || "";
         const floorBedroomDescriptions = (ownersProperty || []).map(owner => {
             const { selectFloor = [], bedroomsByFloor = {}, propertyType, area, doorNo } = owner;
             const floorDescription = selectFloor.map(floor => {
@@ -575,7 +573,6 @@ WITNESSES:
         doc.save(filename);
         return doc.output('blob');
     };
-
     const handleInputChange = (index, field, value) => {
         const updatedItems = [...items];
         updatedItems[index][field] = value;
@@ -702,22 +699,24 @@ WITNESSES:
         }
     };
     useEffect(() => {
-        fetchProperties();
+        fetchProjects();
     }, []);
-    const fetchProperties = async () => {
+    const fetchProjects = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/properties/all');
+            const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
             if (response.ok) {
                 const data = await response.json();
-                setProperties(data);
-                const propertyNamesList = data.map((item) => item.propertyName);
-                setPropertyNames(propertyNamesList);
+                const ownProjects = Array.isArray(data)
+                    ? data.filter(p => (p.projectCategory || '').toLowerCase() === 'own project')
+                    : [];
+                setProjects(ownProjects);
+                console.log('Fetched projects:', ownProjects.length, 'projects');
             } else {
-                setMessage('Error fetching properties.');
+                setMessage('Error fetching projects.');
             }
         } catch (error) {
             console.error('Error:', error);
-            setMessage('Error fetching properties.');
+            setMessage('Error fetching projects.');
         }
     };
     const calculateEndDate = (startDate, validity) => {
@@ -807,15 +806,17 @@ WITNESSES:
         if (lastDigit === 3) return 'rd';
         return 'th';
     };
-    const propertyOptions = propertyNames.map(name => ({
-        value: name,
-        label: name
-    }));
+    const propertyOptions = projects
+        .filter(project => project.projectReferenceName)
+        .map((project) => ({
+            value: project.projectReferenceName,
+            label: project.projectReferenceName,
+        }));
     const filteredOwnerOptions = selectedProperty
-        ? properties
-            .find(p => p.propertyName === selectedProperty.value)
-            ?.ownerDetailsList
-            ?.map(owner => ({ value: owner.ownerName, label: owner.ownerName })) || []
+        ? projects
+            .find(p => p.projectReferenceName === selectedProperty.value)
+            ?.ownerDetails
+            ?.map(owner => ({ value: owner.clientName, label: owner.clientName })) || []
         : [];
     useEffect(() => {
         const fetchTenants = async () => {
@@ -952,42 +953,9 @@ WITNESSES:
                 itemName: item.name,
                 howMany: item.quantity,
             }));
-            // Assuming one tenant and one property only for payload here
-            const shopDetails = ownersProperty.map(prop => ({
-                propertyName: selectedProperty.value,
-                shops: [
-                    {
-                        shopNo: prop.shopNos, // ✅ No array check, use as-is
-                        propertyType: prop.propertyType,
-                        floorName: Array.isArray(prop.selectFloor)
-                            ? prop.selectFloor.map(f => f?.value || f?.label || f).join(", ")
-                            : (prop.selectFloor?.value || prop.selectFloor),
-                        monthlyRent: prop.rent,
-                        advanceAmount: prop.advance,
-                        doorNo: prop.doorNo,
-                        startingDate: Agreementstartdate,
-                        shouldCollectAdvance: prop.shouldCollectAdvance,
-                    }
-                ]
-            }));
-            const tenantShopPayload = {
-                tenantName: tenants[0].tenantName,
-                fullName: tenants[0].tenantsList[0].tenantFullName,
-                tenantFatherName: tenants[0].tenantsList[0].tenantFatherName,
-                age: tenants[0].tenantsList[0].tenantAge,
-                mobileNumber: tenants[0].tenantsList[0].tenantMobile,
-                tenantAddress: tenants[0].tenantsList[0].tenantAddress,
-                property: shopDetails
-            };
-            const tenantShopRes = await fetch('https://backendaab.in/aabuildersDash/api/tenantShop/save', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(tenantShopPayload),
-            });
-            if (!tenantShopRes.ok) throw new Error("Failed to save tenant shop details");
             const agreementPayload = {
-                propertyName: selectedProperty.value,
-                propertyAddress: properties.find(p => p.propertyName === selectedProperty.value)?.propertyAddress || "",
+                propertyName: selectedProperty.value, // This stores projectReferenceName
+                propertyAddress: projects.find(p => p.projectReferenceName === selectedProperty.value)?.projectAddress || "",
                 fileName: filename,
                 rentToBePaid: Renttobepaid,
                 lockInPeriod: Lockinperiod,
@@ -1004,7 +972,6 @@ WITNESSES:
                 agreementTenantNames: updatedTenants,
                 annexureItems: updatedAnnexureItem,
             };
-            if (!tenantShopRes.ok) throw new Error("Failed to save tenant shop details");
             const saveResponse = await fetch("https://backendaab.in/aabuildersDash/api/agreements/save", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -1112,20 +1079,25 @@ WITNESSES:
                         <div>
                             <div className="mb-6 lg:flex gap-5 items-baseline text-left">
                                 <div>
-                                    <label className="block font-semibold text-base mb-2">Property Name</label>
+                                    <label className="block font-semibold text-base mb-2">Project Reference Name</label>
                                     <Select
                                         options={propertyOptions}
                                         value={selectedProperty}
                                         onChange={(selected) => {
                                             setSelectedProperty(selected);
-                                            const matchedProperty = properties.find(p => p.propertyName === selected?.value);
-                                            if (matchedProperty?.propertyDetailsList?.length > 0) {
+                                            const matchedProject = projects.find(p => p.projectReferenceName === selected?.value);
+                                            const propertyDetailsArray = matchedProject?.propertyDetails 
+                                                ? (Array.isArray(matchedProject.propertyDetails) 
+                                                    ? matchedProject.propertyDetails 
+                                                    : Array.from(matchedProject.propertyDetails || []))
+                                                : [];
+                                            if (propertyDetailsArray.length > 0) {
                                                 const propertyNameCheck = selected.value;
                                                 const filteredFileOption = agreementFileOptions.filter(option => option.propertyName === propertyNameCheck);
                                                 setAgreementFilteredFileOptions(filteredFileOption);
                                             }
                                         }}
-                                        placeholder="Select Property Name"
+                                        placeholder="Select Project Reference Name"
                                         className="w-[300px]"
                                         isClearable
                                         menuPortalTarget={document.body}
@@ -1202,7 +1174,7 @@ WITNESSES:
                                 </div>
                             </div>
                             <div className="flex gap-14">
-                                <div className="lg:flex p-5 border-2 border-opacity-20 border-[#BF9853] rounded-lg lg:w-[1610px] lg:h-[463px] overflow-y-auto no-scrollbar w-[420px] appearance-none no-spinner">
+                                <div className="lg:flex p-5 border-2 border-opacity-20 border-[#BF9853] rounded-lg lg:w-[1610px] lg:h-[587px] overflow-y-auto no-scrollbar w-[420px] appearance-none no-spinner">
                                     <div className="relative  mt-5">
                                         <div className="absolute lg:right-2 top-0 bottom-0 lg:w-[2px] bg-[#BF9853] opacity-20" />
                                         <span
@@ -1255,17 +1227,20 @@ WITNESSES:
                                                                                 handleOwnerChange(index, 'ownerAddress', '');
                                                                                 return;
                                                                             }
-                                                                            const ownerObj = properties
-                                                                                .find(p => p.propertyName === selectedProperty?.value)
-                                                                                ?.ownerDetailsList
-                                                                                ?.find(o => o.ownerName === selected.value);
+                                                                            const matchedProject = projects.find(p => p.projectReferenceName === selectedProperty?.value);
+                                                                            const ownerDetailsArray = matchedProject?.ownerDetails 
+                                                                                ? (Array.isArray(matchedProject.ownerDetails) 
+                                                                                    ? matchedProject.ownerDetails 
+                                                                                    : Array.from(matchedProject.ownerDetails || []))
+                                                                                : [];
+                                                                            const ownerObj = ownerDetailsArray.find(o => o.clientName === selected.value);
                                                                             if (ownerObj) {
-                                                                                handleOwnerChange(index, 'ownerName', ownerObj.ownerName);
-                                                                                handleOwnerChange(index, 'fullName', ownerObj.ownerName);
+                                                                                handleOwnerChange(index, 'ownerName', ownerObj.clientName);
+                                                                                handleOwnerChange(index, 'fullName', ownerObj.clientName);
                                                                                 handleOwnerChange(index, 'fatherName', ownerObj.fatherName);
                                                                                 handleOwnerChange(index, 'age', ownerObj.age);
                                                                                 handleOwnerChange(index, 'mobile', ownerObj.mobile);
-                                                                                handleOwnerChange(index, 'ownerAddress', ownerObj.ownerAddress);
+                                                                                handleOwnerChange(index, 'ownerAddress', ownerObj.clientAddress);
                                                                             } else {
                                                                                 handleOwnerChange(index, 'ownerName', selected.value || '');
                                                                             }
@@ -1406,9 +1381,8 @@ WITNESSES:
                                                         </button>
                                                     </div>
                                                 </div>
-                                                <div className="flex justify-end mt-28">
-                                                    <button
-                                                        className="bg-[#c59d5f] hover:bg-[#b38a47] text-white px-6 py-2 rounded w-[80px]"
+                                                <div className="flex justify-end mt-64">
+                                                    <button className="bg-[#c59d5f] hover:bg-[#b38a47] text-white px-6 py-2 rounded w-[80px]"
                                                         onClick={() => setCurrentStep(2)}
                                                     >
                                                         Next
@@ -1425,9 +1399,8 @@ WITNESSES:
                                                                 Tenant - {tenantIndex + 1}
                                                             </h3>
                                                             <div className="flex items-center space-x-4">
-                                                                <p
-                                                                    onClick={addTenant}
-                                                                    className="w-44 border-dashed border-b-2 text-[#E4572E] font-semibold border-[#BF9853] cursor-pointer"
+                                                                <p onClick={addTenant}
+                                                                   className="w-44 border-dashed border-b-2 text-[#E4572E] font-semibold border-[#BF9853] cursor-pointer"
                                                                 >
                                                                     + Add another tenant
                                                                 </p>
@@ -1492,7 +1465,6 @@ WITNESSES:
                                                                             options={tenantFullNameOptions}
                                                                             onChange={(newValue) => {
                                                                                 const selectedName = newValue?.value || '';
-                                                                                // Autofill from source
                                                                                 const matchedDetail = tenantList
                                                                                     .flatMap(t => t.tenantDetailsList || [])
                                                                                     .find(detail => detail.tenantFullName === selectedName);
@@ -1668,12 +1640,16 @@ WITNESSES:
                                                                         const updatedOwners = [...ownersProperty];
                                                                         updatedOwners[index].propertyType = selectedType;
                                                                         if (selectedProperty) {
-                                                                            const matchedProperty = properties.find(
-                                                                                (p) => p.propertyName === selectedProperty.value
+                                                                            const matchedProject = projects.find(
+                                                                                (p) => p.projectReferenceName === selectedProperty.value
                                                                             );
-                                                                            if (matchedProperty) {
-                                                                                const filteredDetails = matchedProperty.propertyDetailsList.filter(
-                                                                                    (detail) => detail.propertyType === selectedType
+                                                                            if (matchedProject) {
+                                                                                // Convert Set to Array if needed
+                                                                                const propertyDetailsArray = Array.isArray(matchedProject.propertyDetails) 
+                                                                                    ? matchedProject.propertyDetails 
+                                                                                    : Array.from(matchedProject.propertyDetails || []);
+                                                                                const filteredDetails = propertyDetailsArray.filter(
+                                                                                    (detail) => detail.projectType === selectedType
                                                                                 );
                                                                                 const floorOptions = [
                                                                                     ...new Set(filteredDetails.map((d) => d.floorName).filter(Boolean))
@@ -1745,9 +1721,15 @@ WITNESSES:
                                                                     onChange={(selected) => {
                                                                         const updated = [...ownersProperty];
                                                                         updated[index].shopNos = selected?.value || '';
-                                                                        const matchedProperty = properties.find(p => p.propertyName === selectedProperty?.value);
-                                                                        const detail = matchedProperty?.propertyDetailsList.find(
-                                                                            d => d.shopNo === selected?.value && d.propertyType === owner.propertyType
+                                                                        const matchedProject = projects.find(p => p.projectReferenceName === selectedProperty?.value);
+                                                                        // Convert Set to Array if needed
+                                                                        const propertyDetailsArray = matchedProject?.propertyDetails 
+                                                                            ? (Array.isArray(matchedProject.propertyDetails) 
+                                                                                ? matchedProject.propertyDetails 
+                                                                                : Array.from(matchedProject.propertyDetails || []))
+                                                                            : [];
+                                                                        const detail = propertyDetailsArray.find(
+                                                                            d => (String(d.shopNo) === String(selected?.value) || d.shopNo === selected?.value) && d.projectType === owner.propertyType
                                                                         );
                                                                         if (detail) {
                                                                             updated[index].doorNo = detail.doorNo || '';
@@ -1922,7 +1904,7 @@ WITNESSES:
                                                             + Add Another Property
                                                         </button>
                                                     </div>
-                                                    <div className="flex justify-end mt-48">
+                                                    <div className="flex justify-end mt-80">
                                                         <div className="flex gap-5">
                                                             <button className="border w-[80px] h-[35px] text-[#BF9853] border-[#BF9853] rounded " onClick={() => setCurrentStep(currentStep - 1)}>
                                                                 Back
@@ -2071,7 +2053,7 @@ WITNESSES:
                                                             </select>
                                                         </div>
                                                     </div>
-                                                    <div className="flex lg:justify-end mt-14">
+                                                    <div className="flex lg:justify-end mt-48">
                                                         <div className="flex gap-5">
                                                             <button className="border w-[80px] h-[35px] text-[#BF9853] border-[#BF9853] rounded " onClick={() => setCurrentStep(currentStep - 1)}>
                                                                 Back
@@ -2151,7 +2133,7 @@ WITNESSES:
                                                             </button>
                                                         )}
                                                     </div>
-                                                    <div className="flex justify-between mt-12">
+                                                    <div className="flex justify-between mt-52">
                                                         <button
                                                             className="bg-[#007233] text-white py-2 px-6 rounded font-medium"
                                                             onClick={handleSubmitAgreement}

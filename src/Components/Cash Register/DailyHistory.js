@@ -48,6 +48,9 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     const [newRefundReceived, setNewRefundReceived] = useState({
         date: new Date().toISOString().split("T")[0],
         labour_id: "",
+        vendor_id: "",
+        contractor_id: "",
+        employee_id: "",
         amount: ""
     });
     const [showPopups, setShowPopups] = useState(false);
@@ -59,6 +62,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     const [selectedFileForPopup, setSelectedFileForPopup] = useState(null);
     const [editingDailyExpenseRowId, setEditingDailyExpenseRowId] = useState('');
     const [editingPaymentId, setEditingPaymentId] = useState('');
+    const [isRefundChangeButtonActive, setIsRefundChangeButtonActive] = useState(false);
     const [editDailyExpenseData, setEditDailyExpenseData] = useState({
         date: "",
         labour_id: "",
@@ -75,6 +79,9 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     });
     const [editRefundPaymentData, setEditRefundPaymentData] = useState({
         labour_id: "",
+        vendor_id: "",
+        contractor_id: "",
+        employee_id: "",
         amount: "",
     });
     const [showWeeklyPaymentExpensesModal, setShowWeeklyPaymentExpensesModal] = useState(false);
@@ -482,6 +489,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             // Always set the first day of the selected week as default
             const defaultDate = weekDays[0].toISOString().split("T")[0];
             setSelectedDate(defaultDate);
+            setNewRefundReceived((prev) => ({ ...prev, date: defaultDate }));
             
             // Fetch data for the first day of the week
             const fetchDataForDate = async (dateStr) => {
@@ -507,6 +515,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     const handleDateClick = async (dateStr) => {
         setSelectedDate(dateStr);
         setNewDailyExpense((prev) => ({ ...prev, date: dateStr }));
+        setNewRefundReceived((prev) => ({ ...prev, date: dateStr }));
         try {
             const [dailyRes, refundRes] = await Promise.all([
                 axios.get(`https://backendaab.in/aabuildersDash/api/daily-payments/date/${dateStr}`),
@@ -563,21 +572,46 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         const { name, value } = e.target;
         setNewRefundReceived(prev => ({ ...prev, [name]: value }));
     };
-    const handleLabourChange = (selected) => {
+    const handleRefundSelectChange = (selected) => {
         setNewRefundReceived(prev => ({
             ...prev,
-            labour_id: selected ? selected.id : ""
+            labour_id: selected && selected.type === "Labour" ? selected.id : "",
+            vendor_id: selected && selected.type === "Vendor" ? selected.id : "",
+            contractor_id: selected && selected.type === "Contractor" ? selected.id : "",
+            employee_id: selected && selected.type === "Employee" ? selected.id : "",
         }));
+    };
+
+    const handleRefundChangeButtonClick = () => {
+        setIsRefundChangeButtonActive((prev) => {
+            const next = !prev;
+            setNewRefundReceived((state) => ({
+                ...state,
+                labour_id: next ? "" : state.labour_id,
+                vendor_id: next ? state.vendor_id : "",
+                contractor_id: next ? state.contractor_id : "",
+                employee_id: next ? state.employee_id : "",
+            }));
+            return next;
+        });
     };
     const handleRefundSubmit = async () => {
         try {
-            if (!newRefundReceived.labour_id || !newRefundReceived.amount) {
-                alert("Please select labour and enter amount.");
+            const hasPayee =
+                (newRefundReceived.labour_id && Number(newRefundReceived.labour_id) > 0) ||
+                (newRefundReceived.vendor_id && Number(newRefundReceived.vendor_id) > 0) ||
+                (newRefundReceived.contractor_id && Number(newRefundReceived.contractor_id) > 0) ||
+                (newRefundReceived.employee_id && Number(newRefundReceived.employee_id) > 0);
+            if (!hasPayee || !newRefundReceived.amount) {
+                alert("Please select payee and enter amount.");
                 return;
             }
             const payload = {
                 date: selectedDate,
-                labour_id: newRefundReceived.labour_id,
+                labour_id: newRefundReceived.labour_id ? Number(newRefundReceived.labour_id) : null,
+                vendor_id: newRefundReceived.vendor_id ? Number(newRefundReceived.vendor_id) : null,
+                contractor_id: newRefundReceived.contractor_id ? Number(newRefundReceived.contractor_id) : null,
+                employee_id: newRefundReceived.employee_id ? Number(newRefundReceived.employee_id) : null,
                 amount: Number(newRefundReceived.amount),
                 weekly_number: Number(selectedWeek),
             };
@@ -589,7 +623,11 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 const refundRes = await axios.get(`https://backendaab.in/aabuildersDash/api/refund_received/date/${selectedDate}`);
                 setRefundPayments(refundRes.data);
                 setNewRefundReceived({
+                    date: selectedDate,
                     labour_id: "",
+                    vendor_id: "",
+                    contractor_id: "",
+                    employee_id: "",
                     amount: "",
                 });
             }
@@ -675,13 +713,13 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     };
 
     const getVendorName = (id) =>
-        vendorOptions.find(v => v.id === id)?.value || "";
+        vendorOptions.find(v => String(v.id) === String(id))?.value || "";
 
     const getContractorName = (id) =>
-        contractorOptions.find(c => c.id === id)?.value || "";
+        contractorOptions.find(c => String(c.id) === String(id))?.value || "";
 
     const getEmployeeName = (id) =>
-        employeeOptions.find(c => c.id === id)?.value || "";
+        employeeOptions.find(e => String(e.id) === String(id))?.value || "";
 
     const getSiteName = (id) =>
         siteOptions.find(s => String(s.id) === String(id))?.value || "";
@@ -781,6 +819,17 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             label: type
         }));
     }, [filteredExpenses]);
+
+    const refundSelectOptions = React.useMemo(() => {
+        const unique = new Map();
+        [...laboursList, ...combinedOptions].forEach((option) => {
+            const key = `${option.type || 'Labour'}-${option.id}`;
+            if (!unique.has(key)) {
+                unique.set(key, option);
+            }
+        });
+        return Array.from(unique.values());
+    }, [laboursList, combinedOptions]);
 
     const sortedDailyExpenses = React.useMemo(() => {
         let sortableData = [...filteredExpenses];
@@ -1364,8 +1413,11 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     const handleEditRefundClick = (row) => {
         setEditingPaymentId(row.id);
         setEditRefundPaymentData({
-            labour_id: row.labour_id,
-            amount: row.amount,
+            labour_id: row.labour_id || "",
+            vendor_id: row.vendor_id || "",
+            contractor_id: row.contractor_id || "",
+            employee_id: row.employee_id || "",
+            amount: row.amount || "",
         });
     };
     const handleEditRefundChange = (e) => {
@@ -1378,18 +1430,28 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     const handleEditRefundLabourChange = (selected) => {
         setEditRefundPaymentData((prev) => ({
             ...prev,
-            labour_id: selected ? selected.id : "",
+            labour_id: selected && selected.type === "Labour" ? selected.id : "",
+            vendor_id: selected && selected.type === "Vendor" ? selected.id : "",
+            contractor_id: selected && selected.type === "Contractor" ? selected.id : "",
+            employee_id: selected && selected.type === "Employee" ? selected.id : "",
         }));
     };
     const saveEditedRefundPayment = async (id) => {
         try {
+            const payload = {
+                labour_id: editRefundPaymentData.labour_id ? Number(editRefundPaymentData.labour_id) : null,
+                vendor_id: editRefundPaymentData.vendor_id ? Number(editRefundPaymentData.vendor_id) : null,
+                contractor_id: editRefundPaymentData.contractor_id ? Number(editRefundPaymentData.contractor_id) : null,
+                employee_id: editRefundPaymentData.employee_id ? Number(editRefundPaymentData.employee_id) : null,
+                amount: Number(editRefundPaymentData.amount),
+            };
             await axios.put(
                 `https://backendaab.in/aabuildersDash/api/refund_received/edit/${id}?username=${encodeURIComponent(username)}`,
-                editRefundPaymentData
+                payload
             );
             setRefundPayments((prev) =>
                 prev.map((row) =>
-                    row.id === id ? { ...row, ...editRefundPaymentData } : row
+                    row.id === id ? { ...row, ...payload } : row
                 )
             );
             setEditingPaymentId(null); 
@@ -2213,19 +2275,32 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                                                 <td className="py-2">
                                                     {editingPaymentId === row.id && Number(selectedWeek) === Number(lastWeekNumber) ? (
                                                         <Select
-                                                            name="labour_id"
-                                                            className="w-[180px]"
-                                                            placeholder="Labour Name"
+                                                            name="refund_party"
+                                                            className="w-[200px]"
+                                                            placeholder="Select Name"
                                                             isSearchable
                                                             isClearable
-                                                            value={laboursList.find(opt => opt.id === editRefundPaymentData.labour_id) || null}
+                                                            value={
+                                                                refundSelectOptions.find(opt =>
+                                                                    (opt.type === "Labour" && String(opt.id) === String(editRefundPaymentData.labour_id)) ||
+                                                                    (opt.type === "Vendor" && String(opt.id) === String(editRefundPaymentData.vendor_id)) ||
+                                                                    (opt.type === "Contractor" && String(opt.id) === String(editRefundPaymentData.contractor_id)) ||
+                                                                    (opt.type === "Employee" && String(opt.id) === String(editRefundPaymentData.employee_id))
+                                                                ) || null
+                                                            }
                                                             onChange={handleEditRefundLabourChange}
-                                                            options={laboursList}
+                                                            options={refundSelectOptions}
                                                             menuPortalTarget={document.body}
                                                             styles={customStyles}
                                                         />
                                                     ) : (
-                                                        laboursList.find(opt => opt.id === Number(row.labour_id))?.label || ""
+                                                        (() => {
+                                                            const employee = getEmployeeName(row.employee_id);
+                                                            const vendor = getVendorName(row.vendor_id);
+                                                            const contractor = getContractorName(row.contractor_id);
+                                                            const labour = laboursList.find(opt => String(opt.id) === String(row.labour_id))?.label || "";
+                                                            return employee || vendor || contractor || labour || "";
+                                                        })()
                                                     )}
                                                 </td>
                                                 <td className="py-2">
@@ -2270,19 +2345,36 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                                         {Number(selectedWeek) === Number(lastWeekNumber) && (
                                         <tr>
                                             <td className="py-2 text-left">
-                                                <Select
-                                                    name="labour_id"
-                                                    className="w-[265px] text-left"
-                                                    placeholder="Labour Name"
-                                                    isSearchable
-                                                    isClearable
-                                                    value={laboursList.find(opt => opt.id === newRefundReceived.labour_id) || null}
-                                                    onChange={handleLabourChange}
-                                                    onKeyDown={handleKeyDown}
-                                                    options={laboursList}
-                                                    styles={customStyles}
-                                                    menuPortalTarget={document.body}
-                                                />
+                                                <div className="flex items-center gap-2">
+                                                    <Select
+                                                        name="refund_party"
+                                                        className="w-[265px] text-left"
+                                                        placeholder={isRefundChangeButtonActive ? "Vendor/Contractor/Employee" : "Labour Name"}
+                                                        isSearchable
+                                                        isClearable
+                                                        value={
+                                                            isRefundChangeButtonActive
+                                                                ? combinedOptions.find(opt =>
+                                                                    (opt.type === "Employee" && String(opt.id) === String(newRefundReceived.employee_id)) ||
+                                                                    (opt.type === "Vendor" && String(opt.id) === String(newRefundReceived.vendor_id)) ||
+                                                                    (opt.type === "Contractor" && String(opt.id) === String(newRefundReceived.contractor_id))
+                                                                ) || null
+                                                                : laboursList.find(opt => String(opt.id) === String(newRefundReceived.labour_id)) || null
+                                                        }
+                                                        onChange={handleRefundSelectChange}
+                                                        onKeyDown={handleKeyDown}
+                                                        options={isRefundChangeButtonActive ? combinedOptions : laboursList}
+                                                        styles={customStyles}
+                                                        menuPortalTarget={document.body}
+                                                    />
+                                                    <button onClick={handleRefundChangeButtonClick}>
+                                                        <img
+                                                            src={Change}
+                                                            className={`w-4 h-4 ${isRefundChangeButtonActive ? 'opacity-10' : ''}`}
+                                                            alt="Toggle options"
+                                                        />
+                                                    </button>
+                                                </div>
                                             </td>
                                             <td className="py-2">
                                                 <input
@@ -2379,7 +2471,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 </div>
             )}
 
-            {/* File Upload Popup Modal */}
             {fileUploadPopup && (
                 <div
                     className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
@@ -2450,7 +2541,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 </div>
             )}
 
-            {/* History Modal for Daily Expenses */}
             {showWeeklyPaymentExpensesModal && (
                 <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
                     <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1800px] mx-4 p-2">
@@ -2498,7 +2588,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 </div>
             )}
 
-            {/* History Modal for Refund Payments */}
             {showWeeklyPaymentReceivedModal && (
                 <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
                     <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1800px] mx-4 p-2">

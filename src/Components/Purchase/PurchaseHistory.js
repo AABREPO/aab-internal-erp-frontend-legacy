@@ -720,7 +720,7 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
     }
   }, [editModalOpen, editRowData?.category_id, categoryOptions, poItemName]);
   return (
-    <div className="gap-6 [@media(min-width:1450)]w-[1900px] pl-10 bg-[#FFFCF6]">
+    <div className="gap-6 [@media(min-width:1450)]w-[1900px] pl-10 bg-[#FFFCF6] mr-10">
       <div className="bg-white p-4">
         <div className='flex justify-end mb-6 lg:mr-14 '>
           <button
@@ -805,7 +805,7 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
               <div className="w-[100px] text-right pr-4">Activity</div>
             </div>
             {purchaseOrders.length > 0 ? (
-              <ul className="lg:h-[650px] h-[200px] overflow-auto">
+              <ul className="lg:h-[550px] h-[200px] overflow-auto">
                 {purchaseOrders.map((order, index) => (
                   <li
                     key={order.id}
@@ -862,7 +862,7 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
             {selectedOrder ? (
               <>
                 {selectedOrder && !selectedOrder.deleted && (
-                  <div className='ml-[900px]'>
+                  <div className='flex justify-end'>
                     {isHeaderEditable ? (
                       <button
                         onClick={handleHeaderSave}

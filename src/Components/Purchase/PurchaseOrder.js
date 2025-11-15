@@ -1000,7 +1000,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
     }, [hasRestoredSession, selectedBrand, brandOptions, selectedModel, selectedItemName, poItemName]);
     return (
         <div>
-            <div className="p-6 border-collapse bg-[#FFFFFF] rounded-md mx-auto ml-4 mr-2 w-full sm:w-[100%] md:w-[95%] lg:w-[95%] xl:w-[95%] 2xl:max-w-[1870px]">
+            <div className="p-6 border-collapse bg-[#FFFFFF] rounded-md ml-8 mr-8 [@media(min-width:1450)]w-[1900px]">
                 <div className="flex flex-wrap [@media(min-width:1300px)]:gap-6 gap-3 ">
                     <div className="mt-2 text-left">
                         <h4 className="font-bold [@media(min-width:1300px)]:mb-2 ">Vendor Name</h4>
@@ -1092,7 +1092,7 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                 </div>
             </div>
             {selectedVendor && selectedSite && (
-                <div className="p-6 border-collapse bg-[#FFFFFF] rounded-md mx-auto ml-4 mr-4 mt-3 w-full sm:w-[100%] md:w-[95%] lg:w-[95%] xl:w-[95%] 2xl:max-w-[1870px]">
+                <div className="p-6 border-collapse bg-[#FFFFFF] rounded-md ml-8 mr-8 mt-3 [@media(min-width:1450)]w-[1900px]">
                     <div className="lg:flex  lg:gap-10 gap-8">
                         <div className="[@media(min-width:1300px)]:space-y-6 text-left">
                             <div>

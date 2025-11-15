@@ -64,7 +64,7 @@ const PropertyTab = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchPropertyTaxPayments = async () => {
             try {
-                const response = await axios.get('https://backendaab.in/aabuilderDash/expenses_form/utility/propertytax');
+                const response = await axios.get('https://backendaab.in/aabuilderDash/expenses_form/utility/property');
                 setPropertyTaxPayments(response.data || []);
             } catch (error) {
                 console.error('Error fetching property tax payments:', error);
@@ -121,57 +121,78 @@ const PropertyTab = ({ username, userRoles = [] }) => {
 
     // Apply filters
     useEffect(() => {
-        let filtered = projects;
+        const toLower = (value) => (value ? value.toString().toLowerCase() : '');
+        const vendorFilter = toLower(filters.vendor);
+        const doorFilter = toLower(filters.doorNo);
+        const shopFilter = toLower(filters.shop);
+        const projectTypeFilter = toLower(filters.projectType);
+        const serviceFilter = toLower(filters.service);
+        const tenantFilter = toLower(filters.tenant);
+        const projectNameFilter = toLower(filters.projectName);
 
-        // Filter by project category only if a category is selected
-        if (selectedCategory) {
-            filtered = filtered.filter(project =>
-                project.projectCategory === selectedCategory
-            );
-        }
+        const filtered = projects.reduce((acc, project) => {
+            if (selectedCategory && project.projectCategory !== selectedCategory) {
+                return acc;
+            }
 
-        if (filters.projectName) {
-            filtered = filtered.filter(project =>
-                project.projectName.toLowerCase().includes(filters.projectName.toLowerCase())
-            );
-        }
+            if (projectNameFilter && !toLower(project.projectName).includes(projectNameFilter)) {
+                return acc;
+            }
 
-        if (filters.doorNo) {
-            filtered = filtered.filter(project =>
-                project.propertyDetails.some(property =>
-                    property.doorNo && property.doorNo.toLowerCase().includes(filters.doorNo.toLowerCase())
-                )
-            );
-        }
+            const filteredProperties = (project.propertyDetails || []).filter(property => {
+                if (!property || !property.propertyTaxNo || !property.propertyTaxNo.trim()) {
+                    return false;
+                }
+                if (doorFilter && !toLower(property.doorNo).includes(doorFilter)) {
+                    return false;
+                }
+                if (shopFilter && !toLower(property.shopNo).includes(shopFilter)) {
+                    return false;
+                }
+                if (projectTypeFilter && !toLower(property.projectType).includes(projectTypeFilter)) {
+                    return false;
+                }
+                if (serviceFilter && !toLower(property.propertyTaxNo).includes(serviceFilter)) {
+                    return false;
+                }
+                if (tenantFilter) {
+                    const tenantValue = toLower(
+                        property.tenantName ||
+                        property.tenant ||
+                        (property.tenantDetails && property.tenantDetails.tenantName)
+                    );
+                    if (!tenantValue || !tenantValue.includes(tenantFilter)) {
+                        return false;
+                    }
+                }
+                if (vendorFilter) {
+                    const vendorValue = toLower(
+                        property.vendorName ||
+                        property.vendor ||
+                        project.vendorName ||
+                        project.vendor
+                    );
+                    if (!vendorValue || !vendorValue.includes(vendorFilter)) {
+                        return false;
+                    }
+                }
+                return true;
+            });
 
-        if (filters.shop) {
-            filtered = filtered.filter(project =>
-                project.propertyDetails.some(property =>
-                    property.shopNo && property.shopNo.toLowerCase().includes(filters.shop.toLowerCase())
-                )
-            );
-        }
+            if (filteredProperties.length === 0) {
+                return acc;
+            }
 
-        if (filters.projectType) {
-            filtered = filtered.filter(project =>
-                project.propertyDetails.some(property =>
-                    property.projectType && property.projectType.toLowerCase().includes(filters.projectType.toLowerCase())
-                )
-            );
-        }
+            acc.push({
+                ...project,
+                propertyDetails: filteredProperties
+            });
 
-        if (filters.service) {
-            filtered = filtered.filter(project =>
-                project.propertyDetails.some(property =>
-                    property.propertyTaxNo && property.propertyTaxNo.toLowerCase().includes(filters.service.toLowerCase())
-                )
-            );
-        }
-
+            return acc;
+        }, []);
 
         // Note: Year filter is handled in the getPaymentData function
         // We show all projects but filter payment data by year
-
         setFilteredProjects(filtered);
     }, [filters, projects, selectedCategory, propertyTaxPayments]);
 

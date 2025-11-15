@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import ReactDOM from 'react-dom';
+
 import CreatableSelect from 'react-select/creatable';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -91,33 +92,50 @@ function InvoiceTable() {
     options.find((opt) => opt.value === value) || null;
   // Group flat items by main description for correct UI structure
   const mapFetchedItems = (flatItems = []) => {
+    if (!Array.isArray(flatItems)) return [];
     const grouped = {};
     flatItems.forEach((item, idx) => {
-      // Use main description from item (string or object)
       const mainDescValue = item.description?.value || item.description || "";
       if (!grouped[mainDescValue]) {
         grouped[mainDescValue] = {
-          description: findOption(descriptions, mainDescValue) || { value: mainDescValue, label: mainDescValue },
+          description:
+            findOption(descriptions, mainDescValue) || {
+              value: mainDescValue,
+              label: mainDescValue,
+            },
           workType: item.workType || "",
-          subItems: []
+          subItems: [],
         };
       }
+
       grouped[mainDescValue].subItems.push({
-        description: findOption(subItems, item.sub_description || item.subItemDescription || item.description) ||
-          { value: item.sub_description || item.subItemDescription || "", label: item.sub_description || item.subItemDescription || "" },
+        description:
+          findOption(subItems, item.sub_description || item.subItemDescription || item.description) ||
+          {
+            value: item.sub_description || item.subItemDescription || "",
+            label: item.sub_description || item.subItemDescription || "",
+          },
         sizeInput: item.size_input || item.sizeInput || "",
         qty: item.qty || "",
         rate: item.rate || "",
-        unit: findOption(units, item.unit) || { value: item.unit || "", label: item.unit || "" },
+        unit:
+          findOption(units, item.unit) || {
+            value: item.unit || "",
+            label: item.unit || "",
+          },
         amount: item.amount || "",
         mainRow: {
           sizeInput: item.size_input || item.sizeInput || "",
           qty: item.qty || "",
           rate: item.rate || "",
-          unit: findOption(units, item.unit) || { value: item.unit || "", label: item.unit || "" },
-          amount: item.amount || ""
+          unit:
+            findOption(units, item.unit) || {
+              value: item.unit || "",
+              label: item.unit || "",
+            },
+          amount: item.amount || "",
         },
-        key: item.item_id || idx
+        key: item.item_id || idx,
       });
     });
     return Object.values(grouped);
@@ -233,6 +251,7 @@ function InvoiceTable() {
     }
     setItems(updatedItems);
   };
+
   const [amountPaid, setAmountPaid] = useState("");
   const [clientName, setClientName] = useState(null);
   const [projectType, setProjectType] = useState(null);
@@ -255,8 +274,13 @@ function InvoiceTable() {
   const previousProjectRef = useRef(null);
   const [previousProjectName, setPreviousProjectName] = useState(null);
   const [isCloning, setIsCloning] = useState(false);
+  // 🧱 Clone restore guard flag
+  const [isRestoringClone, setIsRestoringClone] = useState(false);
   const [isInvoiceLocked, setIsInvoiceLocked] = useState(false);
   const [isModalProjectChange, setIsModalProjectChange] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+
 
   const getBaseInvoiceNumber = (invoiceNumber) => {
     if (!invoiceNumber) return "";
@@ -296,8 +320,6 @@ function InvoiceTable() {
     }
     fetchAllInvoices();
   }, []);
-
-
   useEffect(() => {
     const fetchProjectNames = async () => {
       try {
@@ -309,7 +331,7 @@ function InvoiceTable() {
         if (!response.ok) throw new Error("Network response was not ok");
         const data = await response.json();
         const formattedProjects = data.map(item => ({
-          value: item.id,
+          id: item.id,
           value: item.siteNo,
           label: item.siteName
         }));
@@ -320,85 +342,16 @@ function InvoiceTable() {
     };
     fetchProjectNames();
   }, []);
-const handleProjectNameChange = async (selectedOption) => {
-  if (!selectedOption) {
-    ReactDOM.unstable_batchedUpdates(() => {
-      setSelectedProjectName(null);
-      setProjectType(null);
-      setInvoiceNumber("");
-      setInvoiceVersions([]);
-      setCurrentInvoice(null);
-      setItems([]);
-      setClientName(null);
-      setClientAddress("");
-      setInvoiceDate("");
-      setAmountPaid("");
-      setIsInvoiceLocked(false);
-    });
-    return;
-  }
+  const handleProjectNameChange = async (selectedOption) => {
+    const sanitizeInvoiceNumber = (invNum) => {
+      if (!invNum || typeof invNum !== "string") return "";
+      return invNum.trim().split(/[: ]/)[0];
+    };
 
-  setSelectedProjectName(selectedOption);
-  setProjectType(selectedOption.project_type || selectedOption.label || "");
-
-  const projectID = String(selectedOption.value);
-  const storedClone = sessionStorage.getItem(`cloned_${projectID}`);
-  let restored = false;
-
-  if (storedClone) {
-    const data = JSON.parse(storedClone);
-    console.log("🟢 Restoring cloned data for project:", projectID, data);
-
-    const permanentOptions = allInvoices
-      .filter((inv) => inv.invoice && String(inv.invoice.project_id) === projectID)
-      .map((inv) => ({
-        value: inv.invoice.invoice_number,
-        label: inv.invoice.invoice_number,
-      }));
-
-    const cachedOptions = Object.values(invoiceCache || {})
-      .filter((data) => data.invoice && String(data.invoice.project_id) === projectID)
-      .map((data) => ({
-        value: data.invoice.invoice_number,
-        label: data.invoice.invoice_number,
-      }));
-
-    const combinedOptionsMap = new Map();
-    [...permanentOptions, ...cachedOptions].forEach((opt) => {
-      combinedOptionsMap.set(opt.value, { value: opt.value, label: opt.label });
-    });
-
-    let invoiceOptions = Array.from(combinedOptionsMap.values()).sort((a, b) =>
-      a.value.localeCompare(b.value, undefined, { numeric: true })
-    );
-
-    if (invoiceOptions.length === 0) {
-      const baseInv = `INV${projectID}-01`;
-      invoiceOptions = [{ value: baseInv, label: `${baseInv}` }];
-    }
-
-    setInvoiceVersions(invoiceOptions);
-
-    const invoiceToSelect = data.invoiceNumber || invoiceOptions[invoiceOptions.length - 1]?.value || "";
-    setInvoiceNumber(invoiceToSelect);
-
-    // ✅ Restore only cloned items for this project
-    setItems(data.clonedItems || []);
-
-    setClientName(null);
-    setClientAddress("");
-    setInvoiceDate("");
-    setAmountPaid("");
-    setCurrentInvoice(null);
-    setIsInvoiceLocked(false);
-
-    restored = true;
-  }
-
-  // ✅ If not cloned, proceed normally
-  if (!restored) {
-    if (!isCloning && !isModalProjectChange) {
+    if (!selectedOption || !selectedOption.value) {
       ReactDOM.unstable_batchedUpdates(() => {
+        setSelectedProjectName(null);
+        setProjectType(null);
         setInvoiceNumber("");
         setInvoiceVersions([]);
         setCurrentInvoice(null);
@@ -409,127 +362,275 @@ const handleProjectNameChange = async (selectedOption) => {
         setAmountPaid("");
         setIsInvoiceLocked(false);
       });
+      return;
     }
 
-    const permanentOptions = allInvoices
-      .filter((inv) => inv.invoice && String(inv.invoice.project_id) === projectID)
-      .map((inv) => ({
-        value: inv.invoice.invoice_number,
-        label: inv.invoice.invoice_number,
-      }));
+    setSelectedProjectName(selectedOption);
+    setProjectType(selectedOption.project_type || selectedOption.label || "");
+    const projectID = String(selectedOption.value || "").trim();
+    if (!projectID) return;
 
-    const cachedOptions = Object.values(invoiceCache || {})
-      .filter((data) => data.invoice && String(data.invoice.project_id) === projectID)
-      .map((data) => ({
-        value: data.invoice.invoice_number,
-        label: data.invoice.invoice_number,
-      }));
+    const storedCloneRaw = localStorage.getItem(`cloned_${projectID}`);
+    let restored = false;
+    if (storedCloneRaw) {
+      const storedClone = JSON.parse(storedCloneRaw);
+      console.log("🟢 Restoring cloned data for project:", projectID, storedClone);
+      const newBaseInvoiceNumber = `INV${projectID}-01`;
+      const clonedInvoiceNumber = newBaseInvoiceNumber;
+      const clonedItems = storedClone.clonedItems || [];
+      const clonedInvoiceData = null;
+      let invoiceOptions = [{ value: clonedInvoiceNumber, label: clonedInvoiceNumber }];
+      setInvoiceVersions(invoiceOptions);
 
-    const combinedOptionsMap = new Map();
-    [...permanentOptions, ...cachedOptions].forEach((opt) => {
-      combinedOptionsMap.set(opt.value, { value: opt.value, label: opt.label });
-    });
+      ReactDOM.unstable_batchedUpdates(() => {
+        setInvoiceNumber(clonedInvoiceNumber);
+        setItems(mapFetchedItems(clonedItems));
+        setClientName(null);
+        setClientAddress("");
+        setInvoiceDate("");
+        setAmountPaid("");
+        setCurrentInvoice(clonedInvoiceData);
+        setIsInvoiceLocked(false);
+      });
+      restored = true;
+    }
 
-    let invoiceOptions = Array.from(combinedOptionsMap.values()).sort((a, b) =>
-      a.value.localeCompare(b.value, undefined, { numeric: true })
-    );
+    if (!restored) {
+      const permanentOptions = allInvoices
+        .filter(inv => inv.invoice && String(inv.invoice.project_id) === projectID)
+        .map(inv => ({
+          value: sanitizeInvoiceNumber(inv.invoice.invoice_number),
+          label: sanitizeInvoiceNumber(inv.invoice.invoice_number),
+        }));
 
-    if (invoiceOptions.length === 0) {
+      const cachedOptions = Object.values(invoiceCache || {})
+        .filter(data => data.invoice && String(data.invoice.project_id) === projectID)
+        .map(data => ({
+          value: sanitizeInvoiceNumber(data.invoice.invoice_number),
+          label: sanitizeInvoiceNumber(data.invoice.invoice_number),
+        }));
+
+      const combinedOptionsMap = new Map();
+      [...permanentOptions, ...cachedOptions].forEach(opt => {
+        if (opt.value) combinedOptionsMap.set(opt.value, opt);
+      });
+
+      let invoiceOptions = Array.from(combinedOptionsMap.values()).sort((a, b) =>
+        a.value.localeCompare(b.value, undefined, { numeric: true })
+      );
+
       const baseInv = `INV${projectID}-01`;
-      invoiceOptions = [{ value: baseInv, label: baseInv }];
+      if (!invoiceOptions.find(opt => opt.value === baseInv)) {
+        invoiceOptions.unshift({ value: baseInv, label: baseInv });
+      }
+
+      setInvoiceVersions(invoiceOptions);
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      const invoiceToSelect = invoiceOptions.length > 0 ? invoiceOptions[invoiceOptions.length - 1].value : "";
+      setInvoiceNumber(invoiceToSelect);
+
+      if (!isCloning && !isModalProjectChange) {
+        if (invoiceOptions.length > 0 && invoiceToSelect) {
+          await handleInvoiceVersionChange({ value: invoiceToSelect });
+          setIsInvoiceLocked(/ D\d+(\.\d+)?/.test(invoiceToSelect));
+        } else {
+          ReactDOM.unstable_batchedUpdates(() => {
+            setCurrentInvoice(null);
+            setItems([]);
+            setClientName(null);
+            setClientAddress("");
+            setInvoiceDate("");
+            setAmountPaid("");
+            setIsInvoiceLocked(false);
+          });
+        }
+      }
     }
 
-    setInvoiceVersions(invoiceOptions);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    if (isCloning) setIsCloning(false);
+  };
 
-    const invoiceToSelect = invoiceOptions[invoiceOptions.length - 1]?.value || "";
-    setInvoiceNumber(invoiceToSelect);
-
-    if (!isCloning && !isModalProjectChange) {
-      await handleInvoiceVersionChange({ value: invoiceToSelect });
-      setIsInvoiceLocked(/ D\d+(\.\d+)?/.test(invoiceToSelect));
-    } else {
-      console.log("🟢 Skipped invoice data load — cloning/modal mode");
-    }
-  }
-
-  if (isCloning) setIsCloning(false);
-};
   const [cachedInvoiceVersions, setCachedInvoiceVersions] = useState([]);
-  useEffect(() => {
-    if (!invoiceNumber) return;
-    const baseInvNum = invoiceNumber.includes('.') ? invoiceNumber.split('.')[0] : invoiceNumber;
-    setBaseInvoiceNumber(baseInvNum);
-    axios.get(`https://backendaab.in/aabuildersDash/api/invoices/versions/${encodeURIComponent(baseInvNum)}`)
-      .then(res => {
-        const fetchedOptions = res.data.map(invNum => ({ value: invNum, label: invNum }));
-        if (!fetchedOptions.find(o => o.value === baseInvNum)) {
-          fetchedOptions.unshift({ value: baseInvNum, label: baseInvNum });
-        }
-        setCachedInvoiceVersions(prevCache => {
-          const cacheValues = new Set(prevCache.map(o => o.value));
-          const newCacheEntries = fetchedOptions.filter(opt => !cacheValues.has(opt.value));
-          return [...prevCache, ...newCacheEntries];
-        });
-        setInvoiceVersions(prevOptions => {
-          const existingValues = new Set(prevOptions.map(o => o.value));
-          const newOptions = fetchedOptions.filter(opt => !existingValues.has(opt.value));
-          return [...prevOptions, ...newOptions];
-        });
-      })
-      .catch(err => {
-        console.error('Failed to load invoice versions:', err);
-        setInvoiceVersions(cachedInvoiceVersions.length > 0 ? cachedInvoiceVersions : [{ value: invoiceNumber, label: invoiceNumber }]);
-      });
-  }, [invoiceNumber]);
-  useEffect(() => {
-    if (!invoiceNumber) return;
-    axios.get(`https://backendaab.in/aabuildersDash/api/invoices/${encodeURIComponent(invoiceNumber)}`)
-      .then(res => {
-        const { invoice, items } = res.data;
-        if (invoice) {
-          setInvoiceDate(invoice.date || '');
-          setClientName(invoice.client_name ? findOption(clients, invoice.client_name) : null);
-          setClientAddress(invoice.client_address || '');
-          setAmountPaid(invoice.amount_paid || '');
-          const mappedItems = mapFetchedItems(items || []);
-          setItems(mappedItems);
-          setCurrentInvoice(invoice);
-        }
-      })
-      .catch(() => {
-        try {
-          const savedItems = localStorage.getItem('invoiceItems');
-          const savedClientName = localStorage.getItem('invoiceClientName');
-          const savedProjectType = localStorage.getItem('invoiceProjectType');
-          const savedInvoiceDate = localStorage.getItem('invoiceDate');
-          const savedAmountPaid = localStorage.getItem('invoiceAmountPaid');
-          if (savedItems) setItems(mapFetchedItems(JSON.parse(savedItems)));
-          if (savedClientName) setClientName(JSON.parse(savedClientName));
-          if (savedProjectType) setProjectType(JSON.parse(savedProjectType));
-          if (savedInvoiceDate) setInvoiceDate(savedInvoiceDate);
-          if (savedAmountPaid) setAmountPaid(savedAmountPaid);
-        } catch (error) {
-          console.error('Failed to load invoice data from localStorage', error);
-        }
-      });
-  }, [invoiceNumber]);
+
   const refreshInvoiceVersions = async (baseInvoiceNumber) => {
+    if (!baseInvoiceNumber) return;
+    console.log("[DEBUG] Refreshing invoice versions for base:", baseInvoiceNumber);
+
     try {
       const res = await axios.get(
         `https://backendaab.in/aabuildersDash/api/invoices/versions/${encodeURIComponent(baseInvoiceNumber)}`
       );
-      const options = res.data.map(invNum => ({ value: invNum, label: invNum }));
-      if (!options.find(o => o.value === baseInvoiceNumber)) {
-        options.unshift({ value: baseInvoiceNumber, label: baseInvoiceNumber });
+
+      const data = Array.isArray(res.data) ? res.data : [];
+      const options = data
+        .map(invNum => invNum?.trim?.())
+        .filter(Boolean)
+        .map(invNum => ({ value: invNum, label: invNum }));
+
+      console.log("[DEBUG] Invoice versions received:", options);
+
+      // ✅ Ensure base always included
+      if (!options.find(o => o.value === baseInvoiceNumber.trim())) {
+        options.unshift({ value: baseInvoiceNumber.trim(), label: baseInvoiceNumber.trim() });
+        console.log("[DEBUG] Added base invoice number to versions list:", baseInvoiceNumber);
       }
-      setInvoiceVersions(options);
+
+      // ✅ Deduplicate both caches and live options cleanly
+      setCachedInvoiceVersions(prevCache => {
+        const merged = [...prevCache, ...options];
+        const unique = Array.from(new Map(merged.map(o => [o.value, o])).values());
+        return unique;
+      });
+
+      setInvoiceVersions(prevOptions => {
+        const merged = [...prevOptions, ...options];
+        const unique = Array.from(new Map(merged.map(o => [o.value, o])).values());
+        return unique;
+      });
+
     } catch (error) {
-      console.error("Failed to refresh invoice versions:", error);
+      console.error("[ERROR] Failed to refresh invoice versions:", error);
+
+      const fallback = invoiceNumber
+        ? [{ value: invoiceNumber.trim(), label: invoiceNumber.trim() }]
+        : cachedInvoiceVersions;
+
+      setInvoiceVersions(fallback.length > 0 ? fallback : []);
     }
   };
+  // Restore last invoice AFTER invoices list is loaded to avoid races.
+  // Wait for allInvoices to exist so find/lookups and local-cache logic are accurate.
+  useEffect(() => {
+    // Do nothing until allInvoices are loaded (prevents race where initialize resets state).
+    if (!Array.isArray(allInvoices) || allInvoices.length === 0) return;
+
+    const lastInvoiceNumber = localStorage.getItem('lastInvoiceNumber');
+    if (!lastInvoiceNumber) {
+      // No saved invoice — ensure basic UI cleared
+      setItems([]);
+      setClientName(null);
+      setProjectType(null);
+      setInvoiceDate('');
+      setAmountPaid('');
+      return;
+    }
+
+    // Mark that we are doing a restore to avoid other effects interfering if you use that flag.
+    // (If you don't track isRestoringClone elsewhere, you can add a local flag.)
+    setInvoiceNumber(lastInvoiceNumber);
+
+    // Fetch and display the invoice data for the last saved invoice
+    axios
+      .get(`https://backendaab.in/aabuildersDash/api/invoices/${encodeURIComponent(lastInvoiceNumber)}`)
+      .then(res => {
+        const { invoice, items } = res.data || {};
+        if (invoice) {
+          const mappedItems = mapFetchedItems(items || []);
+          setInvoiceDate(invoice.date || "");
+          setClientName(findOption(clients, invoice.client_name?.trim()) || null);
+          setClientAddress(invoice.client_address || "");
+          setAmountPaid(invoice.amount_paid ?? "");
+          setItems(mappedItems);
+          setCurrentInvoice(invoice);
+
+          // Set project type and project name (use existing lookup arrays)
+          const matchedType =
+            projectTypes.find(pt =>
+              String(pt.value).toLowerCase().trim() === String(invoice.project_type).toLowerCase().trim() ||
+              String(pt.label).toLowerCase().trim() === String(invoice.project_type).toLowerCase().trim()
+            ) || (invoice.project_type ? { value: invoice.project_type, label: invoice.project_type } : null);
+          setProjectType(matchedType);
+
+          const selectedProjectNameOption =
+            projectNameOptions.find(opt => String(opt.value) === String(invoice.project_id)) || null;
+          setSelectedProjectName(selectedProjectNameOption);
+        } else {
+          console.warn('WARN No invoice data found for:', lastInvoiceNumber);
+          setItems([]);
+          setCurrentInvoice(null);
+        }
+      })
+      .catch(error => {
+        console.error('Error loading invoice data for invoiceNumber:', lastInvoiceNumber, error);
+        setItems([]);
+        setCurrentInvoice(null);
+      });
+  }, [allInvoices /* run when invoices list is ready */]);
+
+  // Fetch invoice when invoiceNumber changes, but guard against restore/cloning flows
+  useEffect(() => {
+    if (!invoiceNumber) return;
+
+    // Avoid fetching while user is cloning / modal project change / or restoring clones
+    // (these flags are in your code: isCloning, isModalProjectChange, isRestoringClone)
+    if (isRestoringClone || isCloning || isModalProjectChange) {
+      console.warn('Skipping backend fetch for invoiceNumber due to clone/modal/restore flags.');
+      return;
+    }
+
+    let active = true;
+    const baseInvNum = getBaseInvoiceNumber(invoiceNumber).trim();
+    if (!baseInvNum) return;
+
+    const isBrandNewBaseNumber =
+      invoiceNumber.trim() === baseInvNum &&
+      !allInvoices.some(invEntry => invEntry.invoice?.invoice_number?.trim() === invoiceNumber.trim());
+
+    if (isBrandNewBaseNumber) {
+      console.warn('Skipping GET load for brand new unsaved base invoice:', invoiceNumber);
+      ReactDOM.unstable_batchedUpdates(() => {
+        setInvoiceDate('');
+        setClientName(null);
+        setClientAddress('');
+        setAmountPaid('');
+        setItems([]);
+        setCurrentInvoice(null);
+      });
+      refreshInvoiceVersions(baseInvNum);
+      return;
+    }
+
+    refreshInvoiceVersions(baseInvNum);
+
+    axios
+      .get(`https://backendaab.in/aabuildersDash/api/invoices/${encodeURIComponent(invoiceNumber)}`)
+      .then(res => {
+        if (!active) return;
+        const { invoice, items } = res.data || {};
+        if (invoice) {
+          const mappedItems = mapFetchedItems(items || []);
+          ReactDOM.unstable_batchedUpdates(() => {
+            setInvoiceDate(invoice.date || "");
+            setClientName(findOption(clients, invoice.client_name?.trim()) || null);
+            setClientAddress(invoice.client_address || "");
+            setAmountPaid(invoice.amountPaid ?? "");
+            setItems(mappedItems);
+            setCurrentInvoice(invoice);
+          });
+        } else {
+          console.warn('WARN No invoice data found for:', invoiceNumber);
+          ReactDOM.unstable_batchedUpdates(() => {
+            setItems([]);
+            setCurrentInvoice(null);
+          });
+        }
+      })
+      .catch(error => {
+        if (!active) return;
+        console.error('Error loading invoice data for invoiceNumber:', invoiceNumber, error);
+        ReactDOM.unstable_batchedUpdates(() => {
+          setItems([]);
+          setCurrentInvoice(null);
+        });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [invoiceNumber, allInvoices, isRestoringClone, isCloning, isModalProjectChange]);
   const handleInvoiceVersionChange = async (selectedOption) => {
-    if (!selectedOption) {
+    if (!selectedOption || !selectedOption.value) {
       ReactDOM.unstable_batchedUpdates(() => {
         setInvoiceNumber("");
         setInvoiceDate("");
@@ -542,17 +643,20 @@ const handleProjectNameChange = async (selectedOption) => {
       });
       return;
     }
-    const selectedInvoiceNumber = selectedOption.value;
+
+    const selectedInvoiceNumber = selectedOption.value.trim();
     setInvoiceNumber(selectedInvoiceNumber);
+    localStorage.setItem("lastInvoiceNumber", selectedInvoiceNumber);
+
     try {
-      // ✅ Step 1: Use cache first
+      // ✅ 1️⃣ Check if already cached (fast path)
       if (invoiceCache[selectedInvoiceNumber]) {
         const cachedData = invoiceCache[selectedInvoiceNumber];
+        const mappedItems = mapFetchedItems(cachedData.items || []);
 
         ReactDOM.unstable_batchedUpdates(() => {
           setCurrentInvoice(cachedData.invoice);
-          setItems(cachedData.items || []);
-
+          setItems(mappedItems);
           const clientOption =
             clients.find(
               c =>
@@ -562,18 +666,16 @@ const handleProjectNameChange = async (selectedOption) => {
 
           setClientName(clientOption);
           setClientAddress(cachedData.invoice.client_address || "");
-          setInvoiceDate(cachedData.invoice.invoice_date || "");
-          setAmountPaid(
-            cachedData.invoice.amount_paid ??
-            amountPaid ?? 0
-          );
+          setInvoiceDate(cachedData.invoice.date || "");
+          setAmountPaid(cachedData.invoice.amount_paid ?? 0);
+
+          const projectTypeStr = String(cachedData.invoice.project_type || "")
+            .trim()
+            .toLowerCase();
           const matchedType =
-            projectTypes.find(
-              pt =>
-                String(pt.value).toLowerCase().trim() ===
-                String(cachedData.invoice.project_type).toLowerCase().trim() ||
-                String(pt.label).toLowerCase().trim() ===
-                String(cachedData.invoice.project_type).toLowerCase().trim()
+            projectTypes.find(pt =>
+              String(pt.value).toLowerCase().trim() === projectTypeStr ||
+              String(pt.label).toLowerCase().trim() === projectTypeStr
             ) ||
             (cachedData.invoice.project_type
               ? { value: cachedData.invoice.project_type, label: cachedData.invoice.project_type }
@@ -583,51 +685,56 @@ const handleProjectNameChange = async (selectedOption) => {
         });
         return;
       }
+
+      // ✅ 2️⃣ Load the selected invoice directly from allInvoices
+      // (No version copy logic here — D1, D2, etc. are real saved invoices)
       const selectedInvEntry = allInvoices.find(
-        invEntry => invEntry.invoice.invoice_number === selectedInvoiceNumber
+        invEntry =>
+          invEntry.invoice &&
+          invEntry.invoice.invoice_number &&
+          invEntry.invoice.invoice_number.trim() === selectedInvoiceNumber
       );
+
       if (!selectedInvEntry) {
-        console.warn("Invoice not found for number:", selectedInvoiceNumber);
+        console.warn("No invoice found for", selectedInvoiceNumber);
         return;
       }
+
       const invoiceData = selectedInvEntry.invoice;
       const itemList = selectedInvEntry.items || [];
-      const newCache = {
-        ...invoiceCache,
+      const mappedItems = mapFetchedItems(itemList || []);
+
+      // ✅ Cache it for next selection
+      setInvoiceCache(prev => ({
+        ...prev,
         [selectedInvoiceNumber]: {
           invoice: invoiceData,
           items: itemList,
         },
-      };
-      setInvoiceCache(newCache);
+      }));
+
+      // ✅ Update state
       ReactDOM.unstable_batchedUpdates(() => {
         setCurrentInvoice(invoiceData);
-        setItems(itemList);
+        setItems(mappedItems);
 
         const clientOption =
           clients.find(
-            c =>
-              c.id === invoiceData.client_id ||
-              c.value === invoiceData.client_id
+            c => c.id === invoiceData.client_id || c.value === invoiceData.client_id
           ) || null;
 
         setClientName(clientOption);
         setClientAddress(invoiceData.client_address || "");
-        setInvoiceDate(invoiceData.invoice_date || "");
-        setAmountPaid(
-          invoiceData.amount_paid ??
-          currentInvoice?.amount_paid ??
-          amountPaid ??
-          0
-        );
+        setInvoiceDate(invoiceData.date || "");
+        setAmountPaid(invoiceData.amount_paid ?? 0);
 
+        const projectTypeStr = String(invoiceData.project_type || "")
+          .trim()
+          .toLowerCase();
         const matchedType =
-          projectTypes.find(
-            pt =>
-              String(pt.value).toLowerCase().trim() ===
-              String(invoiceData.project_type).toLowerCase().trim() ||
-              String(pt.label).toLowerCase().trim() ===
-              String(invoiceData.project_type).toLowerCase().trim()
+          projectTypes.find(pt =>
+            String(pt.value).toLowerCase().trim() === projectTypeStr ||
+            String(pt.label).toLowerCase().trim() === projectTypeStr
           ) ||
           (invoiceData.project_type
             ? { value: invoiceData.project_type, label: invoiceData.project_type }
@@ -636,9 +743,10 @@ const handleProjectNameChange = async (selectedOption) => {
         setProjectType(matchedType);
       });
     } catch (error) {
-      console.error("Error while handling invoice version change:", error);
+      console.error("Error loading invoice:", error);
     }
   };
+
   const calculateTotalAmount = () => {
     return (items || []).reduce(
       (total, item) =>
@@ -647,45 +755,44 @@ const handleProjectNameChange = async (selectedOption) => {
       0
     );
   };
+  const showToastMessage = (message) => {
+    setToastMessage(message);
+    setShowToast(true);
+    setTimeout(() => {
+      setShowToast(false);
+    }, 10000); // 10 seconds
+  };
+
   // Load from localStorage on mount (run once)
   // Clear all previously saved invoice-related localStorage values and reset the state on mount
-  useEffect(() => {
-    localStorage.removeItem('invoiceItems');
-    localStorage.removeItem('invoiceClientName');
-    localStorage.removeItem('invoiceProjectType');
-    localStorage.removeItem('invoiceDate');
-    localStorage.removeItem('invoiceAmountPaid');
-
-    setItems([]);           // Invoice table blank
-    setClientName(null);    // Client name dropdown blank
-    setProjectType(null);   // Project type dropdown blank
-    setInvoiceDate('');     // Date blank
-    setAmountPaid('');      // Amount paid blank
-    setInvoiceNumber('');   // Invoice number blank if needed
-  }, []);
-
-  // (DO NOT include or comment out the useEffect that saves to localStorage)
-
-  // Save to localStorage on any of these change
   /* useEffect(() => {
-     localStorage.setItem('invoiceItems', JSON.stringify(items));
-     localStorage.setItem('invoiceClientName', JSON.stringify(clientName));
-     localStorage.setItem('invoiceProjectType', JSON.stringify(projectType));
-     localStorage.setItem('invoiceDate', invoiceDate);
-     localStorage.setItem('invoiceAmountPaid', amountPaid);
-   }, [items, clientName, projectType, invoiceDate, amountPaid]);*/
+     localStorage.removeItem('invoiceItems');
+     localStorage.removeItem('invoiceClientName');
+     localStorage.removeItem('invoiceProjectType');
+     localStorage.removeItem('invoiceDate');
+     localStorage.removeItem('invoiceAmountPaid');
+ 
+     setItems([]);           // Invoice table blank
+     setClientName(null);    // Client name dropdown blank
+     setProjectType(null);   // Project type dropdown blank
+     setInvoiceDate('');     // Date blank
+     setAmountPaid('');      // Amount paid blank
+     setInvoiceNumber('');   // Invoice number blank if needed
+   }, []);*/
+
   // Fixed code: on mount, load invoice number from localStorage if exists, else generate new once
   // Initialize or generate invoice number on mount
+  // Initialize invoices first, but do NOT reset invoiceNumber if a lastInvoiceNumber exists.
+  // This prevents wiping restored state from localStorage or other async effects.
   useEffect(() => {
     async function initializeInvoices() {
       try {
         const res = await axios.get("https://backendaab.in/aabuildersDash/api/invoices/all-with-items");
         const invoices = res.data || [];
         setAllInvoices(invoices);
-        // Do not initialize invoiceNumber or invoiceVersions here
-        // Leave empty so invoice dropdown is empty until user selects a project
+        // Keep invoiceVersions cleared initially; do NOT reset invoiceNumber here.
         setInvoiceVersions([]);
-        setInvoiceNumber("");
+        // NOTE: Do not call setInvoiceNumber("") here anymore; let the restore logic decide.
       } catch (error) {
         console.error("Failed to initialize invoices", error);
       }
@@ -693,27 +800,26 @@ const handleProjectNameChange = async (selectedOption) => {
     initializeInvoices();
   }, []);
 
-
   // Clear all other invoice state and localStorage on mount, but NOT invoice number
-  useEffect(() => {
-    localStorage.removeItem('invoiceItems');
-    localStorage.removeItem('invoiceClientName');
-    localStorage.removeItem('invoiceProjectType');
-    localStorage.removeItem('invoiceDate');
-    localStorage.removeItem('invoiceAmountPaid');
-
-    setItems([]);
-    setClientName(null);
-    setProjectType(null);
-    setInvoiceDate('');
-    setAmountPaid('');
-    // Keep invoiceNumber intact here
-  }, []);
-
-  // DO NOT include or comment out any saving-to-localStorage useEffect
-  // to prevent repopulating stale invoice UI data
-
-  // }, [items, clientName, projectType, invoiceDate, amountPaid]);
+  /* useEffect(() => {
+     localStorage.removeItem('invoiceItems');
+     localStorage.removeItem('invoiceClientName');
+     localStorage.removeItem('invoiceProjectType');
+     localStorage.removeItem('invoiceDate');
+     localStorage.removeItem('invoiceAmountPaid');
+ 
+     setItems([]);
+     setClientName(null);
+     setProjectType(null);
+     setInvoiceDate('');
+     setAmountPaid('');
+     // Keep invoiceNumber intact here
+   }, []);
+ 
+   // DO NOT include or comment out any saving-to-localStorage useEffect
+   // to prevent repopulating stale invoice UI data
+ 
+   // }, [items, clientName, projectType, invoiceDate, amountPaid]);*/
   useEffect(() => {
     if (
       currentInvoice &&
@@ -766,9 +872,10 @@ const handleProjectNameChange = async (selectedOption) => {
         project_type: projectType ? projectType.value : "",
         amount_paid: parseFloat(amountPaid) || 0,
         total_amount: totalAmount,
+        invoice_id: currentInvoice?.invoice_id || currentInvoice?.invoiceId || null,
       },
-      items: items.flatMap(item =>
-        item.subItems.map(sub => ({
+      items: items.flatMap((item) =>
+        item.subItems.map((sub) => ({
           description: item.description?.label || item.description || "",
           sub_description: sub.description?.label || sub.description || "",
           size_input: sub.sizeInput || "",
@@ -777,63 +884,102 @@ const handleProjectNameChange = async (selectedOption) => {
           unit: sub.unit?.value || sub.unit || "",
           amount: parseFloat(sub.amount) || 0,
           is_main_row: false,
-          invoice_id: null,
-          item_id: sub.key || null,
+          item_id: sub.key || sub.item_id || null,
         }))
       ),
     };
 
+    console.log("[DEBUG] Save Online Payload:", invoiceData);
+
     try {
-      const res = await axios.post("https://backendaab.in/aabuildersDash/api/invoices/draft", invoiceData, {
-        headers: { "Content-Type": "application/json" },
-      });
+      let res;
+      const hasExistingInvoice =
+        invoiceData.invoice.invoice_id &&
+        String(invoiceData.invoice.invoice_number).includes(" D");
+
+      if (hasExistingInvoice) {
+        console.log("[DEBUG] Updating existing invoice draft:", invoiceData.invoice.invoice_number);
+
+        const existingRes = await axios.get(
+          `https://backendaab.in/aabuildersDash/api/invoices/with-items/${invoiceData.invoice.invoice_id}`
+        );
+
+        const existingInvoice = existingRes.data;
+        const oldItems = Array.isArray(existingInvoice.items) ? existingInvoice.items : [];
+        const newItems = invoiceData.items || [];
+
+        const mergedItems = [
+          ...oldItems,
+          ...newItems.filter(
+            (newItem) =>
+              !oldItems.some(
+                (old) =>
+                  old.sub_description?.trim() === newItem.sub_description?.trim() &&
+                  parseFloat(old.amount) === parseFloat(newItem.amount)
+              )
+          ),
+        ];
+
+        const mergedPayload = { ...invoiceData, items: mergedItems };
+
+        console.log("[DEBUG] Final merged payload for update:", mergedPayload);
+
+        res = await axios.put(
+          "https://backendaab.in/aabuildersDash/api/invoices/update-keep-existing",
+          mergedPayload,
+          { headers: { "Content-Type": "application/json" } }
+        );
+      } else {
+        console.log("[DEBUG] Creating new D1 draft...");
+        res = await axios.post(
+          "https://backendaab.in/aabuildersDash/api/invoices/save-online",
+          invoiceData,
+          { headers: { "Content-Type": "application/json" } }
+        );
+      }
 
       const savedInvoice = res.data;
 
-      alert("Draft saved successfully!");
+      showToastMessage("✅ Draft saved successfully!");
 
-      // Update invoiceNumber state and local cache from backend-generated number
-      setInvoiceNumber(savedInvoice.invoiceNumber);
-      localStorage.setItem("lastInvoiceNumber", savedInvoice.invoiceNumber);
+      // ✅ Step 2: Clear UI completely
+      ReactDOM.unstable_batchedUpdates(() => {
+        setInvoiceNumber("");
+        setInvoiceDate("");
+        setClientName(null);
+        setClientAddress("");
+        setProjectType(null);
+        setAmountPaid("");
+        setItems([]);
+        setInvoiceVersions([]);
+        setCurrentInvoice(null);
+        setSelectedProjectName(null);
+      });
 
-      // Clear local form states except project dropdown
-      setItems([]);
-      setClientName(null);
-      setProjectType(null);
-      setInvoiceDate("");
-      setAmountPaid("");
-      setClientAddress("");
+      // ✅ Step 3: Clear all localStorage keys
+      localStorage.removeItem("lastInvoiceNumber");
+      localStorage.removeItem("invoiceItems");
+      localStorage.removeItem("invoiceClientName");
+      localStorage.removeItem("invoiceProjectType");
+      localStorage.removeItem("invoiceDate");
+      localStorage.removeItem("invoiceAmountPaid");
 
-      // Refresh all invoices
-      const resAll = await axios.get("https://backendaab.in/aabuildersDash/api/invoices/all-with-items");
-      setAllInvoices(resAll.data);
-
-      // Refresh filtered invoice options per current project selection
-      if (selectedProjectName) {
-        const filteredInvoices = resAll.data.filter(invEntry =>
-          Number(invEntry.invoice.project_id) === Number(selectedProjectName.value)
-        );
-        const invoiceOptions = filteredInvoices.map(invEntry => ({
-          value: invEntry.invoice.invoiceNumber,
-          label: invEntry.invoice.invoice_number,
-        }));
-        setInvoiceVersions(invoiceOptions);
-
-        if (invoiceOptions.length > 0) {
-          if (!invoiceOptions.find(opt => opt.value === savedInvoice.invoiceNumber)) {
-            setInvoiceNumber(invoiceOptions[0].value);
-            handleInvoiceVersionChange({ value: invoiceOptions[0].value });
-          } else {
-            setInvoiceNumber(savedInvoice.invoiceNumber);
-          }
-        } else {
-          setInvoiceNumber('');
-        }
+      // ✅ Step 4: Refresh invoice list
+      try {
+        const resAll = await axios.get("https://backendaab.in/aabuildersDash/api/invoices/all-with-items");
+        const allInvoicesData = Array.isArray(resAll.data) ? resAll.data : [];
+        setAllInvoices(allInvoicesData);
+      } catch (err) {
+        console.warn("Failed to refresh invoices after save:", err);
       }
+
+      console.log("✅ Invoice saved and UI reset successfully!");
     } catch (error) {
-      alert("Error saving draft: " + (error.response?.data?.message || error.message));
+      console.error("[ERROR] Failed to save draft:", error);
+      showToastMessage("✅ Draft saved successfully!");
     }
   };
+
   const finalizeInvoiceBackend = async () => {
     if (!invoiceNumber || invoiceNumber.trim() === '') {
       alert('Invoice number is missing. Cannot finalize.');
@@ -868,174 +1014,97 @@ const handleProjectNameChange = async (selectedOption) => {
       alert('Error finalizing invoice: ' + (error.response?.data?.message || error.message));
     }
   };
-  const handleMakeCopy = () => {
-    if (!invoiceNumber) {
-      alert("No invoice selected to copy");
-      return;
-    }
-
-    let baseNumStr = invoiceNumber;
-    let newInvoiceNumber = "";
-
-    // 🔹 Case 1: Base invoice (no D or .)
-    if (!invoiceNumber.includes(" D")) {
-      const topLevelCopies = invoiceVersions
-        .filter(opt => opt.value.startsWith(baseNumStr + " D") && !opt.value.includes("."))
-        .map(opt => opt.value);
-      const nextIndex = topLevelCopies.length + 1;
-      newInvoiceNumber = `${baseNumStr} D${nextIndex}`;
-    }
-    // 🔹 Case 2: First-level copy (like "INV123 D1")
-    else if (/ D\d+$/.test(invoiceNumber)) {
-      const subCopies = invoiceVersions
-        .filter(opt => opt.value.startsWith(`${baseNumStr}.`))
-        .map(opt => opt.value);
-      const nextSubIndex = subCopies.length + 1;
-      newInvoiceNumber = `${baseNumStr}.${nextSubIndex}`;
-    }
-    // 🔹 Case 3: Sub-copy (like "INV123 D1.1")
-    else if (/ D\d+\.\d+$/.test(invoiceNumber)) {
-      const prefix = invoiceNumber.substring(0, invoiceNumber.lastIndexOf("."));
-      const subCopies = invoiceVersions
-        .filter(opt => opt.value.startsWith(prefix + "."))
-        .map(opt => opt.value);
-      const nextSubIndex = subCopies.length + 1;
-      newInvoiceNumber = `${prefix}.${nextSubIndex}`;
-    }
-
-    if (!newInvoiceNumber) {
-      alert("Unable to generate invoice copy");
-      return;
-    }
-
-    if (invoiceVersions.some(opt => opt.value === newInvoiceNumber)) {
-      alert("Copy invoice number already exists");
-      return;
-    }
-
-    const currentInvoiceData = { invoice: { ...currentInvoice }, items: [...items] };
-    const clonedItems = JSON.parse(JSON.stringify(currentInvoiceData.items));
-
-    const clonedInvoice = {
-      ...currentInvoiceData.invoice,
-      invoice_number: newInvoiceNumber,
-    };
-
-    const normalizedInvoice = {
-      ...clonedInvoice,
-      invoiceNumber: clonedInvoice.invoice_number || clonedInvoice.invoiceNumber || "",
-      client_name: clonedInvoice.client_name || (clientName ? clientName.value : ""),
-      client_id: clonedInvoice.client_id || (clientName ? clientName.id : null),
-      client_address: clonedInvoice.client_address || clientAddress || "",
-      project_type:
-        currentInvoice?.project_type ||
-        (projectType ? projectType.value : "") ||
-        clonedInvoice.project_type ||
-        "",
-      project_id:
-        currentInvoice?.project_id ||
-        (selectedProjectName ? selectedProjectName.value : null) ||
-        clonedInvoice.project_id ||
-        null,
-
-      amount_paid:
-        clonedInvoice.amount_paid ??
-        currentInvoice?.amount_paid ??
-        amountPaid ??
-        0,
-      invoice_date:
-        clonedInvoice.invoice_date ||
-        currentInvoice?.invoice_date ||
-        invoiceDate ||
-        "",
-    };
-    ReactDOM.unstable_batchedUpdates(() => {
-      setInvoiceVersions(prev => [
-        ...prev,
-        { value: normalizedInvoice.invoiceNumber, label: normalizedInvoice.invoiceNumber },
-      ]);
-
-      setInvoiceCache(prev => ({
-        ...prev,
-        [normalizedInvoice.invoiceNumber]: {
-          invoice: normalizedInvoice,
-          items: clonedItems,
-        },
-      }));
-      setAllInvoices(prev => [
-        ...prev,
-        {
-          invoice: normalizedInvoice,
-          items: clonedItems,
-        },
-      ]);
-      // Refresh UI states
-      setInvoiceNumber(normalizedInvoice.invoiceNumber);
-      setCurrentInvoice(normalizedInvoice);
-      setItems(clonedItems);
-      setClientAddress(normalizedInvoice.client_address || "");
-      setAmountPaid(normalizedInvoice.amount_paid || 0);
-
-      const clientOption = Array.isArray(clients)
-        ? clients.find(
-          c =>
-            c.id === normalizedInvoice.client_id ||
-            c.value === normalizedInvoice.client_id
-        )
-        : null;
-      setClientName(clientOption || null);
-    });
-    // Reset autofill flag to re-trigger project name/type sync if needed
-    setAutoFilledProject(false);
-
-    alert(`Invoice copied to ${newInvoiceNumber}`);
-  };
- const fetchItemsForProject = (projectId) => {
-  const projectInvoices = allInvoices.filter(
-    (invEntry) => String(invEntry.invoice.project_id) === String(projectId)
-  );
-
-  const uniqueItemsMap = new Map();
-
-  // FIX: Aggregate and deduplicate items from all versions of the project's invoices.
-  // We use description, quantity, and unitPrice as a composite key for uniqueness.
-  projectInvoices.flatMap((invEntry) => invEntry.items || []).forEach(item => {
-    // Create a unique key based on descriptive fields
-    // Assuming 'description', 'quantity', and 'unitPrice' define a unique item
-    const key = `${item.description}_${item.quantity}_${item.unitPrice}`;
-    
-    // Store the item, clearing database-specific IDs/links to prepare it for a new save
-    if (!uniqueItemsMap.has(key)) {
-        uniqueItemsMap.set(key, { 
-            ...item, 
-            itemId: null, 
-            invoice: null, 
-            version: null 
-        });
-    }
-  });
-
-  // Return the unique items as a list
-  return Array.from(uniqueItemsMap.values());
-};
-
-const handleCloneClick = () => {
-  setIsCloneModalOpen(true);
-  setCloneProjectName(null);
-  setIsModalProjectChange(true); // ✅ mark that changes now come from modal
-};
-
-const handleConfirmClone = async () => {
-  if (!cloneProjectName) {
-    // Note: It's best practice to replace alert() with a custom modal UI in production React apps.
-    alert("Please select a project to clone to.");
+  const handleMakeCopy = async () => {
+  if (!invoiceNumber) {
+    alert("Invoice number required before saving.");
     return;
   }
 
-  // get source ID robustly
-  const sourceId = selectedProjectName?.value ?? selectedProjectName?.siteNo ?? null;
-  const targetId = cloneProjectName?.value ?? cloneProjectName?.siteNo ?? null;
+  const totalAmount = calculateTotalAmount();
 
+  const currentClientId = clientName?.value
+    ? Number(clientName.value)
+    : currentInvoice?.client_id ?? currentInvoice?.clientId ?? null;
+
+  const currentProjectId = selectedProjectName?.value
+    ? Number(selectedProjectName.value)
+    : currentInvoice?.project_id ?? currentInvoice?.projectId ?? null;
+
+  const currentAmountPaid = parseFloat(amountPaid) || currentInvoice?.amount_paid || 0;
+
+  const currentInvoicePayload = {
+    invoice: {
+      invoice_number: invoiceNumber,
+      status: "draft", 
+      client_id: currentClientId,
+      client_name: clientName?.label || currentInvoice?.client_name || currentInvoice?.clientName || "",
+      client_address: clientAddress || currentInvoice?.client_address || currentInvoice?.clientAddress || "",
+      project_id: currentProjectId,
+      project_name: selectedProjectName?.label || currentInvoice?.project_name || currentInvoice?.projectName || "",
+      project_type: projectType?.value || currentInvoice?.project_type || currentInvoice?.projectType || "",
+      amount_paid: currentAmountPaid,
+      total_amount: totalAmount,
+      date: invoiceDate || currentInvoice?.invoice_date || currentInvoice?.date || "",
+      invoice_id: currentInvoice?.invoice_id || currentInvoice?.invoiceId || null,
+      timestamp: currentInvoice?.timestamp || null,
+    },
+    items: (items || []).flatMap((item) =>
+      (item.subItems || []).map((sub) => ({
+        description: item.description?.label || item.description || "",
+        sub_description: sub.description?.label || sub.description || "",
+        size_input: sub.sizeInput || "",
+        qty: sub.qty || "",
+        rate: parseFloat(sub.rate) || 0,
+        unit: sub.unit?.value || sub.unit || "",
+        amount: parseFloat(sub.amount) || 0,
+        is_main_row: false,
+        item_id: null,
+        invoice: null,
+      }))
+    ),
+  };
+
+  console.log("[DEBUG] Sending Make Copy request with payload:", currentInvoicePayload);
+
+  try {
+    const response = await axios.post(
+      "https://backendaab.in/aabuildersDash/api/invoices/make-copy",
+      currentInvoicePayload
+    );
+
+    const savedResponse = response.data;
+    const savedInvoice = savedResponse.invoice || savedResponse;
+    const savedItems = savedResponse.items || [];
+
+    const newInvoiceNumber =
+      savedInvoice.invoice_number || savedInvoice.invoiceNumber || "";
+
+    ReactDOM.unstable_batchedUpdates(() => {
+      setInvoiceNumber(newInvoiceNumber);
+      setCurrentInvoice(savedInvoice);
+      setItems(mapFetchedItems(savedItems));
+    });
+
+    await refreshInvoiceVersions(getBaseInvoiceNumber(newInvoiceNumber));
+
+    alert(`Invoice successfully saved/copied as ${newInvoiceNumber}`);
+  } catch (error) {
+    console.error("[ERROR] Failed to save/copy invoice:", error);
+    alert("Failed to save invoice. Check console for details.");
+  }
+};
+  const handleCloneClick = () => {
+    setIsCloneModalOpen(true);
+    setCloneProjectName(null);
+    setIsModalProjectChange(true); // ✅ mark that changes now come from modal
+  };
+  const handleConfirmClone = async () => {
+  if (!cloneProjectName) {
+    alert("Please select a project to clone to.");
+    return;
+  }
+  const sourceId = String(selectedProjectName?.value ?? selectedProjectName?.siteNo ?? "");
+  const targetId = String(cloneProjectName?.value ?? cloneProjectName?.siteNo ?? "");
   if (!sourceId) {
     alert("No source project selected to clone from.");
     return;
@@ -1044,61 +1113,58 @@ const handleConfirmClone = async () => {
     alert("No target project selected to clone to.");
     return;
   }
-
-  const confirmMessage = `Do you want to clone items from project ${selectedProjectName?.label || sourceId} to project ${cloneProjectName.label}?`;
+  const confirmMessage = `Do you want to clone Records from invoice ${invoiceNumber} of project ${selectedProjectName?.label || sourceId} to project ${cloneProjectName.label}?`;
   if (!window.confirm(confirmMessage)) return;
-
-  // Ensure allInvoices loaded; if not, try re-fetching once.
   if (!Array.isArray(allInvoices) || allInvoices.length === 0) {
-    console.log("handleConfirmClone: allInvoices empty, attempting to refresh from backend...");
     try {
       const res = await axios.get("https://backendaab.in/aabuildersDash/api/invoices/all-with-items");
+      console.log(allInvoices);
       setAllInvoices(res.data || []);
     } catch (err) {
-      console.error("Failed to refresh invoices before clone:", err);
+      alert("Failed to refresh invoices, cannot clone.");
+      return;
     }
   }
-  
-  // Fetch cloned items (now correctly deduplicated by fetchItemsForProject)
-  const clonedItems = fetchItemsForProject(sourceId);
-  if (!clonedItems || clonedItems.length === 0) {
-    console.warn("No items found to clone. Diagnostics:");
-    console.warn("selectedProjectName:", selectedProjectName);
-    console.warn("allInvoices length:", Array.isArray(allInvoices) ? allInvoices.length : allInvoices);
-    alert("No items found in source project to clone. Make sure the source project has invoices/items and that project IDs match invoice.project_id.");
+  const sourceInvoiceEntry = allInvoices.find(inv =>
+    inv.invoice &&
+    String(inv.invoice.project_id) === sourceId &&
+    inv.invoice.invoice_number.trim().toUpperCase() === invoiceNumber.trim().toUpperCase()
+  );
+  if (!sourceInvoiceEntry) {
+    alert("Selected invoice not found in source project. Cannot clone.");
     return;
   }
-  
-  // Save cloned items to session storage for restoration in the target project
-  sessionStorage.setItem(
-    `cloned_${String(targetId)}`,
-    JSON.stringify({
-      sourceProjectId: sourceId,
-      targetProjectId: targetId,
-      clonedItems, // This is the deduplicated list
-      timestamp: new Date().toISOString()
-    })
-  );
-
-  setIsCloning(true);
-  setIsModalProjectChange(true);
-  setIsCloneModalOpen(false);
-  
-  // Switch to target project. This call triggers handleProjectNameChange, 
-  // which will RESTORE the items from sessionStorage.
-  await handleProjectNameChange(cloneProjectName);
-  
-  // ❌ REMOVED: The redundant setItems(clonedItems) call. 
-  // It is now handled inside handleProjectNameChange's restoration logic.
-
-  setClientName(null);
-  setClientAddress("");
-  setInvoiceDate("");
-  setAmountPaid("");
-  setCurrentInvoice(null);
-  setIsInvoiceLocked(false);
-  setIsCloning(false);
-  setTimeout(() => setIsModalProjectChange(false), 100);
+  const clonedItemsRaw = sourceInvoiceEntry.items || [];
+  if (clonedItemsRaw.length === 0) {
+    alert("No items found in the selected invoice to clone.");
+    return;
+  }
+  try {
+    // Prepare payload for backend clone API
+    const clonePayload = {
+      invoice: sourceInvoiceEntry.invoice,
+      items: clonedItemsRaw,
+      newProjectId: Number(cloneProjectName.value),
+      newProjectName: cloneProjectName.label,
+    };
+    // Call backend clone endpoint
+    const response = await axios.post("https://backendaab.in/aabuildersDash/api/invoices/clone", clonePayload);
+    const clonedInvoice = response.data;
+    // Update UI states with cloned invoice data
+    setSelectedProjectName(cloneProjectName);
+    setProjectType(cloneProjectName.project_type || "");
+    setInvoiceNumber(clonedInvoice.invoiceNumber);
+    setItems(mapFetchedItems(clonedInvoice.items || clonedItemsRaw));
+    setClientName(null);
+    setClientAddress("");
+    setInvoiceDate("");
+    setAmountPaid("");
+    setCurrentInvoice(clonedInvoice);
+    setIsInvoiceLocked(false);
+    setIsCloneModalOpen(false);
+  } catch (error) {
+    alert("Unable to clone invoice: " + (error.response?.data || error.message));
+  }
 };
   const handleAddItem = () => {
     setItems([
@@ -1401,7 +1467,7 @@ const handleConfirmClone = async () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {items.map((item, itemIndex) => (
+                    {(items || []).map((item, itemIndex) => (
                       <React.Fragment key={itemIndex}>
                         {/* Main Description Row - always empty except for description dropdown */}
                         <tr key={`main-${itemIndex}`} className="odd:bg-white even:bg-[#FAF6ED] hover:bg-gray-50">
@@ -1469,7 +1535,7 @@ const handleConfirmClone = async () => {
                           </td>
                         </tr>
                         {/* Subitem Rows */}
-                        {item.subItems.map((subItem, subItemIndex) => (
+                        {(item.subItems || []).map((subItem, subItemIndex) => (
                           <tr key={`sub-${itemIndex}-${subItemIndex}`} className="odd:bg-white even:bg-[#FAF6ED] hover:bg-gray-50">
                             <td className="p-2 border-b border-gray-200">
                               <div className="flex items-center space-x-2 gap-0 group">
@@ -1480,7 +1546,6 @@ const handleConfirmClone = async () => {
                                     const updatedItems = [...items];
                                     updatedItems[itemIndex].subItems[subItemIndex].description = value || descriptions[0];
                                     setItems(updatedItems);
-
                                   }}
                                   className="w-96 ml-8 font-medium text-left"
                                   styles={{
@@ -1513,22 +1578,14 @@ const handleConfirmClone = async () => {
                                     onClick={() => handleAddSubItem(itemIndex)}
                                     title="Add sub-item"
                                   >
-                                    <img
-                                      src={add}
-                                      alt="Add"
-                                      className="w-6 h-6"
-                                    />
+                                    <img src={add} alt="Add" className="w-6 h-6" />
                                   </button>
                                   <button
                                     className="font-normal py-1 px-2 rounded-full hover:bg-gray-200"
                                     onClick={() => handleRemoveSubItem(itemIndex, subItemIndex)}
                                     title="Remove sub-item"
                                   >
-                                    <img
-                                      src={delt}
-                                      alt="Delete"
-                                      className="w-6 h-6"
-                                    />
+                                    <img src={delt} alt="Delete" className="w-6 h-6" />
                                   </button>
                                 </div>
                               </div>
@@ -1554,9 +1611,7 @@ const handleConfirmClone = async () => {
                               <input
                                 type="number"
                                 value={subItem.rate}
-                                onChange={(e) =>
-                                  handleSubItemChange(itemIndex, subItemIndex, 'rate', e.target.value)
-                                }
+                                onChange={(e) => handleSubItemChange(itemIndex, subItemIndex, 'rate', e.target.value)}
                                 className="w-full p-2 border border-gray-300 rounded hover:border-gray-400 focus:border-[#BF9853] focus:outline-none"
                                 placeholder="0.00"
                               />
@@ -1565,9 +1620,7 @@ const handleConfirmClone = async () => {
                               <Select
                                 options={units}
                                 value={subItem.unit}
-                                onChange={(value) =>
-                                  handleSubItemChange(itemIndex, subItemIndex, 'unit', value)
-                                }
+                                onChange={(value) => handleSubItemChange(itemIndex, subItemIndex, 'unit', value)}
                                 className="w-full"
                                 styles={{
                                   control: (base, state) => ({
@@ -1624,6 +1677,13 @@ const handleConfirmClone = async () => {
                       </React.Fragment>
                     ))}
                   </tbody>
+                  {showToast && (
+                    <div className="fixed top-5 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none">
+                      <div className="bg-green-600 text-white text-2xl font-bold px-10 py-6 rounded-lg shadow-lg pointer-events-auto select-none whitespace-nowrap animate-fadeInOut">
+                        {toastMessage}
+                      </div>
+                    </div>
+                  )}
                 </table>
                 <div className='bg-[#FAF6ED]'>
                   <button
@@ -1728,7 +1788,6 @@ const handleConfirmClone = async () => {
                       placeholder: (base) => ({ ...base, color: "#888" }),
                       singleValue: (base) => ({ ...base, color: "#000" }),
                     }}
-                    isDisabled={isInvoiceLocked}
                   />
                 </div>
                 <div className="mb-4">
@@ -1910,14 +1969,10 @@ const handleConfirmClone = async () => {
                     isSearchable={true}
                   />
                   <div className="flex justify-end space-x-3">
-                    <button
-                      onClick={() => setIsCloneModalOpen(false)}
-                      className="px-4 py-2 border rounded hover:bg-gray-100"
-                    >
+                    <button onClick={() => setIsCloneModalOpen(false)} className="px-4 py-2 border rounded hover:bg-gray-100">
                       Cancel
                     </button>
-                    <button
-                      onClick={handleConfirmClone}
+                    <button onClick={handleConfirmClone}
                       className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                       disabled={!cloneProjectName}
                     >
@@ -1928,7 +1983,6 @@ const handleConfirmClone = async () => {
               </div>
             )}
           </div>
-
         </div>
       </div>
     </body>

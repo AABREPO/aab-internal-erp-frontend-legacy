@@ -30,7 +30,7 @@ const PurchaseHeading = ({ username, userRoles = [] }) => {
     };
 
     return (
-        <div className="bg-[#FAF6ED]">
+        <div className="bg-[#FAF6ED] w-full h-screen">
             <div className="topbar-title">
                 <h2
                     className={`link ${activeTab === 'purchaseorder' ? 'active' : ''}`}

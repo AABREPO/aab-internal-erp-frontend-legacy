@@ -4,6 +4,7 @@ import Edit from '../Images/Edit.svg';
 import Delete from '../Images/Delete.svg';
 import history from '../Images/History.svg';
 import Filter from '../Images/filter (3).png';
+import Change from '../Images/dropdownchange.png';
 import Select from 'react-select';
 import download from '../Images/file_download.png'
 import NotesStart from '../Images/notes _start.png';
@@ -32,18 +33,43 @@ function cleanUrl(url) {
 const History = ({ username, userRoles = [] }) => {
     const [expenses, setExpenses] = useState([]);
     const [payments, setPayments] = useState([]);
-    const [newExpense, setNewExpense] = useState({ date: "", contractor: "", vendor: "", project: "", type: "", amount: "" });
+    const [newExpense, setNewExpense] = useState({
+        date: "",
+        contractor: "",
+        vendor: "",
+        project: "",
+        project_id: "",
+        contractor_id: "",
+        vendor_id: "",
+        employee_id: "",
+        type: "",
+        amount: "",
+        client_name: "",
+        client_id: "",
+    });
     const [newPayment, setNewPayment] = useState({ date: "", amount: "", type: "Weekly" });
     const [weeks, setWeeks] = useState([]);
     const [vendorOptions, setVendorOptions] = useState([]);
     const [contractorOptions, setContractorOptions] = useState([]);
     const [siteOptions, setSiteOptions] = useState([]);
     const [combinedOptions, setCombinedOptions] = useState([]);
+    const [clientOptions, setClientOptions] = useState([]);
+    const [clientProjectOptions, setClientProjectOptions] = useState([]);
+    const [clientProjectMap, setClientProjectMap] = useState({});
+    const [projectIdToClientName, setProjectIdToClientName] = useState({});
+    const [isClientToggleActive, setIsClientToggleActive] = useState(false);
+    const [selectedClient, setSelectedClient] = useState(null);
+    const [selectedContractor, setSelectedContractor] = useState(null);
+    const [selectedVendor, setSelectedVendor] = useState(null);
+    const [selectedEmployee, setSelectedEmployee] = useState(null);
+    const [selectedProjectName, setSelectedProjectName] = useState(null);
+    const [selectedProjectOption, setSelectedProjectOption] = useState(null);
+    const [projectId, setProjectId] = useState('');
     const [vendorId, setVendorId] = useState('');
     const [contractorId, setContractorId] = useState('');
-    const [projectId, setProjectId] = useState('');
     const [selectedWeek, setSelectedWeek] = useState("");
     const [editingRowId, setEditingRowId] = useState('');
+    const [editingOriginalRow, setEditingOriginalRow] = useState(null);
     const [employeeOptions, setEmployeeOptions] = useState([]);
     const [editingPaymentId, setEditingPaymentId] = useState('');
     const [showWeeklyPaymentExpensesModal, setShowWeeklyPaymentExpensesModal] = useState(false);
@@ -93,6 +119,8 @@ const History = ({ username, userRoles = [] }) => {
         amount: "",
         advance_portal_id: "",
         staff_advance_portal_id: "",
+        client_name: "",
+        client_id: "",
         description: "",
     });
     // Click and drag scrolling functionality
@@ -224,6 +252,38 @@ const History = ({ username, userRoles = [] }) => {
             console.error("Error formatting date:", error);
             return "";
         }
+    };
+    const buildClientKey = (name = "", father = "", mobile = "") => {
+        const normalizedName = (name || "").trim().toLowerCase();
+        if (!normalizedName) return "";
+        const normalizedFather = (father || "").trim().toLowerCase();
+        const normalizedMobile = (mobile || "").trim();
+        return `${normalizedName}|${normalizedFather}|${normalizedMobile}`;
+    };
+    const getClientName = (entry) => {
+        if (!entry) return "";
+        if (entry.client_name) return entry.client_name;
+        if (entry.client_id) {
+            const option = clientOptions.find(opt => String(opt.clientId || opt.id) === String(entry.client_id));
+            if (option) return option.label;
+        }
+        if (entry.project_id) {
+            const mapped = projectIdToClientName[String(entry.project_id)];
+            if (mapped) return mapped;
+        }
+        return "";
+    };
+    const getClientOption = (clientId, clientName) => {
+        if (!clientOptions.length) return null;
+        if (clientId) {
+            const byId = clientOptions.find(opt => String(opt.clientId || opt.id) === String(clientId));
+            if (byId) return byId;
+        }
+        if (clientName) {
+            const byName = clientOptions.find(opt => opt.label === clientName);
+            if (byName) return byName;
+        }
+        return null;
     };
     useEffect(() => {
         fetchWeeklyType();
@@ -529,9 +589,21 @@ const History = ({ username, userRoles = [] }) => {
     }, []);
     useEffect(() => { setCombinedOptions([...vendorOptions, ...contractorOptions, ...employeeOptions]); }, [vendorOptions, contractorOptions, employeeOptions]);
     useEffect(() => {
+        const predefinedSiteOptions = [
+            { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
+            { value: "Material Advance", label: "Material Advance", id: 2, sNo: "2" },
+            { value: "Weekly Advance", label: "Weekly Advance", id: 3, sNo: "3" },
+            { value: "Excess Advance", label: "Excess Advance", id: 4, sNo: "4" },
+            { value: "Material Rent", label: "Material Rent", id: 5, sNo: "5" },
+            { value: "Subhash Kumar - Kunnur", label: "Subhash Kumar - Kunnur", id: 6, sNo: "6" },
+            { value: "Summary Bill", label: "Summary Bill", id: 7, sNo: "7" },
+            { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
+            { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
+            { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
+        ];
         const fetchSites = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+                const response = await fetch("https://backendaab.in/aabuilderDash/api/projects/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -542,71 +614,82 @@ const History = ({ username, userRoles = [] }) => {
                     throw new Error("Network response was not ok: " + response.statusText);
                 }
                 const data = await response.json();
-                const formattedData = data.map(item => ({
-                    value: item.siteName,
-                    label: item.siteName,
-                    id: item.id,
-                    sNo: item.siteNo
-                }));
-                const predefinedSiteOptions = [
-                    {
-                        value: "Mason Advance",
-                        label: "Mason Advance",
-                        id: 1,
-                        sNo: "1"
-                    },
-                    {
-                        value: "Material Advance",
-                        label: "Material Advance",
-                        id: 2,
-                        sNo: "2"
-                    },
-                    {
-                        value: "Weekly Advance",
-                        label: "Weekly Advance",
-                        id: 3,
-                        sNo: "3"
-                    },
-                    {
-                        value: "Excess Advance",
-                        label: "Excess Advance",
-                        id: 4,
-                        sNo: "4"
-                    },
-                    {
-                        value: "Material Rent",
-                        label: "Material Rent",
-                        id: 5,
-                        sNo: "5"
-                    },
-                    {
-                        value: "Subhash Kumar - Kunnur",
-                        label: "Subhash Kumar - Kunnur",
-                        id: 6,
-                        sNo: "6"
-                    },
-                    {
-                        value: "Summary Bill",
-                        label: "Summary Bill",
-                        id: 7,
-                        sNo: "7"
-                    },
-                    {
-                        value: "Daily Wage",
-                        label: "Daily Wage",
-                        id: 8,
-                        sNo: "8"
-                    }
-                ];
-                // Combine backend data with predefined options
-                const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
+                const projectClientMapTemp = {};
+                const projectClientNameTemp = {};
+                const projectOptions = Array.isArray(data)
+                    ? data.map((project, index) => {
+                        const label = (project.projectName || project.projectReferenceName || `Project ${project.projectId || project.id || index + 1}`).trim();
+                        const rawId = project.id ?? project.projectId ?? (100000 + index);
+                        const optionId = Number(rawId);
+                        const option = {
+                            value: label,
+                            label,
+                            id: optionId,
+                            sNo: project.projectId || ""
+                        };
+                        const ownerCandidates = Array.isArray(project?.ownerDetailsList)
+                            ? project.ownerDetailsList
+                            : Array.isArray(project?.ownerDetails)
+                                ? project.ownerDetails
+                                : [];
+                        ownerCandidates.forEach((owner) => {
+                            const key = buildClientKey(owner?.clientName, owner?.fatherName, owner?.mobile);
+                            if (!key) return;
+                            if (!projectClientMapTemp[key]) {
+                                projectClientMapTemp[key] = {
+                                    name: owner?.clientName || "",
+                                    fatherName: owner?.fatherName || "",
+                                    mobile: owner?.mobile || "",
+                                    clientId: owner?.id || key,
+                                    projects: [],
+                                };
+                            }
+                            projectClientMapTemp[key].projects.push(option);
+                            if (!projectClientNameTemp[optionId]) {
+                                projectClientNameTemp[optionId] = owner?.clientName || "";
+                            }
+                        });
+                        if (!projectClientNameTemp[optionId]) {
+                            projectClientNameTemp[optionId] = "";
+                        }
+                        return option;
+                    })
+                    : [];
+                const combinedSiteOptions = [...predefinedSiteOptions, ...projectOptions];
                 setSiteOptions(combinedSiteOptions);
+                setProjectIdToClientName(projectClientNameTemp);
+                setClientProjectMap(projectClientMapTemp);
+                const clientOptionList = Object.entries(projectClientMapTemp).map(([key, value]) => ({
+                    value: value.name,
+                    label: value.name,
+                    id: value.clientId,
+                    clientId: value.clientId,
+                    fatherName: value.fatherName,
+                    mobile: value.mobile,
+                    projects: value.projects,
+                    compositeKey: key,
+                }));
+                setClientOptions(clientOptionList);
             } catch (error) {
                 console.error("Fetch error: ", error);
+                setSiteOptions(predefinedSiteOptions);
+                setClientOptions([]);
+                setClientProjectMap({});
+                setProjectIdToClientName({});
             }
         };
         fetchSites();
     }, []);
+    useEffect(() => {
+        if (!isClientToggleActive) return;
+        if (clientProjectOptions.length === 1) {
+            const onlyProject = clientProjectOptions[0];
+            setSelectedProjectName(onlyProject);
+            setSelectedProjectOption(onlyProject);
+            setProjectId(onlyProject.id);
+            setNewExpense((prev) => ({ ...prev, project_id: onlyProject.id }));
+        }
+    }, [clientProjectOptions, isClientToggleActive]);
 
     useEffect(() => {
         const fetchWeeks = async () => {
@@ -695,6 +778,15 @@ const History = ({ username, userRoles = [] }) => {
     const getSiteName = (id) =>
         siteOptions.find(s => String(s.id) === String(id))?.value || "";
 
+    const getPartyDisplayName = (entry) => {
+        const client = getClientName(entry);
+        if (client) return client;
+        if (entry.vendor_id) return getVendorName(entry.vendor_id);
+        if (entry.contractor_id) return getContractorName(entry.contractor_id);
+        if (entry.employee_id) return getEmployeeName(entry.employee_id);
+        return "";
+    };
+
     // Filtered data based on selected filters
     const filteredExpenses = expenses.filter((entry) => {
         // Date filter (exact match since it's type="date")
@@ -709,10 +801,7 @@ const History = ({ username, userRoles = [] }) => {
         }
         // Contractor/Vendor filter
         if (selectContractororVendorName) {
-            const name =
-                entry.vendor_id
-                    ? getVendorName(entry.vendor_id)
-                    : getContractorName(entry.contractor_id) || getEmployeeName(entry.employee_id);
+            const name = getPartyDisplayName(entry);
             if (name.toLowerCase() !== selectContractororVendorName.toLowerCase())
                 return false;
         }
@@ -730,22 +819,16 @@ const History = ({ username, userRoles = [] }) => {
     });
 
     const contractorVendorFilterOptions = React.useMemo(() => {
-        const ids = new Set();
+        const labels = new Set();
         return filteredExpenses.map(exp => {
-            const option =
-                combinedOptions.find(
-                    opt =>
-                        (opt.type === "Contractor" && opt.id === Number(exp.contractor_id)) ||
-                        (opt.type === "Vendor" && opt.id === Number(exp.vendor_id)) ||
-                        (opt.type === "Employee" && opt.id === Number(exp.employee_id))
-                );
-            if (option && !ids.has(option.id)) {
-                ids.add(option.id);
-                return { value: option.label, label: option.label };
+            const label = getPartyDisplayName(exp);
+            if (label && !labels.has(label)) {
+                labels.add(label);
+                return { value: label, label };
             }
             return null;
         }).filter(Boolean);
-    }, [filteredExpenses, combinedOptions]);
+    }, [filteredExpenses, combinedOptions, clientOptions, projectIdToClientName]);
 
     const projectFilterOptions = React.useMemo(() => {
         const ids = new Set();
@@ -774,6 +857,28 @@ const History = ({ username, userRoles = [] }) => {
         }
         setNewExpense((prev) => ({ ...prev, [name]: value }));
     };
+    const handlePartySourceToggle = () => {
+        setIsClientToggleActive((prev) => !prev);
+        setSelectedClient(null);
+        setClientProjectOptions([]);
+        setSelectedProjectName(null);
+        setSelectedProjectOption(null);
+        setSelectedContractor(null);
+        setSelectedVendor(null);
+        setSelectedEmployee(null);
+        setNewExpense((prev) => ({
+            ...prev,
+            client_name: "",
+            client_id: "",
+            project_id: "",
+            contractor_id: "",
+            vendor_id: "",
+            employee_id: "",
+        }));
+        setVendorId('');
+        setContractorId('');
+        setProjectId('');
+    };
     useEffect(() => {
         const handleWheel = (event) => {
             if (document.activeElement.type === "number") {
@@ -788,49 +893,190 @@ const History = ({ username, userRoles = [] }) => {
         };
     }, []);
 
+    const updateLoanPortalEntry = async (loanPortalId, { date, amount, vendorId, contractorId, employeeId, projectId }) => {
+        if (!loanPortalId) return;
+        const payload = {
+            type: "Loan",
+            date,
+            amount,
+            loan_payment_mode: "Cash",
+            loan_refund_amount: 0,
+            from_purpose_id: 0,
+            transfer_Project_id: 0,
+            to_purpose_id: 0,
+            vendor_id: vendorId || 0,
+            contractor_id: contractorId || 0,
+            employee_id: employeeId || 0,
+            project_id: projectId || 0,
+            description: "",
+            file_url: ""
+        };
+        const response = await fetch(
+            `https://backendaab.in/aabuildersDash/api/loans/${loanPortalId}?editedBy=${encodeURIComponent(username)}`,
+            {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            }
+        );
+        if (!response.ok) {
+            throw new Error("Failed to update Loan Portal entry");
+        }
+        return response.json();
+    };
+    const clearLoanPortalEntry = async (loanPortalId, date) => {
+        if (!loanPortalId) return;
+        const payload = {
+            loanPortalId,
+            type: "",
+            date,
+            amount: 0,
+            loan_refund_amount: 0,
+            loan_payment_mode: "",
+            from_purpose_id: 0,
+            to_purpose_id: 0,
+            vendor_id: 0,
+            contractor_id: 0,
+            employee_id: 0,
+            project_id: 0,
+            transfer_Project_id: 0,
+            entry_no: 0,
+            description: "",
+        };
+        const response = await fetch(
+            `https://backendaab.in/aabuildersDash/api/loans/${loanPortalId}?editedBy=${encodeURIComponent(username)}`,
+            {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            }
+        );
+        if (!response.ok) {
+            throw new Error("Failed to clear Loan Portal entry");
+        }
+        return response.json();
+    };
+    const createLoanPortalEntry = async ({ date, amount, vendorId, contractorId, employeeId, projectId }) => {
+        const payload = {
+            type: "Loan",
+            date,
+            amount,
+            loan_payment_mode: "Cash",
+            loan_refund_amount: 0,
+            from_purpose_id: 0,
+            transfer_Project_id: 0,
+            to_purpose_id: 0,
+            vendor_id: vendorId || 0,
+            contractor_id: contractorId || 0,
+            employee_id: employeeId || 0,
+            project_id: projectId || 0,
+            description: "Loan from Cash Register",
+            file_url: ""
+        };
+        const response = await fetch(
+            "https://backendaab.in/aabuildersDash/api/loans/save",
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            }
+        );
+        if (!response.ok) {
+            throw new Error("Failed to save Loan Portal entry");
+        }
+        return response.json();
+    };
+
     const handlePaymentChange = (e) => {
         const { name, value } = e.target;
         setNewPayment((prev) => ({ ...prev, [name]: value }));
     };
     const handleKeyDown = async (e) => {
-        if (e.key === "Enter") {
+        if (e.key !== "Enter") return;
+        if (!newExpense.date) {
+            alert("Please select a date");
+            return;
+        }
+        if (!selectedProjectName || !newExpense.type || !newExpense.amount) {
+            alert("Please fill all fields except date");
+            return;
+        }
+        const payload = {
+            date: newExpense.date,
+            created_at: new Date().toISOString(),
+            contractor_id: selectedContractor ? Number(selectedContractor.id) : null,
+            vendor_id: selectedVendor ? Number(selectedVendor.id) : null,
+            employee_id: selectedEmployee ? Number(selectedEmployee.id) : null,
+            project_id: selectedProjectName ? Number(selectedProjectName.id) : null,
+            client_name: selectedClient?.label || newExpense.client_name || null,
+            client_id: selectedClient?.id || newExpense.client_id || null,
+            type: newExpense.type,
+            amount: Number(newExpense.amount),
+            status: false,
+            weekly_number: Number(selectedWeek),
+            period_start_date: new Date().toISOString().split("T")[0],
+            period_end_date: new Date().toISOString().split("T")[0],
+            advance_portal_id: null,
+            staff_advance_portal_id: null,
+            loan_portal_id: null,
+        };
 
-            const payload = {
-                date: newExpense.date,
-                created_at: new Date().toISOString(),
-                contractor_id: contractorId || null,
-                vendor_id: vendorId || null,
-                project_id: projectId || null,
-                type: newExpense.type,
-                amount: parseFloat(newExpense.amount),
-                status: true,
-                weekly_number: Number(selectedWeek),
-                period_start_date: new Date().toISOString().split("T")[0],
-                period_end_date: new Date().toISOString().split("T")[0],
-            };
-
-            try {
-                const response = await fetch("https://backendaab.in/aabuildersDash/api/weekly-expenses/update/save", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify(payload),
-                });
-
-                if (response.ok) {
-                    window.location.reload();
-                    setExpenses((prev) => [{ id: Date.now(), ...newExpense }, ...prev]);
-                    setNewExpense({ date: "", contractor: "", project: "", type: "", amount: "" });
-                    setVendorId('');
-                    setContractorId('');
-                    setProjectId('');
-                } else {
-                    console.error("Failed to save expense. Server responded with:", response.status);
+        try {
+            if (newExpense.type === "Loan") {
+                try {
+                    const loanResponse = await createLoanPortalEntry({
+                        date: newExpense.date,
+                        amount: Number(newExpense.amount) || 0,
+                        vendorId: selectedVendor ? Number(selectedVendor.id) : 0,
+                        contractorId: selectedContractor ? Number(selectedContractor.id) : 0,
+                        employeeId: selectedEmployee ? Number(selectedEmployee.id) : 0,
+                        projectId: selectedProjectName ? Number(selectedProjectName.id) : 0,
+                    });
+                    payload.loan_portal_id = loanResponse?.id || loanResponse?.loanPortalId || null;
+                } catch (loanError) {
+                    console.error("Error creating loan portal entry:", loanError);
                 }
-            } catch (err) {
-                console.error("Error during expense save:", err);
             }
+            const response = await fetch("https://backendaab.in/aabuildersDash/api/weekly-expenses/update/save", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(payload),
+            });
+
+            if (response.ok) {
+                window.location.reload();
+                setExpenses((prev) => [{ id: Date.now(), ...newExpense }, ...prev]);
+                setNewExpense({
+                    date: "",
+                    contractor: "",
+                    vendor: "",
+                    project: "",
+                    project_id: "",
+                    contractor_id: "",
+                    vendor_id: "",
+                    employee_id: "",
+                    type: "",
+                    amount: "",
+                    client_name: "",
+                    client_id: "",
+                });
+                setSelectedClient(null);
+                setClientProjectOptions([]);
+                setSelectedProjectName(null);
+                setSelectedProjectOption(null);
+                setSelectedContractor(null);
+                setSelectedVendor(null);
+                setSelectedEmployee(null);
+                setVendorId('');
+                setContractorId('');
+                setProjectId('');
+            } else {
+                console.error("Failed to save expense. Server responded with:", response.status);
+            }
+        } catch (err) {
+            console.error("Error during expense save:", err);
         }
     };
 
@@ -990,11 +1236,7 @@ const History = ({ username, userRoles = [] }) => {
         const expensesData = pdfFilteredExpenses.map((row, idx) => [
             String(idx + 1 || ""),
             String(row.date ? formatDateOnly(row.date) : ""),
-            String(combinedOptions.find(opt =>
-                (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
-                (opt.type === "Vendor" && opt.id === Number(row.vendor_id)) ||
-                (opt.type === "Employee" && opt.id === Number(row.employee_id))
-            )?.label || ""),
+            String(getPartyDisplayName(row) || ""),
             String(siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""),
             String(row.type || ""),
             String(Number(row.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
@@ -1306,11 +1548,7 @@ const History = ({ username, userRoles = [] }) => {
         ]];
         const staffAdvanceBody = staffAdvanceEntries.map(e => [
             String(e.date ? formatDateOnly(e.date) : ""),
-            String(combinedOptions.find(opt =>
-                (opt.type === "Contractor" && opt.id === Number(e.contractor_id)) ||
-                (opt.type === "Vendor" && opt.id === Number(e.vendor_id)) ||
-                (opt.type === "Employee" && opt.id === Number(e.employee_id))
-            )?.label || ""),
+            String(getPartyDisplayName(e) || ""),
             String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
             String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
         ]);
@@ -1348,11 +1586,7 @@ const History = ({ username, userRoles = [] }) => {
         ]];
         const staffSalaryBody = staffSalaryEntries.map(e => [
             String(e.date ? formatDateOnly(e.date) : ""),
-            String(combinedOptions.find(opt =>
-                (opt.type === "Contractor" && opt.id === Number(e.contractor_id)) ||
-                (opt.type === "Vendor" && opt.id === Number(e.vendor_id)) ||
-                (opt.type === "Employee" && opt.id === Number(e.employee_id))
-            )?.label || ""),
+            String(getPartyDisplayName(e) || ""),
             String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
             String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
         ]);
@@ -1395,11 +1629,7 @@ const History = ({ username, userRoles = [] }) => {
         ]];
         const diwaliBonusBody = diwaliBonusEntries.map(e => [
             String(e.date ? formatDateOnly(e.date) : ""),
-            String(combinedOptions.find(opt =>
-                (opt.type === "Contractor" && opt.id === Number(e.contractor_id)) ||
-                (opt.type === "Vendor" && opt.id === Number(e.vendor_id)) ||
-                (opt.type === "Employee" && opt.id === Number(e.employee_id))
-            )?.label || ""),
+            String(getPartyDisplayName(e) || ""),
             String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
             ""
         ]);
@@ -1475,6 +1705,35 @@ const History = ({ username, userRoles = [] }) => {
     };
     const saveEditedExpense = async (row) => {
         try {
+            const originalExpense =
+                editingOriginalRow && editingOriginalRow.id === row.id
+                    ? editingOriginalRow
+                    : expenses.find((exp) => exp.id === row.id);
+            const wasLoan = originalExpense?.type === "Loan";
+            const isNowLoan = row.type === "Loan";
+            if (isNowLoan) {
+                const loanPayload = {
+                    date: row.date,
+                    amount: Number(row.amount) || 0,
+                    vendorId: row.vendor_id ? Number(row.vendor_id) : 0,
+                    contractorId: row.contractor_id ? Number(row.contractor_id) : 0,
+                    employeeId: row.employee_id ? Number(row.employee_id) : 0,
+                    projectId: row.project_id ? Number(row.project_id) : 0,
+                };
+                if (row.loan_portal_id) {
+                    await updateLoanPortalEntry(row.loan_portal_id, loanPayload);
+                } else {
+                    const newLoan = await createLoanPortalEntry(loanPayload);
+                    row.loan_portal_id = newLoan?.id || newLoan?.loanPortalId || null;
+                }
+            } else if (wasLoan && originalExpense?.loan_portal_id) {
+                try {
+                    await clearLoanPortalEntry(originalExpense.loan_portal_id, row.date);
+                } catch (loanError) {
+                    console.error("Error clearing loan portal entry:", loanError);
+                }
+                row.loan_portal_id = null;
+            }
             const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/update/${row.id}?username=${encodeURIComponent(username)} `, {
                 method: "PUT",
                 headers: {
@@ -1488,6 +1747,7 @@ const History = ({ username, userRoles = [] }) => {
             window.location.reload();
             if (row.type === "Carry Forward") return;
             setEditingRowId(null);
+            setEditingOriginalRow(null);
         } catch (error) {
             console.error("Error updating expense:", error);
         }
@@ -1551,6 +1811,16 @@ const History = ({ username, userRoles = [] }) => {
         const confirmed = window.confirm("Are you sure you want to delete This Expense Data?");
         if (confirmed) {
             try {
+                const expenseRecord = expenses.find((exp) => exp.id === id);
+                if (expenseRecord?.type === "Loan" && expenseRecord.loan_portal_id) {
+                    try {
+                        await clearLoanPortalEntry(expenseRecord.loan_portal_id, expenseRecord.date);
+                    } catch (loanError) {
+                        console.error("Error clearing loan portal entry:", loanError);
+                        alert("Failed to clear the associated Loan entry. Please try again.");
+                        return;
+                    }
+                }
                 const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/delete/${id}`, {
                     method: 'DELETE',
                 });
@@ -1688,7 +1958,9 @@ const History = ({ username, userRoles = [] }) => {
                                         <tr className="bg-[#FAF6ED]">
                                             <th className="pt-2 pl-2 w-[60px] font-bold text-left">Sl.No</th>
                                             <th className="pt-2 w-[135px] font-bold text-left">Date</th>
-                                            <th className="pt-2 w-[200px] font-bold text-left">Contractor/Vendor</th>
+                                            <th className="pt-2 w-[200px] font-bold text-left">
+                                                {isClientToggleActive ? "Client Name" : "Contractor/Vendor/Employee"}
+                                            </th>
                                             <th className="pt-2 w-[200px] font-bold text-left">Project Name</th>
                                             <th className="pt-2 w-[100px] font-bold text-left">Type</th>
                                             <th className="pt-2 w-[110px] font-bold text-left">Amount</th>
@@ -1712,7 +1984,7 @@ const History = ({ username, userRoles = [] }) => {
                                                         value={selectContractororVendorName ? { value: selectContractororVendorName, label: selectContractororVendorName } : null}
                                                         onChange={(opt) => setSelectContractororVendorName(opt ? opt.value : "")}
                                                         className="text-xs focus:outline-none"
-                                                        placeholder="Contractor/Ven..."
+                                                        placeholder={isClientToggleActive ? "Client Name..." : "Contractor/Ven..."}
                                                         isSearchable
                                                         isClearable
                                                         styles={{
@@ -1871,65 +2143,141 @@ const History = ({ username, userRoles = [] }) => {
                                                     />
                                                 </td>
                                                 <td className="px-4 py-2">
-                                                    <Select
-                                                        name="contractor"
-                                                        className="w-[150px] sm:w-[180px]"
-                                                        value={
-                                                            combinedOptions.find(
-                                                                opt =>
-                                                                    (opt.type === "Contractor" && opt.id === Number(newExpense.contractor_id)) ||
-                                                                    (opt.type === "Vendor" && opt.id === Number(newExpense.vendor_id)) ||
-                                                                    (opt.type === "Employee" && opt.id === Number(newExpense.employee_id))
-                                                            ) || null
-                                                        }
-                                                        onChange={(selectedOption) => {
-                                                            if (!selectedOption) {
+                                                    <div className="flex items-center gap-2">
+                                                        <Select
+                                                            name="contractor"
+                                                            className="w-[150px] sm:w-[180px]"
+                                                            value={
+                                                                isClientToggleActive
+                                                                    ? selectedClient
+                                                                : selectedContractor ||
+                                                                combinedOptions.find(
+                                                                        opt =>
+                                                                            (opt.type === "Contractor" && opt.id === Number(newExpense.contractor_id)) ||
+                                                                            (opt.type === "Vendor" && opt.id === Number(newExpense.vendor_id)) ||
+                                                                            (opt.type === "Employee" && opt.id === Number(newExpense.employee_id))
+                                                                    ) || null
+                                                            }
+                                                            onChange={(selectedOption) => {
+                                                                if (isClientToggleActive) {
+                                                                    setSelectedClient(selectedOption || null);
+                                                                    setNewExpense(prev => ({
+                                                                        ...prev,
+                                                                        client_name: selectedOption ? selectedOption.label : "",
+                                                                        client_id: selectedOption ? (selectedOption.clientId || selectedOption.id) : "",
+                                                                    }));
+                                                                    setVendorId('');
+                                                                    setContractorId('');
+                                                                setSelectedContractor(null);
+                                                                setSelectedVendor(null);
+                                                                setSelectedEmployee(null);
+                                                                    const clientKey = selectedOption?.compositeKey || (selectedOption ? buildClientKey(selectedOption.label, selectedOption.fatherName, selectedOption.mobile) : "");
+                                                                    const projectsForClient = selectedOption
+                                                                        ? selectedOption.projects || (clientKey ? (clientProjectMap[clientKey]?.projects || []) : [])
+                                                                        : [];
+                                                                    setClientProjectOptions(projectsForClient);
+                                                                    if (projectsForClient.length === 1) {
+                                                                        const onlyProject = projectsForClient[0];
+                                                                    setSelectedProjectName(onlyProject);
+                                                                    setSelectedProjectOption(onlyProject);
+                                                                    setProjectId(onlyProject.id);
+                                                                        setNewExpense(prev => ({ ...prev, project_id: onlyProject.id }));
+                                                                    }
+                                                                    if (!selectedOption) {
+                                                                    setSelectedProjectName(null);
+                                                                    setSelectedProjectOption(null);
+                                                                    setProjectId('');
+                                                                        setNewExpense(prev => ({ ...prev, project_id: "" }));
+                                                                    }
+                                                                    return;
+                                                                }
+                                                            setSelectedClient(null);
+                                                                setSelectedClient(null);
+                                                                setClientProjectOptions([]);
+                                                            setSelectedProjectName(null);
+                                                            setSelectedProjectOption(null);
+                                                            setProjectId('');
+                                                                if (!selectedOption) {
+                                                                    setNewExpense(prev => ({
+                                                                        ...prev,
+                                                                        contractor_id: "",
+                                                                        vendor_id: ""
+                                                                    }));
+                                                                    setContractorId("");
+                                                                    setVendorId("");
+                                                                setSelectedContractor(null);
+                                                                setSelectedVendor(null);
+                                                                setSelectedEmployee(null);
+                                                            } else if (selectedOption.type === "Employee") {
                                                                 setNewExpense(prev => ({
                                                                     ...prev,
+                                                                    employee_id: selectedOption.id,
                                                                     contractor_id: "",
                                                                     vendor_id: ""
                                                                 }));
-                                                                setContractorId("");
-                                                                setVendorId("");
-                                                            } else if (selectedOption.type === "Contractor") {
-                                                                setNewExpense(prev => ({
-                                                                    ...prev,
-                                                                    contractor_id: selectedOption.id,
-                                                                    vendor_id: ""
-                                                                }));
-                                                                setContractorId(selectedOption.id);
-                                                                setVendorId("");
-                                                            } else if (selectedOption.type === "Vendor") {
-                                                                setNewExpense(prev => ({
-                                                                    ...prev,
-                                                                    vendor_id: selectedOption.id,
-                                                                    contractor_id: ""
-                                                                }));
-                                                                setVendorId(selectedOption.id);
-                                                                setContractorId("");
-                                                            }
-                                                        }}
-                                                        options={combinedOptions}
-                                                        placeholder="Contractor/Vendor"
-                                                        isSearchable
-                                                        isClearable
-                                                        styles={customStyles}
-                                                    />
+                                                                setSelectedEmployee(selectedOption);
+                                                                setSelectedContractor(null);
+                                                                setSelectedVendor(null);
+                                                                } else if (selectedOption.type === "Contractor") {
+                                                                    setNewExpense(prev => ({
+                                                                        ...prev,
+                                                                        contractor_id: selectedOption.id,
+                                                                        vendor_id: ""
+                                                                    }));
+                                                                    setContractorId(selectedOption.id);
+                                                                    setVendorId("");
+                                                                setSelectedContractor(selectedOption);
+                                                                setSelectedVendor(null);
+                                                                setSelectedEmployee(null);
+                                                                } else if (selectedOption.type === "Vendor") {
+                                                                    setNewExpense(prev => ({
+                                                                        ...prev,
+                                                                        vendor_id: selectedOption.id,
+                                                                        contractor_id: ""
+                                                                    }));
+                                                                    setVendorId(selectedOption.id);
+                                                                    setContractorId("");
+                                                                setSelectedVendor(selectedOption);
+                                                                setSelectedContractor(null);
+                                                                setSelectedEmployee(null);
+                                                                }
+                                                            }}
+                                                            options={isClientToggleActive ? clientOptions : combinedOptions}
+                                                            placeholder={isClientToggleActive ? "Client Name" : "Contractor/Vendor"}
+                                                            isSearchable
+                                                            isClearable
+                                                            styles={customStyles}
+                                                        />
+                                                        <button type="button" onClick={handlePartySourceToggle}>
+                                                            <img
+                                                                src={Change}
+                                                                className={`w-4 h-4 ${isClientToggleActive ? 'opacity-100' : 'opacity-60'}`}
+                                                                alt="Toggle party type"
+                                                            />
+                                                        </button>
+                                                    </div>
                                                 </td>
                                                 <td className="px-2 py-2">
                                                     <Select
                                                         name="project"
                                                         className="w-[180px] sm:w-[220px]"
-                                                        value={siteOptions.find(opt => opt.id === Number(newExpense.project_id)) || null}
+                                                        value={selectedProjectName || siteOptions.find(opt => opt.id === Number(newExpense.project_id)) || null}
                                                         onChange={(selectedOption) => {
+                                                            if (isClientToggleActive) {
+                                                                setSelectedProjectName(selectedOption);
+                                                                setSelectedProjectOption(selectedOption);
+                                                            } else {
+                                                                setSelectedProjectName(selectedOption);
+                                                                setSelectedProjectOption(null);
+                                                            }
                                                             setNewExpense(prev => ({
                                                                 ...prev,
                                                                 project_id: selectedOption ? selectedOption.id : ""
                                                             }));
                                                             setProjectId(selectedOption ? selectedOption.id : "");
                                                         }}
-                                                        options={siteOptions}
-                                                        placeholder="Select Site"
+                                                        options={(isClientToggleActive && clientProjectOptions.length > 0) ? clientProjectOptions : siteOptions}
+                                                        placeholder={isClientToggleActive ? "Client Project..." : "Select Site"}
                                                         isSearchable
                                                         isClearable
                                                         styles={customStyles}
@@ -1990,14 +2338,29 @@ const History = ({ username, userRoles = [] }) => {
                                                             name="party"
                                                             className="w-[180px]"
                                                             value={
-                                                                combinedOptions.find(
-                                                                    opt =>
-                                                                        (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
-                                                                        (opt.type === "Vendor" && opt.id === Number(row.vendor_id)) ||
-                                                                        (opt.type === "Employee" && opt.id === Number(row.employee_id))
-                                                                ) || null
+                                                                (isClientToggleActive || (!row.contractor_id && !row.vendor_id && !row.employee_id && (row.client_name || row.client_id)))
+                                                                    ? getClientOption(row.client_id, row.client_name)
+                                                                    : combinedOptions.find(
+                                                                        opt =>
+                                                                            (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
+                                                                            (opt.type === "Vendor" && opt.id === Number(row.vendor_id)) ||
+                                                                            (opt.type === "Employee" && opt.id === Number(row.employee_id))
+                                                                    ) || null
                                                             }
                                                             onChange={(selectedOption) => {
+                                                                const useClientMode = isClientToggleActive || (!row.contractor_id && !row.vendor_id && !row.employee_id && (row.client_name || row.client_id));
+                                                                if (useClientMode) {
+                                                                    if (!selectedOption) {
+                                                                        handleEditExpense(row.id, "client_name", "");
+                                                                        handleEditExpense(row.id, "client_id", "");
+                                                                    } else {
+                                                                        handleEditExpense(row.id, "client_name", selectedOption.label);
+                                                                        handleEditExpense(row.id, "client_id", selectedOption.clientId || selectedOption.id);
+                                                                    }
+                                                                    handleEditExpense(row.id, "contractor_id", "");
+                                                                    handleEditExpense(row.id, "vendor_id", "");
+                                                                    return;
+                                                                }
                                                                 if (!selectedOption) {
                                                                     handleEditExpense(row.id, "contractor_id", "");
                                                                     handleEditExpense(row.id, "vendor_id", "");
@@ -2009,20 +2372,15 @@ const History = ({ username, userRoles = [] }) => {
                                                                     handleEditExpense(row.id, "contractor_id", "");
                                                                 }
                                                             }}
-                                                            options={combinedOptions}
-                                                            placeholder="Select Contractor/Vendor"
+                                                            options={(isClientToggleActive || (!row.contractor_id && !row.vendor_id && !row.employee_id && (row.client_name || row.client_id))) ? clientOptions : combinedOptions}
+                                                            placeholder={(isClientToggleActive || (!row.contractor_id && !row.vendor_id && !row.employee_id && (row.client_name || row.client_id))) ? "Client Name" : "Select Contractor/Vendor"}
                                                             isSearchable
                                                             isClearable
                                                             styles={customStyles}
                                                         />
                                                     ) : (
                                                         <div className="w-[180px] h-[40px] flex items-center">
-                                                            {combinedOptions.find(
-                                                                opt =>
-                                                                    (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
-                                                                    (opt.type === "Vendor" && opt.id === Number(row.vendor_id)) ||
-                                                                    (opt.type === "Employee" && opt.id === Number(row.employee_id))
-                                                            )?.label || ""}
+                                                            {getPartyDisplayName(row)}
                                                         </div>
                                                     )}
                                                 </td>
@@ -2229,7 +2587,10 @@ const History = ({ username, userRoles = [] }) => {
                                                                         alt="Edit Disabled"
                                                                     />
                                                                 ) : (
-                                                                    <button onClick={() => setEditingRowId(row.id)}>
+                                                                    <button onClick={() => {
+                                                                        setEditingRowId(row.id);
+                                                                        setEditingOriginalRow({ ...row });
+                                                                    }}>
                                                                         <img className="w-5 h-4" src={Edit} alt="Edit" />
                                                                     </button>
                                                                 )

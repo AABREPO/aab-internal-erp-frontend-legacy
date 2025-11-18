@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import Modal from 'react-modal';
+import edit from '../Images/Edit.svg';
 import Filter from '../Images/filter (3).png'
 import Select from 'react-select';
 import Reload from '../Images/rotate-right.png';
 import QRCode from '../Images/AAB_QR_CODE.jpeg';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+Modal.setAppElement('#root');
 const Table = () => {
     const [rentForms, setRentForms] = useState([]);
     const [showFilters, setShowFilters] = useState(false);
@@ -29,6 +32,26 @@ const Table = () => {
     const [tenantShopData, setTenantShopData] = useState([]);
     const [shopNoIdToShopNoMap, setShopNoIdToShopNoMap] = useState({});
     const [tenantNameIdToTenantNameMap, setTenantNameIdToTenantNameMap] = useState({});
+    // Edit modal state
+    const [editId, setEditId] = useState(null);
+    const [modalIsOpen, setModalIsOpen] = useState(false);
+    const [editTenantOptions, setEditTenantOptions] = useState([]);
+    const [editShopNoOptions, setEditShopNoOptions] = useState([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [rentFormData, setRentFormData] = useState({
+        formType: '',
+        shopNo: '',
+        shopNoId: null,
+        tenantName: '',
+        tenantNameId: null,
+        amount: '',
+        refundAmount: '',
+        paymentMode: '',
+        paidOnDate: '',
+        forTheMonthOf: '',
+        attachedFile: '',
+    });
+    const [paymentModeOptions, setPaymentModeOptions] = useState([]);
     useEffect(() => {
         const savedSelectedDate = sessionStorage.getItem('selectedDate');
         const savedShopNo = sessionStorage.getItem('shopNo')
@@ -96,8 +119,13 @@ const Table = () => {
     const [allShops, setAllShops] = useState([]);
     useEffect(() => {
         fetchProjects();
-        fetchTenants();
     }, []);
+    
+    useEffect(() => {
+        if (projects.length > 0) {
+            fetchTenants();
+        }
+    }, [projects]);
     
     // Fetch projects for allShops
     const fetchProjects = async () => {
@@ -146,19 +174,74 @@ const Table = () => {
         }
     };
     
-    // Fetch tenants data
+    // Fetch tenant link data
     const fetchTenants = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/tenantShop/getAll');
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setTenantShopData(data);
+                
+                // Build mapping from shopNoId to shopNo from projects (project management)
+                const shopNoIdToShopNoMap = {};
+                projects
+                    .filter(project => project.projectReferenceName)
+                    .forEach(project => {
+                        const propertyDetailsArray = Array.isArray(project.propertyDetails)
+                            ? project.propertyDetails
+                            : Array.from(project.propertyDetails || []);
+
+                        propertyDetailsArray.forEach(detail => {
+                            if (detail.shopNo && detail.id) {
+                                shopNoIdToShopNoMap[detail.id] = detail.shopNo;
+                            }
+                        });
+                    });
+
+                // Create ID-based options for edit popup
+                const shopMap = new Map();
+                data.flatMap(t => (t.shopNos || []).filter(shop => !shop.shopClosureDate))
+                    .forEach(shop => {
+                        const shopNo = shop.shopNoId ? shopNoIdToShopNoMap[shop.shopNoId] : null;
+                        if (shopNo && shop.shopNoId && !shopMap.has(shop.shopNoId)) {
+                            shopMap.set(shop.shopNoId, shopNo);
+                        }
+                    });
+                
+                const editShopOptions = Array.from(shopMap.entries()).map(([shopNoId, shopNo]) => ({
+                    label: shopNo,
+                    value: shopNoId, // Use shopNoId as value
+                    shopNo: shopNo
+                }));
+                setEditShopNoOptions(editShopOptions);
+                
+                // Create ID-based tenant options for edit popup from tenant link data
+                const editTenantOptions = data.flatMap(t =>
+                    (t.shopNos || [])
+                        .filter(shop => !shop.shopClosureDate)
+                        .map(shop => {
+                            const shopNo = shop.shopNoId ? shopNoIdToShopNoMap[shop.shopNoId] : null;
+                            return {
+                                label: t.tenantName,
+                                value: t.id, // Use tenant ID as value
+                                tenantName: t.tenantName,
+                                shopNoId: shop.shopNoId || null,
+                                shopNo: shopNo
+                            };
+                        })
+                        .filter(opt => opt.shopNo)
+                );
+                // Remove duplicates based on tenant ID
+                const uniqueEditTenantOptions = editTenantOptions.filter(
+                    (t, i, arr) => arr.findIndex(x => x.value === t.value) === i
+                );
+                setEditTenantOptions(uniqueEditTenantOptions);
             } else {
-                console.log('Error fetching tenants.');
+                console.log('Error fetching tenant link data.');
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching tenants.');
+            console.log('Error fetching tenant link data.');
         }
     };
     
@@ -182,7 +265,7 @@ const Table = () => {
             });
         setShopNoIdToShopNoMap(shopNoIdMap);
         
-        // Build tenantNameId -> tenantName mapping from tenantShopData
+        // Build tenantNameId -> tenantName mapping from tenantLinkData
         const tenantNameIdMap = {};
         tenantShopData.forEach(tenant => {
             if (tenant.id && tenant.tenantName) {
@@ -587,7 +670,9 @@ const Table = () => {
             const matchesTenantName = tenantName ? rent.tenantName === tenantName : true;
             const matchesPaymentMode = paymentMode ? rent.paymentMode === paymentMode : true;
             const matchesFormType = formType ? rent.formType === formType : true;
-            const matchesDate = selectedDate ? rent.paidOnDate === selectedDate : true;
+            // Convert selectedDate (YYYY-MM-DD) to DD-MM-YYYY for comparison with backend format
+            const formattedSelectedDate = selectedDate ? convertYYYYMMDDToDDMMYYYY(selectedDate) : '';
+            const matchesDate = selectedDate ? rent.paidOnDate === formattedSelectedDate : true;
             const matchesENo = selectedENo ? rent.eno === selectedENo : true;
             const matchesMonth = selectedRentMonth
                 ? rent.forTheMonthOf &&
@@ -621,12 +706,206 @@ const Table = () => {
         });
         setMonthOptions(formattedMonths);
     }, [shopNo, tenantName, paymentMode, formType, selectedRentMonth, selectedDate, rentForms, selectedENo]);
+    
     const formatDateOnly = (dateString) => {
+        if (!dateString) return '';
+        // If already in DD-MM-YYYY format, just replace - with /
+        if (dateString.includes('-') && dateString.split('-')[0].length === 2) {
+            return dateString.replace(/-/g, '/');
+        }
+        // If in YYYY-MM-DD format, convert to DD/MM/YYYY
+        if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
+            const parts = dateString.split('-');
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+        // Try parsing as date
         const date = new Date(dateString);
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}/${month}/${year}`;
+        if (!isNaN(date.getTime())) {
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}/${month}/${year}`;
+        }
+        return dateString;
+    };
+    
+    // Helper function to convert DD-MM-YYYY to YYYY-MM-DD for date input
+    const convertDDMMYYYYToYYYYMMDD = (dateString) => {
+        if (!dateString) return '';
+        if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
+            return dateString;
+        }
+        if (dateString.includes('-')) {
+            const parts = dateString.split('-');
+            if (parts.length === 3 && parts[0].length === 2) {
+                return `${parts[2]}-${parts[1]}-${parts[0]}`;
+            }
+        }
+        const date = new Date(dateString);
+        if (!isNaN(date.getTime())) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        return dateString;
+    };
+
+    // Helper function to convert YYYY-MM-DD to DD-MM-YYYY
+    const convertYYYYMMDDToDDMMYYYY = (dateString) => {
+        if (!dateString) return '';
+        if (dateString.includes('-') && dateString.split('-')[0].length === 2) {
+            return dateString;
+        }
+        if (dateString.includes('-')) {
+            const parts = dateString.split('-');
+            if (parts.length === 3 && parts[0].length === 4) {
+                return `${parts[2]}-${parts[1]}-${parts[0]}`;
+            }
+        }
+        const date = new Date(dateString);
+        if (!isNaN(date.getTime())) {
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}-${month}-${year}`;
+        }
+        return dateString;
+    };
+    
+    // Function to check if shopNoId is linked to tenantNameId in tenant link data
+    const isShopLinkedToTenant = (shopNoId, tenantNameId) => {
+        if (!shopNoId || !tenantNameId) return false;
+        return tenantShopData.some(tenant => 
+            tenant.id === tenantNameId && 
+            tenant.shopNos && 
+            tenant.shopNos.some(shop => shop.shopNoId === shopNoId && !shop.shopClosureDate)
+        );
+    };
+    
+    // Fetch payment modes
+    useEffect(() => {
+        const fetchPaymentModes = async () => {
+            try {
+                const response = await fetch('https://backendaab.in/aabuildersDash/api/payment_mode/getAll');
+                if (response.ok) {
+                    const data = await response.json();
+                    const formattedOptions = data.map(mode => ({
+                        value: mode.modeOfPayment,
+                        label: mode.modeOfPayment
+                    }));
+                    setPaymentModeOptions(formattedOptions);
+                }
+            } catch (error) {
+                console.error('Error fetching payment modes:', error);
+            }
+        };
+        fetchPaymentModes();
+    }, []);
+    
+    const handleEditClick = (rent) => {
+        // Prevent editing Shop Closure or Refund forms
+        if (rent.formType === 'Shop Closure' || rent.formType === 'Refund') {
+            alert('Cannot edit Shop Closure or Refund forms');
+            return;
+        }
+        
+        // Check if shopNoId is linked to tenantNameId
+        if (rent.shopNoId && rent.tenantNameId) {
+            if (!isShopLinkedToTenant(rent.shopNoId, rent.tenantNameId)) {
+                alert('Cannot edit: Shop is not linked to this tenant in tenant link data');
+                return;
+            }
+        }
+        
+        setEditId(rent.id);
+        // Convert paidOnDate from DD-MM-YYYY to YYYY-MM-DD for date input
+        const convertedRent = {
+            ...rent,
+            paidOnDate: convertDDMMYYYYToYYYYMMDD(rent.paidOnDate),
+            shopNo: rent.shopNoId && shopNoIdToShopNoMap[rent.shopNoId] ? shopNoIdToShopNoMap[rent.shopNoId] : rent.shopNo,
+            tenantName: rent.tenantNameId && tenantNameIdToTenantNameMap[rent.tenantNameId] ? tenantNameIdToTenantNameMap[rent.tenantNameId] : rent.tenantName
+        };
+        setRentFormData(convertedRent);
+        setModalIsOpen(true);
+    };
+    
+    const handleCancel = () => {
+        setModalIsOpen(false);
+    };
+    
+    const handleChange = (e) => {
+        const { name, type, value, files } = e.target;
+        if (name === "paidOnDate" && value === "") {
+            return;
+        }
+        setRentFormData({
+            ...rentFormData,
+            [name]: type === "file" ? files[0] : value
+        });
+    };
+    
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        
+        // Validate that shopNoId is linked to tenantNameId
+        if (rentFormData.shopNoId && rentFormData.tenantNameId) {
+            if (!isShopLinkedToTenant(rentFormData.shopNoId, rentFormData.tenantNameId)) {
+                alert('Cannot save: Selected shop is not linked to selected tenant in tenant link data');
+                return;
+            }
+        }
+        
+        const {
+            formType, shopNoId, tenantNameId, amount,
+            refundAmount, paymentMode, paidOnDate,
+            forTheMonthOf, attachedFile
+        } = rentFormData;
+        
+        // Convert paidOnDate from YYYY-MM-DD to DD-MM-YYYY for backend
+        const formattedPaidOnDate = convertYYYYMMDDToDDMMYYYY(paidOnDate);
+        
+        // Get shopNo and tenantName from IDs
+        const shopNo = shopNoId && shopNoIdToShopNoMap[shopNoId] ? shopNoIdToShopNoMap[shopNoId] : '';
+        const tenantName = tenantNameId && tenantNameIdToTenantNameMap[tenantNameId] ? tenantNameIdToTenantNameMap[tenantNameId] : '';
+        
+        const payload = {
+            formType,
+            shopNo: shopNo,
+            shopNoId: shopNoId,
+            tenantName: tenantName,
+            tenantNameId: tenantNameId,
+            amount,
+            refundAmount,
+            paymentMode,
+            paidOnDate: formattedPaidOnDate,
+            forTheMonthOf,
+            attachedFile,
+        };
+        
+        setIsSubmitting(true);
+        try {
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/rental_forms/update/${editId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+            if (response.ok) {
+                alert('Rent form updated successfully!');
+                handleCancel();
+                window.location.reload();
+            } else {
+                const errorMsg = await response.text();
+                alert(`Failed to update: ${errorMsg}`);
+            }
+        } catch (error) {
+            console.error('Error updating rent form:', error);
+            alert('Something went wrong. Please try again.');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
     return (
         <body className="bg-[#FAF6ED] ">
@@ -773,6 +1052,7 @@ const Table = () => {
                                         >
                                             Type {sortField === 'formType' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
+                                        <th className="px-1 sm:px-2 py-2 font-bold text-xs sm:text-sm">Activity</th>
                                         <th className="px-1 sm:px-2 py-2 font-bold text-xs sm:text-sm">Print</th>
                                     </tr>
                                     {showFilters && (
@@ -1175,6 +1455,30 @@ const Table = () => {
                                             </td>
                                             <td className="text-xs sm:text-sm text-left px-1 sm:px-2 font-semibold">{rent.paymentMode}</td>
                                             <td className="text-xs sm:text-sm text-left px-1 sm:px-2 font-semibold">{rent.formType}</td>
+                                            <td className="flex w-[100px] justify-between py-2">
+                                                <button
+                                                    onClick={() => handleEditClick(rent)}
+                                                    disabled={rent.formType === 'Shop Closure' || rent.formType === 'Refund'}
+                                                    className={`rounded-full transition duration-200 ml-2 mr-3 ${
+                                                        rent.formType === 'Shop Closure' || rent.formType === 'Refund' 
+                                                            ? 'opacity-50 cursor-not-allowed' 
+                                                            : ''
+                                                    }`}
+                                                    title={rent.formType === 'Shop Closure' || rent.formType === 'Refund' 
+                                                        ? 'Cannot edit Shop Closure or Refund forms' 
+                                                        : ''}
+                                                >
+                                                    <img
+                                                        src={edit}
+                                                        alt="Edit"
+                                                        className={`w-4 h-6 transition duration-200 ${
+                                                            rent.formType === 'Shop Closure' || rent.formType === 'Refund' 
+                                                                ? '' 
+                                                                : 'transform hover:scale-110 hover:brightness-110'
+                                                        }`}
+                                                    />
+                                                </button>
+                                            </td>
                                             <td className="text-xs sm:text-sm text-left px-1 sm:px-2 py-2 font-semibold">
                                                 <button
                                                     className="text-blue-600 underline text-xs sm:text-sm"
@@ -1188,6 +1492,205 @@ const Table = () => {
                                 </tbody>
                             </table>
                         </div>
+                        <Modal
+                            isOpen={modalIsOpen}
+                            onRequestClose={handleCancel}
+                            contentLabel="Edit Rent Form"
+                            className="fixed inset-0 flex items-center justify-center p-4 bg-gray-800 bg-opacity-50"
+                            overlayClassName="fixed inset-0">
+                            <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl">
+                                <h2 className="text-xl font-bold mb-6 border-b-2">Edit Rent Form</h2>
+                                <form className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-gray-500 font-semibold text-left">Type</label>
+                                        <select
+                                            name="formType"
+                                            value={rentFormData.formType}
+                                            onChange={handleChange}
+                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none">
+                                            <option value="" disabled>--- Select ---</option>
+                                            <option value="Rent">Rent</option>
+                                            <option value="Advance">Advance</option>
+                                            <option value="Shop Closure">Shop Closure</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-gray-500 font-semibold text-left">Shop No</label>
+                                        <Select
+                                            name="shopNo"
+                                            value={editShopNoOptions.find(option => option.value === rentFormData.shopNoId)}
+                                            onChange={(selectedOption) => {
+                                                const newShopNoId = selectedOption?.value || null;
+                                                // Validate if new shop is linked to current tenant
+                                                if (newShopNoId && rentFormData.tenantNameId) {
+                                                    if (!isShopLinkedToTenant(newShopNoId, rentFormData.tenantNameId)) {
+                                                        alert('Selected shop is not linked to the selected tenant in tenant link data');
+                                                        return;
+                                                    }
+                                                }
+                                                setRentFormData({
+                                                    ...rentFormData,
+                                                    shopNo: selectedOption?.shopNo || '',
+                                                    shopNoId: newShopNoId
+                                                });
+                                            }}
+                                            options={editShopNoOptions}
+                                            placeholder="--- Select Shop ---"
+                                            styles={{
+                                                control: (base) => ({
+                                                    ...base,
+                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                    borderWidth: '2px',
+                                                    borderRadius: '0.5rem',
+                                                    padding: '0.25rem',
+                                                    textAlign: 'left',
+                                                }),
+                                                option: (provided, state) => ({
+                                                    ...provided,
+                                                    textAlign: 'left',
+                                                    fontWeight: 'normal',
+                                                    fontSize: '15px',
+                                                    backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                    color: 'black',
+                                                }),
+                                            }}
+                                            menuPlacement="bottom"
+                                            menuPosition="absolute"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-gray-500 font-semibold text-left">Tenant Name </label>
+                                        <Select
+                                            name="tenantName"
+                                            options={editTenantOptions}
+                                            value={editTenantOptions.find(opt => opt.value === rentFormData.tenantNameId)}
+                                            onChange={(selectedOption) => {
+                                                const newTenantNameId = selectedOption?.value || null;
+                                                // Validate if current shop is linked to new tenant
+                                                if (rentFormData.shopNoId && newTenantNameId) {
+                                                    if (!isShopLinkedToTenant(rentFormData.shopNoId, newTenantNameId)) {
+                                                        alert('Selected tenant is not linked to the selected shop in tenant link data');
+                                                        return;
+                                                    }
+                                                }
+                                                setRentFormData({
+                                                    ...rentFormData,
+                                                    tenantName: selectedOption?.tenantName || '',
+                                                    tenantNameId: newTenantNameId
+                                                });
+                                            }}
+                                            isClearable
+                                            styles={{
+                                                control: (base, state) => ({
+                                                    ...base,
+                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                    borderWidth: '2px',
+                                                    borderRadius: '0.5rem',
+                                                    padding: '0.25rem',
+                                                    textAlign: 'left',
+                                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                    '&:hover': {
+                                                        borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                    },
+                                                }),
+                                                placeholder: (base) => ({
+                                                    ...base,
+                                                    color: '#6B7280',
+                                                    textAlign: 'left',
+                                                }),
+                                                option: (provided, state) => ({
+                                                    ...provided,
+                                                    textAlign: 'left',
+                                                    fontWeight: 'normal',
+                                                    fontSize: '15px',
+                                                    backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                    color: 'black',
+                                                }),
+                                                singleValue: (base) => ({
+                                                    ...base,
+                                                    color: '#111827',
+                                                }),
+                                                menu: (base) => ({
+                                                    ...base,
+                                                    zIndex: 999,
+                                                }),
+                                            }}
+                                            placeholder="--- Select Tenant ---"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-gray-500 font-semibold text-left">Paid On Date</label>
+                                        <input
+                                            type="date"
+                                            name="paidOnDate"
+                                            value={rentFormData.paidOnDate}
+                                            onChange={handleChange}
+                                            required
+                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-gray-500 font-semibold text-left">Amount </label>
+                                        <input
+                                            type="text"
+                                            name="amount"
+                                            value={rentFormData.amount}
+                                            onChange={handleChange}
+                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-gray-500 font-semibold text-left">Payment Mode </label>
+                                        <Select
+                                            name="paymentMode"
+                                            value={paymentModeOptions.find(option => option.value === rentFormData.paymentMode)}
+                                            onChange={(selectedOption) =>
+                                                setRentFormData({ ...rentFormData, paymentMode: selectedOption?.value || '' })
+                                            }
+                                            options={paymentModeOptions}
+                                            placeholder="--- Select PaymentMode ---"
+                                            styles={{
+                                                control: (base) => ({
+                                                    ...base,
+                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                    borderWidth: '2px',
+                                                    borderRadius: '0.5rem',
+                                                    padding: '0.25rem',
+                                                    textAlign: 'left',
+                                                }),
+                                                option: (provided, state) => ({
+                                                    ...provided,
+                                                    textAlign: 'left',
+                                                    fontWeight: 'normal',
+                                                    fontSize: '15px',
+                                                    backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                    color: 'black',
+                                                }),
+                                            }}
+                                            menuPlacement="bottom"
+                                            menuPosition="absolute"
+                                        />
+                                    </div>
+                                    <input
+                                        type="month"
+                                        name="forTheMonthOf"
+                                        value={rentFormData.forTheMonthOf}
+                                        onChange={handleChange}
+                                        className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                    />
+                                    <div className="col-span-2 flex justify-end space-x-4 mt-4 border-t-2 ">
+                                        <button type="button" onClick={handleCancel} className="px-4 py-2 border-2 border-opacity-[] border-[#BF9853] text-[#BF9853] rounded mt-3">
+                                            Cancel
+                                        </button>
+                                        <button type="submit" onClick={handleSubmit} disabled={isSubmitting}
+                                            className={`px-4 py-2 bg-[#BF9853] text-white rounded mt-3 transition duration-200 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                        >
+                                            {isSubmitting ? 'Submitting...' : 'Submit'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </Modal>
                     </div>
                 </div>
             </div>

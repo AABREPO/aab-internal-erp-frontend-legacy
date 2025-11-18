@@ -22,6 +22,10 @@ const Summary = () => {
   const [selectedPaymentModeMonth, setSelectedPaymentModeMonth] = useState("");
   const [monthTotal, setMonthTotal] = useState(0);
   const [filteredMonthTotal, setFilteredMonthTotal] = useState(0);
+  const [projects, setProjects] = useState([]);
+  const [tenantShopData, setTenantShopData] = useState([]);
+  const [shopNoIdToShopNoMap, setShopNoIdToShopNoMap] = useState({});
+  const [tenantNameIdToTenantNameMap, setTenantNameIdToTenantNameMap] = useState({});
   useEffect(() => {
     const today = new Date();
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -35,6 +39,10 @@ const Summary = () => {
 
     setFromDate(formatDate(firstDayOfMonth));
     setToDate(formatDate(today));
+  }, []);
+  useEffect(() => {
+    fetchProjects();
+    fetchTenants();
   }, []);
   useEffect(() => {
     axios
@@ -54,6 +62,59 @@ const Summary = () => {
   useEffect(() => {
     fetchPaymentModes();
   }, []);
+  
+  const fetchProjects = async () => {
+    try {
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
+      if (response.ok) {
+        const data = await response.json();
+        // Filter for "own project" category
+        const ownProjects = Array.isArray(data)
+          ? data.filter(p => (p.projectCategory || '').toLowerCase() === 'own project')
+          : [];
+        setProjects(ownProjects);
+        
+        // Build mapping from shopNoId to shopNo
+        const shopNoIdMap = {};
+        ownProjects
+          .filter(project => project.projectReferenceName)
+          .forEach(project => {
+            const propertyDetailsArray = Array.isArray(project.propertyDetails)
+              ? project.propertyDetails
+              : Array.from(project.propertyDetails || []);
+            propertyDetailsArray.forEach(detail => {
+              if (detail.shopNo && detail.id) {
+                shopNoIdMap[detail.id] = detail.shopNo;
+              }
+            });
+          });
+        setShopNoIdToShopNoMap(shopNoIdMap);
+      }
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+    }
+  };
+  
+  const fetchTenants = async () => {
+    try {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll');
+      if (response.ok) {
+        const data = await response.json();
+        setTenantShopData(data);
+        
+        // Build mapping from tenantNameId to tenantName
+        const tenantNameIdMap = {};
+        data.forEach(tenant => {
+          if (tenant.id && tenant.tenantName) {
+            tenantNameIdMap[tenant.id] = tenant.tenantName;
+          }
+        });
+        setTenantNameIdToTenantNameMap(tenantNameIdMap);
+      }
+    } catch (error) {
+      console.error('Error fetching tenants:', error);
+    }
+  };
   const fetchPaymentModes = async () => {
     try {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/payment_mode/getAll');
@@ -70,8 +131,17 @@ const Summary = () => {
       const from = new Date(fromDate);
       const to = new Date(toDate);
       // Filter entries within the selected date range
+      // Handle dd-mm-yyyy format from database
       const dateFiltered = rentForms.filter(entry => {
-        const entryDate = new Date(entry.paidOnDate);
+        if (!entry.paidOnDate) return false;
+        let entryDate;
+        // Check if date is in dd-mm-yyyy format
+        if (entry.paidOnDate.includes('-') && entry.paidOnDate.split('-')[0].length === 2) {
+          const [day, month, year] = entry.paidOnDate.split('-');
+          entryDate = new Date(year, month - 1, day);
+        } else {
+          entryDate = new Date(entry.paidOnDate);
+        }
         return entryDate >= from && entryDate <= to;
       });
       // Calculate total for date range only
@@ -163,6 +233,29 @@ const Summary = () => {
 
     return `${day}/${month}/${year}`;
   };
+  
+  // Format date from database (dd-mm-yyyy) to display format (dd/mm/yyyy)
+  const formatDateOnly = (dateString) => {
+    if (!dateString) return '';
+    // If already in DD-MM-YYYY format, just replace - with / for display
+    if (dateString.includes('-') && dateString.split('-')[0].length === 2) {
+      return dateString.replace(/-/g, '/');
+    }
+    // If in YYYY-MM-DD format, convert to DD/MM/YYYY
+    if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
+      const parts = dateString.split('-');
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    // Try parsing as date
+    const date = new Date(dateString);
+    if (!isNaN(date.getTime())) {
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    }
+    return dateString;
+  };
   const getPreviousMonth = (dateStr) => {
     const date = new Date(dateStr);
     date.setMonth(date.getMonth() - 1);
@@ -193,9 +286,21 @@ const Summary = () => {
       alert('No data found for the selected date range and filters.');
       return;
     }
+    
+    // Map shopNoId to shopNo and tenantNameId to tenantName
+    const mappedData = dataToUse.map(entry => {
+      const shopNo = entry.shopNoId ? (shopNoIdToShopNoMap[entry.shopNoId] || entry.shopNo) : entry.shopNo;
+      const tenantName = entry.tenantNameId ? (tenantNameIdToTenantNameMap[entry.tenantNameId] || entry.tenantName) : entry.tenantName;
+      return {
+        ...entry,
+        shopNo: shopNo,
+        tenantName: tenantName
+      };
+    });
+    
     const previousMonthStr = formatMonth(getPreviousMonth(fromDate)); // e.g., "May 2025"
 
-    const totalPreviousMonthAmount = dataToUse
+    const totalPreviousMonthAmount = mappedData
       .filter(entry => formatMonth(entry.forTheMonthOf) === previousMonthStr)
       .reduce((sum, entry) => {
         const isShopClosure = entry.formType === 'Shop Closure';
@@ -204,12 +309,12 @@ const Summary = () => {
       }, 0);
 
     // Sort alphabetically by tenant name
-    dataToUse.sort((a, b) => a.shopNo.localeCompare(b.shopNo, undefined, { numeric: true }));
+    mappedData.sort((a, b) => a.shopNo.localeCompare(b.shopNo, undefined, { numeric: true }));
     // Calculate totals
     let totalCash = 0;
     let totalNetBanking = 0;
 
-    dataToUse.forEach((entry) => {
+    mappedData.forEach((entry) => {
       const isShopClosure = entry.formType === 'Shop Closure';
       const amt = isShopClosure ? Number(entry.refundAmount || 0) : Number(entry.amount || 0);
 
@@ -296,14 +401,14 @@ const Summary = () => {
     doc.text(`${formatDate(toDate)}`, 262.5, 33);
     // Table
     const tableColumn = ['S.No', 'Date', 'Shop No', 'Tenant Name', 'Amount', 'Form Type', 'Paid On', 'For The Month Of', 'Mode'];
-    const tableRows = dataToUse.map((entry, index) => [
+    const tableRows = mappedData.map((entry, index) => [
       index + 1,
       formatDateTime(entry.timestamp),
       entry.shopNo,
       entry.tenantName,
       formatINRPlain(entry.formType === 'Shop Closure' ? -entry.refundAmount : entry.amount),
       entry.formType,
-      formatDate(entry.paidOnDate),
+      formatDateOnly(entry.paidOnDate),
       entry.forTheMonthOf ? formatMonth(entry.forTheMonthOf) : '',
       entry.paymentMode,
     ]);
@@ -347,7 +452,15 @@ const Summary = () => {
     const from = new Date(fromDate);
     const to = new Date(toDate);
     const dataToUse = rentForms.filter(entry => {
-      const entryDate = new Date(entry.paidOnDate);
+      if (!entry.paidOnDate) return false;
+      let entryDate;
+      // Check if date is in dd-mm-yyyy format
+      if (entry.paidOnDate.includes('-') && entry.paidOnDate.split('-')[0].length === 2) {
+        const [day, month, year] = entry.paidOnDate.split('-');
+        entryDate = new Date(year, month - 1, day);
+      } else {
+        entryDate = new Date(entry.paidOnDate);
+      }
       const inRange = entryDate >= from && entryDate <= to;
       const matchType = selectedTypes ? entry.formType === selectedTypes : true;
       const matchMode = selectedPaymentMode ? entry.paymentMode === selectedPaymentMode : true;
@@ -359,13 +472,24 @@ const Summary = () => {
       return;
     }
 
+    // Map shopNoId to shopNo and tenantNameId to tenantName
+    const mappedData = dataToUse.map(entry => {
+      const shopNo = entry.shopNoId ? (shopNoIdToShopNoMap[entry.shopNoId] || entry.shopNo) : entry.shopNo;
+      const tenantName = entry.tenantNameId ? (tenantNameIdToTenantNameMap[entry.tenantNameId] || entry.tenantName) : entry.tenantName;
+      return {
+        ...entry,
+        shopNo: shopNo,
+        tenantName: tenantName
+      };
+    });
+
     const previousMonthStr = formatMonth(getPreviousMonth(fromDate));
     const todayDateStr = formatDate(new Date());
 
     // Totals
     let totalCash = 0;
     let totalNetBanking = 0;
-    dataToUse.forEach(entry => {
+    mappedData.forEach(entry => {
       const isShopClosure = entry.formType === "Shop Closure";
       const amount = isShopClosure ? Number(entry.refundAmount || 0) : Number(entry.amount || 0);
       if (entry.paymentMode === "Cash") totalCash += isShopClosure ? -amount : amount;
@@ -386,7 +510,7 @@ const Summary = () => {
       "Payment Mode"
     ];
 
-    const tableRows = dataToUse.map((entry, index) => {
+    const tableRows = mappedData.map((entry, index) => {
       const amountValue = entry.formType === "Shop Closure"
         ? -Number(entry.refundAmount || 0)
         : Number(entry.amount || 0);
@@ -397,7 +521,7 @@ const Summary = () => {
         entry.tenantName,
         amountValue.toFixed(2),
         entry.formType,
-        formatDate(entry.paidOnDate),
+        formatDateOnly(entry.paidOnDate),
         entry.forTheMonthOf ? formatMonth(entry.forTheMonthOf) : "",
         entry.paymentMode
       ];
@@ -446,17 +570,28 @@ const Summary = () => {
       return;
     }
 
+    // Map shopNoId to shopNo and tenantNameId to tenantName
+    const mappedData = dataToUse.map(entry => {
+      const shopNo = entry.shopNoId ? (shopNoIdToShopNoMap[entry.shopNoId] || entry.shopNo) : entry.shopNo;
+      const tenantName = entry.tenantNameId ? (tenantNameIdToTenantNameMap[entry.tenantNameId] || entry.tenantName) : entry.tenantName;
+      return {
+        ...entry,
+        shopNo: shopNo,
+        tenantName: tenantName
+      };
+    });
+
     // Totals
-    const totalCash = dataToUse
+    const totalCash = mappedData
       .filter(entry => entry.paymentMode === 'Cash')
       .reduce((sum, entry) => sum + Number(entry.amount), 0);
 
-    const totalNetBanking = dataToUse
+    const totalNetBanking = mappedData
       .filter(entry => entry.paymentMode === 'Net Banking')
       .reduce((sum, entry) => sum + Number(entry.amount), 0);
 
     const totalAmount = totalCash + totalNetBanking;
-    dataToUse.sort((a, b) => a.shopNo.localeCompare(b.shopNo, undefined, { numeric: true }));
+    mappedData.sort((a, b) => a.shopNo.localeCompare(b.shopNo, undefined, { numeric: true }));
     // Draw boxes
     doc.rect(startX, startY, 15, rowHeight); // "MONTH"
     doc.rect(startX + 15, startY, 25, rowHeight); // Value
@@ -531,14 +666,14 @@ const Summary = () => {
 
     // Table
     const tableColumn = ['S.No', 'Date', 'Shop No', 'Tenant Name', 'Amount', 'Form Type', 'Paid On', 'For The Month Of', 'Mode'];
-    const tableRows = dataToUse.map((entry, index) => [
+    const tableRows = mappedData.map((entry, index) => [
       index + 1,
       formatDateTime(entry.timestamp),
       entry.shopNo,
       entry.tenantName,
       formatINRPlain(entry.amount),
       entry.formType,
-      formatDate(entry.paidOnDate),
+      formatDateOnly(entry.paidOnDate),
       formatMonth(entry.forTheMonthOf),
       entry.paymentMode,
     ]);
@@ -586,10 +721,21 @@ const Summary = () => {
       return;
     }
 
+    // Map shopNoId to shopNo and tenantNameId to tenantName
+    const mappedData = dataToUse.map(entry => {
+      const shopNo = entry.shopNoId ? (shopNoIdToShopNoMap[entry.shopNoId] || entry.shopNo) : entry.shopNo;
+      const tenantName = entry.tenantNameId ? (tenantNameIdToTenantNameMap[entry.tenantNameId] || entry.tenantName) : entry.tenantName;
+      return {
+        ...entry,
+        shopNo: shopNo,
+        tenantName: tenantName
+      };
+    });
+
     // Totals
     let totalCash = 0;
     let totalNetBanking = 0;
-    dataToUse.forEach(entry => {
+    mappedData.forEach(entry => {
       const isShopClosure = entry.formType === "Shop Closure";
       const amount = isShopClosure ? Number(entry.refundAmount || 0) : Number(entry.amount || 0);
       if (entry.paymentMode === "Cash") totalCash += isShopClosure ? -amount : amount;
@@ -598,7 +744,7 @@ const Summary = () => {
     const totalAmount = totalCash + totalNetBanking;
 
     // Sort by Shop No
-    dataToUse.sort((a, b) => a.shopNo.localeCompare(b.shopNo, undefined, { numeric: true }));
+    mappedData.sort((a, b) => a.shopNo.localeCompare(b.shopNo, undefined, { numeric: true }));
 
     // Header block
     const summaryHeader = [
@@ -611,7 +757,7 @@ const Summary = () => {
 
     // Table
     const tableHeaders = ['S.No', 'Date', 'Shop No', 'Tenant Name', 'Amount', 'Form Type', 'Paid On', 'For The Month Of', 'Mode'];
-    const tableRows = dataToUse.map((entry, index) => {
+    const tableRows = mappedData.map((entry, index) => {
       const amount = entry.formType === 'Shop Closure'
         ? -Number(entry.refundAmount || 0)
         : Number(entry.amount || 0);
@@ -622,7 +768,7 @@ const Summary = () => {
         entry.tenantName,
         amount.toFixed(2),
         entry.formType,
-        formatDate(entry.paidOnDate),
+        formatDateOnly(entry.paidOnDate),
         formatMonth(entry.forTheMonthOf),
         entry.paymentMode
       ];

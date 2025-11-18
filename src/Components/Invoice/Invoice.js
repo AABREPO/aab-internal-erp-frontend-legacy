@@ -88,9 +88,23 @@ function InvoiceTable() {
       ],
     },
   ]);
-  const findOption = (options, value) =>
-    options.find((opt) => opt.value === value) || null;
-  // Group flat items by main description for correct UI structure
+  // ...existing code...
+const findOption = (options, value) =>
+  options.find((opt) => opt.value === value) || null;
+
+// --- ADD: normalize option input to either an option object or null
+const normalizeOption = (input, options = []) => {
+  if (!input && input !== 0) return null;
+  // already an option-like object
+  if (typeof input === 'object' && input.value !== undefined && input.label !== undefined) {
+    return input;
+  }
+  // string/number -> try to find matching option
+  const str = String(input).trim();
+  const found = (options || []).find(o => String(o.value) === str || String(o.label) === str);
+  return found || { value: str, label: str };
+};
+// ...existing code...
   const mapFetchedItems = (flatItems = []) => {
     if (!Array.isArray(flatItems)) return [];
     const grouped = {};
@@ -98,41 +112,27 @@ function InvoiceTable() {
       const mainDescValue = item.description?.value || item.description || "";
       if (!grouped[mainDescValue]) {
         grouped[mainDescValue] = {
-          description:
-            findOption(descriptions, mainDescValue) || {
-              value: mainDescValue,
-              label: mainDescValue,
-            },
+          description: normalizeOption(mainDescValue, descriptions),
           workType: item.workType || "",
           subItems: [],
         };
       }
 
       grouped[mainDescValue].subItems.push({
-        description:
-          findOption(subItems, item.sub_description || item.subItemDescription || item.description) ||
-          {
-            value: item.sub_description || item.subItemDescription || "",
-            label: item.sub_description || item.subItemDescription || "",
-          },
+        description: normalizeOption(
+          item.sub_description || item.subItemDescription || item.description,
+          subItems
+        ) || { value: item.sub_description || item.subItemDescription || "", label: item.sub_description || item.subItemDescription || "" },
         sizeInput: item.size_input || item.sizeInput || "",
         qty: item.qty || "",
         rate: item.rate || "",
-        unit:
-          findOption(units, item.unit) || {
-            value: item.unit || "",
-            label: item.unit || "",
-          },
+        unit: normalizeOption(item.unit || (item.unit && item.unit.value) || item.unit, units) || { value: item.unit || "", label: item.unit || "" },
         amount: item.amount || "",
         mainRow: {
           sizeInput: item.size_input || item.sizeInput || "",
           qty: item.qty || "",
           rate: item.rate || "",
-          unit:
-            findOption(units, item.unit) || {
-              value: item.unit || "",
-              label: item.unit || "",
-            },
+          unit: normalizeOption(item.unit || (item.unit && item.unit.value) || item.unit, units) || { value: item.unit || "", label: item.unit || "" },
           amount: item.amount || "",
         },
         key: item.item_id || idx,
@@ -140,6 +140,7 @@ function InvoiceTable() {
     });
     return Object.values(grouped);
   };
+// ...existing code...
 
   useEffect(() => {
     try {
@@ -168,63 +169,85 @@ function InvoiceTable() {
     const numStr = qtyStr.toString().replace(/[^\d.-]/g, '');
     return parseFloat(numStr) || 0;
   };
-  const handleInputChangeForRow = (e, itemIndex, subItemIndex, isMainRow = false) => {
-    const { value } = e.target;
-    const updatedItems = [...items];
-    const subItem = updatedItems[itemIndex].subItems[subItemIndex];
-    const selectedUnit = isMainRow
-      ? subItem.mainRow.unit?.value || 'SQFT'
-      : subItem.unit?.value || 'SQFT';
+const handleInputChangeForRow = (e, itemIndex, subItemIndex, isMainRow = false) => {
+  const { value } = e.target;
+  const updatedItems = [...items];
+  const subItem = updatedItems[itemIndex].subItems[subItemIndex];
+  const selectedUnit = isMainRow
+    ? subItem.mainRow.unit?.value || 'SQFT'
+    : subItem.unit?.value || 'SQFT';
+
+  // --- NEW: treat pure numeric input as direct quantity (allow "10" to work)
+  const trimmed = (value || "").toString().trim();
+  const isPureNumber = /^\d+(\.\d+)?$/.test(trimmed);
+  if (isPureNumber) {
     if (isMainRow) {
-      subItem.mainRow.sizeInput = value;
-    } else {
-      subItem.sizeInput = value;
-    }
-    const isValid = validateSizeInput(value, selectedUnit);
-    if (isValid) {
-      if (selectedUnit === "SQFT" || selectedUnit === "M²") {
-        const area = calculateArea(value, selectedUnit);
-        if (isMainRow) {
-          subItem.mainRow.qty = `${area} ${selectedUnit === "SQFT" ? "Sqft" : "m²"}`;
-        } else {
-          subItem.qty = `${area} ${selectedUnit === "SQFT" ? "Sqft" : "m²"}`;
-        }
-      } else if (selectedUnit === "CFT" || selectedUnit === "M³") {
-        const volume = calculateVolume(value, selectedUnit);
-        if (isMainRow) {
-          subItem.mainRow.qty = `${volume} ${selectedUnit === "CFT" ? "Cubic Feet" : "m³"}`;
-        } else {
-          subItem.qty = `${volume} ${selectedUnit === "CFT" ? "Cubic Feet" : "m³"}`;
-        }
-      } else if (selectedUnit === "RFT") {
-        const length = convertToFeet(value);
-        const qtyStr = isNaN(length) ? "Invalid input" : `${length.toFixed(2)} ft`;
-        if (isMainRow) {
-          subItem.mainRow.qty = qtyStr;
-        } else {
-          subItem.qty = qtyStr;
-        }
-      } else if (selectedUnit === "L") {
-        const liters = calculateLiters(value);
-        if (isMainRow) {
-          subItem.mainRow.qty = `${liters} L`;
-        } else {
-          subItem.qty = `${liters} L`;
-        }
-      } else if (selectedUnit === "NOS" || selectedUnit === "L.S") {
-        // Evaluate arithmetic expressions for NOS and L.S units
-        const evalQty = evaluateExpression(value);
-        if (isMainRow) {
-          subItem.mainRow.qty = isNaN(evalQty) ? "Invalid input" : `${evalQty}`;
-        } else {
-          subItem.qty = isNaN(evalQty) ? "Invalid input" : `${evalQty}`;
-        }
+      subItem.mainRow.sizeInput = trimmed;
+      subItem.mainRow.qty = trimmed;
+      if (subItem.mainRow.rate) {
+        const qtyValue = parseFloat(trimmed) || 0;
+        subItem.mainRow.amount = (qtyValue * (parseFloat(subItem.mainRow.rate) || 0)).toFixed(2);
       } else {
-        if (isMainRow) {
-          subItem.mainRow.qty = "";
-        } else {
-          subItem.qty = "";
-        }
+        subItem.mainRow.amount = '';
+      }
+    } else {
+      subItem.sizeInput = trimmed;
+      subItem.qty = trimmed;
+      if (subItem.rate) {
+        const qtyValue = parseFloat(trimmed) || 0;
+        subItem.amount = (qtyValue * (parseFloat(subItem.rate) || 0)).toFixed(2);
+      } else {
+        subItem.amount = '';
+      }
+    }
+    setItems(updatedItems);
+    return;
+  }
+  // --- END NEW
+
+  if (isMainRow) {
+    subItem.mainRow.sizeInput = value;
+  } else {
+    subItem.sizeInput = value;
+  }
+  const isValid = validateSizeInput(value, selectedUnit);
+
+  if (isValid) {
+    if (selectedUnit === "SQFT" || selectedUnit === "M²") {
+      const area = calculateArea(value, selectedUnit);
+      if (isMainRow) {
+        subItem.mainRow.qty = `${area} ${selectedUnit === "SQFT" ? "Sqft" : "m²"}`;
+      } else {
+        subItem.qty = `${area} ${selectedUnit === "SQFT" ? "Sqft" : "m²"}`;
+      }
+    } else if (selectedUnit === "CFT" || selectedUnit === "M³") {
+      const volume = calculateVolume(value, selectedUnit);
+      if (isMainRow) {
+        subItem.mainRow.qty = `${volume} ${selectedUnit === "CFT" ? "Cubic Feet" : "m³"}`;
+      } else {
+        subItem.qty = `${volume} ${selectedUnit === "CFT" ? "Cubic Feet" : "m³"}`;
+      }
+    } else if (selectedUnit === "RFT") {
+      const length = convertToFeet(value);
+      const qtyStr = isNaN(length) ? "Invalid input" : `${length.toFixed(2)} ft`;
+      if (isMainRow) {
+        subItem.mainRow.qty = qtyStr;
+      } else {
+        subItem.qty = qtyStr;
+      }
+    } else if (selectedUnit === "L") {
+      const liters = calculateLiters(value);
+      if (isMainRow) {
+        subItem.mainRow.qty = `${liters} L`;
+      } else {
+        subItem.qty = `${liters} L`;
+      }
+    } else if (selectedUnit === "NOS" || selectedUnit === "L.S") {
+      const evalQty = evaluateExpression(value);
+      if (isMainRow) {
+        subItem.mainRow.qty = isNaN(evalQty) ? "Invalid input" : `${evalQty}`;
+      } else {
+        subItem.qty = isNaN(evalQty) ? "Invalid input" : `${evalQty}`;
       }
     } else {
       if (isMainRow) {
@@ -233,25 +256,32 @@ function InvoiceTable() {
         subItem.qty = "";
       }
     }
-    // Calculate amount if quantity and rate exist
+  } else {
     if (isMainRow) {
-      if (subItem.mainRow.qty && subItem.mainRow.rate) {
-        const qtyValue = parseQty(subItem.mainRow.qty);
-        subItem.mainRow.amount = (qtyValue * subItem.mainRow.rate).toFixed(2);
-      } else {
-        subItem.mainRow.amount = '';
-      }
+      subItem.mainRow.qty = "";
     } else {
-      if (subItem.qty && subItem.rate) {
-        const qtyValue = parseQty(subItem.qty);
-        subItem.amount = (qtyValue * subItem.rate).toFixed(2);
-      } else {
-        subItem.amount = '';
-      }
+      subItem.qty = "";
     }
-    setItems(updatedItems);
-  };
+  }
 
+  // Calculate amount if quantity and rate exist
+  if (isMainRow) {
+    if (subItem.mainRow.qty && subItem.mainRow.rate) {
+      const qtyValue = parseQty(subItem.mainRow.qty);
+      subItem.mainRow.amount = (qtyValue * subItem.mainRow.rate).toFixed(2);
+    } else {
+      subItem.mainRow.amount = '';
+    }
+  } else {
+    if (subItem.qty && subItem.rate) {
+      const qtyValue = parseQty(subItem.qty);
+      subItem.amount = (qtyValue * subItem.rate).toFixed(2);
+    } else {
+      subItem.amount = '';
+    }
+  }
+  setItems(updatedItems);
+};
   const [amountPaid, setAmountPaid] = useState("");
   const [clientName, setClientName] = useState(null);
   const [projectType, setProjectType] = useState(null);
@@ -342,7 +372,7 @@ function InvoiceTable() {
     };
     fetchProjectNames();
   }, []);
-  const handleProjectNameChange = async (selectedOption) => {
+const handleProjectNameChange = async (selectedOption) => {
     const sanitizeInvoiceNumber = (invNum) => {
       if (!invNum || typeof invNum !== "string") return "";
       return invNum.trim().split(/[: ]/)[0];
@@ -355,7 +385,8 @@ function InvoiceTable() {
         setInvoiceNumber("");
         setInvoiceVersions([]);
         setCurrentInvoice(null);
-        setItems([]);
+        // Assuming 'setItems' is available globally/in scope
+        setItems([]); 
         setClientName(null);
         setClientAddress("");
         setInvoiceDate("");
@@ -366,7 +397,8 @@ function InvoiceTable() {
     }
 
     setSelectedProjectName(selectedOption);
-    setProjectType(selectedOption.project_type || selectedOption.label || "");
+    // FIX: Set projectType to null to prevent persistence on project name change
+    setProjectType(null);
     const projectID = String(selectedOption.value || "").trim();
     if (!projectID) return;
 
@@ -384,7 +416,8 @@ function InvoiceTable() {
 
       ReactDOM.unstable_batchedUpdates(() => {
         setInvoiceNumber(clonedInvoiceNumber);
-        setItems(mapFetchedItems(clonedItems));
+        // Assuming 'mapFetchedItems' and 'setItems' are available globally/in scope
+        setItems(mapFetchedItems(clonedItems)); 
         setClientName(null);
         setClientAddress("");
         setInvoiceDate("");
@@ -432,12 +465,14 @@ function InvoiceTable() {
 
       if (!isCloning && !isModalProjectChange) {
         if (invoiceOptions.length > 0 && invoiceToSelect) {
-          await handleInvoiceVersionChange({ value: invoiceToSelect });
+          // FIX: Removed manual call to handleInvoiceVersionChange. 
+          // The useEffect watching invoiceNumber will now handle the fetch.
           setIsInvoiceLocked(/ D\d+(\.\d+)?/.test(invoiceToSelect));
         } else {
           ReactDOM.unstable_batchedUpdates(() => {
             setCurrentInvoice(null);
-            setItems([]);
+            // Assuming 'setItems' is available globally/in scope
+            setItems([]); 
             setClientName(null);
             setClientAddress("");
             setInvoiceDate("");
@@ -556,7 +591,7 @@ function InvoiceTable() {
         setItems([]);
         setCurrentInvoice(null);
       });
-  }, [allInvoices /* run when invoices list is ready */]);
+  }, [allInvoices]);
 
   // Fetch invoice when invoiceNumber changes, but guard against restore/cloning flows
   useEffect(() => {
@@ -762,24 +797,6 @@ function InvoiceTable() {
       setShowToast(false);
     }, 10000); // 10 seconds
   };
-
-  // Load from localStorage on mount (run once)
-  // Clear all previously saved invoice-related localStorage values and reset the state on mount
-  /* useEffect(() => {
-     localStorage.removeItem('invoiceItems');
-     localStorage.removeItem('invoiceClientName');
-     localStorage.removeItem('invoiceProjectType');
-     localStorage.removeItem('invoiceDate');
-     localStorage.removeItem('invoiceAmountPaid');
- 
-     setItems([]);           // Invoice table blank
-     setClientName(null);    // Client name dropdown blank
-     setProjectType(null);   // Project type dropdown blank
-     setInvoiceDate('');     // Date blank
-     setAmountPaid('');      // Amount paid blank
-     setInvoiceNumber('');   // Invoice number blank if needed
-   }, []);*/
-
   // Fixed code: on mount, load invoice number from localStorage if exists, else generate new once
   // Initialize or generate invoice number on mount
   // Initialize invoices first, but do NOT reset invoiceNumber if a lastInvoiceNumber exists.
@@ -799,27 +816,6 @@ function InvoiceTable() {
     }
     initializeInvoices();
   }, []);
-
-  // Clear all other invoice state and localStorage on mount, but NOT invoice number
-  /* useEffect(() => {
-     localStorage.removeItem('invoiceItems');
-     localStorage.removeItem('invoiceClientName');
-     localStorage.removeItem('invoiceProjectType');
-     localStorage.removeItem('invoiceDate');
-     localStorage.removeItem('invoiceAmountPaid');
- 
-     setItems([]);
-     setClientName(null);
-     setProjectType(null);
-     setInvoiceDate('');
-     setAmountPaid('');
-     // Keep invoiceNumber intact here
-   }, []);
- 
-   // DO NOT include or comment out any saving-to-localStorage useEffect
-   // to prevent repopulating stale invoice UI data
- 
-   // }, [items, clientName, projectType, invoiceDate, amountPaid]);*/
   useEffect(() => {
     if (
       currentInvoice &&
@@ -851,135 +847,149 @@ function InvoiceTable() {
     }
   }, [currentInvoice, invoiceNumber, projectNameOptions, projectTypes, autoFilledProject]);
 
-  const saveDraftToBackend = async () => {
-    if (!invoiceNumber) {
-      alert("Invoice number required before saving draft.");
-      return;
-    }
+  // ...existing code...
+const saveDraftToBackend = async () => {
+  if (!invoiceNumber) {
+    alert("Invoice number required before saving draft.");
+    return;
+  }
 
-    const totalAmount = calculateTotalAmount();
+  const totalAmount = calculateTotalAmount();
 
-    const invoiceData = {
-      invoice: {
-        invoice_number: invoiceNumber,
-        status: "draft",
-        date: invoiceDate,
-        client_name: clientName ? clientName.value : "",
-        client_address: clientAddress || "",
-        client_id: clientName ? clientName.id : null,
-        project_name: selectedProjectName ? selectedProjectName.label : "",
-        project_id: selectedProjectName ? selectedProjectName.value : null,
-        project_type: projectType ? projectType.value : "",
-        amount_paid: parseFloat(amountPaid) || 0,
-        total_amount: totalAmount,
-        invoice_id: currentInvoice?.invoice_id || currentInvoice?.invoiceId || null,
-      },
-      items: items.flatMap((item) =>
-        item.subItems.map((sub) => ({
-          description: item.description?.label || item.description || "",
-          sub_description: sub.description?.label || sub.description || "",
-          size_input: sub.sizeInput || "",
-          qty: sub.qty || "",
-          rate: parseFloat(sub.rate) || 0,
-          unit: sub.unit?.value || sub.unit || "",
-          amount: parseFloat(sub.amount) || 0,
-          is_main_row: false,
-          item_id: sub.key || sub.item_id || null,
-        }))
-      ),
-    };
-
-    console.log("[DEBUG] Save Online Payload:", invoiceData);
-
-    try {
-      let res;
-      const hasExistingInvoice =
-        invoiceData.invoice.invoice_id &&
-        String(invoiceData.invoice.invoice_number).includes(" D");
-
-      if (hasExistingInvoice) {
-        console.log("[DEBUG] Updating existing invoice draft:", invoiceData.invoice.invoice_number);
-
-        const existingRes = await axios.get(
-          `https://backendaab.in/aabuildersDash/api/invoices/with-items/${invoiceData.invoice.invoice_id}`
-        );
-
-        const existingInvoice = existingRes.data;
-        const oldItems = Array.isArray(existingInvoice.items) ? existingInvoice.items : [];
-        const newItems = invoiceData.items || [];
-
-        const mergedItems = [
-          ...oldItems,
-          ...newItems.filter(
-            (newItem) =>
-              !oldItems.some(
-                (old) =>
-                  old.sub_description?.trim() === newItem.sub_description?.trim() &&
-                  parseFloat(old.amount) === parseFloat(newItem.amount)
-              )
-          ),
-        ];
-
-        const mergedPayload = { ...invoiceData, items: mergedItems };
-
-        console.log("[DEBUG] Final merged payload for update:", mergedPayload);
-
-        res = await axios.put(
-          "https://backendaab.in/aabuildersDash/api/invoices/update-keep-existing",
-          mergedPayload,
-          { headers: { "Content-Type": "application/json" } }
-        );
-      } else {
-        console.log("[DEBUG] Creating new D1 draft...");
-        res = await axios.post(
-          "https://backendaab.in/aabuildersDash/api/invoices/save-online",
-          invoiceData,
-          { headers: { "Content-Type": "application/json" } }
-        );
-      }
-
-      const savedInvoice = res.data;
-
-      showToastMessage("✅ Draft saved successfully!");
-
-      // ✅ Step 2: Clear UI completely
-      ReactDOM.unstable_batchedUpdates(() => {
-        setInvoiceNumber("");
-        setInvoiceDate("");
-        setClientName(null);
-        setClientAddress("");
-        setProjectType(null);
-        setAmountPaid("");
-        setItems([]);
-        setInvoiceVersions([]);
-        setCurrentInvoice(null);
-        setSelectedProjectName(null);
-      });
-
-      // ✅ Step 3: Clear all localStorage keys
-      localStorage.removeItem("lastInvoiceNumber");
-      localStorage.removeItem("invoiceItems");
-      localStorage.removeItem("invoiceClientName");
-      localStorage.removeItem("invoiceProjectType");
-      localStorage.removeItem("invoiceDate");
-      localStorage.removeItem("invoiceAmountPaid");
-
-      // ✅ Step 4: Refresh invoice list
-      try {
-        const resAll = await axios.get("https://backendaab.in/aabuildersDash/api/invoices/all-with-items");
-        const allInvoicesData = Array.isArray(resAll.data) ? resAll.data : [];
-        setAllInvoices(allInvoicesData);
-      } catch (err) {
-        console.warn("Failed to refresh invoices after save:", err);
-      }
-
-      console.log("✅ Invoice saved and UI reset successfully!");
-    } catch (error) {
-      console.error("[ERROR] Failed to save draft:", error);
-      showToastMessage("✅ Draft saved successfully!");
-    }
+  const invoiceData = {
+    invoice: {
+      invoice_number: invoiceNumber,
+      status: "draft",
+      date: invoiceDate,
+      client_name: clientName ? clientName.value : "",
+      client_address: clientAddress || "",
+      client_id: clientName ? clientName.id : null,
+      project_name: selectedProjectName ? selectedProjectName.label : "",
+      project_id: selectedProjectName ? selectedProjectName.value : null,
+      project_type: projectType ? projectType.value : "",
+      amount_paid: parseFloat(amountPaid) || 0,
+      total_amount: totalAmount,
+      invoice_id: currentInvoice?.invoice_id || currentInvoice?.invoiceId || null,
+    },
+    items: items.flatMap((item) =>
+      item.subItems.map((sub) => ({
+        description: item.description?.label || item.description || "",
+        sub_description: sub.description?.label || sub.description || "",
+        size_input: sub.sizeInput || "",
+        qty: sub.qty || "",
+        rate: parseFloat(sub.rate) || 0,
+        unit: sub.unit?.value || sub.unit || "",
+        amount: parseFloat(sub.amount) || 0,
+        is_main_row: false,
+        item_id: sub.key || sub.item_id || null,
+      }))
+    ),
   };
 
+  console.log("[DEBUG] Save Online Payload:", invoiceData);
+
+  try {
+    let res;
+    const hasExistingInvoice =
+      invoiceData.invoice.invoice_id &&
+      String(invoiceData.invoice.invoice_number).includes(" D");
+
+    if (hasExistingInvoice) {
+      const existingRes = await axios.get(
+        `https://backendaab.in/aabuildersDash/api/invoices/with-items/${invoiceData.invoice.invoice_id}`
+      );
+      const existingInvoice = existingRes.data;
+      const oldItems = Array.isArray(existingInvoice.items) ? existingInvoice.items : [];
+      const newItems = invoiceData.items || [];
+
+      const mergedItems = [
+        ...oldItems,
+        ...newItems.filter(
+          (newItem) =>
+            !oldItems.some(
+              (old) =>
+                old.sub_description?.trim() === newItem.sub_description?.trim() &&
+                parseFloat(old.amount) === parseFloat(newItem.amount)
+            )
+        ),
+      ];
+
+      const mergedPayload = { ...invoiceData, items: mergedItems };
+
+      res = await axios.put(
+        "https://backendaab.in/aabuildersDash/api/invoices/update-keep-existing",
+        mergedPayload,
+        { headers: { "Content-Type": "application/json" } }
+      );
+    } else {
+      res = await axios.post(
+        "https://backendaab.in/aabuildersDash/api/invoices/save-online",
+        invoiceData,
+        { headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    const savedResponse = res.data || {};
+    const savedInvoice = savedResponse.invoice || savedResponse;
+    const savedItems = savedResponse.items || invoiceData.items || [];
+    const savedNumber = String(savedInvoice.invoice_number || invoiceNumber).trim();
+
+    // --- NEW: cache saved invoice BEFORE clearing UI
+    setInvoiceCache(prev => ({
+      ...prev,
+      [savedNumber]: { invoice: savedInvoice, items: savedItems }
+    }));
+
+    setAllInvoices(prev => {
+      const copy = Array.isArray(prev) ? [...prev] : [];
+      const idx = copy.findIndex(e => String(e.invoice?.invoice_number || "").trim() === savedNumber);
+      if (idx >= 0) {
+        copy[idx] = { invoice: savedInvoice, items: savedItems };
+      } else {
+        copy.push({ invoice: savedInvoice, items: savedItems });
+      }
+      return copy;
+    });
+
+    showToastMessage("✅ Draft saved successfully!");
+
+    // Now clear UI (user requested UI reset on Save Online)
+    ReactDOM.unstable_batchedUpdates(() => {
+      setInvoiceNumber("");
+      setInvoiceDate("");
+      setClientName(null);
+      setClientAddress("");
+      setProjectType(null);
+      setAmountPaid("");
+      setItems([]);
+      setInvoiceVersions([]);
+      setCurrentInvoice(null);
+      setSelectedProjectName(null);
+    });
+
+    // Clear persistent keys
+    localStorage.removeItem("lastInvoiceNumber");
+    localStorage.removeItem("invoiceItems");
+    localStorage.removeItem("invoiceClientName");
+    localStorage.removeItem("invoiceProjectType");
+    localStorage.removeItem("invoiceDate");
+    localStorage.removeItem("invoiceAmountPaid");
+
+    // Refresh invoices list
+    try {
+      const resAll = await axios.get("https://backendaab.in/aabuildersDash/api/invoices/all-with-items");
+      const allInvoicesData = Array.isArray(resAll.data) ? resAll.data : [];
+      setAllInvoices(allInvoicesData);
+    } catch (err) {
+      console.warn("Failed to refresh invoices after save:", err);
+    }
+
+    console.log("✅ Invoice saved and UI reset successfully!");
+  } catch (error) {
+    console.error("[ERROR] Failed to save draft:", error);
+    showToastMessage("❌ Failed to save draft.");
+  }
+};
   const finalizeInvoiceBackend = async () => {
     if (!invoiceNumber || invoiceNumber.trim() === '') {
       alert('Invoice number is missing. Cannot finalize.');
@@ -1474,12 +1484,12 @@ function InvoiceTable() {
                           <td className="p-2 border-b border-gray-200">
                             <div className="flex items-center mb-2">
                               <span className="mr-2 font-semibold">{displayIndex++}.</span>
-                              <CreatableSelect
+                             <CreatableSelect
                                 options={descriptions}
-                                value={item.description || ''}
+                                value={normalizeOption(item.description, descriptions) || null}
                                 onChange={(value) => {
                                   const updatedItems = [...items];
-                                  updatedItems[itemIndex].description = value || '';
+                                  updatedItems[itemIndex].description = normalizeOption(value, descriptions) || null;
                                   setItems(updatedItems);
                                 }}
                                 className="w-52 font-semibold text-left"
@@ -1539,12 +1549,12 @@ function InvoiceTable() {
                           <tr key={`sub-${itemIndex}-${subItemIndex}`} className="odd:bg-white even:bg-[#FAF6ED] hover:bg-gray-50">
                             <td className="p-2 border-b border-gray-200">
                               <div className="flex items-center space-x-2 gap-0 group">
-                                <CreatableSelect
+                                    <CreatableSelect
                                   options={subItems}
-                                  value={subItem.description || ''}
+                                  value={normalizeOption(subItem.description, subItems) || null}
                                   onChange={(value) => {
                                     const updatedItems = [...items];
-                                    updatedItems[itemIndex].subItems[subItemIndex].description = value || descriptions[0];
+                                    updatedItems[itemIndex].subItems[subItemIndex].description = normalizeOption(value, subItems) || null;
                                     setItems(updatedItems);
                                   }}
                                   className="w-96 ml-8 font-medium text-left"
@@ -1854,7 +1864,7 @@ function InvoiceTable() {
                       placeholder: (base) => ({ ...base, color: "#888" }),
                       singleValue: (base) => ({ ...base, color: "#000" }),
                     }}
-                    isDisabled={isInvoiceLocked}
+                    
                   />
                 </div>
                 <div className="mb-4" style={{ display: "flex", flexDirection: "column" }}>
@@ -1969,10 +1979,14 @@ function InvoiceTable() {
                     isSearchable={true}
                   />
                   <div className="flex justify-end space-x-3">
-                    <button onClick={() => setIsCloneModalOpen(false)} className="px-4 py-2 border rounded hover:bg-gray-100">
+                    <button
+                      onClick={() => setIsCloneModalOpen(false)}
+                      className="px-4 py-2 border rounded hover:bg-gray-100"
+                    >
                       Cancel
                     </button>
-                    <button onClick={handleConfirmClone}
+                    <button
+                      onClick={handleConfirmClone}
                       className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                       disabled={!cloneProjectName}
                     >
@@ -1983,6 +1997,7 @@ function InvoiceTable() {
               </div>
             )}
           </div>
+
         </div>
       </div>
     </body>

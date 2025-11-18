@@ -329,6 +329,13 @@ const InputData = ({ username, userRoles = [] }) => {
     }
     return null;
   };
+  const getShopsByProjectReferenceName = (projectRefName, useUnfiltered = false) => {
+    const allShops = useUnfiltered ? getAllShopNumbersUnfiltered() : getAllShopNumbers();
+    if (!projectRefName || projectRefName === '') {
+      return allShops;
+    }
+    return allShops.filter(shop => shop.projectReferenceName === projectRefName);
+  };
 
   const [formData, setFormData] = useState({
     tenantName: '',
@@ -631,6 +638,7 @@ const InputData = ({ username, userRoles = [] }) => {
     shopNos: [
       {
         shopNoId: '',
+        projectReferenceName: '',
         monthlyRent: '',
         advanceAmount: '',
         startingDate: '',
@@ -648,6 +656,7 @@ const InputData = ({ username, userRoles = [] }) => {
     shopNos: [
       {
         shopNoId: '',
+        projectReferenceName: '',
         monthlyRent: '',
         advanceAmount: '',
         startingDate: '',
@@ -1141,6 +1150,7 @@ const InputData = ({ username, userRoles = [] }) => {
       shopNos: [
         {
           shopNoId: '',
+          projectReferenceName: '',
           monthlyRent: '',
           advanceAmount: '',
           startingDate: '',
@@ -1162,6 +1172,7 @@ const InputData = ({ username, userRoles = [] }) => {
       shopNos: [
         {
           shopNoId: '',
+          projectReferenceName: '',
           monthlyRent: '',
           advanceAmount: '',
           startingDate: '',
@@ -1179,19 +1190,24 @@ const InputData = ({ username, userRoles = [] }) => {
       age: item.age || '',
       mobileNumber: item.mobileNumber || '',
       tenantAddress: item.tenantAddress || '',
-      shopNos: item.shopNos && item.shopNos.length > 0 ? item.shopNos.map(shop => ({
-        id: shop.id,
-        shopNoId: shop.shopNoId || '',
-        monthlyRent: shop.monthlyRent || '',
-        advanceAmount: shop.advanceAmount || '',
-        startingDate: shop.startingDate || '',
-        rentIncreaseYear: shop.rentIncreaseYear || '',
-        rentIncreasePercentage: shop.rentIncreasePercentage || '',
-        rentAssignDate: shop.rentAssignDate || '',
-        shouldCollectAdvance: shop.shouldCollectAdvance !== undefined ? shop.shouldCollectAdvance : true,
-        shopClosureDate: shop.shopClosureDate || ''
-      })) : [{
+      shopNos: item.shopNos && item.shopNos.length > 0 ? item.shopNos.map(shop => {
+        const shopDetails = shop.shopNoId ? getShopDetailsById(shop.shopNoId) : null;
+        return {
+          id: shop.id,
+          shopNoId: shop.shopNoId || '',
+          projectReferenceName: shopDetails?.projectReferenceName || shop.projectReferenceName || '',
+          monthlyRent: shop.monthlyRent || '',
+          advanceAmount: shop.advanceAmount || '',
+          startingDate: shop.startingDate || '',
+          rentIncreaseYear: shop.rentIncreaseYear || '',
+          rentIncreasePercentage: shop.rentIncreasePercentage || '',
+          rentAssignDate: shop.rentAssignDate || '',
+          shouldCollectAdvance: shop.shouldCollectAdvance !== undefined ? shop.shouldCollectAdvance : true,
+          shopClosureDate: shop.shopClosureDate || ''
+        };
+      }) : [{
         shopNoId: '',
+        projectReferenceName: '',
         monthlyRent: '',
         advanceAmount: '',
         startingDate: '',
@@ -1217,6 +1233,7 @@ const InputData = ({ username, userRoles = [] }) => {
       shopNos: [
         {
           shopNoId: '',
+          projectReferenceName: '',
           monthlyRent: '',
           advanceAmount: '',
           startingDate: '',
@@ -1308,6 +1325,7 @@ const InputData = ({ username, userRoles = [] }) => {
         ...tenantLinkFormData.shopNos,
         {
           shopNoId: '',
+          projectReferenceName: '',
           monthlyRent: '',
           advanceAmount: '',
           startingDate: '',
@@ -1324,10 +1342,15 @@ const InputData = ({ username, userRoles = [] }) => {
         ...editTenantLinkFormData.shopNos,
         {
           shopNoId: '',
+          projectReferenceName: '',
           monthlyRent: '',
           advanceAmount: '',
           startingDate: '',
-          shouldCollectAdvance: true
+          rentIncreaseYear: '',
+          rentIncreasePercentage: '',
+          rentAssignDate: '',
+          shouldCollectAdvance: true,
+          shopClosureDate: ''
         }
       ]
     });
@@ -4334,31 +4357,93 @@ const InputData = ({ username, userRoles = [] }) => {
                 const showProjectAtTop = projectRefNames.length === 1 && projectRefNames[0];
                 return (
                   <>
-                    {showProjectAtTop && (
-                      <div className="mb-2 text-sm text-gray-600">
-                        <span className="font-semibold">Project: </span>{projectRefNames[0]}
-                      </div>
-                    )}
                     {tenantLinkFormData.shopNos.map((shop, sIndex) => {
                       const shopDetails = getShopDetailsById(shop.shopNoId);
-                      const selectedShopOption = getAllShopNumbers().find(option =>
+                      const filteredShops = getShopsByProjectReferenceName(shop.projectReferenceName);
+                      const selectedShopOption = filteredShops.find(option =>
+                        option.value === shop.shopNoId || option.id === shop.shopNoId ||
+                        String(option.value) === String(shop.shopNoId) || String(option.id) === String(shop.shopNoId)
+                      ) || getAllShopNumbers().find(option =>
                         option.value === shop.shopNoId || option.id === shop.shopNoId ||
                         String(option.value) === String(shop.shopNoId) || String(option.id) === String(shop.shopNoId)
                       );
-                      const showProjectPerShop = !showProjectAtTop && shopDetails?.projectReferenceName;
                       return (
                         <div key={sIndex} className="bg-gray-50 p-4 rounded-lg shadow-md mb-6 text-left w-[1150px]">
-                          {showProjectPerShop && (
-                            <div className="mb-2">
-                              <div className="mb-2 text-sm text-gray-600">
-                                <span className="font-semibold">Project: </span>{shopDetails.projectReferenceName || 'N/A'}
-                              </div>
-                            </div>
-                          )}
-                          <div className="grid grid-cols-6 mb-2 ">
+                          <div className="flex gap-2 mb-2 ">
+                            <Select
+                              name="projectReferenceName"
+                              options={projectOptions}
+                              value={projectOptions.find(opt => opt.value === shop.projectReferenceName)}
+                              onChange={(selectedOption) => {
+                                const projectRefName = selectedOption?.value || '';
+                                handleTenantLinkShopChange(sIndex, {
+                                  target: {
+                                    name: 'projectReferenceName',
+                                    value: projectRefName
+                                  }
+                                });
+                                if (selectedShopOption && selectedShopOption.projectReferenceName !== projectRefName) {
+                                  handleTenantLinkShopChange(sIndex, {
+                                    target: {
+                                      name: 'shopNoId',
+                                      value: ''
+                                    }
+                                  });
+                                }
+                              }}
+                              placeholder="Property"
+                              isSearchable
+                              isClearable
+                              className="w-72 text-sm"
+                              classNamePrefix="select"
+                              menuPortalTarget={document.body}
+                              styles={{
+                                control: (provided, state) => ({
+                                  ...provided,
+                                  height: '44px',
+                                  minHeight: '44px',
+                                  backgroundColor: 'transparent',
+                                  borderWidth: '2px',
+                                  borderColor: state.isFocused
+                                    ? 'rgba(191, 152, 83, 0.5)'
+                                    : 'rgba(191, 152, 83, 0.25)',
+                                  borderRadius: '8px',
+                                  boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                  '&:hover': {
+                                    borderColor: 'rgba(191, 152, 83, 0.4)',
+                                  },
+                                }),
+                                menuPortal: (base) => ({
+                                  ...base,
+                                  zIndex: 9999,
+                                }),
+                                menu: (provided) => ({
+                                  ...provided,
+                                  zIndex: 9999,
+                                }),
+                                option: (provided, state) => ({
+                                  ...provided,
+                                  backgroundColor: state.isSelected
+                                    ? 'rgba(191, 152, 83, 0.3)'
+                                    : state.isFocused
+                                      ? 'rgba(191, 152, 83, 0.1)'
+                                      : 'white',
+                                  color: 'black',
+                                  fontWeight: state.isSelected ? 'bold' : 'normal',
+                                }),
+                                singleValue: (provided) => ({
+                                  ...provided,
+                                  color: 'black',
+                                }),
+                                placeholder: (provided) => ({
+                                  ...provided,
+                                  color: '#999',
+                                }),
+                              }}
+                            />
                             <Select
                               name="shopNo"
-                              options={getAllShopNumbers()}
+                              options={getShopsByProjectReferenceName(shop.projectReferenceName)}
                               value={selectedShopOption}
                               menuPlacement="auto"
                               onMenuOpen={() => {
@@ -4382,12 +4467,22 @@ const InputData = ({ username, userRoles = [] }) => {
                               }}
                               onChange={(selectedOption) => {
                                 if (selectedOption) {
+                                  const shopDetails = getShopDetailsById(selectedOption.value || selectedOption.id);
                                   handleTenantLinkShopChange(sIndex, {
                                     target: {
                                       name: 'shopNoId',
                                       value: selectedOption.value || selectedOption.id
                                     }
                                   });
+                                  // Auto-populate project reference name if not set
+                                  if (!shop.projectReferenceName && shopDetails?.projectReferenceName) {
+                                    handleTenantLinkShopChange(sIndex, {
+                                      target: {
+                                        name: 'projectReferenceName',
+                                        value: shopDetails.projectReferenceName
+                                      }
+                                    });
+                                  }
                                 } else {
                                   // Handle clear
                                   handleTenantLinkShopChange(sIndex, {
@@ -4401,7 +4496,7 @@ const InputData = ({ username, userRoles = [] }) => {
                               placeholder="Shop No"
                               isSearchable
                               isClearable
-                              className="w-44"
+                              className="w-44 text-sm"
                               classNamePrefix="select"
                               menuPortalTarget={document.body}
                               styles={{
@@ -4453,7 +4548,7 @@ const InputData = ({ username, userRoles = [] }) => {
                               name="doorNo"
                               value={shopDetails?.doorNo || ''}
                               readOnly
-                              className="border-2 border-[#BF9853] w-28 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
+                              className="border-2 text-sm border-[#BF9853] w-28 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
                               placeholder="Door No"
                             />
                             <div className='flex gap-1'>
@@ -4470,7 +4565,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                     },
                                   });
                                 }}
-                                className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
+                                className="border-2 text-sm border-[#BF9853] w-36 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
                                 placeholder="Rent"
                               />
                               <input
@@ -4478,7 +4573,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                 name="shouldCollectAdvance"
                                 checked={shop.shouldCollectAdvance}
                                 onChange={(e) => handleTenantLinkShopChange(sIndex, e)}
-                                className="custom-checkbox cursor-pointer appearance-none w-4 h-4 mt-3 -ml-1 rounded bg-slate-200 checked:bg-[#E2F9E1] checked:border-[#034638] "
+                                className="custom-checkbox cursor-pointer appearance-none w-4 h-4 mt-3 rounded bg-slate-200 checked:bg-[#E2F9E1] checked:border-[#034638] "
                               />
                             </div>
                             <input
@@ -4494,7 +4589,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                   },
                                 });
                               }}
-                              className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
+                              className="border-2 text-sm border-[#BF9853] w-36 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
                               placeholder="Advance"
                             />
                             <div className="relative flex">
@@ -4511,7 +4606,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                     },
                                   });
                                 }}
-                                className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
+                                className="border-2 text-sm border-[#BF9853] w-32 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
                                 placeholder="Advance"
                               />
                               {tenantLinkFormData.shopNos.length > 1 && (
@@ -4560,7 +4655,7 @@ const InputData = ({ username, userRoles = [] }) => {
       )}
       {isTenantLinkEditOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
-          <div className="bg-white rounded-md w-[85rem] h-[44rem] px-2 py-2 overflow-y-auto">
+          <div className="bg-white rounded-md w-[90rem] h-[44rem] px-2 py-2 overflow-y-auto">
             <div>
               <button className="text-red-500 ml-[95%]" onClick={closeEditTenantLink}>
                 <img src={cross} alt='cross' className='w-5 h-5' />
@@ -4654,32 +4749,93 @@ const InputData = ({ username, userRoles = [] }) => {
                 const showProjectAtTop = projectRefNames.length === 1 && projectRefNames[0];
                 return (
                   <>
-                    {showProjectAtTop && (
-                      <div className="mb-2 text-sm text-gray-600">
-                        <span className="font-semibold">Project: </span>{projectRefNames[0]}
-                      </div>
-                    )}
                     {editTenantLinkFormData.shopNos.map((shop, sIndex) => {
                       const shopDetails = getShopDetailsById(shop.shopNoId);
-                      const allShopOptions = getAllShopNumbersUnfiltered();
-                      const selectedShopOption = allShopOptions.find(option =>
+                      const filteredShops = getShopsByProjectReferenceName(shop.projectReferenceName, true);
+                      const selectedShopOption = filteredShops.find(option =>
+                        option.value === shop.shopNoId || option.id === shop.shopNoId ||
+                        String(option.value) === String(shop.shopNoId) || String(option.id) === String(shop.shopNoId)
+                      ) || getAllShopNumbersUnfiltered().find(option =>
                         option.value === shop.shopNoId || option.id === shop.shopNoId ||
                         String(option.value) === String(shop.shopNoId) || String(option.id) === String(shop.shopNoId)
                       );
-                      const showProjectPerShop = !showProjectAtTop && shopDetails?.projectReferenceName;
                       return (
-                        <div key={sIndex} className="bg-gray-50 p-4 rounded-lg shadow-md mb-6 text-left w-[1150px]">
-                          {showProjectPerShop && (
-                            <div className="mb-2">
-                              <div className="mb-2 text-sm text-gray-600">
-                                <span className="font-semibold">Project: </span>{shopDetails.projectReferenceName || 'N/A'}
-                              </div>
-                            </div>
-                          )}
-                          <div className="grid grid-cols-6 mb-2 ">
+                        <div key={sIndex} className="bg-gray-50 p-4 rounded-lg shadow-md mb-6 text-left w-[1220px]">
+                          <div className="flex gap-2 mb-2 ">
+                            <Select
+                              name="projectReferenceName"
+                              options={projectOptions}
+                              value={projectOptions.find(opt => opt.value === shop.projectReferenceName)}
+                              onChange={(selectedOption) => {
+                                const projectRefName = selectedOption?.value || '';
+                                handleEditTenantLinkShopChange(sIndex, {
+                                  target: {
+                                    name: 'projectReferenceName',
+                                    value: projectRefName
+                                  }
+                                });
+                                if (selectedShopOption && selectedShopOption.projectReferenceName !== projectRefName) {
+                                  handleEditTenantLinkShopChange(sIndex, {
+                                    target: {
+                                      name: 'shopNoId',
+                                      value: ''
+                                    }
+                                  });
+                                }
+                              }}
+                              placeholder="Project"
+                              isSearchable
+                              isClearable
+                              className="w-72 text-sm"
+                              classNamePrefix="select"
+                              menuPortalTarget={document.body}
+                              styles={{
+                                control: (provided, state) => ({
+                                  ...provided,
+                                  height: '44px',
+                                  minHeight: '44px',
+                                  backgroundColor: 'transparent',
+                                  borderWidth: '2px',
+                                  borderColor: state.isFocused
+                                    ? 'rgba(191, 152, 83, 0.5)'
+                                    : 'rgba(191, 152, 83, 0.25)',
+                                  borderRadius: '8px',
+                                  boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                  '&:hover': {
+                                    borderColor: 'rgba(191, 152, 83, 0.4)',
+                                  },
+                                }),
+                                menuPortal: (base) => ({
+                                  ...base,
+                                  zIndex: 9999,
+                                }),
+                                menu: (provided) => ({
+                                  ...provided,
+                                  zIndex: 9999,
+                                }),
+                                option: (provided, state) => ({
+                                  ...provided,
+                                  backgroundColor: state.isSelected
+                                    ? 'rgba(191, 152, 83, 0.3)'
+                                    : state.isFocused
+                                      ? 'rgba(191, 152, 83, 0.1)'
+                                      : 'white',
+                                  color: 'black',
+                                  fontWeight: state.isSelected ? 'bold' : 'normal',
+                                }),
+                                singleValue: (provided) => ({
+                                  ...provided,
+                                  color: 'black',
+                                }),
+                                placeholder: (provided) => ({
+                                  ...provided,
+                                  color: '#999',
+                                }),
+                              }}
+                            />
                             <Select
                               name="shopNo"
-                              options={allShopOptions}
+                              options={filteredShops}
                               value={selectedShopOption}
                               menuPlacement="auto"
                               onMenuOpen={() => {
@@ -4708,6 +4864,14 @@ const InputData = ({ username, userRoles = [] }) => {
                                       value: selectedOption.value || selectedOption.id
                                     }
                                   });
+                                  if (!shop.projectReferenceName && shopDetails?.projectReferenceName) {
+                                    handleEditTenantLinkShopChange(sIndex, {
+                                      target: {
+                                        name: 'projectReferenceName',
+                                        value: shopDetails.projectReferenceName
+                                      }
+                                    });
+                                  }
                                 } else {
                                   handleEditTenantLinkShopChange(sIndex, {
                                     target: {
@@ -4720,7 +4884,7 @@ const InputData = ({ username, userRoles = [] }) => {
                               placeholder="Shop No"
                               isSearchable
                               isClearable
-                              className="w-44"
+                              className="w-44 text-sm"
                               classNamePrefix="select"
                               menuPortalTarget={document.body}
                               styles={{
@@ -4772,7 +4936,7 @@ const InputData = ({ username, userRoles = [] }) => {
                               name="doorNo"
                               value={shopDetails?.doorNo || ''}
                               readOnly
-                              className="border-2 ml-4 border-[#BF9853] w-28 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
+                              className="border-2 text-sm border-[#BF9853] w-20 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
                               placeholder="Door No"
                             />
                             <div className='flex gap-1'>
@@ -4789,7 +4953,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                     },
                                   });
                                 }}
-                                className="border-2 border-[#BF9853] w-32 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
+                                className="border-2 text-sm border-[#BF9853] w-32 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
                                 placeholder="Rent"
                               />
                               <input
@@ -4797,7 +4961,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                 name="shouldCollectAdvance"
                                 checked={shop.shouldCollectAdvance}
                                 onChange={(e) => handleEditTenantLinkShopChange(sIndex, e)}
-                                className="custom-checkbox cursor-pointer appearance-none w-4 h-4 mt-3 -ml-1 rounded bg-slate-200 checked:bg-[#E2F9E1] checked:border-[#034638]"
+                                className="custom-checkbox cursor-pointer appearance-none w-4 h-4 mt-3 rounded bg-slate-200 checked:bg-[#E2F9E1] checked:border-[#034638]"
                               />
                             </div>
                             <input
@@ -4813,7 +4977,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                   },
                                 });
                               }}
-                              className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
+                              className="border-2 text-sm border-[#BF9853] w-32 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
                               placeholder="Advance"
                             />
                             <input
@@ -4829,7 +4993,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                   },
                                 });
                               }}
-                              className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
+                              className="border-2 text-sm border-[#BF9853] w-32 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
                               placeholder="Advance"
                             />
                             <div className="relative flex">
@@ -4846,15 +5010,11 @@ const InputData = ({ username, userRoles = [] }) => {
                                     },
                                   });
                                 }}
-                                className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
+                                className="border-2 text-sm border-[#BF9853] w-32 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
                                 placeholder="Closure Date"
                               />
                               {editTenantLinkFormData.shopNos.length > 1 && (
-                                <button
-                                  type="button"
-                                  onClick={() => removeEditTenantLinkShop(sIndex)}
-                                  className=" text-red-500 font-bold ml-3"
-                                >
+                                <button type="button" onClick={() => removeEditTenantLinkShop(sIndex)} className=" text-red-500 font-bold ml-3">
                                   <img src={cross} alt='cross' className='w-5 h-5' />
                                 </button>
                               )}
@@ -4867,19 +5027,12 @@ const InputData = ({ username, userRoles = [] }) => {
                 );
               })()}
               <div className='text-left'>
-                <button
-                  type="button"
-                  onClick={addEditTenantLinkShop}
-                  className='text-[#E4572E] font-bold px-1  border-dashed border-b-2 border-[#BF9853]'
-                >
+                <button type="button" onClick={addEditTenantLinkShop} className='text-[#E4572E] font-bold px-1  border-dashed border-b-2 border-[#BF9853]'>
                   + Add On
                 </button>
               </div>
               <div className="flex space-x-2 mt-6 mb-4">
-                <button
-                  type="submit"
-                  className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
-                >
+                <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
                   Submit
                 </button>
                 <button

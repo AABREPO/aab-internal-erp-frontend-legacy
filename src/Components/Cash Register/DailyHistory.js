@@ -12,6 +12,7 @@ import history from '../Images/History.svg';
 import Filter from '../Images/filter (3).png';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import * as XLSX from 'xlsx';
 const DailyHistory = ({ username, userRoles = [] }) => {
     const [selectedWeek, setSelectedWeek] = useState("");
     const [weeks, setWeeks] = useState([]);
@@ -1033,21 +1034,34 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             }
         });
         const firstTableEndY = doc.lastAutoTable.finalY;
-        const spaceBetweenTables = 15;
-        const docPageWidth = doc.internal.pageSize.width;
-        const leftMargin = 14;
-        const rightMargin = 14;
-        const availableWidth = docPageWidth - leftMargin - rightMargin;
-        const tableSpacing = 10;
-        const hasAdvanceExpenses = advanceExpenses.length > 0;
+        const spaceBetweenTables = 10;
+        const netBalance = totalAmount - totalRefundAmount;
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(`NET BALANCE: ${netBalance.toLocaleString('en-IN')}`, 155, 38);
+        
+        // Calculate Y position for side-by-side tables
+        let sideBySideStartY = firstTableEndY + spaceBetweenTables;
+        
+        // Check if we need a new page for the side-by-side tables
+        const pageHeight = doc.internal.pageSize.height;
+        const margin = 30; // Bottom margin to ensure table fits
+        if (sideBySideStartY > pageHeight - margin) {
+            doc.addPage();
+            sideBySideStartY = 20; // Start at top of new page
+        }
+        
+        // Prepare WAGE REFUND table data
         const refundTableColumn = [
             "SNO", "NAME", "AMOUNT"
         ];
         const refundTableRows = refundPayments
             .reverse()
             .map((row, index) => {
+                const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
+                const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
                 const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
-                const name = labour?.label || "";
+                const name = vendor?.label || contractor?.label || labour?.label || "";
                 const amount = Number(row.amount || 0);
                 const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
                 return [
@@ -1061,15 +1075,13 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             "TOTAL",
             `${totalRefundAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
         ]);
-        const netBalance = totalAmount - totalRefundAmount;
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
-        doc.text(`NET BALANCE: ${netBalance.toLocaleString('en-IN')}`, 155, 38);
+        
+        // Render WAGE REFUND heading and table together
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
-        doc.text('WAGE REFUND', 14, firstTableEndY + spaceBetweenTables - 2);
+        doc.text('WAGE REFUND', 14, sideBySideStartY - 2);
         doc.autoTable({
-            startY: firstTableEndY + spaceBetweenTables,
+            startY: sideBySideStartY,
             head: [refundTableColumn],
             body: refundTableRows,
             tableWidth: 'wrap',
@@ -1101,6 +1113,75 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             margin: { left: 14, right: 0 }
         });        
         const refundTableEndY = doc.lastAutoTable.finalY;
+        
+        // Render WAGE ADVANCE table at the same Y position (right side)
+        if (advanceExpenses.length > 0) {
+            const advanceTableColumn = [
+                "S.NO", "PROJECT NAME", "EMPLOYEE NAME", "TOTAL AMOUNT"
+            ];            
+            const advanceTableRows = advanceExpenses
+                .map((row, index) => {
+                    const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
+                    const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
+                    const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
+                    const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
+                    const name = [employee?.label, vendor?.label, contractor?.label, labour?.label]
+                        .filter(Boolean).join(" | ") || "";
+                    const projectName = siteOptions.find(opt => opt.id === Number(row.project_id))?.label || "";
+                    const amount = (row.amount || 0) + (row.extra_amount || 0);
+                    const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
+                    
+                    return [
+                        (index + 1).toString(),
+                        projectName,
+                        name,
+                        formattedAmount
+                    ];
+                });            
+            advanceTableRows.push([
+                "",
+                "TOTAL",
+                "",
+                `${totalAdvanceAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
+            ]);                 
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text('WAGE ADVANCE', 95, sideBySideStartY - 2);    
+            doc.autoTable({
+                startY: sideBySideStartY,
+                head: [advanceTableColumn],
+                body: advanceTableRows,
+                tableWidth: 'wrap', 
+                styles: {
+                    fontSize: 8,
+                    cellPadding: 2,
+                    halign: 'left',
+                    valign: 'middle',
+                    textColor: [80, 80, 80],
+                },
+                headStyles: {
+                    fillColor: [255, 248, 220], 
+                    textColor: [0, 0, 0],
+                    fontStyle: 'bold',
+                    lineColor: [200, 200, 200],
+                    lineWidth: 0.1,
+                },
+                bodyStyles: {
+                    lineWidth: 0.1,
+                },
+                alternateRowStyles: {
+                    fillColor: false,
+                },
+                columnStyles: {
+                    0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },   
+                    1: { cellWidth: 35, halign: 'left' },      
+                    2: { cellWidth: 35, halign: 'left' },      
+                    3: { cellWidth: 20, halign: 'right' }      
+                },
+                margin: { left: 95, right: 0 }
+            });
+        }
+        
         if (diwaliBonusExpenses.length > 0) {
             const diwaliBonusTableColumn = [
                 "SNO", "NAME", "AMOUNT"
@@ -1162,74 +1243,182 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 margin: { left: 14, right: 0 }
             });
         }
-        if (advanceExpenses.length > 0) {
-            const advanceTableColumn = [
-                "S.NO", "PROJECT NAME", "EMPLOYEE NAME", "TOTAL AMOUNT"
-            ];            
-            const advanceTableRows = advanceExpenses
-                .map((row, index) => {
-                    const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
-                    const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
-                    const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
-                    const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
-                    const name = [employee?.label, vendor?.label, contractor?.label, labour?.label]
-                        .filter(Boolean).join(" | ") || "";
-                    const projectName = siteOptions.find(opt => opt.id === Number(row.project_id))?.label || "";
-                    const amount = (row.amount || 0) + (row.extra_amount || 0);
-                    const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
-                    
-                    return [
-                        (index + 1).toString(),
-                        projectName,
-                        name,
-                        formattedAmount
-                    ];
-                });            
-            advanceTableRows.push([
-                "",
-                "TOTAL",
-                "",
-                `${totalAdvanceAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
-            ]);                 
-            doc.setFontSize(12);
-            doc.setFont(undefined, 'bold');
-            doc.text('WAGE ADVANCE', 95, firstTableEndY + spaceBetweenTables - 2);    
-            doc.autoTable({
-                startY: firstTableEndY + spaceBetweenTables,
-                head: [advanceTableColumn],
-                body: advanceTableRows,
-                tableWidth: 102, 
-                styles: {
-                    fontSize: 8,
-                    cellPadding: 2,
-                    halign: 'left',
-                    valign: 'middle',
-                    textColor: [80, 80, 80],
-                },
-                headStyles: {
-                    fillColor: [255, 248, 220], 
-                    textColor: [0, 0, 0],
-                    fontStyle: 'bold',
-                    lineColor: [200, 200, 200],
-                    lineWidth: 0.1,
-                },
-                bodyStyles: {
-                    lineWidth: 0.1,
-                },
-                alternateRowStyles: {
-                    fillColor: false,
-                },
-                columnStyles: {
-                    0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },   
-                    1: { cellWidth: 35, halign: 'left' },      
-                    2: { cellWidth: 35, halign: 'left' },      
-                    3: { cellWidth: 20, halign: 'right' }      
-                },
-                margin: { left: 95, right: 0 }
-            });
-        }        
         const fileName = `PS ${selectedWeek} - Daily Payment Statement ${formatDateOnly(selectedDate)}.pdf`;
         doc.save(fileName);
+    };
+
+    const generateWeekDataExcel = async () => {
+        if (!weeks || weeks.length === 0) {
+            alert("No weeks data available to export");
+            return;
+        }
+
+        try {
+            setLoading(true);
+            
+            const allDailyExpenses = [];
+            const allRefundPayments = [];
+
+            // Fetch data for all weeks - iterate through each week
+            for (const week of weeks) {
+                // Get all days in this week
+                const start = new Date(week.start);
+                const weekDays = [];
+                for (let i = 0; i < 7; i++) {
+                    const day = new Date(start);
+                    day.setDate(start.getDate() + i);
+                    weekDays.push(day);
+                }
+
+                // Fetch data for each day in this week
+                for (const day of weekDays) {
+                    const dateStr = day.toISOString().split("T")[0];
+                    try {
+                        const [dailyRes, refundRes] = await Promise.all([
+                            axios.get(`https://backendaab.in/aabuildersDash/api/daily-payments/date/${dateStr}`),
+                            axios.get(`https://backendaab.in/aabuildersDash/api/refund_received/date/${dateStr}`)
+                        ]);
+                        allDailyExpenses.push(...dailyRes.data);
+                        allRefundPayments.push(...refundRes.data);
+                    } catch (error) {
+                        console.error(`Error fetching data for ${dateStr}:`, error);
+                    }
+                }
+            }
+
+            // Create workbook
+            const workbook = XLSX.utils.book_new();
+
+            // Sheet 1: Daily Expenses (All Weeks)
+            const dailyExpensesHeaders = ['S.No', 'Date', 'Week Number', 'Name', 'Project Name', 'Amount', 'Extra Amount', 'Type', 'Quantity', 'Description', 'Created At'];
+            const dailyExpensesRows = allDailyExpenses.map((row, idx) => {
+                const name = 
+                    laboursList.find(opt => opt.id === Number(row.labour_id))?.label ||
+                    vendorOptions.find(opt => opt.id === Number(row.vendor_id))?.label ||
+                    contractorOptions.find(opt => opt.id === Number(row.contractor_id))?.label ||
+                    employeeOptions.find(opt => opt.id === Number(row.employee_id))?.label ||
+                    "";
+                const projectName = siteOptions.find(opt => opt.id === Number(row.project_id))?.label || "";
+                
+                // Find which week this date belongs to
+                const rowDate = row.date ? new Date(row.date) : null;
+                let weekNumber = "";
+                if (rowDate) {
+                    const matchingWeek = weeks.find(week => {
+                        const weekStart = new Date(week.start);
+                        const weekEnd = new Date(week.end);
+                        return rowDate >= weekStart && rowDate <= weekEnd;
+                    });
+                    weekNumber = matchingWeek ? matchingWeek.number : "";
+                }
+                
+                // Format created_at
+                let createdAt = "";
+                if (row.created_at) {
+                    const createdDate = new Date(row.created_at);
+                    createdAt = createdDate.toLocaleString("en-GB", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit"
+                    });
+                }
+                
+                return [
+                    idx + 1,
+                    row.date ? new Date(row.date).toLocaleDateString("en-GB") : "",
+                    weekNumber,
+                    name,
+                    projectName,
+                    Number(row.amount || 0),
+                    Number(row.extra_amount || 0),
+                    row.type || "",
+                    row.quantity || "",
+                    row.description || "",
+                    createdAt
+                ];
+            });
+            const dailyExpensesData = [dailyExpensesHeaders, ...dailyExpensesRows];
+            const dailyExpensesWs = XLSX.utils.aoa_to_sheet(dailyExpensesData);
+            dailyExpensesWs['!cols'] = [
+                { wch: 8 }, 
+                { wch: 12 }, 
+                { wch: 12 },  
+                { wch: 25 },  
+                { wch: 25 },  
+                { wch: 15 },  
+                { wch: 15 }, 
+                { wch: 20 }, 
+                { wch: 10 }, 
+                { wch: 40 }, 
+                { wch: 20 }  
+            ];
+            XLSX.utils.book_append_sheet(workbook, dailyExpensesWs, 'Daily Expenses');
+            const refundPaymentsHeaders = ['S.No', 'Date', 'Week Number', 'Name', 'Amount', 'Created At'];
+            const refundPaymentsRows = allRefundPayments.map((row, idx) => {
+                const name = 
+                    laboursList.find(opt => opt.id === Number(row.labour_id))?.label ||
+                    vendorOptions.find(opt => opt.id === Number(row.vendor_id))?.label ||
+                    contractorOptions.find(opt => opt.id === Number(row.contractor_id))?.label ||
+                    employeeOptions.find(opt => opt.id === Number(row.employee_id))?.label ||
+                    "";
+                const rowDate = row.date ? new Date(row.date) : null;
+                let weekNumber = "";
+                if (rowDate) {
+                    const matchingWeek = weeks.find(week => {
+                        const weekStart = new Date(week.start);
+                        const weekEnd = new Date(week.end);
+                        return rowDate >= weekStart && rowDate <= weekEnd;
+                    });
+                    weekNumber = matchingWeek ? matchingWeek.number : "";
+                }                
+                let createdAt = "";
+                if (row.created_at) {
+                    const createdDate = new Date(row.created_at);
+                    createdAt = createdDate.toLocaleString("en-GB", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit"
+                    });
+                }
+                return [
+                    idx + 1,
+                    row.date ? new Date(row.date).toLocaleDateString("en-GB") : "",
+                    weekNumber,
+                    name,
+                    Number(row.amount || 0),
+                    createdAt
+                ];
+            });
+            const refundPaymentsData = [refundPaymentsHeaders, ...refundPaymentsRows];
+            const refundPaymentsWs = XLSX.utils.aoa_to_sheet(refundPaymentsData);
+            refundPaymentsWs['!cols'] = [
+                { wch: 8 },  
+                { wch: 12 },  
+                { wch: 12 },  
+                { wch: 25 },  
+                { wch: 15 },  
+                { wch: 20 } 
+            ];
+            XLSX.utils.book_append_sheet(workbook, refundPaymentsWs, 'Refund Payments');
+            const firstWeek = weeks[0];
+            const lastWeek = weeks[weeks.length - 1];
+            const startDate = new Date(firstWeek.start).toLocaleDateString("en-GB").replace(/\//g, "-");
+            const endDate = new Date(lastWeek.end).toLocaleDateString("en-GB").replace(/\//g, "-");
+            const fileName = `All_Weeks_Data_${startDate}_to_${endDate}.xlsx`;
+            XLSX.writeFile(workbook, fileName);
+            setLoading(false);
+            alert("Excel file generated successfully with all weeks data!");
+        } catch (error) {
+            console.error("Error generating Excel file:", error);
+            setLoading(false);
+            alert("Error generating Excel file. Please try again.");
+        }
     };
     const handleDescriptionClick = (row) => {
         if (row.description) {
@@ -1590,6 +1779,13 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 </div>
                 <div className="mr-5">
                     <button onClick={generateExpensesPDF} className='font-semibold mt-4 mr-5 hover:text-[#E4572E]'>Report</button>
+                    <button 
+                        onClick={generateWeekDataExcel} 
+                        className='font-semibold mt-4 mr-5 hover:text-[#E4572E]'
+                        disabled={loading}
+                    >
+                        {loading ? 'Generating...' : 'Export Excel'}
+                    </button>
                 </div>
             </div>
             <div className="mt-4 flex justify-end mr-4 lg:mr-16">
@@ -2217,7 +2413,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                                                     <td className="px-1 py-2 relative">
                                                         {Number(selectedWeek) === Number(lastWeekNumber) && (
                                                             <div className="flex gap-2 w-[80px]">
-                                                                {/* Edit Button */}
                                                                 {editingDailyExpenseRowId === row.id ? (
                                                                     <button className="text-green-600 font-bold text-lg relative z-10" onClick={() => saveEditedExpense(row)}>
                                                                         ✓
@@ -2227,11 +2422,9 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                                                                         <img className="w-5 h-4" src={Edit} alt="Edit" />
                                                                     </button>
                                                                 )}
-                                                                {/* Delete Button */}
                                                                 <button onClick={() => handleDailyExpensesDelete(row.id)}>
                                                                     <img src={Delete} className="w-5 h-4" alt="Delete" />
                                                                 </button>
-                                                                {/* History Button */}
                                                                 <button onClick={() => fetchAuditDetailsForDailyExpense(row.id)}>
                                                                     <img src={history} className="w-5 h-4" alt="History" />
                                                                 </button>
@@ -2400,8 +2593,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
             </div>
-
-            {/* Description Popup Modal */}
             {showPopups && (
                 <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
                     onKeyDown={(e) => {
@@ -2470,7 +2661,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
             )}
-
             {fileUploadPopup && (
                 <div
                     className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
@@ -2540,7 +2730,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
             )}
-
             {showWeeklyPaymentExpensesModal && (
                 <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
                     <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1800px] mx-4 p-2">
@@ -2587,7 +2776,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
             )}
-
             {showWeeklyPaymentReceivedModal && (
                 <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
                     <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1800px] mx-4 p-2">

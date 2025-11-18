@@ -13,6 +13,9 @@ const LoanTableview = ({ username, userRoles = [] }) => {
   const [combinedOptions, setCombinedOptions] = useState([]);
   const [selectedOption, setSelectedOption] = useState(null);
   const [siteOptions, setSiteOptions] = useState([]);
+  const [clientOptions, setClientOptions] = useState([]);
+  const [projectClientNamesById, setProjectClientNamesById] = useState({});
+  const [projectClientNamesByName, setProjectClientNamesByName] = useState({});
   const [loanData, setLoanData] = useState([]);
   const [selectDate, setSelectDate] = useState('');
   const [selectContractororVendorName, setSelectContractororVendorName] = useState('');
@@ -137,6 +140,9 @@ const LoanTableview = ({ username, userRoles = [] }) => {
     { id: 4, value: 'Cheque', label: 'Cheque' },
     { id: 5, value: 'Advance Transfer', label: 'Advance Transfer' }
   ], []);
+  const associateFilterOptions = useMemo(() => (
+    clientOptions.length ? clientOptions : combinedOptions
+  ), [clientOptions, combinedOptions]);
   const customStyles = useMemo(() => ({
     control: (provided, state) => ({
       ...provided,
@@ -155,6 +161,21 @@ const LoanTableview = ({ username, userRoles = [] }) => {
     contractorOptions.find(c => c.id === id)?.value || "";
   const getSiteName = (id) =>
     siteOptions.find(s => String(s.id) === String(id))?.value || "";
+  const getClientNameByProjectId = (projectId) => {
+    if (projectId === null || projectId === undefined) return "";
+    const directMatch = projectClientNamesById[String(projectId)];
+    if (directMatch) return directMatch;
+    const projectName = getSiteName(projectId);
+    if (!projectName) return "";
+    return projectClientNamesByName[projectName.trim().toLowerCase()] || "";
+  };
+  const getAssociateName = (entry) => {
+    return getClientNameByProjectId(entry.project_id) ||
+      (entry.vendor_id
+        ? getVendorName(entry.vendor_id)
+        : getContractorName(entry.contractor_id)) ||
+      "";
+  };
   const totalLoanAmount = loanData
     .filter(entry => entry.type === "Loan")
     .reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
@@ -286,6 +307,62 @@ const LoanTableview = ({ username, userRoles = [] }) => {
     fetchSites();
   }, []);
   useEffect(() => {
+    const fetchProjectClients = async () => {
+      try {
+        const response = await fetch("https://backendaab.in/aabuilderDash/api/projects/getAll", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+        if (!response.ok) {
+          throw new Error("Network response was not ok: " + response.statusText);
+        }
+        const data = await response.json();
+        const idMap = {};
+        const nameMap = {};
+        const clientMap = new Map();
+        data.forEach((project, index) => {
+          const projectId = project?.id ?? project?.projectId ?? null;
+          const projectName = (project?.projectName || project?.projectReferenceName || "").trim();
+          const owners = Array.isArray(project?.ownerDetailsList)
+            ? project.ownerDetailsList
+            : Array.isArray(project?.ownerDetails)
+              ? project.ownerDetails
+              : [];
+          const ownerNames = owners
+            .map(owner => owner?.clientName?.trim())
+            .filter(Boolean);
+          const displayName = ownerNames.join(", ") || project?.clientName || project?.ownerName || "";
+          if (displayName) {
+            if (projectId !== null && projectId !== undefined) {
+              idMap[String(projectId)] = displayName;
+            }
+            if (projectName) {
+              nameMap[projectName.toLowerCase()] = displayName;
+            }
+            ownerNames.forEach(name => {
+              const normalized = name.toLowerCase();
+              if (!clientMap.has(normalized)) {
+                clientMap.set(normalized, { value: name, label: name, type: 'Client' });
+              }
+            });
+          }
+        });
+        setProjectClientNamesById(idMap);
+        setProjectClientNamesByName(nameMap);
+        setClientOptions(Array.from(clientMap.values()));
+      } catch (error) {
+        console.error("Error fetching project clients: ", error);
+        setProjectClientNamesById({});
+        setProjectClientNamesByName({});
+        setClientOptions([]);
+      }
+    };
+    fetchProjectClients();
+  }, []);
+  useEffect(() => {
     const fetchData = async () => {
       try {
         const response = await fetch('https://backendaab.in/aabuildersDash/api/loans/all');
@@ -309,10 +386,7 @@ const LoanTableview = ({ username, userRoles = [] }) => {
       if (formattedEntryDate !== formattedSelectDate) return false;
     }
     if (selectContractororVendorName) {
-      const name =
-        entry.vendor_id
-          ? getVendorName(entry.vendor_id)
-          : getContractorName(entry.contractor_id) || "";
+      const name = getAssociateName(entry) || "";
       if (name.toLowerCase() !== selectContractororVendorName.toLowerCase())
         return false;
     }
@@ -424,9 +498,7 @@ const LoanTableview = ({ username, userRoles = [] }) => {
     const rows = sortedData.map((entry, index) => [
       index + 1,
       formatDateOnly(entry.date),
-      entry.vendor_id
-        ? getVendorName(entry.vendor_id)
-        : getContractorName(entry.contractor_id),
+      getAssociateName(entry),
       getSiteName(entry.project_id),
       entry.loan_amount != null && entry.loan_amount !== ""
         ? Number(entry.loan_amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
@@ -484,9 +556,7 @@ const LoanTableview = ({ username, userRoles = [] }) => {
     const csvRows = sortedData.map((entry, index) => [
       index + 1,
       formatDateOnly(entry.date),
-      entry.vendor_id
-        ? getVendorName(entry.vendor_id)
-        : getContractorName(entry.contractor_id),
+      getAssociateName(entry),
       getSiteName(entry.project_id),
       entry.loan_amount != null && entry.loan_amount !== ""
         ? Number(entry.loan_amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
@@ -631,7 +701,7 @@ const LoanTableview = ({ username, userRoles = [] }) => {
                 )}
                 {selectContractororVendorName && (
                   <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                    <span className="font-normal">Contractor/Vendor Name: </span>
+                    <span className="font-normal">Client Name: </span>
                     <span className="font-bold">{selectContractororVendorName}</span>
                     <button onClick={() => setSelectContractororVendorName('')} className="text-[#BF9853] text-2xl ml-1">×</button>
                   </span>
@@ -708,11 +778,11 @@ const LoanTableview = ({ username, userRoles = [] }) => {
                     </th>
                     <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[180px]">
                       <Select
-                        options={combinedOptions}
+                        options={associateFilterOptions}
                         value={selectContractororVendorName ? { value: selectContractororVendorName, label: selectContractororVendorName } : null}
                         onChange={(opt) => setSelectContractororVendorName(opt ? opt.value : "")}
                         className="text-xs focus:outline-none"
-                        placeholder="Contractor/Ven..."
+                        placeholder="Client Name..."
                         isSearchable
                         isClearable
                         styles={{
@@ -846,10 +916,10 @@ const LoanTableview = ({ username, userRoles = [] }) => {
                     <tr key={entry.loanPortalId || entry.id} className="odd:bg-white even:bg-[#FAF6ED] h-12">
                       <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[140px] font-semibold">{formatDateOnly(entry.date)}</td>
                       <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[180px] font-semibold">
-                        {entry.vendor_id ? getVendorName(entry.vendor_id) : getContractorName(entry.contractor_id)}
+                        {getAssociateName(entry)}
                       </td>
                       <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[200px] font-semibold">
-                        {purposeOptions.find(p => p.id === entry.from_purpose_id)?.value || entry.from_purpose_id}
+                        {getSiteName(entry.project_id) || purposeOptions.find(p => p.id === entry.from_purpose_id)?.value || entry.from_purpose_id}
                       </td>
                       <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-semibold">
                         {entry.type === "Transfer" ? (

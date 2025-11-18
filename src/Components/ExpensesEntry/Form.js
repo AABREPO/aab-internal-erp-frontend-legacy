@@ -48,6 +48,9 @@ const Form = ({ username, userRoles = [] }) => {
     const [ebNumberOptions, setEbNumberOptions] = useState([]);
     const [utilityType, setUtilityType] = useState('');
     const [projectData, setProjectData] = useState(null);
+    const [showReviewModal, setShowReviewModal] = useState(false);
+    const [isReviewEditMode, setIsReviewEditMode] = useState(false);
+    const [filePreviewUrl, setFilePreviewUrl] = useState(null);
     useEffect(() => {
         const fetchUserRoles = async () => {
             try {
@@ -573,6 +576,15 @@ const Form = ({ username, userRoles = [] }) => {
         }
         e.target.value = '';
     };
+    useEffect(() => {
+        if (!selectedFile) {
+            setFilePreviewUrl(null);
+            return;
+        }
+        const objectUrl = URL.createObjectURL(selectedFile);
+        setFilePreviewUrl(objectUrl);
+        return () => URL.revokeObjectURL(objectUrl);
+    }, [selectedFile]);
     const handleCategoryChange = (selectedCategory) => {
         setSelectedCategory(selectedCategory);
         if (selectedCategory && selectedCategory.label === 'Machine Repair') {
@@ -620,21 +632,47 @@ const Form = ({ username, userRoles = [] }) => {
         const year = date.getFullYear();
         return `${day}-${month}-${year}`;
     };
-    const handleUpload = async (e) => {
-        e.preventDefault();
-        if (!date || !selectedSite || !amount || !selectedCategory || !selectedOption) {
+    const validateFormFields = () => {
+        if (!selectedAccountType || !date || !selectedSite || !amount || !selectedCategory || !selectedOption) {
             alert('Please fill out all required fields.');
-            return;
+            return false;
         }
         if ((selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills') && !paymentMode) {
             alert('Please select a payment mode for this account type.');
-            return;
+            return false;
         }
         if (selectedAccountType === 'Bill Refund' && !selectedFile) {
             alert('PDF file is required for Bill Refund.');
+            return false;
+        }
+        if (selectedAccountType === 'Utility Bills' && !selectedFile) {
+            alert('PDF file is required for Utility Bills.');
+            return false;
+        }
+        if (
+            selectedAccountType !== 'Daily Wage' &&
+            selectedAccountType !== 'Utility Bills' &&
+            selectedAccountType !== 'Bill Refund' &&
+            !selectedFile
+        ) {
+            alert('PDF file is required for this type.');
+            return false;
+        }
+        return true;
+    };
+    const handleFormSubmit = (e) => {
+        e.preventDefault();
+        if (!validateFormFields()) {
             return;
         }
-        if ((selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills') && ["GPay", "PhonePe", "Net Banking", "Cheque"].includes(paymentMode)) {
+        setShowReviewModal(true);
+        setIsReviewEditMode(false);
+    };
+    const submitExpenseData = async () => {
+        if (
+            (selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills') &&
+            ["GPay", "PhonePe", "Net Banking", "Cheque"].includes(paymentMode)
+        ) {
             setPaymentModalData({
                 date: date,
                 amount: amount,
@@ -645,20 +683,12 @@ const Form = ({ username, userRoles = [] }) => {
                 accountNumber: ""
             });
             setShowPaymentModal(true);
+            setShowReviewModal(false);
             return;
         }
         setIsSubmitting(true);
+        setShowReviewModal(false);
         try {
-            if (selectedAccountType === 'Utility Bills' && !selectedFile) {
-                alert('PDF file is required for Utility Bills.');
-                setIsSubmitting(false);
-                return;
-            }
-            if (selectedAccountType !== 'Daily Wage' && selectedAccountType !== 'Utility Bills' && selectedAccountType !== 'Bill Refund' && !selectedFile) {
-                alert('PDF file is required for this type.');
-                setIsSubmitting(false);
-                return;
-            }
             let vendor = '';
             let contractor = '';
             if (selectedType === 'Vendor') {
@@ -831,6 +861,31 @@ const Form = ({ username, userRoles = [] }) => {
             setIsSubmitting(false);
         }
     };
+    const handleReviewConfirm = () => {
+        if (isReviewEditMode) {
+            return;
+        }
+        if (!validateFormFields()) {
+            return;
+        }
+        submitExpenseData();
+    };
+    const handleReviewClose = () => {
+        setShowReviewModal(false);
+        setIsReviewEditMode(false);
+    };
+    const handleReviewSave = () => {
+        if (!validateFormFields()) {
+            return;
+        }
+        setIsReviewEditMode(false);
+    };
+    const renderReviewRow = (label, value) => (
+        <div className="flex justify-between gap-4 border border-gray-100 rounded-lg px-4 py-2" key={label}>
+            <span className="text-sm font-semibold text-gray-600">{label}</span>
+            <span className="text-sm text-gray-800 text-right break-words">{value || '-'}</span>
+        </div>
+    );
     const resetForm = () => {
         setAmount('');
         setQuantity('');
@@ -848,6 +903,8 @@ const Form = ({ username, userRoles = [] }) => {
         setUtilityType('');
         setProjectData(null);
         setEbNumberOptions([]);
+        setShowReviewModal(false);
+        setIsReviewEditMode(false);
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
@@ -1058,9 +1115,41 @@ const Form = ({ username, userRoles = [] }) => {
             setIsSubmitting(false);
         }
     };
+    const handleChangeAttachment = () => {
+        if (fileInputRef.current) {
+            fileInputRef.current.click();
+        }
+    };
     const sortedSiteOptions = siteOptions.sort((a, b) =>
         a.label.localeCompare(b.label)
     );
+    const vendorOrContractorLabel = selectedOption ? `${selectedOption.label}${selectedType ? ` (${selectedType})` : ''}` : '';
+    const formattedAmount = amount ? `${selectedAccountType === 'Bill Refund' ? '-' : ''}₹${formatNumber(Math.abs(amount))}` : '';
+    const reviewDetails = [
+        { label: 'Account Type', value: selectedAccountType || '-' },
+        { label: 'Date', value: date || '-' },
+        { label: 'Project Name', value: selectedSite?.label || '-' },
+        { label: 'Site Number', value: selectedSite?.sNo || '-' },
+        { label: 'Vendor / Contractor', value: vendorOrContractorLabel || '-' },
+    ];
+    if (selectedType === 'Vendor' && selectedOption?.id) {
+        reviewDetails.push({ label: 'Vendor ID', value: selectedOption.id });
+    }
+    if (selectedType === 'Contractor' && selectedOption?.id) {
+        reviewDetails.push({ label: 'Contractor ID', value: selectedOption.id });
+    }
+    reviewDetails.push(
+        { label: 'Quantity', value: quantity || '-' },
+        { label: 'Amount', value: formattedAmount || '-' },
+        { label: 'Category', value: selectedCategory?.label || '-' },
+        { label: 'Payment Mode', value: paymentMode || '-' },
+        { label: 'Utility Type', value: utilityType || '-' },
+        { label: 'Utility Number', value: selectedEbNumber?.label || '-' },
+        { label: 'Utility Months', value: selectedMonths || '-' },
+        { label: 'Validity / Additional Info', value: thirdInput || '-' },
+        { label: 'Comments', value: comments || '-' },
+    );
+    const isPdfPreview = selectedFile?.type?.toLowerCase().includes('pdf');
     useEffect(() => {
         const today = new Date();
         const formatted = today.toISOString().split('T')[0];
@@ -1078,7 +1167,7 @@ const Form = ({ username, userRoles = [] }) => {
                 }
             `}</style>
             <div className=" mx-auto p-6 bg-white rounded-lg shadow-lg lg:w-[1824px]">
-                <form onSubmit={handleUpload}>
+                <form onSubmit={handleFormSubmit}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div className="md:col-span-2">
                             <div className="flex mb-4 items-center gap-4">
@@ -1318,6 +1407,276 @@ const Form = ({ username, userRoles = [] }) => {
                 draggable
                 theme="colored"
             />
+            {showReviewModal && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                    <div className="bg-white text-left rounded-xl p-6 w-[1400px] h-[680px] overflow-hidden flex flex-col">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-gray-800">Review Submission</h3>
+                            <button onClick={handleReviewClose} className="text-2xl font-bold text-gray-400 hover:text-gray-700">
+                                ×
+                            </button>
+                        </div>
+                        <div className="flex flex-1 gap-6 overflow-hidden">
+                            <div className="flex-[0.40] flex flex-col">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h4 className="text-base font-semibold text-gray-700">Expense Details</h4>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsReviewEditMode((prev) => !prev)}
+                                        className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg hover:bg-[#FFF8EE]"
+                                    >
+                                        {isReviewEditMode ? 'Cancel Edit' : 'Edit'}
+                                    </button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto pr-4">
+                                    {isReviewEditMode ? (
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-sm font-semibold mb-1 block">Account Type</label>
+                                                <select
+                                                    className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                                                    value={selectedAccountType}
+                                                    onChange={(e) => {
+                                                        const selectedValue = e.target.value;
+                                                        setSelectedAccountType(selectedValue);
+                                                        const selectedOption = accountTypeOptions.find(option => option.value === selectedValue);
+                                                        if (selectedOption) {
+                                                            console.log("Selected ID:", selectedOption.id);
+                                                        }
+                                                    }}
+                                                >
+                                                    <option value="" disabled>--- Select ---</option>
+                                                    {accountTypeOptions.map((option) => (
+                                                        <option key={option.value} value={option.value}>
+                                                            {option.label}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="text-sm font-semibold mb-1 block">Date</label>
+                                                <input
+                                                    type="date"
+                                                    value={date}
+                                                    onChange={(e) => setDate(e.target.value)}
+                                                    className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-sm font-semibold mb-1 block">Project Name</label>
+                                                <Select
+                                                    options={sortedSiteOptions || []}
+                                                    placeholder="Select a site..."
+                                                    isSearchable
+                                                    value={selectedSite}
+                                                    onChange={setSelectedSite}
+                                                    styles={customStyles}
+                                                    isClearable
+                                                    className="custom-select rounded-lg"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-sm font-semibold mb-1 block">Vendor / Contractor</label>
+                                                <Select
+                                                    options={combinedOptions}
+                                                    value={selectedOption}
+                                                    onChange={handleChange}
+                                                    placeholder="Select an Option..."
+                                                    styles={customStyles}
+                                                    isClearable
+                                                    className="custom-select rounded-lg"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-sm font-semibold mb-1 block">Quantity</label>
+                                                <input
+                                                    type="text"
+                                                    value={quantity}
+                                                    onChange={(e) => setQuantity(e.target.value)}
+                                                    className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-sm font-semibold mb-1 block">Amount</label>
+                                                <div className="relative">
+                                                    <span className="absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-600">₹</span>
+                                                    <input
+                                                        type="text"
+                                                        value={formatNumber(amount)}
+                                                        onChange={handleAmountChange}
+                                                        className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg pl-7 pr-3 border-opacity-20"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-sm font-semibold mb-1 block">Category</label>
+                                                <Select
+                                                    options={categoryOptions}
+                                                    value={selectedCategory}
+                                                    onChange={handleCategoryChange}
+                                                    styles={customStyles}
+                                                    isClearable
+                                                    placeholder="Select a category..."
+                                                    className="custom-select rounded-lg"
+                                                />
+                                            </div>
+                                            {(selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills') && (
+                                                <div>
+                                                    <label className="text-sm font-semibold mb-1 block">Payment Mode</label>
+                                                    <select
+                                                        value={paymentMode}
+                                                        onChange={(e) => setPaymentMode(e.target.value)}
+                                                        className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                                                    >
+                                                        <option value="">Select Payment Mode</option>
+                                                        <option value="Cash">Cash</option>
+                                                        <option value="GPay">GPay</option>
+                                                        <option value="PhonePe">PhonePe</option>
+                                                        <option value="Net Banking">Net Banking</option>
+                                                        <option value="Cheque">Cheque</option>
+                                                    </select>
+                                                </div>
+                                            )}
+                                            {selectedAccountType === 'Utility Bills' && (
+                                                <>
+                                                    <div>
+                                                        <label className="text-sm font-semibold mb-1 block">Utility Type</label>
+                                                        <select
+                                                            value={utilityType}
+                                                            onChange={(e) => setUtilityType(e.target.value)}
+                                                            className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                                                        >
+                                                            <option value="" disabled>--- Select ---</option>
+                                                            <option value="Electricity">Electricity</option>
+                                                            <option value="Property">Property</option>
+                                                            <option value="Water">Water</option>
+                                                            <option value="Telecom">Telecom</option>
+                                                            <option value="Subscription">Subscription</option>
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-sm font-semibold mb-1 block">
+                                                            {utilityType === 'Electricity' ? 'EB Number' :
+                                                                utilityType === 'Property' ? 'Property Tax Number' :
+                                                                    utilityType === 'Water' ? 'Water Tax Number' : 'Number'}
+                                                        </label>
+                                                        <Select
+                                                            options={ebNumberOptions}
+                                                            value={selectedEbNumber}
+                                                            onChange={setSelectedEbNumber}
+                                                            styles={customStyles}
+                                                            isClearable
+                                                            placeholder="Select number..."
+                                                            className="custom-select rounded-lg"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-sm font-semibold mb-1 block">Months</label>
+                                                        <input
+                                                            type="month"
+                                                            value={selectedMonths}
+                                                            onChange={(e) => setSelectedMonths(e.target.value)}
+                                                            className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                                                        />
+                                                    </div>
+                                                    {(utilityType === 'Telecom' || utilityType === 'Subscription') && (
+                                                        <div>
+                                                            <label className="text-sm font-semibold mb-1 block">Additional Input</label>
+                                                            <input
+                                                                type="text"
+                                                                value={thirdInput}
+                                                                onChange={(e) => setThirdInput(e.target.value)}
+                                                                className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+                                            <div className="col-span-2">
+                                                <label className="text-sm font-semibold mb-1 block">Comments</label>
+                                                <input
+                                                    type="text"
+                                                    value={comments}
+                                                    onChange={(e) => setComments(e.target.value)}
+                                                    className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                                                />
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {reviewDetails.map((detail) => renderReviewRow(detail.label, detail.value))}
+                                        </div>
+                                    )}
+                                </div>
+                                {isReviewEditMode && (
+                                    <div className="flex justify-end gap-3 mt-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsReviewEditMode(false)}
+                                            className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg"
+                                        >
+                                            Discard
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleReviewSave}
+                                            className="px-4 py-2 bg-[#BF9853] text-white rounded-lg"
+                                        >
+                                            Save Changes
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="w-px bg-gray-200"></div>
+                            <div className="flex-[0.65] flex flex-col">
+                                <h4 className="text-base font-semibold text-gray-700 mb-3"> Preview</h4>
+                                <div className="flex-1 border-2 border-dashed border-gray-200 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50">
+                                    {filePreviewUrl ? (
+                                        isPdfPreview ? (
+                                            <iframe
+                                                src={`${filePreviewUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                                                title="Attachment preview"
+                                                className="w-full h-full rounded-lg border-none "
+                                            />
+                                        ) : (
+                                            <img src={filePreviewUrl} alt="Attachment preview" className="w-full h-full object-contain" />
+                                        )
+                                    ) : (
+                                        <p className="text-sm text-gray-500">No file selected</p>
+                                    )}
+                                </div>
+                                {selectedFile && (
+                                    <p className="text-xs text-gray-500 mt-2 break-words">{selectedFile.name}</p>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={handleChangeAttachment}
+                                    className="mt-4 px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg hover:bg-[#FFF8EE]"
+                                >
+                                    Change Attachfile
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-3 mt-6">
+                            <button
+                                type="button"
+                                onClick={handleReviewClose}
+                                className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg"
+                            >
+                                Close
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleReviewConfirm}
+                                disabled={isSubmitting || isReviewEditMode}
+                                className={`px-4 py-2 rounded-lg text-white ${isSubmitting || isReviewEditMode ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#BF9853]'}`}
+                            >
+                                {isSubmitting ? 'Submitting...' : 'Confirm & Submit'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             {showPaymentModal && (
                 <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
                     <div className="bg-white text-left rounded-xl p-6 w-[800px] h-[600px] overflow-y-auto flex flex-col">

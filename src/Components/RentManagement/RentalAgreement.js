@@ -2,15 +2,12 @@ import React, { useState, useEffect } from "react";
 import jsPDF from "jspdf";
 import CreatableSelect from 'react-select/creatable';
 import Select from 'react-select';
-import AttachIcon from '../Images/Attachfile.svg';
-import axios from 'axios';
 import loadingScreen from '../Images/AAlogoBlackSVG.svg';
 const RentalAgreement = () => {
     const [projects, setProjects] = useState([]);
     const [fullAgreementData, setFullAgreementData] = useState([]);
     const [isRentPopupOpen, setIsRentPopupOpen] = useState(false);
     const [selectedProperty, setSelectedProperty] = useState(null);
-    const [isWaiting, setIsWaiting] = useState(false);
     const [options, setOptions] = useState([]);
     const [selectedPropertyType, setSelectedPropertyType] = useState(null);
     const [tenantFullNameOptions, setTenantFullNameOptions] = useState([]);
@@ -87,8 +84,7 @@ const RentalAgreement = () => {
                     tenantFatherName: '',
                     tenantMobile: '',
                     tenantAge: '',
-                    tenantAddress: '',
-                    aadhaarFile: null
+                    tenantAddress: ''
                 }
             ]
         }
@@ -192,16 +188,44 @@ const RentalAgreement = () => {
         sessionStorage.setItem('Agreementenddate', JSON.stringify(Agreementenddate));
         if (Noticeperiod) sessionStorage.setItem('Noticeperiod', JSON.stringify(Noticeperiod));
     }, [Noticeperiod, Lockinperiod, owners, Agreementstartdate, Agreementvalidity, Renttobepaid, tenants, selectedProperty, Agreementenddate, ownersProperty, selectedPropertyType]);
-    const getRevisionNumber = async (selectedProperty) => {
+    const getRevisionNumber = async (propertyName, doorNos) => {
         try {
             const clientResponse = await fetch("https://backendaab.in/aabuildersDash/api/agreements/all");
             if (!clientResponse.ok) {
                 throw new Error("Failed to fetch agreements from the backend");
             }
             const clientData = await clientResponse.json();
-            const matchingAgreements = clientData.filter(
-                (agreement) => agreement.propertyName === selectedProperty.value
-            );
+            const matchingAgreements = clientData.filter((agreement) => {
+                if (agreement.propertyName !== propertyName) {
+                    return false;
+                }
+                let existingDoorNos = [];
+                if (agreement.fileName) {
+                    const fileNameParts = agreement.fileName.split('_');
+                    const doorNoParts = [];
+                    for (let i = 1; i < fileNameParts.length; i++) {
+                        if (fileNameParts[i].startsWith('R')) break;
+                        doorNoParts.push(fileNameParts[i]);
+                    }
+                    if (doorNoParts.length > 0) {
+                        existingDoorNos = doorNoParts;
+                    }
+                }
+                if (existingDoorNos.length === 0 && agreement.propertyTypeDetails) {
+                    const propertyDetails = Array.isArray(agreement.propertyTypeDetails) 
+                        ? agreement.propertyTypeDetails 
+                        : [agreement.propertyTypeDetails];
+                    existingDoorNos = propertyDetails
+                        .map(detail => detail?.doorNo)
+                        .filter(doorNo => doorNo);
+                }
+                const normalizedExisting = existingDoorNos.sort().join('_');
+                const normalizedCurrent = Array.isArray(doorNos) 
+                    ? doorNos.sort().join('_') 
+                    : (doorNos || '').split('_').sort().join('_');
+                
+                return normalizedExisting === normalizedCurrent && normalizedCurrent !== '';
+            });
             return matchingAgreements.length;
         } catch (error) {
             console.error("Error fetching revision number:", error.message);
@@ -210,14 +234,22 @@ const RentalAgreement = () => {
     };
     useEffect(() => {
         const fetchRevision = async () => {
-            if (selectedProperty?.value) {
-                const count = await getRevisionNumber(selectedProperty);
-                setRevisionCount(count);
+            if (selectedProperty?.value && ownersProperty.length > 0) {
+                const doorNos = ownersProperty
+                    .map(prop => prop.doorNo)
+                    .filter(doorNo => doorNo && doorNo.trim() !== '');
+                if (doorNos.length > 0) {
+                    const count = await getRevisionNumber(selectedProperty.value, doorNos);
+                    setRevisionCount(count);
+                } else {
+                    setRevisionCount(0);
+                }
+            } else {
+                setRevisionCount(0);
             }
         };
         fetchRevision();
-    }, [selectedProperty]);
-
+    }, [selectedProperty, ownersProperty]);
     useEffect(() => {
         fetchAgreements();
     }, []);
@@ -241,8 +273,15 @@ const RentalAgreement = () => {
             setMessage('Error fetching agreements.');
         }
     };
-    const generatePDF = () => {
-        getRevisionNumber(selectedProperty.value);
+    const generatePDF = async () => {
+        const doorNos = ownersProperty
+            .map(prop => prop.doorNo)
+            .filter(doorNo => doorNo && doorNo.trim() !== '');
+        let currentRevision = revisionCount;
+        if (selectedProperty?.value && doorNos.length > 0) {
+            currentRevision = await getRevisionNumber(selectedProperty.value, doorNos);
+            setRevisionCount(currentRevision);
+        }
         const doc = new jsPDF();
         const title = "RENTAL AGREEMENT";
         const pageWidth = doc.internal.pageSize.getWidth();
@@ -283,7 +322,7 @@ const RentalAgreement = () => {
         const formattedSecurityDeposit = Number(totals.totalAdvance).toLocaleString("en-IN");
         const agreementValidityInWords = numberToWords1(Number(Agreementvalidity));
         const propertyTypes = ownersProperty.map(o => o.propertyType);
-        const propertyDoorNo = ownersProperty.map(o => o.doorNo);
+        const propertyDoorNo = doorNos.join("_");
         const propertyAddress = projects.find(
             p => p.projectReferenceName === selectedProperty.value
         )?.projectAddress || "";
@@ -569,7 +608,7 @@ WITNESSES:
             doc.setPage(i);
             addFooter();
         }
-        const filename = `${selectedProperty.value}_${propertyDoorNo}_R${revisionCount}`;
+        const filename = `${selectedProperty.value}_${propertyDoorNo}_R${currentRevision}`;
         doc.save(filename);
         return doc.output('blob');
     };
@@ -579,27 +618,53 @@ WITNESSES:
         setItems(updatedItems);
     };
     const handleTenantChange = (tenantId, field, value) => {
-        setTenants((prevTenants) =>
-            prevTenants.map((tenant) =>
-                tenant.id === tenantId ? { ...tenant, [field]: value } : tenant
-            )
-        );
-        if (value && !options.find((opt) => opt.value === value)) {
-            setOptions((prevOptions) => [...prevOptions, { value, label: value }]);
-        }
         if (field === 'tenantName') {
-            const selectedGroup = tenantList.find(t => t.tenantName === value);
-            if (selectedGroup && selectedGroup.tenantDetailsList) {
-                const filteredFullNames = [...new Set(selectedGroup.tenantDetailsList.map(p => p.tenantFullName))]
-                    .filter(name => !!name)
-                    .map(name => ({
-                        label: name,
-                        value: name,
-                    }));
-                setTenantFullNameOptions(filteredFullNames);
+            const selectedTenant = tenantList.find(t => t.tenantName === value);
+            setTenants((prevTenants) =>
+                prevTenants.map((tenant) => {
+                    if (tenant.id === tenantId) {
+                        const updatedTenantsList = [...tenant.tenantsList];
+                        if (selectedTenant && updatedTenantsList.length > 0) {
+                            updatedTenantsList[0] = {
+                                ...updatedTenantsList[0],
+                                tenantFullName: selectedTenant.fullName || '',
+                                tenantFatherName: selectedTenant.tenantFatherName || '',
+                                tenantAge: selectedTenant.age || '',
+                                tenantMobile: selectedTenant.mobileNumber || '',
+                                tenantAddress: selectedTenant.tenantAddress || ''
+                            };
+                        }
+                        return {
+                            ...tenant,
+                            tenantName: value,
+                            tenantsList: updatedTenantsList
+                        };
+                    }
+                    return tenant;
+                })
+            );
+            if (selectedTenant) {
+                const fullName = selectedTenant.fullName;
+                if (fullName) {
+                    setTenantFullNameOptions([{
+                        label: fullName,
+                        value: fullName,
+                    }]);
+                } else {
+                    setTenantFullNameOptions([]);
+                }
             } else {
                 setTenantFullNameOptions([]);
             }
+        } else {
+            setTenants((prevTenants) =>
+                prevTenants.map((tenant) =>
+                    tenant.id === tenantId ? { ...tenant, [field]: value } : tenant
+                )
+            );
+        }
+        if (value && !options.find((opt) => opt.value === value)) {
+            setOptions((prevOptions) => [...prevOptions, { value, label: value }]);
         }
     };
     const handlePartnerChange = (tenantId, partnerIndex, field, value) => {
@@ -610,21 +675,6 @@ WITNESSES:
                     updatedPartners[partnerIndex] = {
                         ...updatedPartners[partnerIndex],
                         [field]: value,
-                    };
-                    return { ...tenant, tenantsList: updatedPartners };
-                }
-                return tenant;
-            })
-        );
-    };
-    const handleFileChange = (tenantId, partnerIndex, file) => {
-        setTenants((prev) =>
-            prev.map((tenant) => {
-                if (tenant.id === tenantId) {
-                    const updatedPartners = [...tenant.tenantsList];
-                    updatedPartners[partnerIndex] = {
-                        ...updatedPartners[partnerIndex],
-                        aadhaarFile: file,
                     };
                     return { ...tenant, tenantsList: updatedPartners };
                 }
@@ -710,7 +760,6 @@ WITNESSES:
                     ? data.filter(p => (p.projectCategory || '').toLowerCase() === 'own project')
                     : [];
                 setProjects(ownProjects);
-                console.log('Fetched projects:', ownProjects.length, 'projects');
             } else {
                 setMessage('Error fetching projects.');
             }
@@ -821,94 +870,45 @@ WITNESSES:
     useEffect(() => {
         const fetchTenants = async () => {
             try {
-                const response = await axios.get('https://backendaab.in/aabuildersDash/api/tenant-groups/all');
-                const updatedTenants = response.data.map((tenant) => {
-                    if (tenant.aadhaarFile) {
-                        return {
-                            ...tenant,
-                            aadhaarImageUrl: `data:image/jpeg;base64,${tenant.aadhaarFile}`,
-                        };
-                    }
-                    return tenant;
-                });
-                const tenantNameOptions = [...new Set(response.data.map(t => t.tenantName))]
-                    .filter(name => !!name)
-                    .map(name => ({
-                        label: name,
-                        value: name,
-                    }));
-                setOptions(tenantNameOptions);
-                setTenantList(updatedTenants);
+                const response = await fetch('https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll');
+                if (response.ok) {
+                    const data = await response.json();
+                    const tenantNameOptions = [...new Set(data.map(t => t.tenantName))]
+                        .filter(name => !!name)
+                        .map(name => ({
+                            label: name,
+                            value: name,
+                        }));
+                    setOptions(tenantNameOptions);
+                    setTenantList(data);
+                } else {
+                    console.error('Error fetching tenant link data');
+                }
             } catch (error) {
                 console.error('Error fetching tenants:', error);
             }
         };
         fetchTenants();
     }, []);
-    const fileToBase64 = (file) => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = () => {
-                const base64String = reader.result.split(',')[1];
-                resolve(base64String);
-            };
-            reader.onerror = (error) => reject(error);
-        });
-    };
-    const handleSubmit = async () => {
-        setIsWaiting(true);
-        try {
-            const updatedTenants = await Promise.all(tenants.map(async group => {
-                const tenantDetailsList = await Promise.all(
-                    group.tenantsList.map(async tenant => {
-                        let base64File = null;
-                        if (tenant.aadhaarFile instanceof File) {
-                            base64File = await fileToBase64(tenant.aadhaarFile);
-                        }
-                        return {
-                            tenantFullName: tenant.tenantFullName,
-                            tenantFatherName: tenant.tenantFatherName,
-                            tenantMobile: tenant.tenantMobile,
-                            tenantAge: parseInt(tenant.tenantAge),
-                            tenantAddress: tenant.tenantAddress,
-                            aadhaarFile: base64File,
-                        };
-                    })
-                );
-                return {
-                    tenantName: group.tenantName,
-                    tenantDetailsList,
-                };
-            }));
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/tenant-groups/bulk-save', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(updatedTenants),
-            });
-            setIsWaiting(false);
-            setCurrentStep(3);
-            if (!response.ok) throw new Error('Failed to save tenant groups');
-            const result = await response.json();
-        } catch (error) {
-            console.error('Error:', error);
-        }
-    };
     const handleSubmitAgreement = async () => {
         setIsRentPopupOpen(true);
         try {
+            const doorNos = ownersProperty
+                .map(prop => prop.doorNo)
+                .filter(doorNo => doorNo && doorNo.trim() !== '');
+            let currentRevisionCount = revisionCount;
+            if (selectedProperty?.value && doorNos.length > 0) {
+                currentRevisionCount = await getRevisionNumber(selectedProperty.value, doorNos);
+                setRevisionCount(currentRevisionCount);
+            }
             const pdfData = await generatePDF();
             const pdfBlob = new Blob([pdfData], { type: 'application/pdf' });
             const date = new Date();
-            const propertyDoorNo = ownersProperty.map(o => o.doorNo).join("_");
-            const filename = `${selectedProperty.value}_${propertyDoorNo}_R${revisionCount}`;
-
+            const propertyDoorNo = doorNos.join("_");
+            const filename = `${selectedProperty.value}_${propertyDoorNo}_R${currentRevisionCount}`;
             const formData = new FormData();
             formData.append("file", pdfBlob);
             formData.append("file_name", filename);
-
             const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/agreement/googleUploader/uploadToGoogleDrive", {
                 method: "POST",
                 body: formData,
@@ -954,7 +954,7 @@ WITNESSES:
                 howMany: item.quantity,
             }));
             const agreementPayload = {
-                propertyName: selectedProperty.value, // This stores projectReferenceName
+                propertyName: selectedProperty.value,
                 propertyAddress: projects.find(p => p.projectReferenceName === selectedProperty.value)?.projectAddress || "",
                 fileName: filename,
                 rentToBePaid: Renttobepaid,
@@ -986,7 +986,6 @@ WITNESSES:
             setIsRentPopupOpen(false);
         }
     };
-
     const reversedAgreementFileOptions = [...agreementFilteredFileOptions].reverse();
     const handleAgreementSelection = (selectedOption) => {
         const selectedAgreementId = selectedOption.value;
@@ -1183,8 +1182,7 @@ WITNESSES:
                                         />
                                         <ul className="relative z-10 lg:grid lg:gird-col-1 flex  overflow-auto no-scrollbar">
                                             {steps.map((step, index) => (
-                                                <li
-                                                    key={index}
+                                                <li key={index}
                                                     className="relative flex items-center justify-between lg:py-4 lg:px-6 py-4 lg:mr-5 ml-[-30px] cursor-pointer"
                                                     onClick={() => setCurrentStep(index + 1)}
                                                 >
@@ -1465,15 +1463,17 @@ WITNESSES:
                                                                             options={tenantFullNameOptions}
                                                                             onChange={(newValue) => {
                                                                                 const selectedName = newValue?.value || '';
-                                                                                const matchedDetail = tenantList
-                                                                                    .flatMap(t => t.tenantDetailsList || [])
-                                                                                    .find(detail => detail.tenantFullName === selectedName);
+                                                                                // Find tenant from tenant link data by tenantName and fullName
+                                                                                const matchedTenant = tenantList.find(t => 
+                                                                                    t.tenantName === tenant.tenantName && 
+                                                                                    t.fullName === selectedName
+                                                                                );
                                                                                 handlePartnerChange(tenant.id, partnerIndex, 'tenantFullName', selectedName);
-                                                                                if (matchedDetail) {
-                                                                                    handlePartnerChange(tenant.id, partnerIndex, 'tenantFatherName', matchedDetail.tenantFatherName || '');
-                                                                                    handlePartnerChange(tenant.id, partnerIndex, 'tenantAge', matchedDetail.tenantAge || '');
-                                                                                    handlePartnerChange(tenant.id, partnerIndex, 'tenantMobile', matchedDetail.tenantMobile || '');
-                                                                                    handlePartnerChange(tenant.id, partnerIndex, 'tenantAddress', matchedDetail.tenantAddress || '');
+                                                                                if (matchedTenant) {
+                                                                                    handlePartnerChange(tenant.id, partnerIndex, 'tenantFatherName', matchedTenant.tenantFatherName || '');
+                                                                                    handlePartnerChange(tenant.id, partnerIndex, 'tenantAge', matchedTenant.age || '');
+                                                                                    handlePartnerChange(tenant.id, partnerIndex, 'tenantMobile', matchedTenant.mobileNumber || '');
+                                                                                    handlePartnerChange(tenant.id, partnerIndex, 'tenantAddress', matchedTenant.tenantAddress || '');
                                                                                 }
                                                                             }}
                                                                             placeholder="Select..."
@@ -1546,27 +1546,6 @@ WITNESSES:
                                                                         />
                                                                     </div>
                                                                     <div className="flex items-center gap-3">
-                                                                        <label
-                                                                            htmlFor={`fileInput-${tenant.id}-${partnerIndex}`}
-                                                                            className="cursor-pointer flex items-center text-orange-600 lg:mb-6 mb-3"
-                                                                        >
-                                                                            <img className="w-5 h-4 mr-1" alt="Attach" src={AttachIcon} />
-                                                                            Attach file
-                                                                        </label>
-                                                                        <input
-                                                                            id={`fileInput-${tenant.id}-${partnerIndex}`}
-                                                                            type="file"
-                                                                            accept=".pdf,image/*"
-                                                                            className="hidden"
-                                                                            onChange={(e) => {
-                                                                                if (e.target.files.length > 0) {
-                                                                                    handleFileChange(tenant.id, partnerIndex, e.target.files[0]);
-                                                                                }
-                                                                            }}
-                                                                        />
-                                                                        {partner.aadhaarFile && (
-                                                                            <p className="text-xs text-green-700">{partner.aadhaarFile.name}</p>
-                                                                        )}
                                                                         {tenant.tenantsList.length > 1 && (
                                                                             <button
                                                                                 onClick={() => removePartner(tenant.id, partnerIndex)}
@@ -1607,17 +1586,10 @@ WITNESSES:
                                                         Back
                                                     </button>
                                                     <button
-                                                        className={`bg-yellow-700 text-white px-6 py-2 rounded-md hover:bg-yellow-600 transition duration-200 ${isWaiting ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                        disabled={isWaiting}
-                                                        onClick={async (e) => {
-                                                            e.preventDefault();
-                                                            const success = await handleSubmit();
-                                                            if (success) {
-                                                                setCurrentStep(currentStep + 1);
-                                                            }
-                                                        }}
+                                                        className="bg-yellow-700 text-white px-6 py-2 rounded-md hover:bg-yellow-600 transition duration-200"
+                                                        onClick={() => setCurrentStep(currentStep + 1)}
                                                     >
-                                                        {isWaiting ? 'Wait...' : 'Next'}
+                                                        Next
                                                     </button>
                                                 </div>
                                             </div>

@@ -268,30 +268,30 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
 
       // Employee filter
       if (selectEmployeeName) {
-        const employeeName = getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || "";
+        const employeeName = String(getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || "");
         if (employeeName.toLowerCase() !== selectEmployeeName.toLowerCase()) return false;
       }
 
       // Purpose filter
       if (selectPurpose) {
-        const purposeName = getPurposeName(entry.from_purpose_id) || "";
+        const purposeName = String(getPurposeName(entry.from_purpose_id) || "");
         if (purposeName.toLowerCase() !== selectPurpose.toLowerCase()) return false;
       }
 
       // Transfer To filter
       if (selectTransferTo) {
-        const transferToName = getPurposeName(entry.to_purpose_id) || "";
+        const transferToName = String(getPurposeName(entry.to_purpose_id) || "");
         if (transferToName.toLowerCase() !== selectTransferTo.toLowerCase()) return false;
       }
 
       // Type filter
       if (selectType) {
-        if (entry.type?.toLowerCase() !== selectType.toLowerCase()) return false;
+        if (String(entry.type || "").toLowerCase() !== selectType.toLowerCase()) return false;
       }
 
       // Mode filter
       if (selectMode) {
-        if (entry.staff_payment_mode?.toLowerCase() !== selectMode.toLowerCase()) return false;
+        if (String(entry.staff_payment_mode || "").toLowerCase() !== selectMode.toLowerCase()) return false;
       }
 
       return true; // passes all filters

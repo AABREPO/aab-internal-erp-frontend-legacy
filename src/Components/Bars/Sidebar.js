@@ -263,8 +263,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
             </Link>
           </div>
         )}
-        <div
-          className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'account' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+        <div className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'account' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('account')}
         >
           <img src={activeMenu === 'account' ? accountWhite : account} alt="account" className="h-4 w-4" />
@@ -464,6 +463,10 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
               }}>
               <p className="text-sm cursor-pointer"><li>Tools Tracker</li></p>
             </Link>
+            <Link to="/testtoolsTracker" className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Test Tools Tracker' ? 'text-red-500' : ''
+              }`} onClick={() => handleSubmenuItemClick('Test Tools Tracker')}>
+              <p className="text-sm cursor-pointer"><li>Test Tools Tracker</li></p>
+            </Link>
           </div>
         )}
         <div
@@ -565,8 +568,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
             </Link>
           </div>
         )}
-        <div
-          className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'hr' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+        <div className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'hr' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('hr')}
         >
           <img src={activeMenu === 'hr' ? hrWhite : hr} alt="hr" className="h-4 w-4" />
@@ -589,10 +591,8 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
               <p className="text-sm cursor-pointer"><li>Attendance</li></p>
             </Link>
             <Link to="/staffadvance/staffAdvance" className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Staff Advance' ? 'text-red-500' : ''}`}
-              onClick={() => {
-                handleSubmenuItemClick('Staff Advance');
-                if (onCloseSidebar) onCloseSidebar();
-              }}>
+              onClick={() => { handleSubmenuItemClick('Staff Advance'); if (onCloseSidebar) onCloseSidebar(); }}
+            >
               <p className="text-sm cursor-pointer"><li>Staff Advance</li></p>
             </Link>
             <Link to={hasAccessToModel('Manage User') ? 'user_manage' : '#'}
@@ -610,8 +610,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
             </Link>
           </div>
         )}
-        <div
-          className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'utility' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+        <div className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'utility' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('utility')}
         >
           <img src={activeMenu === 'utility' ? sideUtilityHub : sidesetting} alt="utility" className="h-4 w-4" />
@@ -641,8 +640,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
             </Link>
           </div>
         )}
-        <div
-          className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'masterdata' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+        <div className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'masterdata' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('masterdata')}
         >
           <img src={activeMenu === 'masterdata' ? sideMasterData : sidesaving} alt="masterdata" className="h-4 w-4" />
@@ -662,7 +660,6 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
             </Link>
           </div>
         )}
-
         <div className="mt-[6rem] ml-4 w-44">
           <p style={{ fontSize: '16px', marginTop: '1rem' }}>
             <span className="font-semibold">Last Updated:</span>{' '}

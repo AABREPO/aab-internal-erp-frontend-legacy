@@ -292,19 +292,32 @@ const AdvanceReport = () => {
     fetchData();
   }, []);
 
-  // Helper — ISO-ish week number (keeps original behavior)
+  // Helper — Week number calculation for Monday-Sunday weeks
   const getWeekNumberFromDate = (date) => {
     const d = new Date(date);
-    const oneJan = new Date(d.getFullYear(), 0, 1);
-    const numberOfDays = Math.floor((d - oneJan) / (24 * 60 * 60 * 1000));
-    return Math.ceil((numberOfDays + oneJan.getDay() + 1) / 7);
+    d.setHours(0, 0, 0, 0);
+    // Get the Monday of the week containing this date
+    const dayOfWeek = d.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Convert to Monday = 0
+    const mondayOfWeek = new Date(d);
+    mondayOfWeek.setDate(d.getDate() + mondayOffset);
+    
+    // Get January 1st of the year
+    const jan1 = new Date(mondayOfWeek.getFullYear(), 0, 1);
+    // Get the Monday of the week containing January 1st
+    const jan1DayOfWeek = jan1.getDay();
+    const jan1MondayOffset = jan1DayOfWeek === 0 ? -6 : 1 - jan1DayOfWeek;
+    const firstMonday = new Date(jan1);
+    firstMonday.setDate(jan1.getDate() + jan1MondayOffset);
+    
+    // Calculate week number (1-based)
+    const diffTime = mondayOfWeek - firstMonday;
+    const diffDays = Math.floor(diffTime / (24 * 60 * 60 * 1000));
+    return Math.floor(diffDays / 7) + 1;
   };
 
   const getCurrentWeekNumber = () => {
-    const now = new Date();
-    const start = new Date(now.getFullYear(), 0, 1);
-    const days = Math.floor((now - start) / (24 * 60 * 60 * 1000));
-    return Math.ceil((days + start.getDay() + 1) / 7);
+    return getWeekNumberFromDate(new Date());
   };
 
   // Default to current week
@@ -366,10 +379,7 @@ const AdvanceReport = () => {
       return sum + (amount);
     }, 0)
     .toLocaleString("en-IN");
-
-  // Sorting helpers and memoized sorted rows for rendering
   const normStr = (v) => (v ?? "").toString().trim().toLowerCase();
-
   const dateKey = (val) => {
     if (!val) return -Infinity;
     const s = String(val).trim();
@@ -380,9 +390,7 @@ const AdvanceReport = () => {
     const t = Date.parse(s);
     return isNaN(t) ? -Infinity : new Date(new Date(t).toDateString()).getTime();
   };
-
   const getLabelById = (options, id) => options.find((o) => String(o.id) === String(id))?.label || "";
-
   const requestSort = (key) => {
     setSortConfig((prev) => {
       if (prev.key === key) {
@@ -391,7 +399,6 @@ const AdvanceReport = () => {
       return { key, direction: "asc" };
     });
   };
-
   const sortedData = React.useMemo(() => {
     const data = [...filteredData];
     const { key, direction } = sortConfig || {};
@@ -444,55 +451,41 @@ const AdvanceReport = () => {
     });
     return data;
   }, [filteredData, sortConfig, contractorOptions, vendorOptions, siteOptions]);
-
-  // Pagination logic
   const totalPages = Math.ceil(sortedData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentData = sortedData.slice(startIndex, endIndex);
-
-  // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [startDate, endDate, week, year, paymentModeFilter, typeFilter]);
-
   const SortIcon = ({ columnKey }) => {
     if (sortConfig.key !== columnKey) return null;
     return <span className="ml-1">{sortConfig.direction === "asc" ? "↑" : "↓"}</span>;
   };
-
-  // Pagination handlers
   const goToPage = (page) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   };
-
   const goToNextPage = () => {
     if (currentPage < totalPages) {
       setCurrentPage(currentPage + 1);
     }
   };
-
   const goToPreviousPage = () => {
     if (currentPage > 1) {
       setCurrentPage(currentPage - 1);
     }
   };
-
   const handleItemsPerPageChange = (e) => {
     const newItemsPerPage = parseInt(e.target.value);
     setItemsPerPage(newItemsPerPage);
     setCurrentPage(1);
   };
-
-  // Export PDF (landscape) of tableRef
   const handleExportPDF = () => {
     if (!filteredData.length) {
       alert("No data to export");
       return;
     }
-
     const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
-
     const columns = [
       { header: "S.No", dataKey: "sno" },
       { header: "Date", dataKey: "date" },
@@ -507,9 +500,7 @@ const AdvanceReport = () => {
       { header: "Description", dataKey: "description" },
       { header: "Attached file", dataKey: "file" },
     ];
-
     const normStr = v => (v ?? "").toString().trim().toLowerCase();
-
     function dateKey(val) {
       if (!val) return -Infinity;
       const s = String(val).trim();
@@ -520,21 +511,16 @@ const AdvanceReport = () => {
       const t = Date.parse(s);
       return isNaN(t) ? -Infinity : new Date(new Date(t).toDateString()).getTime();
     }
-
     const sortedData = [...filteredData].sort((a, b) => {
       const typeA = normStr(a.type), typeB = normStr(b.type);
       if (typeA !== typeB) return typeA.localeCompare(typeB);
-
       const modeA = normStr(a.payment_mode), modeB = normStr(b.payment_mode);
       if (modeA !== modeB) return modeA.localeCompare(modeB);
-
       return dateKey(a.date) - dateKey(b.date);
     });
-
     const totalAdvanceCash = sortedData
       .filter(row => normStr(row.type) === "advance" && normStr(row.payment_mode) === "cash")
       .reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
-
     const rows = sortedData.map((row, index) => {
       const d = new Date(dateKey(row.date));
       return {
@@ -554,8 +540,6 @@ const AdvanceReport = () => {
         file: row.file_url ? "Yes" : "-",
       };
     });
-
-    // Draw merged header as part of the table
     doc.autoTable({
       startY: 20,
       body: [
@@ -585,8 +569,6 @@ const AdvanceReport = () => {
         5: { cellWidth: 103 },
       }
     });
-
-    // Main data table starts after header
     doc.autoTable({
       startY: doc.lastAutoTable.finalY + 10,
       columns,
@@ -623,15 +605,10 @@ const AdvanceReport = () => {
         file: { cellWidth: 35 },
       }
     });
-
-    // Add second page with Bill Settlement data filtered by selected week using timestamp
     if (week && year) {
       const selectedWeekNum = parseInt(week.replace("Week ", ""), 10);
       const selectedYear = parseInt(year, 10);
-      
-      // Filter Bill Settlement data for the selected week using timestamp (not date)
       const billSettlementData = advanceData.filter((item) => {
-        // Use timestamp field if available, otherwise fall back to date
         const itemTimestamp = item.timestamp ? new Date(item.timestamp) : new Date(item.date);
         const itemWeek = getWeekNumberFromDate(itemTimestamp);
         const itemYear = itemTimestamp.getFullYear();
@@ -640,19 +617,14 @@ const AdvanceReport = () => {
                itemWeek === selectedWeekNum && 
                itemType === "bill settlement";
       });
-
       if (billSettlementData.length > 0) {
-        // Sort Bill Settlement data using timestamp
         const sortedBillSettlement = [...billSettlementData].sort((a, b) => {
           const modeA = normStr(a.payment_mode), modeB = normStr(b.payment_mode);
           if (modeA !== modeB) return modeA.localeCompare(modeB);
-          // Use timestamp for sorting if available
           const timestampA = a.timestamp ? new Date(a.timestamp).getTime() : dateKey(a.date);
           const timestampB = b.timestamp ? new Date(b.timestamp).getTime() : dateKey(b.date);
           return timestampA - timestampB;
         });
-
-        // Calculate totals for Bill Settlement using timestamp
         const billSettlementFromDate = sortedBillSettlement.length
           ? new Date(Math.min(...sortedBillSettlement.map((r) => {
               return r.timestamp ? new Date(r.timestamp) : new Date(r.date);
@@ -665,11 +637,7 @@ const AdvanceReport = () => {
           : "-";
         const totalBillAmount = sortedBillSettlement
           .reduce((sum, row) => sum + (parseFloat(row.bill_amount) || 0), 0);
-
-        // Add new page - ensure it starts fresh
         doc.addPage();
-
-        // Add timestamp to header
         const timestamp = new Date().toLocaleString("en-GB", {
           day: "2-digit",
           month: "2-digit",
@@ -678,8 +646,6 @@ const AdvanceReport = () => {
           minute: "2-digit",
           second: "2-digit"
         });
-
-        // Draw header for Bill Settlement page
         doc.autoTable({
           startY: 20,
           body: [
@@ -713,12 +679,20 @@ const AdvanceReport = () => {
             5: { cellWidth: 103 },
           }
         });
-
         const billSettlementRows = sortedBillSettlement.map((row, index) => {
           const rowDate = row.timestamp ? new Date(row.timestamp) : new Date(row.date);
           return {
             sno: index + 1,
-            date: isNaN(rowDate) ? "" : rowDate.toLocaleDateString("en-GB"),
+            date: isNaN(rowDate) ? "" : (row.timestamp 
+              ? rowDate.toLocaleString("en-GB", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit"
+                })
+              : rowDate.toLocaleDateString("en-GB")),
             cv:
               contractorOptions.find(c => c.id === row.contractor_id)?.label ||
               vendorOptions.find(v => v.id === row.vendor_id)?.label || "",
@@ -756,7 +730,7 @@ const AdvanceReport = () => {
           alternateRowStyles: { fillColor: null },
           columnStyles: {
             sno: { cellWidth: 28 },
-            date: { cellWidth: 50 },
+            date: { cellWidth: 100 },
             cv: { cellWidth: 90 },
             project: { cellWidth: 115 },
             advance: { cellWidth: 45, halign: 'right' },
@@ -771,20 +745,15 @@ const AdvanceReport = () => {
         });
       }
     }
-
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
     doc.save(`AdvanceReport_${fromDate.replace(/\//g, "-")}_to_${toDate.replace(/\//g, "-")}_${timestamp}.pdf`);
   };
-
-  // Export Excel using xlsx
   const handleExportExcel = () => {
     if (!filteredData.length) {
       alert("No data to export");
       return;
     }
-
     const normStr = v => (v ?? "").toString().trim().toLowerCase();
-
     const dateKey = (val) => {
       if (!val) return -Infinity;
       const s = String(val).trim();
@@ -796,21 +765,16 @@ const AdvanceReport = () => {
       const d = new Date(val);
       return isNaN(d) ? -Infinity : new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
     };
-
     const sortedData = [...filteredData].sort((a, b) => {
       const typeA = normStr(a.type), typeB = normStr(b.type);
       if (typeA !== typeB) return typeA.localeCompare(typeB);
-
       const modeA = normStr(a.payment_mode), modeB = normStr(b.payment_mode);
       if (modeA !== modeB) return modeA.localeCompare(modeB);
-
       return dateKey(a.date) - dateKey(b.date);
     });
-
     const totalAdvanceCash = sortedData
       .filter(row => normStr(row.type) === "advance" && normStr(row.payment_mode) === "cash")
       .reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
-
     const header = [
       "S.No",
       "Date",
@@ -825,19 +789,16 @@ const AdvanceReport = () => {
       "Description",
       "Attached file",
     ];
-
     const summaryRow = [
       "", "", "", "",
       `Total Cash Advance: ${totalAdvanceCash.toLocaleString("en-IN")}`,
       "", "", "", "", "", "", ""
     ];
-
     const rows = sortedData.map((row, idx) => {
       const contractor = contractorOptions.find((c) => c.id === row.contractor_id)?.label;
       const vendor = vendorOptions.find((v) => v.id === row.vendor_id)?.label;
       const project = siteOptions.find((s) => s.id === row.project_id)?.label;
       const transferSite = siteOptions.find((s) => s.id === row.transfer_site_id)?.label;
-
       return [
         idx + 1,
         new Date(row.date).toLocaleDateString("en-GB"),
@@ -853,20 +814,14 @@ const AdvanceReport = () => {
         row.file_url ? "Yes" : "-",
       ];
     });
-
     const aoa = [header, summaryRow, ...rows];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "AdvanceReport");
-
-    // Add second sheet with Bill Settlement data filtered by selected week using timestamp
     if (week && year) {
       const selectedWeekNum = parseInt(week.replace("Week ", ""), 10);
       const selectedYear = parseInt(year, 10);
-      
-      // Filter Bill Settlement data for the selected week using timestamp (not date)
       const billSettlementData = advanceData.filter((item) => {
-        // Use timestamp field if available, otherwise fall back to date
         const itemTimestamp = item.timestamp ? new Date(item.timestamp) : new Date(item.date);
         const itemWeek = getWeekNumberFromDate(itemTimestamp);
         const itemYear = itemTimestamp.getFullYear();
@@ -875,19 +830,14 @@ const AdvanceReport = () => {
                itemWeek === selectedWeekNum && 
                itemType === "bill settlement";
       });
-
       if (billSettlementData.length > 0) {
-        // Sort Bill Settlement data using timestamp
         const sortedBillSettlement = [...billSettlementData].sort((a, b) => {
           const modeA = normStr(a.payment_mode), modeB = normStr(b.payment_mode);
           if (modeA !== modeB) return modeA.localeCompare(modeB);
-          // Use timestamp for sorting if available
           const timestampA = a.timestamp ? new Date(a.timestamp).getTime() : dateKey(a.date);
           const timestampB = b.timestamp ? new Date(b.timestamp).getTime() : dateKey(b.date);
           return timestampA - timestampB;
         });
-
-        // Calculate totals for Bill Settlement using timestamp
         const billSettlementFromDate = sortedBillSettlement.length
           ? new Date(Math.min(...sortedBillSettlement.map((r) => {
               return r.timestamp ? new Date(r.timestamp) : new Date(r.date);
@@ -900,8 +850,6 @@ const AdvanceReport = () => {
           : "-";
         const totalBillAmount = sortedBillSettlement
           .reduce((sum, row) => sum + (parseFloat(row.bill_amount) || 0), 0);
-
-        // Add timestamp
         const timestamp = new Date().toLocaleString("en-GB", {
           day: "2-digit",
           month: "2-digit",
@@ -910,8 +858,6 @@ const AdvanceReport = () => {
           minute: "2-digit",
           second: "2-digit"
         });
-
-        // Bill Settlement header
         const billSettlementHeader = [
           "S.No",
           "Date",
@@ -926,8 +872,6 @@ const AdvanceReport = () => {
           "Description",
           "Attached file",
         ];
-
-        // Bill Settlement summary rows with timestamp
         const billSettlementSummaryRows = [
           ["Bill Settlement Report", "", "", "", "", "", "", "", "", "", "", ""],
           [`Generated: ${timestamp}`, "", "", "", "", "", "", "", "", "", "", ""],
@@ -935,8 +879,6 @@ const AdvanceReport = () => {
           ["Start Date", billSettlementFromDate, "End Date", billSettlementToDate, "Total Bill Amount", totalBillAmount.toLocaleString("en-IN"), "", "", "", "", "", ""],
           ["", "", "", "", "", "", "", "", "", "", "", ""],
         ];
-
-        // Bill Settlement data rows - use timestamp for date
         const billSettlementRows = sortedBillSettlement.map((row, idx) => {
           const contractor = contractorOptions.find((c) => c.id === row.contractor_id)?.label;
           const vendor = vendorOptions.find((v) => v.id === row.vendor_id)?.label;
@@ -945,7 +887,16 @@ const AdvanceReport = () => {
           const rowDate = row.timestamp ? new Date(row.timestamp) : new Date(row.date);
           return [
             idx + 1,
-            rowDate.toLocaleDateString("en-GB"),
+            isNaN(rowDate) ? "" : (row.timestamp 
+              ? rowDate.toLocaleString("en-GB", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit"
+                })
+              : rowDate.toLocaleDateString("en-GB")),
             contractor || vendor || "",
             project || "",
             (row.amount ?? 0).toLocaleString("en-IN"),
@@ -958,7 +909,6 @@ const AdvanceReport = () => {
             row.file_url ? "Yes" : "-",
           ];
         });
-
         const billSettlementAoa = [
           ...billSettlementSummaryRows,
           billSettlementHeader,
@@ -968,16 +918,13 @@ const AdvanceReport = () => {
         XLSX.utils.book_append_sheet(wb, billSettlementWs, "Bill Settlement");
       }
     }
-
     const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
     saveAs(
       new Blob([wbout], { type: "application/octet-stream" }),
       `AdvanceReport_${fromDate.replace(/\//g, "-")}_to_${toDate.replace(/\//g, "-")}_${timestamp}.xlsx`
     );
   };
-
   if (loading) {
     return (
       <div className='bg-[#FAF6ED]'>
@@ -997,7 +944,6 @@ const AdvanceReport = () => {
       </div>
     );
   }
-
   if (error) {
     return (
       <div className='bg-[#FAF6ED]'>
@@ -1007,11 +953,9 @@ const AdvanceReport = () => {
       </div>
     );
   }
-
   return (
     <div className='bg-[#FAF6ED] min-h-screen w-full'>
       <div className="flex flex-col xl:flex-row items-start justify-between bg-white p-4 ml-4 sm:ml-6 lg:ml-10 px-4 lg:px-14 lg:h-[128px] rounded-md shadow-sm max-w-[1850px] w-full mb-5">
-        {/* Left Section */}
         <div className="flex flex-wrap space-x-6 text-left">
           <div>
             <label className="block font-semibold mb-1">Week No</label>
@@ -1019,7 +963,6 @@ const AdvanceReport = () => {
               value={week}
               onChange={(e) => {
                 setWeek(e.target.value);
-                // clear date-range when week selected
                 setStartDate("");
                 setEndDate("");
               }}
@@ -1033,7 +976,6 @@ const AdvanceReport = () => {
               ))}
             </select>
           </div>
-
           <div>
             <label className="block font-semibold mb-1">Year</label>
             <select
@@ -1046,8 +988,6 @@ const AdvanceReport = () => {
               ))}
             </select>
           </div>
-
-          {/* Date Range Filter */}
           <div>
             <label className="block font-semibold mb-1">Start Date</label>
             <input
@@ -1055,13 +995,11 @@ const AdvanceReport = () => {
               value={startDate}
               onChange={(e) => {
                 setStartDate(e.target.value);
-                // when using date filter, clear week selection so week filter is ignored
                 setWeek("");
               }}
               className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[168px] h-[45px] focus:outline-none"
             />
           </div>
-
           <div>
             <label className="block font-semibold mb-1">End Date</label>
             <input
@@ -1074,7 +1012,6 @@ const AdvanceReport = () => {
               className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[168px] h-[45px] focus:outline-none"
             />
           </div>
-
           <div>
             <label className="block font-semibold mb-1">Payment Mode</label>
             <select
@@ -1089,7 +1026,6 @@ const AdvanceReport = () => {
               <option value="Cheque">Cheque</option>
             </select>
           </div>
-
           <div>
             <label className="block font-semibold mb-1">Type</label>
             <select
@@ -1105,8 +1041,6 @@ const AdvanceReport = () => {
             </select>
           </div>
         </div>
-
-        {/* Right Section */}
         <div>
           <div className="text-sm text-right space-y-1 border-2 border-[#E4572E] border-opacity-15 p-1">
             <div>
@@ -1243,11 +1177,8 @@ const AdvanceReport = () => {
             </tbody>
           </table>
         </div>
-
-        {/* Pagination Controls */}
         {sortedData.length > 0 && (
           <div className="flex flex-col sm:flex-row justify-between items-center px-5 py-4 bg-white border-t border-gray-200 mb-8">
-            {/* Items per page selector */}
             <div className="flex items-center space-x-2 mb-4 sm:mb-0">
               <label className="text-sm font-medium text-gray-700">Show:</label>
               <select
@@ -1269,13 +1200,9 @@ const AdvanceReport = () => {
               </select>
               <span className="text-sm text-gray-700">entries</span>
             </div>
-
-            {/* Page info */}
             <div className="text-sm text-gray-700 mb-4 sm:mb-0">
               Showing {startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries
             </div>
-
-            {/* Pagination buttons */}
             <div className="flex items-center space-x-2">
               <button
                 onClick={goToPreviousPage}
@@ -1287,8 +1214,6 @@ const AdvanceReport = () => {
               >
                 Previous
               </button>
-
-              {/* Page numbers */}
               <div className="flex items-center space-x-1">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let pageNum;
@@ -1301,7 +1226,6 @@ const AdvanceReport = () => {
                   } else {
                     pageNum = currentPage - 2 + i;
                   }
-
                   return (
                     <button
                       key={pageNum}
@@ -1316,7 +1240,6 @@ const AdvanceReport = () => {
                   );
                 })}
               </div>
-
               <button
                 onClick={goToNextPage}
                 disabled={currentPage === totalPages}
@@ -1334,5 +1257,4 @@ const AdvanceReport = () => {
     </div>
   );
 };
-
 export default AdvanceReport;

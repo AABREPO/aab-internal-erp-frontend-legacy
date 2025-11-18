@@ -11,6 +11,7 @@ import download from '../Images/file_download.png'
 import file from '../Images/file.png';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import Change from '../Images/dropdownchange.png';
 
 // Helper function to clean URL by removing surrounding quotes and parsing JSON if needed
 function cleanUrl(url) {
@@ -49,6 +50,10 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     const [siteOptions, setSiteOptions] = useState([]);
     const [combinedOptions, setCombinedOptions] = useState([]);
     const [employeeOptions, setEmployeeOptions] = useState([]);
+    const [clientOptions, setClientOptions] = useState([]);
+    const [clientProjectOptions, setClientProjectOptions] = useState([]);
+    const [clientProjectMap, setClientProjectMap] = useState({});
+    const [projectIdToClientName, setProjectIdToClientName] = useState({});
     const [weeklyPaymentBills, setWeeklyPaymentBills] = useState([]);
     const [selectedProjectName, setSelectedProjectName] = useState(null);
     const [portalDescriptions, setPortalDescriptions] = useState({});
@@ -56,6 +61,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     const [selectedContractor, setSelectedContractor] = useState(null);
     const [selectedVendor, setSelectedVendor] = useState(null);
     const [selectedEmployee, setSelectedEmployee] = useState(null);
+    const [selectedClient, setSelectedClient] = useState(null);
+    const [isClientToggleActive, setIsClientToggleActive] = useState(false);
     const [weeklyTypes, setWeeklyTypes] = useState([]);
     const [showWeeklyPaymentExpensesModal, setShowWeeklyPaymentExpensesModal] = useState(false);
     const [weeklyPaymentExpensesAudits, setWeeklyPaymentExpensesAudits] = useState([]);
@@ -190,10 +197,13 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         contractor: "",
         vendor: "",
         employee: "",
+        client_name: "",
+        client_id: "",
         project: "",
         type: "",
         amount: "",
         staff_advance_portal_id: "",
+        loan_portal_id: "",
     });
     const [editingRowId, setEditingRowId] = useState(null);
     const [editFormData, setEditFormData] = useState({
@@ -201,32 +211,31 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         contractor_id: "",
         vendor_id: "",
         employee_id: "",
+        client_name: "",
+        client_id: "",
         project_id: "",
         type: "",
         amount: "",
         advance_portal_id: "",
         staff_advance_portal_id: "",
+        loan_portal_id: "",
         description: "",
     });
     const handleEditClick = async (row) => {
         setEditingRowId(row.id);
-        // Start with row data
         let description = row.description || "";
-        // ✅ If advance_portal_id exists, fetch its description
         if (row.advance_portal_id) {
             try {
                 const res = await fetch(
                     `https://backendaab.in/aabuildersDash/api/advance_portal/get/${row.advance_portal_id}`
                 );
                 if (!res.ok) throw new Error("Failed to fetch advance portal data");
-
                 const data = await res.json();
-                description = data.description || description; // fallback if no description
+                description = data.description || description;
             } catch (error) {
                 console.error("Error fetching advance portal data:", error);
             }
         }
-        // ✅ If staff_advance_portal_id exists, fetch its description
         if (row.staff_advance_portal_id) {
             try {
                 const res = await fetch(
@@ -235,7 +244,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 if (!res.ok) throw new Error("Failed to fetch staff advance data");
 
                 const data = await res.json();
-                description = data.description || description; // fallback if no description
+                description = data.description || description;
             } catch (error) {
                 console.error("Error fetching staff advance data:", error);
             }
@@ -245,15 +254,17 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             contractor_id: row.contractor_id,
             vendor_id: row.vendor_id,
             employee_id: row.employee_id,
+            client_name: row.client_name || "",
+            client_id: row.client_id || "",
             project_id: row.project_id,
             type: row.type,
             amount: row.amount,
             advance_portal_id: row.advance_portal_id,
             staff_advance_portal_id: row.staff_advance_portal_id,
-            description: description, // ✅ updated with fetched description if available
+            loan_portal_id: row.loan_portal_id || "",
+            description: description,
         });
     };
-
     const formatDateOnly = (dateString) => {
         const date = new Date(dateString);
         const day = String(date.getDate()).padStart(2, '0');
@@ -269,7 +280,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             if (isNaN(numericValue)) numericValue = "";
             if (numericValue > balance) {
                 alert(`Amount cannot exceed balance: ${balance}`);
-                numericValue = "";   // clear instead of forcing to balance
+                numericValue = "";
             }
             if (numericValue < 0) numericValue = 0;
             setEditFormData((prev) => ({ ...prev, amount: numericValue }));
@@ -281,10 +292,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             setEditFormData((prev) => ({ ...prev, [name]: value }));
         }
     };
-    // Payments
     const [payments, setPayments] = useState([]);
     const [newPayment, setNewPayment] = useState({ date: "", amount: "", type: "Weekly" });
-    // Account Closure popup
     const [showPopup, setShowPopup] = useState(false);
     const [showPopups, setShowPopups] = useState(false);
     const [carryForwardBalance, setCarryForwardBalance] = useState(0);
@@ -294,8 +303,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         amount: "",
         type: ""
     });
-
-    // Payment popup states for Project Advance
     const [showPaymentPopup, setShowPaymentPopup] = useState(false);
     const [paymentPopupData, setPaymentPopupData] = useState({
         date: new Date().toISOString().split('T')[0],
@@ -312,13 +319,10 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     const [currentFileRow, setCurrentFileRow] = useState(null);
     const [selectedFileForPopup, setSelectedFileForPopup] = useState(null);
     const [accountDetails, setAccountDetails] = useState([]);
-    // Category selection popup states
     const [showCategoryPopup, setShowCategoryPopup] = useState(false);
     const [categoryOptions, setCategoryOptions] = useState([]);
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [isConfirmingCategory, setIsConfirmingCategory] = useState(false);
-    // Weekly Payment Bill Data List states
-
     const [showPaymentDetailsPopup, setShowPaymentDetailsPopup] = useState(false);
     const [selectedPaymentDetails, setSelectedPaymentDetails] = useState([]);
     const handleEditPaymentClick = (row) => {
@@ -329,8 +333,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             type: row.type
         });
     };
-
-    // API functions for WeeklyPaymentBillDataList
     const saveWeeklyPaymentBill = async (paymentData) => {
         try {
             const response = await fetch("https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save", {
@@ -352,7 +354,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             throw error;
         }
     };
-
     const fetchWeeklyPaymentBills = async () => {
         try {
             const response = await fetch("https://backendaab.in/aabuildersDash/api/weekly-payment-bills/all", {
@@ -373,7 +374,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             return [];
         }
     };
-
     const getPaymentsByExpenseId = (expenseId) => {
         if (!weeklyPaymentBills || weeklyPaymentBills.length === 0) {
             return [];
@@ -381,14 +381,12 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         const payments = weeklyPaymentBills.filter(bill => bill.weekly_payment_expense_id === expenseId);
         return payments;
     };
-
     // File upload functions
     const handleFileUploadClick = (row) => {
         setCurrentFileRow(row);
         setSelectedFileForPopup(null);
         setFileUploadPopup(true);
     };
-
     const handleFileSelectInPopup = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -396,7 +394,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         }
         e.target.value = '';
     };
-
     const handleSaveFileFromPopup = async () => {
         if (!selectedFileForPopup || !currentFileRow) return;
         try {
@@ -407,12 +404,10 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 contractorOptions.find(opt => opt.id === Number(currentFileRow.contractor_id))?.label ||
                 employeeOptions.find(opt => opt.id === Number(currentFileRow.employee_id))?.label ||
                 "";
-
             const formData = new FormData();
             const finalName = `${currentFileRow.date}-${siteNo}-${name}`;
             formData.append("file", selectedFileForPopup);
             formData.append("file_name", finalName);
-
             const uploadResponse = await fetch(
                 "https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive",
                 {
@@ -420,15 +415,11 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     body: formData,
                 }
             );
-
             if (!uploadResponse.ok) {
                 throw new Error("File upload failed");
             }
-
             const uploadResult = await uploadResponse.json();
             const pdfUrl = uploadResult.url;
-
-            // Update the bill copy URL using the weekly expenses API
             const updateResponse = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/${currentFileRow.id}/bill-copy-url`, {
                 method: 'PUT',
                 headers: {
@@ -436,28 +427,21 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 },
                 body: JSON.stringify({ billCopyUrl: pdfUrl })
             });
-
             if (!updateResponse.ok) {
                 throw new Error("Failed to update bill copy URL");
             }
-
-            // Update local state
             setExpenses((prev) =>
                 prev.map((exp) => (exp.id === currentFileRow.id ? { ...exp, bill_copy_url: pdfUrl } : exp))
             );
-
             setFileUploadPopup(false);
             setCurrentFileRow(null);
             setSelectedFileForPopup(null);
-
-            // Show success message
             setPopup({
                 show: true,
                 message: "File uploaded successfully!",
                 type: "success",
                 dateStr: new Date().toLocaleDateString('en-GB')
             });
-
         } catch (error) {
             console.error("Error uploading file:", error);
             setPopup({
@@ -468,7 +452,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             });
         }
     };
-
     const getPaymentsByType = (expenseId, billPaymentMode) => {
         if (!weeklyPaymentBills || weeklyPaymentBills.length === 0) {
             return [];
@@ -585,9 +568,9 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     }, []);
     useEffect(() => { setCombinedOptions([...vendorOptions, ...contractorOptions, ...employeeOptions]); }, [vendorOptions, contractorOptions, employeeOptions]);
     useEffect(() => {
-        const fetchSites = async () => {
+        const fetchProjects = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+                const response = await fetch("https://backendaab.in/aabuilderDash/api/projects/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -598,82 +581,134 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     throw new Error("Network response was not ok: " + response.statusText);
                 }
                 const data = await response.json();
-                const formattedData = data.map(item => ({
-                    value: item.siteName,
-                    label: item.siteName,
-                    id: item.id,
-                    sNo: item.siteNo
-                }));
                 const predefinedSiteOptions = [
-                    {
-                        value: "Mason Advance",
-                        label: "Mason Advance",
-                        id: 1,
-                        sNo: "1"
-                    },
-                    {
-                        value: "Material Advance",
-                        label: "Material Advance",
-                        id: 2,
-                        sNo: "2"
-                    },
-                    {
-                        value: "Weekly Advance",
-                        label: "Weekly Advance",
-                        id: 3,
-                        sNo: "3"
-                    },
-                    {
-                        value: "Excess Advance",
-                        label: "Excess Advance",
-                        id: 4,
-                        sNo: "4"
-                    },
-                    {
-                        value: "Material Rent",
-                        label: "Material Rent",
-                        id: 5,
-                        sNo: "5"
-                    },
-                    {
-                        value: "Subhash Kumar - Kunnur",
-                        label: "Subhash Kumar - Kunnur",
-                        id: 6,
-                        sNo: "6"
-                    },
-                    {
-                        value: "Summary Bill",
-                        label: "Summary Bill",
-                        id: 7,
-                        sNo: "7"
-                    },
-                    {
-                        value: "Daily Wage",
-                        label: "Daily Wage",
-                        id: 8,
-                        sNo: "8"
-                    },
-                    {
-                        value: "Rent Management Portal",
-                        label: "Rent Management Portal",
-                        id: 9,
-                        sNo: "9"
-                    },
-                    {
-                        value:"Multi-Project Batch",
-                        label:"Multi-Project Batch",
-                        id:10,
-                        sNo:"10"
-                    }
+                    { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
+                    { value: "Material Advance", label: "Material Advance", id: 2, sNo: "2" },
+                    { value: "Weekly Advance", label: "Weekly Advance", id: 3, sNo: "3" },
+                    { value: "Excess Advance", label: "Excess Advance", id: 4, sNo: "4" },
+                    { value: "Material Rent", label: "Material Rent", id: 5, sNo: "5" },
+                    { value: "Subhash Kumar - Kunnur", label: "Subhash Kumar - Kunnur", id: 6, sNo: "6" },
+                    { value: "Summary Bill", label: "Summary Bill", id: 7, sNo: "7" },
+                    { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
+                    { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
+                    { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
                 ];
-                // Combine backend data with predefined options
-                const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
+                const projectClientMapTemp = {};
+                const projectClientNameTemp = {};
+                const projectOptions = Array.isArray(data)
+                    ? data.map((project, index) => {
+                        const label = (project.projectName || project.projectReferenceName || `Project ${project.projectId || project.id || index + 1}`).trim();
+                        const rawId = project.id ?? project.projectId ?? (100000 + index);
+                        const optionId = Number(rawId);
+                        const option = {
+                            value: label,
+                            label,
+                            id: optionId,
+                            sNo: project.projectId || "",
+                        };
+                        const ownerCandidates = Array.isArray(project?.ownerDetailsList)
+                            ? project.ownerDetailsList
+                            : Array.isArray(project?.ownerDetails)
+                                ? project.ownerDetails
+                                : [];
+                        ownerCandidates.forEach((owner) => {
+                            const key = buildClientKey(owner?.clientName, owner?.fatherName, owner?.mobile);
+                            if (!key) return;
+                            if (!projectClientMapTemp[key]) {
+                                projectClientMapTemp[key] = {
+                                    name: owner.clientName,
+                                    fatherName: owner.fatherName || "",
+                                    mobile: owner.mobile || "",
+                                    clientId: owner.id || key,
+                                    projects: [],
+                                };
+                            }
+                            projectClientMapTemp[key].projects.push(option);
+                            if (!projectClientNameTemp[optionId]) {
+                                projectClientNameTemp[optionId] = owner.clientName || "";
+                            }
+                        });
+                        if (!projectClientNameTemp[optionId]) {
+                            projectClientNameTemp[optionId] = "";
+                        }
+                        return option;
+                    })
+                    : [];
+                const combinedSiteOptions = [...predefinedSiteOptions, ...projectOptions];
                 setSiteOptions(combinedSiteOptions);
+                const clientOptionList = Object.entries(projectClientMapTemp).map(([key, value], idx) => ({
+                    value: value.name,
+                    label: value.name,
+                    id: value.clientId || `client-${idx}`,
+                    clientId: value.clientId || `client-${idx}`,
+                    fatherName: value.fatherName,
+                    mobile: value.mobile,
+                    type: "Client",
+                    compositeKey: key,
+                    projects: value.projects,
+                }));
+                setClientOptions(clientOptionList);
+                setClientProjectMap(projectClientMapTemp);
+                setProjectIdToClientName(projectClientNameTemp);
             } catch (error) {
-                console.error("Fetch error: ", error);
+                console.error("Error fetching projects:", error);
+                setClientOptions([]);
+                setClientProjectMap({});
+                setProjectIdToClientName({});
             }
         };
-        fetchSites();
+        fetchProjects();
+    }, []);
+    useEffect(() => {
+        const fetchClientNames = async () => {
+            try {
+                const response = await fetch("https://backendaab.in/aabuilderDash/api/projects/getAll", {
+                    method: "GET",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                });
+                if (!response.ok) {
+                    throw new Error("Network response was not ok: " + response.statusText);
+                }
+                const data = await response.json();
+                const formattedData = Array.isArray(data)
+                    ? data.flatMap((project) => {
+                        const owners = Array.isArray(project?.ownerDetailsList)
+                            ? project.ownerDetailsList
+                            : Array.isArray(project?.ownerDetails)
+                                ? project.ownerDetails
+                                : [];
+                        return owners
+                            .filter((owner) => owner?.clientName)
+                            .map((owner, index) => ({
+                                value: owner.clientName,
+                                label: owner.clientName,
+                                id: owner.id ?? `${project.id || 'project'}-${index}`,
+                                projectId: project.id,
+                                fatherName: owner.fatherName || "",
+                                mobile: owner.mobile || "",
+                                type: "Client",
+                            }));
+                    })
+                    : [];
+                const uniqueOptions = [];
+                const seen = new Set();
+                formattedData.forEach((option) => {
+                    const key = `${option.label}|${option.fatherName}|${option.mobile}`;
+                    if (option.label && !seen.has(key)) {
+                        seen.add(key);
+                        uniqueOptions.push(option);
+                    }
+                });
+                setClientOptions(uniqueOptions);
+            } catch (error) {
+                console.error("Error fetching client names:", error);
+                setClientOptions([]);
+            }
+        };
+        fetchClientNames();
     }, []);
     useEffect(() => {
         fetchWeeklyType();
@@ -835,6 +870,12 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             fetchRefundPayments();
         }
     }, [currentWeekNumber]);
+    useEffect(() => {
+        if (!isClientToggleActive) return;
+        if (clientProjectOptions.length === 1) {
+            setSelectedProjectName(clientProjectOptions[0]);
+        }
+    }, [clientProjectOptions, isClientToggleActive]);
     // Calculations
     const totalExpenses =
         expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0) + (Number(newExpense.amount) || 0);
@@ -860,6 +901,118 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         } else {
             setNewExpense((prev) => ({ ...prev, [name]: value }));
         }
+    };
+    const handlePartySourceToggle = () => {
+        setIsClientToggleActive((prev) => {
+            const nextState = !prev;
+            setSelectContractororVendorName('');
+            if (nextState) {
+                setSelectedContractor(null);
+                setSelectedVendor(null);
+                setSelectedEmployee(null);
+                setSelectedClient(null);
+                setClientProjectOptions([]);
+                setNewExpense((prevExpense) => ({
+                    ...prevExpense,
+                    client_name: "",
+                    client_id: "",
+                }));
+                setSelectedProjectName(null);
+            } else {
+                setSelectedClient(null);
+                setClientProjectOptions([]);
+                setNewExpense((prevExpense) => ({
+                    ...prevExpense,
+                    client_name: "",
+                    client_id: "",
+                }));
+                setSelectedProjectName(null);
+            }
+            return nextState;
+        });
+    };
+    const updateLoanPortalEntry = async (loanPortalId, { date, amount, vendorId, contractorId, employeeId, projectId }) => {
+        if (!loanPortalId) return;
+        const payload = {
+            type: "Loan",
+            date,
+            amount,
+            loan_payment_mode: "Cash",
+            loan_refund_amount: 0,
+            from_purpose_id: 0,
+            transfer_Project_id: 0,
+            to_purpose_id: 0,
+            vendor_id: vendorId || 0,
+            contractor_id: contractorId || 0,
+            employee_id: employeeId || 0,
+            project_id: projectId || 0,
+            description: "",
+            file_url: ""
+        };
+        const response = await fetch(`https://backendaab.in/aabuildersDash/api/loans/${loanPortalId}?editedBy=${encodeURIComponent(username)}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+            throw new Error("Failed to update Loan Portal entry");
+        }
+        return response.json();
+    };
+    const clearLoanPortalEntry = async (loanPortalId, date) => {
+        if (!loanPortalId) return;
+        const payload = {
+            loanPortalId,
+            type: "",
+            date,
+            amount: 0,
+            loan_refund_amount: 0,
+            loan_payment_mode: "",
+            from_purpose_id: 0,
+            to_purpose_id: 0,
+            vendor_id: 0,
+            contractor_id: 0,
+            employee_id: 0,
+            project_id: 0,
+            transfer_Project_id: 0,
+            entry_no: 0,
+            description: "",
+        };
+        const response = await fetch(`https://backendaab.in/aabuildersDash/api/loans/${loanPortalId}?editedBy=${encodeURIComponent(username)}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+            throw new Error("Failed to clear Loan Portal entry");
+        }
+    };
+    const createLoanPortalEntry = async ({ date, amount, vendorId, contractorId, employeeId, projectId }) => {
+        const payload = {
+            type: "Loan",
+            date,
+            amount,
+            loan_payment_mode: "Cash",
+            loan_refund_amount: 0,
+            from_purpose_id: 0,
+            transfer_Project_id: 0,
+            to_purpose_id: 0,
+            vendor_id: vendorId || 0,
+            contractor_id: contractorId || 0,
+            employee_id: employeeId || 0,
+            project_id: projectId || 0,
+            description: "Loan from Cash Register",
+            file_url: ""
+        };
+        const response = await fetch("https://backendaab.in/aabuildersDash/api/loans/save", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+            throw new Error("Failed to save Loan Portal entry");
+        }
+        return response.json();
     };
     // Immediate date validation for Expense
     const validateExpenseDate = (dateStr) => {
@@ -897,6 +1050,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 contractor_id: selectedContractor ? Number(selectedContractor.id) : null,
                 vendor_id: selectedVendor ? Number(selectedVendor.id) : null,
                 employee_id: selectedEmployee ? Number(selectedEmployee.id) : null,
+                client_name: selectedClient?.label || newExpense.client_name || null,
+                client_id: selectedClient?.id || newExpense.client_id || null,
                 project_id: selectedProjectName ? Number(selectedProjectName.id) : null,
                 type: newExpense.type,
                 amount: Number(newExpense.amount),
@@ -905,7 +1060,20 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 created_at: new Date().toISOString(),
                 advance_portal_id: null, // will be filled if Project Advance
                 staff_advance_portal_id: null, // will be filled if Staff Advance
+                loan_portal_id: null,
             };
+            if (newExpense.type === "Loan") {
+                const loanProjectId = selectedProjectName ? Number(selectedProjectName.id) : 0;
+                const loanResponse = await createLoanPortalEntry({
+                    date: newExpense.date,
+                    amount: Number(newExpense.amount) || 0,
+                    vendorId: selectedVendor ? Number(selectedVendor.id) : 0,
+                    contractorId: selectedContractor ? Number(selectedContractor.id) : 0,
+                    employeeId: selectedEmployee ? Number(selectedEmployee.id) : 0,
+                    projectId: loanProjectId,
+                });
+                expenseForBackend.loan_portal_id = loanResponse?.id || loanResponse?.loanPortalId || null;
+            }
             if (newExpense.type === "Project Advance") {
                 // ---------- Save to advance_portal ----------
                 const res = await fetch("https://backendaab.in/aabuildersDash/api/advance_portal/getAll");
@@ -1025,10 +1193,25 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 window.location.reload();
             }
             // ---------- Reset fields ----------
-            setNewExpense({ date: "", contractor: "", project: "", type: "", amount: "", staff_advance_portal_id: "" });
-            setSelectedVendor("");
-            setSelectedContractor("");
-            setSelectedProjectName("");
+            setNewExpense({
+                date: "",
+                contractor: "",
+                vendor: "",
+                employee: "",
+                client_name: "",
+                client_id: "",
+                project: "",
+                type: "",
+                amount: "",
+                staff_advance_portal_id: "",
+                loan_portal_id: "",
+            });
+            setClientProjectOptions([]);
+            setSelectedVendor(null);
+            setSelectedContractor(null);
+            setSelectedEmployee(null);
+            setSelectedClient(null);
+            setSelectedProjectName(null);
         } catch (err) {
             alert("Error saving expense: " + err.message);
         }
@@ -1299,6 +1482,34 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     editFormData.staff_advance_portal_id = savedStaffAdvance.id;
                 }
             }
+            const wasLoan = row.type === "Loan";
+            const isNowLoan = editFormData.type === "Loan";
+            if (isNowLoan) {
+                const loanPayload = {
+                    date: editFormData.date,
+                    amount: Number(editFormData.amount) || 0,
+                    vendorId: editFormData.vendor_id ? Number(editFormData.vendor_id) : 0,
+                    contractorId: editFormData.contractor_id ? Number(editFormData.contractor_id) : 0,
+                    employeeId: editFormData.employee_id ? Number(editFormData.employee_id) : 0,
+                    projectId: editFormData.project_id ? Number(editFormData.project_id) : 0,
+                };
+                if (row.loan_portal_id) {
+                    await updateLoanPortalEntry(row.loan_portal_id, loanPayload);
+                    editFormData.loan_portal_id = row.loan_portal_id;
+                } else {
+                    const newLoan = await createLoanPortalEntry(loanPayload);
+                    editFormData.loan_portal_id = newLoan?.id || newLoan?.loanPortalId || null;
+                }
+            } else if (wasLoan && row.loan_portal_id) {
+                try {
+                    await clearLoanPortalEntry(row.loan_portal_id, editFormData.date);
+                } catch (loanError) {
+                    console.error("❌ Error clearing loan portal entry:", loanError);
+                    alert("Failed to delete the associated Loan Portal entry. Please try again.");
+                    return;
+                }
+                editFormData.loan_portal_id = null;
+            }
             if (!onlyDescriptionChanged) {
                 const response = await fetch(
                     `https://backendaab.in/aabuildersDash/api/weekly-expenses/edit/${row.id}?username=${encodeURIComponent(
@@ -1360,6 +1571,16 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         const confirmed = window.confirm("Are you sure you want to delete This Expense Data?");
         if (confirmed) {
             try {
+                const expenseRecord = expenses.find((exp) => exp.id === id);
+                if (expenseRecord?.type === "Loan" && expenseRecord.loan_portal_id) {
+                    try {
+                        await clearLoanPortalEntry(expenseRecord.loan_portal_id, expenseRecord.date);
+                    } catch (loanError) {
+                        console.error("Error clearing loan portal entry:", loanError);
+                        alert("Failed to clear associated Loan Portal entry. Please try again.");
+                        return;
+                    }
+                }
                 const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/delete/${id}`, {
                     method: 'DELETE',
                 });
@@ -1401,6 +1622,13 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         }
     };
 
+    const buildClientKey = (name = "", father = "", mobile = "") => {
+        const normalizedName = (name || "").trim().toLowerCase();
+        if (!normalizedName) return "";
+        const normalizedFather = (father || "").trim().toLowerCase();
+        const normalizedMobile = (mobile || "").trim();
+        return `${normalizedName}|${normalizedFather}|${normalizedMobile}`;
+    };
     const getVendorName = (id) =>
         vendorOptions.find(v => v.id === id)?.value || "";
     const getContractorName = (id) =>
@@ -1409,6 +1637,31 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         employeeOptions.find(c => c.id === id)?.value || "";
     const getSiteName = (id) =>
         siteOptions.find(s => String(s.id) === String(id))?.value || "";
+    const getClientNameFromProjectId = (projectId) =>
+        projectIdToClientName[String(projectId)] || "";
+    const getClientName = (entry) => {
+        if (!entry) return "";
+        if (entry.client_name) return entry.client_name;
+        if (entry.client_id) {
+            const option = clientOptions.find(opt => String(opt.clientId || opt.id) === String(entry.client_id));
+            if (option) return option.label;
+        }
+        if (entry.project_id) {
+            return getClientNameFromProjectId(entry.project_id);
+        }
+        return "";
+    };
+    const getClientOption = (clientId, clientName) => {
+        if (!clientOptions.length) return null;
+        if (clientId) {
+            const byId = clientOptions.find(opt => String(opt.clientId || opt.id) === String(clientId));
+            if (byId) return byId;
+        }
+        if (clientName) {
+            return clientOptions.find(opt => opt.label === clientName) || null;
+        }
+        return null;
+    };
     const filteredExpenses = expenses.filter((entry) => {
         if (selectDate) {
             const [year, month, day] = selectDate.split("-");
@@ -1418,12 +1671,19 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             if (formattedEntryDate !== formattedSelectDate) return false;
         }
         if (selectContractororVendorName) {
-            const name =
-                entry.vendor_id
-                    ? getVendorName(entry.vendor_id)
-                    : getContractorName(entry.contractor_id) || getEmployeeName(entry.employee_id);
-            if (name.toLowerCase() !== selectContractororVendorName.toLowerCase())
-                return false;
+            if (isClientToggleActive) {
+                const clientName = getClientName(entry) || "";
+                if (clientName.toLowerCase() !== selectContractororVendorName.toLowerCase()) {
+                    return false;
+                }
+            } else {
+                const name =
+                    entry.vendor_id
+                        ? getVendorName(entry.vendor_id)
+                        : getContractorName(entry.contractor_id) || getEmployeeName(entry.employee_id);
+                if (name.toLowerCase() !== selectContractororVendorName.toLowerCase())
+                    return false;
+            }
         }
         if (selectProjectName) {
             const projectName = getSiteName(entry.project_id) || "";
@@ -1453,16 +1713,21 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                         bValue = new Date(b.date);
                         break;
                     case 'contractor_vendor':
-                        aValue = combinedOptions.find(opt =>
-                            (opt.type === "Contractor" && opt.id === Number(a.contractor_id)) ||
-                            (opt.type === "Vendor" && opt.id === Number(a.vendor_id)) ||
-                            (opt.type === "Employee" && opt.id === Number(a.employee_id))
-                        )?.label || "";
-                        bValue = combinedOptions.find(opt =>
-                            (opt.type === "Contractor" && opt.id === Number(b.contractor_id)) ||
-                            (opt.type === "Vendor" && opt.id === Number(b.vendor_id)) ||
-                            (opt.type === "Employee" && opt.id === Number(b.employee_id))
-                        )?.label || "";
+                        if (isClientToggleActive) {
+                            aValue = getClientName(a) || "";
+                            bValue = getClientName(b) || "";
+                        } else {
+                            aValue = combinedOptions.find(opt =>
+                                (opt.type === "Contractor" && opt.id === Number(a.contractor_id)) ||
+                                (opt.type === "Vendor" && opt.id === Number(a.vendor_id)) ||
+                                (opt.type === "Employee" && opt.id === Number(a.employee_id))
+                            )?.label || "";
+                            bValue = combinedOptions.find(opt =>
+                                (opt.type === "Contractor" && opt.id === Number(b.contractor_id)) ||
+                                (opt.type === "Vendor" && opt.id === Number(b.vendor_id)) ||
+                                (opt.type === "Employee" && opt.id === Number(b.employee_id))
+                            )?.label || "";
+                        }
                         break;
                     case 'project_name':
                         aValue = siteOptions.find(opt => opt.id === Number(a.project_id))?.label || "";
@@ -1491,9 +1756,16 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             });
         }
         return sortableData;
-    }, [filteredExpenses, sortConfig, combinedOptions, siteOptions]);
-    const contractorVendorFilterOptions = React.useMemo(() => {
+    }, [filteredExpenses, sortConfig, combinedOptions, siteOptions, clientOptions, isClientToggleActive]);
+    const partyFilterOptions = React.useMemo(() => {
         const ids = new Set();
+        if (isClientToggleActive) {
+            return clientOptions.map(opt => {
+                if (ids.has(opt.label)) return null;
+                ids.add(opt.label);
+                return { value: opt.label, label: opt.label };
+            }).filter(Boolean);
+        }
         return filteredExpenses.map(exp => {
             const option =
                 combinedOptions.find(
@@ -1508,7 +1780,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             }
             return null;
         }).filter(Boolean);
-    }, [filteredExpenses, combinedOptions]);
+    }, [filteredExpenses, combinedOptions, clientOptions, isClientToggleActive]);
     const projectFilterOptions = React.useMemo(() => {
         const ids = new Set();
         return filteredExpenses.map(exp => {
@@ -2123,7 +2395,9 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                         )}
                                         {selectContractororVendorName && (
                                             <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-normal">Contractor/Vendor Name: </span>
+                                                <span className="font-normal">
+                                                    {isClientToggleActive ? 'Client Name:' : 'Contractor/Vendor Name:'}
+                                                </span>
                                                 <span className="font-bold">{selectContractororVendorName}</span>
                                                 <button onClick={() => setSelectContractororVendorName('')} className="text-[#BF9853] text-2xl ml-1">×</button>
                                             </span>
@@ -2163,7 +2437,12 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                             <th className="px-1 w-[200px] font-bold text-left cursor-pointer hover:bg-gray-200"
                                                 onClick={() => handleSort('contractor_vendor')}
                                             >
-                                                Contractor/Vendor {sortConfig.key === 'contractor_vendor' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                <div className="flex items-center gap-2">
+                                                    <span>{isClientToggleActive ? 'Client Name' : 'Contractor/Vendor/Employee'}</span>
+                                                    {sortConfig.key === 'contractor_vendor' && (
+                                                        <span>{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+                                                    )}
+                                                </div>
                                             </th>
                                             <th className="px-1 w-[240px] font-bold text-left cursor-pointer hover:bg-gray-200"
                                                 onClick={() => handleSort('project_name')}
@@ -2192,11 +2471,11 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                 </th>
                                                 <th className="pt-2 pb-2 w-[200px]">
                                                     <Select
-                                                        options={contractorVendorFilterOptions}
+                                                        options={partyFilterOptions}
                                                         value={selectContractororVendorName ? { value: selectContractororVendorName, label: selectContractororVendorName } : null}
                                                         onChange={(opt) => setSelectContractororVendorName(opt ? opt.value : "")}
                                                         className="text-xs focus:outline-none"
-                                                        placeholder="Contractor/Ven..."
+                                                        placeholder={isClientToggleActive ? "Client Name..." : "Contractor/Ven..."}
                                                         isSearchable
                                                         isClearable
                                                         styles={{
@@ -2351,90 +2630,143 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                     onKeyDown={handleKeyDownExpense}
                                                 />
                                             </td>
-                                            <td className="pt-2 pb-2 w-[200px]">
-                                                <Select
-                                                    name="party"
-                                                    value={selectedContractor || selectedVendor || selectedEmployee || null}
-                                                    onChange={(selectedOption) => {
-                                                        if (!selectedOption) {
-                                                            setSelectedContractor(null);
-                                                            setSelectedVendor(null);
-                                                            setSelectedEmployee(null);
-                                                        } else if (selectedOption.type === "Contractor") {
-                                                            setSelectedContractor(selectedOption);
-                                                            setSelectedVendor(null);
-                                                            setSelectedEmployee(null);
-                                                        } else if (selectedOption.type === "Vendor") {
-                                                            setSelectedVendor(selectedOption);
-                                                            setSelectedContractor(null);
-                                                            setSelectedEmployee(null);
-                                                        } else if (selectedOption.type === "Employee") {
-                                                            setSelectedVendor(null);
-                                                            setSelectedContractor(null);
-                                                            setSelectedEmployee(selectedOption);
-                                                        }
-                                                    }}
-                                                    options={combinedOptions}
-                                                    placeholder="Contractor/Ven..."
-                                                    isSearchable
-                                                    isClearable
-                                                    menuPortalTarget={document.body}
-                                                    styles={{
-                                                        control: (provided, state) => ({
-                                                            ...provided,
-                                                            backgroundColor: 'transparent',
-                                                            borderWidth: '3px',
-                                                            borderColor: state.isFocused
-                                                                ? 'rgba(191, 152, 83, 0.2)'
-                                                                : 'rgba(191, 152, 83, 0.2)',
-                                                            borderRadius: '6px',
-                                                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                                                            '&:hover': {
-                                                                borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                            },
-                                                        }),
-                                                        placeholder: (provided) => ({
-                                                            ...provided,
-                                                            color: '#999',
-                                                            textAlign: 'left',
-                                                        }),
-                                                        menu: (provided) => ({
-                                                            ...provided,
-                                                            zIndex: 9,
-                                                        }),
-                                                        option: (provided, state) => ({
-                                                            ...provided,
-                                                            textAlign: 'left',
-                                                            fontWeight: 'normal',
-                                                            fontSize: '15px',
-                                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                            color: 'black',
-                                                        }),
-                                                        singleValue: (provided) => ({
-                                                            ...provided,
-                                                            textAlign: 'left',
-                                                            fontWeight: 'normal',
-                                                            color: 'black',
-                                                        }),
-                                                        indicatorSeparator: () => ({
-                                                            display: 'none'
-                                                        }),
-                                                        indicatorsContainer: (provided) => ({
-                                                            ...provided,
-                                                            height: '40px',
-                                                            gap: '0px'
-                                                        }),
-                                                        clearIndicator: (provided) => ({
-                                                            ...provided,
-                                                            padding: '2px'
-                                                        }),
-                                                        dropdownIndicator: (provided) => ({
-                                                            ...provided,
-                                                            padding: '2px'
-                                                        })
-                                                    }}
-                                                />
-                                            </td>
+                                                <td className="pt-2 pb-2 w-[200px]">
+                                                    <div className="flex items-center gap-2">
+                                                        <Select
+                                                            name="party"
+                                                            value={isClientToggleActive
+                                                                ? (selectedClient || null)
+                                                                : (selectedContractor || selectedVendor || selectedEmployee || null)}
+                                                            onChange={(selectedOption) => {
+                                                                if (isClientToggleActive) {
+                                                                    if (selectedOption) {
+                                                                        const clientKey = selectedOption?.compositeKey || buildClientKey(selectedOption.label, selectedOption.fatherName, selectedOption.mobile);
+                                                                        const projectsForClient = selectedOption?.projects || (clientKey ? (clientProjectMap[clientKey]?.projects || []) : []);
+                                                                        setClientProjectOptions(projectsForClient);
+                                                                        if (projectsForClient.length === 1) {
+                                                                            setSelectedProjectName(projectsForClient[0]);
+                                                                        } else if (projectsForClient.length === 0) {
+                                                                            setSelectedProjectName(null);
+                                                                        } else {
+                                                                            setSelectedProjectName((prevProject) =>
+                                                                                projectsForClient.find((proj) => String(proj.id) === String(prevProject?.id)) || null
+                                                                            );
+                                                                        }
+                                                                        setSelectedClient(selectedOption);
+                                                                        setNewExpense((prev) => ({
+                                                                            ...prev,
+                                                                            client_name: selectedOption.label,
+                                                                            client_id: selectedOption.clientId || selectedOption.id || "",
+                                                                        }));
+                                                                    } else {
+                                                                        setSelectedClient(null);
+                                                                        setClientProjectOptions([]);
+                                                                        setSelectedProjectName(null);
+                                                                        setNewExpense((prev) => ({
+                                                                            ...prev,
+                                                                            client_name: "",
+                                                                            client_id: "",
+                                                                        }));
+                                                                    }
+                                                                    setSelectedContractor(null);
+                                                                    setSelectedVendor(null);
+                                                                    setSelectedEmployee(null);
+                                                                    return;
+                                                                }
+                                                                if (!selectedOption) {
+                                                                    setSelectedContractor(null);
+                                                                    setSelectedVendor(null);
+                                                                    setSelectedEmployee(null);
+                                                                } else if (selectedOption.type === "Contractor") {
+                                                                    setSelectedContractor(selectedOption);
+                                                                    setSelectedVendor(null);
+                                                                    setSelectedEmployee(null);
+                                                                } else if (selectedOption.type === "Vendor") {
+                                                                    setSelectedVendor(selectedOption);
+                                                                    setSelectedContractor(null);
+                                                                    setSelectedEmployee(null);
+                                                                } else if (selectedOption.type === "Employee") {
+                                                                    setSelectedVendor(null);
+                                                                    setSelectedContractor(null);
+                                                                    setSelectedEmployee(selectedOption);
+                                                                }
+                                                                setSelectedClient(null);
+                                                                setClientProjectOptions([]);
+                                                                setNewExpense((prev) => ({
+                                                                    ...prev,
+                                                                    client_name: "",
+                                                                    client_id: "",
+                                                                }));
+                                                            }}
+                                                            options={isClientToggleActive ? clientOptions : combinedOptions}
+                                                            placeholder={isClientToggleActive ? "Client Name" : "Contractor/Ven..."}
+                                                            isSearchable
+                                                            isClearable
+                                                            menuPortalTarget={document.body}
+                                                            styles={{
+                                                                control: (provided, state) => ({
+                                                                    ...provided,
+                                                                    backgroundColor: 'transparent',
+                                                                    borderWidth: '3px',
+                                                                    borderColor: state.isFocused
+                                                                        ? 'rgba(191, 152, 83, 0.2)'
+                                                                        : 'rgba(191, 152, 83, 0.2)',
+                                                                    borderRadius: '6px',
+                                                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                                    '&:hover': {
+                                                                        borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                                    },
+                                                                }),
+                                                                placeholder: (provided) => ({
+                                                                    ...provided,
+                                                                    color: '#999',
+                                                                    textAlign: 'left',
+                                                                }),
+                                                                menu: (provided) => ({
+                                                                    ...provided,
+                                                                    zIndex: 9,
+                                                                }),
+                                                                option: (provided, state) => ({
+                                                                    ...provided,
+                                                                    textAlign: 'left',
+                                                                    fontWeight: 'normal',
+                                                                    fontSize: '15px',
+                                                                    backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                                    color: 'black',
+                                                                }),
+                                                                singleValue: (provided) => ({
+                                                                    ...provided,
+                                                                    textAlign: 'left',
+                                                                    fontWeight: 'normal',
+                                                                    color: 'black',
+                                                                }),
+                                                                indicatorSeparator: () => ({
+                                                                    display: 'none'
+                                                                }),
+                                                                indicatorsContainer: (provided) => ({
+                                                                    ...provided,
+                                                                    height: '40px',
+                                                                    gap: '0px'
+                                                                }),
+                                                                clearIndicator: (provided) => ({
+                                                                    ...provided,
+                                                                    padding: '2px'
+                                                                }),
+                                                                dropdownIndicator: (provided) => ({
+                                                                    ...provided,
+                                                                    padding: '2px'
+                                                                })
+                                                            }}
+                                                        />
+                                                        <button type="button" onClick={handlePartySourceToggle}>
+                                                            <img
+                                                                src={Change}
+                                                                className={`w-4 h-4 ${isClientToggleActive ? 'opacity-100' : 'opacity-60'}`}
+                                                                alt="Toggle party type"
+                                                            />
+                                                        </button>
+                                                    </div>
+                                                </td>
                                             <td className="pt-2 pb-2 w-[240px]">
                                                 <Select
                                                     name="project"
@@ -2442,8 +2774,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                     onChange={(selectedOption) => {
                                                         setSelectedProjectName(selectedOption);
                                                     }}
-                                                    options={siteOptions}
-                                                    placeholder="Project Name..."
+                                                    options={(isClientToggleActive && clientProjectOptions.length > 0) ? clientProjectOptions : siteOptions}
+                                                    placeholder={isClientToggleActive ? "Client Project..." : "Project Name..."}
                                                     isClearable
                                                     isSearchable
                                                     menuPortalTarget={document.body}
@@ -2558,28 +2890,49 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             <Select
                                                                 name="party"
                                                                 value={
-                                                                    combinedOptions.find(
-                                                                        opt =>
-                                                                            (opt.type === "Contractor" && opt.id === Number(editFormData.contractor_id)) ||
-                                                                            (opt.type === "Vendor" && opt.id === Number(editFormData.vendor_id)) ||
-                                                                            (opt.type === "Employee" && opt.id === Number(editFormData.employee_id))
-                                                                    ) || null
+                                                                    (isClientToggleActive || (!row.contractor_id && !row.vendor_id && !row.employee_id))
+                                                                        ? getClientOption(editFormData.client_id, editFormData.client_name || getClientName(row))
+                                                                        : combinedOptions.find(
+                                                                            opt =>
+                                                                                (opt.type === "Contractor" && opt.id === Number(editFormData.contractor_id)) ||
+                                                                                (opt.type === "Vendor" && opt.id === Number(editFormData.vendor_id)) ||
+                                                                                (opt.type === "Employee" && opt.id === Number(editFormData.employee_id))
+                                                                        ) || null
                                                                 }
                                                                 onChange={(selectedOption) => {
+                                                                    const forceClientMode = !row.contractor_id && !row.vendor_id && !row.employee_id;
+                                                                    if (isClientToggleActive || forceClientMode) {
+                                                                        handleEditChange({ target: { name: "client_name", value: selectedOption ? selectedOption.label : "" } });
+                                                                        handleEditChange({ target: { name: "client_id", value: selectedOption ? (selectedOption.clientId || selectedOption.id) : "" } });
+                                                                        handleEditChange({ target: { name: "contractor_id", value: "" } });
+                                                                        handleEditChange({ target: { name: "vendor_id", value: "" } });
+                                                                        handleEditChange({ target: { name: "employee_id", value: "" } });
+                                                                        return;
+                                                                    }
                                                                     if (!selectedOption) {
                                                                         handleEditChange({ target: { name: "contractor_id", value: "" } });
                                                                         handleEditChange({ target: { name: "vendor_id", value: "" } });
+                                                                        handleEditChange({ target: { name: "employee_id", value: "" } });
                                                                     } else if (selectedOption.type === "Contractor") {
                                                                         handleEditChange({ target: { name: "contractor_id", value: selectedOption.id } });
                                                                         handleEditChange({ target: { name: "vendor_id", value: "" } });
+                                                                        handleEditChange({ target: { name: "employee_id", value: "" } });
                                                                     } else if (selectedOption.type === "Vendor") {
                                                                         handleEditChange({ target: { name: "vendor_id", value: selectedOption.id } });
                                                                         handleEditChange({ target: { name: "contractor_id", value: "" } });
+                                                                        handleEditChange({ target: { name: "employee_id", value: "" } });
+                                                                    } else if (selectedOption.type === "Employee") {
+                                                                        handleEditChange({ target: { name: "employee_id", value: selectedOption.id } });
+                                                                        handleEditChange({ target: { name: "contractor_id", value: "" } });
+                                                                        handleEditChange({ target: { name: "vendor_id", value: "" } });
                                                                     }
+                                                                    handleEditChange({ target: { name: "client_name", value: "" } });
+                                                                    handleEditChange({ target: { name: "client_id", value: "" } });
                                                                 }}
-                                                                options={combinedOptions}
-                                                                placeholder="Contractor/Ven..."
+                                                                options={(isClientToggleActive || (!row.contractor_id && !row.vendor_id && !row.employee_id)) ? clientOptions : combinedOptions}
+                                                                placeholder={(isClientToggleActive || (!row.contractor_id && !row.vendor_id && !row.employee_id)) ? "Client Name" : "Contractor/Ven..."}
                                                                 isSearchable
+                                                                isClearable
                                                                 styles={{
                                                                     control: (provided, state) => ({
                                                                         ...provided,
@@ -2636,12 +2989,16 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                 }}
                                                             />
                                                         ) : (
-                                                            combinedOptions.find(
-                                                                opt =>
-                                                                    (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
-                                                                    (opt.type === "Vendor" && opt.id === Number(row.vendor_id)) ||
-                                                                    (opt.type === "Employee" && opt.id === Number(row.employee_id))
-                                                            )?.label || ""
+                                                            (() => {
+                                                                const option = combinedOptions.find(
+                                                                    opt =>
+                                                                        (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
+                                                                        (opt.type === "Vendor" && opt.id === Number(row.vendor_id)) ||
+                                                                        (opt.type === "Employee" && opt.id === Number(row.employee_id))
+                                                                )?.label;
+                                                                const clientName = getClientName(row);
+                                                                return [clientName, option].filter(Boolean).join(" | ") || "";
+                                                            })()
                                                         )}
                                                     </td>
                                                     <td className="text-sm text-left w-[240px] font-semibold">

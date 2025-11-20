@@ -986,6 +986,48 @@ const History = ({ username, userRoles = [] }) => {
         }
         return response.json();
     };
+    const getCurrentISOWeekNumber = () => {
+        const now = new Date();
+        const start = new Date(now.getFullYear(), 0, 1);
+        const diff = now - start + (start.getTimezoneOffset() - now.getTimezoneOffset()) * 60000;
+        const oneWeek = 604800000;
+        return Math.floor(diff / oneWeek) + 1;
+    };
+    const createAdvancePortalEntry = async ({ date, amount, vendorId, contractorId, projectId }) => {
+        const response = await fetch("https://backendaab.in/aabuildersDash/api/advance_portal/getAll");
+        if (!response.ok) {
+            throw new Error("Failed to fetch advance portal entry numbers");
+        }
+        const allEntries = await response.json();
+        const maxEntryNo = allEntries.length > 0 ? Math.max(...allEntries.map(item => item.entry_no || 0)) : 0;
+        const nextEntryNo = maxEntryNo + 1;
+        const weekNo = Number(selectedWeek) || getCurrentISOWeekNumber();
+        const payload = {
+            type: "Advance",
+            date,
+            contractor_id: contractorId || null,
+            vendor_id: vendorId || null,
+            project_id: projectId || null,
+            transfer_site_id: 0,
+            payment_mode: "Cash",
+            amount,
+            bill_amount: 0,
+            refund_amount: 0,
+            entry_no: nextEntryNo,
+            week_no: weekNo,
+            description: "",
+            file_url: "",
+        };
+        const saveResponse = await fetch("https://backendaab.in/aabuildersDash/api/advance_portal/save", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        if (!saveResponse.ok) {
+            throw new Error("Failed to save advance portal entry");
+        }
+        return saveResponse.json();
+    };
 
     const handlePaymentChange = (e) => {
         const { name, value } = e.target;
@@ -1036,6 +1078,16 @@ const History = ({ username, userRoles = [] }) => {
                 } catch (loanError) {
                     console.error("Error creating loan portal entry:", loanError);
                 }
+            }
+            if (newExpense.type === "Project Advance") {
+                const advanceResponse = await createAdvancePortalEntry({
+                    date: newExpense.date,
+                    amount: Number(newExpense.amount) || 0,
+                    vendorId: selectedVendor ? Number(selectedVendor.id) : null,
+                    contractorId: selectedContractor ? Number(selectedContractor.id) : null,
+                    projectId: selectedProjectName ? Number(selectedProjectName.id) : null,
+                });
+                payload.advance_portal_id = advanceResponse?.advancePortalId || advanceResponse?.id || null;
             }
             const response = await fetch("https://backendaab.in/aabuildersDash/api/weekly-expenses/update/save", {
                 method: "POST",

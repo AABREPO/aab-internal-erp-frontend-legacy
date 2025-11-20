@@ -1343,31 +1343,24 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         handleDateClick(defaultDate);
     }
     const totalAmount = dailyExpenses
-        .filter(row => row.date === selectedDate && row.type !== "Staff Advance")        // only current date rows, excluding advance data
+        .filter(row => row.date === selectedDate)
         .reduce((sum, row) => sum + (Number(row.amount || 0) + Number(row.extra_amount || 0)), 0);
     const totalRefund = refundPayments
         .reduce((sum, p) => sum + Number(p.amount || 0), 0);
-    const totalExpenses =
-        expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
     const totalPayments = payments
         .reduce((sum, p) => sum + Number(p.amount || 0), 0);
-    const overAllTotalPayments = (totalPayments + totalRefund);
     const netBalance = totalAmount - totalRefund;
     const balance = totalPayments - expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-    // PDF Generation function for the left side expenses table
     const generateExpensesPDF = () => {
         if (!selectedDate || dailyExpenses.length === 0) {
             alert("No data available to generate PDF");
             return;
         }
         const doc = new jsPDF();
-        // Add header with PS number, title, date and day
         doc.setFontSize(14);
         doc.setFont(undefined, 'bold');
-        // Get day name
         const dateObj = new Date(selectedDate);
         const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
-        // Calculate center position for the header
         const pageWidth = doc.internal.pageSize.width;
         const headerText = `PS: ${currentWeekNumber}`;
         const headerText1 = "DAILY PAYMENT STATEMENT";
@@ -1377,47 +1370,37 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         doc.text(headerText1, 60, 24);
         doc.text(headerText2, 170, 20);
         doc.text(headerText, 14, 20);
-        // Add day name below
         doc.setFontSize(10);
         const dayText = dayName;
         const dayWidth = doc.getTextWidth(dayText);
         doc.text(dayText, 170, 27);
-        // Add lines above and below
         doc.setLineWidth(0.5);
-        doc.line(14, 15, pageWidth - 14, 15); // Line above
-        doc.line(14, 30, pageWidth - 14, 30); // Line below
-        // Reset font
+        doc.line(14, 15, pageWidth - 14, 15);
+        doc.line(14, 30, pageWidth - 14, 30); 
         doc.setFont(undefined, 'normal');
-        // Calculate total amount for selected date (excluding advance data and Diwali Bonus)
         const filteredExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate && row.type !== "Staff Advance" && row.type !== "Diwali Bonus");
         const totalAmount = filteredExpenses.reduce(
             (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
             0
         );        
-        // Filter advance data for separate table
         const advanceExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate && row.type === "Staff Advance");
         const totalAdvanceAmount = advanceExpenses.reduce(
             (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
             0
         );        
-        // Filter Diwali Bonus data for separate table
         const diwaliBonusExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate && row.type === "Diwali Bonus");
         const totalDiwaliBonusAmount = diwaliBonusExpenses.reduce(
             (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
             0
         );
-        // Calculate total refund amount for selected date
         const totalRefundAmount = refundPayments.reduce(
             (sum, row) => sum + Number(row.amount || 0),
             0
         );
-        // Reset color for table
         doc.setTextColor(0, 0, 0);
-        // Expenses table columns (removed Date column)
         const expensesTableColumn = [
             "SNO", "PROJECT NAME", "NAME", "QTY", "TYPE", "AMOUNT", "DESCRIPTION"
         ];
-        // Prepare expenses with projectName and type for sorting
         const expensesTableRows = filteredExpenses
             .map((row, index) => {
                 const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
@@ -1442,13 +1425,11 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     description
                 };
             })
-            // Sort by projectName ASC, then by type DESC
             .sort((a, b) => {
                 const projectCompare = a.projectName.localeCompare(b.projectName);
                 if (projectCompare !== 0) return projectCompare;
                 return b.type.localeCompare(a.type); // type DESC
             })
-            // Map to array format for autoTable
             .map((row, idx) => [
                 (idx + 1).toString(),
                 row.projectName,
@@ -1458,7 +1439,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 row.amount,
                 row.description
             ]);
-        // Add total row for expenses
         expensesTableRows.push([
             "",
             "TOTAL",
@@ -1468,7 +1448,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             `${totalAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`,
             ""
         ]);
-        // Add Expenses table heading
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
         doc.text('WAGE EXPENSES', 14, 48);

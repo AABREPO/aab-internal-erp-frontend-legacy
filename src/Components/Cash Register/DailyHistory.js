@@ -1707,51 +1707,51 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     };
     return (
         <body>
-            <h1 className="font-bold text-xl flex justify-end mr-20 -mt-7">
+            <h1 className="font-bold text-xl flex justify-end mr-5 -mt-7">
                 Balance:<span style={{ color: "#E4572E" }}>{Number(balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}</span>
             </h1>
-            <div className=' w-full max-w-[1800px] lg:flex gap-4 lg:gap-8 p-4 lg:pl-8 border-collapse items-center text-left bg-[#FFFFFF] ml-10 mr-6 rounded-md lg:h-[150px]'>
-                <div className='lg:flex'>
-                    <div>
-                        <h1 className='font-semibold'>Select Week</h1>
+            <div className='mx-auto flex justify-between w-auto p-4 pl-8 border-collapse text-left bg-[#FFFFFF] ml-[30px] mr-6 rounded-md lg:h-[147px]'>
+                <div className='flex gap-4'>
+                    <div className='flex gap-4 mb-4'>
                         <div>
+                            <h1 className='font-semibold'>Select Week</h1>
+                            <div>
+                                <select
+                                    className="w-[303px] h-[45px] border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2"
+                                    value={selectedWeek}
+                                    onChange={(e) => setSelectedWeek(e.target.value)}
+                                >
+                                    <option value="">-- Select Week --</option>
+                                    {weeks.map((week) => {
+                                        const startDate = new Date(week.start);
+                                        const endDate = new Date(week.end);
+                                        const formatDate = (date) =>
+                                            date.toLocaleDateString("en-GB", {
+                                                day: "numeric",
+                                                month: "long"
+                                            });
+                                        return (
+                                            <option key={week.number} value={week.number}>
+                                                {`Week ${week.number}, ${formatDate(startDate)} to ${formatDate(endDate)}`}
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                            </div>
+                        </div>
+                        <div className='block'>
+                            <label className="block font-semibold">Year</label>
                             <select
-                                className="w-[303px] h-[45px] border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2"
-                                value={selectedWeek}
-                                onChange={(e) => setSelectedWeek(e.target.value)}
+                                value={year}
+                                onChange={(e) => setYear(e.target.value)}
+                                className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[168px] h-[45px] focus:outline-none"
                             >
-                                <option value="">-- Select Week --</option>
-                                {weeks.map((week) => {
-                                    const startDate = new Date(week.start);
-                                    const endDate = new Date(week.end);
-                                    const formatDate = (date) =>
-                                        date.toLocaleDateString("en-GB", {
-                                            day: "numeric",
-                                            month: "long"
-                                        });
-                                    return (
-                                        <option key={week.number} value={week.number}>
-                                            {`Week ${week.number}, ${formatDate(startDate)} to ${formatDate(endDate)}`}
-                                        </option>
-                                    );
-                                })}
+                                {years.map((y) => (
+                                    <option key={y} value={y}>{y}</option>
+                                ))}
                             </select>
                         </div>
                     </div>
-                    <div className='block ml-4'>
-                        <label className="block font-semibold">Year</label>
-                        <select
-                            value={year}
-                            onChange={(e) => setYear(e.target.value)}
-                            className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[168px] h-[45px] focus:outline-none"
-                        >
-                            {years.map((y) => (
-                                <option key={y} value={y}>{y}</option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-                <div>
                     {weekDays.length > 0 && (
                         <div className='lg:w-[600px]'>
                             <div className="grid grid-cols-3 lg:grid-cols-7 gap-2">
@@ -1788,24 +1788,22 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     </button>
                 </div>
             </div>
-            <div className="mt-4 flex justify-end mr-4 lg:mr-16">
+            <div className="mt-4 flex justify-end mr-6">
                 <h1 className="font-bold text-xl">
                     Net Amount: <span style={{ color: "#E4572E" }}>
                         {Number(netAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                 </h1>
             </div>
-            <div className="w-full max-w-[1800px] h-auto p-4 lg:p-6 border-collapse bg-[#FFFFFF] ml-10 mr-6 rounded-md">
-                <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
-                    <div className="flex-1 lg:flex-[3] min-w-0">
-                        <div className="flex flex-col sm:flex-row sm:justify-between mb-4 w-full">
+            <div className="mx-auto w-auto p-6 border-collapse bg-[#FFFFFF] ml-[30px] mr-6 rounded-md">
+                <div className="w-full mt- flex flex-col xl:flex-row gap-6">
+                    <div className="flex-[2] min-w-0">
+                        <div className="flex justify-between mb-4">
                             <h1 className="font-bold text-xl">
                                 PS: <span style={{ color: "#E4572E" }}>{selectedWeek}</span>
                             </h1>
-                            <h1 className="font-bold text-base">
-                                Expenses: <span style={{ color: "#E4572E" }}>
-                                    {filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </span>
+                            <h1 className="font-bold text-base mr-16">
+                                Expenses:<span style={{ color: "#E4572E" }}>{Number(filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}</span>
                             </h1>
                         </div>
                         <div className="text-left mb-4">
@@ -1817,12 +1815,10 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                                 />
                             </button>
                         </div>
-                        <div className="w-full h-[500px] rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden">
-                            <div ref={scrollRef} className="overflow-auto max-h-[500px] w-full thin-scrollbar"
-                                onMouseDown={(e) => handleMouseDown(e, scrollRef)} onMouseMove={(e) => handleMouseMove(e, scrollRef)}
-                                onMouseUp={() => handleMouseUp(scrollRef)} onMouseLeave={() => handleMouseUp(scrollRef)}
-                            >
-                                <table className="w-full min-w-[1200px] lg:min-w-[1450px] border-collapse text-left">
+                        <div className="w-full h-[590px] rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden ">
+                            <div ref={scrollRef} className="overflow-auto max-h-[600px] thin-scrollbar" onMouseDown={(e) => handleMouseDown(e, scrollRef)} onMouseMove={(e) => handleMouseMove(e, scrollRef)}
+                                onMouseUp={() => handleMouseUp(scrollRef)} onMouseLeave={() => handleMouseUp(scrollRef)} >
+                                <table className="w-[1200px] border-collapse text-left">
                                     <thead className="sticky top-0 z-10 bg-white">
                                         <tr className="bg-[#FAF6ED] h-12">
                                             <th className="py-2 px-1 text-left w-[60px]">S.No</th>
@@ -2438,23 +2434,16 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                             </div>
                         </div>
                     </div>
-                    <div className="flex-1 lg:flex-[1] min-w-0 lg:max-w-[400px]">
+                    <div className="flex-[1] min-w-0 ">
                         <div className="flex justify-between mb-4">
                             <h1 className="font-bold text-base">Refund Received</h1>
                             <h1 className="font-bold text-base">
-                                Total: <span style={{ color: "#E4572E" }}>
-                                    {Number(totalRefund).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </span>
+                                Total: <span style={{ color: "#E4572E" }}>{Number(totalRefund).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}</span>
                             </h1>
                         </div>
                         <div>
-                            <div ref={refundScrollRef} className="w-full rounded-lg border-l-8 border-l-[#BF9853] overflow-x-auto thin-scrollbar" style={{ maxHeight: "400px" }}
-                                onMouseDown={(e) => handleMouseDown(e, refundScrollRef)}
-                                onMouseMove={(e) => handleMouseMove(e, refundScrollRef)}
-                                onMouseUp={() => handleMouseUp(refundScrollRef)}
-                                onMouseLeave={() => handleMouseUp(refundScrollRef)}
-                            >
-                                <table className="w-full min-w-[350px] lg:min-w-[380px] border-collapse">
+                            <div className="w-full rounded-lg border-l-8 border-l-[#BF9853] overflow-x-auto" style={{ maxHeight: "600px" }}>
+                                <table className="w-full min-w-[320px] border-collapse">
                                     <thead className="bg-[#FAF6ED] h-12">
                                         <tr>
                                             <th className="px-4 py-2 text-left">Name</th>

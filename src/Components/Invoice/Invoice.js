@@ -89,22 +89,22 @@ function InvoiceTable() {
     },
   ]);
   // ...existing code...
-const findOption = (options, value) =>
-  options.find((opt) => opt.value === value) || null;
+  const findOption = (options, value) =>
+    options.find((opt) => opt.value === value) || null;
 
-// --- ADD: normalize option input to either an option object or null
-const normalizeOption = (input, options = []) => {
-  if (!input && input !== 0) return null;
-  // already an option-like object
-  if (typeof input === 'object' && input.value !== undefined && input.label !== undefined) {
-    return input;
-  }
-  // string/number -> try to find matching option
-  const str = String(input).trim();
-  const found = (options || []).find(o => String(o.value) === str || String(o.label) === str);
-  return found || { value: str, label: str };
-};
-// ...existing code...
+  // --- ADD: normalize option input to either an option object or null
+  const normalizeOption = (input, options = []) => {
+    if (!input && input !== 0) return null;
+    // already an option-like object
+    if (typeof input === 'object' && input.value !== undefined && input.label !== undefined) {
+      return input;
+    }
+    // string/number -> try to find matching option
+    const str = String(input).trim();
+    const found = (options || []).find(o => String(o.value) === str || String(o.label) === str);
+    return found || { value: str, label: str };
+  };
+  // ...existing code...
   const mapFetchedItems = (flatItems = []) => {
     if (!Array.isArray(flatItems)) return [];
     const grouped = {};
@@ -140,7 +140,7 @@ const normalizeOption = (input, options = []) => {
     });
     return Object.values(grouped);
   };
-// ...existing code...
+  // ...existing code...
 
   useEffect(() => {
     try {
@@ -169,119 +169,104 @@ const normalizeOption = (input, options = []) => {
     const numStr = qtyStr.toString().replace(/[^\d.-]/g, '');
     return parseFloat(numStr) || 0;
   };
-const handleInputChangeForRow = (e, itemIndex, subItemIndex, isMainRow = false) => {
-  const { value } = e.target;
-  const updatedItems = [...items];
-  const subItem = updatedItems[itemIndex].subItems[subItemIndex];
-  const selectedUnit = isMainRow
-    ? subItem.mainRow.unit?.value || 'SQFT'
-    : subItem.unit?.value || 'SQFT';
+  const handleInputChangeForRow = (e, itemIndex, subItemIndex, isMainRow = false) => {
+    const { value } = e.target;
+    const updatedItems = [...items];
+    const subItem = updatedItems[itemIndex].subItems[subItemIndex];
 
-  // --- NEW: treat pure numeric input as direct quantity (allow "10" to work)
-  const trimmed = (value || "").toString().trim();
-  const isPureNumber = /^\d+(\.\d+)?$/.test(trimmed);
-  if (isPureNumber) {
+    // helper to get plain unit value
+    const getUnitValue = (u) => {
+      if (!u && u !== 0) return '';
+      return typeof u === 'object' && u.value !== undefined ? u.value : String(u);
+    };
+
+    // assign sizeInput
     if (isMainRow) {
-      subItem.mainRow.sizeInput = trimmed;
-      subItem.mainRow.qty = trimmed;
-      if (subItem.mainRow.rate) {
-        const qtyValue = parseFloat(trimmed) || 0;
-        subItem.mainRow.amount = (qtyValue * (parseFloat(subItem.mainRow.rate) || 0)).toFixed(2);
+      subItem.mainRow.sizeInput = value;
+    } else {
+      subItem.sizeInput = value;
+    }
+
+    // compute qty & amount from current sizeInput + unit + rate
+    const unitValue = isMainRow ? getUnitValue(subItem.mainRow.unit) : getUnitValue(subItem.unit);
+    const sizeVal = isMainRow ? (subItem.mainRow.sizeInput || '') : (subItem.sizeInput || '');
+    const rateVal = isMainRow ? (parseFloat(subItem.mainRow.rate) || 0) : (parseFloat(subItem.rate) || 0);
+
+    const computeQty = () => {
+      if (!sizeVal || String(sizeVal).trim() === '') return '';
+      // if user typed pure number treat as direct measure (convertToFeet will handle plain numbers too)
+      try {
+        if (unitValue === 'SQFT' || unitValue === 'M²') {
+          const area = calculateArea(String(sizeVal), unitValue);
+          return isNaN(Number(area)) ? `${area}` : `${area} ${unitValue === 'SQFT' ? 'Sqft' : 'm²'}`;
+        }
+        if (unitValue === 'CFT' || unitValue === 'M³') {
+          const vol = calculateVolume(String(sizeVal));
+          return isNaN(Number(vol)) ? `${vol}` : `${vol} ${unitValue === 'CFT' ? 'Cubic Feet' : 'm³'}`;
+        }
+        if (unitValue === 'RFT') {
+          // convertToFeet handles "10'", '10"','10', etc.
+          const length = convertToFeet(String(sizeVal));
+          return isNaN(length) ? 'Invalid input' : `${length.toFixed(2)} ft`;
+        }
+        if (unitValue === 'L') {
+          const liters = calculateLiters(String(sizeVal));
+          return isNaN(Number(liters)) ? `${liters}` : `${liters} L`;
+        }
+        if (unitValue === 'NOS') {
+          const evalQty = evaluateExpression(String(sizeVal));
+          return isNaN(evalQty) ? 'Invalid input' : `${evalQty}`;
+        }
+        if (unitValue === 'L.S') {
+          const evalQty = evaluateExpression(String(sizeVal));
+          return isNaN(evalQty) ? 'Invalid input' : `${evalQty}`;
+        }
+        // default: treat as direct numeric qty or text
+        return String(sizeVal).trim();
+      } catch {
+        return '';
+      }
+    };
+
+    const newQty = computeQty();
+
+    if (isMainRow) {
+      subItem.mainRow.qty = newQty;
+      // compute amount
+      if (subItem.mainRow.qty && rateVal && unitValue !== 'NOS') {
+        const q = parseQty(subItem.mainRow.qty);
+        subItem.mainRow.amount = (q * rateVal).toFixed(2);
+      } else if (unitValue === 'NOS') {
+        const q = evaluateExpression(String(sizeVal));
+        if (!isNaN(q)) {
+          subItem.mainRow.qty = `${q}`;
+          subItem.mainRow.amount = (q * rateVal).toFixed(2);
+        } else {
+          subItem.mainRow.amount = 'Invalid input';
+        }
       } else {
-        subItem.mainRow.amount = '';
+        subItem.mainRow.amount = subItem.mainRow.amount ? subItem.mainRow.amount : '';
       }
     } else {
-      subItem.sizeInput = trimmed;
-      subItem.qty = trimmed;
-      if (subItem.rate) {
-        const qtyValue = parseFloat(trimmed) || 0;
-        subItem.amount = (qtyValue * (parseFloat(subItem.rate) || 0)).toFixed(2);
+      subItem.qty = newQty;
+      if (subItem.qty && rateVal && unitValue !== 'NOS') {
+        const q = parseQty(subItem.qty);
+        subItem.amount = (q * rateVal).toFixed(2);
+      } else if (unitValue === 'NOS') {
+        const q = evaluateExpression(String(sizeVal));
+        if (!isNaN(q)) {
+          subItem.qty = `${q}`;
+          subItem.amount = (q * rateVal).toFixed(2);
+        } else {
+          subItem.amount = 'Invalid input';
+        }
       } else {
-        subItem.amount = '';
+        subItem.amount = subItem.amount ? subItem.amount : '';
       }
     }
+
     setItems(updatedItems);
-    return;
-  }
-  // --- END NEW
-
-  if (isMainRow) {
-    subItem.mainRow.sizeInput = value;
-  } else {
-    subItem.sizeInput = value;
-  }
-  const isValid = validateSizeInput(value, selectedUnit);
-
-  if (isValid) {
-    if (selectedUnit === "SQFT" || selectedUnit === "M²") {
-      const area = calculateArea(value, selectedUnit);
-      if (isMainRow) {
-        subItem.mainRow.qty = `${area} ${selectedUnit === "SQFT" ? "Sqft" : "m²"}`;
-      } else {
-        subItem.qty = `${area} ${selectedUnit === "SQFT" ? "Sqft" : "m²"}`;
-      }
-    } else if (selectedUnit === "CFT" || selectedUnit === "M³") {
-      const volume = calculateVolume(value, selectedUnit);
-      if (isMainRow) {
-        subItem.mainRow.qty = `${volume} ${selectedUnit === "CFT" ? "Cubic Feet" : "m³"}`;
-      } else {
-        subItem.qty = `${volume} ${selectedUnit === "CFT" ? "Cubic Feet" : "m³"}`;
-      }
-    } else if (selectedUnit === "RFT") {
-      const length = convertToFeet(value);
-      const qtyStr = isNaN(length) ? "Invalid input" : `${length.toFixed(2)} ft`;
-      if (isMainRow) {
-        subItem.mainRow.qty = qtyStr;
-      } else {
-        subItem.qty = qtyStr;
-      }
-    } else if (selectedUnit === "L") {
-      const liters = calculateLiters(value);
-      if (isMainRow) {
-        subItem.mainRow.qty = `${liters} L`;
-      } else {
-        subItem.qty = `${liters} L`;
-      }
-    } else if (selectedUnit === "NOS" || selectedUnit === "L.S") {
-      const evalQty = evaluateExpression(value);
-      if (isMainRow) {
-        subItem.mainRow.qty = isNaN(evalQty) ? "Invalid input" : `${evalQty}`;
-      } else {
-        subItem.qty = isNaN(evalQty) ? "Invalid input" : `${evalQty}`;
-      }
-    } else {
-      if (isMainRow) {
-        subItem.mainRow.qty = "";
-      } else {
-        subItem.qty = "";
-      }
-    }
-  } else {
-    if (isMainRow) {
-      subItem.mainRow.qty = "";
-    } else {
-      subItem.qty = "";
-    }
-  }
-
-  // Calculate amount if quantity and rate exist
-  if (isMainRow) {
-    if (subItem.mainRow.qty && subItem.mainRow.rate) {
-      const qtyValue = parseQty(subItem.mainRow.qty);
-      subItem.mainRow.amount = (qtyValue * subItem.mainRow.rate).toFixed(2);
-    } else {
-      subItem.mainRow.amount = '';
-    }
-  } else {
-    if (subItem.qty && subItem.rate) {
-      const qtyValue = parseQty(subItem.qty);
-      subItem.amount = (qtyValue * subItem.rate).toFixed(2);
-    } else {
-      subItem.amount = '';
-    }
-  }
-  setItems(updatedItems);
-};
+  };
   const [amountPaid, setAmountPaid] = useState("");
   const [clientName, setClientName] = useState(null);
   const [projectType, setProjectType] = useState(null);
@@ -372,7 +357,7 @@ const handleInputChangeForRow = (e, itemIndex, subItemIndex, isMainRow = false) 
     };
     fetchProjectNames();
   }, []);
-const handleProjectNameChange = async (selectedOption) => {
+  const handleProjectNameChange = async (selectedOption) => {
     const sanitizeInvoiceNumber = (invNum) => {
       if (!invNum || typeof invNum !== "string") return "";
       return invNum.trim().split(/[: ]/)[0];
@@ -386,7 +371,7 @@ const handleProjectNameChange = async (selectedOption) => {
         setInvoiceVersions([]);
         setCurrentInvoice(null);
         // Assuming 'setItems' is available globally/in scope
-        setItems([]); 
+        setItems([]);
         setClientName(null);
         setClientAddress("");
         setInvoiceDate("");
@@ -417,7 +402,7 @@ const handleProjectNameChange = async (selectedOption) => {
       ReactDOM.unstable_batchedUpdates(() => {
         setInvoiceNumber(clonedInvoiceNumber);
         // Assuming 'mapFetchedItems' and 'setItems' are available globally/in scope
-        setItems(mapFetchedItems(clonedItems)); 
+        setItems(mapFetchedItems(clonedItems));
         setClientName(null);
         setClientAddress("");
         setInvoiceDate("");
@@ -472,7 +457,7 @@ const handleProjectNameChange = async (selectedOption) => {
           ReactDOM.unstable_batchedUpdates(() => {
             setCurrentInvoice(null);
             // Assuming 'setItems' is available globally/in scope
-            setItems([]); 
+            setItems([]);
             setClientName(null);
             setClientAddress("");
             setInvoiceDate("");
@@ -797,19 +782,13 @@ const handleProjectNameChange = async (selectedOption) => {
       setShowToast(false);
     }, 10000); // 10 seconds
   };
-  // Fixed code: on mount, load invoice number from localStorage if exists, else generate new once
-  // Initialize or generate invoice number on mount
-  // Initialize invoices first, but do NOT reset invoiceNumber if a lastInvoiceNumber exists.
-  // This prevents wiping restored state from localStorage or other async effects.
   useEffect(() => {
     async function initializeInvoices() {
       try {
         const res = await axios.get("https://backendaab.in/aabuildersDash/api/invoices/all-with-items");
         const invoices = res.data || [];
         setAllInvoices(invoices);
-        // Keep invoiceVersions cleared initially; do NOT reset invoiceNumber here.
         setInvoiceVersions([]);
-        // NOTE: Do not call setInvoiceNumber("") here anymore; let the restore logic decide.
       } catch (error) {
         console.error("Failed to initialize invoices", error);
       }
@@ -829,167 +808,139 @@ const handleProjectNameChange = async (selectedOption) => {
         projectNameOptions.find(
           opt => String(opt.value) === String(currentInvoice.project_id)
         ) || null;
-
       const selectedProjectTypeOption =
         projectTypes.find(
           pt =>
             String(pt.value) === String(currentInvoice.project_type) ||
             String(pt.label) === String(currentInvoice.project_type)
         ) || { value: currentInvoice.project_type, label: currentInvoice.project_type };
-
       ReactDOM.unstable_batchedUpdates(() => {
         setSelectedProjectName(selectedProjectNameOption);
         setProjectType(selectedProjectTypeOption);
         setAutoFilledProject(true);
       });
-
-      console.log("✅ Auto-filled copied invoice:", currentInvoice.project_type);
     }
   }, [currentInvoice, invoiceNumber, projectNameOptions, projectTypes, autoFilledProject]);
-
-  // ...existing code...
-const saveDraftToBackend = async () => {
-  if (!invoiceNumber) {
-    alert("Invoice number required before saving draft.");
-    return;
-  }
-
-  const totalAmount = calculateTotalAmount();
-
-  const invoiceData = {
-    invoice: {
-      invoice_number: invoiceNumber,
-      status: "draft",
-      date: invoiceDate,
-      client_name: clientName ? clientName.value : "",
-      client_address: clientAddress || "",
-      client_id: clientName ? clientName.id : null,
-      project_name: selectedProjectName ? selectedProjectName.label : "",
-      project_id: selectedProjectName ? selectedProjectName.value : null,
-      project_type: projectType ? projectType.value : "",
-      amount_paid: parseFloat(amountPaid) || 0,
-      total_amount: totalAmount,
-      invoice_id: currentInvoice?.invoice_id || currentInvoice?.invoiceId || null,
-    },
-    items: items.flatMap((item) =>
-      item.subItems.map((sub) => ({
-        description: item.description?.label || item.description || "",
-        sub_description: sub.description?.label || sub.description || "",
-        size_input: sub.sizeInput || "",
-        qty: sub.qty || "",
-        rate: parseFloat(sub.rate) || 0,
-        unit: sub.unit?.value || sub.unit || "",
-        amount: parseFloat(sub.amount) || 0,
-        is_main_row: false,
-        item_id: sub.key || sub.item_id || null,
-      }))
-    ),
-  };
-
-  console.log("[DEBUG] Save Online Payload:", invoiceData);
-
-  try {
-    let res;
-    const hasExistingInvoice =
-      invoiceData.invoice.invoice_id &&
-      String(invoiceData.invoice.invoice_number).includes(" D");
-
-    if (hasExistingInvoice) {
-      const existingRes = await axios.get(
-        `https://backendaab.in/aabuildersDash/api/invoices/with-items/${invoiceData.invoice.invoice_id}`
-      );
-      const existingInvoice = existingRes.data;
-      const oldItems = Array.isArray(existingInvoice.items) ? existingInvoice.items : [];
-      const newItems = invoiceData.items || [];
-
-      const mergedItems = [
-        ...oldItems,
-        ...newItems.filter(
-          (newItem) =>
-            !oldItems.some(
-              (old) =>
-                old.sub_description?.trim() === newItem.sub_description?.trim() &&
-                parseFloat(old.amount) === parseFloat(newItem.amount)
-            )
-        ),
-      ];
-
-      const mergedPayload = { ...invoiceData, items: mergedItems };
-
-      res = await axios.put(
-        "https://backendaab.in/aabuildersDash/api/invoices/update-keep-existing",
-        mergedPayload,
-        { headers: { "Content-Type": "application/json" } }
-      );
-    } else {
-      res = await axios.post(
-        "https://backendaab.in/aabuildersDash/api/invoices/save-online",
-        invoiceData,
-        { headers: { "Content-Type": "application/json" } }
-      );
+  const saveDraftToBackend = async () => {
+    if (!invoiceNumber) {
+      alert("Invoice number required before saving draft.");
+      return;
     }
-
-    const savedResponse = res.data || {};
-    const savedInvoice = savedResponse.invoice || savedResponse;
-    const savedItems = savedResponse.items || invoiceData.items || [];
-    const savedNumber = String(savedInvoice.invoice_number || invoiceNumber).trim();
-
-    // --- NEW: cache saved invoice BEFORE clearing UI
-    setInvoiceCache(prev => ({
-      ...prev,
-      [savedNumber]: { invoice: savedInvoice, items: savedItems }
-    }));
-
-    setAllInvoices(prev => {
-      const copy = Array.isArray(prev) ? [...prev] : [];
-      const idx = copy.findIndex(e => String(e.invoice?.invoice_number || "").trim() === savedNumber);
-      if (idx >= 0) {
-        copy[idx] = { invoice: savedInvoice, items: savedItems };
-      } else {
-        copy.push({ invoice: savedInvoice, items: savedItems });
-      }
-      return copy;
-    });
-
-    showToastMessage("✅ Draft saved successfully!");
-
-    // Now clear UI (user requested UI reset on Save Online)
-    ReactDOM.unstable_batchedUpdates(() => {
-      setInvoiceNumber("");
-      setInvoiceDate("");
-      setClientName(null);
-      setClientAddress("");
-      setProjectType(null);
-      setAmountPaid("");
-      setItems([]);
-      setInvoiceVersions([]);
-      setCurrentInvoice(null);
-      setSelectedProjectName(null);
-    });
-
-    // Clear persistent keys
-    localStorage.removeItem("lastInvoiceNumber");
-    localStorage.removeItem("invoiceItems");
-    localStorage.removeItem("invoiceClientName");
-    localStorage.removeItem("invoiceProjectType");
-    localStorage.removeItem("invoiceDate");
-    localStorage.removeItem("invoiceAmountPaid");
-
-    // Refresh invoices list
+    const totalAmount = calculateTotalAmount();
+    const invoiceData = {
+      invoice: {
+        invoice_number: invoiceNumber,
+        status: "draft",
+        date: invoiceDate,
+        client_name: clientName ? clientName.value : "",
+        client_address: clientAddress || "",
+        client_id: clientName ? clientName.id : null,
+        project_name: selectedProjectName ? selectedProjectName.label : "",
+        project_id: selectedProjectName ? selectedProjectName.value : null,
+        project_type: projectType ? projectType.value : "",
+        amount_paid: parseFloat(amountPaid) || 0,
+        total_amount: totalAmount,
+        invoice_id: currentInvoice?.invoice_id || currentInvoice?.invoiceId || null,
+      },
+      items: items.flatMap((item) =>
+        item.subItems.map((sub) => ({
+          description: item.description?.label || item.description || "",
+          sub_description: sub.description?.label || sub.description || "",
+          size_input: sub.sizeInput || "",
+          qty: sub.qty || "",
+          rate: parseFloat(sub.rate) || 0,
+          unit: sub.unit?.value || sub.unit || "",
+          amount: parseFloat(sub.amount) || 0,
+          is_main_row: false,
+          item_id: sub.key || sub.item_id || null,
+        }))
+      ),
+    };
     try {
-      const resAll = await axios.get("https://backendaab.in/aabuildersDash/api/invoices/all-with-items");
-      const allInvoicesData = Array.isArray(resAll.data) ? resAll.data : [];
-      setAllInvoices(allInvoicesData);
-    } catch (err) {
-      console.warn("Failed to refresh invoices after save:", err);
+      let res;
+      const hasExistingInvoice =
+        invoiceData.invoice.invoice_id &&
+        String(invoiceData.invoice.invoice_number).includes(" D");
+      if (hasExistingInvoice) {
+        const existingRes = await axios.get(
+          `https://backendaab.in/aabuildersDash/api/invoices/with-items/${invoiceData.invoice.invoice_id}`
+        );
+        const existingInvoice = existingRes.data;
+        const oldItems = Array.isArray(existingInvoice.items) ? existingInvoice.items : [];
+        const newItems = invoiceData.items || [];
+        const mergedItems = [
+          ...oldItems,
+          ...newItems.filter(
+            (newItem) =>
+              !oldItems.some(
+                (old) =>
+                  old.sub_description?.trim() === newItem.sub_description?.trim() &&
+                  parseFloat(old.amount) === parseFloat(newItem.amount)
+              )
+          ),
+        ];
+        const mergedPayload = { ...invoiceData, items: mergedItems };
+        res = await axios.put(
+          "https://backendaab.in/aabuildersDash/api/invoices/update-keep-existing",
+          mergedPayload,
+          { headers: { "Content-Type": "application/json" } }
+        );
+      } else {
+        res = await axios.post(
+          "https://backendaab.in/aabuildersDash/api/invoices/save-online",
+          invoiceData,
+          { headers: { "Content-Type": "application/json" } }
+        );
+      }
+      const savedResponse = res.data || {};
+      const savedInvoice = savedResponse.invoice || savedResponse;
+      const savedItems = savedResponse.items || invoiceData.items || [];
+      const savedNumber = String(savedInvoice.invoice_number || invoiceNumber).trim();
+      setInvoiceCache(prev => ({
+        ...prev,
+        [savedNumber]: { invoice: savedInvoice, items: savedItems }
+      }));
+      setAllInvoices(prev => {
+        const copy = Array.isArray(prev) ? [...prev] : [];
+        const idx = copy.findIndex(e => String(e.invoice?.invoice_number || "").trim() === savedNumber);
+        if (idx >= 0) {
+          copy[idx] = { invoice: savedInvoice, items: savedItems };
+        } else {
+          copy.push({ invoice: savedInvoice, items: savedItems });
+        }
+        return copy;
+      });
+      showToastMessage("✅ Draft saved successfully!");
+      ReactDOM.unstable_batchedUpdates(() => {
+        setInvoiceNumber("");
+        setInvoiceDate("");
+        setClientName(null);
+        setClientAddress("");
+        setProjectType(null);
+        setAmountPaid("");
+        setItems([]);
+        setInvoiceVersions([]);
+        setCurrentInvoice(null);
+        setSelectedProjectName(null);
+      });
+      localStorage.removeItem("lastInvoiceNumber");
+      localStorage.removeItem("invoiceItems");
+      localStorage.removeItem("invoiceClientName");
+      localStorage.removeItem("invoiceProjectType");
+      localStorage.removeItem("invoiceDate");
+      localStorage.removeItem("invoiceAmountPaid");
+      try {
+        const resAll = await axios.get("https://backendaab.in/aabuildersDash/api/invoices/all-with-items");
+        const allInvoicesData = Array.isArray(resAll.data) ? resAll.data : [];
+        setAllInvoices(allInvoicesData);
+      } catch (err) {
+        console.warn("Failed to refresh invoices after save:", err);
+      }
+    } catch (error) {
+      console.error("[ERROR] Failed to save draft:", error);
+      showToastMessage("❌ Failed to save draft.");
     }
-
-    console.log("✅ Invoice saved and UI reset successfully!");
-  } catch (error) {
-    console.error("[ERROR] Failed to save draft:", error);
-    showToastMessage("❌ Failed to save draft.");
-  }
-};
+  };
   const finalizeInvoiceBackend = async () => {
     if (!invoiceNumber || invoiceNumber.trim() === '') {
       alert('Invoice number is missing. Cannot finalize.');
@@ -1004,7 +955,6 @@ const saveDraftToBackend = async () => {
         }
       );
       alert('Invoice finalized successfully!');
-      // Clear all UI states
       setInvoiceNumber('');
       setInvoiceDate('');
       setClientName(null);
@@ -1013,7 +963,6 @@ const saveDraftToBackend = async () => {
       setAmountPaid('');
       setItems([]);
       setInvoiceVersions([]);
-      // Clear local storage keys
       localStorage.removeItem('invoiceNumber');
       localStorage.removeItem('invoiceItems');
       localStorage.removeItem('invoiceClientName');
@@ -1025,157 +974,133 @@ const saveDraftToBackend = async () => {
     }
   };
   const handleMakeCopy = async () => {
-  if (!invoiceNumber) {
-    alert("Invoice number required before saving.");
-    return;
-  }
-
-  const totalAmount = calculateTotalAmount();
-
-  const currentClientId = clientName?.value
-    ? Number(clientName.value)
-    : currentInvoice?.client_id ?? currentInvoice?.clientId ?? null;
-
-  const currentProjectId = selectedProjectName?.value
-    ? Number(selectedProjectName.value)
-    : currentInvoice?.project_id ?? currentInvoice?.projectId ?? null;
-
-  const currentAmountPaid = parseFloat(amountPaid) || currentInvoice?.amount_paid || 0;
-
-  const currentInvoicePayload = {
-    invoice: {
-      invoice_number: invoiceNumber,
-      status: "draft", 
-      client_id: currentClientId,
-      client_name: clientName?.label || currentInvoice?.client_name || currentInvoice?.clientName || "",
-      client_address: clientAddress || currentInvoice?.client_address || currentInvoice?.clientAddress || "",
-      project_id: currentProjectId,
-      project_name: selectedProjectName?.label || currentInvoice?.project_name || currentInvoice?.projectName || "",
-      project_type: projectType?.value || currentInvoice?.project_type || currentInvoice?.projectType || "",
-      amount_paid: currentAmountPaid,
-      total_amount: totalAmount,
-      date: invoiceDate || currentInvoice?.invoice_date || currentInvoice?.date || "",
-      invoice_id: currentInvoice?.invoice_id || currentInvoice?.invoiceId || null,
-      timestamp: currentInvoice?.timestamp || null,
-    },
-    items: (items || []).flatMap((item) =>
-      (item.subItems || []).map((sub) => ({
-        description: item.description?.label || item.description || "",
-        sub_description: sub.description?.label || sub.description || "",
-        size_input: sub.sizeInput || "",
-        qty: sub.qty || "",
-        rate: parseFloat(sub.rate) || 0,
-        unit: sub.unit?.value || sub.unit || "",
-        amount: parseFloat(sub.amount) || 0,
-        is_main_row: false,
-        item_id: null,
-        invoice: null,
-      }))
-    ),
+    if (!invoiceNumber) {
+      alert("Invoice number required before copying.");
+      return;
+    }
+    const totalAmount = calculateTotalAmount();
+    const currentClientId = clientName ? clientName.id : currentInvoice?.client_id || null;
+    const currentProjectId = selectedProjectName ? selectedProjectName.value : currentInvoice?.project_id || null;
+    const currentInvoicePayload = {
+      invoice: {
+        invoice_number: invoiceNumber,
+        status: "draft",
+        date: invoiceDate || currentInvoice?.invoice_date || "",
+        client_name: clientName ? clientName.value : currentInvoice?.client_name || "",
+        client_address: clientAddress || currentInvoice?.client_address || "",
+        client_id: currentClientId,
+        project_name: selectedProjectName ? selectedProjectName.label : currentInvoice?.project_name || "",
+        project_id: currentProjectId,
+        project_type: projectType ? projectType.value : currentInvoice?.project_type || "",
+        amount_paid: parseFloat(amountPaid) || currentInvoice?.amount_paid || 0,
+        total_amount: totalAmount,
+        invoice_id: currentInvoice?.invoice_id || null,
+      },
+      items: (items || []).flatMap(item =>
+        item.subItems.map(sub => ({
+          description: item.description?.label || item.description || "",
+          sub_description: sub.description?.label || sub.description || "",
+          size_input: sub.sizeInput || "",
+          qty: sub.qty || "",
+          rate: parseFloat(sub.rate) || 0,
+          unit: sub.unit?.value || sub.unit || "",
+          amount: parseFloat(sub.amount) || 0,
+          is_main_row: false,
+          item_id: sub.key || sub.item_id || null,
+        }))
+      ),
+    };
+    try {
+      const response = await axios.post(
+        "https://backendaab.in/aabuildersDash/api/invoices/make-copy",
+        currentInvoicePayload,
+        { headers: { "Content-Type": "application/json" } }
+      );
+      const savedResponse = response.data || {};
+      const savedInvoice = savedResponse.invoice || savedResponse;
+      const savedItems = savedResponse.items || [];
+      const newInvoiceNumber = savedInvoice.invoice_number || "";
+      ReactDOM.unstable_batchedUpdates(() => {
+        setInvoiceNumber(newInvoiceNumber);
+        setCurrentInvoice(savedInvoice);
+        setItems(mapFetchedItems(savedItems));
+      });
+      await refreshInvoiceVersions(getBaseInvoiceNumber(newInvoiceNumber));
+      alert(`Invoice successfully copied as ${newInvoiceNumber}`);
+    } catch (error) {
+      console.error("[ERROR] Make Copy failed:", error);
+      alert("Failed to make a copy. See console for details.");
+    }
   };
-
-  console.log("[DEBUG] Sending Make Copy request with payload:", currentInvoicePayload);
-
-  try {
-    const response = await axios.post(
-      "https://backendaab.in/aabuildersDash/api/invoices/make-copy",
-      currentInvoicePayload
-    );
-
-    const savedResponse = response.data;
-    const savedInvoice = savedResponse.invoice || savedResponse;
-    const savedItems = savedResponse.items || [];
-
-    const newInvoiceNumber =
-      savedInvoice.invoice_number || savedInvoice.invoiceNumber || "";
-
-    ReactDOM.unstable_batchedUpdates(() => {
-      setInvoiceNumber(newInvoiceNumber);
-      setCurrentInvoice(savedInvoice);
-      setItems(mapFetchedItems(savedItems));
-    });
-
-    await refreshInvoiceVersions(getBaseInvoiceNumber(newInvoiceNumber));
-
-    alert(`Invoice successfully saved/copied as ${newInvoiceNumber}`);
-  } catch (error) {
-    console.error("[ERROR] Failed to save/copy invoice:", error);
-    alert("Failed to save invoice. Check console for details.");
-  }
-};
   const handleCloneClick = () => {
     setIsCloneModalOpen(true);
     setCloneProjectName(null);
-    setIsModalProjectChange(true); // ✅ mark that changes now come from modal
+    setIsModalProjectChange(true);
   };
   const handleConfirmClone = async () => {
-  if (!cloneProjectName) {
-    alert("Please select a project to clone to.");
-    return;
-  }
-  const sourceId = String(selectedProjectName?.value ?? selectedProjectName?.siteNo ?? "");
-  const targetId = String(cloneProjectName?.value ?? cloneProjectName?.siteNo ?? "");
-  if (!sourceId) {
-    alert("No source project selected to clone from.");
-    return;
-  }
-  if (!targetId) {
-    alert("No target project selected to clone to.");
-    return;
-  }
-  const confirmMessage = `Do you want to clone Records from invoice ${invoiceNumber} of project ${selectedProjectName?.label || sourceId} to project ${cloneProjectName.label}?`;
-  if (!window.confirm(confirmMessage)) return;
-  if (!Array.isArray(allInvoices) || allInvoices.length === 0) {
-    try {
-      const res = await axios.get("https://backendaab.in/aabuildersDash/api/invoices/all-with-items");
-      console.log(allInvoices);
-      setAllInvoices(res.data || []);
-    } catch (err) {
-      alert("Failed to refresh invoices, cannot clone.");
+    if (!cloneProjectName) {
+      alert("Please select a project to clone to.");
       return;
     }
-  }
-  const sourceInvoiceEntry = allInvoices.find(inv =>
-    inv.invoice &&
-    String(inv.invoice.project_id) === sourceId &&
-    inv.invoice.invoice_number.trim().toUpperCase() === invoiceNumber.trim().toUpperCase()
-  );
-  if (!sourceInvoiceEntry) {
-    alert("Selected invoice not found in source project. Cannot clone.");
-    return;
-  }
-  const clonedItemsRaw = sourceInvoiceEntry.items || [];
-  if (clonedItemsRaw.length === 0) {
-    alert("No items found in the selected invoice to clone.");
-    return;
-  }
-  try {
-    // Prepare payload for backend clone API
-    const clonePayload = {
-      invoice: sourceInvoiceEntry.invoice,
-      items: clonedItemsRaw,
-      newProjectId: Number(cloneProjectName.value),
-      newProjectName: cloneProjectName.label,
-    };
-    // Call backend clone endpoint
-    const response = await axios.post("https://backendaab.in/aabuildersDash/api/invoices/clone", clonePayload);
-    const clonedInvoice = response.data;
-    // Update UI states with cloned invoice data
-    setSelectedProjectName(cloneProjectName);
-    setProjectType(cloneProjectName.project_type || "");
-    setInvoiceNumber(clonedInvoice.invoiceNumber);
-    setItems(mapFetchedItems(clonedInvoice.items || clonedItemsRaw));
-    setClientName(null);
-    setClientAddress("");
-    setInvoiceDate("");
-    setAmountPaid("");
-    setCurrentInvoice(clonedInvoice);
-    setIsInvoiceLocked(false);
-    setIsCloneModalOpen(false);
-  } catch (error) {
-    alert("Unable to clone invoice: " + (error.response?.data || error.message));
-  }
-};
+    const sourceId = String(selectedProjectName?.value ?? selectedProjectName?.siteNo ?? "");
+    const targetId = String(cloneProjectName?.value ?? cloneProjectName?.siteNo ?? "");
+    if (!sourceId) {
+      alert("No source project selected to clone from.");
+      return;
+    }
+    if (!targetId) {
+      alert("No target project selected to clone to.");
+      return;
+    }
+    const confirmMessage = `Do you want to clone Records from invoice ${invoiceNumber} of project ${selectedProjectName?.label || sourceId} to project ${cloneProjectName.label}?`;
+    if (!window.confirm(confirmMessage)) return;
+    if (!Array.isArray(allInvoices) || allInvoices.length === 0) {
+      try {
+        const res = await axios.get("https://backendaab.in/aabuildersDash/api/invoices/all-with-items");
+        setAllInvoices(res.data || []);
+      } catch (err) {
+        alert("Failed to refresh invoices, cannot clone.");
+        return;
+      }
+    }
+    const sourceInvoiceEntry = allInvoices.find(inv =>
+      inv.invoice &&
+      String(inv.invoice.project_id) === sourceId &&
+      inv.invoice.invoice_number.trim().toUpperCase() === invoiceNumber.trim().toUpperCase()
+    );
+    if (!sourceInvoiceEntry) {
+      alert("Selected invoice not found in source project. Cannot clone.");
+      return;
+    }
+    const clonedItemsRaw = sourceInvoiceEntry.items || [];
+    if (clonedItemsRaw.length === 0) {
+      alert("No items found in the selected invoice to clone.");
+      return;
+    }
+    try {
+      const clonePayload = {
+        invoice: sourceInvoiceEntry.invoice,
+        items: clonedItemsRaw,
+        newProjectId: Number(cloneProjectName.value),
+        newProjectName: cloneProjectName.label,
+      };
+      const response = await axios.post("https://backendaab.in/aabuildersDash/api/invoices/clone", clonePayload);
+      const clonedInvoice = response.data;
+      setSelectedProjectName(cloneProjectName);
+      setProjectType(cloneProjectName.project_type || "");
+      setInvoiceNumber(clonedInvoice.invoiceNumber);
+      setItems(mapFetchedItems(clonedInvoice.items || clonedItemsRaw));
+      setClientName(null);
+      setClientAddress("");
+      setInvoiceDate("");
+      setAmountPaid("");
+      setCurrentInvoice(clonedInvoice);
+      setIsInvoiceLocked(false);
+      setIsCloneModalOpen(false);
+    } catch (error) {
+      alert("Unable to clone invoice: " + (error.response?.data || error.message));
+    }
+  };
   const handleAddItem = () => {
     setItems([
       ...items,
@@ -1232,24 +1157,23 @@ const saveDraftToBackend = async () => {
     let feet = 0;
     let inches = 0;
     if (dim.includes("'") && dim.includes('"')) {
-      const parts = dim.split("'"); // Separate feet and inches
+      const parts = dim.split("'");
       feet = parseFloat(parts[0].trim());
       inches = parseFloat(parts[1].replace('"', '').trim());
-      return feet + (inches / 12); // Convert inches to feet and add to feet
+      return feet + (inches / 12);
     } else if (dim.includes("'")) {
       feet = parseFloat(dim.replace("'", '').trim());
       return feet;
     } else if (dim.includes('"')) {
       inches = parseFloat(dim.replace('"', '').trim());
-      return inches / 12; // Convert inches to feet
+      return inches / 12;
     }
     return parseFloat(dim.trim());
   };
   const calculateArea = (input, unit) => {
-    input = input.replace(/''/g, '"'); // Fix double single quotes
+    input = input.replace(/''/g, '"');
     const dimensionGroups = input.split('+').map(dim => dim.trim());
     let totalArea = 0;
-    // Helper to convert feet-inches format to decimal feet
     const convertToFeet = (dim) => {
       let feet = 0;
       let inches = 0;
@@ -1257,7 +1181,6 @@ const saveDraftToBackend = async () => {
         const parts = dim.split("'");
         feet = parseFloat(parts[0].trim());
         inches = parseFloat(parts[1].replace('"', '').trim());
-        // Convert inches to feet and sum with feet
         return feet + (inches / 12);
       } else if (dim.includes("'")) {
         feet = parseFloat(dim.replace("'", '').trim());
@@ -1272,11 +1195,10 @@ const saveDraftToBackend = async () => {
       const arr = group.split('x').map(part => part.trim());
       if (arr.length === 2) {
         let length, width;
-
         if (unit === "M²") {
           length = parseFloat(arr[0]);
           width = parseFloat(arr[1]);
-        } else { // default to feet conversion
+        } else {
           length = convertToFeet(arr[0]);
           width = convertToFeet(arr[1]);
         }
@@ -1285,9 +1207,8 @@ const saveDraftToBackend = async () => {
         }
       }
     });
-    return totalArea.toFixed(2);  // Return area rounded to 2 decimals
+    return totalArea.toFixed(2);
   };
-  // Function to calculate volume in cubic feet
   const calculateVolume = (input) => {
     input = input.replace(/''/g, '"');
     const dimensionGroups = input.split('+').map(dim => dim.trim());
@@ -1303,25 +1224,20 @@ const saveDraftToBackend = async () => {
         }
       }
     });
-
     return totalVolume.toFixed(2);
   };
   const calculateLiters = (input) => {
-    // If input looks like a simple number (with optional decimal), assume liters directly
     if (/^\d+(\.\d+)?$/.test(input.trim())) {
       return parseFloat(input).toFixed(2);
     }
-    // Otherwise, treat input as cubic feet dimension(s), convert to liters
     const volumeInCubicFeet = parseFloat(calculateVolume(input));
     const volumeInLiters = volumeInCubicFeet * 28;
     return volumeInLiters.toFixed(2);
   };
-  // The handleSubItemChange function
   const evaluateExpression = (expr) => {
     expr = expr.replace(/x/gi, '*');
     if (/^[0-9+\-*/().\s]+$/.test(expr)) {
       try {
-        // eslint-disable-next-line no-new-func
         return new Function(`return (${expr})`)();
       } catch {
         return NaN;
@@ -1332,128 +1248,96 @@ const saveDraftToBackend = async () => {
   const handleSubItemChange = (itemIndex, subItemIndex, field, value, isMainRow = false) => {
     const updatedItems = [...items];
     const subItem = updatedItems[itemIndex].subItems[subItemIndex];
-    const val = typeof value === 'string' ? value.trim() : value;
+    const getUnitValue = (u) => {
+      if (!u && u !== 0) return '';
+      return typeof u === 'object' && u.value !== undefined ? u.value : String(u);
+    };
+    const setAndRecalc = () => {
+      const unitValue = isMainRow ? getUnitValue(subItem.mainRow.unit) : getUnitValue(subItem.unit);
+      const sizeVal = isMainRow ? (subItem.mainRow.sizeInput || '') : (subItem.sizeInput || '');
+      const rateVal = isMainRow ? (parseFloat(subItem.mainRow.rate) || 0) : (parseFloat(subItem.rate) || 0);
+      const computeQty = () => {
+        if (!sizeVal || String(sizeVal).trim() === '') return '';
+        if (unitValue === 'SQFT' || unitValue === 'M²') {
+          const area = calculateArea(String(sizeVal), unitValue);
+          return isNaN(Number(area)) ? `${area}` : `${area} ${unitValue === 'SQFT' ? 'Sqft' : 'm²'}`;
+        }
+        if (unitValue === 'CFT' || unitValue === 'M³') {
+          const vol = calculateVolume(String(sizeVal));
+          return isNaN(Number(vol)) ? `${vol}` : `${vol} ${unitValue === 'CFT' ? 'Cubic Feet' : 'm³'}`;
+        }
+        if (unitValue === 'RFT') {
+          const length = convertToFeet(String(sizeVal));
+          return isNaN(length) ? 'Invalid input' : `${length.toFixed(2)} ft`;
+        }
+        if (unitValue === 'L') {
+          const liters = calculateLiters(String(sizeVal));
+          return isNaN(Number(liters)) ? `${liters}` : `${liters} L`;
+        }
+        if (unitValue === 'NOS' || unitValue === 'L.S') {
+          const evalQty = evaluateExpression(String(sizeVal));
+          return isNaN(evalQty) ? 'Invalid input' : `${evalQty}`;
+        }
+        return String(sizeVal).trim();
+      };
+      const newQty = computeQty();
+      if (isMainRow) {
+        subItem.mainRow.qty = newQty;
+        if (subItem.mainRow.qty && rateVal && unitValue !== 'NOS') {
+          const q = parseQty(subItem.mainRow.qty);
+          subItem.mainRow.amount = (q * rateVal).toFixed(2);
+        } else if (unitValue === 'NOS') {
+          const q = evaluateExpression(String(sizeVal));
+          if (!isNaN(q)) {
+            subItem.mainRow.qty = `${q}`;
+            subItem.mainRow.amount = (q * rateVal).toFixed(2);
+          } else {
+            subItem.mainRow.amount = 'Invalid input';
+          }
+        } else {
+          subItem.mainRow.amount = subItem.mainRow.amount ? subItem.mainRow.amount : '';
+        }
+      } else {
+        subItem.qty = newQty;
+        if (subItem.qty && rateVal && unitValue !== 'NOS') {
+          const q = parseQty(subItem.qty);
+          subItem.amount = (q * rateVal).toFixed(2);
+        } else if (unitValue === 'NOS') {
+          const q = evaluateExpression(String(sizeVal));
+          if (!isNaN(q)) {
+            subItem.qty = `${q}`;
+            subItem.amount = (q * rateVal).toFixed(2);
+          } else {
+            subItem.amount = 'Invalid input';
+          }
+        } else {
+          subItem.amount = subItem.amount ? subItem.amount : '';
+        }
+      }
+    };
+    const val = typeof value === 'string' ? value : value;
     if (isMainRow) {
       if (field === 'unit') {
         subItem.mainRow.unit = value;
-        if (subItem.mainRow.sizeInput) {
-          const selectedUnit = value?.value || 'SQFT';
-          if (selectedUnit === 'SQFT' || selectedUnit === 'M²') {
-            const area = calculateArea(subItem.mainRow.sizeInput, selectedUnit);
-            const qtyStr = area === 'Invalid size input'
-              ? area
-              : `${area} ${selectedUnit === 'SQFT' ? 'Sqft' : 'm²'}`;
-            subItem.mainRow.qty = qtyStr;
-            subItem.qty = qtyStr;
-          } else if (selectedUnit === 'CFT' || selectedUnit === 'M³') {
-            const volume = calculateVolume(subItem.mainRow.sizeInput, selectedUnit);
-            const qtyStr = volume === 'Invalid size input'
-              ? volume
-              : `${volume} ${selectedUnit === 'CFT' ? 'Cubic Feet' : 'm³'}`;
-            subItem.mainRow.qty = qtyStr;
-            subItem.qty = qtyStr;
-          } else if (selectedUnit === 'RFT') {
-            const length = convertToFeet(subItem.mainRow.sizeInput);
-            const qtyStr = isNaN(length) ? 'Invalid input' : `${length.toFixed(2)} ft`;
-            subItem.mainRow.qty = qtyStr;
-            subItem.qty = qtyStr;
-          } else if (selectedUnit === 'L') {
-            const liters = calculateLiters(subItem.mainRow.sizeInput);
-            const qtyStr = liters === 'Invalid size input'
-              ? liters
-              : `${liters} L`;
-            subItem.mainRow.qty = qtyStr;
-            subItem.qty = qtyStr;
-          } else if (selectedUnit === 'NOS') {
-            // Fix for NOS: do not change quantity, change amount only
-            subItem.mainRow.qty = "1";
-            subItem.qty = "1";
-            const evalAmount = evaluateExpression(subItem.mainRow.sizeInput);
-            if (!isNaN(evalAmount)) {
-              subItem.mainRow.amount = (evalAmount * (parseFloat(subItem.mainRow.rate) || 0)).toFixed(2);
-              subItem.amount = subItem.mainRow.amount;
-            } else {
-              subItem.mainRow.amount = 'Invalid input';
-              subItem.amount = 'Invalid input';
-            }
-          } else if (selectedUnit === 'L.S') {
-            const evalQty = evaluateExpression(subItem.mainRow.sizeInput);
-            subItem.mainRow.qty = isNaN(evalQty)
-              ? 'Invalid input'
-              : `${evalQty}`;
-            subItem.qty = subItem.mainRow.qty;
-          } else {
-            subItem.mainRow.qty = '1';
-            subItem.qty = '1';
-          }
-        }
       } else if (field === 'rate') {
-        subItem.mainRow.rate = parseFloat(val) || 0;
+        subItem.mainRow.rate = parseFloat(val) || '';
       } else if (field === 'amount') {
-        subItem.mainRow.amount = parseFloat(val) || 0;
-      }
-      if (subItem.mainRow.qty && subItem.mainRow.rate && (subItem.mainRow.unit?.value !== 'NOS')) {
-        const qtyValue = parseQty(subItem.mainRow.qty);
-        subItem.mainRow.amount = (qtyValue * subItem.mainRow.rate).toFixed(2);
-      } else if (subItem.mainRow.unit?.value === 'NOS') {
-        // Amount already computed above when unit is NOS
-      } else {
-        subItem.mainRow.amount = '';
+        subItem.mainRow.amount = parseFloat(val) || '';
+      } else if (field === 'sizeInput') {
+        subItem.mainRow.sizeInput = val;
       }
     } else {
       if (field === 'unit') {
         subItem.unit = value;
-        if (subItem.sizeInput) {
-          const selectedUnit = value?.value || 'SQFT';
-          if (selectedUnit === 'SQFT' || selectedUnit === 'M²') {
-            const area = calculateArea(subItem.sizeInput, selectedUnit);
-            subItem.qty = area === 'Invalid size input'
-              ? area
-              : `${area} ${selectedUnit === 'SQFT' ? 'Sqft' : 'm²'}`;
-          } else if (selectedUnit === 'CFT' || selectedUnit === 'M³') {
-            const volume = calculateVolume(subItem.sizeInput, selectedUnit);
-            subItem.qty = volume === 'Invalid size input'
-              ? volume
-              : `${volume} ${selectedUnit === 'CFT' ? 'Cubic Feet' : 'm³'}`;
-          } else if (selectedUnit === 'RFT') {
-            const length = convertToFeet(subItem.sizeInput);
-            subItem.qty = isNaN(length) ? 'Invalid input' : `${length.toFixed(2)} ft`;
-          } else if (selectedUnit === 'L') {
-            const liters = calculateLiters(subItem.sizeInput);
-            subItem.qty = liters === 'Invalid size input'
-              ? liters
-              : `${liters} L`;
-          } else if (selectedUnit === 'NOS') {
-            subItem.qty = "1";
-            const evalAmount = evaluateExpression(subItem.sizeInput);
-            if (!isNaN(evalAmount)) {
-              subItem.amount = (evalAmount * (parseFloat(subItem.rate) || 0)).toFixed(2);
-            } else {
-              subItem.amount = 'Invalid input';
-            }
-          } else if (selectedUnit === 'L.S') {
-            const evalQty = evaluateExpression(subItem.sizeInput);
-            subItem.qty = isNaN(evalQty)
-              ? 'Invalid input'
-              : `${evalQty}`;
-          } else {
-            subItem.qty = '1';
-          }
-        }
       } else if (field === 'rate') {
-        subItem.rate = parseFloat(val) || 0;
+        subItem.rate = parseFloat(val) || '';
       } else if (field === 'amount') {
-        subItem.amount = parseFloat(val) || 0;
-      }
-      if (subItem.qty && subItem.rate && subItem.unit?.value !== 'NOS') {
-        const qtyValue = parseQty(subItem.qty);
-        subItem.amount = (qtyValue * subItem.rate).toFixed(2);
-      } else if (subItem.unit?.value === 'NOS') {
-        // Amount already computed above when unit is NOS
-      } else {
-        subItem.amount = '';
+        subItem.amount = parseFloat(val) || '';
+      } else if (field === 'sizeInput') {
+        subItem.sizeInput = val;
       }
     }
+    setAndRecalc();
     setItems(updatedItems);
   };
   let displayIndex = 1;
@@ -1479,12 +1363,11 @@ const saveDraftToBackend = async () => {
                   <tbody>
                     {(items || []).map((item, itemIndex) => (
                       <React.Fragment key={itemIndex}>
-                        {/* Main Description Row - always empty except for description dropdown */}
                         <tr key={`main-${itemIndex}`} className="odd:bg-white even:bg-[#FAF6ED] hover:bg-gray-50">
                           <td className="p-2 border-b border-gray-200">
                             <div className="flex items-center mb-2">
                               <span className="mr-2 font-semibold">{displayIndex++}.</span>
-                             <CreatableSelect
+                              <CreatableSelect
                                 options={descriptions}
                                 value={normalizeOption(item.description, descriptions) || null}
                                 onChange={(value) => {
@@ -1524,7 +1407,6 @@ const saveDraftToBackend = async () => {
                               />
                             </div>
                           </td>
-                          {/* All other fields empty/disabled for main row */}
                           <td className="p-2 border-b border-gray-200">
                             <input type="text" value="" className="w-full p-2 border border-gray-300 rounded" />
                           </td>
@@ -1544,12 +1426,11 @@ const saveDraftToBackend = async () => {
                             {/* Delete button for main row if needed */}
                           </td>
                         </tr>
-                        {/* Subitem Rows */}
                         {(item.subItems || []).map((subItem, subItemIndex) => (
                           <tr key={`sub-${itemIndex}-${subItemIndex}`} className="odd:bg-white even:bg-[#FAF6ED] hover:bg-gray-50">
                             <td className="p-2 border-b border-gray-200">
                               <div className="flex items-center space-x-2 gap-0 group">
-                                    <CreatableSelect
+                                <CreatableSelect
                                   options={subItems}
                                   value={normalizeOption(subItem.description, subItems) || null}
                                   onChange={(value) => {
@@ -1707,20 +1588,17 @@ const saveDraftToBackend = async () => {
               <div className="flex justify-between mb-4">
                 <div className="mt-16">
                   <h1 className="text-lg font-bold -mt-10" style={{ marginLeft: '-650px' }}>Notes</h1>
-
                   <input
                     type="text"
                     className="p-2 border mb-4 h-11 rounded-md -ml-[5rem]"
                     style={{ width: '620px' }}
                   />
-
                   <input
                     type="text"
                     className="p-1 border mb-4 h-9 rounded-md -ml-[5rem]"
                     style={{ width: '620px' }}
                     placeholder="Terms & Conditions"
                   />
-
                   <input
                     type="text"
                     className="p-2 border mb-4 block h-11 rounded-md -ml-[1.5rem]"
@@ -1864,7 +1742,6 @@ const saveDraftToBackend = async () => {
                       placeholder: (base) => ({ ...base, color: "#888" }),
                       singleValue: (base) => ({ ...base, color: "#000" }),
                     }}
-                    
                   />
                 </div>
                 <div className="mb-4" style={{ display: "flex", flexDirection: "column" }}>
@@ -1979,17 +1856,10 @@ const saveDraftToBackend = async () => {
                     isSearchable={true}
                   />
                   <div className="flex justify-end space-x-3">
-                    <button
-                      onClick={() => setIsCloneModalOpen(false)}
-                      className="px-4 py-2 border rounded hover:bg-gray-100"
-                    >
+                    <button onClick={() => setIsCloneModalOpen(false)} className="px-4 py-2 border rounded hover:bg-gray-100">
                       Cancel
                     </button>
-                    <button
-                      onClick={handleConfirmClone}
-                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                      disabled={!cloneProjectName}
-                    >
+                    <button onClick={handleConfirmClone} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700" disabled={!cloneProjectName}>
                       Confirm
                     </button>
                   </div>
@@ -1997,7 +1867,6 @@ const saveDraftToBackend = async () => {
               </div>
             )}
           </div>
-
         </div>
       </div>
     </body>

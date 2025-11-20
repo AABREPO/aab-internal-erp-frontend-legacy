@@ -854,6 +854,19 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   };
   const handleChange = async (selected) => {
     setSelectedOption(selected);
+    setEditFormData(prev => {
+      if (!prev) return prev;
+      if (!selected) {
+        return { ...prev, vendor_id: '', contractor_id: '' };
+      }
+      if (selected.type === 'Vendor') {
+        return { ...prev, vendor_id: selected.id, contractor_id: '' };
+      }
+      if (selected.type === 'Contractor') {
+        return { ...prev, contractor_id: selected.id, vendor_id: '' };
+      }
+      return prev;
+    });
     if (!selected) {
       setOverallAdvance(0);
       return;
@@ -941,7 +954,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   };
   const handleUpdate = async () => {
     try {
-      // Upload file if exists
       let fileUrl = editFormData.file_url || '';
       if (selectedFile) {
         try {
@@ -967,7 +979,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
           }
           const uploadResult = await uploadResponse.json();
           fileUrl = uploadResult.url;
-          console.log('File URL:', fileUrl);
         } catch (error) {
           console.error('Error during file upload:', error);
           alert('Error during file upload. Please try again.');
@@ -975,140 +986,96 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
         }
       }
 
-      const originalRecord = advanceData.find(r => r.advancePortalId === editingId);
-      const isTypeChanged = originalRecord?.type !== editFormData.type;
-      const createPayload = (overrides = {}, typeOverride) => {
-        const base = { ...editFormData, ...overrides, file_url: fileUrl };
-        const type = typeOverride || editFormData.type;
+      const buildPayload = (overrides = {}, typeOverride) => {
+        const payload = {
+          ...editFormData,
+          ...overrides,
+          file_url: fileUrl,
+        };
+
+        if (selectedOption) {
+          if (selectedOption.type === 'Vendor') {
+            payload.vendor_id = selectedOption.id;
+            payload.contractor_id = '';
+          } else if (selectedOption.type === 'Contractor') {
+            payload.contractor_id = selectedOption.id;
+            payload.vendor_id = '';
+          }
+        }
+
+        const type = typeOverride || payload.type;
         switch (type) {
           case 'Advance':
-            base.bill_amount = '';
-            base.refund_amount = '';
+            payload.bill_amount = '';
+            payload.refund_amount = '';
             break;
           case 'Refund':
-            base.bill_amount = '';
-            base.amount = '';
+            payload.bill_amount = '';
+            payload.amount = '';
             break;
           case 'Transfer':
-            base.bill_amount = '';
-            base.refund_amount = '';
-            base.payment_mode = '';
+            payload.bill_amount = '';
+            payload.refund_amount = '';
+            payload.payment_mode = '';
+            break;
+          case 'Bill Settlement':
+            payload.amount = '';
+            payload.refund_amount = '';
             break;
           default:
             break;
         }
-        return base;
+        return payload;
       };
-      let newEntryNo = editFormData.entry_no;
-      if (isTypeChanged) {
-        const res = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/getAll');
-        const data = await res.json();
-        const allEntryNos = data
-          .map(item => parseInt(item.entry_no))
-          .filter(num => !isNaN(num));
-        const maxEntryNo = Math.max(...allEntryNos, 0);
-        newEntryNo = (maxEntryNo + 1).toString();
-      }
-      if (isTypeChanged) {
-        if (editFormData.type === 'Transfer') {
-          const amountValue = parseFloat(editFormData.amount) || 0;
-          const firstPayload = createPayload({
-            entry_no: editFormData.entry_no,
-            amount: -Math.abs(amountValue)
-          }, 'Transfer');
-          const secondPayload = createPayload({
-            entry_no: editFormData.entry_no,
-            project_id: parseInt(editFormData.transfer_site_id),
-            transfer_site_id: originalRecord?.project_id || 0,
-            amount: Math.abs(amountValue)
-          }, 'Transfer');
-          await Promise.all([
-            fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify(firstPayload)
-            }),
-            fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify(secondPayload)
-            })
-          ]);
-        } else {
-          const payload = createPayload({ entry_no: editFormData.entry_no });
-          const saveRes = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(payload)
-          });
-          if (!saveRes.ok) throw new Error('Failed to create new record after type change');
-        }
-        const clearedData = {
-          entry_no: editFormData.entry_no,
-          date: editFormData.date,
-          amount: '',
-          project_id: '',
-          vendor_id: '',
-          contractor_id: '',
-          file_url: '',
-          description: '',
-          bill_amount: '',
-          type: '',
-          transfer_site_id: '',
-          payment_mode: '',
-          refund_amount: ''
-        };
-        const clearRes = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${editingId}?editedBy=${username}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(clearedData)
-        });
-        if (!clearRes.ok) throw new Error('Failed to clear original record after type change');
-      } else if (editFormData.type === 'Transfer') {
-        const sameEntryRows = advanceData.filter(r => r.entry_no === editFormData.entry_no);
-        if (sameEntryRows.length === 2) {
-          const editedRecord = sameEntryRows.find(r => r.advancePortalId === editingId);
-          const otherRecord = sameEntryRows.find(r => r.advancePortalId !== editingId);
-          const editedAmount = parseFloat(editFormData.amount) || 0;
-          const updatedEdited = createPayload({
-            ...editFormData,
-            transfer_site_id: parseInt(editFormData.transfer_site_id),
-            amount: editedAmount // 👈 Keep exactly what user entered
-          }, 'Transfer');
-          const updatedOther = createPayload({
-            ...otherRecord,
-            project_id: parseInt(editFormData.transfer_site_id),
-            transfer_site_id: editedRecord.project_id,
-            amount: -editedAmount // 👈 Opposite of what user entered
-          }, 'Transfer');
-          await Promise.all([
-            fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${editedRecord.advancePortalId}?editedBy=${username}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(updatedEdited)
-            }),
-            fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${otherRecord.advancePortalId}?editedBy=${username}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(updatedOther)
-            })
-          ]);
-        } else {
-          console.warn('Could not find both Transfer records for entry_no:', editFormData.entry_no);
-        }
-      }
-      else {
-        const payload = createPayload();
-        const res = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${editingId}?editedBy=${username}`, {
+
+      const updateRecord = async (id, payload) => {
+        const res = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${id}?editedBy=${username}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        if (!res.ok) throw new Error('Failed to update');
+        if (!res.ok) {
+          throw new Error('Failed to update record');
+        }
+      };
+
+      if (editFormData.type === 'Transfer') {
+        const sameEntryRows = advanceData.filter(r => r.entry_no === editFormData.entry_no);
+        if (sameEntryRows.length === 2) {
+          const editedRecord = sameEntryRows.find(r => r.advancePortalId === editingId);
+          const otherRecord = sameEntryRows.find(r => r.advancePortalId !== editingId);
+          if (editedRecord && otherRecord) {
+            const editedAmount = parseFloat(editFormData.amount) || 0;
+            const updatedEdited = buildPayload({
+              ...editFormData,
+              transfer_site_id: parseInt(editFormData.transfer_site_id),
+              amount: editedAmount
+            }, 'Transfer');
+            const updatedOther = buildPayload({
+              ...otherRecord,
+              project_id: parseInt(editFormData.transfer_site_id),
+              transfer_site_id: editedRecord.project_id,
+              amount: -editedAmount
+            }, 'Transfer');
+            await Promise.all([
+              updateRecord(editedRecord.advancePortalId, updatedEdited),
+              updateRecord(otherRecord.advancePortalId, updatedOther)
+            ]);
+          } else {
+            console.warn('Transfer pair incomplete for entry_no:', editFormData.entry_no);
+            const fallbackPayload = buildPayload({}, 'Transfer');
+            await updateRecord(editingId, fallbackPayload);
+          }
+        } else {
+          console.warn('Could not find both Transfer records for entry_no:', editFormData.entry_no);
+          const fallbackPayload = buildPayload({}, 'Transfer');
+          await updateRecord(editingId, fallbackPayload);
+        }
+      } else {
+        const payload = buildPayload();
+        await updateRecord(editingId, payload);
       }
+
       window.location.reload();
       setIsEditModalOpen(false);
       setSelectedFile(null);

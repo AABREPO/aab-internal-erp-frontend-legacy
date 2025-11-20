@@ -112,9 +112,7 @@ const DirectoryTelecom = () => {
       responseKeys: ['telecom_purpose', 'telecomPurpose']
     }
   };
-
   const DAY_IN_MS = 1000 * 60 * 60 * 24;
-
   const toDateAtMidnight = (value) => {
     if (!value) return null;
     const date =
@@ -125,7 +123,6 @@ const DirectoryTelecom = () => {
     date.setHours(0, 0, 0, 0);
     return date;
   };
-
   const formatDateInputValue = (date) => {
     if (!(date instanceof Date)) return '';
     const year = date.getFullYear();
@@ -133,7 +130,6 @@ const DirectoryTelecom = () => {
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
-
   const addMonthsRespectingEndOfMonth = (sourceDate, months) => {
     const result = new Date(sourceDate);
     const originalDay = result.getDate();
@@ -144,7 +140,6 @@ const DirectoryTelecom = () => {
     result.setHours(0, 0, 0, 0);
     return result;
   };
-
   const computeServiceEndDate = (startValue, validityValue, validityUnit) => {
     const startDate = toDateAtMidnight(startValue);
     const numericValidity = Number(validityValue);
@@ -152,7 +147,6 @@ const DirectoryTelecom = () => {
     if (!startDate || !Number.isFinite(numericValidity) || numericValidity <= 0 || !normalizedUnit) {
       return null;
     }
-
     let endDate;
     if (normalizedUnit === 'days') {
       endDate = new Date(startDate);
@@ -164,21 +158,17 @@ const DirectoryTelecom = () => {
     } else {
       return null;
     }
-
     endDate.setHours(0, 0, 0, 0);
     return formatDateInputValue(endDate);
   };
-
   const deriveValidityFromDateRange = (startValue, endValue) => {
     const startDate = toDateAtMidnight(startValue);
     const endDate = toDateAtMidnight(endValue);
     if (!startDate || !endDate || endDate < startDate) {
       return null;
     }
-
     const diffDays = Math.floor((endDate.getTime() - startDate.getTime()) / DAY_IN_MS) + 1;
     const totalMonths = (endDate.getFullYear() - startDate.getFullYear()) * 12 + (endDate.getMonth() - startDate.getMonth());
-
     if (totalMonths > 0) {
       const candidateEnd = addMonthsRespectingEndOfMonth(startDate, totalMonths);
       if (candidateEnd.getTime() === endDate.getTime()) {
@@ -197,20 +187,17 @@ const DirectoryTelecom = () => {
         };
       }
     }
-
     return {
       value: diffDays,
       unit: 'Days'
     };
   };
-
   const formatDisplayDate = (value) => {
     if (!value) return '-';
     const date = value instanceof Date ? value : new Date(value);
     if (Number.isNaN(date.getTime())) return '-';
     return date.toLocaleDateString('en-GB');
   };
-
   const formatDateForInput = (value) => {
     if (!value) return '';
     if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -220,22 +207,18 @@ const DirectoryTelecom = () => {
     if (!date) return '';
     return formatDateInputValue(date);
   };
-
   const calculateExpiryDate = (startDate, validityValue, validityUnit, serviceEndDate) => {
     const explicitEnd = toDateAtMidnight(serviceEndDate);
     if (explicitEnd) {
       return explicitEnd;
     }
-
     const computedEnd = computeServiceEndDate(startDate, validityValue, validityUnit);
     if (!computedEnd) {
       return null;
     }
-
     const normalizedEnd = toDateAtMidnight(computedEnd);
     return normalizedEnd;
   };
-
   const calculateRemainingDays = (expiryDate) => {
     if (!expiryDate) return '-';
     const today = new Date();
@@ -249,7 +232,6 @@ const DirectoryTelecom = () => {
     if (diffDays === 0) return 'Today';
     return 'Expired';
   };
-
   const calculateExpiredAgo = (expiryDate) => {
     if (!expiryDate) return '-';
     const today = new Date();
@@ -261,14 +243,12 @@ const DirectoryTelecom = () => {
     if (Number.isNaN(diffDays) || diffDays <= 0) return '-';
     return `${diffDays} day${diffDays === 1 ? '' : 's'}`;
   };
-
   const formatAmount = (value) => {
     if (value === null || value === undefined || value === '') return '-';
     const numberValue = Number(value);
     if (Number.isNaN(numberValue)) return value;
     return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(numberValue);
   };
-
   const findProjectItemByValue = (value) => {
     if (value === null || value === undefined) return undefined;
     const stringValue = String(value);
@@ -278,17 +258,14 @@ const DirectoryTelecom = () => {
       return idMatch || siteNoMatch;
     });
   };
-
   const getProjectName = (projectId) => {
     const project = findProjectItemByValue(projectId);
     return project?.name ?? '-';
   };
-
   const getProjectCategory = (projectId) => {
     const project = findProjectItemByValue(projectId);
     return project?.category ?? '';
   };
-
   const getProjectCategoryStyles = (category) => {
     const normalized = (category ?? '').trim().toLowerCase();
     const isOwn = normalized.includes('own');
@@ -310,7 +287,6 @@ const DirectoryTelecom = () => {
       color: '#1f2937'
     };
   };
-
   const resolveProjectIdForSave = (projectValue) => {
     if (!projectValue && projectValue !== 0) return null;
     const project = findProjectItemByValue(projectValue);
@@ -321,7 +297,6 @@ const DirectoryTelecom = () => {
     const numericValue = Number(projectValue);
     return Number.isNaN(numericValue) ? null : numericValue;
   };
-
   const getEntryStatus = (item) => {
     const expiryDate = calculateExpiryDate(
       item.service_starting_date,
@@ -340,7 +315,6 @@ const DirectoryTelecom = () => {
     if (diffDays <= 7) return 'Expiring Soon';
     return 'Active';
   };
-
   const categoryFilterOptions = useMemo(() => {
     const categories = new Set(
       telecomEntries.map((item) => {
@@ -353,7 +327,6 @@ const DirectoryTelecom = () => {
       label: category
     }));
   }, [telecomEntries, projectItems]);
-
   const statusFilterOptions = useMemo(() => {
     const statuses = new Set(telecomEntries.map((item) => getEntryStatus(item)));
     return Array.from(statuses).map((status) => ({
@@ -361,7 +334,6 @@ const DirectoryTelecom = () => {
       label: status
     }));
   }, [telecomEntries]);
-
   const filteredTelecomEntries = useMemo(() => {
     return telecomEntries.filter((item) => {
       const paymentDateValue = item.payment_date ?? item.paymentDate ?? '';
@@ -373,85 +345,68 @@ const DirectoryTelecom = () => {
       const projectIdValue = item.project_id ?? item.projectId ?? null;
       const projectCategoryValue = getProjectCategory(projectIdValue);
       const entryStatus = getEntryStatus(item);
-
       if (filters.project && String(filters.project) !== String(projectIdValue)) {
         return false;
       }
-
       if (filters.date) {
         if (paymentDateISO !== filters.date) {
           return false;
         }
       }
-
       if (filters.category && projectCategoryValue !== filters.category) {
         return false;
       }
-
       if (filters.status && entryStatus !== filters.status) {
         return false;
       }
-
       if (filters.vendor && !serviceProviderValue.includes(filters.vendor.toLowerCase())) {
         return false;
       }
-
       if (filters.service && !serviceTypeValue.includes(filters.service.toLowerCase())) {
         return false;
       }
-
       if (filters.tenant && !assignedValue.includes(filters.tenant.toLowerCase())) {
         return false;
       }
-
       if (filters.doorNo && !serviceNumberValue.includes(filters.doorNo.toLowerCase())) {
         return false;
       }
-
       if (filters.year) {
         const paymentYear = paymentDateValue ? String(new Date(paymentDateValue).getFullYear()) : '';
         if (paymentYear !== filters.year) {
           return false;
         }
       }
-
       return true;
     });
   }, [telecomEntries, filters, projectItems]);
-
   const filteredTypeItems = useMemo(() => {
     const term = typeSearch.trim().toLowerCase();
     if (!term) return typeItems;
     return typeItems.filter(item => item.name.toLowerCase().includes(term));
   }, [typeItems, typeSearch]);
-
   const filteredNetworkItems = useMemo(() => {
     const term = networkSearch.trim().toLowerCase();
     if (!term) return networkItems;
     return networkItems.filter(item => item.name.toLowerCase().includes(term));
   }, [networkItems, networkSearch]);
-
   const filteredCategoryItems = useMemo(() => {
     const term = categorySearch.trim().toLowerCase();
     if (!term) return categoryItems;
     return categoryItems.filter(item => item.name.toLowerCase().includes(term));
   }, [categoryItems, categorySearch]);
-
   const typeOptions = useMemo(
     () => typeItems.map(item => ({ value: item.name, label: item.name })),
     [typeItems]
   );
-
   const networkOptions = useMemo(
     () => networkItems.map(item => ({ value: item.name, label: item.name })),
     [networkItems]
   );
-
   const categoryOptions = useMemo(
     () => categoryItems.map(item => ({ value: item.name, label: item.name })),
     [categoryItems]
   );
-
   const projectOptions = useMemo(
     () => projectItems.map(item => ({
       value: String(item.id ?? item.siteNo ?? ''),
@@ -460,32 +415,26 @@ const DirectoryTelecom = () => {
     })),
     [projectItems]
   );
-
   const selectedTypeOption = useMemo(
     () => typeOptions.find(option => option.value === form.type) ?? null,
     [typeOptions, form.type]
   );
-
   const selectedNetworkOption = useMemo(
     () => networkOptions.find(option => option.value === form.network) ?? null,
     [networkOptions, form.network]
   );
-
   const selectedCategoryOption = useMemo(
     () => categoryOptions.find(option => option.value === form.purpose) ?? null,
     [categoryOptions, form.purpose]
   );
-
   const selectedProjectOption = useMemo(
     () => projectOptions.find(option => option.value === form.project) ?? null,
     [projectOptions, form.project]
   );
-
   const selectedProjectFilterOption = useMemo(
     () => projectOptions.find(option => option.value === filters.project) ?? null,
     [projectOptions, filters.project]
   );
-
   const selectStyles = useMemo(
     () => ({
       container: (provided) => ({
@@ -518,11 +467,9 @@ const DirectoryTelecom = () => {
     }),
     []
   );
-
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
-
   const clearAllFilters = () => {
     setFilters({
       year: '',
@@ -536,16 +483,13 @@ const DirectoryTelecom = () => {
       date: ''
     });
   };
-
   const handleFormChange = (key, value) => {
     setForm((prev) => {
       const next = { ...prev, [key]: value };
-
       if (key === 'serviceEnd') {
         next.serviceEnd = formatDateForInput(value);
         return next;
       }
-
       if (['serviceStart', 'validityValue', 'validityUnit'].includes(key)) {
         const computedEnd = computeServiceEndDate(
           next.serviceStart,
@@ -560,19 +504,16 @@ const DirectoryTelecom = () => {
       return next;
     });
   };
-
   const handleOpenAddPopup = (popupKey) => {
     setActiveAddPopup(popupKey)
     setAddPopupValue('')
     setEditingItem(null)
   }
-
   const handleCloseAddPopup = () => {
     setActiveAddPopup(null)
     setAddPopupValue('')
     setEditingItem(null)
   }
-
   const fetchList = async (key) => {
     const config = listConfig[key];
     if (!config) return;
@@ -604,7 +545,6 @@ const DirectoryTelecom = () => {
       console.error(error);
     }
   };
-
   const fetchProjectItems = async () => {
     try {
       const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
@@ -628,7 +568,6 @@ const DirectoryTelecom = () => {
       console.error(error);
     }
   };
-
   const fetchTelecomEntries = async () => {
     setTelecomLoading(true);
     setTelecomError('');
@@ -649,39 +588,30 @@ const DirectoryTelecom = () => {
       setTelecomLoading(false);
     }
   };
-
   useEffect(() => {
     fetchList('type');
     fetchList('network');
     fetchList('category');
     fetchProjectItems();
     fetchTelecomEntries();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
   useEffect(() => {
     if (!isInputsOpen) return;
     fetchList('type');
     fetchList('network');
     fetchList('category');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInputsOpen]);
-
   useEffect(() => {
     if (!isCreateOpen) return;
     fetchProjectItems();
     setSaveError('');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCreateOpen]);
-
   useEffect(() => {
     const { serviceStart, serviceEnd } = form;
     if (!serviceStart || !serviceEnd) {
       return;
     }
-
     const validity = deriveValidityFromDateRange(serviceStart, serviceEnd);
-
     setForm((prev) => {
       if (!validity) {
         if (prev.validityValue === 0 && prev.validityUnit === '') {
@@ -693,11 +623,9 @@ const DirectoryTelecom = () => {
           validityUnit: ''
         };
       }
-
       if (prev.validityValue === validity.value && prev.validityUnit === validity.unit) {
         return prev;
       }
-
       return {
         ...prev,
         validityValue: validity.value,
@@ -705,7 +633,6 @@ const DirectoryTelecom = () => {
       };
     });
   }, [form.serviceStart, form.serviceEnd]);
-
   const durationDaysLabel = useMemo(() => {
     if (form.validityUnit !== 'Days') {
       return '';
@@ -721,7 +648,6 @@ const DirectoryTelecom = () => {
     }
     return `Duration: ${diffDays} Day${diffDays === 1 ? '' : 's'}`;
   }, [form.serviceStart, form.serviceEnd, form.validityUnit]);
-
   const handleSubmitAddPopup = () => {
     if (!activeAddPopup) return;
     const { setItems, endpoints, requestKey, responseKeys } = listConfig[activeAddPopup];
@@ -790,10 +716,8 @@ const DirectoryTelecom = () => {
     };
     saveItem();
   };
-
   const handleCreateSubmit = async () => {
     const projectIdValue = resolveProjectIdForSave(form.project);
-
     const payload = {
       service_type: form.type || null,
       service_provider: form.network || null,
@@ -809,7 +733,6 @@ const DirectoryTelecom = () => {
       registered_person: form.registeredPerson || null,
       assigned_person: form.assignedPerson || null
     };
-
     setIsSaving(true);
     setSaveError('');
     const isEditing = Boolean(editingEntry?.id);
@@ -836,11 +759,9 @@ const DirectoryTelecom = () => {
       setIsSaving(false);
     }
   };
-
   const handleImportClick = (key) => {
     fileInputRefs.current[key]?.click();
   }
-
   const handleFileImport = (key, event) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -862,7 +783,7 @@ const DirectoryTelecom = () => {
         for (const value of uniqueValues) {
           const payload = { [config.requestKey]: value };
           try {
-          const response = await fetch(`${API_BASE_URL}${config.endpoints.create}`, {
+            const response = await fetch(`${API_BASE_URL}${config.endpoints.create}`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json'
@@ -915,13 +836,11 @@ const DirectoryTelecom = () => {
       }
     }),
   };
-
   const handleEditItem = (key, item) => {
     setActiveAddPopup(key);
     setAddPopupValue(item.name ?? '');
     setEditingItem({ ...item, key });
   };
-
   const handleDeleteItem = async (key, item) => {
     const config = listConfig[key];
     if (!config?.endpoints?.delete) return;
@@ -939,7 +858,6 @@ const DirectoryTelecom = () => {
       console.error(error);
     }
   };
-
   const handleDeleteEntry = async (item) => {
     if (!item?.id) return;
     const confirmed = window.confirm('Are you sure you want to delete this telecom entry?');
@@ -956,7 +874,6 @@ const DirectoryTelecom = () => {
       console.error(error);
     }
   };
-
   const resetForm = () => {
     setForm({
       type: '',
@@ -974,7 +891,6 @@ const DirectoryTelecom = () => {
       assignedPerson: ''
     });
   }
-
   const closeCreateModal = (force = false) => {
     if (isSaving && !force) return;
     setIsCreateOpen(false);
@@ -982,7 +898,6 @@ const DirectoryTelecom = () => {
     resetForm();
     setSaveError('');
   };
-
   const openCreateModal = (entry = null) => {
     if (entry) {
       const validityRaw = entry.validity ?? entry.validity_value ?? entry.validityValue ?? '';
@@ -1015,7 +930,6 @@ const DirectoryTelecom = () => {
     setSaveError('');
     setIsCreateOpen(true);
   };
-
   return (
     <div className=" rounded-lg shadow-sm ">
       <div className="bg-white lg:flex gap-3 p-4 ml-5 mr-5 rounded-md lg:h-[128px] text-left">
@@ -1110,23 +1024,15 @@ const DirectoryTelecom = () => {
         </div>
       </div>
       <div className="mt-4 overflow-x-auto bg-white p-4 ml-5 mr-5 rounded-md">
-        {/* Tabs and Actions */}
         <div className=" flex flex-col md:flex-row md:items-center md:justify-between mt-5 mb-3">
           <div className="inline-flex rounded-md p-1 w-fit gap-4">
-          <button
-              className="inline-flex items-center gap-2 text-sm font-semibold rounded-md px-3 py-1 shadow-lg"
-              onClick={() => setIsFilterRowVisible(prev => !prev)}
-            >
+            <button className="inline-flex items-center gap-2 text-sm font-semibold rounded-md px-3 py-1 shadow-lg" onClick={() => setIsFilterRowVisible(prev => !prev)} >
               <img src={filterIcon} alt="filter" className="w-4 h-5" />
             </button>
-            <button
-              className={'px-6 py-2 rounded font-semibold transition-colors border border-gray-300 hover:bg-gray-50'}
-            >
+            <button className={'px-6 py-2 rounded font-semibold transition-colors border border-gray-300 hover:bg-gray-50'} >
               Clients Projects
             </button>
-            <button
-              className={'px-6 py-2 rounded font-semibold transition-colors border border-gray-300 hover:bg-gray-50'}
-            >
+            <button className={'px-6 py-2 rounded font-semibold transition-colors border border-gray-300 hover:bg-gray-50'} >
               Own Projects
             </button>
           </div>
@@ -1139,62 +1045,59 @@ const DirectoryTelecom = () => {
           </div>
         </div>
         <div className="flex justify-between items-center mb-3 px-2">
-            
-            {(filters.date || filters.project || filters.category || filters.status || filters.vendor || filters.service) && (
-              <div className="flex flex-wrap gap-2 items-center">
-                {filters.date && (
-                  <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium">
-                    <span className="font-normal">Date:</span>
-                    <span className="font-bold">{filters.date}</span>
-                    <button onClick={() => handleFilterChange('date', '')} className="text-[#BF9853] ml-1 text-lg leading-none">×</button>
-                  </span>
-                )}
-                {filters.project && (
-                  <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium">
-                    <span className="font-normal">Project:</span>
-                    <span className="font-bold">{getProjectName(filters.project)}</span>
-                    <button onClick={() => handleFilterChange('project', '')} className="text-[#BF9853] ml-1 text-lg leading-none">×</button>
-                  </span>
-                )}
-                {filters.vendor && (
-                  <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium">
-                    <span className="font-normal">Provider:</span>
-                    <span className="font-bold">{filters.vendor}</span>
-                    <button onClick={() => handleFilterChange('vendor', '')} className="text-[#BF9853] ml-1 text-lg leading-none">×</button>
-                  </span>
-                )}
-                {filters.service && (
-                  <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium">
-                    <span className="font-normal">Type:</span>
-                    <span className="font-bold">{filters.service}</span>
-                    <button onClick={() => handleFilterChange('service', '')} className="text-[#BF9853] ml-1 text-lg leading-none">×</button>
-                  </span>
-                )}
-                {filters.category && (
-                  <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium">
-                    <span className="font-normal">Category:</span>
-                    <span className="font-bold">{filters.category}</span>
-                    <button onClick={() => handleFilterChange('category', '')} className="text-[#BF9853] ml-1 text-lg leading-none">×</button>
-                  </span>
-                )}
-                {filters.status && (
-                  <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium">
-                    <span className="font-normal">Status:</span>
-                    <span className="font-bold">{filters.status}</span>
-                    <button onClick={() => handleFilterChange('status', '')} className="text-[#BF9853] ml-1 text-lg leading-none">×</button>
-                  </span>
-                )}
-                <button
-                  onClick={clearAllFilters}
-                  className="text-[#BF9853] border border-[#BF9853] rounded px-3 py-1 text-sm font-medium hover:bg-[#BF9853] hover:text-white transition-colors"
-                >
-                  Clear All
-                </button>
-              </div>
-            )}
-          </div>
+          {(filters.date || filters.project || filters.category || filters.status || filters.vendor || filters.service) && (
+            <div className="flex flex-wrap gap-2 items-center">
+              {filters.date && (
+                <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium">
+                  <span className="font-normal">Date:</span>
+                  <span className="font-bold">{filters.date}</span>
+                  <button onClick={() => handleFilterChange('date', '')} className="text-[#BF9853] ml-1 text-lg leading-none">×</button>
+                </span>
+              )}
+              {filters.project && (
+                <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium">
+                  <span className="font-normal">Project:</span>
+                  <span className="font-bold">{getProjectName(filters.project)}</span>
+                  <button onClick={() => handleFilterChange('project', '')} className="text-[#BF9853] ml-1 text-lg leading-none">×</button>
+                </span>
+              )}
+              {filters.vendor && (
+                <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium">
+                  <span className="font-normal">Provider:</span>
+                  <span className="font-bold">{filters.vendor}</span>
+                  <button onClick={() => handleFilterChange('vendor', '')} className="text-[#BF9853] ml-1 text-lg leading-none">×</button>
+                </span>
+              )}
+              {filters.service && (
+                <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium">
+                  <span className="font-normal">Type:</span>
+                  <span className="font-bold">{filters.service}</span>
+                  <button onClick={() => handleFilterChange('service', '')} className="text-[#BF9853] ml-1 text-lg leading-none">×</button>
+                </span>
+              )}
+              {filters.category && (
+                <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium">
+                  <span className="font-normal">Category:</span>
+                  <span className="font-bold">{filters.category}</span>
+                  <button onClick={() => handleFilterChange('category', '')} className="text-[#BF9853] ml-1 text-lg leading-none">×</button>
+                </span>
+              )}
+              {filters.status && (
+                <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium">
+                  <span className="font-normal">Status:</span>
+                  <span className="font-bold">{filters.status}</span>
+                  <button onClick={() => handleFilterChange('status', '')} className="text-[#BF9853] ml-1 text-lg leading-none">×</button>
+                </span>
+              )}
+              <button onClick={clearAllFilters}
+                className="text-[#BF9853] border border-[#BF9853] rounded px-3 py-1 text-sm font-medium hover:bg-[#BF9853] hover:text-white transition-colors"
+              >
+                Clear All
+              </button>
+            </div>
+          )}
+        </div>
         <div className="rounded-lg border-l-8 border-l-[#BF9853]">
-          
           <table className="w-full table-auto mb-4 border-collapse">
             <thead>
               <tr className="bg-[#FAF6ED] text-left">
@@ -1376,7 +1279,6 @@ const DirectoryTelecom = () => {
                 <button className="text-red-600 text-2xl" onClick={() => setIsInputsOpen(false)}>×</button>
               </div>
               <div className="flex overflow-x-auto space-x-[1%] pb-4">
-                {/* TYPE COLUMN */}
                 <div>
                   <div className="ml-5">
                     <div className="flex items-center mb-2">
@@ -1421,7 +1323,7 @@ const DirectoryTelecom = () => {
                               <tr key={`${item.id}-${item.name}`} className="border-b last:border-b-0 group">
                                 <td className="p-2 w-16 font-semibold">{item.id}</td>
                                 <td className="p-2 w-40 flex justify-between">{item.name}
-                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                                     <button onClick={() => handleEditItem('type', item)} className="p-1 rounded hover:bg-gray-100">
                                       <img src={edit} alt="edit" className="w-4 h-4" />
                                     </button>
@@ -1438,7 +1340,6 @@ const DirectoryTelecom = () => {
                     </div>
                   </div>
                 </div>
-                {/* NETWORK COLUMN */}
                 <div>
                   <div className="ml-7">
                     <div className="flex items-center mb-2">
@@ -1458,10 +1359,7 @@ const DirectoryTelecom = () => {
                         <img src={imports} alt="import" className="w-6 h-5 bg-transparent pr-2 mt-1" />
                         <h1 className="mt-1.5">Import file</h1>
                       </button>
-                      <button
-                        className="text-black font-bold px-1 ml-6 rounded border-dashed border-b-2 border-[#BF9853]"
-                        onClick={() => handleOpenAddPopup('network')}
-                      >
+                      <button className="text-black font-bold px-1 ml-6 rounded border-dashed border-b-2 border-[#BF9853]" onClick={() => handleOpenAddPopup('network')}>
                         + Add
                       </button>
                     </div>
@@ -1483,7 +1381,7 @@ const DirectoryTelecom = () => {
                               <tr key={`${item.id}-${item.name}`} className="border-b last:border-b-0 group">
                                 <td className="p-2 w-16 font-semibold">{item.id}</td>
                                 <td className="p-2 w-40 flex justify-between">{item.name}
-                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                                     <button onClick={() => handleEditItem('network', item)} className="p-1 rounded hover:bg-gray-100">
                                       <img src={edit} alt="edit" className="w-4 h-4" />
                                     </button>
@@ -1500,7 +1398,6 @@ const DirectoryTelecom = () => {
                     </div>
                   </div>
                 </div>
-                {/* CATEGORY COLUMN */}
                 <div>
                   <div className="ml-7">
                     <div className="flex items-center mb-2">
@@ -1513,17 +1410,14 @@ const DirectoryTelecom = () => {
                       />
                       <button className="-ml-8 mt-5 transform -translate-y-1/2 text-gray-500">
                         <img src={search} alt='search' className=' w-5 h-5' />
-                        </button>
+                      </button>
                     </div>
                     <div className="flex items-center justify-between">
-                    <button className="text-[#E4572E] font-semibold text-sm flex" onClick={() => handleImportClick('category')}>
-                      <img src={imports} alt="import" className="w-6 h-5 bg-transparent pr-2 mt-1" />
-                      <h1 className="mt-1.5">Import file</h1>
-                    </button>
-                      <button
-                        className="text-black font-bold px-1 ml-6 rounded border-dashed border-b-2 border-[#BF9853]"
-                        onClick={() => handleOpenAddPopup('category')}
-                      >
+                      <button className="text-[#E4572E] font-semibold text-sm flex" onClick={() => handleImportClick('category')}>
+                        <img src={imports} alt="import" className="w-6 h-5 bg-transparent pr-2 mt-1" />
+                        <h1 className="mt-1.5">Import file</h1>
+                      </button>
+                      <button className="text-black font-bold px-1 ml-6 rounded border-dashed border-b-2 border-[#BF9853]" onClick={() => handleOpenAddPopup('category')}>
                         + Add
                       </button>
                     </div>
@@ -1545,7 +1439,7 @@ const DirectoryTelecom = () => {
                               <tr key={`${item.id}-${item.name}`} className="border-b last:border-b-0 group">
                                 <td className="p-2 w-16 font-semibold">{item.id}</td>
                                 <td className="p-2 w-40 flex justify-between">{item.name}
-                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                                     <button onClick={() => handleEditItem('category', item)} className="p-1 rounded hover:bg-gray-100">
                                       <img src={edit} alt="edit" className="w-4 h-4" />
                                     </button>
@@ -1563,7 +1457,6 @@ const DirectoryTelecom = () => {
                   </div>
                 </div>
               </div>
-              {/* Action Buttons */}
               <div className="flex gap-2 justify-end mr-10 mb-4">
                 <button className="px-6 py-2 bg-[#BF9853] text-white rounded-md">Save</button>
                 <button className="px-6 py-2 border border-[#BF9853] text-[#BF9853] rounded-md" onClick={() => setIsInputsOpen(false)}>Cancel</button>
@@ -1590,10 +1483,7 @@ const DirectoryTelecom = () => {
                   />
                 </div>
                 <div className="flex justify-end gap-3">
-                  <button
-                    className="px-6 py-2 border border-[#BF9853] text-[#BF9853] rounded-md"
-                    onClick={handleCloseAddPopup}
-                  >
+                  <button className="px-6 py-2 border border-[#BF9853] text-[#BF9853] rounded-md" onClick={handleCloseAddPopup} >
                     Cancel
                   </button>
                   <button
@@ -1673,7 +1563,6 @@ const DirectoryTelecom = () => {
                   <label className="block font-semibold mb-1">Service Number</label>
                   <input value={form.number} onChange={(e) => handleFormChange('number', e.target.value)} placeholder="Enter here" className="w-full h-11 border-2 border-[#BF9853] border-opacity-30 rounded-lg px-3 focus:outline-none" />
                 </div>
-
                 <div>
                   <label className="block font-semibold mb-1">Project</label>
                   <Select
@@ -1704,7 +1593,6 @@ const DirectoryTelecom = () => {
                   <label className="block font-semibold mb-1">Amount</label>
                   <input value={form.amount} onChange={(e) => handleFormChange('amount', e.target.value)} placeholder="Enter here" className="w-full h-11 border-2 border-[#BF9853] border-opacity-30 rounded-lg px-3 focus:outline-none" />
                 </div>
-
                 <div>
                   <label className="block font-semibold mb-1">Payment Date</label>
                   <input type="date" value={form.paymentDate} onChange={(e) => handleFormChange('paymentDate', e.target.value)} className="w-full h-11 border-2 border-[#BF9853] border-opacity-30 rounded-lg px-3 focus:outline-none" />
@@ -1776,5 +1664,4 @@ const DirectoryTelecom = () => {
     </div>
   )
 }
-
 export default DirectoryTelecom

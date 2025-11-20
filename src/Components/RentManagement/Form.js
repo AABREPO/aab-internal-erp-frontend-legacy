@@ -138,9 +138,6 @@ const Form = () => {
                     ? data.filter(p => (p.projectCategory || '').toLowerCase() === 'own project')
                     : [];
                 setProjects(ownProjects);
-                console.log('Fetched projects:', ownProjects.length, 'projects');
-                
-                // Build mapping from shopNoId to shopNo
                 const shopNoIdMap = {};
                 ownProjects
                     .filter(project => project.projectReferenceName)
@@ -263,7 +260,6 @@ const Form = () => {
                 if (shop.shopNoId) {
                     const shopNo = shopNoIdToShopNoMap[shop.shopNoId] || '';
                     if (shopNo) {
-                        // Find the project for this shop to get doorNo and projectReferenceName
                         let doorNo = '';
                         let projectReferenceName = '';
                         projects
@@ -422,33 +418,31 @@ const Form = () => {
 
         setAdvanceAmount(totalAdvance);
     };
-    // Calculate pending rent up to a specific date using rent history data
+    const buildTenantShopMapping = () => {
+        const tenantShopMapping = {};
+        tenantShopData.forEach(tenant => {
+            tenant.shopNos?.forEach(shop => {
+                if (!shop) return;
+                const tenantShopKey = (shop.id ?? shop.shopNoId);
+                const shopNo = shop.shopNoId ? (shopNoIdToShopNoMap[shop.shopNoId] || '') : '';
+                if (!tenantShopKey || !shopNo) return;
+                tenantShopMapping[tenantShopKey.toString()] = {
+                    shopNo: shopNo,
+                    tenantName: tenant.tenantName,
+                    startingDate: shop.startingDate,
+                    shopClosureDate: shop.shopClosureDate,
+                    monthlyRent: shop.monthlyRent
+                };
+            });
+        });
+        return tenantShopMapping;
+    };
     const calculatePendingRentUpToDate = (endDate) => {
         if (!formTenantName || !formShopNo || !startingDate || rentHistoryData.length === 0) {
             return 0;
         }
-        // Use closure date if provided, otherwise use the passed endDate
         const calculationEndDate = closureDate || endDate;
-        // Create a mapping from tenantWithShopNoId (shopNoId) to shopNo
-        const tenantShopMapping = {};
-        tenantShopData.forEach(tenant => {
-            tenant.shopNos?.forEach(shop => {
-                if (shop.shopNoId) {
-                    const shopNo = shopNoIdToShopNoMap[shop.shopNoId] || '';
-                    if (shopNo) {
-                        tenantShopMapping[shop.shopNoId] = {
-                            shopNo: shopNo,
-                            tenantName: tenant.tenantName,
-                            startingDate: shop.startingDate
-                        };
-                    }
-                }
-            });
-        });
-        rentHistoryData.forEach(history => {
-            const shopDetails = tenantShopMapping[history.tenantWithShopNoId];
-        });
-        // Filter rent history data for the specific shopNo by first finding matching tenantWithShopNoIds
+        const tenantShopMapping = buildTenantShopMapping();
         const matchingTenantShopIds = Object.keys(tenantShopMapping).filter(id =>
             tenantShopMapping[id].shopNo === formShopNo &&
             tenantShopMapping[id].tenantName === formTenantName
@@ -457,9 +451,27 @@ const Form = () => {
             return 0;
         }
         // Get rent history for the matching tenantWithShopNoIds
-        const shopRentHistory = rentHistoryData.filter(history =>
+        let shopRentHistory = rentHistoryData.filter(history =>
             matchingTenantShopIds.includes(history.tenantWithShopNoId.toString())
         );
+        if (shopRentHistory.length === 0) {
+            const fallbackTenantShopId = matchingTenantShopIds[0];
+            const tenantShopInfo = tenantShopMapping[fallbackTenantShopId] || {};
+            const shopInfo = shopInfoMap[formShopNo] || {};
+            const fallbackMonthlyRent = parseFloat(tenantShopInfo.monthlyRent || shopInfo.monthlyRent || 0);
+            const fallbackStartDate = tenantShopInfo.startingDate || startingDate;
+            if (fallbackMonthlyRent > 0 && fallbackStartDate) {
+                const fallbackStart = new Date(fallbackStartDate);
+                if (!isNaN(fallbackStart.getTime())) {
+                    const fallbackMonth = `${fallbackStart.getFullYear()}-${(fallbackStart.getMonth() + 1).toString().padStart(2, '0')}`;
+                    shopRentHistory = [{
+                        tenantWithShopNoId: fallbackTenantShopId,
+                        rentAmount: fallbackMonthlyRent,
+                        startingMonthForThisRent: fallbackMonth
+                    }];
+                }
+            }
+        }
         if (shopRentHistory.length === 0) {
             return 0;
         }
@@ -538,34 +550,23 @@ const Form = () => {
         if (!formTenantName || !formShopNo || !startingDate || rentHistoryData.length === 0 || tenantShopData.length === 0) {
             return 0;
         }
+        // Get shopNoId from shopInfoMap
+        const tenantInfo = shopInfoMap[formShopNo];
+        const formShopNoId = tenantInfo?.shopNoId || null;
+        
         // Find the tenant and shop to get the shop closure date
         let shopClosureDate = null;
         const matchingTenant = tenantShopData.find(tenant => tenant.tenantName === formTenantName);
         if (matchingTenant) {
             matchingTenant.shopNos?.forEach(shop => {
                 const shopNo = shop.shopNoId ? shopNoIdToShopNoMap[shop.shopNoId] : null;
-                if (shopNo === formShopNo) {
+                // Match by both shopNo and shopNoId for reliability
+                if ((shopNo === formShopNo) || (shop.shopNoId === formShopNoId)) {
                     shopClosureDate = shop.shopClosureDate;
                 }
             });
         }
-        // Create a mapping from tenantWithShopNoId (shopNoId) to shopNo
-        const tenantShopMapping = {};
-        tenantShopData.forEach(tenant => {
-            tenant.shopNos?.forEach(shop => {
-                if (shop.shopNoId) {
-                    const shopNo = shopNoIdToShopNoMap[shop.shopNoId] || '';
-                    if (shopNo) {
-                        tenantShopMapping[shop.shopNoId] = {
-                            shopNo: shopNo,
-                            tenantName: tenant.tenantName,
-                            startingDate: shop.startingDate,
-                            shopClosureDate: shop.shopClosureDate
-                        };
-                    }
-                }
-            });
-        });
+        const tenantShopMapping = buildTenantShopMapping();
         // Filter rent history data for the specific shopNo
         const matchingTenantShopIds = Object.keys(tenantShopMapping).filter(id =>
             tenantShopMapping[id].shopNo === formShopNo &&
@@ -574,9 +575,27 @@ const Form = () => {
         if (matchingTenantShopIds.length === 0) {
             return 0;
         }
-        const shopRentHistory = rentHistoryData.filter(history =>
+        let shopRentHistory = rentHistoryData.filter(history =>
             matchingTenantShopIds.includes(history.tenantWithShopNoId.toString())
         );
+        if (shopRentHistory.length === 0) {
+            const fallbackTenantShopId = matchingTenantShopIds[0];
+            const tenantShopInfo = tenantShopMapping[fallbackTenantShopId] || {};
+            const shopInfo = shopInfoMap[formShopNo] || {};
+            const fallbackMonthlyRent = parseFloat(tenantShopInfo.monthlyRent || shopInfo.monthlyRent || 0);
+            const fallbackStartDate = tenantShopInfo.startingDate || startingDate;
+            if (fallbackMonthlyRent > 0 && fallbackStartDate) {
+                const fallbackStart = new Date(fallbackStartDate);
+                if (!isNaN(fallbackStart.getTime())) {
+                    const fallbackMonth = `${fallbackStart.getFullYear()}-${(fallbackStart.getMonth() + 1).toString().padStart(2, '0')}`;
+                    shopRentHistory = [{
+                        tenantWithShopNoId: fallbackTenantShopId,
+                        rentAmount: fallbackMonthlyRent,
+                        startingMonthForThisRent: fallbackMonth
+                    }];
+                }
+            }
+        }
         if (shopRentHistory.length === 0) {
             return 0;
         }
@@ -584,8 +603,26 @@ const Form = () => {
         const sortedRentHistory = shopRentHistory.sort((a, b) => new Date(a.startingMonthForThisRent) - new Date(b.startingMonthForThisRent));
         // Use shop closure date from tenant data, or current date if no closure date
         const endDate = shopClosureDate || new Date().toISOString().split('T')[0];
-        const start = new Date(startingDate);
+        const infoStartDate = startingDate ? new Date(startingDate) : null;
+        const earliestHistoryStart = sortedRentHistory.length
+            ? new Date(sortedRentHistory[0].startingMonthForThisRent)
+            : null;
+        let start;
+        if (infoStartDate && !isNaN(infoStartDate.getTime())) {
+            start = new Date(infoStartDate.getFullYear(), infoStartDate.getMonth(), 1);
+        } else if (earliestHistoryStart && !isNaN(earliestHistoryStart.getTime())) {
+            start = new Date(earliestHistoryStart.getFullYear(), earliestHistoryStart.getMonth(), 1);
+        } else {
+            return 0;
+        }
         const end = new Date(endDate);
+        if (end < start) {
+            if (earliestHistoryStart && !isNaN(earliestHistoryStart.getTime())) {
+                start = new Date(earliestHistoryStart.getFullYear(), earliestHistoryStart.getMonth(), 1);
+            } else {
+                return 0;
+            }
+        }
         let totalPendingRent = 0;
         let currentDate = new Date(start.getFullYear(), start.getMonth(), 1);
         while (currentDate <= end) {
@@ -613,9 +650,10 @@ const Form = () => {
                 continue;
             }
             // Get all rent-related payments for this month from rentalFormsData
+            // Use shopNoId for more reliable matching
             const allRentPayments = rentalFormsData.filter(form =>
                 form.tenantName === formTenantName &&
-                form.shopNo === formShopNo &&
+                (form.shopNoId === formShopNoId || form.shopNo === formShopNo) &&
                 form.forTheMonthOf === currentMonth &&
                 (
                     (form.formType === "Rent") ||
@@ -943,6 +981,7 @@ const Form = () => {
             pdfUrl = uploadResult.url;
         }
         const tenantInfo = shopInfoMap[formShopNo];
+        const formShopNoId = tenantInfo?.shopNoId || null;
         const baseMonthlyRent = parseFloat(tenantInfo?.monthlyRent || 0);
         const closureValueForForm = selectedRentType === "Shop Closure"
             ? (closureDate || "")
@@ -962,7 +1001,7 @@ const Form = () => {
             const selectedMonthStr = currentDate.toISOString().slice(0, 7);
             const existingEntriesForSelectedMonth = rentForms.filter(r => {
                 return (r.formType === "Rent" || r.formType === "Pending Rent") &&
-                    r.shopNo === formShopNo &&
+                    (r.shopNoId === formShopNoId || r.shopNo === formShopNo) &&
                     r.forTheMonthOf === selectedMonthStr;
             });
             const alreadyPaidForSelectedMonth = existingEntriesForSelectedMonth.reduce(
@@ -999,11 +1038,11 @@ const Form = () => {
                 const existingEntries = rentForms.filter(r => {
                     if (selectedRentType === "Pending Rent") {
                         return (r.formType === "Rent" || r.formType === "Pending Rent") &&
-                            r.shopNo === formShopNo &&
+                            (r.shopNoId === formShopNoId || r.shopNo === formShopNo) &&
                             r.forTheMonthOf === currentMonthStr;
                     } else {
                         return r.formType === "Rent" &&
-                            r.shopNo === formShopNo &&
+                            (r.shopNoId === formShopNoId || r.shopNo === formShopNo) &&
                             r.forTheMonthOf === currentMonthStr;
                     }
                 });
@@ -1101,7 +1140,7 @@ const Form = () => {
                     const matchingForms = allForms.filter(f =>
                         f.eno === eno &&
                         f.tenantName === formTenantName &&
-                        f.shopNo === formShopNo &&
+                        (f.shopNoId === formShopNoId || f.shopNo === formShopNo) &&
                         f.paidOnDate === paidOnDate
                     );
                     // Get the IDs from matching forms
@@ -1140,9 +1179,9 @@ const Form = () => {
                 console.error("❌ Error submitting weekly expense:", error);
             }
         }
-        if (selectedRentType === "Shop Closure" && closureDate && formTenantName && formShopNo) {
+        if (selectedRentType === "Shop Closure" && closureDate && formTenantName && formShopNo && formShopNoId) {
             try {
-                const updateClosureResponse = await fetch(`https://backendaab.in/aabuildersDash/api/tenantShop/updateClosureDate/${encodeURIComponent(formTenantName)}/${encodeURIComponent(formShopNo)}`, {
+                const updateClosureResponse = await fetch(`https://backendaab.in/aabuildersDash/api/tenant_link_shop/updateClosureDate/${encodeURIComponent(formTenantName)}/${encodeURIComponent(formShopNoId)}`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ shopClosureDate: closureDate }),
@@ -1155,18 +1194,20 @@ const Form = () => {
             } catch (error) {
                 console.error("❌ Error updating closure date:", error);
             }
-            try {
-                await vacateShop(selectedTenantId, formShopNo);
-            } catch (err) {
-                console.error("❌ VacateShop failed", err);
+            if (selectedTenantId && formShopNoId) {
+                try {
+                    await vacateShop(selectedTenantId, formShopNoId);
+                } catch (err) {
+                    console.error("❌ VacateShop failed", err);
+                }
             }
         }
         return submittedFormIds;
     };
 
-    const vacateShop = async (tenantId, shopNo) => {
+    const vacateShop = async (tenantId, shopNoId) => {
         try {
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/tenantShop/vacateShop/${tenantId}/${shopNo}`, {
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/tenant_link_shop/vacateShop/${tenantId}/${shopNoId}`, {
                 method: 'PUT',
             });
             if (!response.ok) {
@@ -1181,7 +1222,9 @@ const Form = () => {
         }
     };
     useEffect(() => {
-        if (!startingDate || !selectedMonth || (selectedRentType !== "Rent" && selectedRentType !== "Pending Rent")) return;
+        // Skip this calculation for "Pending Rent" - it has its own calculation in a separate useEffect
+        if (selectedRentType === "Pending Rent") return;
+        if (!startingDate || !selectedMonth || selectedRentType !== "Rent") return;
         const isTenantVacated = tenantShopData.some(tenant =>
             tenant.tenantName === formTenantName &&
             tenant.shopNos?.some(shop => {
@@ -1262,34 +1305,16 @@ const Form = () => {
         }
     }, [advanceAmount]);
     useEffect(() => {
-        if (selectedRentType === "Pending Rent" && formTenantName && formShopNo && rentHistoryData.length > 0 && tenantShopData.length > 0) {
-            const tenantShopMapping = {};
-            tenantShopData.forEach(tenant => {
-                tenant.shopNos?.forEach(shop => {
-                    if (shop.shopNoId) {
-                        const shopNo = shopNoIdToShopNoMap[shop.shopNoId] || '';
-                        if (shopNo) {
-                            tenantShopMapping[shop.shopNoId] = {
-                                shopNo: shopNo,
-                                tenantName: tenant.tenantName,
-                                startingDate: shop.startingDate
-                            };
-                        }
-                    }
-                });
-            });
-            rentHistoryData.forEach(history => {
-                const shopDetails = tenantShopMapping[history.tenantWithShopNoId];
-            });
-            const matchingTenantShopIds = Object.keys(tenantShopMapping).filter(id =>
-                tenantShopMapping[id].shopNo === formShopNo &&
-                tenantShopMapping[id].tenantName === formTenantName
-            );
-            const shopRentHistory = rentHistoryData.filter(history =>
-                matchingTenantShopIds.includes(history.tenantWithShopNoId.toString())
-            );
+        if (selectedRentType === "Pending Rent" && formTenantName && formShopNo && rentHistoryData.length > 0 && tenantShopData.length > 0 && startingDate) {
+            // Calculate pending rent until shopClosureDate for vacated shops
+            const pendingRent = calculatePendingRentForPendingType();
+            if (pendingRent > 0) {
+                setCalculatedRent(pendingRent.toString());
+            } else {
+                setCalculatedRent("0");
+            }
         }
-    }, [selectedRentType, formTenantName, formShopNo, rentHistoryData, tenantShopData]);
+    }, [selectedRentType, formTenantName, formShopNo, rentHistoryData, tenantShopData, startingDate, rentalFormsData, shopInfoMap, shopNoIdToShopNoMap]);
     useEffect(() => {
         if (selectedRentType === "Rent" && formTenantName && formShopNo && startingDate && closureDate) {
             const totalPendingRent = calculatePendingRentUpToDate(closureDate);
@@ -1561,22 +1586,36 @@ const Form = () => {
                                 setSelectedTenantId(selectedOption.tenantId);
                                 if (selectedRentType !== "Pending Rent") {
                                     const tenantMatch = tenantShopData.find(t => t.tenantName === selectedOption.value);
-                                    const tenantShops = tenantMatch?.property?.flatMap(p => p.shops)?.filter(shop => {
-                                        if (!shop) return false;
-                                        if (selectedRentType === "Refund") {
-                                            return !shop.active || !!shop.shopClosureDate;
-                                        }
-                                        return shop.active && !shop.shopClosureDate;
-                                    }) || [];
+                                    const tenantShopsRaw = tenantMatch?.shopNos || [];
+                                    const tenantShops = tenantShopsRaw
+                                        .map(shop => {
+                                            if (!shop) return null;
+                                            const resolvedShopNo = shop.shopNo
+                                                ? String(shop.shopNo)
+                                                : (shop.shopNoId ? shopNoIdToShopNoMap[shop.shopNoId] : null);
+                                            if (!resolvedShopNo) return null;
+                                            return {
+                                                ...shop,
+                                                resolvedShopNo
+                                            };
+                                        })
+                                        .filter(Boolean)
+                                        .filter(shop => {
+                                            if (selectedRentType === "Refund") {
+                                                return !!shop.shopClosureDate;
+                                            }
+                                            return !shop.shopClosureDate;
+                                        });
                                     const newShopOptions = tenantShops.map(shop => ({
-                                        value: shop.shopNo,
-                                        label: shop.shopNo
+                                        value: shop.resolvedShopNo,
+                                        label: shop.resolvedShopNo,
+                                        shopNoId: shop.shopNoId
                                     }));
                                     setFilteredShopNoOptions(newShopOptions);
                                     if (tenantShops.length > 0) {
                                         const activeShop = tenantShops[0];
-                                        setFormShopNo(activeShop.shopNo);
-                                        const shopData = shopInfoMap[activeShop.shopNo];
+                                        setFormShopNo(activeShop.resolvedShopNo);
+                                        const shopData = shopInfoMap[activeShop.resolvedShopNo];
                                         if (shopData) {
                                             setStartingDate(shopData.startingDate);
                                         }
@@ -1585,16 +1624,30 @@ const Form = () => {
                                     }
                                 } else {
                                     const tenantMatch = tenantShopData.find(t => t.tenantName === selectedOption.value);
-                                    const tenantShops = tenantMatch?.property?.flatMap(p => p.shops) || [];
+                                    const tenantShopsRaw = tenantMatch?.shopNos || [];
+                                    const tenantShops = tenantShopsRaw
+                                        .map(shop => {
+                                            if (!shop) return null;
+                                            const resolvedShopNo = shop.shopNo
+                                                ? String(shop.shopNo)
+                                                : (shop.shopNoId ? shopNoIdToShopNoMap[shop.shopNoId] : null);
+                                            if (!resolvedShopNo) return null;
+                                            return {
+                                                ...shop,
+                                                resolvedShopNo
+                                            };
+                                        })
+                                        .filter(Boolean);
                                     const newShopOptions = tenantShops.map(shop => ({
-                                        value: shop.shopNo,
-                                        label: shop.shopNo
+                                        value: shop.resolvedShopNo,
+                                        label: shop.resolvedShopNo,
+                                        shopNoId: shop.shopNoId
                                     }));
                                     setFilteredShopNoOptions(newShopOptions);
                                     if (tenantShops.length > 0) {
                                         const firstShop = tenantShops[0];
-                                        setFormShopNo(firstShop.shopNo);
-                                        const shopData = shopInfoMap[firstShop.shopNo];
+                                        setFormShopNo(firstShop.resolvedShopNo);
+                                        const shopData = shopInfoMap[firstShop.resolvedShopNo];
                                         if (shopData) {
                                             setStartingDate(shopData.startingDate);
                                         }

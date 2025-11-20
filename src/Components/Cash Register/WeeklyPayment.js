@@ -398,7 +398,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         if (!selectedFileForPopup || !currentFileRow) return;
         try {
             const project = siteOptions.find(opt => opt.id === Number(currentFileRow.project_id));
-            const siteNo = project?.siteNo || "";
+            const siteNo = project?.sNo || "";
             const name =
                 vendorOptions.find(opt => opt.id === Number(currentFileRow.vendor_id))?.label ||
                 contractorOptions.find(opt => opt.id === Number(currentFileRow.contractor_id))?.label ||
@@ -4227,11 +4227,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                         }
                                         return;
                                     }
-
-                                    // Set loading state and close popup immediately
                                     setIsConfirmingCategory(true);
                                     setShowCategoryPopup(false);
-
                                     try {
                                         const enoResponse = await fetch('https://backendaab.in/aabuilderDash/expenses_form/get_form');
                                         if (!enoResponse.ok) {

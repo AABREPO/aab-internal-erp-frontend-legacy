@@ -680,19 +680,11 @@ const AdvanceReport = () => {
           }
         });
         const billSettlementRows = sortedBillSettlement.map((row, index) => {
-          const rowDate = row.timestamp ? new Date(row.timestamp) : new Date(row.date);
+          const rowDate = row.date ? new Date(row.date) : new Date(row.date);
+          const formattedDate = isNaN(rowDate) ? "" : rowDate.toLocaleDateString("en-GB");
           return {
             sno: index + 1,
-            date: isNaN(rowDate) ? "" : (row.timestamp 
-              ? rowDate.toLocaleString("en-GB", {
-                  day: "2-digit",
-                  month: "2-digit",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  second: "2-digit"
-                })
-              : rowDate.toLocaleDateString("en-GB")),
+            date: formattedDate,
             cv:
               contractorOptions.find(c => c.id === row.contractor_id)?.label ||
               vendorOptions.find(v => v.id === row.vendor_id)?.label || "",

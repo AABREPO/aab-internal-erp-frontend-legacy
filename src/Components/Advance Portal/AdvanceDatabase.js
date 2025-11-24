@@ -32,6 +32,8 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   const [advancePortalAudits, setAdvancePortalAudits] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [requestingEntry, setRequestingEntry] = useState(null);
   const [editFormData, setEditFormData] = useState({});
   const [editingId, setEditingId] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
@@ -208,17 +210,26 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
 
     if (!isNaN(rawValue)) {
       setEditFormData(prev => {
+        const numericValue = rawValue === "" ? "" : Number(rawValue);
         if (prev.type === "Refund") {
-          return { ...prev, refund_amount: rawValue, amount: '' };
-        } else {
-          return { ...prev, amount: rawValue, refund_amount: '' };
+          return { ...prev, refund_amount: numericValue, amount: '' };
         }
+        return { ...prev, amount: numericValue, refund_amount: '' };
       });
     }
   };
   const formatWithCommas = (value) => {
-    if (!value) return "";
-    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    if (value === '' || value === null || value === undefined) return "";
+    const numericValue = typeof value === 'number' ? value : Number(value);
+    if (Number.isNaN(numericValue)) {
+      return value.toString();
+    }
+    return numericValue.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+  };
+  const sanitizeNumberField = (value) => {
+    if (value === '' || value === null || value === undefined) return 0;
+    const numericValue = Number(value);
+    return Number.isNaN(numericValue) ? 0 : numericValue;
   };
   const handleSort = (key) => {
     setSortConfig((prev) => {
@@ -618,7 +629,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
     if (file) {
       setSelectedFile(file);
     }
-    // This ensures the input is cleared even if the same file is selected again next time
     e.target.value = '';
   };
   const handleUpload = async () => {
@@ -628,20 +638,16 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
     }
     setIsUploading(true);
     try {
-      console.log("Uploading:", file.name);
-      // Prepare the form data
       const formData = new FormData();
       formData.append("file", file);
-      // Send POST request
       const response = await fetch("https://backendaab.in/aabuildersDash/api/advance_portal/upload-sql", {
         method: "POST",
         body: formData,
       });
       if (response.ok) {
-        const result = await response.text(); // or .json() if your API returns JSON
+        const result = await response.text(); 
         alert("File uploaded successfully!");
-        window.location.reload(); // Reload to fetch new data
-        console.log(result);
+        window.location.reload(); 
       } else {
         const errorText = await response.text();
         alert("Upload failed: " + errorText);
@@ -651,8 +657,8 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       console.error("Error uploading file:", error);
       alert("An error occurred while uploading the file.");
     } finally {
-      setIsUploading(false); // Stop loading
-      setIsOpen(false); // Close modal/dialog
+      setIsUploading(false);
+      setIsOpen(false);
     }
   };
   const formatDateOnly = (dateString) => {
@@ -672,7 +678,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
     siteOptions.find(s => String(s.id) === String(id))?.value || "";
 
   const filteredData = advanceData.filter((entry) => {
-    // Date range filter (Start Date and End Date)
     if (startDate && endDate) {
       const s = new Date(startDate);
       const e = new Date(endDate);
@@ -690,18 +695,13 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       const entryDate = new Date(entry.date);
       if (entryDate > e) return false;
     }
-
-    // Timestamp filter (exact date match on timestamp)
     if (selectTimeStampDate) {
       const selectedDate = new Date(selectTimeStampDate);
       const entryTimestamp = new Date(entry.timestamp);
-      // Compare only the date part (ignore time)
       if (selectedDate.toDateString() !== entryTimestamp.toDateString()) {
         return false;
       }
     }
-
-    // Date filter (exact date match)
     if (selectDatabaseDate) {
       const [year, month, day] = selectDatabaseDate.split("-");
       const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
@@ -709,7 +709,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
       if (formattedEntryDate !== formattedSelectDate) return false;
     }
-    // Contractor/Vendor filter
     if (selectDatabaseContractororVendorName) {
       const name = entry.vendor_id
         ? getVendorName(entry.vendor_id)
@@ -717,39 +716,32 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       if (name.toLowerCase() !== selectDatabaseContractororVendorName.toLowerCase())
         return false;
     }
-    // Project Name filter
     if (selectDatabaseProjectName) {
       const projectName = getSiteName(entry.project_id) || "";
       if (projectName.toLowerCase() !== selectDatabaseProjectName.toLowerCase())
         return false;
     }
-    // Transfer Site filter
     if (selectDatabaseTransfer) {
       const transferName = getSiteName(entry.transfer_site_id) || "";
       if (transferName.toLowerCase() !== selectDatabaseTransfer.toLowerCase())
         return false;
     }
-    // Type filter
     if (selectDatabaseType) {
       if (entry.type?.toLowerCase() !== selectDatabaseType.toLowerCase()) return false;
     }
-    // Mode filter
     if (selectDatabaseMode) {
       if (entry.payment_mode?.toLowerCase() !== selectDatabaseMode.toLowerCase()) return false;
     }
-    // Entry No filter (partial match)
     if (selectDatabaseEntryNo) {
       if (!entry.entry_no?.toString().includes(selectDatabaseEntryNo.toString())) return false;
     }
-    return true; // passes all filters
+    return true;
   });
   const sortedData = React.useMemo(() => {
     let sortableData = [...filteredData];
-
     if (sortConfig.key) {
       sortableData.sort((a, b) => {
         let aValue, bValue;
-
         switch (sortConfig.key) {
           case 'timestamp':
             aValue = new Date(a.timestamp);
@@ -786,54 +778,37 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
           default:
             return 0;
         }
-
         const entryA = Number(a.entry_no) || 0;
         const entryB = Number(b.entry_no) || 0;
-
-        // Handle timestamp sorting with matching entry_no direction
         if (sortConfig.key === 'timestamp') {
           if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
           if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-          // Secondary sort by entry_no - match the direction of timestamp sort
           return sortConfig.direction === 'asc' ? entryA - entryB : entryB - entryA;
         }
-
-        // Handle date sorting with matching entry_no direction
         if (sortConfig.key === 'date') {
           if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
           if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-          // Secondary sort by entry_no - match the direction of date sort
           return sortConfig.direction === 'asc' ? entryA - entryB : entryB - entryA;
         }
-
-        // Handle entry_no sorting (no secondary sort needed)
         if (sortConfig.key === 'entry_no') {
           return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
         }
-
-        // Handle other fields
         if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
         if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-
-        // Secondary sort by entry_no - always ascending for non-date/timestamp fields
         return entryA - entryB;
       });
     } else {
-      // Default sorting: entry_no descending
       sortableData.sort((a, b) => Number(b.entry_no) - Number(a.entry_no));
     }
     return sortableData;
   }, [filteredData, sortConfig]);
-  // Pagination logic
   const totalPages = Math.ceil(sortedData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentData = sortedData.slice(startIndex, endIndex);
-  // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [selectTimeStampDate, selectDatabaseDate, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseMode, selectDatabaseEntryNo, startDate, endDate]);
-  // Pagination handlers
   const goToPage = (page) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   };
@@ -850,7 +825,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   const handleItemsPerPageChange = (e) => {
     const newItemsPerPage = parseInt(e.target.value);
     setItemsPerPage(newItemsPerPage);
-    setCurrentPage(1); // Reset to first page when changing items per page
+    setCurrentPage(1);
   };
   const handleChange = async (selected) => {
     setSelectedOption(selected);
@@ -926,8 +901,15 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
     }
   };
   const handleEditClick = (entry) => {
+    // Check if editing is allowed - if not, show request popup
+    if (entry.not_allow_to_edit || entry.allow_to_edit === false) {
+      setRequestingEntry(entry);
+      setIsRequestModalOpen(true);
+      return;
+    }
+    
     setEditingId(entry.advancePortalId);
-    setSelectedFile(null); // Reset selected file when opening edit modal
+    setSelectedFile(null); 
     setEditFormData({
       date: entry.date?.split('T')[0] || '',
       amount: entry.amount || '',
@@ -952,8 +934,50 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
     setSelectedOption(preSelected || null);
     setIsEditModalOpen(true);
   };
+
+  const handleSendEditRequest = async () => {
+    if (!requestingEntry) return;
+    
+    try {
+      const requestData = {
+        module_name: 'Advance Portal',
+        module_name_id: requestingEntry.advancePortalId,
+        module_name_eno: requestingEntry.entry_no,
+        request_send_by: username,
+        request_approval: false,
+        request_completed: false
+      };
+
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/edit_requests/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(requestData)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to create edit request');
+      }
+
+      alert('Edit request sent successfully. Waiting for admin approval.');
+      setIsRequestModalOpen(false);
+      setRequestingEntry(null);
+    } catch (error) {
+      console.error('Error creating edit request:', error);
+      alert('Failed to send edit request. Please try again.');
+    }
+  };
+ 
   const handleUpdate = async () => {
     try {
+      // Check if editing is allowed
+      const currentEntry = advanceData.find(entry => entry.advancePortalId === editingId);
+      if (currentEntry && currentEntry.not_allow_to_edit) {
+        alert('Editing is not allowed for this record. Please request permission to edit.');
+        return;
+      }
+
       let fileUrl = editFormData.file_url || '';
       if (selectedFile) {
         try {
@@ -985,14 +1009,12 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
           return;
         }
       }
-
       const buildPayload = (overrides = {}, typeOverride) => {
         const payload = {
           ...editFormData,
           ...overrides,
           file_url: fileUrl,
         };
-
         if (selectedOption) {
           if (selectedOption.type === 'Vendor') {
             payload.vendor_id = selectedOption.id;
@@ -1002,7 +1024,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
             payload.vendor_id = '';
           }
         }
-
         const type = typeOverride || payload.type;
         switch (type) {
           case 'Advance':
@@ -1019,26 +1040,53 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
             payload.payment_mode = '';
             break;
           case 'Bill Settlement':
-            payload.amount = '';
             payload.refund_amount = '';
             break;
           default:
             break;
         }
+        payload.amount = sanitizeNumberField(payload.amount);
+        payload.bill_amount = sanitizeNumberField(payload.bill_amount);
+        payload.refund_amount = sanitizeNumberField(payload.refund_amount);
+        payload.project_id = sanitizeNumberField(payload.project_id);
+        payload.transfer_site_id = sanitizeNumberField(payload.transfer_site_id);
+        payload.vendor_id = sanitizeNumberField(payload.vendor_id);
+        payload.contractor_id = sanitizeNumberField(payload.contractor_id);
+        payload.week_no = sanitizeNumberField(payload.week_no);
+        payload.entry_no = sanitizeNumberField(payload.entry_no);
         return payload;
       };
-
       const updateRecord = async (id, payload) => {
         const res = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${id}?editedBy=${username}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify(payload)
         });
         if (!res.ok) {
-          throw new Error('Failed to update record');
+          const errorText = await res.text();
+          throw new Error(errorText || 'Failed to update record');
         }
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          return res.json();
+        }
+        return null;
       };
 
+      const setAllowToEdit = async (id, allow) => {
+        try {
+          const res = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/allow/${id}?allow=${allow}`, {
+            method: 'PUT',
+            credentials: 'include'
+          });
+          if (!res.ok) {
+            console.error('Failed to update allowToEdit');
+          }
+        } catch (error) {
+          console.error('Error updating allowToEdit:', error);
+        }
+      };
       if (editFormData.type === 'Transfer') {
         const sameEntryRows = advanceData.filter(r => r.entry_no === editFormData.entry_no);
         if (sameEntryRows.length === 2) {
@@ -1061,21 +1109,57 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
               updateRecord(editedRecord.advancePortalId, updatedEdited),
               updateRecord(otherRecord.advancePortalId, updatedOther)
             ]);
+            // Set allowToEdit to false after successful update
+            await Promise.all([
+              setAllowToEdit(editedRecord.advancePortalId, false),
+              setAllowToEdit(otherRecord.advancePortalId, false)
+            ]);
+            setAdvanceData(prev =>
+              prev.map(item => {
+                if (item.advancePortalId === editedRecord.advancePortalId) {
+                  return { ...item, ...updatedEdited };
+                }
+                if (item.advancePortalId === otherRecord.advancePortalId) {
+                  return { ...item, ...updatedOther };
+                }
+                return item;
+              })
+            );
           } else {
             console.warn('Transfer pair incomplete for entry_no:', editFormData.entry_no);
             const fallbackPayload = buildPayload({}, 'Transfer');
             await updateRecord(editingId, fallbackPayload);
+            // Set allowToEdit to false after successful update
+            await setAllowToEdit(editingId, false);
+            setAdvanceData(prev =>
+              prev.map(item =>
+                item.advancePortalId === editingId ? { ...item, ...fallbackPayload } : item
+              )
+            );
           }
         } else {
           console.warn('Could not find both Transfer records for entry_no:', editFormData.entry_no);
           const fallbackPayload = buildPayload({}, 'Transfer');
           await updateRecord(editingId, fallbackPayload);
+          // Set allowToEdit to false after successful update
+          await setAllowToEdit(editingId, false);
+          setAdvanceData(prev =>
+            prev.map(item =>
+              item.advancePortalId === editingId ? { ...item, ...fallbackPayload } : item
+            )
+          );
         }
       } else {
         const payload = buildPayload();
-        await updateRecord(editingId, payload);
+        const updatedRecord = await updateRecord(editingId, payload);
+        // Set allowToEdit to false after successful update
+        await setAllowToEdit(editingId, false);
+        setAdvanceData(prev =>
+          prev.map(item =>
+            item.advancePortalId === editingId ? { ...item, ...payload } : item
+          )
+        );
       }
-
       window.location.reload();
       setIsEditModalOpen(false);
       setSelectedFile(null);
@@ -1097,7 +1181,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       }
       const entryNo = record.entry_no;
       const clearedData = {
-        entry_no: entryNo, // Preserve entry_no
+        entry_no: entryNo,
         date: record.date,
         amount: '',
         project_id: '',
@@ -1152,7 +1236,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
     },
     { amount: 0, bill_amount: 0, refund_amount: 0 }
   );
-
   if (loading) {
     return (
       <body className='bg-[#FAF6ED]'>
@@ -1172,7 +1255,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       </body>
     );
   }
-
   if (error) {
     return (
       <body className='bg-[#FAF6ED]'>
@@ -1182,7 +1264,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       </body>
     );
   }
-
   return (
     <div className='bg-[#FAF6ED] min-h-screen w-full'>
       <div className='max-w-[1850px] w-full bg-white rounded-md ml-10 lg:h-[128px] px-4 lg:px-10 text-left flex flex-wrap justify-between items-center gap-5 pb-5'>
@@ -2006,6 +2087,49 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                 </button>
                 <button onClick={handleUpdate} className="px-4 py-2 bg-[#BF9853] w-[100px] h-[45px] text-white rounded">
                   Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {isRequestModalOpen && requestingEntry && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+            <div className="bg-white p-6 rounded-lg w-[500px]">
+              <h2 className="text-lg font-bold mb-4 text-[#BF9853]">Request Edit Permission</h2>
+              <div className="mb-4">
+                <p className="text-gray-700 mb-2">
+                  You need admin approval to edit this record.
+                </p>
+                <div className="bg-gray-50 p-3 rounded border">
+                  <p className="text-sm text-gray-600">
+                    <strong>Record ID:</strong> {requestingEntry.advancePortalId}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    <strong>Entry No:</strong> {requestingEntry.entry_no}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    <strong>Date:</strong> {formatDateOnly(requestingEntry.date)}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    <strong>Type:</strong> {requestingEntry.type || '-'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 mt-4">
+                <button
+                  onClick={() => {
+                    setIsRequestModalOpen(false);
+                    setRequestingEntry(null);
+                  }}
+                  className="px-4 py-2 border border-[#BF9853] w-[100px] h-[45px] rounded"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSendEditRequest}
+                  className="px-4 py-2 bg-[#BF9853] w-[100px] h-[45px] text-white rounded"
+                >
+                  Send Request
                 </button>
               </div>
             </div>

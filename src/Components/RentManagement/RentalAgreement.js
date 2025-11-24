@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import jsPDF from "jspdf";
 import CreatableSelect from 'react-select/creatable';
 import Select from 'react-select';
@@ -384,11 +384,8 @@ const RentalAgreement = () => {
         const centeredTextWidth = doc.getTextWidth(centeredLine);
         const centeredX = (pageWidth - centeredTextWidth) / 2;
         const enhancedPercentage = Agreementvalidity;
-        console.log(enhancedPercentage);
         doc.text(centeredLine, centeredX, cursorY);
         cursorY += lineHeight;
-        const ownersAddress = owners.map(o => o.ownerAddress);
-        const ownerAreas = ownersProperty.map(o => o.area);
         const landlordLinesRaw = owners.map((owner, index) => {
             const isLast = index === owners.length - 1;
             return `Mr. ${owner.fullName}, aged ${owner.age} years, son of Mr. ${owner.fatherName}, residing at Door No.${owner.ownerAddress}${isLast ? ', hereinafter called the' : ','}`;
@@ -502,6 +499,8 @@ const RentalAgreement = () => {
             });
             cursorY += 3;
         });
+        doc.addPage();
+        cursorY = defaultMarginTop;
         const scheduleTitle = "SCHEDULE";
         const scheduleTitleWidth = doc.getTextWidth(scheduleTitle);
         const scheduleTitleX = (pageWidth - scheduleTitleWidth) / 2;
@@ -580,7 +579,6 @@ const RentalAgreement = () => {
         }
 
         const witnessText = `
-        Tenant                                                                              Landlord 
 
 
 
@@ -594,6 +592,15 @@ WITNESSES:
         `.trim();
 
         cursorY += 16;
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.text("TENANT", marginLeft, cursorY);
+        const landLordText = "LANDLORD";
+        const landLordWidth = doc.getTextWidth(landLordText);
+        doc.text(landLordText, pageWidth - marginRight - landLordWidth, cursorY);
+        doc.setFont("helvetica", "normal");
+        cursorY += lineHeight * 2;
+        doc.setFontSize(13);
         const witnessLines = doc.splitTextToSize(witnessText, maxLineWidth);
         witnessLines.forEach(line => {
             if (cursorY > pageHeight - 20) {
@@ -823,6 +830,47 @@ WITNESSES:
         const value = e.target.value.replace(/\D/g, '');
         setRentTobepaid(value);
     };
+    const handleShopSelection = (ownerIndex, selectedOption) => {
+        setOwnersProperty((prev) => {
+            const updated = prev.map((owner, idx) => (idx === ownerIndex ? { ...owner } : owner));
+            const ownerToUpdate = { ...updated[ownerIndex] };
+            const selectedValue = selectedOption?.value || '';
+
+            ownerToUpdate.shopNos = selectedValue;
+
+            if (!selectedValue) {
+                ownerToUpdate.propertyType = '';
+                ownerToUpdate.selectFloor = [];
+                ownerToUpdate.doorNo = '';
+                ownerToUpdate.area = '';
+                updated[ownerIndex] = ownerToUpdate;
+                return updated;
+            }
+
+            const matchedDetail = projectPropertyDetails.find(
+                detail => detail?.shopNo != null && String(detail.shopNo) === selectedValue
+            );
+
+            if (matchedDetail) {
+                const inferredType = matchedDetail.projectType || '';
+                const inferredFloorOptions = inferredType ? (floorOptionsByType[inferredType] || []) : [];
+                const inferredShopOptions = inferredType ? (shopOptionsByType[inferredType] || []) : [];
+                const floorOption = matchedDetail.floorName
+                    ? { value: String(matchedDetail.floorName), label: String(matchedDetail.floorName) }
+                    : null;
+
+                ownerToUpdate.propertyType = inferredType;
+                ownerToUpdate.floorOptions = inferredFloorOptions;
+                ownerToUpdate.shopNoOptions = inferredShopOptions;
+                ownerToUpdate.selectFloor = floorOption ? [floorOption] : [];
+                ownerToUpdate.doorNo = matchedDetail.doorNo || '';
+                ownerToUpdate.area = matchedDetail.area || '';
+            }
+
+            updated[ownerIndex] = ownerToUpdate;
+            return updated;
+        });
+    };
     const customStyles = {
         multiValue: (provided) => ({
             ...provided,
@@ -861,6 +909,71 @@ WITNESSES:
             value: project.projectReferenceName,
             label: project.projectReferenceName,
         }));
+
+    const matchedProject = useMemo(() => {
+        if (!selectedProperty?.value) return null;
+        return projects.find(p => p.projectReferenceName === selectedProperty.value) || null;
+    }, [projects, selectedProperty]);
+
+    const projectPropertyDetails = useMemo(() => {
+        if (!matchedProject?.propertyDetails) return [];
+        if (Array.isArray(matchedProject.propertyDetails)) {
+            return matchedProject.propertyDetails.filter(Boolean);
+        }
+        try {
+            return Array.from(matchedProject.propertyDetails || []).filter(Boolean);
+        } catch (error) {
+            console.error("Error parsing property details:", error);
+            return [];
+        }
+    }, [matchedProject]);
+
+    const { floorOptionsByType, shopOptionsByType, globalShopOptions } = useMemo(() => {
+        const floorMap = {};
+        const shopMap = {};
+        const globalShopSet = new Map();
+
+        projectPropertyDetails.forEach(detail => {
+            if (!detail) return;
+            const type = detail.projectType || '';
+            if (type) {
+                if (!floorMap[type]) floorMap[type] = new Map();
+                if (!shopMap[type]) shopMap[type] = new Map();
+
+                if (detail.floorName) {
+                    const floorValue = String(detail.floorName);
+                    if (!floorMap[type].has(floorValue)) {
+                        floorMap[type].set(floorValue, { value: floorValue, label: floorValue });
+                    }
+                }
+                if (detail.shopNo != null) {
+                    const shopValue = String(detail.shopNo);
+                    if (!shopMap[type].has(shopValue)) {
+                        shopMap[type].set(shopValue, { value: shopValue, label: shopValue });
+                    }
+                }
+            }
+
+            if (detail?.shopNo != null) {
+                const shopValue = String(detail.shopNo);
+                if (!globalShopSet.has(shopValue)) {
+                    globalShopSet.set(shopValue, { value: shopValue, label: shopValue });
+                }
+            }
+        });
+
+        const convert = (map) =>
+            Object.keys(map).reduce((acc, key) => {
+                acc[key] = Array.from(map[key].values());
+                return acc;
+            }, {});
+
+        return {
+            floorOptionsByType: convert(floorMap),
+            shopOptionsByType: convert(shopMap),
+            globalShopOptions: Array.from(globalShopSet.values()),
+        };
+    }, [projectPropertyDetails]);
     const filteredOwnerOptions = selectedProperty
         ? projects
             .find(p => p.projectReferenceName === selectedProperty.value)
@@ -1012,18 +1125,117 @@ WITNESSES:
             }));
             setOwners(formattedOwners);
             const propertyDetailsList = selectedAgreement.propertyTypeDetails || [];
+            // Compute options from project data if property is selected
+            let computedFloorOptionsByType = {};
+            let computedShopOptionsByType = {};
+            let computedGlobalShopOptions = [];
+            
+            if (selectedProperty?.value) {
+                const matchedProject = projects.find(p => p.projectReferenceName === selectedProperty.value);
+                if (matchedProject?.propertyDetails) {
+                    const propertyDetailsArray = Array.isArray(matchedProject.propertyDetails) 
+                        ? matchedProject.propertyDetails 
+                        : Array.from(matchedProject.propertyDetails || []);
+                    
+                    const floorMap = {};
+                    const shopMap = {};
+                    const globalShopSet = new Map();
+                    
+                    propertyDetailsArray.forEach(detail => {
+                        if (!detail) return;
+                        const type = detail.projectType || '';
+                        if (type) {
+                            if (!floorMap[type]) floorMap[type] = new Map();
+                            if (!shopMap[type]) shopMap[type] = new Map();
+                            
+                            if (detail.floorName) {
+                                const floorValue = String(detail.floorName);
+                                if (!floorMap[type].has(floorValue)) {
+                                    floorMap[type].set(floorValue, { value: floorValue, label: floorValue });
+                                }
+                            }
+                            if (detail.shopNo != null) {
+                                const shopValue = String(detail.shopNo);
+                                if (!shopMap[type].has(shopValue)) {
+                                    shopMap[type].set(shopValue, { value: shopValue, label: shopValue });
+                                }
+                            }
+                        }
+                        
+                        if (detail?.shopNo != null) {
+                            const shopValue = String(detail.shopNo);
+                            if (!globalShopSet.has(shopValue)) {
+                                globalShopSet.set(shopValue, { value: shopValue, label: shopValue });
+                            }
+                        }
+                    });
+                    
+                    computedFloorOptionsByType = Object.keys(floorMap).reduce((acc, key) => {
+                        acc[key] = Array.from(floorMap[key].values());
+                        return acc;
+                    }, {});
+                    
+                    computedShopOptionsByType = Object.keys(shopMap).reduce((acc, key) => {
+                        acc[key] = Array.from(shopMap[key].values());
+                        return acc;
+                    }, {});
+                    
+                    computedGlobalShopOptions = Array.from(globalShopSet.values());
+                }
+            }
+            
             const formattedProperties = propertyDetailsList.map((property) => {
                 const floorValue = property.selectFloor || '';
+                const propertyType = property.propertyType || '';
+                const shopNoValue = property.shopNos != null ? String(property.shopNos) : '';
+                
+                // Get floor and shop options based on property type
+                const typeFloorOptions = propertyType ? (computedFloorOptionsByType[propertyType] || floorOptionsByType[propertyType] || []) : [];
+                let typeShopOptions = propertyType ? (computedShopOptionsByType[propertyType] || shopOptionsByType[propertyType] || []) : [];
+                
+                // If shop number exists but not in options, add it
+                if (shopNoValue && !typeShopOptions.find(opt => opt.value === shopNoValue)) {
+                    typeShopOptions = [...typeShopOptions, { value: shopNoValue, label: shopNoValue }];
+                }
+                
+                // Use global options as fallback, and ensure shop number is included
+                let finalShopOptions = typeShopOptions.length > 0 
+                    ? typeShopOptions 
+                    : (computedGlobalShopOptions.length > 0 ? computedGlobalShopOptions : globalShopOptions);
+                
+                // Ensure the shop number is in the final options
+                if (shopNoValue && !finalShopOptions.find(opt => opt.value === shopNoValue)) {
+                    finalShopOptions = [...finalShopOptions, { value: shopNoValue, label: shopNoValue }];
+                }
+                
+                // Parse selectFloor if it's a string (comma-separated)
+                let parsedSelectFloor = [];
+                if (floorValue) {
+                    if (typeof floorValue === 'string' && floorValue.includes(',')) {
+                        // Handle comma-separated floor values
+                        parsedSelectFloor = floorValue.split(',').map(f => {
+                            const trimmed = f.trim();
+                            return { label: trimmed, value: trimmed };
+                        });
+                    } else if (typeof floorValue === 'string') {
+                        parsedSelectFloor = [{ label: floorValue, value: floorValue }];
+                    } else {
+                        parsedSelectFloor = floorValue ? [{ label: floorValue, value: floorValue }] : [];
+                    }
+                }
+                
                 return {
-                    propertyType: property.propertyType || '',
-                    selectFloor: floorValue ? [{ label: floorValue, value: floorValue }] : [],
-                    floorOptions: floorValue ? [{ label: floorValue, value: floorValue }] : [],
-                    shopNos: property.shopNos != null ? String(property.shopNos) : '',
+                    propertyType: propertyType,
+                    selectFloor: parsedSelectFloor,
+                    floorOptions: typeFloorOptions.length > 0 ? typeFloorOptions : (parsedSelectFloor.length > 0 ? parsedSelectFloor : []),
+                    shopNoOptions: finalShopOptions,
+                    shopNos: shopNoValue,
                     doorNo: property.doorNo || '',
                     area: property.area || '',
                     bedroomsByFloor: {},
                     rent: property.rent || '',
-                    advance: property.advance || ''
+                    advance: property.advance || '',
+                    shouldCollectAdvance: true
                 };
             });
             setOwnersProperty(formattedProperties);
@@ -1078,12 +1290,25 @@ WITNESSES:
                         <div>
                             <div className="mb-6 lg:flex gap-5 items-baseline text-left">
                                 <div>
-                                    <label className="block font-semibold text-base mb-2">Project Reference Name</label>
+                                    <label className="block font-semibold text-base mb-2">Property Name</label>
                                     <Select
                                         options={propertyOptions}
                                         value={selectedProperty}
                                         onChange={(selected) => {
                                             setSelectedProperty(selected);
+                                            // Clear Property Type, Floor, Shop No, and Door No when Property Name changes
+                                            setOwnersProperty((prev) => {
+                                                return prev.map((owner) => ({
+                                                    ...owner,
+                                                    propertyType: '',
+                                                    selectFloor: [],
+                                                    floorOptions: [],
+                                                    shopNos: '',
+                                                    shopNoOptions: [],
+                                                    doorNo: '',
+                                                    bedroomsByFloor: {}
+                                                }));
+                                            });
                                             const matchedProject = projects.find(p => p.projectReferenceName === selected?.value);
                                             const propertyDetailsArray = matchedProject?.propertyDetails 
                                                 ? (Array.isArray(matchedProject.propertyDetails) 
@@ -1451,7 +1676,7 @@ WITNESSES:
                                                         </div>
                                                         {tenant.tenantsList.map((partner, partnerIndex) => (
                                                             <div key={partnerIndex} className="lg:border lg:p-4 rounded mb-4 shadow-sm">
-                                                                <div className="flex lg:gap-5 gap-3 items-end">
+                                                                <div className="flex lg:gap-7 gap-3 items-end">
                                                                     <div>
                                                                         <label className="block font-semibold lg:mb-6 mb-6 lg:ml-0 ml-1">{String.fromCharCode(65 + partnerIndex)})</label>
                                                                     </div>
@@ -1480,7 +1705,7 @@ WITNESSES:
                                                                             styles={{
                                                                                 container: (base) => ({
                                                                                     ...base,
-                                                                                    width: 180,
+                                                                                    width: 310,
                                                                                     marginBottom: 16,
                                                                                 }),
                                                                                 control: (base) => ({
@@ -1508,7 +1733,7 @@ WITNESSES:
                                                                         <label className="block font-semibold mb-2">Father Name</label>
                                                                         <input
                                                                             type="text"
-                                                                            className="border-2 border-[#BF9853] rounded-md border-opacity-20 placeholder:text-sm pl-4 w-[180px] h-[43px] mb-4 focus:outline-none"
+                                                                            className="border-2 border-[#BF9853] rounded-md border-opacity-20 placeholder:text-sm pl-4 w-[380px] h-[43px] mb-4 focus:outline-none"
                                                                             placeholder="Enter father name"
                                                                             value={partner.tenantFatherName}
                                                                             onChange={(e) =>
@@ -1534,7 +1759,7 @@ WITNESSES:
                                                                         <input
                                                                             type="tel"
                                                                             maxLength={10}
-                                                                            className="w-[110px] h-[43px] border-2 border-[#BF9853] border-opacity-20 rounded-md focus:outline-none no-spinner placeholder:text-sm pl-2 mb-4"
+                                                                            className="w-[310px] h-[43px] border-2 border-[#BF9853] border-opacity-20 rounded-md focus:outline-none no-spinner placeholder:text-sm pl-2 mb-4"
                                                                             placeholder="Enter number"
                                                                             value={partner.tenantMobile}
                                                                             onChange={(e) => {
@@ -1609,33 +1834,30 @@ WITNESSES:
                                                                     value={propertyTypeOptions.find(option => option.value === owner.propertyType) || null}
                                                                     onChange={(selected) => {
                                                                         const selectedType = selected?.value || '';
-                                                                        const updatedOwners = [...ownersProperty];
-                                                                        updatedOwners[index].propertyType = selectedType;
-                                                                        if (selectedProperty) {
-                                                                            const matchedProject = projects.find(
-                                                                                (p) => p.projectReferenceName === selectedProperty.value
+                                                                        setOwnersProperty((prev) => {
+                                                                            const updatedOwners = prev.map((item, ownerIdx) =>
+                                                                                ownerIdx === index ? { ...item } : item
                                                                             );
-                                                                            if (matchedProject) {
-                                                                                // Convert Set to Array if needed
-                                                                                const propertyDetailsArray = Array.isArray(matchedProject.propertyDetails) 
-                                                                                    ? matchedProject.propertyDetails 
-                                                                                    : Array.from(matchedProject.propertyDetails || []);
-                                                                                const filteredDetails = propertyDetailsArray.filter(
-                                                                                    (detail) => detail.projectType === selectedType
+                                                                            const ownerToUpdate = { ...updatedOwners[index] };
+                                                                            ownerToUpdate.propertyType = selectedType;
+                                                                            ownerToUpdate.floorOptions = selectedType ? (floorOptionsByType[selectedType] || []) : [];
+                                                                            ownerToUpdate.shopNoOptions = selectedType ? (shopOptionsByType[selectedType] || []) : [];
+                                                                            if (!selectedType) {
+                                                                                ownerToUpdate.shopNos = '';
+                                                                                ownerToUpdate.selectFloor = [];
+                                                                            } else {
+                                                                                const allowedShopValues = new Set(
+                                                                                    (ownerToUpdate.shopNoOptions || []).map(option => option.value)
                                                                                 );
-                                                                                const floorOptions = [
-                                                                                    ...new Set(filteredDetails.map((d) => d.floorName).filter(Boolean))
-                                                                                ].map((f) => ({ value: f, label: f }));
-                                                                                const shopNoOptions = [
-                                                                                    ...new Set(filteredDetails.map((d) => d.shopNo).filter(Boolean))
-                                                                                ].map((s) => ({ value: s, label: s }));
-                                                                                updatedOwners[index].floorOptions = floorOptions;
-                                                                                updatedOwners[index].shopNoOptions = shopNoOptions;
-                                                                                updatedOwners[index].selectFloor = [];
-                                                                                updatedOwners[index].bedroomsByFloor = {};
+                                                                                if (!allowedShopValues.has(String(ownerToUpdate.shopNos || ''))) {
+                                                                                    ownerToUpdate.shopNos = '';
+                                                                                }
+                                                                                ownerToUpdate.selectFloor = [];
                                                                             }
-                                                                        }
-                                                                        setOwnersProperty(updatedOwners);
+                                                                            ownerToUpdate.bedroomsByFloor = {};
+                                                                            updatedOwners[index] = ownerToUpdate;
+                                                                            return updatedOwners;
+                                                                        });
                                                                     }}
                                                                     options={propertyTypeOptions}
                                                                     placeholder="---Select---"
@@ -1688,27 +1910,18 @@ WITNESSES:
                                                                 <label className="block font-semibold mb-2">Shop No</label>
                                                                 <Select
                                                                     className="w-[180px] mb-4"
-                                                                    options={owner.shopNoOptions || []}
-                                                                    value={owner.shopNoOptions?.find(option => option.value === owner.shopNos) || null}
-                                                                    onChange={(selected) => {
-                                                                        const updated = [...ownersProperty];
-                                                                        updated[index].shopNos = selected?.value || '';
-                                                                        const matchedProject = projects.find(p => p.projectReferenceName === selectedProperty?.value);
-                                                                        // Convert Set to Array if needed
-                                                                        const propertyDetailsArray = matchedProject?.propertyDetails 
-                                                                            ? (Array.isArray(matchedProject.propertyDetails) 
-                                                                                ? matchedProject.propertyDetails 
-                                                                                : Array.from(matchedProject.propertyDetails || []))
-                                                                            : [];
-                                                                        const detail = propertyDetailsArray.find(
-                                                                            d => (String(d.shopNo) === String(selected?.value) || d.shopNo === selected?.value) && d.projectType === owner.propertyType
-                                                                        );
-                                                                        if (detail) {
-                                                                            updated[index].doorNo = detail.doorNo || '';
-                                                                            updated[index].area = detail.area || '';
-                                                                        }
-                                                                        setOwnersProperty(updated);
-                                                                    }}
+                                                                    options={
+                                                                        (owner.shopNoOptions && owner.shopNoOptions.length > 0)
+                                                                            ? owner.shopNoOptions
+                                                                            : globalShopOptions
+                                                                    }
+                                                                    value={
+                                                                        ((owner.shopNoOptions && owner.shopNoOptions.length > 0)
+                                                                            ? owner.shopNoOptions
+                                                                            : globalShopOptions
+                                                                        )?.find(option => option.value === owner.shopNos) || null
+                                                                    }
+                                                                    onChange={(selected) => handleShopSelection(index, selected)}
                                                                     placeholder="Select Shop No"
                                                                     isClearable
                                                                     styles={{

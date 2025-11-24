@@ -35,6 +35,7 @@ const BankReconciliation = () => {
   const [siteOptions, setSiteOptions] = useState([]);
   const [purposeOptions, setPurposeOptions] = useState([]);
   const [tenantOptions, setTenantOptions] = useState([]);
+  console.log("tenantOptions", tenantOptions);
   // Preview modal state
   const [showPreview, setShowPreview] = useState(false);
   const [previewTab, setPreviewTab] = useState("allEntries");
@@ -114,7 +115,7 @@ const BankReconciliation = () => {
         })));
         
         // Tenant options
-        const tenantRes = await fetch('https://backendaab.in/aabuildersDash/api/tenantShop/getAll');
+        const tenantRes = await fetch('https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll');
         const tenantData = tenantRes.ok ? await tenantRes.json() : [];
         setTenantOptions(tenantData.map(tenant => ({
           value: tenant.tenantName,

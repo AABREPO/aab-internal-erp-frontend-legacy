@@ -19,6 +19,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
     const [employeeOptions, setEmployeeOptions] = useState([]);
     const [purposeOptions, setPurposeOptions] = useState([]);
     const [tenantOptions, setTenantOptions] = useState([]);
+    const [tenantShopData, setTenantShopData] = useState([]);
     const [selectedProjectName, setSelectedProjectName] = useState(null);
     const [selectedContractor, setSelectedContractor] = useState(null);
     const [selectedVendor, setSelectedVendor] = useState(null);
@@ -132,9 +133,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
             });
             if (response.ok) {
                 const data = await response.json();
-                // Sort all entries by ID (newest first) - ID represents creation order
                 const sortedData = data.sort((a, b) => (b.id || 0) - (a.id || 0));
-                console.log(sortedData);
                 setBillPayments(sortedData);
             } else {
                 console.error("Failed to fetch bill payments");
@@ -326,10 +325,10 @@ const BillPayment = ({ username, userRoles = [] }) => {
             setPurposeOptions([]);
         }
     }, []);
-    // Fetch tenant options from API
+    // Fetch tenant options from tenant link shop API (like Form.js)
     const fetchTenantOptions = useCallback(async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/tenantShop/getAll', {
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll', {
                 method: "GET",
                 credentials: "include",
                 headers: {
@@ -338,16 +337,25 @@ const BillPayment = ({ username, userRoles = [] }) => {
             });
             if (response.ok) {
                 const data = await response.json();
-                const options = data.map(tenant => ({
-                    value: tenant.tenantName,
-                    label: tenant.tenantName,
-                    id: tenant.id,
-                }));
-                setTenantOptions(options);
+                setTenantShopData(data);
+                
+                // Build tenant options from tenant link shop data (unique tenant names)
+                const tenantOptionsUnique = data
+                    .filter(t => t.tenantName)
+                    .map(t => ({
+                        label: t.tenantName,
+                        value: t.tenantName,
+                        id: t.id,
+                        tenantId: t.id
+                    }))
+                    .filter((t, i, arr) => arr.findIndex(x => x.value === t.value) === i);
+                
+                setTenantOptions(tenantOptionsUnique);
             }
         } catch (error) {
             console.error("Error fetching tenant options:", error);
             setTenantOptions([]);
+            setTenantShopData([]);
         }
     }, []);
     
@@ -544,8 +552,14 @@ const BillPayment = ({ username, userRoles = [] }) => {
         return purpose ? purpose.label : '-';
     };
     const getTenantName = (tenantId) => {
+        // First try to find in tenantOptions
         const tenant = tenantOptions.find(option => option.id === tenantId);
-        return tenant ? tenant.label : '-';
+        if (tenant) {
+            return tenant.label;
+        }
+        // Fallback: search in tenantShopData
+        const tenantFromLink = tenantShopData.find(t => t.id === tenantId);
+        return tenantFromLink ? tenantFromLink.tenantName : '-';
     };
     const getPartyNameAndType = (item) => {
         const contractorName = getContractorName(item.contractor_id);
@@ -1382,10 +1396,6 @@ const BillPayment = ({ username, userRoles = [] }) => {
                                     </button>
                                     <button
                                         onClick={() => {
-                                            console.log("Payment data to save:", {
-                                                ...paymentPopupData,
-                                                currentRow: currentBillPaymentRow
-                                            });
                                             setShowEditPaymentPopup(false);
                                             setPaymentPopupData({
                                                 date: new Date().toISOString().split('T')[0],

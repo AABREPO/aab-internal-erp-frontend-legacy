@@ -5,10 +5,14 @@ import logo from '../Images/aablogo.png';
 import Sidebar from './Sidebar';
 import Logout from '../Images/Logout.png'
 import DownloadIcon from '../Images/download.png';
+import EditIcon from '../Images/Edit.svg';
 const Navbar = ({ username, userImage, position, email, onLogout , userRoles = []}) => {
   const [isSidebarVisible, setIsSidebarVisible] = useState(false);
   const [isProfileDropdownVisible, setIsProfileDropdownVisible] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isEditRequestsModalOpen, setIsEditRequestsModalOpen] = useState(false);
+  const [editRequests, setEditRequests] = useState([]);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const sidebarRef = useRef(null);
   const profileRef = useRef(null);
   const [roleModels, setRoleModels] = useState([]);
@@ -39,6 +43,7 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
   };
   const normalizedUsername = username?.trim().toLowerCase();
   const canDownloadExpenses = normalizedUsername === 'admin' || normalizedUsername === 'mahalingam m';
+  const canViewEditRequests = normalizedUsername === 'admin' || normalizedUsername === 'mahalingam m';
 
   const handleDownloadExpenses = async () => {
     if (isDownloading || !canDownloadExpenses) return;
@@ -208,7 +213,10 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
           'Payment Mode': expense.paymentMode || '',
           Remarks: expense.remarks || '',
           'Created By': expense.username || '',
-          Timestamp: formatDate(expense.timestamp, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+          Timestamp: formatDate(expense.timestamp, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
+          'Project ID': expense.projectId ?? '',
+          'Vendor ID': expense.vendorId ?? '',
+          'Contractor ID': expense.contractorId ?? ''
         };
       });
       const advanceData = Array.isArray(advanceResponse.data) ? advanceResponse.data : [];
@@ -239,7 +247,11 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
           'Description': entry.description || '',
           'Mode': entry.payment_mode || '',
           'Attached file': entry.file_url || '',
-          'E.No': entry.entry_no || ''
+          'E.No': entry.entry_no || '',
+          'Project ID': entry.project_id ?? '',
+          'Transfer Site ID': entry.transfer_site_id ?? '',
+          'Vendor ID': entry.vendor_id ?? '',
+          'Contractor ID': entry.contractor_id ?? ''
         };
       });
       const buildShopNoMap = (projects = []) => {
@@ -314,7 +326,9 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
           'E No': entry.eno || '',
           'For the Month Of': formatMonthLabel(entry.forTheMonthOf),
           'Payment Mode': entry.paymentMode || '',
-          'Type': entry.formType || ''
+          'Type': entry.formType || '',
+          'Shop No ID': entry.shopNoId ?? '',
+          'Tenant Name ID': entry.tenantNameId ?? ''
         };
       });
       const formatLoanAmount = (value) => {
@@ -355,7 +369,13 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
           'Type': entry.type || '',
           'Description': entry.description || '',
           'Mode': entry.loan_payment_mode || '',
-          'E.No': entry.entry_no || ''
+          'E.No': entry.entry_no || '',
+          'Project ID': entry.project_id ?? '',
+          'Transfer Project ID': entry.transfer_Project_id ?? '',
+          'Vendor ID': entry.vendor_id ?? '',
+          'Contractor ID': entry.contractor_id ?? '',
+          'From Purpose ID': entry.from_purpose_id ?? '',
+          'To Purpose ID': entry.to_purpose_id ?? ''
         };
       });
       const expensesWorksheet = XLSX.utils.json_to_sheet(worksheetData);
@@ -390,6 +410,93 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Fetch edit requests
+  useEffect(() => {
+    if (canViewEditRequests) {
+      fetchEditRequests();
+      // Poll for new requests every 30 seconds
+      const interval = setInterval(fetchEditRequests, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [canViewEditRequests]);
+
+  const fetchEditRequests = async () => {
+    try {
+      const response = await axios.get('https://backendaab.in/aabuildersDash/api/edit_requests/getAll', {
+        withCredentials: true
+      });
+      const allRequests = response.data || [];
+      // Filter only pending requests (not completed)
+      const pending = allRequests.filter(req => !req.request_completed);
+      setEditRequests(pending);
+      setPendingRequestsCount(pending.length);
+    } catch (error) {
+      console.error('Error fetching edit requests:', error);
+    }
+  };
+
+  const handleApproveRequest = async (requestId, moduleNameId) => {
+    try {
+      // Set allowToEdit to true to allow the user to edit
+      if (moduleNameId) {
+        await axios.put(
+          `https://backendaab.in/aabuildersDash/api/advance_portal/allow/${moduleNameId}?allow=true`,
+          {},
+          { withCredentials: true }
+        );
+      }
+
+      // Update the request to mark as approved and completed
+      await axios.put(`https://backendaab.in/aabuildersDash/api/edit_requests/edit/${requestId}`, {
+        request_approval: true,
+        request_completed: true
+      }, {
+        withCredentials: true
+      });
+
+      alert('Edit request approved. User can now edit the record.');
+      fetchEditRequests();
+    } catch (error) {
+      console.error('Error approving request:', error);
+      alert('Failed to approve request. Please try again.');
+    }
+  };
+
+  const handleRejectRequest = async (requestId) => {
+    try {
+      await axios.put(`https://backendaab.in/aabuildersDash/api/edit_requests/edit/${requestId}`, {
+        request_approval: false,
+        request_completed: true
+      }, {
+        withCredentials: true
+      });
+
+      alert('Edit request rejected.');
+      fetchEditRequests();
+    } catch (error) {
+      console.error('Error rejecting request:', error);
+      alert('Failed to reject request. Please try again.');
+    }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return '-';
+    try {
+      const date = new Date(dateString);
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      let hours = date.getHours();
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? String(hours).padStart(2, '0') : '12';
+      return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+    } catch {
+      return dateString;
+    }
+  };
+
   return (
     <>
       <nav className="navbar fixed w-full top-0 z-10 bg-white h-14 shadow-md">
@@ -406,11 +513,28 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
           <div className="relative flex items-center space-x-4" ref={profileRef}>
             {canDownloadExpenses && (
               <button type="button" onClick={handleDownloadExpenses} disabled={isDownloading}
-                className="flex items-center px-3 py-1 border border-[#BF9853] rounded-md text-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="flex items-center border border-[#BF9853] rounded-md text-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed"
                 title={isDownloading ? "Preparing download..." : "Download expenses"}
               >
-                <img src={DownloadIcon} alt="Download expenses" className="w-5 h-5 mr-2" />
-                <span>{isDownloading ? 'Preparing...' : 'Download'}</span>
+                <img src={DownloadIcon} alt="Download expenses" className="w-5 h-5" />
+              </button>
+            )}
+            {canViewEditRequests && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditRequestsModalOpen(true);
+                  fetchEditRequests();
+                }}
+                className="relative flex items-center border border-[#BF9853] rounded-md text-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors duration-150 p-2"
+                title="Edit Requests"
+              >
+                <img src={EditIcon} alt="Edit Requests" className="w-5 h-5" />
+                {pendingRequestsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {pendingRequestsCount}
+                  </span>
+                )}
               </button>
             )}
             {userImage ? (
@@ -460,6 +584,96 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
           </div>
         </div>
       </nav>
+      {isEditRequestsModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+          <div className="bg-white rounded-lg shadow-lg w-[90%] max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-4 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-[#BF9853]">Edit Requests</h2>
+              <button
+                onClick={() => setIsEditRequestsModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-4">
+              {editRequests.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No pending edit requests
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {editRequests.map((request) => {
+                    return (
+                      <div key={request.id} className="border border-gray-300 rounded-lg p-4 bg-white hover:bg-gray-50">
+                        <div className="grid grid-cols-2 gap-4 mb-3">
+                          <div>
+                            <p className="text-xs text-gray-500">Timestamp</p>
+                            <p className="text-sm font-semibold">{formatDate(request.timestamp)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Module</p>
+                            <p className="text-sm font-semibold">{request.module_name || '-'}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Record ID</p>
+                            <p className="text-sm font-semibold">{request.module_name_id || '-'}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Entry No</p>
+                            <p className="text-sm font-semibold">{request.module_name_eno || '-'}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Requested By</p>
+                            <p className="text-sm font-semibold">{request.request_send_by || '-'}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Status</p>
+                            <span className={`inline-block px-2 py-1 rounded text-xs ${
+                              request.request_completed
+                                ? 'bg-green-100 text-green-800'
+                                : request.request_approval
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {request.request_completed
+                                ? 'Completed'
+                                : request.request_approval
+                                ? 'Approved'
+                                : 'Pending'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="mt-3 p-3 bg-blue-50 rounded border border-blue-200">
+                          <p className="text-xs text-blue-700">
+                            <strong>Permission Request:</strong> User is requesting permission to edit this record (Record ID: {request.module_name_id}, Entry No: {request.module_name_eno}).
+                          </p>
+                        </div>
+                        {!request.request_completed && (
+                          <div className="flex gap-2 mt-3">
+                            <button
+                              onClick={() => handleApproveRequest(request.id, request.module_name_id)}
+                              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm font-semibold"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handleRejectRequest(request.id)}
+                              className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 text-sm font-semibold"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       <Sidebar isVisible={isSidebarVisible} sidebarRef={sidebarRef} userRoles={userRoles} onCloseSidebar={() => setIsSidebarVisible(false)}/>
     </>
   );

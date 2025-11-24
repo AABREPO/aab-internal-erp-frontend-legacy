@@ -1123,13 +1123,21 @@ const Form = ({ username, userRoles = [] }) => {
     const sortedSiteOptions = siteOptions.sort((a, b) =>
         a.label.localeCompare(b.label)
     );
+    const formatDateForReview = (dateString) => {
+        if (!dateString) return '-';
+        const date = new Date(dateString);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = String(date.getFullYear()).slice(-2);
+        return `${day}/${month}/${year}`;
+    };
     const vendorOrContractorLabel = selectedOption ? `${selectedOption.label}${selectedType ? ` (${selectedType})` : ''}` : '';
     const formattedAmount = amount ? `${selectedAccountType === 'Bill Refund' ? '-' : ''}₹${formatNumber(Math.abs(amount))}` : '';
     const reviewDetails = [
         { label: 'Account Type', value: selectedAccountType || '-' },
-        { label: 'Date', value: date || '-' },
+        { label: 'Date', value: formatDateForReview(date) || '-' },
         { label: 'Project Name', value: selectedSite?.label || '-' },
-        { label: 'Site Number', value: selectedSite?.sNo || '-' },
+        { label: 'Project Number', value: selectedSite?.sNo || '-' },
         { label: 'Vendor / Contractor', value: vendorOrContractorLabel || '-' },
     ];
     if (selectedType === 'Vendor' && selectedOption?.id) {

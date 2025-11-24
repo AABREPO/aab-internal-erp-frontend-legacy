@@ -13,7 +13,6 @@ import fileUpload from '../Images/file_upload.png';
 import file from '../Images/file.png';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-
 function cleanUrl(url) {
     if (!url) return url;
     let cleanedUrl = url.replace(/^["']|["']$/g, '');
@@ -29,7 +28,6 @@ function cleanUrl(url) {
     }
     return cleanedUrl;
 }
-
 const History = ({ username, userRoles = [] }) => {
     const [expenses, setExpenses] = useState([]);
     const [payments, setPayments] = useState([]);
@@ -99,13 +97,11 @@ const History = ({ username, userRoles = [] }) => {
     const [fileUploadPopup, setFileUploadPopup] = useState(false);
     const [currentFileRow, setCurrentFileRow] = useState(null);
     const [selectedFileForPopup, setSelectedFileForPopup] = useState(null);
-    // Category selection popup states
     const [showCategoryPopup, setShowCategoryPopup] = useState(false);
     const [categoryOptions, setCategoryOptions] = useState([]);
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [isConfirmingCategory, setIsConfirmingCategory] = useState(false);
     const [popup, setPopup] = useState({ show: false, message: "", type: "", dateStr: "" });
-    // Description functionality
     const [showPopups, setShowPopups] = useState(false);
     const [currentRow, setCurrentRow] = useState(null);
     const [portalDescriptions, setPortalDescriptions] = useState({});
@@ -123,7 +119,6 @@ const History = ({ username, userRoles = [] }) => {
         client_id: "",
         description: "",
     });
-    // Click and drag scrolling functionality
     const scrollRef = useRef(null);
     const paymentsScrollRef = useRef(null);
     const isDragging = useRef(false);
@@ -200,7 +195,6 @@ const History = ({ username, userRoles = [] }) => {
         };
         animationFrame.current = requestAnimationFrame(step);
     };
-    // Filter state variables
     const [showFilters, setShowFilters] = useState(false);
     const [selectDate, setSelectDate] = useState('');
     const [selectContractororVendorName, setSelectContractororVendorName] = useState('');
@@ -210,9 +204,9 @@ const History = ({ username, userRoles = [] }) => {
         const simple = new Date(year, 0, 1 + (weekNumber - 1) * 7);
         const dayOfWeek = simple.getDay();
         const ISOWeekStart = new Date(simple);
-        ISOWeekStart.setDate(simple.getDate() - ((dayOfWeek + 7) % 9)); // Monday
+        ISOWeekStart.setDate(simple.getDate() - ((dayOfWeek + 7) % 9));
         const ISOWeekEnd = new Date(ISOWeekStart);
-        ISOWeekEnd.setDate(ISOWeekStart.getDate() + 6); // Saturday (not Sunday)
+        ISOWeekEnd.setDate(ISOWeekStart.getDate() + 6);
         return {
             number: weekNumber,
             start: ISOWeekStart.toISOString().split("T")[0],
@@ -308,7 +302,6 @@ const History = ({ username, userRoles = [] }) => {
             console.log('Error fetching tile area names.');
         }
     };
-
     const fetchAccountDetails = async () => {
         try {
             const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/getAll');
@@ -322,7 +315,6 @@ const History = ({ username, userRoles = [] }) => {
             console.error('Error fetching account details:', error);
         }
     };
-
     const fetchCategories = async () => {
         try {
             const response = await fetch("https://backendaab.in/aabuilderDash/api/expenses_categories/getAll", {
@@ -346,14 +338,11 @@ const History = ({ username, userRoles = [] }) => {
             console.error("Fetch error: ", error);
         }
     };
-
-    // File upload functions
     const handleFileUploadClick = (row) => {
         setCurrentFileRow(row);
         setSelectedFileForPopup(null);
         setFileUploadPopup(true);
     };
-
     const handleFileSelectInPopup = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -361,23 +350,31 @@ const History = ({ username, userRoles = [] }) => {
         }
         e.target.value = '';
     };
-
     const handleSaveFileFromPopup = async () => {
         if (!selectedFileForPopup || !currentFileRow) return;
         try {
             const project = siteOptions.find(opt => opt.id === Number(currentFileRow.project_id));
-            const siteNo = project?.siteNo || "";
+            const siteNo = project?.sNo || "";
             const name =
                 vendorOptions.find(opt => opt.id === Number(currentFileRow.vendor_id))?.label ||
                 contractorOptions.find(opt => opt.id === Number(currentFileRow.contractor_id))?.label ||
                 employeeOptions.find(opt => opt.id === Number(currentFileRow.employee_id))?.label ||
                 "";
-
+            const now = new Date();
+            const timestamp = now.toLocaleString("en-GB", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true
+            })
+                .replace(",", "")
+                .replace(/\s/g, "-");
             const formData = new FormData();
-            const finalName = `${currentFileRow.date}-${siteNo}-${name}`;
+            const finalName = `${timestamp}-${siteNo}-${name}`;
             formData.append("file", selectedFileForPopup);
             formData.append("file_name", finalName);
-
             const uploadResponse = await fetch(
                 "https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive",
                 {
@@ -385,15 +382,11 @@ const History = ({ username, userRoles = [] }) => {
                     body: formData,
                 }
             );
-
             if (!uploadResponse.ok) {
                 throw new Error("File upload failed");
             }
-
             const uploadResult = await uploadResponse.json();
             const pdfUrl = uploadResult.url;
-
-            // Update the bill copy URL using the weekly expenses API
             const updateResponse = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/${currentFileRow.id}/bill-copy-url`, {
                 method: 'PUT',
                 headers: {
@@ -401,28 +394,21 @@ const History = ({ username, userRoles = [] }) => {
                 },
                 body: JSON.stringify({ billCopyUrl: pdfUrl })
             });
-
             if (!updateResponse.ok) {
                 throw new Error("Failed to update bill copy URL");
             }
-
-            // Update local state
             setExpenses((prev) =>
                 prev.map((exp) => (exp.id === currentFileRow.id ? { ...exp, bill_copy_url: pdfUrl } : exp))
             );
-
             setFileUploadPopup(false);
             setCurrentFileRow(null);
             setSelectedFileForPopup(null);
-
-            // Show success message
             setPopup({
                 show: true,
                 message: "File uploaded successfully!",
                 type: "success",
                 dateStr: new Date().toLocaleDateString('en-GB')
             });
-
         } catch (error) {
             console.error("Error uploading file:", error);
             setPopup({
@@ -433,7 +419,6 @@ const History = ({ username, userRoles = [] }) => {
             });
         }
     };
-
     const fetchWeeklyPaymentBills = async () => {
         try {
             const response = await fetch("https://backendaab.in/aabuildersDash/api/weekly-payment-bills/all", {
@@ -454,36 +439,24 @@ const History = ({ username, userRoles = [] }) => {
             return [];
         }
     };
-
     useEffect(() => {
         const fetchNextWeekDiscount = async () => {
             if (!selectedWeek) {
                 setNextWeekDiscountInfo(null);
                 return;
             }
-
             const nextWeekNumber = Number(selectedWeek) + 1;
             if (!Number.isFinite(nextWeekNumber)) {
                 setNextWeekDiscountInfo(null);
                 return;
             }
-
             try {
                 const response = await axios.get(`https://backendaab.in/aabuildersDash/api/payments-received/week/${nextWeekNumber}`);
                 const nextWeekPayments = Array.isArray(response.data) ? response.data : [];
-
                 const discountSum = nextWeekPayments.reduce((sum, payment) => {
                     const discount = Number(payment.discount_amount) || 0;
                     return discount > 0 ? sum + discount : sum;
                 }, 0);
-
-                console.log("Next Week Discount Info:", {
-                    selectedWeek: Number(selectedWeek),
-                    nextWeekNumber,
-                    discountSum,
-                    nextWeekPayments,
-                });
-
                 if (discountSum > 0) {
                     setNextWeekDiscountInfo({
                         weekNumber: nextWeekNumber,
@@ -497,14 +470,11 @@ const History = ({ username, userRoles = [] }) => {
                 setNextWeekDiscountInfo(null);
             }
         };
-
         fetchNextWeekDiscount();
     }, [selectedWeek]);
-
     useEffect(() => {
         fetchWeeklyPaymentBills();
     }, []);
-
     useEffect(() => {
         const fetchVendorNames = async () => {
             try {
@@ -552,7 +522,6 @@ const History = ({ username, userRoles = [] }) => {
                     id: item.id,
                     type: "Employee",
                 }));
-
                 setEmployeeOptions(formattedData);
             } catch (error) {
                 console.error("Fetch error: ", error);
@@ -690,18 +659,14 @@ const History = ({ username, userRoles = [] }) => {
             setNewExpense((prev) => ({ ...prev, project_id: onlyProject.id }));
         }
     }, [clientProjectOptions, isClientToggleActive]);
-
     useEffect(() => {
         const fetchWeeks = async () => {
             try {
                 const response = await axios.get('https://backendaab.in/aabuildersDash/api/payments-received/active_weeks');
                 const currentYear = new Date().getFullYear();
-
                 const enrichedWeeks = response.data.map((weekNumber) =>
                     getStartAndEndDateOfWeek(weekNumber, currentYear)
                 );
-
-                console.log("Enriched weeks:", enrichedWeeks);
                 setWeeks(enrichedWeeks);
             } catch (error) {
                 console.error('Error fetching active weeks:', error);
@@ -709,27 +674,20 @@ const History = ({ username, userRoles = [] }) => {
         };
         fetchWeeks();
     }, []);
-
     useEffect(() => {
         const fetchWeekData = async () => {
             if (!selectedWeek) return;
-
             try {
                 const [expensesRes, paymentsRes] = await Promise.all([
                     axios.get(`https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${selectedWeek}`),
                     axios.get(`https://backendaab.in/aabuildersDash/api/payments-received/week/${selectedWeek}`)
                 ]);
-
                 setExpenses(expensesRes.data);
                 const filteredPayments = paymentsRes.data.filter(
                     (payment) => payment.type !== "Handover"
                 );
                 setPayments(filteredPayments);
-
-                // Fetch weekly payment bills
                 await fetchWeeklyPaymentBills();
-
-                // Fetch descriptions for Project Advance rows
                 const projectAdvanceRows = expensesRes.data.filter(row => row.type === "Project Advance" && row.advance_portal_id);
                 const newDescriptions = { ...portalDescriptions };
                 for (const row of projectAdvanceRows) {
@@ -751,73 +709,59 @@ const History = ({ username, userRoles = [] }) => {
                 console.error("Error fetching weekly data:", error);
             }
         };
-
         fetchWeekData();
     }, [selectedWeek]);
     const handleInputChange = (e) => {
         setNewExpense((prev) => ({ ...prev, [e.target.name]: e.target.value }));
     };
-
-    // Filter functions
     const clearFilters = () => {
         setSelectDate('');
         setSelectContractororVendorName('');
         setSelectProjectName('');
         setSelectType('');
     };
-
     const getVendorName = (id) =>
         vendorOptions.find(v => v.id === id)?.value || "";
-
     const getContractorName = (id) =>
         contractorOptions.find(c => c.id === id)?.value || "";
-
     const getEmployeeName = (id) =>
         employeeOptions.find(c => c.id === id)?.value || "";
-
     const getSiteName = (id) =>
         siteOptions.find(s => String(s.id) === String(id))?.value || "";
-
     const getPartyDisplayName = (entry) => {
-        const client = getClientName(entry);
-        if (client) return client;
+        const hasContractorVendorEmployee = entry.contractor_id || entry.vendor_id || entry.employee_id;
+        if (!hasContractorVendorEmployee && entry.type === "Loan") {
+            const client = getClientName(entry);
+            if (client) return client;
+        }
         if (entry.vendor_id) return getVendorName(entry.vendor_id);
         if (entry.contractor_id) return getContractorName(entry.contractor_id);
         if (entry.employee_id) return getEmployeeName(entry.employee_id);
         return "";
     };
-
-    // Filtered data based on selected filters
     const filteredExpenses = expenses.filter((entry) => {
-        // Date filter (exact match since it's type="date")
         if (selectDate) {
-            // Convert selectDate (YYYY-MM-DD) → DD-M-YYYY
             const [year, month, day] = selectDate.split("-");
             const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
-            // Convert entry.date to DD-M-YYYY
             const entryDateObj = new Date(entry.date);
             const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
             if (formattedEntryDate !== formattedSelectDate) return false;
         }
-        // Contractor/Vendor filter
         if (selectContractororVendorName) {
             const name = getPartyDisplayName(entry);
             if (name.toLowerCase() !== selectContractororVendorName.toLowerCase())
                 return false;
         }
-        // Project Name filter
         if (selectProjectName) {
             const projectName = getSiteName(entry.project_id) || "";
             if (projectName.toLowerCase() !== selectProjectName.toLowerCase())
                 return false;
         }
-        // Type filter
         if (selectType) {
             if (entry.type?.toLowerCase() !== selectType.toLowerCase()) return false;
         }
-        return true; // passes all filters
+        return true;
     });
-
     const contractorVendorFilterOptions = React.useMemo(() => {
         const labels = new Set();
         return filteredExpenses.map(exp => {
@@ -829,7 +773,6 @@ const History = ({ username, userRoles = [] }) => {
             return null;
         }).filter(Boolean);
     }, [filteredExpenses, combinedOptions, clientOptions, projectIdToClientName]);
-
     const projectFilterOptions = React.useMemo(() => {
         const ids = new Set();
         return filteredExpenses.map(exp => {
@@ -841,18 +784,15 @@ const History = ({ username, userRoles = [] }) => {
             return null;
         }).filter(Boolean);
     }, [filteredExpenses, siteOptions]);
-
     const balance = (
         payments.reduce((total, row) => total + Number(row.amount || 0), 0) -
         filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)
     ).toFixed(2);
-
-    // For new expense input
     const handleExpenseChange = (e) => {
         const { name, value } = e.target;
         if (name === "amount" && Number(value) > Number(balance)) {
             alert("Amount cannot exceed the available Balance!");
-            setNewExpense((prev) => ({ ...prev, [name]: "" })); // clear field
+            setNewExpense((prev) => ({ ...prev, [name]: "" }));
             return;
         }
         setNewExpense((prev) => ({ ...prev, [name]: value }));
@@ -885,14 +825,11 @@ const History = ({ username, userRoles = [] }) => {
                 event.preventDefault();
             }
         };
-
         document.addEventListener("wheel", handleWheel, { passive: false });
-
         return () => {
             document.removeEventListener("wheel", handleWheel);
         };
     }, []);
-
     const updateLoanPortalEntry = async (loanPortalId, { date, amount, vendorId, contractorId, employeeId, projectId }) => {
         if (!loanPortalId) return;
         const payload = {
@@ -1028,7 +965,6 @@ const History = ({ username, userRoles = [] }) => {
         }
         return saveResponse.json();
     };
-
     const handlePaymentChange = (e) => {
         const { name, value } = e.target;
         setNewPayment((prev) => ({ ...prev, [name]: value }));
@@ -1062,7 +998,6 @@ const History = ({ username, userRoles = [] }) => {
             staff_advance_portal_id: null,
             loan_portal_id: null,
         };
-
         try {
             if (newExpense.type === "Loan") {
                 try {
@@ -1096,7 +1031,6 @@ const History = ({ username, userRoles = [] }) => {
                 },
                 body: JSON.stringify(payload),
             });
-
             if (response.ok) {
                 window.location.reload();
                 setExpenses((prev) => [{ id: Date.now(), ...newExpense }, ...prev]);
@@ -1131,7 +1065,6 @@ const History = ({ username, userRoles = [] }) => {
             console.error("Error during expense save:", err);
         }
     };
-
     const handleKeyDown1 = async (e) => {
         if (e.key === "Enter") {
             const paymentPayload = {
@@ -1143,7 +1076,6 @@ const History = ({ username, userRoles = [] }) => {
                 period_start_date: new Date().toISOString().split("T")[0],
                 period_end_date: new Date().toISOString().split("T")[0],
             };
-
             try {
                 const response = await fetch("https://backendaab.in/aabuildersDash/api/payments-received/update/save", {
                     method: "POST",
@@ -1152,9 +1084,7 @@ const History = ({ username, userRoles = [] }) => {
                     },
                     body: JSON.stringify(paymentPayload),
                 });
-
                 if (response.ok) {
-                    console.log("✅ Payment saved successfully");
                     window.location.reload();
                     setPayments((prev) => [{ id: Date.now(), ...newPayment }, ...prev]);
                     setNewPayment({ date: "", amount: "", type: "Weekly" });
@@ -1166,11 +1096,9 @@ const History = ({ username, userRoles = [] }) => {
             }
         }
     };
-
     const handleEditExpense = (id, field, value) => {
         if (field === "amount" && Number(value) > Number(balance)) {
             alert("Amount cannot exceed the available Balance!");
-            // Clear the input for this row
             setExpenses((prevExpenses) =>
                 prevExpenses.map((expense) =>
                     expense.id === id ? { ...expense, amount: "" } : expense
@@ -1192,25 +1120,19 @@ const History = ({ username, userRoles = [] }) => {
         );
     };
     function getWeekStartEnd(year, weekNumber) {
-        // Start with Jan 1
         const simple = new Date(year, 0, 1 + (weekNumber - 1) * 7);
-
-        // ISO week correction (start on Monday)
         const dow = simple.getDay();
         const ISOweekStart = simple;
         if (dow <= 4) {
-            ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1); // Monday
+            ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
         } else {
-            ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay()); // Next Monday
+            ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
         }
-
         const ISOweekEnd = new Date(ISOweekStart);
         ISOweekEnd.setDate(ISOweekStart.getDate() + 6);
-
         return { start: ISOweekStart, end: ISOweekEnd };
     }
     const generatePDF = () => {
-        // Safety check for selectedWeek
         if (!selectedWeek) {
             alert("Please select a week before generating the PDF.");
             return;
@@ -1219,7 +1141,6 @@ const History = ({ username, userRoles = [] }) => {
         const pageWidth = doc.internal.pageSize.getWidth();
         const year = new Date().getFullYear();
         const weekDates = getWeekStartEnd(year, Number(selectedWeek));
-        // Safety check for valid dates
         if (!weekDates || !weekDates.start || !weekDates.end) {
             alert("Error: Could not calculate week dates. Please try again.");
             return;
@@ -1227,7 +1148,6 @@ const History = ({ username, userRoles = [] }) => {
         const { start, end } = weekDates;
         const weekStartDate = start.toLocaleDateString("en-GB");
         const weekEndDate = end.toLocaleDateString("en-GB");
-        // Safety check for expenses and payments arrays
         if (!Array.isArray(expenses) || !Array.isArray(payments)) {
             alert("Error: Data not loaded properly. Please refresh the page and try again.");
             return;
@@ -1235,32 +1155,24 @@ const History = ({ username, userRoles = [] }) => {
         const totalExpenses = filteredExpenses.reduce((t, e) => t + Number(e.amount || 0), 0);
         const totalPayments = payments.reduce((t, p) => t + Number(p.amount || 0), 0);
         const balance = totalPayments - totalExpenses;
-        // ===== FUNCTION TO DRAW HEADER =====
         const drawHeader = (doc, titleText = "") => {
             doc.setFontSize(10);
             doc.setTextColor(0, 0, 0);
-            // Outer rectangle + lines
             doc.rect(20, 24, 810, 40);
-            // PS label
-            // PS with selected week
             doc.setFont("helvetica", "normal");
             doc.setFontSize(10);
             doc.text(`PS: ${String(selectedWeek || "")}`, 30, 40);
-            // Current Date under PS
             doc.setFontSize(9);
             doc.text(String(new Date().toLocaleDateString("en-GB") || ""), 30, 55);
-            // Main Title (dynamic)
             doc.setFontSize(14);
             doc.setFont("helvetica", "bold");
             doc.text(titleText, 180, 50);
-            // Dates stacked
             doc.setFont("helvetica", "normal");
             doc.setFontSize(10);
             doc.text(`START  ${String(weekStartDate || "")}`, 460, 40);
             doc.text(`END    ${String(weekEndDate || "")}`, 465, 58);
-            // === Expenses with green background ===
-            doc.setFillColor(220, 250, 220); // light green
-            doc.rect(620, 25, 190, 18.5, "F"); // background box for Balance
+            doc.setFillColor(220, 250, 220);
+            doc.rect(620, 25, 190, 18.5, "F"); 
             doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
             doc.text("EXPENSES", 660, 37);
@@ -1268,9 +1180,8 @@ const History = ({ username, userRoles = [] }) => {
                 String(totalExpenses.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
                 730, 37
             );
-            // === Balance with pink background ===
-            doc.setFillColor(250, 220, 220); // light pink
-            doc.rect(620, 44, 190, 18.5, "F"); // background box for Expenses
+            doc.setFillColor(250, 220, 220);
+            doc.rect(620, 44, 190, 18.5, "F"); 
             doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
             doc.text("BALANCE", 660, 58);
@@ -1279,11 +1190,8 @@ const History = ({ username, userRoles = [] }) => {
                 740, 58
             );
         };
-        // Draw header on first page with "WEEKLY PAYMENT REPORT"
         drawHeader(doc, "WEEKLY PAYMENT REPORT");
-        // ===== EXPENSES TABLE =====
         const expensesHeaders = [["SNO", "Date", "Contractor/Vendor", "Site Name", "Type", "Amount", "AC", "C", ""]];
-        // Use the same filtered expenses as the UI, but exclude certain types for PDF
         const pdfFilteredExpenses = filteredExpenses.filter(row => row.type !== "Project Advance" && row.type !== "Staff Advance" && row.type !== "Staff Salary" && row.type !== "Daily" && row.type !== "Diwali Bonus");
         const expensesData = pdfFilteredExpenses.map((row, idx) => [
             String(idx + 1 || ""),
@@ -1297,7 +1205,7 @@ const History = ({ username, userRoles = [] }) => {
         autoTable(doc, {
             head: expensesHeaders,
             body: expensesData,
-            margin: { top: 64, left: 20 }, // give space for custom header
+            margin: { top: 64, left: 20 },
             tableWidth: 810,
             theme: "grid",
             styles: {
@@ -1315,7 +1223,7 @@ const History = ({ username, userRoles = [] }) => {
                 fontStyle: 'normal'
             },
             columnStyles: {
-                5: { halign: 'right' } // Amount column
+                5: { halign: 'right' }
             },
             didDrawPage: (data) => {
                 drawHeader(doc, "WEEKLY PAYMENT REPORT");
@@ -1323,12 +1231,9 @@ const History = ({ username, userRoles = [] }) => {
                     doc.setFontSize(10);
                 }
             },
-            // Enable page breaks for large tables
             pageBreak: 'auto',
-            // Ensure table continues properly on new pages
             showHead: 'everyPage',
         });
-        // ===== PAYMENTS TABLE =====
         const paymentsHeaders = [["DATE RECEIVED", "AMOUNT", "TYPE"]];
         const paymentsData = payments.map(r => [
             String(r.created_at ? formatDate(r.created_at) : ""),
@@ -1345,11 +1250,9 @@ const History = ({ username, userRoles = [] }) => {
             { content: String(balance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"), styles: { fontStyle: "bold" } },
             { content: "", styles: { fontStyle: "bold" } }
         ]);
-        // ===== NEW PAGE for remaining tables =====
         doc.addPage();
         drawHeader(doc, "WEEKLY PAYMENT STATEMENT");
         const baseY = 110;
-        // Add heading for payments table
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.text("PAYMENT RECEIVED", 22, baseY - 25);
@@ -1364,13 +1267,12 @@ const History = ({ username, userRoles = [] }) => {
             headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
             bodyStyles: { fontStyle: 'bold' },
             columnStyles: {
-                1: { halign: 'right' } // Amount column
+                1: { halign: 'right' }
             },
             didDrawPage: () => {
                 drawHeader(doc);
             }
         });
-        // ----- HANDOVER DETAILS -----
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.text("HANDOVER DETAILS", 22, baseY + 250);
@@ -1388,32 +1290,26 @@ const History = ({ username, userRoles = [] }) => {
             headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
             bodyStyles: { fontStyle: 'bold' },
             columnStyles: {
-                1: { halign: 'right' } // Amount column
+                1: { halign: 'right' } 
             },
             didDrawPage: () => {
                 drawHeader(doc);
             }
         });
-        // ===== DRAW VERTICAL DIVIDER AFTER HANDOVER DETAILS =====
-        const dividerX = 260;  // adjust X position as needed
-        const headerBottomY = 65; // header ends at y=24+55=79
+        const dividerX = 260; 
+        const headerBottomY = 65;
         const pageHeight = doc.internal.pageSize.getHeight();
-        // Draw vertical line (from bottom of header box down to page bottom margin)
-        doc.setDrawColor(0, 0, 0);  // black
+        doc.setDrawColor(0, 0, 0); 
         doc.setLineWidth(0.5);
         doc.line(dividerX, headerBottomY, dividerX, pageHeight - 0);
-        // ----- EXTRA -----
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
-        // Filter for Daily type expenses
         const dailyExpenses = filteredExpenses.filter(expense => expense.type === "Daily");
         const dailyExpenseData = dailyExpenses.map(expense => [
-            String(expense.date ? formatDateOnly(expense.date) : ""), // Date in first column
-            String(Number(expense.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00") // Amount in second column
+            String(expense.date ? formatDateOnly(expense.date) : ""), 
+            String(Number(expense.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
         ]);
-        // Calculate total of daily expenses
         const dailyExpensesTotal = dailyExpenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
-        // If no daily expenses, show a message
         if (dailyExpenseData.length === 0) {
             dailyExpenseData.push(["No Daily Expenses", "0.00"]);
         }
@@ -1437,37 +1333,31 @@ const History = ({ username, userRoles = [] }) => {
                 lineColor: [0, 0, 0],
                 lineWidth: 1,
                 fontStyle: 'bold',
-                halign: 'left'  // <-- aligns header cells to the right
+                halign: 'left'
             },
             bodyStyles: {
                 fontStyle: 'bold'
             },
             columnStyles: {
-                0: { halign: 'left' },   // First column stays left-aligned
-                1: { halign: 'right' }   // Second column (amount) right-aligned
+                0: { halign: 'left' }, 
+                1: { halign: 'right' }  
             },
             didDrawPage: () => {
                 drawHeader(doc);
             }
         });
-        // ===== BOX NEXT TO DAILY WAGE =====
         const dailyWageTable = doc.lastAutoTable;
         if (dailyWageTable) {
-            // Position the box at the same Y as the Daily Wage table
-            const boxY = dailyWageTable.finalY + 2; // small spacing below table
-            const boxX = 300;  // to the right of the Daily Wage table
+            const boxY = dailyWageTable.finalY + 2;
+            const boxX = 300; 
             const boxWidth = 200;
             const boxHeight = 20;
-            const splitX = boxX + 114; // divider inside the box
-            // Draw rectangle
+            const splitX = boxX + 114; 
             doc.rect(boxX, boxY, boxWidth, boxHeight);
-            // Divider line inside box
             doc.line(splitX, boxY, splitX, boxY + boxHeight);
-            // Add "TOTAL" text on left
             doc.setFontSize(10);
             doc.setFont("helvetica", "bold");
-            doc.text("TOTAL", boxX + 10, boxY + 13); // 10pt padding left, vertically centered
-            // Add total amount on right, right-aligned inside box
+            doc.text("TOTAL", boxX + 10, boxY + 13);
             doc.text(
                 String(dailyExpensesTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })),
                 boxX + boxWidth - 10,
@@ -1475,18 +1365,13 @@ const History = ({ username, userRoles = [] }) => {
                 { align: "right" }
             );
         }
-        // ----- SUMMARY -----
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.text("EXPENDITURE PAYMENTS", 300, baseY - 25);
-
-        // Initialize summaryMap with all weeklyTypes (with 0 count and 0 total)
         const summaryMap = weeklyTypes.reduce((acc, typeObj) => {
             acc[typeObj.type] = { count: 0, total: 0 };
             return acc;
         }, {});
-
-        // Populate summaryMap with actual expense data (including expenses with amount > 0)
         filteredExpenses
             .filter(expense => Number(expense.amount) > 0)
             .forEach(expense => {
@@ -1502,24 +1387,18 @@ const History = ({ username, userRoles = [] }) => {
                 String(type || ""),
                 String(Number(total || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
                 count,
-                total // Keep original total for sorting
+                total 
             ])
             .sort((a, b) => {
-                // Sort by total amount: non-zero amounts first, then zero amounts
                 const totalA = Number(a[3]);
                 const totalB = Number(b[3]);
-
                 if (totalA === 0 && totalB === 0) {
-                    // Both are zero, sort alphabetically by type name
                     return a[0].localeCompare(b[0]);
                 } else if (totalA === 0) {
-                    // A is zero, B is not - put A after B
                     return 1;
                 } else if (totalB === 0) {
-                    // B is zero, A is not - put B after A
                     return -1;
                 } else {
-                    // Both are non-zero, sort by amount descending
                     return totalB - totalA;
                 }
             })
@@ -1527,7 +1406,7 @@ const History = ({ username, userRoles = [] }) => {
                 type,
                 formattedTotal,
                 count
-            ]); // Remove the original total from final array
+            ]);
         autoTable(doc, {
             head: [["SUMMARY", "TOTAL"]],
             body: summaryData.map(r => [String(r[0] || ""), String(r[1] || "0")]),
@@ -1539,20 +1418,19 @@ const History = ({ username, userRoles = [] }) => {
             headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
             bodyStyles: { fontStyle: 'bold' },
             columnStyles: {
-                1: { halign: 'right' } // Amount column
+                1: { halign: 'right' } 
             },
             didDrawPage: () => {
                 drawHeader(doc);
             },
             didDrawCell: (data) => {
-                // Only for body rows in first column
                 if (data.section === 'body' && data.column.index === 0 && data.row && data.row.index !== undefined) {
                     const rowData = summaryData[data.row.index];
                     if (rowData && rowData[2] !== undefined) {
-                        const count = rowData[2];  // third element = count
+                        const count = rowData[2]; 
                         if (data.cell && typeof data.cell.x === 'number' && typeof data.cell.y === 'number' && typeof data.cell.height === 'number') {
-                            const textX = data.cell.x - 3; // 10pt to the left of table
-                            const textY = data.cell.y + data.cell.height / 2 + 2; // vertical centering
+                            const textX = data.cell.x - 3; 
+                            const textY = data.cell.y + data.cell.height / 2 + 2;
                             doc.setFontSize(9);
                             doc.text(String(count || "0"), textX, textY, { align: 'right' });
                         }
@@ -1560,7 +1438,6 @@ const History = ({ username, userRoles = [] }) => {
                 }
             }
         });
-        // draw counts outside table
         const summaryTable = doc.lastAutoTable;
         if (summaryTable && summaryTable.body && Array.isArray(summaryTable.body)) {
             summaryData.forEach((row, i) => {
@@ -1660,19 +1537,13 @@ const History = ({ username, userRoles = [] }) => {
             }
         });
         newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
-        // Filter for Diwali Bonus type expenses
         const diwaliBonusEntries = filteredExpenses.filter(e => e.type === "Diwali Bonus");
         const diwaliBonusCount = diwaliBonusEntries.length;
         const diwaliBonusTotal = diwaliBonusEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-
-        // Position Diwali Bonus table below Staff Salary table with proper spacing
-        const diwaliBonusY = newTableY + 30; // Add extra spacing to avoid overlap
-
-        // Add heading for Diwali Bonus table
+        const diwaliBonusY = newTableY + 30; 
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.text("DIWALI BONUS", newTableX, diwaliBonusY - 25);
-
         const diwaliBonusHead = [[
             String(diwaliBonusCount || "0"),
             "NAME",
@@ -2202,8 +2073,8 @@ const History = ({ username, userRoles = [] }) => {
                                                             value={
                                                                 isClientToggleActive
                                                                     ? selectedClient
-                                                                : selectedContractor ||
-                                                                combinedOptions.find(
+                                                                    : selectedContractor ||
+                                                                    combinedOptions.find(
                                                                         opt =>
                                                                             (opt.type === "Contractor" && opt.id === Number(newExpense.contractor_id)) ||
                                                                             (opt.type === "Vendor" && opt.id === Number(newExpense.vendor_id)) ||
@@ -2220,9 +2091,9 @@ const History = ({ username, userRoles = [] }) => {
                                                                     }));
                                                                     setVendorId('');
                                                                     setContractorId('');
-                                                                setSelectedContractor(null);
-                                                                setSelectedVendor(null);
-                                                                setSelectedEmployee(null);
+                                                                    setSelectedContractor(null);
+                                                                    setSelectedVendor(null);
+                                                                    setSelectedEmployee(null);
                                                                     const clientKey = selectedOption?.compositeKey || (selectedOption ? buildClientKey(selectedOption.label, selectedOption.fatherName, selectedOption.mobile) : "");
                                                                     const projectsForClient = selectedOption
                                                                         ? selectedOption.projects || (clientKey ? (clientProjectMap[clientKey]?.projects || []) : [])
@@ -2230,25 +2101,25 @@ const History = ({ username, userRoles = [] }) => {
                                                                     setClientProjectOptions(projectsForClient);
                                                                     if (projectsForClient.length === 1) {
                                                                         const onlyProject = projectsForClient[0];
-                                                                    setSelectedProjectName(onlyProject);
-                                                                    setSelectedProjectOption(onlyProject);
-                                                                    setProjectId(onlyProject.id);
+                                                                        setSelectedProjectName(onlyProject);
+                                                                        setSelectedProjectOption(onlyProject);
+                                                                        setProjectId(onlyProject.id);
                                                                         setNewExpense(prev => ({ ...prev, project_id: onlyProject.id }));
                                                                     }
                                                                     if (!selectedOption) {
-                                                                    setSelectedProjectName(null);
-                                                                    setSelectedProjectOption(null);
-                                                                    setProjectId('');
+                                                                        setSelectedProjectName(null);
+                                                                        setSelectedProjectOption(null);
+                                                                        setProjectId('');
                                                                         setNewExpense(prev => ({ ...prev, project_id: "" }));
                                                                     }
                                                                     return;
                                                                 }
-                                                            setSelectedClient(null);
+                                                                setSelectedClient(null);
                                                                 setSelectedClient(null);
                                                                 setClientProjectOptions([]);
-                                                            setSelectedProjectName(null);
-                                                            setSelectedProjectOption(null);
-                                                            setProjectId('');
+                                                                setSelectedProjectName(null);
+                                                                setSelectedProjectOption(null);
+                                                                setProjectId('');
                                                                 if (!selectedOption) {
                                                                     setNewExpense(prev => ({
                                                                         ...prev,
@@ -2257,19 +2128,19 @@ const History = ({ username, userRoles = [] }) => {
                                                                     }));
                                                                     setContractorId("");
                                                                     setVendorId("");
-                                                                setSelectedContractor(null);
-                                                                setSelectedVendor(null);
-                                                                setSelectedEmployee(null);
-                                                            } else if (selectedOption.type === "Employee") {
-                                                                setNewExpense(prev => ({
-                                                                    ...prev,
-                                                                    employee_id: selectedOption.id,
-                                                                    contractor_id: "",
-                                                                    vendor_id: ""
-                                                                }));
-                                                                setSelectedEmployee(selectedOption);
-                                                                setSelectedContractor(null);
-                                                                setSelectedVendor(null);
+                                                                    setSelectedContractor(null);
+                                                                    setSelectedVendor(null);
+                                                                    setSelectedEmployee(null);
+                                                                } else if (selectedOption.type === "Employee") {
+                                                                    setNewExpense(prev => ({
+                                                                        ...prev,
+                                                                        employee_id: selectedOption.id,
+                                                                        contractor_id: "",
+                                                                        vendor_id: ""
+                                                                    }));
+                                                                    setSelectedEmployee(selectedOption);
+                                                                    setSelectedContractor(null);
+                                                                    setSelectedVendor(null);
                                                                 } else if (selectedOption.type === "Contractor") {
                                                                     setNewExpense(prev => ({
                                                                         ...prev,
@@ -2278,9 +2149,9 @@ const History = ({ username, userRoles = [] }) => {
                                                                     }));
                                                                     setContractorId(selectedOption.id);
                                                                     setVendorId("");
-                                                                setSelectedContractor(selectedOption);
-                                                                setSelectedVendor(null);
-                                                                setSelectedEmployee(null);
+                                                                    setSelectedContractor(selectedOption);
+                                                                    setSelectedVendor(null);
+                                                                    setSelectedEmployee(null);
                                                                 } else if (selectedOption.type === "Vendor") {
                                                                     setNewExpense(prev => ({
                                                                         ...prev,
@@ -2289,9 +2160,9 @@ const History = ({ username, userRoles = [] }) => {
                                                                     }));
                                                                     setVendorId(selectedOption.id);
                                                                     setContractorId("");
-                                                                setSelectedVendor(selectedOption);
-                                                                setSelectedContractor(null);
-                                                                setSelectedEmployee(null);
+                                                                    setSelectedVendor(selectedOption);
+                                                                    setSelectedContractor(null);
+                                                                    setSelectedEmployee(null);
                                                                 }
                                                             }}
                                                             options={isClientToggleActive ? clientOptions : combinedOptions}
@@ -2422,6 +2293,10 @@ const History = ({ username, userRoles = [] }) => {
                                                                 } else if (selectedOption.type === "Vendor") {
                                                                     handleEditExpense(row.id, "vendor_id", selectedOption.id);
                                                                     handleEditExpense(row.id, "contractor_id", "");
+                                                                } else if (selectedOption.type === "Employee") {
+                                                                    handleEditExpense(row.id, "employee_id", selectedOption.id);
+                                                                    handleEditExpense(row.id, "contractor_id", "");
+                                                                    handleEditExpense(row.id, "vendor_id", "");
                                                                 }
                                                             }}
                                                             options={(isClientToggleActive || (!row.contractor_id && !row.vendor_id && !row.employee_id && (row.client_name || row.client_id))) ? clientOptions : combinedOptions}
@@ -2493,7 +2368,6 @@ const History = ({ username, userRoles = [] }) => {
                                                                                 transactionNumber: "",
                                                                                 accountNumber: ""
                                                                             });
-                                                                            // Fetch previous payments for this expense
                                                                             const previousPaymentsForExpense = getPaymentsByExpenseId(row.id);
                                                                             setPreviousPayments(previousPaymentsForExpense);
                                                                             setShowPaymentPopup(true);
@@ -2623,12 +2497,9 @@ const History = ({ username, userRoles = [] }) => {
                                                 </td>
                                                 <td className="text-sm text-left pl-2 w-[120px] font-semibold">
                                                     {Number(row.weekly_number) === Number(lastWeekNumber) && (
-                                                        <div className="flex gap-2"> {/* <-- Added flex container */}
+                                                        <div className="flex gap-2">
                                                             {editingRowId === row.id ? (
-                                                                <button
-                                                                    className="text-green-600 font-bold text-lg relative z-10"
-                                                                    onClick={() => saveEditedExpense(row)}
-                                                                >
+                                                                <button className="text-green-600 font-bold text-lg relative z-10" onClick={() => saveEditedExpense(row)}>
                                                                     ✓
                                                                 </button>
                                                             ) : (
@@ -2647,7 +2518,6 @@ const History = ({ username, userRoles = [] }) => {
                                                                     </button>
                                                                 )
                                                             )}
-                                                            {/* Delete Button */}
                                                             {row.type === "Daily" ? (
                                                                 <img
                                                                     className="w-5 h-4 opacity-40 cursor-not-allowed"
@@ -2659,7 +2529,6 @@ const History = ({ username, userRoles = [] }) => {
                                                                     <img src={Delete} className="w-5 h-4" alt="Delete" />
                                                                 </button>
                                                             )}
-                                                            {/* History Button */}
                                                             {row.type === "Daily" ? (
                                                                 <img
                                                                     className="w-5 h-4 opacity-40 cursor-not-allowed"
@@ -2671,7 +2540,6 @@ const History = ({ username, userRoles = [] }) => {
                                                                     <img src={history} className="w-5 h-4" alt="History" />
                                                                 </button>
                                                             )}
-
                                                         </div>
                                                     )}
                                                 </td>
@@ -2682,7 +2550,6 @@ const History = ({ username, userRoles = [] }) => {
                             </div>
                         </div>
                     </div>
-                    {/* PAYMENTS RECEIVED TABLE */}
                     <div className="w-full xl:flex-[2] xl:min-w-[300px]">
                         <div className="block">
                             <div className="flex flex-col sm:flex-row justify-between mb-4 gap-2">
@@ -2823,7 +2690,6 @@ const History = ({ username, userRoles = [] }) => {
                                                 </td>
                                             </tr>
                                         ))}
-                                        {/* FIXED INPUT ROW */}
                                         {Number(selectedWeek) === Number(lastWeekNumber) ? (
                                             <tr>
                                                 <td className="px-4 py-2">
@@ -2869,7 +2735,6 @@ const History = ({ username, userRoles = [] }) => {
                                 </table>
                             </div>
                         </div>
-                        {/* SUMMARY SECTION */}
                         <div className="mt-4 pt-2">
                             <h2 className="font-bold text-lg mb-2">Summary</h2>
                             <div className="overflow-hidden rounded-md border-l-8 border-[#BF9853] text-left">
@@ -2877,7 +2742,7 @@ const History = ({ username, userRoles = [] }) => {
                                     <tbody>
                                         {Object.entries(
                                             filteredExpenses
-                                                .filter(expense => Number(expense.amount) > 0) // only positive amounts
+                                                .filter(expense => Number(expense.amount) > 0) 
                                                 .reduce((acc, expense) => {
                                                     const type = expense.type;
                                                     const amount = Number(expense.amount);
@@ -2909,17 +2774,13 @@ const History = ({ username, userRoles = [] }) => {
                 <AuditModalWeeklyPaymentsReceived show={showWeeklyPaymentReceivedModal} onClose={() => setShowWeeklyPaymentReceivedModal(false)}
                     audits={weeklyPaymentReceivedAudits} />
             </div>
-
-            {/* Payment Popup */}
             {showPaymentPopup && (
                 <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
                     <div className="bg-white text-left rounded-xl  p-6 w-[800px] h-[770px] overflow-y-auto">
                         <h3 className="text-lg font-semibold mb-4 text-center">Add Payment</h3>
                         <div className="space-y-4 mb-4 justify-items-center">
-                            {/* First Row: Date, Amount, Mode - with border */}
                             <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-4">
                                 <div className="grid grid-cols-3 gap-4">
-                                    {/* Date */}
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
                                         <div className="relative">
@@ -2932,8 +2793,6 @@ const History = ({ username, userRoles = [] }) => {
                                             />
                                         </div>
                                     </div>
-
-                                    {/* Amount */}
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
                                         <input
@@ -2944,8 +2803,6 @@ const History = ({ username, userRoles = [] }) => {
                                             className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none no-spinner"
                                         />
                                     </div>
-
-                                    {/* Mode */}
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">Mode</label>
                                         <select
@@ -2962,14 +2819,10 @@ const History = ({ username, userRoles = [] }) => {
                                     </div>
                                 </div>
                             </div>
-
-                            {/* Second Row: Transaction Number, Account Number, Cheque Fields - with border */}
                             <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-4">
                                 <div className="space-y-4">
-                                    {/* Cheque Fields Row (only for Cheque mode) */}
                                     {paymentPopupData.paymentMode === "Cheque" && (
                                         <div className="grid grid-cols-2 gap-4">
-                                            {/* Cheque No */}
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No</label>
                                                 <input
@@ -2980,8 +2833,6 @@ const History = ({ username, userRoles = [] }) => {
                                                     className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
                                                 />
                                             </div>
-
-                                            {/* Cheque Date */}
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date</label>
                                                 <input
@@ -2993,9 +2844,7 @@ const History = ({ username, userRoles = [] }) => {
                                             </div>
                                         </div>
                                     )}
-                                    {/* Transaction Number and Account Number Row */}
                                     <div className="grid grid-cols-2 gap-4">
-                                        {/* Transaction Number */}
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
                                             <input
@@ -3006,8 +2855,6 @@ const History = ({ username, userRoles = [] }) => {
                                                 className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
                                             />
                                         </div>
-
-                                        {/* Account Number */}
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
                                             <select
@@ -3024,12 +2871,9 @@ const History = ({ username, userRoles = [] }) => {
                                             </select>
                                         </div>
                                     </div>
-
-
                                 </div>
                             </div>
                         </div>
-                        {/* Previous Payments Section */}
                         {previousPayments.length > 0 && (
                             <div>
                                 <h4 className="text-md font-medium text-gray-700 mb-3 ml-20">Previous Payments: {previousPayments.length} </h4>
@@ -3037,10 +2881,8 @@ const History = ({ username, userRoles = [] }) => {
                                     <div className="space-y-4 max-h-64 overflow-y-auto">
                                         {previousPayments.map((payment, index) => (
                                             <div key={index} className="">
-                                                {/* First Row: Date, Amount, Mode */}
                                                 <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-4 mb-4">
                                                     <div className="grid grid-cols-3 gap-4">
-                                                        {/* Date */}
                                                         <div>
                                                             <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
                                                             <input
@@ -3050,8 +2892,6 @@ const History = ({ username, userRoles = [] }) => {
                                                                 className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
                                                             />
                                                         </div>
-
-                                                        {/* Amount */}
                                                         <div>
                                                             <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
                                                             <input
@@ -3061,8 +2901,6 @@ const History = ({ username, userRoles = [] }) => {
                                                                 className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
                                                             />
                                                         </div>
-
-                                                        {/* Mode */}
                                                         <div>
                                                             <label className="block text-sm font-medium text-gray-700 mb-2">Mode</label>
                                                             <input
@@ -3074,14 +2912,10 @@ const History = ({ username, userRoles = [] }) => {
                                                         </div>
                                                     </div>
                                                 </div>
-
-                                                {/* Second Row: Transaction Number, Account Number, Cheque Fields */}
                                                 <div className="border-2 border-[#BF9853] border-opacity-25 rounded-lg p-4">
                                                     <div className="space-y-4">
-                                                        {/* Cheque Fields Row (if cheque payment) */}
                                                         {payment.bill_payment_mode === "Cheque" && (
                                                             <div className="grid grid-cols-2 gap-4">
-                                                                {/* Cheque No */}
                                                                 <div>
                                                                     <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No</label>
                                                                     <input
@@ -3091,7 +2925,6 @@ const History = ({ username, userRoles = [] }) => {
                                                                         className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
                                                                     />
                                                                 </div>
-                                                                {/* Cheque Date */}
                                                                 <div>
                                                                     <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date</label>
                                                                     <input
@@ -3103,9 +2936,7 @@ const History = ({ username, userRoles = [] }) => {
                                                                 </div>
                                                             </div>
                                                         )}
-                                                        {/* Transaction Number and Account Number Row */}
                                                         <div className="grid grid-cols-2 gap-4">
-                                                            {/* Transaction Number */}
                                                             <div>
                                                                 <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
                                                                 <input
@@ -3115,7 +2946,6 @@ const History = ({ username, userRoles = [] }) => {
                                                                     className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
                                                                 />
                                                             </div>
-                                                            {/* Account Number */}
                                                             <div>
                                                                 <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
                                                                 <input
@@ -3197,7 +3027,7 @@ const History = ({ username, userRoles = [] }) => {
                                                             const start = new Date(now.getFullYear(), 0, 1);
                                                             const diff =
                                                                 now - start + (start.getTimezoneOffset() - now.getTimezoneOffset()) * 60000;
-                                                            const oneWeek = 604800000; // ms in a week
+                                                            const oneWeek = 604800000; 
                                                             return Math.floor(diff / oneWeek) + 1;
                                                         };
                                                         const description = portalDescriptions[currentProjectAdvanceRow.advance_portal_id] || "";
@@ -3231,7 +3061,6 @@ const History = ({ username, userRoles = [] }) => {
                                                         } else {
                                                             const advanceResponseData = await advanceResponse.json();
                                                             advancePortalId = advanceResponseData.advancePortalId || advanceResponseData.advance_portal_id;
-                                                            console.log("Advance portal payment mode updated successfully, ID:", advancePortalId);
                                                         }
                                                     } catch (error) {
                                                         console.error("Error updating advance portal payment mode:", error);
@@ -3252,7 +3081,7 @@ const History = ({ username, userRoles = [] }) => {
                                                             const start = new Date(now.getFullYear(), 0, 1);
                                                             const diff =
                                                                 now - start + (start.getTimezoneOffset() - now.getTimezoneOffset()) * 60000;
-                                                            const oneWeek = 604800000; // ms in a week
+                                                            const oneWeek = 604800000;
                                                             return Math.floor(diff / oneWeek) + 1;
                                                         };
                                                         const staffAdvanceSaveData = {
@@ -3284,7 +3113,6 @@ const History = ({ username, userRoles = [] }) => {
                                                         } else {
                                                             const staffAdvanceResponseData = await staffAdvanceResponse.json();
                                                             staffAdvancePortalId = staffAdvanceResponseData.staffAdvancePortalId || staffAdvanceResponseData.staff_advance_portal_id;
-                                                            console.log("Staff advance saved successfully, ID:", staffAdvancePortalId);
                                                         }
                                                     } catch (error) {
                                                         console.error("Error saving staff advance:", error);
@@ -3318,19 +3146,15 @@ const History = ({ username, userRoles = [] }) => {
                                                 if (!response.ok) {
                                                     throw new Error("Failed to save payment");
                                                 }
-                                                // Refresh the data
                                                 const [expensesRes, paymentsRes] = await Promise.all([
                                                     axios.get(`https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${selectedWeek}`),
                                                     axios.get(`https://backendaab.in/aabuildersDash/api/payments-received/week/${selectedWeek}`)
                                                 ]);
-
                                                 setExpenses(expensesRes.data);
                                                 const filteredPayments = paymentsRes.data.filter(
                                                     (payment) => payment.type !== "Handover"
                                                 );
                                                 setPayments(filteredPayments);
-
-                                                // Refresh weekly payment bills
                                                 await fetchWeeklyPaymentBills();
                                             }
                                         } catch (error) {
@@ -3368,8 +3192,6 @@ const History = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
             )}
-
-            {/* Description Popup */}
             {showPopups && (currentRow?.type === "Project Advance" || currentRow?.type === "Bill") && (
                 <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
                     <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
@@ -3403,7 +3225,6 @@ const History = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
             )}
-            {/* File Upload Popup */}
             {fileUploadPopup && (
                 <div
                     className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
@@ -3471,7 +3292,6 @@ const History = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
             )}
-            {/* Category Popup */}
             {showCategoryPopup && (
                 <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
                     <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
@@ -3562,11 +3382,8 @@ const History = ({ username, userRoles = [] }) => {
                                         }
                                         return;
                                     }
-
-                                    // Set loading state and close popup immediately
                                     setIsConfirmingCategory(true);
                                     setShowCategoryPopup(false);
-
                                     try {
                                         const enoResponse = await fetch('https://backendaab.in/aabuilderDash/expenses_form/get_form');
                                         if (!enoResponse.ok) {
@@ -3605,21 +3422,16 @@ const History = ({ username, userRoles = [] }) => {
                                             },
                                         });
                                         if (response.ok) {
-                                            // Refresh the data
                                             const [expensesRes, paymentsRes] = await Promise.all([
                                                 axios.get(`https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${selectedWeek}`),
                                                 axios.get(`https://backendaab.in/aabuildersDash/api/payments-received/week/${selectedWeek}`)
                                             ]);
-
                                             setExpenses(expensesRes.data);
                                             const filteredPayments = paymentsRes.data.filter(
                                                 (payment) => payment.type !== "Handover"
                                             );
                                             setPayments(filteredPayments);
-
-                                            // Refresh weekly payment bills
                                             await fetchWeeklyPaymentBills();
-
                                             setCurrentProjectAdvanceRow(prev => ({ ...prev, send_to_expenses_entry: true }));
                                             setPopup({
                                                 show: true,
@@ -3666,7 +3478,6 @@ const History = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
             )}
-            {/* Popup for success/error messages */}
             {popup.show && (
                 <div className="fixed top-1/3 left-1/2 transform -translate-x-1/2 bg-white border rounded-lg shadow-lg p-4 z-50 w-96">
                     <p className="mb-4 font-semibold text-center">{popup.message}</p>

@@ -177,18 +177,15 @@ const Dashboard = () => {
             const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
             if (response.ok) {
                 const data = await response.json();
-                // Filter for "own project" category
                 const ownProjects = Array.isArray(data)
                     ? data.filter(p => (p.projectCategory || '').toLowerCase() === 'own project')
                     : [];
                 setProjects(ownProjects);
-                console.log('Fetched projects:', ownProjects.length, 'projects');
             } else {
                 console.log('Error fetching projects.');
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching projects.');
         }
     };
     useEffect(() => {
@@ -213,9 +210,6 @@ const Dashboard = () => {
             if (response.ok) {
                 const data = await response.json();
                 setTenantShopData(data);
-                console.log(data);
-                
-                // Build mapping from shopNoId to shopNo from projects (project management)
                 const shopNoIdToShopNoMap = {};
                 projects
                     .filter(project => project.projectReferenceName)
@@ -231,8 +225,6 @@ const Dashboard = () => {
                         });
                     });
                 setShopNoIdToShopNoMap(shopNoIdToShopNoMap);
-                
-                // Build tenantNameId -> tenantName mapping
                 const tenantNameIdMap = {};
                 data.forEach(tenant => {
                     if (tenant.id && tenant.tenantName) {
@@ -240,8 +232,6 @@ const Dashboard = () => {
                     }
                 });
                 setTenantNameIdToTenantNameMap(tenantNameIdMap);
-                
-                //get the total actual rent
                 let total = 0;
                 data.forEach(tenant => {
                     tenant.shopNos?.forEach(shop => {
@@ -250,7 +240,6 @@ const Dashboard = () => {
                         }
                     });
                 });
-                console.log(total);
                 setTotalMonthlyRent(total);
             } else {
                 console.error('Error fetching tenants.');
@@ -261,16 +250,13 @@ const Dashboard = () => {
     };
     const formatDateOnly = (dateString) => {
         if (!dateString) return '';
-        // If already in DD-MM-YYYY format, just replace - with / for display
         if (dateString.includes('-') && dateString.split('-')[0].length === 2) {
             return dateString.replace(/-/g, '/');
         }
-        // If in YYYY-MM-DD format, convert to DD/MM/YYYY
         if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
             const parts = dateString.split('-');
             return `${parts[2]}/${parts[1]}/${parts[0]}`;
         }
-        // Try parsing as date
         const date = new Date(dateString);
         if (!isNaN(date.getTime())) {
             const day = String(date.getDate()).padStart(2, '0');
@@ -280,7 +266,6 @@ const Dashboard = () => {
         }
         return dateString;
     };
-    // Build shopInfoMap using shopNoId as key (from tenant link data)
     const shopInfoMap = useMemo(() => {
         const map = {};
         tenantShopData.forEach(tenant => {
@@ -288,7 +273,6 @@ const Dashboard = () => {
                 if (shop.shopNoId) {
                     const shopNo = shopNoIdToShopNoMap[shop.shopNoId] || '';
                     if (shopNo) {
-                        // Find the project for this shop to get doorNo and projectReferenceName
                         let doorNo = '';
                         let projectReferenceName = '';
                         projects
@@ -304,7 +288,6 @@ const Dashboard = () => {
                                     }
                                 });
                             });
-                        
                         map[shopNo] = {
                             doorNo: doorNo,
                             projectReferenceName: projectReferenceName,
@@ -322,7 +305,10 @@ const Dashboard = () => {
         });
         return map;
     }, [tenantShopData, shopNoIdToShopNoMap, projects]);
-    
+    const parseAmountOrZero = (value) => {
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? numeric : 0;
+    };
     useEffect(() => {
         const buildTenantKey = (shopNo, tenantId, tenantName) => {
             const normalizedShop = shopNo || 'unknown';
@@ -333,7 +319,6 @@ const Dashboard = () => {
                     : 'vacant';
             return `${normalizedShop}||${tenantIdentifier}`;
         };
-
         const getTenantKeyFromForm = (entry) => {
             const resolvedShopNo = entry.shopNoId
                 ? (shopNoIdToShopNoMap[entry.shopNoId] || entry.shopNo || '')
@@ -346,9 +331,7 @@ const Dashboard = () => {
                     : 'vacant';
             return `${resolvedShopNo}||${tenantIdentifier}`;
         };
-
         const createMonthBuckets = () => Array(12).fill(null).map(() => []);
-
         const doesFormBelongToShop = (entry, shop) => {
             const shopMatches = entry.shopNoId
                 ? (shop.shopNoId && entry.shopNoId === shop.shopNoId)
@@ -362,14 +345,10 @@ const Dashboard = () => {
             }
             return !entry.tenantName && !shop.tenantName;
         };
-
         const allShops = [];
-        // 1. Collect all shop data from projects (project management)
-        // Only include projects with projectReferenceName
         projects
-            .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
+            .filter(project => project.projectReferenceName)
             .forEach(project => {
-                // Convert Set to Array if needed, or handle as array
                 const propertyDetailsArray = Array.isArray(project.propertyDetails) 
                     ? project.propertyDetails 
                     : Array.from(project.propertyDetails || []);
@@ -379,7 +358,7 @@ const Dashboard = () => {
                         allShops.push({
                             shopNo: shop.shopNo,
                             doorNo: shop.doorNo || '',
-                            propertyName: project.projectReferenceName || '', // Use projectReferenceName
+                            propertyName: project.projectReferenceName || '',
                             advance: null,
                             tenantName: null,
                             tenantId: null,
@@ -396,7 +375,6 @@ const Dashboard = () => {
                     }
                 });
             });
-        // 2. Merge tenant data from tenant_link_shop (including closed shops for tenant name)
         tenantShopData.forEach(tenant => {
             tenant.shopNos?.forEach(shop => {
                 if (!shop?.shopNoId) return;
@@ -481,7 +459,7 @@ const Dashboard = () => {
                 }
                 advanceAdjustmentDetailsMap[key].push(`${paidOn} - ₹${amount.toLocaleString()}`);
             } else if (entry.formType === 'Shop Closure') {
-                const amount = parseFloat(entry.refundAmount || entry.amount || 0);
+                const amount = parseAmountOrZero(entry.refundAmount ?? entry.amount);
                 const paidOn = formatDateOnly(entry.paidOnDate) || '';
                 if (!shopClosureDetailsMap[key]) {
                     shopClosureDetailsMap[key] = [];
@@ -496,7 +474,6 @@ const Dashboard = () => {
                 refundDetailsMap[key].push(`${paidOn} - ₹${amount.toLocaleString()}`);
             }
         });
-        // 6. Final table data
         const finalTableData = [];
         shopsForTable.forEach((shop) => {
             const months = groupedRentals[shop.tenantKey] || createMonthBuckets();
@@ -506,7 +483,6 @@ const Dashboard = () => {
             const advanceAdjustmentDetails = advanceAdjustmentDetailsMap[shop.tenantKey] || [];
             const shopClosureDetails = shopClosureDetailsMap[shop.tenantKey] || [];
             const refundDetails = refundDetailsMap[shop.tenantKey] || [];
-            // Match using shopNoId if available, otherwise fallback to shopNo
             const totalRentPaid = rentForms
                 .filter(entry => {
                     return doesFormBelongToShop(entry, shop) &&
@@ -514,29 +490,18 @@ const Dashboard = () => {
                         entry.paymentMode?.trim() === 'Advance Adjustment';
                 })
                 .reduce((sum, entry) => sum + parseFloat(entry.amount || 0), 0);
-            
-            // Calculate Shop Closure payments that should be subtracted from advance
             const totalShopClosurePaid = rentForms
                 .filter(entry => {
                     return doesFormBelongToShop(entry, shop) && entry.formType === 'Shop Closure';
                 })
-                .reduce((sum, entry) => sum + parseFloat(entry.refundAmount || entry.amount || 0), 0);
-            
-            // Calculate Refund payments that should be subtracted from advance
+                .reduce((sum, entry) => sum + parseAmountOrZero(entry.refundAmount ?? entry.amount), 0);
             const totalRefundPaid = rentForms
                 .filter(entry => {
                     return doesFormBelongToShop(entry, shop) && entry.formType === 'Refund';
                 })
                 .reduce((sum, entry) => sum + parseFloat(entry.refundAmount || entry.amount || 0), 0);
-            console.log("Shop Closure:",totalShopClosurePaid);
-            console.log("Refund:",totalRefundPaid);
-            
             const remainingAdvance = Math.max(0, advanceAmount - totalRentPaid - totalShopClosurePaid - totalRefundPaid);
-
-            // Check if shop had rent payments this year
             const hadRentPaymentsThisYear = months.some(monthArr => monthArr.length > 0);
-            
-            // Check if shop was vacated in the selected year
             const shopClosureDate = shop.shopClosureDate || shopInfoMap[shop.shopNo]?.shopClosureDate;
             let vacatedThisYear = false;
             if (shopClosureDate && !shop.active) {
@@ -544,10 +509,7 @@ const Dashboard = () => {
                 const closureYear = closureDate.getFullYear();
                 vacatedThisYear = closureYear === parseInt(selectedYear);
             }
-            
-            // Show as vacated if it had payments this year OR was vacated this year
             const wasActiveThisYear = hadRentPaymentsThisYear || vacatedThisYear;
-            
             const row = {
                 shNo: finalTableData.length + 1,
                 shopNo: shop.shopNo,
@@ -570,16 +532,15 @@ const Dashboard = () => {
                 const hasAnotherActiveTenant = shopsForTable.some(
                     s => s.shopNo === shop.shopNo && s.active
                 );
-                // For vacated tenant, show the tenant name and remaining advance amount
                 finalTableData.push({
                     ...row,
-                    tenantName: shop.tenantName || 'Vacated', // Show actual tenant name for vacated
+                    tenantName: shop.tenantName || 'Vacated', 
                     vacated: true,
-                    advance: remainingAdvance, // Show remaining advance for vacated tenant
-                    advanceDetails: advanceDetails, // Show advance details for vacated
-                    advanceAdjustmentDetails: advanceAdjustmentDetails, // Show adjustment details for vacated
-                    shopClosureDetails: shopClosureDetails, // Show closure details for vacated
-                    refundDetails: refundDetails // Show refund details for vacated
+                    advance: remainingAdvance, 
+                    advanceDetails: advanceDetails, 
+                    advanceAdjustmentDetails: advanceAdjustmentDetails, 
+                    shopClosureDetails: shopClosureDetails, 
+                    refundDetails: refundDetails 
                 });
                 if (!hasAnotherActiveTenant) {
                     finalTableData.push({
@@ -611,7 +572,6 @@ const Dashboard = () => {
     const handleSaveRentAdvance = async () => {
         const { tenantId, shopId } = selectedShop;
         try {
-            // First, update the tenant shop data
             const updateResponse = await fetch(`https://backendaab.in/aabuildersDash/api/tenantShop/update/${tenantId}/shop/${shopId}`, {
                 method: 'PUT',
                 headers: {
@@ -622,16 +582,13 @@ const Dashboard = () => {
                     advanceAmount: editAdvance || null
                 })
             });
-            
             if (updateResponse.ok) {
-                // If rent amount and starting month are provided, save rent history
                 if (editRent && editStartingMonth) {
                     const rentHistoryData = {
                         tenantWithShopNoId: shopId,
                         rentAmount: editRent,
                         startingMonthForThisRent: editStartingMonth
                     };
-                    
                     const historyResponse = await fetch('https://backendaab.in/aabuildersDash/api/rent-history/save', {
                         method: 'POST',
                         headers: {
@@ -639,14 +596,12 @@ const Dashboard = () => {
                         },
                         body: JSON.stringify(rentHistoryData)
                     });
-                    
                     if (!historyResponse.ok) {
                         console.error('Failed to save rent history');
                         alert('Rent/Advance updated but failed to save rent history');
                     }
                 }
-                
-                await fetchTenants();  // Refresh data
+                await fetchTenants();
                 setShowEditPopup(false);
                 setSelectedShop(null);
                 setEditRent('');
@@ -670,8 +625,6 @@ const Dashboard = () => {
             const isVacant = shop.tenantName === 'Vacant';
             const isVacated = shop.vacated;
             const isOccupied = !isVacant && !isVacated;
-            
-            // Occupancy status filter
             let matchesOccupancyStatus = true;
             if (selectedOccupancyStatus) {
                 if (selectedOccupancyStatus === 'vacant') {
@@ -682,7 +635,6 @@ const Dashboard = () => {
                     matchesOccupancyStatus = isVacated;
                 }
             }
-            
             let matchesMonthStatus = true;
             if (selectedMonth !== '' && paymentStatus !== '') {
                 const monthPayments = shop.months?.[selectedMonth] || [];

@@ -363,7 +363,6 @@ const Tenant = () => {
                           className="w-4 h-4 transform hover:scale-110 hover:brightness-110 transition duration-200"
                         />
                       </button>
-
                       {agreement.confirmedAgreementUrl ? (
                         <a
                           href={agreement.confirmedAgreementUrl}

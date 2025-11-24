@@ -24,6 +24,8 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [requestingEntry, setRequestingEntry] = useState(null);
   const [editFormData, setEditFormData] = useState({});
   const [editingId, setEditingId] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
@@ -33,22 +35,16 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
   const [progress, setProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState(null);
   const fileInputRef = useRef(null);
-
-  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
 
-  // Load filters from sessionStorage on mount
   useEffect(() => {
-    // Check if this is a page refresh or navigation
     const isPageRefresh = sessionStorage.getItem('advanceTableViewPageLoaded') === null;
 
     if (isPageRefresh) {
-      // First load or manual refresh - clear filters
       sessionStorage.removeItem('advanceTableViewFilters');
       sessionStorage.setItem('advanceTableViewPageLoaded', 'true');
     } else {
-      // Navigation from another page - restore filters
       const savedFilters = sessionStorage.getItem('advanceTableViewFilters');
       if (savedFilters) {
         try {
@@ -68,33 +64,25 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
         }
       }
     }
-    // Set flag to indicate page is loaded
     return () => {
-      // On unmount (when navigating away), keep the flag
       sessionStorage.setItem('advanceTableViewPageLoaded', 'true');
     };
   }, []);
 
-  // Detect page refresh and clear the flag
   useEffect(() => {
     const handleBeforeUnload = () => {
-      // Check if it's a refresh (reload)
       const entries = performance.getEntriesByType('navigation');
       const navigationType = entries.length > 0 ? entries[0].type : null;
-
       if (navigationType === 'reload') {
         sessionStorage.removeItem('advanceTableViewPageLoaded');
       }
     };
-
     window.addEventListener('beforeunload', handleBeforeUnload);
-
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, []);
 
-  // Save filters to sessionStorage whenever they change
   useEffect(() => {
     const filters = {
       selectDate,
@@ -186,44 +174,46 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     animationFrame.current = requestAnimationFrame(step);
   };
   const formatWithCommas = (value) => {
-    if (!value) return "";
-    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    if (value === '' || value === null || value === undefined) return "";
+    const numericValue = typeof value === 'number' ? value : Number(value);
+    if (Number.isNaN(numericValue)) {
+      return value.toString();
+    }
+    return numericValue.toLocaleString("en-IN", { maximumFractionDigits: 0 });
   };
-
+  const sanitizeNumberField = (value) => {
+    if (value === '' || value === null || value === undefined) return 0;
+    const numericValue = Number(value);
+    return Number.isNaN(numericValue) ? 0 : numericValue;
+  };
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       setSelectedFile(file);
     }
-    // This ensures the input is cleared even if the same file is selected again next time
     e.target.value = '';
   };
-
   const handleAmountChange = (e) => {
     const rawValue = e.target.value.replace(/,/g, "");
-
     if (!isNaN(rawValue)) {
       setEditFormData(prev => {
+        const numericValue = rawValue === "" ? "" : Number(rawValue);
         if (prev.type === "Refund") {
-          return { ...prev, refund_amount: rawValue, amount: '' };
+          return { ...prev, refund_amount: numericValue, amount: '' };
         } else {
-          return { ...prev, amount: rawValue, refund_amount: '' };
+          return { ...prev, amount: numericValue, refund_amount: '' };
         }
       });
     }
   };
-
   const handleSort = (key) => {
     setSortConfig((prev) => {
       if (prev.key === key) {
-        // Toggle direction if clicking the same column
         return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
       }
-      // Default to ascending if switching column
       return { key, direction: 'asc' };
     });
   };
-
   const handleChange = async (selected) => {
     setSelectedOption(selected);
     setEditFormData(prev => {
@@ -270,11 +260,8 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
       setOverallAdvance(0);
     }
   };
-
   const exportPDF = () => {
-    const doc = new jsPDF("l", "pt", "a4"); // landscape mode
-
-    // Table column headers (S.No first, no Activity)
+    const doc = new jsPDF("l", "pt", "a4"); 
     const headers = [
       [
         "S.No",
@@ -291,10 +278,8 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
         "E.No"
       ]
     ];
-
-    // Map only filtered table data
     const rows = sortedData.map((entry, index) => [
-      index + 1, // Serial number
+      index + 1, 
       formatDateOnly(entry.date),
       entry.vendor_id
         ? getVendorName(entry.vendor_id)
@@ -315,10 +300,8 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
       entry.payment_mode,
       entry.entry_no
     ]);
-
     doc.setFontSize(12);
     doc.text("Advance Data Table", 40, 30);
-
     doc.autoTable({
       head: headers,
       body: rows,
@@ -347,10 +330,8 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
         7: { halign: 'right' }  // Refund
       }
     });
-
     doc.save("AdvanceData.pdf");
   };
-
   const exportCSV = () => {
     const csvHeaders = [
       "S.No",
@@ -367,7 +348,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
       "Attached file",
       "E.No"
     ];
-
     const csvRows = sortedData.map((entry, index) => [
       index + 1,
       formatDateOnly(entry.date),
@@ -388,21 +368,17 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
       entry.type,
       entry.description,
       entry.payment_mode,
-      "", // Attached file col
+      "",
       entry.entry_no
     ]);
-
-    // Convert to CSV string manually
     const csvString = [
-      csvHeaders.join(","), // header row
+      csvHeaders.join(","), 
       ...csvRows.map(row =>
         row
-          .map(value => `"${String(value).replace(/"/g, '""')}"`) // escape quotes
+          .map(value => `"${String(value).replace(/"/g, '""')}"`)
           .join(",")
       )
     ].join("\n");
-
-    // Create a blob and trigger download
     const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -411,7 +387,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     link.click();
     document.body.removeChild(link);
   };
-
   useEffect(() => {
     return () => cancelMomentum();
   }, []);
@@ -553,7 +528,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
             sNo: "9"
           }
         ];
-        // Combine backend data with predefined options
         const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
         setSiteOptions(combinedSiteOptions);
         setProgress(75);
@@ -656,7 +630,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
   const getSiteName = (id) =>
     siteOptions.find(s => String(s.id) === String(id))?.value || "";
   const filteredData = advanceData.filter((entry) => {
-    // Date range filter (Start Date and End Date)
     if (startDate && endDate) {
       const s = new Date(startDate);
       const e = new Date(endDate);
@@ -674,8 +647,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
       const entryDate = new Date(entry.date);
       if (entryDate > e) return false;
     }
-
-    // Single date filter
     if (selectDate) {
       const [year, month, day] = selectDate.split("-");
       const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
@@ -707,7 +678,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     if (selectMode) {
       if (entry.payment_mode?.toLowerCase() !== selectMode.toLowerCase()) return false;
     }
-    // Entry No filter (partial match)
     if (selectEntryNo) {
       if (!entry.entry_no?.toString().includes(selectEntryNo.toString())) return false;
     }
@@ -746,23 +716,15 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
           default:
             return 0;
         }
-
         const entryA = Number(a.entry_no) || 0;
         const entryB = Number(b.entry_no) || 0;
-
-        // Handle date sorting with matching entry_no direction
         if (sortConfig.key === 'date') {
           if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
           if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-          // Secondary sort by entry_no - match the direction of date sort
           return sortConfig.direction === 'asc' ? entryA - entryB : entryB - entryA;
         }
-
-        // Handle other fields
         if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
         if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-
-        // Secondary sort by entry_no - always ascending for non-date fields
         return entryA - entryB;
       });
     } else {
@@ -770,8 +732,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
         const dateA = new Date(a.date);
         const dateB = new Date(b.date);
         const dateDiff = dateB - dateA;
-
-        // If dates are equal, sort by entry_no descending to match date order
         if (dateDiff === 0) {
           const entryA = Number(a.entry_no) || 0;
           const entryB = Number(b.entry_no) || 0;
@@ -826,23 +786,30 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     return sum;
   }, 0);
   const handleEditClick = (entry) => {
+    // Check if editing is allowed - if not, show request popup
+    if (entry.not_allow_to_edit || entry.allow_to_edit === false) {
+      setRequestingEntry(entry);
+      setIsRequestModalOpen(true);
+      return;
+    }
+    
     setEditingId(entry.advancePortalId);
-    setSelectedFile(null); // Reset selected file when opening edit modal
+    setSelectedFile(null);
     setEditFormData({
       date: entry.date?.split('T')[0] || '',
-      amount: entry.amount || '',
-      project_id: entry.project_id || '',
-      vendor_id: entry.vendor_id || '',
-      contractor_id: entry.contractor_id || '',
-      entry_no: entry.entry_no || '',
-      week_no: entry.week_no || '',
+      amount: entry.amount ?? '',
+      project_id: entry.project_id ?? '',
+      vendor_id: entry.vendor_id ?? '',
+      contractor_id: entry.contractor_id ?? '',
+      entry_no: entry.entry_no ?? '',
+      week_no: entry.week_no ?? '',
       file_url: entry.file_url || '',
       description: entry.description || '',
-      bill_amount: entry.bill_amount || '',
+      bill_amount: entry.bill_amount ?? '',
       type: entry.type || '',
-      transfer_site_id: entry.transfer_site_id || '',
+      transfer_site_id: entry.transfer_site_id ?? '',
       payment_mode: entry.payment_mode || '',
-      refund_amount: entry.refund_amount || ''
+      refund_amount: entry.refund_amount ?? ''
     });
     const preSelected = combinedOptions.find(opt =>
       entry.vendor_id ? opt.id === entry.vendor_id && opt.type === "Vendor"
@@ -851,6 +818,40 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     );
     setSelectedOption(preSelected || null);
     setIsEditModalOpen(true);
+  };
+
+  const handleSendEditRequest = async () => {
+    if (!requestingEntry) return;
+    
+    try {
+      const requestData = {
+        module_name: 'Advance Portal',
+        module_name_id: requestingEntry.advancePortalId,
+        module_name_eno: requestingEntry.entry_no,
+        request_send_by: username,
+        request_approval: false,
+        request_completed: false
+      };
+
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/edit_requests/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(requestData)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to create edit request');
+      }
+
+      alert('Edit request sent successfully. Waiting for admin approval.');
+      setIsRequestModalOpen(false);
+      setRequestingEntry(null);
+    } catch (error) {
+      console.error('Error creating edit request:', error);
+      alert('Failed to send edit request. Please try again.');
+    }
   };
   const sortedSiteOptions = siteOptions.sort((a, b) =>
     a.label.localeCompare(b.label)
@@ -867,8 +868,16 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
       }
     }),
   };
+
   const handleUpdate = async () => {
     try {
+      // Check if editing is allowed
+      const currentEntry = advanceData.find(entry => entry.advancePortalId === editingId);
+      if (currentEntry && currentEntry.not_allow_to_edit) {
+        alert('Editing is not allowed for this record. Please request permission to edit.');
+        return;
+      }
+
       let fileUrl = editFormData.file_url || '';
       if (selectedFile) {
         try {
@@ -900,14 +909,12 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
           return;
         }
       }
-
       const buildPayload = (overrides = {}, typeOverride) => {
         const payload = {
           ...editFormData,
           ...overrides,
           file_url: fileUrl,
         };
-
         if (selectedOption) {
           if (selectedOption.type === 'Vendor') {
             payload.vendor_id = selectedOption.id;
@@ -917,7 +924,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
             payload.vendor_id = '';
           }
         }
-
         const type = typeOverride || payload.type;
         switch (type) {
           case 'Advance':
@@ -934,27 +940,53 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
             payload.payment_mode = '';
             break;
           case 'Bill Settlement':
-            payload.amount = '';
             payload.refund_amount = '';
             break;
           default:
             break;
         }
+        payload.amount = sanitizeNumberField(payload.amount);
+        payload.bill_amount = sanitizeNumberField(payload.bill_amount);
+        payload.refund_amount = sanitizeNumberField(payload.refund_amount);
+        payload.project_id = sanitizeNumberField(payload.project_id);
+        payload.transfer_site_id = sanitizeNumberField(payload.transfer_site_id);
+        payload.vendor_id = sanitizeNumberField(payload.vendor_id);
+        payload.contractor_id = sanitizeNumberField(payload.contractor_id);
+        payload.week_no = sanitizeNumberField(payload.week_no);
+        payload.entry_no = sanitizeNumberField(payload.entry_no);
         return payload;
       };
-
       const updateRecord = async (id, payload) => {
         const res = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${id}?editedBy=${username}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify(payload)
         });
-
         if (!res.ok) {
-          throw new Error('Failed to update record');
+          const errorText = await res.text();
+          throw new Error(errorText || 'Failed to update record');
         }
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          return res.json();
+        }
+        return null;
       };
 
+      const setAllowToEdit = async (id, allow) => {
+        try {
+          const res = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/allow/${id}?allow=${allow}`, {
+            method: 'PUT',
+            credentials: 'include'
+          });
+          if (!res.ok) {
+            console.error('Failed to update allowToEdit');
+          }
+        } catch (error) {
+          console.error('Error updating allowToEdit:', error);
+        }
+      };
       if (editFormData.type === 'Transfer') {
         const sameEntryRows = advanceData.filter(r => r.entry_no === editFormData.entry_no);
         if (sameEntryRows.length === 2) {
@@ -977,21 +1009,57 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
               updateRecord(editedRecord.advancePortalId, updatedEdited),
               updateRecord(otherRecord.advancePortalId, updatedOther)
             ]);
+            // Set allowToEdit to false after successful update
+            await Promise.all([
+              setAllowToEdit(editedRecord.advancePortalId, false),
+              setAllowToEdit(otherRecord.advancePortalId, false)
+            ]);
+            setAdvanceData(prev =>
+              prev.map(item => {
+                if (item.advancePortalId === editedRecord.advancePortalId) {
+                  return { ...item, ...updatedEdited };
+                }
+                if (item.advancePortalId === otherRecord.advancePortalId) {
+                  return { ...item, ...updatedOther };
+                }
+                return item;
+              })
+            );
           } else {
             console.warn('Transfer pair incomplete for entry_no:', editFormData.entry_no);
             const fallbackPayload = buildPayload({}, 'Transfer');
             await updateRecord(editingId, fallbackPayload);
+            // Set allowToEdit to false after successful update
+            await setAllowToEdit(editingId, false);
+            setAdvanceData(prev =>
+              prev.map(item =>
+                item.advancePortalId === editingId ? { ...item, ...fallbackPayload } : item
+              )
+            );
           }
         } else {
           console.warn('Could not find both Transfer records for entry_no:', editFormData.entry_no);
           const fallbackPayload = buildPayload({}, 'Transfer');
           await updateRecord(editingId, fallbackPayload);
+          // Set allowToEdit to false after successful update
+          await setAllowToEdit(editingId, false);
+          setAdvanceData(prev =>
+            prev.map(item =>
+              item.advancePortalId === editingId ? { ...item, ...fallbackPayload } : item
+            )
+          );
         }
       } else {
         const payload = buildPayload();
-        await updateRecord(editingId, payload);
+        const updatedRecord = await updateRecord(editingId, payload);
+        // Set allowToEdit to false after successful update
+        await setAllowToEdit(editingId, false);
+        setAdvanceData(prev =>
+          prev.map(item =>
+            item.advancePortalId === editingId ? { ...item, ...payload } : item
+          )
+        );
       }
-
       window.location.reload();
       setIsEditModalOpen(false);
       setSelectedFile(null);
@@ -1000,9 +1068,9 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
       }
     } catch (err) {
       console.error('Update error:', err);
+      alert('Failed to submit edit request. Please try again.');
     }
   };
-  // 👉 Compute totals
   const totals = currentData.reduce(
     (acc, entry) => {
       acc.amount += Number(entry.amount) || 0;
@@ -1012,7 +1080,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     },
     { amount: 0, bill_amount: 0, refund_amount: 0 }
   );
-
   if (loading) {
     return (
       <body className='bg-[#FAF6ED]'>
@@ -1032,7 +1099,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
       </body>
     );
   }
-
   if (error) {
     return (
       <body className='bg-[#FAF6ED]'>
@@ -1042,7 +1108,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
       </body>
     );
   }
-
   return (
     <div className='bg-[#FAF6ED] min-h-screen w-full'>
       <div>
@@ -1477,33 +1542,27 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                     currentData.map((entry) => (
                       <tr key={entry.id} className="odd:bg-white even:bg-[#FAF6ED]">
                         <td className="text-sm text-left p-2 w-40 font-semibold">{formatDateOnly(entry.date)}</td>
-                        {/* Show vendor name if vendor_id exists, else contractor name */}
                         <td className="text-sm text-left w-[150px] font-semibold">
                           {entry.vendor_id
                             ? getVendorName(entry.vendor_id)
                             : getContractorName(entry.contractor_id)}
                         </td>
-                        {/* Project name */}
                         <td className="text-sm text-left w-[250px] font-semibold">
                           {getSiteName(entry.project_id)}
                         </td>
-                        {/* Transfer site name */}
                         <td className="text-sm text-left font-semibold">
                           {getSiteName(entry.transfer_site_id)}
                         </td>
-                        {/* Amount */}
                         <td className="text-sm text-right font-semibold">
                           {entry.amount != null && entry.amount !== ""
                             ? Number(entry.amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })
                             : ""}
                         </td>
-                        {/* Bill Amount */}
                         <td className="text-sm text-right font-semibold">
                           {entry.bill_amount != null && entry.bill_amount !== ""
                             ? Number(entry.bill_amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })
                             : ""}
                         </td>
-                        {/* Refund Amount */}
                         <td className="text-sm text-right pr-1 font-semibold">
                           {entry.refund_amount != null && entry.refund_amount !== ""
                             ? Number(entry.refund_amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })
@@ -1553,10 +1612,8 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
               </table>
             </div>
           </div>
-          {/* Pagination Controls */}
           {sortedData.length > 0 && (
             <div className="flex flex-col sm:flex-row justify-between items-center px-5 py-4 bg-white border-t border-gray-200">
-              {/* Items per page selector */}
               <div className="flex items-center space-x-2 mb-4 sm:mb-0">
                 <label className="text-sm font-medium text-gray-700">Show:</label>
                 <select
@@ -1579,13 +1636,9 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                 </select>
                 <span className="text-sm text-gray-700">entries</span>
               </div>
-
-              {/* Page info */}
               <div className="text-sm text-gray-700 mb-4 sm:mb-0">
                 Showing {startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries
               </div>
-
-              {/* Pagination buttons */}
               <div className="flex items-center space-x-2">
                 <button
                   onClick={goToPreviousPage}
@@ -1597,8 +1650,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                 >
                   Previous
                 </button>
-
-                {/* Page numbers */}
                 <div className="flex items-center space-x-1">
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                     let pageNum;
@@ -1611,7 +1662,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                     } else {
                       pageNum = currentPage - 2 + i;
                     }
-
                     return (
                       <button
                         key={pageNum}
@@ -1626,7 +1676,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                     );
                   })}
                 </div>
-
                 <button
                   onClick={goToNextPage}
                   disabled={currentPage === totalPages}
@@ -1640,13 +1689,11 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
               </div>
             </div>
           )}
-
           {isEditModalOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
               <div className="bg-white p-6 rounded-lg w-[700px]">
                 <h2 className="text-lg font-bold mb-4">Edit Entry</h2>
                 <div className='grid grid-cols-2 gap-4 text-left ml-5'>
-                  {/* Select Type */}
                   <div className='flex items-center gap-3'>
                     <label className='font-semibold text-[#E4572E]'>Select Type</label>
                     <select
@@ -1655,7 +1702,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                         const newType = e.target.value;
                         setEditFormData(prev => {
                           const updated = { ...prev, type: newType };
-                          // Reset amount fields based on new type
                           if (newType === 'Refund') {
                             updated.amount = '';
                             updated.bill_amount = '';
@@ -1682,7 +1728,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                       <option value='Transfer'>Transfer</option>
                     </select>
                   </div>
-                  {/* Date */}
                   <div className='flex items-center gap-3'>
                     <label className='font-semibold text-[#E4572E]'>Date</label>
                     <input
@@ -1693,7 +1738,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                       className='w-[144px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
                     />
                   </div>
-                  {/* Contractor/Vendor */}
                   <div className=''>
                     <div className='flex'>
                       <label className='font-semibold block'>Contractor/Vendor</label>
@@ -1707,7 +1751,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                       styles={customStyles}
                     />
                   </div>
-                  {/* Project Name */}
                   <div>
                     <label className='font-semibold block'>Project Name</label>
                     <Select
@@ -1720,7 +1763,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                       isClearable
                       className='w-[263px] h-[45px] focus:outline-none' />
                   </div>
-                  {/* Bill Amount (only for Bill Settlement) */}
                   {editFormData.type === 'Bill Settlement' && (
                     <div>
                       <label className='font-semibold block'>Bill Amount</label>
@@ -1731,7 +1773,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                       />
                     </div>
                   )}
-                  {/* Transfer Amount */}
                   <div>
                     <label className='font-semibold block'>
                       {editFormData.type === 'Transfer'
@@ -1746,7 +1787,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                       className='w-[263px] h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
                     />
                   </div>
-                  {/* Conditional Dropdown */}
                   <div className=''>
                     {editFormData.type === 'Transfer' ? (
                       <>
@@ -1829,6 +1869,49 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                     className="px-4 py-2 bg-[#BF9853] w-[100px] h-[45px] text-white rounded"
                   >
                     Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {isRequestModalOpen && requestingEntry && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+              <div className="bg-white p-6 rounded-lg w-[500px]">
+                <h2 className="text-lg font-bold mb-4 text-[#BF9853]">Request Edit Permission</h2>
+                <div className="mb-4">
+                  <p className="text-gray-700 mb-2">
+                    You need admin approval to edit this record.
+                  </p>
+                  <div className="bg-gray-50 p-3 rounded border">
+                    <p className="text-sm text-gray-600">
+                      <strong>Record ID:</strong> {requestingEntry.advancePortalId}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      <strong>Entry No:</strong> {requestingEntry.entry_no}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      <strong>Date:</strong> {formatDateOnly(requestingEntry.date)}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      <strong>Type:</strong> {requestingEntry.type || '-'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 mt-4">
+                  <button
+                    onClick={() => {
+                      setIsRequestModalOpen(false);
+                      setRequestingEntry(null);
+                    }}
+                    className="px-4 py-2 border border-[#BF9853] w-[100px] h-[45px] rounded"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSendEditRequest}
+                    className="px-4 py-2 bg-[#BF9853] w-[100px] h-[45px] text-white rounded"
+                  >
+                    Send Request
                   </button>
                 </div>
               </div>

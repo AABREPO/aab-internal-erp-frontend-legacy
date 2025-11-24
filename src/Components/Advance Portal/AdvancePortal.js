@@ -39,6 +39,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
   const [eno, setEno] = useState(null);
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [accountDetails, setAccountDetails] = useState([]);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editFormData, setEditFormData] = useState({});
   const [editingId, setEditingId] = useState(null);
@@ -349,6 +350,29 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
     fetchCategories();
   }, []);
 
+  // Fetch account details
+  useEffect(() => {
+    const fetchAccountDetails = async () => {
+      try {
+        const response = await fetch("https://backendaab.in/aabuildersDash/api/account-details/getAll", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+        if (!response.ok) {
+          throw new Error("Network response was not ok: " + response.statusText);
+        }
+        const data = await response.json();
+        setAccountDetails(data);
+      } catch (error) {
+        console.error("Error fetching account details:", error);
+      }
+    };
+    fetchAccountDetails();
+  }, []);
+
   // Fetch latest ENo for expenses form
   const fetchLatestEno = async () => {
     try {
@@ -583,7 +607,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
           }
           const uploadResult = await uploadResponse.json();
           fileUrl = uploadResult.url;
-          console.log('File URL:', fileUrl);
         } catch (error) {
           console.error('Error during file upload:', error);
           alert('Error during file upload. Please try again.');
@@ -628,13 +651,11 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
           fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
             body: JSON.stringify(firstPayload)
           }),
           fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
             body: JSON.stringify(secondPayload)
           })
         ]);
@@ -643,7 +664,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
         await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
           body: JSON.stringify(payload)
         });
         // Also save to expenses form if Bill Settlement
@@ -1022,10 +1042,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
     setIsEditModalOpen(true);
   };
   const handlePaymentSubmit = async () => {
-    if (!paymentModalData.transactionNumber && paymentModalData.paymentMode !== "Cash") {
-      alert("Please enter transaction number.");
-      return;
-    }
     if (!paymentModalData.accountNumber && paymentModalData.paymentMode !== "Cash") {
       alert("Please select account number.");
       return;
@@ -1072,7 +1088,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
           }
           const uploadResult = await uploadResponse.json();
           fileUrl = uploadResult.url;
-          console.log('File URL:', fileUrl);
         } catch (error) {
           console.error('Error during file upload:', error);
           alert('Error during file upload. Please try again.');
@@ -1114,7 +1129,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
       const advanceResponse = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(advancePayload)
       });
 
@@ -1151,7 +1165,6 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
       const weeklyResponse = await fetch('https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(weeklyPaymentBillPayload)
       });
 
@@ -1896,7 +1909,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                           )}
                           <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number<span className="text-red-500">*</span></label>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
                               <input
                                 type="text"
                                 value={paymentModalData.transactionNumber}
@@ -1913,9 +1926,11 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                                 className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
                               >
                                 <option value="">Select Account</option>
-                                <option value="2027887700014">2027887700014</option>
-                                <option value="2027887700015">2027887700015</option>
-                                <option value="2027887700016">2027887700016</option>
+                                {accountDetails.map((account) => (
+                                  <option key={account.id} value={account.account_number}>
+                                    {account.account_number}
+                                  </option>
+                                ))}
                               </select>
                             </div>
                           </div>

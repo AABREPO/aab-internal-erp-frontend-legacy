@@ -116,7 +116,6 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             if (response.ok) {
                 const data = await response.json();
                 setPoModel(data);
-                console.log(data);
             } else {
                 console.log('Error fetching model names.');
             }
@@ -247,6 +246,43 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             }
         } catch (error) {
             console.error('Error:', error);
+        }
+    };
+    const getNumericEno = (purchaseOrder = {}) => {
+        const candidateKeys = ['eno', 'poNo', 'po_no', 'po_number', 'purchase_order_number'];
+        for (const key of candidateKeys) {
+            const value = purchaseOrder[key];
+            if (value === undefined || value === null || value === '') continue;
+            const parsed = parseInt(value, 10);
+            if (!Number.isNaN(parsed)) {
+                return parsed;
+            }
+        }
+        return 0;
+    };
+    const fetchNextPoNumberForVendor = async (vendorId) => {
+        if (!vendorId) {
+            return 1;
+        }
+        try {
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/purchase_orders/getAll');
+            if (!response.ok) {
+                throw new Error('Failed to fetch purchase orders');
+            }
+            const data = await response.json();
+            const normalizedVendorId = String(vendorId);
+            const vendorOrders = data.filter(order => String(order.vendor_id ?? order.vendorId) === normalizedVendorId);
+            if (!vendorOrders.length) {
+                return 1;
+            }
+            const latestEno = vendorOrders.reduce((maxValue, order) => {
+                const currentEno = getNumericEno(order);
+                return currentEno > maxValue ? currentEno : maxValue;
+            }, 0);
+            return latestEno + 1;
+        } catch (error) {
+            console.error('Failed to fetch last PO number:', error);
+            return 1;
         }
     };
     useEffect(() => {
@@ -795,11 +831,13 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
         }
     };
     const generatePO = async () => {
+        if (!selectedVendor?.id) {
+            alert("Please select a Vendor before generating a PO.");
+            return;
+        }
         try {
-            const countResponse = await fetch(`https://backendaab.in/aabuildersDash/api/purchase_orders/countByVendor?vendorId=${selectedVendor?.id}`);
-            if (!countResponse.ok) throw new Error("Failed to fetch vendor count");
-            const vendorCount = await countResponse.json();
-            const currentPoNo = vendorCount + 1;
+            const currentPoNo = await fetchNextPoNumberForVendor(selectedVendor.id);
+            setPoNo(currentPoNo);
             const payload = {
                 vendor_id: selectedVendor?.id,
                 client_id: selectedSite?.id,
@@ -1008,18 +1046,10 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
                             value={vendorNameOptions.find(option => option.value === selectedVendor?.value)}
                             onChange={async (selectedOption) => {
                                 const value = selectedOption?.id || '';
-                                console.log(value);
                                 setSelectedVendor(selectedOption);
                                 if (value) {
-                                    try {
-                                        const countResponse = await fetch(`https://backendaab.in/aabuildersDash/api/purchase_orders/countByVendor?vendorId=${value}`);
-                                        if (!countResponse.ok) throw new Error("Failed to fetch PO count");
-                                        const vendorCount = await countResponse.json();
-                                        setPoNo(vendorCount + 1); 
-                                    } catch (err) {
-                                        console.error("Failed to fetch PO count", err);
-                                        setPoNo(0);
-                                    }
+                                    const nextPoNumber = await fetchNextPoNumberForVendor(value);
+                                    setPoNo(nextPoNumber);
                                 } else {
                                     setPoNo(0);
                                 }

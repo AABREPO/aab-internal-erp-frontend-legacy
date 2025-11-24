@@ -59,6 +59,7 @@ const InputData = ({ username, userRoles = [] }) => {
       doorNo: "",
       area: "",
       ebNo: "",
+      ebNoPhase: "1P",
       ebNoFrequency: "",
       propertyTaxNo: "",
       propertyTaxFrequency: "",
@@ -66,6 +67,55 @@ const InputData = ({ username, userRoles = [] }) => {
       waterTaxFrequency: ""
     }]
   });
+  const sortPropertyDetailsByShopNo = (details = []) => {
+    const parseShopNo = (shopNo = '') => {
+      const trimmed = shopNo.trim().toUpperCase();
+      const sanitized = trimmed.replace(/[\s-]+/g, '');
+      if (!trimmed) {
+        return { isEmpty: true, prefix: '', number: Number.MAX_SAFE_INTEGER, remainder: '' };
+      }
+
+      const alphaNumericMatch = sanitized.match(/^([A-Z]+)(\d+)/);
+      if (alphaNumericMatch) {
+        const [, prefix, numberPart] = alphaNumericMatch;
+        return {
+          isEmpty: false,
+          prefix,
+          number: parseInt(numberPart, 10),
+          remainder: sanitized.slice(alphaNumericMatch[0].length),
+        };
+      }
+
+      const numericMatch = sanitized.match(/^(\d+)/);
+      if (numericMatch) {
+        return {
+          isEmpty: false,
+          prefix: '',
+          number: parseInt(numericMatch[1], 10),
+          remainder: sanitized.slice(numericMatch[1].length),
+        };
+      }
+
+      return { isEmpty: false, prefix: sanitized || trimmed, number: Number.MAX_SAFE_INTEGER, remainder: '' };
+    };
+
+    return [...details].sort((a, b) => {
+      const shopA = parseShopNo(a.shopNo);
+      const shopB = parseShopNo(b.shopNo);
+
+      if (shopA.isEmpty !== shopB.isEmpty) {
+        return shopA.isEmpty ? 1 : -1;
+      }
+      if (shopA.prefix !== shopB.prefix) {
+        return shopA.prefix.localeCompare(shopB.prefix);
+      }
+      if (shopA.number !== shopB.number) {
+        return shopA.number - shopB.number;
+      }
+      return shopA.remainder.localeCompare(shopB.remainder);
+    });
+  };
+
   const [editProject, setEditProject] = useState({
     projectName: '',
     projectAddress: '',
@@ -86,6 +136,7 @@ const InputData = ({ username, userRoles = [] }) => {
       doorNo: "",
       area: "",
       ebNo: "",
+      ebNoPhase: "1P",
       ebNoFrequency: "",
       propertyTaxNo: "",
       propertyTaxFrequency: "",
@@ -146,11 +197,11 @@ const InputData = ({ username, userRoles = [] }) => {
     label: name
   }));
   const projectOptions = projects
-    .filter(project => project.projectReferenceName) 
+    .filter(project => project.projectReferenceName)
     .map(project => ({
       value: project.projectReferenceName,
       label: project.projectReferenceName,
-      project: project 
+      project: project
     }));
   const [newProperty, setNewProperty] = useState({
     propertyName: "",
@@ -163,14 +214,11 @@ const InputData = ({ username, userRoles = [] }) => {
     const matchedProject = projects.find(
       (p) => p.projectReferenceName === projectRefName
     );
-
     if (!matchedProject) {
-      console.log('No matched project found for:', projectRefName);
       return [];
     }
 
     if (!matchedProject.propertyDetails) {
-      console.log('No propertyDetails found for project:', matchedProject);
       return [];
     }
 
@@ -179,22 +227,20 @@ const InputData = ({ username, userRoles = [] }) => {
       : Array.from(matchedProject.propertyDetails || []);
 
     if (propertyDetailsArray.length === 0) {
-      console.log('propertyDetailsArray is empty for project:', projectRefName);
       return [];
     }
     const filteredByType = propertyDetailsArray.filter((detail) =>
       detail.projectType === propertyType
     );
     if (filteredByType.length === 0) {
-      console.log(`No propertyDetails found for projectType: ${propertyType} in project: ${projectRefName}`);
       return [];
     }
     const shopNos = filteredByType
       .map((detail) => detail.shopNo)
       .filter((shopNo) => shopNo !== null && shopNo !== undefined && shopNo !== '')
       .map((shopNo) => String(shopNo).trim())
-      .filter((shopNo) => shopNo !== '') 
-      .filter((shopNo, i, arr) => arr.indexOf(shopNo) === i); 
+      .filter((shopNo) => shopNo !== '')
+      .filter((shopNo, i, arr) => arr.indexOf(shopNo) === i);
     const currentShopNosSet = new Set(includeCurrentShops.map(s => String(s)));
     const availableShopNos = shopNos.filter((shopNo) => {
       const isMapped = usedShopNos.has(shopNo);
@@ -227,7 +273,7 @@ const InputData = ({ username, userRoles = [] }) => {
     }));
   };
   const getAllShopNumbersUnfiltered = () => {
-    const shopMap = new Map(); 
+    const shopMap = new Map();
     projects.forEach((project) => {
       if (!project || !project.propertyDetails) return;
       const propertyDetailsArray = Array.isArray(project.propertyDetails)
@@ -323,7 +369,9 @@ const InputData = ({ username, userRoles = [] }) => {
       if (detail) {
         return {
           projectReferenceName: project.projectReferenceName || '',
-          doorNo: detail.doorNo || ''
+          doorNo: detail.doorNo || '',
+          projectType: detail.projectType || '',
+          floorName: detail.floorName || ''
         };
       }
     }
@@ -397,7 +445,10 @@ const InputData = ({ username, userRoles = [] }) => {
   const handleEditDetailChange = (index, field, value) => {
     const updatedDetails = [...editProject.propertyDetailsList];
     updatedDetails[index][field] = value;
-    setEditProject((prev) => ({ ...prev, propertyDetailsList: updatedDetails }));
+    setEditProject((prev) => ({
+      ...prev,
+      propertyDetailsList: sortPropertyDetailsByShopNo(updatedDetails),
+    }));
   };
   const addEditOwner = () => {
     setEditProject((prev) => ({
@@ -415,19 +466,23 @@ const InputData = ({ username, userRoles = [] }) => {
   const addEditPropertyDetail = () => {
     setEditProject((prev) => ({
       ...prev,
-      propertyDetailsList: [...prev.propertyDetailsList, {
-        projectType: "",
-        floorName: "",
-        shopNo: "",
-        doorNo: "",
-        area: "",
-        ebNo: "",
-        ebNoFrequency: "",
-        propertyTaxNo: "",
-        propertyTaxFrequency: "",
-        waterTaxNo: "",
-        waterTaxFrequency: ""
-      }]
+      propertyDetailsList: sortPropertyDetailsByShopNo([
+        ...prev.propertyDetailsList,
+        {
+          projectType: "",
+          floorName: "",
+          shopNo: "",
+          doorNo: "",
+          area: "",
+          ebNo: "",
+          ebNoPhase: "1P",
+          ebNoFrequency: "",
+          propertyTaxNo: "",
+          propertyTaxFrequency: "",
+          waterTaxNo: "",
+          waterTaxFrequency: ""
+        },
+      ]),
     }));
   };
   const handleTenantChange = (e) => {
@@ -689,7 +744,7 @@ const InputData = ({ username, userRoles = [] }) => {
     { value: 'Shop', label: 'Shop' },
     { value: 'House', label: 'House' },
     { value: 'Land', label: 'Land' },
-    { value: 'Flat', label: 'Flat' }, 
+    { value: 'Flat', label: 'Flat' },
   ];
   const propertyTypeEditOptions = [
     { value: 'Shop', label: 'Shop' },
@@ -1622,19 +1677,29 @@ const InputData = ({ username, userRoles = [] }) => {
         age: "",
         clientAddress: ""
       }],
-      propertyDetailsList: item.propertyDetails && item.propertyDetails.length > 0 ? item.propertyDetails : [{
-        projectType: "",
-        floorName: "",
-        shopNo: "",
-        doorNo: "",
-        area: "",
-        ebNo: "",
-        ebNoFrequency: "",
-        propertyTaxNo: "",
-        propertyTaxFrequency: "",
-        waterTaxNo: "",
-        waterTaxFrequency: ""
-      }]
+      propertyDetailsList: sortPropertyDetailsByShopNo(
+        item.propertyDetails && item.propertyDetails.length > 0
+          ? item.propertyDetails.map(detail => ({
+            ...detail,
+            ebNoPhase: detail.ebNoPhase || "1P"
+          }))
+          : [
+            {
+              projectType: "",
+              floorName: "",
+              shopNo: "",
+              doorNo: "",
+              area: "",
+              ebNo: "",
+              ebNoPhase: "1P",
+              ebNoFrequency: "",
+              propertyTaxNo: "",
+              propertyTaxFrequency: "",
+              waterTaxNo: "",
+              waterTaxFrequency: ""
+            }
+          ]
+      )
     });
     setIsProjectEditOpen(true);
   };
@@ -1831,7 +1896,7 @@ const InputData = ({ username, userRoles = [] }) => {
               body: JSON.stringify(siteNamePayload),
             });
             if (siteNameResponse.ok) {
-              fetchSiteNames(); 
+              fetchSiteNames();
             }
           } else {
             const siteNameResponse = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/save', {
@@ -1840,7 +1905,7 @@ const InputData = ({ username, userRoles = [] }) => {
               body: JSON.stringify(siteNamePayload),
             });
             if (siteNameResponse.ok) {
-              fetchSiteNames(); 
+              fetchSiteNames();
             }
           }
         } catch (syncError) {
@@ -1891,22 +1956,22 @@ const InputData = ({ username, userRoles = [] }) => {
             <input
               type="text"
               className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
-              placeholder="Search tenant name.."
-              value={tenantNameSearch}
-              onChange={(e) => setTenantNameSearch(e.target.value)}
+              placeholder="Search Tenant Link.."
+              value={tenantLinkSearch}
+              onChange={(e) => setTenantLinkSearch(e.target.value)}
             />
             <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
               <img src={search} alt='search' className=' w-5 h-5' />
             </button>
             <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
-              onClick={openAccountTypes}>
+              onClick={openTenantLinkPopup}>
               + Add
             </button>
           </div>
           <button className="text-[#E4572E] -mb-4 flex"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' /><h1 className='mt-1.5 text-sm'>Import file</h1></button>
           <div className={`${userPermissions.includes("Delete") ? '' : 'mt-5'}`}>
             {userPermissions.includes("Delete") && (
-              <button onClick={handleAllTenantWithShop}>
+              <button onClick={handleAllTenantLinkDelete}>
                 <img src={deleteIcon} alt='del' className='-mb-14 mt-5 ml-[15rem]' />
               </button>
             )}
@@ -1925,67 +1990,29 @@ const InputData = ({ username, userRoles = [] }) => {
             <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
               <table className="table-auto w-96">
                 <tbody>
-                  {filteredTenantName.map((group, index) => (
-                    <React.Fragment key={index}>
-                      <tr className="border-b bg-white hover:bg-gray-50 cursor-pointer" >
-                        <td className="p-2 align-top">{index + 1}</td>
-                        <td className="py-2 pl-9 font-semibold group flex text-left ">
-                          <div className="flex flex-grow">
-                            {group.tenantName}
-                          </div>
-                          <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
-                            <button type="button" onClick={() => openEditTenantNameWithShop(group)}>
-                              <img src={edit} alt="add" className="w-4 h-4" type="button" />
+                  {filteredTenantLink.map((item, index) => (
+                    <tr key={item.id} className="border-b bg-white hover:bg-gray-50 cursor-pointer" >
+                      <td className="p-2 align-top">{index + 1}</td>
+                      <td className="py-2 pl-9 font-semibold group flex text-left ">
+                        <div className="flex flex-grow">
+                          {item.tenantName || 'N/A'}
+                        </div>
+                        <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
+                          <button type="button" onClick={() => openEditTenantLink(item)}>
+                            <img src={edit} alt="add" className="w-4 h-4" type="button" />
+                          </button>
+                          {userPermissions.includes("Delete") && (
+                            <button >
+                              <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleTenantLinkDelete(item.id)} />
                             </button>
-                            {userPermissions.includes("Delete") && (
-                              <button >
-                                <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleTenantDelete(group.id)} />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    </React.Fragment>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            {isModalOpen && selectedPdf && (
-              <div style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                backgroundColor: 'rgba(0,0,0,0.5)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1000,
-              }}>
-                <div style={{
-                  backgroundColor: '#fff',
-                  padding: '20px',
-                  borderRadius: '10px',
-                  width: '80%',
-                  height: '80%',
-                  position: 'relative'
-                }}>
-                  <button onClick={closeModal} style={{
-                    position: 'absolute',
-                    top: 10,
-                    right: 10,
-                    fontSize: '18px'
-                  }}>X</button>
-                  <iframe
-                    src={selectedPdf}
-                    title="Aadhaar PDF"
-                    width="100%"
-                    height="100%"
-                  ></iframe>
-                </div>
-              </div>
-            )}
           </div>
         </div>
         <div>
@@ -2125,70 +2152,6 @@ const InputData = ({ username, userRoles = [] }) => {
                           <button onClick={() => handleDeleteProject(item.id)} className="text-red-600 hover:text-red-800" title="Delete" >
                             <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
                           </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-        <div>
-          <div className="flex items-center mb-2 lg:mt-0 mt-3">
-            <input
-              type="text"
-              className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
-              placeholder="Search Tenant Link.."
-              value={tenantLinkSearch}
-              onChange={(e) => setTenantLinkSearch(e.target.value)}
-            />
-            <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
-              <img src={search} alt='search' className=' w-5 h-5' />
-            </button>
-            <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
-              onClick={openTenantLinkPopup}>
-              + Add
-            </button>
-          </div>
-          <button className="text-[#E4572E] -mb-4 flex"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' /><h1 className='mt-1.5 text-sm'>Import file</h1></button>
-          <div className={`${userPermissions.includes("Delete") ? '' : 'mt-5'}`}>
-            {userPermissions.includes("Delete") && (
-              <button onClick={handleAllTenantLinkDelete}>
-                <img src={deleteIcon} alt='del' className='-mb-14 mt-5 ml-[15rem]' />
-              </button>
-            )}
-          </div>
-          <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
-            <div className="bg-[#FAF6ED]">
-              <table className="table-auto w-96">
-                <thead className='bg-[#FAF6ED]'>
-                  <tr className="border-b">
-                    <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left text-xl font-bold">Tenant Link</th>
-                  </tr>
-                </thead>
-              </table>
-            </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto w-96">
-                <tbody>
-                  {filteredTenantLink.map((item, index) => (
-                    <tr key={item.id} className="border-b bg-white hover:bg-gray-50 cursor-pointer" >
-                      <td className="p-2 align-top">{index + 1}</td>
-                      <td className="py-2 pl-9 font-semibold group flex text-left ">
-                        <div className="flex flex-grow">
-                          {item.tenantName || 'N/A'}
-                        </div>
-                        <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
-                          <button type="button" onClick={() => openEditTenantLink(item)}>
-                            <img src={edit} alt="add" className="w-4 h-4" type="button" />
-                          </button>
-                          {userPermissions.includes("Delete") && (
-                            <button >
-                              <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleTenantLinkDelete(item.id)} />
-                            </button>
-                          )}
                         </div>
                       </td>
                     </tr>
@@ -2393,995 +2356,6 @@ const InputData = ({ username, userRoles = [] }) => {
                   Submit
                 </button>
                 <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={closeEditPropertyPopup}>
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {tenantshoplink && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
-          <div className="bg-white rounded-md w-[85rem] h-[44rem] px-2 py-2 overflow-y-auto">
-            <div>
-              <button className="text-red-500 ml-[95%]" onClick={closeAccountTypes}>
-                <img src={cross} alt='cross' className='w-5 h-5' />
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="max-w-5xl mx-auto space-y-2">
-              <h2 className="text-2xl font-bold">Tenant Details</h2>
-              <div className='text-left mb-2'>
-                <div className='flex gap-10'>
-                  <div className='mt-3'>
-                    <label className='block font-semibold'>Tenant Name</label>
-                    <input
-                      type="text"
-                      name="tenantName"
-                      value={formData.tenantName}
-                      onChange={handleTenantChange}
-                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
-                      placeholder="Tenant Name"
-                    />
-                  </div>
-                  <div className='mt-3'>
-                    <label className='block font-semibold'>Tenant FullName</label>
-                    <input
-                      type="text"
-                      name="fullName"
-                      value={formData.fullName}
-                      onChange={handleTenantChange}
-                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
-                      placeholder="Full Name"
-                    />
-                  </div>
-                </div>
-                <div className='flex gap-10'>
-                  <div className='mt-3'>
-                    <label className='block font-semibold'>Tenant FatherName</label>
-                    <input
-                      type="text"
-                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
-                      placeholder="Father Name"
-                    />
-                  </div>
-                  <div className='mt-3'>
-                    <label className='block font-semibold'>Tenant Age</label>
-                    <input
-                      type="text"
-                      name="age"
-                      value={formData.age}
-                      onChange={handleTenantChange}
-                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
-                      placeholder="Age"
-                    />
-                  </div>
-                </div>
-                <div className='flex gap-10'>
-                  <div className='mt-3'>
-                    <label className='block font-semibold'>Mobile Number</label>
-                    <input
-                      type="text"
-                      name="mobileNumber"
-                      value={formData.mobileNumber}
-                      onChange={handleTenantChange}
-                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
-                      placeholder="Mobile Number"
-                    />
-                  </div>
-                  <div className='mt-3'>
-                    <label className='block font-semibold'>Tenant Address</label>
-                    <input
-                      type="text"
-                      name="tenantAddress"
-                      value={formData.tenantAddress}
-                      onChange={handleTenantChange}
-                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
-                      placeholder="Tenant Address"
-                    />
-                  </div>
-                </div>
-              </div>
-              <h2 className="text-2xl font-bold">Project Details</h2>
-              {formData.properties.map((property, pIndex) => (
-                <div key={pIndex} className="bg-gray-50 p-4 rounded-lg shadow-md mb-6 text-left w-[1150px]">
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => removeProperty(pIndex)} // ← attach function here
-                      className="ml-[950px] text-red-500 font-bold"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <div>
-                    <label className='font-semibold'>Project Reference Name</label>
-                    <Select
-                      name="propertyName"
-                      options={projectOptions}
-                      value={projectOptions.find(opt => opt.value === property.propertyName)}
-                      onChange={(selectedOption) => {
-                        const selectedProjectRefName = selectedOption?.value || '';
-                        setSelectedProperty(selectedProjectRefName);
-                        handlePropertyChange(pIndex, {
-                          target: {
-                            name: 'propertyName',
-                            value: selectedProjectRefName
-                          }
-                        });
-                        // Options are now computed dynamically via helper functions
-                        // They will update automatically when propertyName changes
-                      }}
-                      placeholder="Select Project Reference Name"
-                      className="w-[970px] mb-3"
-                      isClearable
-                      menuPortalTarget={document.body}
-                      styles={{
-                        control: (provided, state) => ({
-                          ...provided,
-                          backgroundColor: 'transparent',
-                          borderWidth: '2.5px',
-                          borderColor: state.isFocused
-                            ? 'rgba(191, 152, 83, 0.2)'
-                            : 'rgba(191, 152, 83, 0.2)',
-                          borderRadius: '6px',
-                          boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                          '&:hover': {
-                            borderColor: 'rgba(191, 152, 83, 0.2)',
-                          },
-                        }),
-                        menuPortal: (base) => ({
-                          ...base,
-                          zIndex: 9999,
-                        }),
-                        placeholder: (provided) => ({
-                          ...provided,
-                          color: '#999',
-                          textAlign: 'left',
-                        }),
-                        menu: (provided) => ({
-                          ...provided,
-                          zIndex: 9999,
-                        }),
-                        option: (provided, state) => ({
-                          ...provided,
-                          textAlign: 'left',
-                          fontWeight: 'normal',
-                          fontSize: '15px',
-                          backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                          color: 'black',
-                        }),
-                        singleValue: (provided) => ({
-                          ...provided,
-                          textAlign: 'left',
-                          fontWeight: 'normal',
-                          color: 'black',
-                        }),
-                      }}
-                    />
-                  </div>
-                  {property.shops.map((shop, sIndex) => (
-                    <div key={sIndex} className="grid grid-cols-7 mb-2 ">
-                      <Select
-                        name="propertyType"
-                        value={propertyTypeOptions.find(option => option.value === shop.propertyType)}
-                        onChange={(selectedOption) => {
-                          const newType = selectedOption?.value || '';
-                          handleShopChange(pIndex, sIndex, {
-                            target: {
-                              name: 'propertyType',
-                              value: newType,
-                            },
-                          });
-                        }}
-                        options={propertyTypeOptions}
-                        className="mb-4 w-36 "
-                        classNamePrefix="select"
-                        placeholder="Type..."
-                        isSearchable
-                        isClearable
-                        styles={{
-                          control: (provided, state) => ({
-                            ...provided,
-                            height: '44px',
-                            minHeight: '44px',
-                            backgroundColor: 'transparent',
-                            borderWidth: '2.5px',
-                            borderColor: state.isFocused
-                              ? 'rgba(191, 152, 83, 0.2)'
-                              : 'rgba(191, 152, 83, 0.2)',
-                            borderRadius: '6px',
-                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                            '&:hover': {
-                              borderColor: 'rgba(191, 152, 83, 0.2)',
-                            },
-                          }),
-                          menuPortal: (base) => ({
-                            ...base,
-                            zIndex: 9999,
-                          }),
-                          placeholder: (provided) => ({
-                            ...provided,
-                            color: '#999',
-                            textAlign: 'left',
-                          }),
-                          menu: (provided) => ({
-                            ...provided,
-                            zIndex: 9999,
-                          }),
-                          option: (provided, state) => ({
-                            ...provided,
-                            textAlign: 'left',
-                            fontWeight: 'normal',
-                            fontSize: '15px',
-                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                            color: 'black',
-                          }),
-                          singleValue: (provided) => ({
-                            ...provided,
-                            textAlign: 'left',
-                            fontWeight: 'normal',
-                            color: 'black',
-                          }),
-                        }}
-                      />
-                      <CreatableSelect
-                        name="floorName"
-                        value={getFloorOptionsForProperty(property.propertyName, shop.propertyType).find(option => option.value === shop.floorName)}
-                        onChange={(selectedOption) => {
-                          handleShopChange(pIndex, sIndex, {
-                            target: {
-                              name: 'floorName',
-                              value: selectedOption ? selectedOption.value : '',
-                            },
-                          });
-                        }}
-                        options={getFloorOptionsForProperty(property.propertyName, shop.propertyType)}
-                        placeholder="Floor"
-                        isClearable
-                        className="w-36"
-                        classNamePrefix="select"
-                        styles={{
-                          control: (provided, state) => ({
-                            ...provided,
-                            height: '44px', // equivalent to h-11
-                            minHeight: '44px',
-                            backgroundColor: 'transparent',
-                            borderWidth: '2px',
-                            borderColor: state.isFocused
-                              ? 'rgba(191, 152, 83, 0.5)'
-                              : 'rgba(191, 152, 83, 0.25)',
-                            borderRadius: '8px',
-                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                            '&:hover': {
-                              borderColor: 'rgba(191, 152, 83, 0.4)',
-                            },
-                          }),
-                          menu: (provided) => ({
-                            ...provided,
-                            zIndex: 9999,
-                          }),
-                          option: (provided, state) => ({
-                            ...provided,
-                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                            color: 'black',
-                          }),
-                          singleValue: (provided) => ({
-                            ...provided,
-                            color: 'black',
-                          }),
-                          placeholder: (provided) => ({
-                            ...provided,
-                            color: '#999',
-                          }),
-                        }}
-                      />
-                      <Select
-                        name="shopNo"
-                        value={getShopOptionsForProperty(property.propertyName, shop.propertyType).find(option =>
-                          String(option.value) === String(shop.shopNo) || option.value === shop.shopNo
-                        )}
-                        onChange={(selectedOption) => {
-                          const selectedShopNo = selectedOption ? selectedOption.value : '';
-                          const currentPropertyName = formData.properties[pIndex]?.propertyName;
-
-                          let doorNo = '';
-                          if (currentPropertyName && selectedShopNo) {
-                            const matchedProject = projects.find(
-                              (p) => p.projectReferenceName === currentPropertyName
-                            );
-                            if (matchedProject && matchedProject.propertyDetails) {
-                              // Convert Set to Array if needed, or handle as array
-                              const propertyDetailsArray = Array.isArray(matchedProject.propertyDetails)
-                                ? matchedProject.propertyDetails
-                                : Array.from(matchedProject.propertyDetails || []);
-
-                              const matchedDetail = propertyDetailsArray.find(
-                                (detail) =>
-                                  detail.projectType === shop.propertyType &&
-                                  (String(detail.shopNo) === String(selectedShopNo) || detail.shopNo === selectedShopNo)
-                              );
-                              if (matchedDetail) {
-                                doorNo = matchedDetail.doorNo || '';
-                              }
-                            }
-                          }
-                          // Update both shopNo and doorNo
-                          handleShopChange(pIndex, sIndex, {
-                            target: {
-                              name: 'shopNo',
-                              value: selectedShopNo,
-                            },
-                          });
-
-                          handleShopChange(pIndex, sIndex, {
-                            target: {
-                              name: 'doorNo',
-                              value: doorNo,
-                            },
-                          });
-                        }}
-                        options={getShopOptionsForProperty(property.propertyName, shop.propertyType)}
-                        placeholder="Shop No"
-                        isSearchable
-                        isClearable
-                        className="w-36"
-                        classNamePrefix="select"
-                        styles={{
-                          control: (provided, state) => ({
-                            ...provided,
-                            height: '44px',
-                            minHeight: '44px',
-                            backgroundColor: 'transparent',
-                            borderWidth: '2px',
-                            borderColor: state.isFocused
-                              ? 'rgba(191, 152, 83, 0.5)'
-                              : 'rgba(191, 152, 83, 0.25)',
-                            borderRadius: '8px',
-                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                            '&:hover': {
-                              borderColor: 'rgba(191, 152, 83, 0.4)',
-                            },
-                          }),
-                          menu: (provided) => ({
-                            ...provided,
-                            zIndex: 9999,
-                          }),
-                          option: (provided, state) => ({
-                            ...provided,
-                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                            color: 'black',
-                          }),
-                          singleValue: (provided) => ({
-                            ...provided,
-                            color: 'black',
-                          }),
-                          placeholder: (provided) => ({
-                            ...provided,
-                            color: '#999',
-                          }),
-                        }}
-                      />
-                      <input
-                        type="text"
-                        name="doorNo"
-                        value={shop.doorNo}
-                        onChange={(e) => handleShopChange(pIndex, sIndex, e)}
-                        className="border-2 border-[#BF9853] w-28 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
-                        placeholder="Door No"
-                      />
-                      <div className='flex gap-1'>
-                        <input
-                          type="text"
-                          name="monthlyRent"
-                          value={formatINR(shop.monthlyRent)}
-                          onChange={(e) => {
-                            const rawValue = e.target.value.replace(/[^0-9]/g, '');
-                            handleShopChange(pIndex, sIndex, {
-                              target: {
-                                name: 'monthlyRent',
-                                value: rawValue, // store unformatted numeric value
-                              },
-                            });
-                          }}
-                          className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
-                          placeholder="Rent"
-                        />
-                        <input
-                          type="checkbox"
-                          name="shouldCollectAdvance"
-                          checked={shop.shouldCollectAdvance}
-                          onChange={(e) => handleShopChange(pIndex, sIndex, e)}
-                          className="custom-checkbox cursor-pointer appearance-none w-4 h-4 mt-3 -ml-1 rounded bg-slate-200 checked:bg-[#E2F9E1] checked:border-[#034638] "
-                        />
-                      </div>
-                      <input
-                        type="text"
-                        name="advanceAmount"
-                        value={formatINR(shop.advanceAmount)}
-                        onChange={(e) => {
-                          const rawValue = e.target.value.replace(/[^0-9]/g, '');
-                          handleShopChange(pIndex, sIndex, {
-                            target: {
-                              name: 'advanceAmount',
-                              value: rawValue, // store unformatted numeric value
-                            },
-                          });
-                        }}
-                        className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
-                        placeholder="Advance"
-                      />
-                      <div className="relative flex">
-                        <input
-                          type="date"
-                          name="startingDate"
-                          value={shop.startingDate}
-                          onChange={(e) => {
-                            const rawValue = e.target.value;
-                            handleShopChange(pIndex, sIndex, {
-                              target: {
-                                name: 'startingDate',
-                                value: rawValue, // store unformatted numeric value
-                              },
-                            });
-                          }}
-                          className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
-                          placeholder="Advance"
-                        />
-                        {property.shops.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeShop(pIndex, sIndex)}
-                            className=" text-red-500 font-bold ml-3"
-                          >
-                            <img src={cross} alt='cross' className='w-5 h-5' />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => addShop(pIndex)}
-                    className='text-[#E4572E] font-bold px-1  border-dashed border-b-2 border-[#BF9853]'
-                  >
-                    + Add On
-                  </button>
-                </div>
-              ))}
-              <div className='text-left'>
-                <button
-                  type="button"
-                  onClick={addProperty}
-                  className='text-[#E4572E] font-bold px-1 border-dashed border-b-2 border-[#BF9853]'
-                >
-                  + Add Another row
-                </button>
-              </div>
-              <div className="flex space-x-2 mt-6 mb-4">
-                <button
-                  type="submit"
-                  className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
-                >
-                  Submit
-                </button>
-                <button
-                  type="button"
-                  className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
-                  onClick={closeAccountTypes}>
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {tenantshopadd && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
-          <div className="bg-white rounded-md w-[85rem] h-[44rem] px-2 py-2 overflow-y-auto">
-            <div>
-              <button className="text-red-500 ml-[95%]" onClick={closeAccount1Types}>
-                <img src={cross} alt='cross' className='w-5 h-5' />
-              </button>
-            </div>
-            <form className="max-w-5xl mx-auto space-y-2" onSubmit={handleEditTenantSubmit}>
-              <h2 className="text-2xl font-bold">Tenant Details</h2>
-              <div className='text-left'>
-                <div className='flex gap-10'>
-                  <div className='mt-3'>
-                    <label className='block font-semibold'>Tenant Name</label>
-                    <input
-                      type="text"
-                      name="tenantName"
-                      value={editformData.tenantName}
-                      onChange={handleTenanteditChange}
-                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
-                      placeholder="Tenant Name"
-                    />
-                  </div>
-                  <div className='mt-3'>
-                    <label className='block font-semibold'>Tenant FullName</label>
-                    <input
-                      type="text"
-                      name="fullName"
-                      value={editformData.fullName}
-                      onChange={handleTenanteditChange}
-                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
-                      placeholder="Full Name"
-                    />
-                  </div>
-                </div>
-                <div className='flex gap-10'>
-                  <div className='mt-3'>
-                    <label className='block font-semibold'>Tenant FatherName</label>
-                    <input
-                      type="text"
-                      name="fatherName"
-                      value={editformData.fatherName}
-                      onChange={handleTenanteditChange}
-                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
-                      placeholder="Father Name"
-                    />
-                  </div>
-                  <div className='mt-3'>
-                    <label className='block font-semibold'>Tenant Age</label>
-                    <input
-                      type="text"
-                      name="age"
-                      value={editformData.age}
-                      onChange={handleTenanteditChange}
-                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
-                      placeholder="Age"
-                    />
-                  </div>
-                </div>
-                <div className='flex gap-10'>
-                  <div className='mt-3'>
-                    <label className='block font-semibold'>Mobile Number</label>
-                    <input
-                      type="text"
-                      name="mobileNumber"
-                      value={editformData.mobileNumber}
-                      onChange={handleTenanteditChange}
-                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
-                      placeholder="Mobile Number"
-                    />
-                  </div>
-                  <div className='mt-3'>
-                    <label className='block font-semibold'>Tenant Address</label>
-                    <input
-                      type="text"
-                      name="tenantAddress"
-                      value={editformData.tenantAddress}
-                      onChange={handleTenanteditChange}
-                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
-                      placeholder="Tenant Address"
-                    />
-                  </div>
-                </div>
-              </div>
-              <h2 className="text-2xl font-bold">Project Details</h2>
-              {editformData.property.map((property, pIndex) => (
-                <div key={pIndex} className="bg-gray-50 p-4 rounded-lg shadow-md ml-[-90px] mb-6 text-left w-[1200px]">
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => removePropertyEdit(pIndex)}
-                      className="ml-[1100px] text-red-500 font-bold"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <div>
-                    <label className='font-semibold'>Project Reference Name</label>
-                    <Select
-                      name="propertyName"
-                      options={projectOptions}
-                      value={projectOptions.find(opt => opt.value === property.propertyName)}
-                      onChange={(selectedOption) => {
-                        setSelectedPropertyEdit(selectedOption?.value);
-                        handlePropertyeditChange(pIndex, {
-                          target: {
-                            name: 'propertyName',
-                            value: selectedOption?.value || ''
-                          }
-                        });
-                      }}
-                      placeholder="Select Project Reference Name"
-                      className="w-[970px] mb-3"
-                      isClearable
-                      menuPortalTarget={document.body}
-                      styles={{
-                        control: (provided, state) => ({
-                          ...provided,
-                          backgroundColor: 'transparent',
-                          borderWidth: '2.5px',
-                          borderColor: state.isFocused
-                            ? 'rgba(191, 152, 83, 0.2)'
-                            : 'rgba(191, 152, 83, 0.2)',
-                          borderRadius: '6px',
-                          boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                          '&:hover': {
-                            borderColor: 'rgba(191, 152, 83, 0.2)',
-                          },
-                        }),
-                        menuPortal: (base) => ({
-                          ...base,
-                          zIndex: 9999,
-                        }),
-                        placeholder: (provided) => ({
-                          ...provided,
-                          color: '#999',
-                          textAlign: 'left',
-                        }),
-                        menu: (provided) => ({
-                          ...provided,
-                          zIndex: 9999,
-                        }),
-                        option: (provided, state) => ({
-                          ...provided,
-                          textAlign: 'left',
-                          fontWeight: 'normal',
-                          fontSize: '15px',
-                          backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                          color: 'black',
-                        }),
-                        singleValue: (provided) => ({
-                          ...provided,
-                          textAlign: 'left',
-                          fontWeight: 'normal',
-                          color: 'black',
-                        }),
-                      }}
-                    />
-                  </div>
-                  {property.shops.map((shop, sIndex) => (
-                    <div key={sIndex} className="grid grid-cols-8 mb-5 ">
-                      <Select
-                        name="propertyType"
-                        value={propertyTypeEditOptions.find(option => option.value === shop.propertyType)}
-                        onChange={(selectedOption) => {
-                          const newType = selectedOption?.value || '';
-                          const currentPropertyName = editformData.property[pIndex]?.propertyName;
-                          if (currentPropertyName && newType) {
-                            // Get all current shop numbers from the tenant being edited
-                            const currentShops = editformData.property.flatMap((prop) =>
-                              prop.shops?.map((shop) => shop.shopNo).filter(Boolean) || []
-                            );
-
-                            // Use the helper function with current shops included
-                            const shopOptions = getShopOptionsForProperty(currentPropertyName, newType, currentShops);
-                            const floorOptions = getFloorOptionsForProperty(currentPropertyName, newType);
-
-                            setEditFloorOptions(floorOptions);
-                            setEditShopNoOptions(shopOptions);
-                          }
-                          handleShopeditChange(pIndex, sIndex, {
-                            target: {
-                              name: 'propertyType',
-                              value: newType,
-                            },
-                          });
-                        }}
-                        options={propertyTypeEditOptions}
-                        className="mb-4 w-36 "
-                        classNamePrefix="select"
-                        placeholder="Type..."
-                        isSearchable
-                        isClearable
-                        styles={{
-                          control: (provided, state) => ({
-                            ...provided,
-                            height: '44px', // ✅ Set manual height here
-                            minHeight: '44px',
-                            backgroundColor: 'transparent',
-                            borderWidth: '2.5px',
-                            borderColor: state.isFocused
-                              ? 'rgba(191, 152, 83, 0.2)'
-                              : 'rgba(191, 152, 83, 0.2)',
-                            borderRadius: '6px',
-                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                            '&:hover': {
-                              borderColor: 'rgba(191, 152, 83, 0.2)',
-                            },
-                          }),
-                          menuPortal: (base) => ({
-                            ...base,
-                            zIndex: 9999,
-                          }),
-                          placeholder: (provided) => ({
-                            ...provided,
-                            color: '#999',
-                            textAlign: 'left',
-                          }),
-                          menu: (provided) => ({
-                            ...provided,
-                            zIndex: 9999,
-                          }),
-                          option: (provided, state) => ({
-                            ...provided,
-                            textAlign: 'left',
-                            fontWeight: 'normal',
-                            fontSize: '15px',
-                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                            color: 'black',
-                          }),
-                          singleValue: (provided) => ({
-                            ...provided,
-                            textAlign: 'left',
-                            fontWeight: 'normal',
-                            color: 'black',
-                          }),
-                        }}
-                      />
-                      <CreatableSelect
-                        name="floorName"
-                        value={editFloorOptions.find(option => option.value === shop.floorName)}
-                        onChange={(selectedOption) => {
-                          handleShopeditChange(pIndex, sIndex, {
-                            target: {
-                              name: 'floorName',
-                              value: selectedOption ? selectedOption.value : '',
-                            },
-                          });
-                        }}
-                        options={editFloorOptions}
-                        placeholder="Floor"
-                        isClearable
-                        className="w-36"
-                        classNamePrefix="select"
-                        styles={{
-                          control: (provided, state) => ({
-                            ...provided,
-                            height: '44px', // equivalent to h-11
-                            minHeight: '44px',
-                            backgroundColor: 'transparent',
-                            borderWidth: '2px',
-                            borderColor: state.isFocused
-                              ? 'rgba(191, 152, 83, 0.5)'
-                              : 'rgba(191, 152, 83, 0.25)',
-                            borderRadius: '8px',
-                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                            '&:hover': {
-                              borderColor: 'rgba(191, 152, 83, 0.4)',
-                            },
-                          }),
-                          menu: (provided) => ({
-                            ...provided,
-                            zIndex: 9999,
-                          }),
-                          option: (provided, state) => ({
-                            ...provided,
-                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                            color: 'black',
-                          }),
-                          singleValue: (provided) => ({
-                            ...provided,
-                            color: 'black',
-                          }),
-                          placeholder: (provided) => ({
-                            ...provided,
-                            color: '#999',
-                          }),
-                        }}
-                      />
-                      <Select
-                        name="shopNo"
-                        value={getShopOptionsForProperty(
-                          property.propertyName,
-                          shop.propertyType,
-                          editformData.property.flatMap((prop) =>
-                            prop.shops?.map((s) => s.shopNo).filter(Boolean) || []
-                          )
-                        ).find(option =>
-                          String(option.value) === String(shop.shopNo) || option.value === shop.shopNo
-                        )}
-                        onChange={(selectedOption) => {
-                          const selectedShopNo = selectedOption ? selectedOption.value : '';
-                          const currentPropertyName = editformData.property[pIndex]?.propertyName;
-                          let doorNo = '';
-                          if (currentPropertyName && selectedShopNo) {
-                            const matchedProject = projects.find(
-                              (p) => p.projectReferenceName === currentPropertyName
-                            );
-                            if (matchedProject && matchedProject.propertyDetails) {
-                              // Convert Set to Array if needed, or handle as array
-                              const propertyDetailsArray = Array.isArray(matchedProject.propertyDetails)
-                                ? matchedProject.propertyDetails
-                                : Array.from(matchedProject.propertyDetails || []);
-
-                              const matchedDetail = propertyDetailsArray.find(
-                                (detail) =>
-                                  detail.projectType === shop.propertyType &&
-                                  (String(detail.shopNo) === String(selectedShopNo) || detail.shopNo === selectedShopNo)
-                              );
-                              if (matchedDetail) {
-                                doorNo = matchedDetail.doorNo || '';
-                              }
-                            }
-                          }
-                          handleShopeditChange(pIndex, sIndex, {
-                            target: {
-                              name: 'shopNo',
-                              value: selectedShopNo,
-                            },
-                          });
-                          handleShopeditChange(pIndex, sIndex, {
-                            target: {
-                              name: 'doorNo',
-                              value: doorNo,
-                            },
-                          });
-                        }}
-                        options={getShopOptionsForProperty(
-                          property.propertyName,
-                          shop.propertyType,
-                          editformData.property.flatMap((prop) =>
-                            prop.shops?.map((s) => s.shopNo).filter(Boolean) || []
-                          )
-                        )}
-                        placeholder="Shop No"
-                        isSearchable
-                        isClearable
-                        className="w-36"
-                        classNamePrefix="select"
-                        styles={{
-                          control: (provided, state) => ({
-                            ...provided,
-                            height: '44px',
-                            minHeight: '44px',
-                            backgroundColor: 'transparent',
-                            borderWidth: '2px',
-                            borderColor: state.isFocused
-                              ? 'rgba(191, 152, 83, 0.5)'
-                              : 'rgba(191, 152, 83, 0.25)',
-                            borderRadius: '8px',
-                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                            '&:hover': {
-                              borderColor: 'rgba(191, 152, 83, 0.4)',
-                            },
-                          }),
-                          menu: (provided) => ({
-                            ...provided,
-                            zIndex: 9999,
-                          }),
-                          option: (provided, state) => ({
-                            ...provided,
-                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                            color: 'black',
-                          }),
-                          singleValue: (provided) => ({
-                            ...provided,
-                            color: 'black',
-                          }),
-                          placeholder: (provided) => ({
-                            ...provided,
-                            color: '#999',
-                          }),
-                        }}
-                      />
-                      <input
-                        type="text"
-                        name="doorNo"
-                        value={shop.doorNo}
-                        onChange={(e) => handleShopeditChange(pIndex, sIndex, e)}
-                        className="border-2 border-[#BF9853] w-28 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
-                        placeholder="Door No"
-                      />
-                      <div className='flex gap-1'>
-                        <input
-                          type="text"
-                          name="monthlyRent"
-                          value={formatINR(shop.monthlyRent)}
-                          onChange={(e) => {
-                            const rawValue = e.target.value.replace(/[^0-9]/g, '');
-                            handleShopeditChange(pIndex, sIndex, {
-                              target: {
-                                name: 'monthlyRent',
-                                value: rawValue, // store unformatted numeric value
-                              },
-                            });
-                          }}
-                          className="border-2 border-[#BF9853] w-32 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
-                          placeholder="Rent"
-                        />
-                        <input
-                          type="checkbox"
-                          name="shouldCollectAdvance"
-                          checked={shop.shouldCollectAdvance}
-                          onChange={(e) => handleShopeditChange(pIndex, sIndex, e)}
-                          className="custom-checkbox cursor-pointer appearance-none w-4 h-4 mt-3 -ml-1 rounded bg-slate-200 checked:bg-[#E2F9E1] checked:border-[#034638]"
-                        />
-                      </div>
-                      <input
-                        type="text"
-                        name="advanceAmount"
-                        value={formatINR(shop.advanceAmount)}
-                        onChange={(e) => {
-                          const rawValue = e.target.value.replace(/[^0-9]/g, '');
-                          handleShopeditChange(pIndex, sIndex, {
-                            target: {
-                              name: 'advanceAmount',
-                              value: rawValue, // store unformatted numeric value
-                            },
-                          });
-                        }}
-                        className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
-                        placeholder="Advance"
-                      />
-                      <input
-                        type="date"
-                        name="startingDate"
-                        value={shop.startingDate}
-                        onChange={(e) => {
-                          const rawValue = e.target.value;
-                          handleShopeditChange(pIndex, sIndex, {
-                            target: {
-                              name: 'startingDate',
-                              value: rawValue, // store unformatted numeric value
-                            },
-                          });
-                        }}
-                        className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
-                        placeholder="Advance"
-                      />
-                      <div className="relative flex">
-                        <input
-                          type="date"
-                          name="shopClosureDate"
-                          value={shop.shopClosureDate || ''}
-                          onChange={(e) => {
-                            const rawValue = e.target.value;
-                            handleShopeditChange(pIndex, sIndex, {
-                              target: {
-                                name: 'shopClosureDate',
-                                value: rawValue,
-                              },
-                            });
-                          }}
-                          className="border-2 border-[#BF9853] w-36 h-11 border-opacity-25 -ml-8 p-2 rounded-lg focus:outline-none"
-                          placeholder="Closure Date"
-                        />
-                        {property.shops.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeShopEdit(pIndex, sIndex)}
-                            className=" text-red-500 font-bold ml-3"
-                          >
-                            <img src={cross} alt='cross' className='w-5 h-5' />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => addShopEdit(pIndex)}
-                    className='text-[#E4572E] font-bold px-1  border-dashed border-b-2 border-[#BF9853]'
-                  >
-                    + Add On
-                  </button>
-                </div>
-              ))}
-              <div className='text-left'>
-                <button
-                  type="button"
-                  onClick={addPropertyEdit}
-                  className='text-[#E4572E] font-bold px-1 border-dashed border-b-2 border-[#BF9853]'
-                >
-                  + Add Another row
-                </button>
-              </div>
-              <div className="flex space-x-2 mt-6 mb-4">
-                <button
-                  type="submit"
-                  className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
-                >
-                  Submit
-                </button>
-                <button
-                  type="button"
-                  className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
-                  onClick={closeAccount1Types}>
                   Cancel
                 </button>
               </div>
@@ -3903,7 +2877,33 @@ const InputData = ({ username, userRoles = [] }) => {
                       />
                     </div>
                     <div className="relative">
-                      <label className='block mb-1 text-lg font-medium '>EB.NO</label>
+                      <div className="flex items-center gap-2 mb-1">
+                        <label className='text-lg font-medium '>EB.NO</label>
+                        <div className="relative inline-flex bg-gray-200 rounded-lg p-0.5">
+                          <button
+                            type="button"
+                            onClick={() => handleNewDetailChange(index, 'ebNoPhase', '1P')}
+                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                              (detail.ebNoPhase || '1P') === '1P'
+                                ? 'bg-[#BF9853] text-white shadow-sm'
+                                : 'text-gray-600 hover:text-gray-800'
+                            }`}
+                          >
+                            1P
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleNewDetailChange(index, 'ebNoPhase', '3P')}
+                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                              detail.ebNoPhase === '3P'
+                                ? 'bg-[#BF9853] text-white shadow-sm'
+                                : 'text-gray-600 hover:text-gray-800'
+                            }`}
+                          >
+                            3P
+                          </button>
+                        </div>
+                      </div>
                       <div className="flex">
                         <input
                           type='text'
@@ -4186,7 +3186,33 @@ const InputData = ({ username, userRoles = [] }) => {
                       />
                     </div>
                     <div className="relative">
-                      <label className='block mb-1 text-lg font-medium '>EB.NO</label>
+                      <div className="flex items-center gap-2 mb-1">
+                        <label className='text-lg font-medium '>EB.NO</label>
+                        <div className="relative inline-flex bg-gray-200 rounded-lg p-0.5">
+                          <button
+                            type="button"
+                            onClick={() => handleEditDetailChange(index, 'ebNoPhase', '1P')}
+                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                              (detail.ebNoPhase || '1P') === '1P'
+                                ? 'bg-[#BF9853] text-white shadow-sm'
+                                : 'text-gray-600 hover:text-gray-800'
+                            }`}
+                          >
+                            1P
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleEditDetailChange(index, 'ebNoPhase', '3P')}
+                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                              detail.ebNoPhase === '3P'
+                                ? 'bg-[#BF9853] text-white shadow-sm'
+                                : 'text-gray-600 hover:text-gray-800'
+                            }`}
+                          >
+                            3P
+                          </button>
+                        </div>
+                      </div>
                       <div className="flex">
                         <input
                           type='text'
@@ -4391,7 +3417,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                   });
                                 }
                               }}
-                              placeholder="Property"
+                              placeholder="Property Name"
                               isSearchable
                               isClearable
                               className="w-72 text-sm"
@@ -4551,6 +3577,22 @@ const InputData = ({ username, userRoles = [] }) => {
                               className="border-2 text-sm border-[#BF9853] w-28 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
                               placeholder="Door No"
                             />
+                            <input
+                              type="text"
+                              name="projectType"
+                              value={shopDetails?.projectType || ''}
+                              readOnly
+                              className="border-2 text-sm border-[#BF9853] w-32 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
+                              placeholder="Project type"
+                            />
+                            <input
+                              type="text"
+                              name="floorName"
+                              value={shopDetails?.floorName || ''}
+                              readOnly
+                              className="border-2 text-sm border-[#BF9853] w-36 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
+                              placeholder="Floor"
+                            />
                             <div className='flex gap-1'>
                               <input
                                 type="text"
@@ -4655,394 +3697,423 @@ const InputData = ({ username, userRoles = [] }) => {
       )}
       {isTenantLinkEditOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
-          <div className="bg-white rounded-md w-[90rem] h-[44rem] px-2 py-2 overflow-y-auto">
-            <div>
-              <button className="text-red-500 ml-[95%]" onClick={closeEditTenantLink}>
-                <img src={cross} alt='cross' className='w-5 h-5' />
-              </button>
-            </div>
-            <form className="max-w-5xl mx-auto space-y-2" onSubmit={handleEditTenantLinkSubmit}>
-              <h2 className="text-2xl font-bold">Tenant Details</h2>
-              <div className='text-left'>
-                <div className='flex gap-10'>
-                  <div className='mt-3'>
-                    <label className='block font-semibold'>Tenant Name</label>
-                    <input
-                      type="text"
-                      name="tenantName"
-                      value={editTenantLinkFormData.tenantName}
-                      onChange={handleEditTenantLinkChange}
-                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
-                      placeholder="Tenant Name"
-                    />
-                  </div>
-                  <div className='mt-3'>
-                    <label className='block font-semibold'>Tenant FullName</label>
-                    <input
-                      type="text"
-                      name="fullName"
-                      value={editTenantLinkFormData.fullName}
-                      onChange={handleEditTenantLinkChange}
-                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
-                      placeholder="Full Name"
-                    />
-                  </div>
-                </div>
-                <div className='flex gap-10'>
-                  <div className='mt-3'>
-                    <label className='block font-semibold'>Tenant FatherName</label>
-                    <input
-                      type="text"
-                      name="tenantFatherName"
-                      value={editTenantLinkFormData.tenantFatherName}
-                      onChange={handleEditTenantLinkChange}
-                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
-                      placeholder="Father Name"
-                    />
-                  </div>
-                  <div className='mt-3'>
-                    <label className='block font-semibold'>Tenant Age</label>
-                    <input
-                      type="text"
-                      name="age"
-                      value={editTenantLinkFormData.age}
-                      onChange={handleEditTenantLinkChange}
-                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
-                      placeholder="Age"
-                    />
-                  </div>
-                </div>
-                <div className='flex gap-10'>
-                  <div className='mt-3'>
-                    <label className='block font-semibold'>Mobile Number</label>
-                    <input
-                      type="text"
-                      name="mobileNumber"
-                      value={editTenantLinkFormData.mobileNumber}
-                      onChange={handleEditTenantLinkChange}
-                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
-                      placeholder="Mobile Number"
-                    />
-                  </div>
-                  <div className='mt-3'>
-                    <label className='block font-semibold'>Tenant Address</label>
-                    <input
-                      type="text"
-                      name="tenantAddress"
-                      value={editTenantLinkFormData.tenantAddress}
-                      onChange={handleEditTenantLinkChange}
-                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
-                      placeholder="Tenant Address"
-                    />
-                  </div>
-                </div>
+          <div className="bg-white rounded-md w-[87rem] h-[44rem] px-6 py-4 pl-24 ">
+            <div className='overflow-y-auto h-[38rem]'>
+              <div className="flex justify-end mb-2">
+                <button className="text-red-500 " onClick={closeEditTenantLink}>
+                  <img src={cross} alt='cross' className='w-5 h-5' />
+                </button>
               </div>
-              <h2 className="text-2xl font-bold">Shop Details</h2>
-              {(() => {
-                const projectRefNames = editTenantLinkFormData.shopNos
-                  .map(shop => {
-                    const details = getShopDetailsById(shop.shopNoId);
-                    return details?.projectReferenceName;
-                  })
-                  .filter(name => name && name !== '')
-                  .filter((name, index, self) => self.indexOf(name) === index);
-                const showProjectAtTop = projectRefNames.length === 1 && projectRefNames[0];
-                return (
-                  <>
-                    {editTenantLinkFormData.shopNos.map((shop, sIndex) => {
-                      const shopDetails = getShopDetailsById(shop.shopNoId);
-                      const filteredShops = getShopsByProjectReferenceName(shop.projectReferenceName, true);
-                      const selectedShopOption = filteredShops.find(option =>
-                        option.value === shop.shopNoId || option.id === shop.shopNoId ||
-                        String(option.value) === String(shop.shopNoId) || String(option.id) === String(shop.shopNoId)
-                      ) || getAllShopNumbersUnfiltered().find(option =>
-                        option.value === shop.shopNoId || option.id === shop.shopNoId ||
-                        String(option.value) === String(shop.shopNoId) || String(option.id) === String(shop.shopNoId)
-                      );
-                      return (
-                        <div key={sIndex} className="bg-gray-50 p-4 rounded-lg shadow-md mb-6 text-left w-[1220px]">
-                          <div className="flex gap-2 mb-2 ">
-                            <Select
-                              name="projectReferenceName"
-                              options={projectOptions}
-                              value={projectOptions.find(opt => opt.value === shop.projectReferenceName)}
-                              onChange={(selectedOption) => {
-                                const projectRefName = selectedOption?.value || '';
-                                handleEditTenantLinkShopChange(sIndex, {
-                                  target: {
-                                    name: 'projectReferenceName',
-                                    value: projectRefName
-                                  }
-                                });
-                                if (selectedShopOption && selectedShopOption.projectReferenceName !== projectRefName) {
+              <form className="space-y-2" onSubmit={handleEditTenantLinkSubmit}>
+                <h2 className="text-2xl font-bold">Tenant Details</h2>
+                <div className='text-left'>
+                  <div className='flex gap-10'>
+                    <div className='mt-3'>
+                      <label className='block font-semibold'>Tenant Name</label>
+                      <input
+                        type="text"
+                        name="tenantName"
+                        value={editTenantLinkFormData.tenantName}
+                        onChange={handleEditTenantLinkChange}
+                        className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                        placeholder="Tenant Name"
+                      />
+                    </div>
+                    <div className='mt-3'>
+                      <label className='block font-semibold'>Tenant FullName</label>
+                      <input
+                        type="text"
+                        name="fullName"
+                        value={editTenantLinkFormData.fullName}
+                        onChange={handleEditTenantLinkChange}
+                        className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                        placeholder="Full Name"
+                      />
+                    </div>
+                  </div>
+                  <div className='flex gap-10'>
+                    <div className='mt-3'>
+                      <label className='block font-semibold'>Tenant FatherName</label>
+                      <input
+                        type="text"
+                        name="tenantFatherName"
+                        value={editTenantLinkFormData.tenantFatherName}
+                        onChange={handleEditTenantLinkChange}
+                        className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                        placeholder="Father Name"
+                      />
+                    </div>
+                    <div className='mt-3'>
+                      <label className='block font-semibold'>Tenant Age</label>
+                      <input
+                        type="text"
+                        name="age"
+                        value={editTenantLinkFormData.age}
+                        onChange={handleEditTenantLinkChange}
+                        className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                        placeholder="Age"
+                      />
+                    </div>
+                  </div>
+                  <div className='flex gap-10'>
+                    <div className='mt-3'>
+                      <label className='block font-semibold'>Mobile Number</label>
+                      <input
+                        type="text"
+                        name="mobileNumber"
+                        value={editTenantLinkFormData.mobileNumber}
+                        onChange={handleEditTenantLinkChange}
+                        className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                        placeholder="Mobile Number"
+                      />
+                    </div>
+                    <div className='mt-3'>
+                      <label className='block font-semibold'>Tenant Address</label>
+                      <input
+                        type="text"
+                        name="tenantAddress"
+                        value={editTenantLinkFormData.tenantAddress}
+                        onChange={handleEditTenantLinkChange}
+                        className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                        placeholder="Tenant Address"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <h2 className="text-2xl font-bold">Shop Details</h2>
+                {(() => {
+                  const projectRefNames = editTenantLinkFormData.shopNos
+                    .map(shop => {
+                      const details = getShopDetailsById(shop.shopNoId);
+                      return details?.projectReferenceName;
+                    })
+                    .filter(name => name && name !== '')
+                    .filter((name, index, self) => self.indexOf(name) === index);
+                  const showProjectAtTop = projectRefNames.length === 1 && projectRefNames[0];
+                  return (
+                    <>
+                      {editTenantLinkFormData.shopNos.map((shop, sIndex) => {
+                        const shopDetails = getShopDetailsById(shop.shopNoId);
+                        const filteredShops = getShopsByProjectReferenceName(shop.projectReferenceName, true);
+                        const selectedShopOption = (shop.shopNoId && (shop.shopNoId !== '' && shop.shopNoId !== null))
+                          ? (filteredShops.find(option =>
+                            option.value === shop.shopNoId || option.id === shop.shopNoId ||
+                            String(option.value) === String(shop.shopNoId) || String(option.id) === String(shop.shopNoId)
+                          ) || getAllShopNumbersUnfiltered().find(option =>
+                            option.value === shop.shopNoId || option.id === shop.shopNoId ||
+                            String(option.value) === String(shop.shopNoId) || String(option.id) === String(shop.shopNoId)
+                          ))
+                          : null;
+                        return (
+                          <div key={sIndex} className="bg-gray-50 p-4 rounded-lg shadow-md mb-6 text-left w-[1220px]">
+                            <div className="flex gap-2 mb-2 ">
+                              <Select
+                                name="projectReferenceName"
+                                options={projectOptions}
+                                value={projectOptions.find(opt => opt.value === shop.projectReferenceName)}
+                                onChange={(selectedOption) => {
+                                  const projectRefName = selectedOption?.value || '';
                                   handleEditTenantLinkShopChange(sIndex, {
                                     target: {
-                                      name: 'shopNoId',
-                                      value: ''
+                                      name: 'projectReferenceName',
+                                      value: projectRefName
                                     }
                                   });
-                                }
-                              }}
-                              placeholder="Project"
-                              isSearchable
-                              isClearable
-                              className="w-72 text-sm"
-                              classNamePrefix="select"
-                              menuPortalTarget={document.body}
-                              styles={{
-                                control: (provided, state) => ({
-                                  ...provided,
-                                  height: '44px',
-                                  minHeight: '44px',
-                                  backgroundColor: 'transparent',
-                                  borderWidth: '2px',
-                                  borderColor: state.isFocused
-                                    ? 'rgba(191, 152, 83, 0.5)'
-                                    : 'rgba(191, 152, 83, 0.25)',
-                                  borderRadius: '8px',
-                                  boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                                  '&:hover': {
-                                    borderColor: 'rgba(191, 152, 83, 0.4)',
-                                  },
-                                }),
-                                menuPortal: (base) => ({
-                                  ...base,
-                                  zIndex: 9999,
-                                }),
-                                menu: (provided) => ({
-                                  ...provided,
-                                  zIndex: 9999,
-                                }),
-                                option: (provided, state) => ({
-                                  ...provided,
-                                  backgroundColor: state.isSelected
-                                    ? 'rgba(191, 152, 83, 0.3)'
-                                    : state.isFocused
-                                      ? 'rgba(191, 152, 83, 0.1)'
-                                      : 'white',
-                                  color: 'black',
-                                  fontWeight: state.isSelected ? 'bold' : 'normal',
-                                }),
-                                singleValue: (provided) => ({
-                                  ...provided,
-                                  color: 'black',
-                                }),
-                                placeholder: (provided) => ({
-                                  ...provided,
-                                  color: '#999',
-                                }),
-                              }}
-                            />
-                            <Select
-                              name="shopNo"
-                              options={filteredShops}
-                              value={selectedShopOption}
-                              menuPlacement="auto"
-                              onMenuOpen={() => {
-                                setTimeout(() => {
-                                  const menu = document.querySelector('.select__menu');
-                                  if (menu && selectedShopOption) {
-                                    const menuList = menu.querySelector('.select__menu-list');
-                                    if (menuList) {
-                                      const options = menuList.querySelectorAll('.select__option');
-                                      options.forEach((option) => {
-                                        if (option.textContent === selectedShopOption.label ||
-                                          option.textContent === String(selectedShopOption.shopNo)) {
-                                          option.scrollIntoView({ block: 'center', behavior: 'auto' });
-                                        }
-                                      });
-                                    }
-                                  }
-                                }, 50);
-                              }}
-                              onChange={(selectedOption) => {
-                                if (selectedOption) {
-                                  const shopDetails = getShopDetailsById(selectedOption.value || selectedOption.id);
-                                  handleEditTenantLinkShopChange(sIndex, {
-                                    target: {
-                                      name: 'shopNoId',
-                                      value: selectedOption.value || selectedOption.id
-                                    }
-                                  });
-                                  if (!shop.projectReferenceName && shopDetails?.projectReferenceName) {
+                                  // Always clear Shop No if Property Name is cleared
+                                  if (!selectedOption) {
                                     handleEditTenantLinkShopChange(sIndex, {
                                       target: {
-                                        name: 'projectReferenceName',
-                                        value: shopDetails.projectReferenceName
+                                        name: 'shopNoId',
+                                        value: ''
+                                      }
+                                    });
+                                  } else if (selectedShopOption && selectedShopOption.projectReferenceName !== projectRefName) {
+                                    // Also clear if the selected shop's project doesn't match the new property name
+                                    handleEditTenantLinkShopChange(sIndex, {
+                                      target: {
+                                        name: 'shopNoId',
+                                        value: ''
                                       }
                                     });
                                   }
-                                } else {
-                                  handleEditTenantLinkShopChange(sIndex, {
-                                    target: {
-                                      name: 'shopNoId',
-                                      value: ''
+                                }}
+                                placeholder="Property Name"
+                                isSearchable
+                                isClearable
+                                className="w-72 text-sm"
+                                classNamePrefix="select"
+                                menuPortalTarget={document.body}
+                                styles={{
+                                  control: (provided, state) => ({
+                                    ...provided,
+                                    height: '44px',
+                                    minHeight: '44px',
+                                    backgroundColor: 'transparent',
+                                    borderWidth: '2px',
+                                    borderColor: state.isFocused
+                                      ? 'rgba(191, 152, 83, 0.5)'
+                                      : 'rgba(191, 152, 83, 0.25)',
+                                    borderRadius: '8px',
+                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                    '&:hover': {
+                                      borderColor: 'rgba(191, 152, 83, 0.4)',
+                                    },
+                                  }),
+                                  menuPortal: (base) => ({
+                                    ...base,
+                                    zIndex: 9999,
+                                  }),
+                                  menu: (provided) => ({
+                                    ...provided,
+                                    zIndex: 9999,
+                                  }),
+                                  option: (provided, state) => ({
+                                    ...provided,
+                                    backgroundColor: state.isSelected
+                                      ? 'rgba(191, 152, 83, 0.3)'
+                                      : state.isFocused
+                                        ? 'rgba(191, 152, 83, 0.1)'
+                                        : 'white',
+                                    color: 'black',
+                                    fontWeight: state.isSelected ? 'bold' : 'normal',
+                                  }),
+                                  singleValue: (provided) => ({
+                                    ...provided,
+                                    color: 'black',
+                                  }),
+                                  placeholder: (provided) => ({
+                                    ...provided,
+                                    color: '#999',
+                                  }),
+                                }}
+                              />
+                              <Select
+                                name="shopNo"
+                                options={filteredShops}
+                                value={selectedShopOption}
+                                menuPlacement="auto"
+                                onMenuOpen={() => {
+                                  setTimeout(() => {
+                                    const menu = document.querySelector('.select__menu');
+                                    if (menu && selectedShopOption) {
+                                      const menuList = menu.querySelector('.select__menu-list');
+                                      if (menuList) {
+                                        const options = menuList.querySelectorAll('.select__option');
+                                        options.forEach((option) => {
+                                          if (option.textContent === selectedShopOption.label ||
+                                            option.textContent === String(selectedShopOption.shopNo)) {
+                                            option.scrollIntoView({ block: 'center', behavior: 'auto' });
+                                          }
+                                        });
+                                      }
                                     }
-                                  });
-                                }
-                              }}
-                              placeholder="Shop No"
-                              isSearchable
-                              isClearable
-                              className="w-44 text-sm"
-                              classNamePrefix="select"
-                              menuPortalTarget={document.body}
-                              styles={{
-                                control: (provided, state) => ({
-                                  ...provided,
-                                  height: '44px',
-                                  minHeight: '44px',
-                                  backgroundColor: 'transparent',
-                                  borderWidth: '2px',
-                                  borderColor: state.isFocused
-                                    ? 'rgba(191, 152, 83, 0.5)'
-                                    : 'rgba(191, 152, 83, 0.25)',
-                                  borderRadius: '8px',
-                                  boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                                  '&:hover': {
-                                    borderColor: 'rgba(191, 152, 83, 0.4)',
-                                  },
-                                }),
-                                menuPortal: (base) => ({
-                                  ...base,
-                                  zIndex: 9999,
-                                }),
-                                menu: (provided) => ({
-                                  ...provided,
-                                  zIndex: 9999,
-                                }),
-                                option: (provided, state) => ({
-                                  ...provided,
-                                  backgroundColor: state.isSelected
-                                    ? 'rgba(191, 152, 83, 0.3)'
-                                    : state.isFocused
-                                      ? 'rgba(191, 152, 83, 0.1)'
-                                      : 'white',
-                                  color: 'black',
-                                  fontWeight: state.isSelected ? 'bold' : 'normal',
-                                }),
-                                singleValue: (provided) => ({
-                                  ...provided,
-                                  color: 'black',
-                                }),
-                                placeholder: (provided) => ({
-                                  ...provided,
-                                  color: '#999',
-                                }),
-                              }}
-                            />
-                            <input
-                              type="text"
-                              name="doorNo"
-                              value={shopDetails?.doorNo || ''}
-                              readOnly
-                              className="border-2 text-sm border-[#BF9853] w-20 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
-                              placeholder="Door No"
-                            />
-                            <div className='flex gap-1'>
+                                  }, 50);
+                                }}
+                                onChange={(selectedOption) => {
+                                  if (selectedOption) {
+                                    const shopDetails = getShopDetailsById(selectedOption.value || selectedOption.id);
+                                    handleEditTenantLinkShopChange(sIndex, {
+                                      target: {
+                                        name: 'shopNoId',
+                                        value: selectedOption.value || selectedOption.id
+                                      }
+                                    });
+                                    if (!shop.projectReferenceName && shopDetails?.projectReferenceName) {
+                                      handleEditTenantLinkShopChange(sIndex, {
+                                        target: {
+                                          name: 'projectReferenceName',
+                                          value: shopDetails.projectReferenceName
+                                        }
+                                      });
+                                    }
+                                  } else {
+                                    handleEditTenantLinkShopChange(sIndex, {
+                                      target: {
+                                        name: 'shopNoId',
+                                        value: ''
+                                      }
+                                    });
+                                  }
+                                }}
+                                placeholder="Shop No"
+                                isSearchable
+                                isClearable
+                                className="w-44 text-sm"
+                                classNamePrefix="select"
+                                menuPortalTarget={document.body}
+                                styles={{
+                                  control: (provided, state) => ({
+                                    ...provided,
+                                    height: '44px',
+                                    minHeight: '44px',
+                                    backgroundColor: 'transparent',
+                                    borderWidth: '2px',
+                                    borderColor: state.isFocused
+                                      ? 'rgba(191, 152, 83, 0.5)'
+                                      : 'rgba(191, 152, 83, 0.25)',
+                                    borderRadius: '8px',
+                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                    '&:hover': {
+                                      borderColor: 'rgba(191, 152, 83, 0.4)',
+                                    },
+                                  }),
+                                  menuPortal: (base) => ({
+                                    ...base,
+                                    zIndex: 9999,
+                                  }),
+                                  menu: (provided) => ({
+                                    ...provided,
+                                    zIndex: 9999,
+                                  }),
+                                  option: (provided, state) => ({
+                                    ...provided,
+                                    backgroundColor: state.isSelected
+                                      ? 'rgba(191, 152, 83, 0.3)'
+                                      : state.isFocused
+                                        ? 'rgba(191, 152, 83, 0.1)'
+                                        : 'white',
+                                    color: 'black',
+                                    fontWeight: state.isSelected ? 'bold' : 'normal',
+                                  }),
+                                  singleValue: (provided) => ({
+                                    ...provided,
+                                    color: 'black',
+                                  }),
+                                  placeholder: (provided) => ({
+                                    ...provided,
+                                    color: '#999',
+                                  }),
+                                }}
+                              />
                               <input
                                 type="text"
-                                name="monthlyRent"
-                                value={formatINR(shop.monthlyRent)}
+                                name="doorNo"
+                                value={shopDetails?.doorNo || ''}
+                                readOnly
+                                className="border-2 text-sm border-[#BF9853] w-20 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
+                                placeholder="Door No"
+                              />
+                              <input
+                                type="text"
+                                name="projectType"
+                                value={shopDetails?.projectType || ''}
+                                readOnly
+                                className="border-2 text-sm border-[#BF9853] w-32 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
+                                placeholder="Project type"
+                              />
+                              <input
+                                type="text"
+                                name="floorName"
+                                value={shopDetails?.floorName || ''}
+                                readOnly
+                                className="border-2 text-sm border-[#BF9853] w-36 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
+                                placeholder="Floor"
+                              />
+                              <div className='flex gap-1'>
+                                <input
+                                  type="text"
+                                  name="monthlyRent"
+                                  value={formatINR(shop.monthlyRent)}
+                                  onChange={(e) => {
+                                    const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                                    handleEditTenantLinkShopChange(sIndex, {
+                                      target: {
+                                        name: 'monthlyRent',
+                                        value: rawValue,
+                                      },
+                                    });
+                                  }}
+                                  className="border-2 text-sm border-[#BF9853] w-32 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
+                                  placeholder="Rent"
+                                />
+                                <input
+                                  type="checkbox"
+                                  name="shouldCollectAdvance"
+                                  checked={shop.shouldCollectAdvance}
+                                  onChange={(e) => handleEditTenantLinkShopChange(sIndex, e)}
+                                  className="custom-checkbox cursor-pointer appearance-none w-4 h-4 mt-3 rounded bg-slate-200 checked:bg-[#E2F9E1] checked:border-[#034638]"
+                                />
+                              </div>
+                              <input
+                                type="text"
+                                name="advanceAmount"
+                                value={formatINR(shop.advanceAmount)}
                                 onChange={(e) => {
                                   const rawValue = e.target.value.replace(/[^0-9]/g, '');
                                   handleEditTenantLinkShopChange(sIndex, {
                                     target: {
-                                      name: 'monthlyRent',
+                                      name: 'advanceAmount',
                                       value: rawValue,
                                     },
                                   });
                                 }}
                                 className="border-2 text-sm border-[#BF9853] w-32 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
-                                placeholder="Rent"
+                                placeholder="Advance"
                               />
-                              <input
-                                type="checkbox"
-                                name="shouldCollectAdvance"
-                                checked={shop.shouldCollectAdvance}
-                                onChange={(e) => handleEditTenantLinkShopChange(sIndex, e)}
-                                className="custom-checkbox cursor-pointer appearance-none w-4 h-4 mt-3 rounded bg-slate-200 checked:bg-[#E2F9E1] checked:border-[#034638]"
-                              />
-                            </div>
-                            <input
-                              type="text"
-                              name="advanceAmount"
-                              value={formatINR(shop.advanceAmount)}
-                              onChange={(e) => {
-                                const rawValue = e.target.value.replace(/[^0-9]/g, '');
-                                handleEditTenantLinkShopChange(sIndex, {
-                                  target: {
-                                    name: 'advanceAmount',
-                                    value: rawValue,
-                                  },
-                                });
-                              }}
-                              className="border-2 text-sm border-[#BF9853] w-32 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
-                              placeholder="Advance"
-                            />
-                            <input
-                              type="date"
-                              name="startingDate"
-                              value={shop.startingDate}
-                              onChange={(e) => {
-                                const rawValue = e.target.value;
-                                handleEditTenantLinkShopChange(sIndex, {
-                                  target: {
-                                    name: 'startingDate',
-                                    value: rawValue,
-                                  },
-                                });
-                              }}
-                              className="border-2 text-sm border-[#BF9853] w-32 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
-                              placeholder="Advance"
-                            />
-                            <div className="relative flex">
                               <input
                                 type="date"
-                                name="shopClosureDate"
-                                value={shop.shopClosureDate || ''}
+                                name="startingDate"
+                                value={shop.startingDate}
                                 onChange={(e) => {
                                   const rawValue = e.target.value;
                                   handleEditTenantLinkShopChange(sIndex, {
                                     target: {
-                                      name: 'shopClosureDate',
+                                      name: 'startingDate',
                                       value: rawValue,
                                     },
                                   });
                                 }}
                                 className="border-2 text-sm border-[#BF9853] w-32 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
-                                placeholder="Closure Date"
+                                placeholder="Advance"
                               />
-                              {editTenantLinkFormData.shopNos.length > 1 && (
-                                <button type="button" onClick={() => removeEditTenantLinkShop(sIndex)} className=" text-red-500 font-bold ml-3">
-                                  <img src={cross} alt='cross' className='w-5 h-5' />
-                                </button>
-                              )}
+                              <div className="relative flex">
+                                <input
+                                  type="date"
+                                  name="shopClosureDate"
+                                  value={shop.shopClosureDate || ''}
+                                  onChange={(e) => {
+                                    const rawValue = e.target.value;
+                                    handleEditTenantLinkShopChange(sIndex, {
+                                      target: {
+                                        name: 'shopClosureDate',
+                                        value: rawValue,
+                                      },
+                                    });
+                                  }}
+                                  className="border-2 text-sm border-[#BF9853] w-32 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
+                                  placeholder="Closure Date"
+                                />
+                                {editTenantLinkFormData.shopNos.length > 1 && (
+                                  <button type="button" onClick={() => removeEditTenantLinkShop(sIndex)} className=" text-red-500 font-bold ml-3">
+                                    <img src={cross} alt='cross' className='w-5 h-5' />
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </>
-                );
-              })()}
-              <div className='text-left'>
-                <button type="button" onClick={addEditTenantLinkShop} className='text-[#E4572E] font-bold px-1  border-dashed border-b-2 border-[#BF9853]'>
-                  + Add On
-                </button>
-              </div>
-              <div className="flex space-x-2 mt-6 mb-4">
-                <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
-                  Submit
-                </button>
-                <button
-                  type="button"
-                  className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
-                  onClick={closeEditTenantLink}>
-                  Cancel
-                </button>
-              </div>
-            </form>
+                        );
+                      })}
+                    </>
+                  );
+                })()}
+                <div className='text-left'>
+                  <button type="button" onClick={addEditTenantLinkShop} className='text-[#E4572E] font-bold px-1  border-dashed border-b-2 border-[#BF9853]'>
+                    + Add On
+                  </button>
+                </div>
+              </form>
+            </div>
+            <div className="flex justify-end space-x-2 mb-4">
+              <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
+                Submit
+              </button>
+              <button
+                type="button"
+                className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
+                onClick={closeEditTenantLink}>
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

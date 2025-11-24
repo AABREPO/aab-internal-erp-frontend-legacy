@@ -15,7 +15,7 @@ import Change from '../Images/dropdownchange.png';
 
 // Helper function to clean URL by removing surrounding quotes and parsing JSON if needed
 function cleanUrl(url) {
-    if (!url) return url;    
+    if (!url) return url;
     let cleanedUrl = url.replace(/^["']|["']$/g, '');
     if (cleanedUrl.includes('{') && cleanedUrl.includes('billCopyUrl')) {
         try {
@@ -26,7 +26,7 @@ function cleanUrl(url) {
         } catch (e) {
             console.warn('Failed to parse URL as JSON:', cleanedUrl);
         }
-    }    
+    }
     return cleanedUrl;
 }
 function getStartAndEndDateOfISOWeek(weekNo, year) {
@@ -288,6 +288,22 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         else if (name === "description") {
             setEditFormData((prev) => ({ ...prev, description: value }));
         }
+        else if (name === "type") {
+            // Clear invalid fields when type changes
+            setEditFormData((prev) => {
+                const updated = { ...prev, [name]: value };
+                // If changing to Staff Advance, clear contractor and vendor
+                if (value === "Staff Advance") {
+                    updated.contractor_id = "";
+                    updated.vendor_id = "";
+                }
+                // If changing to Project Advance, clear employee
+                if (value === "Project Advance") {
+                    updated.employee_id = "";
+                }
+                return updated;
+            });
+        }
         else {
             setEditFormData((prev) => ({ ...prev, [name]: value }));
         }
@@ -404,8 +420,20 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 contractorOptions.find(opt => opt.id === Number(currentFileRow.contractor_id))?.label ||
                 employeeOptions.find(opt => opt.id === Number(currentFileRow.employee_id))?.label ||
                 "";
+            const now = new Date();
+            const timestamp = now.toLocaleString("en-GB", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true
+            })
+                .replace(",", "")
+                .replace(/\s/g, "-");
+
             const formData = new FormData();
-            const finalName = `${currentFileRow.date}-${siteNo}-${name}`;
+            const finalName = `${timestamp}-${siteNo}-${name}`;
             formData.append("file", selectedFileForPopup);
             formData.append("file_name", finalName);
             const uploadResponse = await fetch(
@@ -898,6 +926,18 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             }
             if (numericValue < 0) numericValue = 0;
             setNewExpense((prev) => ({ ...prev, amount: numericValue }));
+        } else if (name === "type") {
+            // Clear invalid fields when type changes
+            setNewExpense((prev) => ({ ...prev, [name]: value }));
+            // If changing to Staff Advance, clear contractor and vendor
+            if (value === "Staff Advance") {
+                setSelectedContractor(null);
+                setSelectedVendor(null);
+            }
+            // If changing to Project Advance, clear employee
+            if (value === "Project Advance") {
+                setSelectedEmployee(null);
+            }
         } else {
             setNewExpense((prev) => ({ ...prev, [name]: value }));
         }
@@ -1043,6 +1083,28 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             alert("Please fill all fields except date");
             return;
         }
+        // Validation for Staff Advance: only employee_id allowed
+        if (newExpense.type === "Staff Advance") {
+            if (selectedContractor || selectedVendor) {
+                alert("Staff Advance type only allows Employee. Please select an Employee and remove Contractor/Vendor selection.");
+                return;
+            }
+            if (!selectedEmployee) {
+                alert("Staff Advance type requires an Employee to be selected.");
+                return;
+            }
+        }
+        // Validation for Project Advance: only contractor_id or vendor_id allowed
+        if (newExpense.type === "Project Advance") {
+            if (selectedEmployee) {
+                alert("Project Advance type only allows Contractor or Vendor. Please select a Contractor/Vendor and remove Employee selection.");
+                return;
+            }
+            if (!selectedContractor && !selectedVendor) {
+                alert("Project Advance type requires either a Contractor or Vendor to be selected.");
+                return;
+            }
+        }
         try {
             // ---------- Common object for weekly-expenses ----------
             const expenseForBackend = {
@@ -1108,6 +1170,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     description: "",
                     file_url: "",
                 };
+                // Ensure employee_id is null for Project Advance
+                expenseForBackend.employee_id = null;
                 const saveAdvance = await fetch("https://backendaab.in/aabuildersDash/api/advance_portal/save", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -1160,6 +1224,9 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 if (!saveStaffAdvance.ok) throw new Error("Failed to save staff advance");
                 const savedStaffAdvance = await saveStaffAdvance.json();
                 // ---------- Save to weekly-expenses ----------
+                // Ensure contractor_id and vendor_id are null for Staff Advance
+                expenseForBackend.contractor_id = null;
+                expenseForBackend.vendor_id = null;
                 expenseForBackend.staff_advance_portal_id = savedStaffAdvance.staffAdvancePortalId;
                 const saveWeekly = await fetch("https://backendaab.in/aabuildersDash/api/weekly-expenses/save", {
                     method: "POST",
@@ -1307,6 +1374,28 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     const mergedExpenses = Object.entries(groupedExpenses).map(([type, amount]) => ({ type, amount }));
     const saveEditedExpense = async (row) => {
         try {
+            // Validation for Staff Advance: only employee_id allowed
+            if (editFormData.type === "Staff Advance") {
+                if (editFormData.contractor_id || editFormData.vendor_id) {
+                    alert("Staff Advance type only allows Employee. Please select an Employee and remove Contractor/Vendor selection.");
+                    return;
+                }
+                if (!editFormData.employee_id) {
+                    alert("Staff Advance type requires an Employee to be selected.");
+                    return;
+                }
+            }
+            // Validation for Project Advance: only contractor_id or vendor_id allowed
+            if (editFormData.type === "Project Advance") {
+                if (editFormData.employee_id) {
+                    alert("Project Advance type only allows Contractor or Vendor. Please select a Contractor/Vendor and remove Employee selection.");
+                    return;
+                }
+                if (!editFormData.contractor_id && !editFormData.vendor_id) {
+                    alert("Project Advance type requires either a Contractor or Vendor to be selected.");
+                    return;
+                }
+            }
             const normalize = (val) =>
                 val === null || val === undefined ? "" : String(val).trim();
             const changedFields = Object.keys(editFormData).filter(
@@ -1511,6 +1600,15 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 editFormData.loan_portal_id = null;
             }
             if (!onlyDescriptionChanged) {
+                // Ensure invalid fields are null based on type
+                const finalEditData = { ...editFormData };
+                if (editFormData.type === "Project Advance") {
+                    finalEditData.employee_id = null;
+                }
+                if (editFormData.type === "Staff Advance") {
+                    finalEditData.contractor_id = null;
+                    finalEditData.vendor_id = null;
+                }
                 const response = await fetch(
                     `https://backendaab.in/aabuildersDash/api/weekly-expenses/edit/${row.id}?username=${encodeURIComponent(
                         username
@@ -1518,7 +1616,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     {
                         method: "PUT",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(editFormData),
+                        body: JSON.stringify(finalEditData),
                     }
                 );
                 if (!response.ok) throw new Error("Failed to update expense");
@@ -1717,16 +1815,27 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                             aValue = getClientName(a) || "";
                             bValue = getClientName(b) || "";
                         } else {
-                            aValue = combinedOptions.find(opt =>
-                                (opt.type === "Contractor" && opt.id === Number(a.contractor_id)) ||
-                                (opt.type === "Vendor" && opt.id === Number(a.vendor_id)) ||
-                                (opt.type === "Employee" && opt.id === Number(a.employee_id))
-                            )?.label || "";
-                            bValue = combinedOptions.find(opt =>
-                                (opt.type === "Contractor" && opt.id === Number(b.contractor_id)) ||
-                                (opt.type === "Vendor" && opt.id === Number(b.vendor_id)) ||
-                                (opt.type === "Employee" && opt.id === Number(b.employee_id))
-                            )?.label || "";
+                            const aHasContractorVendorEmployee = a.contractor_id || a.vendor_id || a.employee_id;
+                            const bHasContractorVendorEmployee = b.contractor_id || b.vendor_id || b.employee_id;
+                            // Only use client name if there's no contractor/vendor/employee AND type is Loan
+                            if (!aHasContractorVendorEmployee && a.type === "Loan") {
+                                aValue = getClientName(a) || "";
+                            } else {
+                                aValue = combinedOptions.find(opt =>
+                                    (opt.type === "Contractor" && opt.id === Number(a.contractor_id)) ||
+                                    (opt.type === "Vendor" && opt.id === Number(a.vendor_id)) ||
+                                    (opt.type === "Employee" && opt.id === Number(a.employee_id))
+                                )?.label || "";
+                            }
+                            if (!bHasContractorVendorEmployee && b.type === "Loan") {
+                                bValue = getClientName(b) || "";
+                            } else {
+                                bValue = combinedOptions.find(opt =>
+                                    (opt.type === "Contractor" && opt.id === Number(b.contractor_id)) ||
+                                    (opt.type === "Vendor" && opt.id === Number(b.vendor_id)) ||
+                                    (opt.type === "Employee" && opt.id === Number(b.employee_id))
+                                )?.label || "";
+                            }
                         }
                         break;
                     case 'project_name':
@@ -2482,6 +2591,9 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             control: (provided, state) => ({
                                                                 ...provided,
                                                                 backgroundColor: 'transparent',
+                                                                width: '200px',
+                                                                maxWidth: '200px',
+                                                                minWidth: '200px',
                                                                 borderWidth: '3px',
                                                                 borderColor: state.isFocused
                                                                     ? 'rgba(191, 152, 83, 0.2)'
@@ -2509,11 +2621,20 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                 backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
                                                                 color: 'black',
                                                             }),
+                                                            valueContainer: (provided) => ({
+                                                                ...provided,
+                                                                maxWidth: '160px',
+                                                                overflow: 'hidden',
+                                                            }),
                                                             singleValue: (provided) => ({
                                                                 ...provided,
                                                                 textAlign: 'left',
                                                                 fontWeight: 'normal',
                                                                 color: 'black',
+                                                                maxWidth: '100%',
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis',
+                                                                whiteSpace: 'nowrap',
                                                             }),
                                                             indicatorSeparator: () => ({
                                                                 display: 'none'
@@ -2630,143 +2751,169 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                     onKeyDown={handleKeyDownExpense}
                                                 />
                                             </td>
-                                                <td className="pt-2 pb-2 w-[200px]">
-                                                    <div className="flex items-center gap-2">
-                                                        <Select
-                                                            name="party"
-                                                            value={isClientToggleActive
-                                                                ? (selectedClient || null)
-                                                                : (selectedContractor || selectedVendor || selectedEmployee || null)}
-                                                            onChange={(selectedOption) => {
-                                                                if (isClientToggleActive) {
-                                                                    if (selectedOption) {
-                                                                        const clientKey = selectedOption?.compositeKey || buildClientKey(selectedOption.label, selectedOption.fatherName, selectedOption.mobile);
-                                                                        const projectsForClient = selectedOption?.projects || (clientKey ? (clientProjectMap[clientKey]?.projects || []) : []);
-                                                                        setClientProjectOptions(projectsForClient);
-                                                                        if (projectsForClient.length === 1) {
-                                                                            setSelectedProjectName(projectsForClient[0]);
-                                                                        } else if (projectsForClient.length === 0) {
-                                                                            setSelectedProjectName(null);
-                                                                        } else {
-                                                                            setSelectedProjectName((prevProject) =>
-                                                                                projectsForClient.find((proj) => String(proj.id) === String(prevProject?.id)) || null
-                                                                            );
-                                                                        }
-                                                                        setSelectedClient(selectedOption);
-                                                                        setNewExpense((prev) => ({
-                                                                            ...prev,
-                                                                            client_name: selectedOption.label,
-                                                                            client_id: selectedOption.clientId || selectedOption.id || "",
-                                                                        }));
-                                                                    } else {
-                                                                        setSelectedClient(null);
-                                                                        setClientProjectOptions([]);
-                                                                        setSelectedProjectName(null);
-                                                                        setNewExpense((prev) => ({
-                                                                            ...prev,
-                                                                            client_name: "",
-                                                                            client_id: "",
-                                                                        }));
-                                                                    }
-                                                                    setSelectedContractor(null);
-                                                                    setSelectedVendor(null);
-                                                                    setSelectedEmployee(null);
+                                            <td className="pt-2 pb-2 w-[200px]">
+                                                <div className="flex items-center gap-2 w-full">
+                                                    <Select
+                                                        name="party"
+                                                        value={isClientToggleActive
+                                                            ? (selectedClient || null)
+                                                            : (selectedContractor || selectedVendor || selectedEmployee || null)}
+                                                        onChange={(selectedOption) => {
+                                                            // Validation: Staff Advance only allows Employee
+                                                            if (newExpense.type === "Staff Advance") {
+                                                                if (selectedOption && (selectedOption.type === "Contractor" || selectedOption.type === "Vendor")) {
+                                                                    alert("Staff Advance type only allows Employee. Please select an Employee.");
                                                                     return;
                                                                 }
-                                                                if (!selectedOption) {
-                                                                    setSelectedContractor(null);
-                                                                    setSelectedVendor(null);
-                                                                    setSelectedEmployee(null);
-                                                                } else if (selectedOption.type === "Contractor") {
-                                                                    setSelectedContractor(selectedOption);
-                                                                    setSelectedVendor(null);
-                                                                    setSelectedEmployee(null);
-                                                                } else if (selectedOption.type === "Vendor") {
-                                                                    setSelectedVendor(selectedOption);
-                                                                    setSelectedContractor(null);
-                                                                    setSelectedEmployee(null);
-                                                                } else if (selectedOption.type === "Employee") {
-                                                                    setSelectedVendor(null);
-                                                                    setSelectedContractor(null);
-                                                                    setSelectedEmployee(selectedOption);
+                                                            }
+                                                            // Validation: Project Advance only allows Contractor or Vendor
+                                                            if (newExpense.type === "Project Advance") {
+                                                                if (selectedOption && selectedOption.type === "Employee") {
+                                                                    alert("Project Advance type only allows Contractor or Vendor. Please select a Contractor or Vendor.");
+                                                                    return;
                                                                 }
-                                                                setSelectedClient(null);
-                                                                setClientProjectOptions([]);
-                                                                setNewExpense((prev) => ({
-                                                                    ...prev,
-                                                                    client_name: "",
-                                                                    client_id: "",
-                                                                }));
-                                                            }}
-                                                            options={isClientToggleActive ? clientOptions : combinedOptions}
-                                                            placeholder={isClientToggleActive ? "Client Name" : "Contractor/Ven..."}
-                                                            isSearchable
-                                                            isClearable
-                                                            menuPortalTarget={document.body}
-                                                            styles={{
-                                                                control: (provided, state) => ({
-                                                                    ...provided,
-                                                                    backgroundColor: 'transparent',
-                                                                    borderWidth: '3px',
-                                                                    borderColor: state.isFocused
-                                                                        ? 'rgba(191, 152, 83, 0.2)'
-                                                                        : 'rgba(191, 152, 83, 0.2)',
-                                                                    borderRadius: '6px',
-                                                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                                                                    '&:hover': {
-                                                                        borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                                    },
-                                                                }),
-                                                                placeholder: (provided) => ({
-                                                                    ...provided,
-                                                                    color: '#999',
-                                                                    textAlign: 'left',
-                                                                }),
-                                                                menu: (provided) => ({
-                                                                    ...provided,
-                                                                    zIndex: 9,
-                                                                }),
-                                                                option: (provided, state) => ({
-                                                                    ...provided,
-                                                                    textAlign: 'left',
-                                                                    fontWeight: 'normal',
-                                                                    fontSize: '15px',
-                                                                    backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                                    color: 'black',
-                                                                }),
-                                                                singleValue: (provided) => ({
-                                                                    ...provided,
-                                                                    textAlign: 'left',
-                                                                    fontWeight: 'normal',
-                                                                    color: 'black',
-                                                                }),
-                                                                indicatorSeparator: () => ({
-                                                                    display: 'none'
-                                                                }),
-                                                                indicatorsContainer: (provided) => ({
-                                                                    ...provided,
-                                                                    height: '40px',
-                                                                    gap: '0px'
-                                                                }),
-                                                                clearIndicator: (provided) => ({
-                                                                    ...provided,
-                                                                    padding: '2px'
-                                                                }),
-                                                                dropdownIndicator: (provided) => ({
-                                                                    ...provided,
-                                                                    padding: '2px'
-                                                                })
-                                                            }}
+                                                            }
+                                                            if (isClientToggleActive) {
+                                                                if (selectedOption) {
+                                                                    const clientKey = selectedOption?.compositeKey || buildClientKey(selectedOption.label, selectedOption.fatherName, selectedOption.mobile);
+                                                                    const projectsForClient = selectedOption?.projects || (clientKey ? (clientProjectMap[clientKey]?.projects || []) : []);
+                                                                    setClientProjectOptions(projectsForClient);
+                                                                    if (projectsForClient.length === 1) {
+                                                                        setSelectedProjectName(projectsForClient[0]);
+                                                                    } else if (projectsForClient.length === 0) {
+                                                                        setSelectedProjectName(null);
+                                                                    } else {
+                                                                        setSelectedProjectName((prevProject) =>
+                                                                            projectsForClient.find((proj) => String(proj.id) === String(prevProject?.id)) || null
+                                                                        );
+                                                                    }
+                                                                    setSelectedClient(selectedOption);
+                                                                    setNewExpense((prev) => ({
+                                                                        ...prev,
+                                                                        client_name: selectedOption.label,
+                                                                        client_id: selectedOption.clientId || selectedOption.id || "",
+                                                                    }));
+                                                                } else {
+                                                                    setSelectedClient(null);
+                                                                    setClientProjectOptions([]);
+                                                                    setSelectedProjectName(null);
+                                                                    setNewExpense((prev) => ({
+                                                                        ...prev,
+                                                                        client_name: "",
+                                                                        client_id: "",
+                                                                    }));
+                                                                }
+                                                                setSelectedContractor(null);
+                                                                setSelectedVendor(null);
+                                                                setSelectedEmployee(null);
+                                                                return;
+                                                            }
+                                                            if (!selectedOption) {
+                                                                setSelectedContractor(null);
+                                                                setSelectedVendor(null);
+                                                                setSelectedEmployee(null);
+                                                            } else if (selectedOption.type === "Contractor") {
+                                                                setSelectedContractor(selectedOption);
+                                                                setSelectedVendor(null);
+                                                                setSelectedEmployee(null);
+                                                            } else if (selectedOption.type === "Vendor") {
+                                                                setSelectedVendor(selectedOption);
+                                                                setSelectedContractor(null);
+                                                                setSelectedEmployee(null);
+                                                            } else if (selectedOption.type === "Employee") {
+                                                                setSelectedVendor(null);
+                                                                setSelectedContractor(null);
+                                                                setSelectedEmployee(selectedOption);
+                                                            }
+                                                            setSelectedClient(null);
+                                                            setClientProjectOptions([]);
+                                                            setNewExpense((prev) => ({
+                                                                ...prev,
+                                                                client_name: "",
+                                                                client_id: "",
+                                                            }));
+                                                        }}
+                                                        options={isClientToggleActive ? clientOptions : combinedOptions}
+                                                        placeholder={isClientToggleActive ? "Client Name" : "Contractor/Ven..."}
+                                                        isSearchable
+                                                        isClearable
+                                                        menuPortalTarget={document.body}
+                                                        styles={{
+                                                            control: (provided, state) => ({
+                                                                ...provided,
+                                                                backgroundColor: 'transparent',
+                                                                width: '260px',
+                                                                maxWidth: '260px',
+                                                                minWidth: '260px',
+                                                                borderWidth: '3px',
+                                                                borderColor: state.isFocused
+                                                                    ? 'rgba(191, 152, 83, 0.2)'
+                                                                    : 'rgba(191, 152, 83, 0.2)',
+                                                                borderRadius: '6px',
+                                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                                '&:hover': {
+                                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                                },
+                                                            }),
+                                                            placeholder: (provided) => ({
+                                                                ...provided,
+                                                                color: '#999',
+                                                                textAlign: 'left',
+                                                            }),
+                                                            menu: (provided) => ({
+                                                                ...provided,
+                                                                zIndex: 9,
+                                                            }),
+                                                            option: (provided, state) => ({
+                                                                ...provided,
+                                                                textAlign: 'left',
+                                                                fontWeight: 'normal',
+                                                                fontSize: '15px',
+                                                                backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                                color: 'black',
+                                                            }),
+                                                            valueContainer: (provided) => ({
+                                                                ...provided,
+                                                                maxWidth: '210px',
+                                                                overflow: 'hidden',
+                                                            }),
+                                                            singleValue: (provided) => ({
+                                                                ...provided,
+                                                                textAlign: 'left',
+                                                                fontWeight: 'normal',
+                                                                color: 'black',
+                                                                maxWidth: '100%',
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis',
+                                                                whiteSpace: 'nowrap',
+                                                            }),
+                                                            indicatorSeparator: () => ({
+                                                                display: 'none'
+                                                            }),
+                                                            indicatorsContainer: (provided) => ({
+                                                                ...provided,
+                                                                height: '40px',
+                                                                gap: '0px'
+                                                            }),
+                                                            clearIndicator: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px'
+                                                            }),
+                                                            dropdownIndicator: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px'
+                                                            })
+                                                        }}
+                                                    />
+                                                    <button type="button" onClick={handlePartySourceToggle}>
+                                                        <img
+                                                            src={Change}
+                                                            className={`w-4 h-4 ${isClientToggleActive ? 'opacity-100' : 'opacity-60'}`}
+                                                            alt="Toggle party type"
                                                         />
-                                                        <button type="button" onClick={handlePartySourceToggle}>
-                                                            <img
-                                                                src={Change}
-                                                                className={`w-4 h-4 ${isClientToggleActive ? 'opacity-100' : 'opacity-60'}`}
-                                                                alt="Toggle party type"
-                                                            />
-                                                        </button>
-                                                    </div>
-                                                </td>
+                                                    </button>
+                                                </div>
+                                            </td>
                                             <td className="pt-2 pb-2 w-[240px]">
                                                 <Select
                                                     name="project"
@@ -2900,6 +3047,20 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                         ) || null
                                                                 }
                                                                 onChange={(selectedOption) => {
+                                                                    // Validation: Staff Advance only allows Employee
+                                                                    if (editFormData.type === "Staff Advance") {
+                                                                        if (selectedOption && (selectedOption.type === "Contractor" || selectedOption.type === "Vendor")) {
+                                                                            alert("Staff Advance type only allows Employee. Please select an Employee.");
+                                                                            return;
+                                                                        }
+                                                                    }
+                                                                    // Validation: Project Advance only allows Contractor or Vendor
+                                                                    if (editFormData.type === "Project Advance") {
+                                                                        if (selectedOption && selectedOption.type === "Employee") {
+                                                                            alert("Project Advance type only allows Contractor or Vendor. Please select a Contractor or Vendor.");
+                                                                            return;
+                                                                        }
+                                                                    }
                                                                     const forceClientMode = !row.contractor_id && !row.vendor_id && !row.employee_id;
                                                                     if (isClientToggleActive || forceClientMode) {
                                                                         handleEditChange({ target: { name: "client_name", value: selectedOption ? selectedOption.label : "" } });
@@ -2937,6 +3098,9 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                     control: (provided, state) => ({
                                                                         ...provided,
                                                                         backgroundColor: 'transparent',
+                                                                        width: '200px',
+                                                                        maxWidth: '200px',
+                                                                        minWidth: '200px',
                                                                         borderWidth: '3px',
                                                                         borderColor: state.isFocused
                                                                             ? 'rgba(191, 152, 83, 0.2)'
@@ -2964,11 +3128,20 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                         backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
                                                                         color: 'black',
                                                                     }),
+                                                                    valueContainer: (provided) => ({
+                                                                        ...provided,
+                                                                        maxWidth: '160px',
+                                                                        overflow: 'hidden',
+                                                                    }),
                                                                     singleValue: (provided) => ({
                                                                         ...provided,
                                                                         textAlign: 'left',
                                                                         fontWeight: 'normal',
                                                                         color: 'black',
+                                                                        maxWidth: '100%',
+                                                                        overflow: 'hidden',
+                                                                        textOverflow: 'ellipsis',
+                                                                        whiteSpace: 'nowrap',
                                                                     }),
                                                                     indicatorSeparator: () => ({
                                                                         display: 'none'
@@ -2990,13 +3163,16 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             />
                                                         ) : (
                                                             (() => {
+                                                                const hasContractorVendorEmployee = row.contractor_id || row.vendor_id || row.employee_id;
                                                                 const option = combinedOptions.find(
                                                                     opt =>
                                                                         (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
                                                                         (opt.type === "Vendor" && opt.id === Number(row.vendor_id)) ||
                                                                         (opt.type === "Employee" && opt.id === Number(row.employee_id))
                                                                 )?.label;
-                                                                const clientName = getClientName(row);
+                                                                // Only show client name if there's no contractor/vendor/employee AND type is Loan
+                                                                const shouldShowClientName = !hasContractorVendorEmployee && row.type === "Loan";
+                                                                const clientName = shouldShowClientName ? getClientName(row) : "";
                                                                 return [clientName, option].filter(Boolean).join(" | ") || "";
                                                             })()
                                                         )}
@@ -3908,7 +4084,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                         } else {
                                                             const advanceResponseData = await advanceResponse.json();
                                                             advancePortalId = advanceResponseData.advancePortalId || advanceResponseData.advance_portal_id;
-                                                            console.log("Advance portal payment mode updated successfully, ID:", advancePortalId);
                                                         }
                                                     } catch (error) {
                                                         console.error("Error updating advance portal payment mode:", error);
@@ -3961,7 +4136,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                         } else {
                                                             const staffAdvanceResponseData = await staffAdvanceResponse.json();
                                                             staffAdvancePortalId = staffAdvanceResponseData.staffAdvancePortalId || staffAdvanceResponseData.staff_advance_portal_id;
-                                                            console.log("Staff advance saved successfully, ID:", staffAdvancePortalId);
                                                         }
                                                     } catch (error) {
                                                         console.error("Error saving staff advance:", error);

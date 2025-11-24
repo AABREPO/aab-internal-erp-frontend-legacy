@@ -47,6 +47,46 @@ const AdvanceSummary = () => {
   const [billStatusPopupContext, setBillStatusPopupContext] = useState("");
   const [billStatusPopupSortConfig, setBillStatusPopupSortConfig] = useState({ key: null, direction: 'asc' });
   const [isBillStatusFromFirstTable, setIsBillStatusFromFirstTable] = useState(true);
+  // Function to convert Google Drive URL to viewable format for opening in new tab
+  const convertToViewableUrl = (url) => {
+    if (!url) return url;
+    
+    // Check if it's a Google Drive URL
+    if (url.includes('drive.google.com')) {
+      // Extract file ID from various Google Drive URL formats
+      let fileId = null;
+      
+      // Format: https://drive.google.com/file/d/FILE_ID/view?usp=sharing
+      const match1 = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+      if (match1) {
+        fileId = match1[1];
+      }
+      
+      // Format: https://drive.google.com/open?id=FILE_ID
+      if (!fileId) {
+        const match2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+        if (match2) {
+          fileId = match2[1];
+        }
+      }
+      
+      // Format: https://drive.google.com/uc?id=FILE_ID
+      if (!fileId) {
+        const match3 = url.match(/\/uc\?id=([a-zA-Z0-9_-]+)/);
+        if (match3) {
+          fileId = match3[1];
+        }
+      }
+      
+      if (fileId) {
+        // Return view URL for opening in new tab
+        return `https://drive.google.com/file/d/${fileId}/view`;
+      }
+    }
+    
+    // If not a Google Drive URL or couldn't extract ID, return original URL
+    return url;
+  };
   useEffect(() => {
     const savedContractorVendor = sessionStorage.getItem('selectedContractorOrVendorOption');
     try {
@@ -465,16 +505,29 @@ const AdvanceSummary = () => {
           : item.vendor_id === contractorVendorId)
         : true;
       return matchesProject && matchesEntity && item.bill_amount > 0;
-    }).map(item => ({
-      advancePortalId: item.advancePortalId || 0,
-      date: new Date(item.date).toLocaleDateString('en-GB'),
-      amount: parseFloat(item.bill_amount) || 0,
-      projectName: siteOptions.find(s => String(s.id) === String(item.project_id))?.label || "Unknown Site",
-      contractorVendorName: item.contractor_id
-        ? contractorOptions.find(c => c.id === item.contractor_id)?.label || "-"
-        : vendorOptions.find(v => v.id === item.vendor_id)?.label || "-",
-      type: item.type || "Bill"
-    }));
+    }).map(item => {
+      // Debug: log to see actual data structure
+      if (item.bill_amount > 0) {
+        console.log('Bill item from API:', {
+          advancePortalId: item.advancePortalId,
+          bill_amount: item.bill_amount,
+          file_url: item.file_url,
+          type: item.type,
+          allKeys: Object.keys(item)
+        });
+      }
+      return {
+        advancePortalId: item.advancePortalId || 0,
+        date: new Date(item.date).toLocaleDateString('en-GB'),
+        amount: parseFloat(item.bill_amount) || 0,
+        projectName: siteOptions.find(s => String(s.id) === String(item.project_id))?.label || "Unknown Site",
+        contractorVendorName: item.contractor_id
+          ? contractorOptions.find(c => c.id === item.contractor_id)?.label || "-"
+          : vendorOptions.find(v => v.id === item.vendor_id)?.label || "-",
+        type: item.type || "Bill",
+        file_url: (item.file_url && typeof item.file_url === 'string' && item.file_url.trim() !== '') ? item.file_url : null
+      };
+    });
   };
   const getAdvanceDetails = (projectId, contractorVendorId, contractorVendorType) => {
     if (!advanceData.length) return [];
@@ -1118,7 +1171,7 @@ const AdvanceSummary = () => {
     document.body.removeChild(link);
   };
 
-  // Export Bill Status Popup PDF
+    // Export Bill Status Popup PDF
   const exportBillStatusPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(14);
@@ -1162,6 +1215,7 @@ const AdvanceSummary = () => {
       const key = `${bill.date}-${bill.advancePortalId}`;
       if (dateMap.has(key)) {
         dateMap.get(key).billAmount = bill.amount;
+        dateMap.get(key).file_url = bill.file_url || null;
       } else {
         dateMap.set(key, {
           date: bill.date,
@@ -1172,7 +1226,8 @@ const AdvanceSummary = () => {
           contractorVendorName: bill.contractorVendorName,
           transferSiteName: bill.transferSiteName,
           type: bill.type,
-          isRefund: false
+          isRefund: false,
+          file_url: bill.file_url || null
         });
       }
     });
@@ -1344,6 +1399,7 @@ const AdvanceSummary = () => {
       const key = `${bill.date}-${bill.advancePortalId}`;
       if (dateMap.has(key)) {
         dateMap.get(key).billAmount = bill.amount;
+        dateMap.get(key).file_url = bill.file_url || null;
       } else {
         dateMap.set(key, {
           date: bill.date,
@@ -1354,7 +1410,8 @@ const AdvanceSummary = () => {
           contractorVendorName: bill.contractorVendorName,
           transferSiteName: bill.transferSiteName,
           type: bill.type,
-          isRefund: false
+          isRefund: false,
+          file_url: bill.file_url || null
         });
       }
     });
@@ -1709,7 +1766,6 @@ const AdvanceSummary = () => {
           </div>
         </div>
       </div>
-      {/* Tooltip for first table (Project table - shows contractor/vendor names only when no contractor/vendor is selected) */}
       {projectTooltipData && (
         <div className="fixed z-50 bg-white text-black p-3 rounded shadow-lg text-sm max-w-xs"
           style={{ left: projectTooltipPosition.x + 10, top: projectTooltipPosition.y - 10, pointerEvents: 'none' }}
@@ -2013,7 +2069,6 @@ const AdvanceSummary = () => {
           </div>
         </div>
       )}
-      {/* Bill Status Popup - Combined view of advances and bills */}
       {showBillStatusPopup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
           onClick={() => setShowBillStatusPopup(false)}
@@ -2096,11 +2151,8 @@ const AdvanceSummary = () => {
                 </thead>
                 <tbody>
                   {(() => {
-                    // Combine advances and bills into a single array with combined rows
                     const combinedData = [];
                     const dateMap = new Map();
-
-                    // Process advances
                     billStatusPopupData.advances.forEach(adv => {
                       const key = `${adv.date}-${adv.advancePortalId}`;
                       dateMap.set(key, {
@@ -2115,12 +2167,12 @@ const AdvanceSummary = () => {
                         isRefund: adv.isRefund
                       });
                     });
-
-                    // Process bills
                     billStatusPopupData.bills.forEach(bill => {
                       const key = `${bill.date}-${bill.advancePortalId}`;
+                      const fileUrl = bill.file_url && bill.file_url.trim() !== '' ? bill.file_url : null;
                       if (dateMap.has(key)) {
                         dateMap.get(key).billAmount = bill.amount;
+                        dateMap.get(key).file_url = fileUrl;
                       } else {
                         dateMap.set(key, {
                           date: bill.date,
@@ -2131,52 +2183,42 @@ const AdvanceSummary = () => {
                           contractorVendorName: bill.contractorVendorName,
                           transferSiteName: bill.transferSiteName,
                           type: bill.type,
-                          isRefund: false
+                          isRefund: false,
+                          file_url: fileUrl
                         });
                       }
                     });
-
                     combinedData.push(...Array.from(dateMap.values()));
-
-                    // Sort the combined data
                     const parseDate = (dateStr) => {
                       const [day, month, year] = dateStr.split('/');
                       return new Date(`${year}-${month}-${day}`);
                     };
-
                     if (!billStatusPopupSortConfig.key) {
                       combinedData.sort((a, b) => {
                         const dateDiff = parseDate(b.date) - parseDate(a.date);
                         if (dateDiff !== 0) return dateDiff;
-                        // Secondary sort by advancePortalId (entry number) - descending to match date order
                         return b.advancePortalId - a.advancePortalId;
                       });
                     } else {
                       combinedData.sort((a, b) => {
                         let aValue = a[billStatusPopupSortConfig.key];
                         let bValue = b[billStatusPopupSortConfig.key];
-
                         if (billStatusPopupSortConfig.key === 'date') {
                           aValue = parseDate(aValue);
                           bValue = parseDate(bValue);
                           const primarySort = billStatusPopupSortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
                           if (primarySort !== 0) return primarySort;
-                          // Secondary sort by advancePortalId (entry number) - match the direction of date sort
                           return billStatusPopupSortConfig.direction === 'asc' ? a.advancePortalId - b.advancePortalId : b.advancePortalId - a.advancePortalId;
                         }
-
                         if (typeof aValue === 'number' && typeof bValue === 'number') {
                           const primarySort = billStatusPopupSortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
                           if (primarySort !== 0) return primarySort;
-                          // Secondary sort by advancePortalId (entry number) - always ascending for amounts
                           return a.advancePortalId - b.advancePortalId;
                         }
-
                         aValue = String(aValue || '').toLowerCase();
                         bValue = String(bValue || '').toLowerCase();
                         if (aValue < bValue) return billStatusPopupSortConfig.direction === 'asc' ? -1 : 1;
                         if (aValue > bValue) return billStatusPopupSortConfig.direction === 'asc' ? 1 : -1;
-                        // Secondary sort by advancePortalId (entry number) - always ascending for text fields
                         return a.advancePortalId - b.advancePortalId;
                       });
                     }
@@ -2205,7 +2247,20 @@ const AdvanceSummary = () => {
                         <td className={`p-3 text-right font-semibold ${entry.advanceAmount < 0 ? 'text-red-600' : ''}`}>
                           {entry.advanceAmount !== 0 ? `₹${entry.advanceAmount.toLocaleString('en-IN')}` : '-'}
                         </td>
-                        <td className="p-3 text-right font-semibold">
+                        <td 
+                          className={`p-3 text-right font-semibold ${entry.billAmount !== 0 && entry.file_url ? 'cursor-pointer hover:underline' : ''}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (entry.billAmount !== 0 && entry.file_url) {
+                              const viewableUrl = convertToViewableUrl(entry.file_url);
+                              window.open(viewableUrl, '_blank', 'noopener,noreferrer');
+                            }
+                          }}
+                          style={entry.billAmount !== 0 && entry.file_url ? { 
+                            cursor: 'pointer'
+                          } : {}}
+                          title={entry.billAmount !== 0 && entry.file_url ? 'Click to open bill document in new tab' : ''}
+                        >
                           {entry.billAmount !== 0 ? `₹${entry.billAmount.toLocaleString('en-IN')}` : '-'}
                         </td>
                       </tr>

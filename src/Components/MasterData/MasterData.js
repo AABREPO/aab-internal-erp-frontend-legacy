@@ -13,6 +13,7 @@ import QRCode from '../Images/AAB_QR_CODE.jpeg';
 import DownloadIcon from '../Images/download_icon.png';
 import Select from 'react-select';
 const MasterData = ({ username, userRoles = [] }) => {
+  // State for Project Names (from ExpensesInputData)
   const [isSiteNamesOpen, setIsSiteNamesOpen] = useState(false);
   const [siteNameSearch, setSiteNameSearch] = useState("");
   const [siteName, setSiteName] = useState('');
@@ -23,6 +24,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const [editSiteNo, setEditSiteNo] = useState('');
   const [selectedSiteId, setSelectedSiteId] = useState(null);
   const [accountDetails, setAccountDetails] = useState([]);
+  // State for Vendor Names
   const [isVendorNameOpens, setIsVendorNameOpens] = useState(false);
   const [vendorNameSearch, setVendorNameSearch] = useState("");
   const [vendorName, setVendorName] = useState('');
@@ -53,6 +55,8 @@ const MasterData = ({ username, userRoles = [] }) => {
   const [selectedVendorId, setSelectedVendorId] = useState(null);
   const [vendorBulkUploadFile, setVendorBulkUploadFile] = useState(null);
   const [isVendorBulkUploadOpen, setIsVendorBulkUploadOpen] = useState(false);
+
+  // State for Contractor Names
   const [isContractorNameOpens, setContractorNameOpens] = useState(false);
   const [contractorNameSearch, setContractorNameSearch] = useState("");
   const [contractorName, setContractorName] = useState('');
@@ -84,6 +88,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const [selectedContractorId, setSelectedContractorId] = useState(null);
   const [isAccountDetailsOpen, setIsAccountDetailsOpen] = useState(false);
   const [accountDetailsSearch, setAccountDetailsSearch] = useState("");
+  // State for Account Details
   const [accountHolderName, setAccountHolderName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [bankName, setBankName] = useState('');
@@ -98,10 +103,14 @@ const MasterData = ({ username, userRoles = [] }) => {
   const [selectedAccountId, setSelectedAccountId] = useState(null);
   const [editAccountHolderName, setEditAccountHolderName] = useState('');
   const [editAccountNumber, setEditAccountNumber] = useState('');
+
+  // Edit mode states for all three popups
   const [isVendorEditMode, setIsVendorEditMode] = useState(false);
   const [isContractorEditMode, setIsContractorEditMode] = useState(false);
   const [isAccountEditMode, setIsAccountEditMode] = useState(false);
   const [isEmployeeEditMode, setIsEmployeeEditMode] = useState(false);
+
+  // Copy button feedback state
   const [copiedButtonId, setCopiedButtonId] = useState(null);
   const [editBankName, setEditBankName] = useState('');
   const [editBranch, setEditBranch] = useState('');
@@ -111,9 +120,12 @@ const MasterData = ({ username, userRoles = [] }) => {
   const [editAccountType, setEditAccountType] = useState('');
   const [editQrImage, setEditQrImage] = useState(null);
   const [editQrImagePreview, setEditQrImagePreview] = useState(null);
+
+  // Store original data for reset on cancel
   const [originalVendorData, setOriginalVendorData] = useState({});
   const [originalContractorData, setOriginalContractorData] = useState({});
   const [originalAccountData, setOriginalAccountData] = useState({});
+  // State for Categories
   const [isCategoryOpens, setIsCategoryOpens] = useState(false);
   const [expensesCategorySearch, setExpensesCategorySearch] = useState("");
   const [category, setCategory] = useState('');
@@ -121,6 +133,8 @@ const MasterData = ({ username, userRoles = [] }) => {
   const [isCategoriesEditOpen, setIsCategoriesEditOpen] = useState(false);
   const [editCategory, setEditCategory] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+
+  // State for Machine Tools
   const [isMachineToolsOpen, setIsMachineToolsOpen] = useState(false);
   const [machineToolsSearch, setMachineToolsSearch] = useState("");
   const [machineTool, setMachineTool] = useState('');
@@ -128,6 +142,8 @@ const MasterData = ({ username, userRoles = [] }) => {
   const [isMachineToolsEditOpen, setIsMachineToolsEditOpen] = useState(false);
   const [editMachineTool, setEditMachineTool] = useState('');
   const [selectedMachineId, setSelectedMachineId] = useState(null);
+
+  // State for Employee Details (from WeeklyPaymentAddInput)
   const [isEmployeeDataOpen, setIsEmployeeDataOpen] = useState(false);
   const [employeeSearch, setEmployeeSearch] = useState('');
   const [employeeName, setEmployeeName] = useState('');
@@ -164,6 +180,8 @@ const MasterData = ({ username, userRoles = [] }) => {
   const [editEmployeeId, setEditEmployeeId] = useState('');
   const [editAadhaarPdfFile, setEditAadhaarPdfFile] = useState(null);
   const [editAadhaarImageUrl, setEditAadhaarImageUrl] = useState('');
+
+  // State for Labours List
   const [isLaboursListDataOpen, setIsLaboursListDataOpen] = useState(false);
   const [laboursListSearch, setLaboursListSearch] = useState('');
   const [labourName, setLabourName] = useState('');
@@ -173,6 +191,8 @@ const MasterData = ({ username, userRoles = [] }) => {
   const [selectedLabourDataId, setSelectedLabourDataId] = useState(null);
   const [editLabourName, setEditLabourName] = useState('');
   const [editLabourSalary, setEditLabourSalary] = useState('');
+
+  // State for Bank Account Type
   const [isBankAccountTypeOpen, setIsBankAccountTypeOpen] = useState(false);
   const [bankAccountTypeSearch, setBankAccountTypeSearch] = useState('');
   const [bankAccountType, setBankAccountType] = useState('');
@@ -180,6 +200,8 @@ const MasterData = ({ username, userRoles = [] }) => {
   const [isBankAccountTypeEditOpen, setIsBankAccountTypeEditOpen] = useState(false);
   const [selectedBankAccountTypeId, setSelectedBankAccountTypeId] = useState(null);
   const [editBankAccountType, setEditBankAccountType] = useState('');
+
+  // State for EB Service Link with Project ID
   const [isEbServiceLinkOpen, setIsEbServiceLinkOpen] = useState(false);
   const [ebServiceLinkSearch, setEbServiceLinkSearch] = useState('');
   const [projectId, setProjectId] = useState('');
@@ -193,6 +215,8 @@ const MasterData = ({ username, userRoles = [] }) => {
   const [editSelectedProject, setEditSelectedProject] = useState(null);
   const [editDoorNo, setEditDoorNo] = useState('');
   const [editEbServiceNo, setEditEbServiceNo] = useState('');
+
+  // State for Project Management
   const [isProjectManagementOpen, setIsProjectManagementOpen] = useState(false);
   const [projectManagementSearch, setProjectManagementSearch] = useState('');
   const [newProject, setNewProject] = useState({
@@ -215,6 +239,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       doorNo: "",
       area: "",
       ebNo: "",
+      ebNoPhase: "1P",
       ebNoFrequency: "",
       propertyTaxNo: "",
       propertyTaxFrequency: "",
@@ -254,6 +279,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       doorNo: "",
       area: "",
       ebNo: "",
+      ebNoPhase: "1P",
       ebNoFrequency: "",
       propertyTaxNo: "",
       propertyTaxFrequency: "",
@@ -261,24 +287,35 @@ const MasterData = ({ username, userRoles = [] }) => {
       waterTaxFrequency: ""
     }]
   });
+
   const [message, setMessage] = useState('');
+  // Tooltip state for Account Details hover
   const [tooltipData, setTooltipData] = useState(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [tooltipTitle, setTooltipTitle] = useState("");
+
+  // Export functionality states
   const [isExportTypeModalOpen, setIsExportTypeModalOpen] = useState(false);
   const [isExportSelectionModalOpen, setIsExportSelectionModalOpen] = useState(false);
-  const [exportType, setExportType] = useState('');
-  const [exportDataType, setExportDataType] = useState('');
+  const [exportType, setExportType] = useState(''); // 'pdf' or 'excel'
+  const [exportDataType, setExportDataType] = useState(''); // 'vendor' or 'contractor'
   const [exportSearchTerm, setExportSearchTerm] = useState('');
   const [exportProjectCategory, setExportProjectCategory] = useState('');
   const [selectedExportItems, setSelectedExportItems] = useState([]);
+
+  // State for Master Table functionality
   const [selectedTable, setSelectedTable] = useState(() => {
+    // Load selected table from localStorage on component mount
     const savedTable = localStorage.getItem('selectedMasterTable');
     return savedTable || null;
   });
+
+  // State for drag scrolling
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
+
+  // Master table data with all table headings
   const masterTableData = [
     { id: 'project-management', name: 'Project Management', description: 'Manage project details with owners and properties' },
     { id: 'vendor-names', name: 'Vendor Names', description: 'Manage vendor information' },
@@ -293,6 +330,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   ];
   const [vendorQrImageFile, setVendorQrImageFile] = useState(null);
   const [vendorQrImagePreview, setVendorQrImagePreview] = useState(null);
+
   const handleVendorQrImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -304,26 +342,40 @@ const MasterData = ({ username, userRoles = [] }) => {
       reader.readAsDataURL(file);
     }
   };
+
+  // Function to get reordered table data (selected table first, others after)
   const getReorderedTableData = () => {
     if (!selectedTable) return masterTableData;
+
     const selectedTableData = masterTableData.find(table => table.id === selectedTable);
     const otherTables = masterTableData.filter(table => table.id !== selectedTable);
+
     return [selectedTableData, ...otherTables];
   };
+
+  // Function to handle table selection
   const handleTableSelection = (tableId) => {
     setSelectedTable(tableId);
+    // Save selected table to localStorage
     localStorage.setItem('selectedMasterTable', tableId);
   };
+
+  // Function to clear selection
   const clearSelection = () => {
     setSelectedTable(null);
+    // Remove selected table from localStorage
     localStorage.removeItem('selectedMasterTable');
   };
+
+  // Drag scrolling functions
   const interactiveDragSelectors =
     'input, textarea, button, select, a, label, [role="button"], [contenteditable="true"], .prevent-drag-scroll';
+
   const shouldSkipDragScroll = (target) => {
     if (!target || typeof target.closest !== 'function') return false;
     return Boolean(target.closest(interactiveDragSelectors));
   };
+
   const handleMouseDown = (e) => {
     if (shouldSkipDragScroll(e.target)) {
       setIsDragging(false);
@@ -333,19 +385,24 @@ const MasterData = ({ username, userRoles = [] }) => {
     setStartX(e.pageX - e.currentTarget.offsetLeft);
     setScrollLeft(e.currentTarget.scrollLeft);
   };
+
   const handleMouseLeave = () => {
     setIsDragging(false);
   };
+
   const handleMouseUp = () => {
     setIsDragging(false);
   };
+
   const handleMouseMove = (e) => {
     if (!isDragging) return;
     e.preventDefault();
     const x = e.pageX - e.currentTarget.offsetLeft;
-    const walk = (x - startX) * 2;
+    const walk = (x - startX) * 2; // Scroll speed multiplier
     e.currentTarget.scrollLeft = scrollLeft - walk;
   };
+
+  // Touch support for mobile devices
   const handleTouchStart = (e) => {
     if (shouldSkipDragScroll(e.target)) {
       setIsDragging(false);
@@ -355,41 +412,55 @@ const MasterData = ({ username, userRoles = [] }) => {
     setStartX(e.touches[0].pageX - e.currentTarget.offsetLeft);
     setScrollLeft(e.currentTarget.scrollLeft);
   };
+
   const handleTouchMove = (e) => {
     if (!isDragging) return;
     e.preventDefault();
     const x = e.touches[0].pageX - e.currentTarget.offsetLeft;
-    const walk = (x - startX) * 2;
+    const walk = (x - startX) * 2; // Scroll speed multiplier
     e.currentTarget.scrollLeft = scrollLeft - walk;
   };
+
   const handleTouchEnd = () => {
     setIsDragging(false);
   };
+
+  // Open/Close functions
   const openSiteNames = () => {
+    // Generate next site number automatically
     const generateNextSiteNumber = () => {
       if (siteNames.length === 0) {
-        return '342';
+        return '342'; // Start with 342 as requested
       }
+
+      // Extract numbers from existing site numbers and find the highest
       const siteNumbers = siteNames
         .map(site => site.siteNo)
         .filter(siteNo => siteNo && siteNo.toString().trim() !== '')
         .map(siteNo => {
+          // Try to extract numeric value from various formats
           const numericMatch = siteNo.toString().match(/\d+/);
           return numericMatch ? parseInt(numericMatch[0]) : null;
         })
         .filter(num => num !== null && !isNaN(num));
+
       if (siteNumbers.length === 0) {
-        return '342';
+        return '342'; // Default to 342 if no valid numbers found
       }
+
       const maxNumber = Math.max(...siteNumbers);
       const nextNumber = maxNumber + 1;
       return nextNumber.toString();
     };
+
+    // Clear previous values and set new site number
     setSiteName('');
     setSiteNo(generateNextSiteNumber());
     setIsSiteNamesOpen(true);
   };
+
   const closeSiteNames = () => {
+    // Clear form fields when closing
     setSiteName('');
     setSiteNo('');
     setIsSiteNamesOpen(false);
@@ -397,12 +468,14 @@ const MasterData = ({ username, userRoles = [] }) => {
   const openvendorNames = () => setIsVendorNameOpens(true);
   const closevendorNames = () => {
     setIsVendorNameOpens(false);
+    // Clear vendor QR image when closing without submitting
     setVendorQrImage(null);
     setVendorQrImagePreview(null);
   };
   const openContractorNames = () => setContractorNameOpens(true);
   const closeContractorNames = () => {
     setContractorNameOpens(false);
+    // Clear contractor QR image when closing without submitting
     setContractorQrImage(null);
     setContractorQrImagePreview(null);
   };
@@ -417,6 +490,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const openAccountDetails = () => setIsAccountDetailsOpen(true);
   const closeAccountDetails = () => {
     setIsAccountDetailsOpen(false);
+    // Clear QR image when closing without submitting
     setQrImage(null);
     setQrImagePreview(null);
   };
@@ -425,34 +499,44 @@ const MasterData = ({ username, userRoles = [] }) => {
   const openEbServiceLink = () => setIsEbServiceLinkOpen(true);
   const closeEbServiceLink = () => setIsEbServiceLinkOpen(false);
   const openProjectManagement = () => {
+    // Generate next project ID
     const generateNextProjectId = () => {
       if (projects.length === 0) {
-        return '1';
+        return '1'; // Start with 1 if no projects exist
       }
+
+      // Extract numbers from existing project IDs and find the highest
       const projectIds = projects
         .map(project => project.projectId)
         .filter(projectId => projectId && projectId.toString().trim() !== '')
         .map(projectId => {
+          // Try to extract numeric value from various formats
           const numericMatch = projectId.toString().match(/\d+/);
           return numericMatch ? parseInt(numericMatch[0]) : null;
         })
         .filter(num => num !== null && !isNaN(num));
+
       if (projectIds.length === 0) {
-        return '1';
+        return '1'; // Default to 1 if no valid numbers found
       }
+
       const maxNumber = Math.max(...projectIds);
       const nextNumber = maxNumber + 1;
       return nextNumber.toString();
     };
+
+    // Set the auto-generated project ID
     const nextProjectId = generateNextProjectId();
     setNewProject(prev => ({
       ...prev,
       projectId: nextProjectId
     }));
+
     setIsProjectManagementOpen(true);
   };
   const closeProjectManagement = () => {
     setIsProjectManagementOpen(false);
+    // Reset form data with default sets
     setNewProject({
       projectName: '',
       projectAddress: '',
@@ -473,6 +557,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         doorNo: "",
         area: "",
         ebNo: "",
+        ebNoPhase: "1P",
         ebNoFrequency: "",
         propertyTaxNo: "",
         propertyTaxFrequency: "",
@@ -481,6 +566,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       }]
     });
   };
+  // Fetch functions
   useEffect(() => {
     fetchSiteNames();
     fetchVendorNames();
@@ -494,6 +580,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     fetchEbServiceLinks();
     fetchProjects();
   }, []);
+
   const fetchSiteNames = async () => {
     try {
       const response = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/getAll');
@@ -505,6 +592,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
+
   const fetchVendorNames = async () => {
     try {
       console.log('Fetching vendor names from:', 'https://backendaab.in/aabuilderDash/api/vendor_Names/getAll');
@@ -521,6 +609,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error fetching vendor names:', error);
     }
   };
+
   const fetchContractorNames = async () => {
     try {
       const response = await fetch('https://backendaab.in/aabuilderDash/api/contractor_Names/getAll');
@@ -532,6 +621,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
+
   const fetchCategories = async () => {
     try {
       const response = await fetch('https://backendaab.in/aabuilderDash/api/expenses_categories/getAll');
@@ -543,6 +633,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
+
   const fetchMachinTools = async () => {
     try {
       const response = await fetch('https://backendaab.in/aabuilderDash/api/machine_tools/getAll');
@@ -554,6 +645,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
+
   const fetchEmployeeList = async () => {
     try {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/employee_details/getAll');
@@ -565,6 +657,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
+
   const fetchLaboursList = async () => {
     try {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
@@ -576,6 +669,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
+
   const fetchAccountDetails = async () => {
     try {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/getAll');
@@ -587,6 +681,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
+
   const fetchBankAccountTypes = async () => {
     try {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/bank_type/getAll');
@@ -598,6 +693,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
+
   const fetchEbServiceLinks = async () => {
     try {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/eb-service-no/getAll');
@@ -609,6 +705,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
+
   const fetchProjects = async () => {
     try {
       const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
@@ -620,16 +717,20 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
+
+  // Project Management Handler Functions
   const handleNewOwnerChange = (index, field, value) => {
     const updatedOwners = [...newProject.ownerDetailsList];
     updatedOwners[index][field] = value;
     setNewProject((prev) => ({ ...prev, ownerDetailsList: updatedOwners }));
   };
+
   const handleNewDetailChange = (index, field, value) => {
     const updatedDetails = [...newProject.propertyDetailsList];
     updatedDetails[index][field] = value;
     setNewProject((prev) => ({ ...prev, propertyDetailsList: updatedDetails }));
   };
+
   const addNewOwner = () => {
     setNewProject((prev) => ({
       ...prev,
@@ -642,6 +743,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       }]
     }));
   };
+
   const addNewPropertyDetail = () => {
     setNewProject((prev) => ({
       ...prev,
@@ -660,16 +762,20 @@ const MasterData = ({ username, userRoles = [] }) => {
       }]
     }));
   };
+
+  // Edit form handler functions
   const handleEditOwnerChange = (index, field, value) => {
     const updatedOwners = [...editProject.ownerDetailsList];
     updatedOwners[index][field] = value;
     setEditProject((prev) => ({ ...prev, ownerDetailsList: updatedOwners }));
   };
+
   const handleEditDetailChange = (index, field, value) => {
     const updatedDetails = [...editProject.propertyDetailsList];
     updatedDetails[index][field] = value;
     setEditProject((prev) => ({ ...prev, propertyDetailsList: updatedDetails }));
   };
+
   const addEditOwner = () => {
     setEditProject((prev) => ({
       ...prev,
@@ -682,6 +788,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       }]
     }));
   };
+
   const addEditPropertyDetail = () => {
     setEditProject((prev) => ({
       ...prev,
@@ -700,6 +807,8 @@ const MasterData = ({ username, userRoles = [] }) => {
       }]
     }));
   };
+
+  // Submit functions
   const handleSubmitSiteNames = async (e) => {
     e.preventDefault();
     const newSiteNames = { siteName, siteNo };
@@ -717,9 +826,11 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
+
   const handleSubmitVendorName = async (e) => {
-    e.preventDefault();
+    e.preventDefault(); // prevent page reload
     try {
+      // Create a vendor object to match backend @JsonProperty annotations
       const vendorData = {
         vendorName: vendorName,
         account_holder_name: vendorAccountHolderName,
@@ -732,7 +843,9 @@ const MasterData = ({ username, userRoles = [] }) => {
         contact_number: vendorContactNumber,
         contact_email: vendorContactEmail
       };
+      // Create FormData object
       const formData = new FormData();
+      // Create a blob for the vendor data
       const vendorBlob = new Blob([JSON.stringify(vendorData)], { type: 'application/json' });
       formData.append("vendor", vendorBlob);
       if (vendorQrImageFile) {
@@ -753,6 +866,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       const result = await response.json();
       setMessage("Vendor saved successfully!");
       window.location.reload();
+      // Reset form fields or close modal
       setVendorName("");
       setVendorAccountHolderName("");
       setVendorAccountNumber("");
@@ -773,7 +887,9 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const handleSubmitContractorName = async (e) => {
     e.preventDefault();
+    // Create FormData for multipart/form-data submission
     const formData = new FormData();
+    // Create contractor object with correct JSON property names
     const contractorData = {
       contractorName,
       account_holder_name: contractorAccountHolderName,
@@ -786,15 +902,17 @@ const MasterData = ({ username, userRoles = [] }) => {
       contact_number: contractorContactNumber,
       contact_email: contractorContactEmail
     };
+    // Create a blob for the contractor data (like vendor implementation)
     const contractorBlob = new Blob([JSON.stringify(contractorData)], { type: 'application/json' });
     formData.append('contractor', contractorBlob);
+    // Add file if selected
     if (contractorQrImage) {
       formData.append('file', contractorQrImage);
     }
     try {
       const response = await fetch('https://backendaab.in/aabuilderDash/api/contractor_Names/save', {
         method: 'POST',
-        body: formData,
+        body: formData, // No Content-Type header needed, browser sets it automatically for FormData
       });
       if (response.ok) {
         setMessage('Contractor name saved successfully!');
@@ -811,7 +929,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         setContractorQrImage(null);
         setContractorQrImagePreview(null);
         closeContractorNames();
-        fetchContractorNames();
+        fetchContractorNames(); // Refresh the list
         window.location.reload();
       } else {
         const errorData = await response.text();
@@ -858,32 +976,53 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
+  // Function to upload Aadhaar PDF to Google Drive
   const uploadAadhaarPdfToGoogleDrive = async (file, employeeName) => {
     try {
+      console.log('Starting Aadhaar PDF upload for:', employeeName);
+      console.log('File details:', file);
+
       const formData = new FormData();
       const finalName = `${employeeName}_Aadhaar_${new Date().toISOString().split('T')[0]}`;
       formData.append('file', file);
       formData.append('file_name', finalName);
+
+      console.log('Uploading with filename:', finalName);
+
       const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
         method: "POST",
         body: formData,
       });
+
+      console.log('Upload response status:', uploadResponse.status);
+      console.log('Upload response ok:', uploadResponse.ok);
+
       if (!uploadResponse.ok) {
         const errorText = await uploadResponse.text();
         console.error('Upload failed with response:', errorText);
         throw new Error(`File upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
       }
+
       const uploadResult = await uploadResponse.json();
+      console.log('Upload result:', uploadResult);
+
+      // Check different possible response structures
       const url = uploadResult.url || uploadResult.data?.url || uploadResult.fileUrl || uploadResult.downloadUrl;
+      console.log('Extracted URL:', url);
+
       return url;
     } catch (error) {
       console.error('Error during Aadhaar PDF upload:', error);
       throw error;
     }
   };
+
   const handleSubmitEmployeeData = async (e) => {
     e.preventDefault();
+
+    // Handle Aadhaar PDF upload first
     let aadhaarUrl = '';
+
     if (aadhaarPdfFile) {
       try {
         aadhaarUrl = await uploadAadhaarPdfToGoogleDrive(aadhaarPdfFile, employeeName);
@@ -898,6 +1037,8 @@ const MasterData = ({ username, userRoles = [] }) => {
     } else {
       console.log('No Aadhaar PDF file selected');
     }
+
+    // Prepare employee data with Aadhaar URL
     const formData = new FormData();
     const employeeDetails = {
       employee_name: employeeName,
@@ -914,11 +1055,17 @@ const MasterData = ({ username, userRoles = [] }) => {
       contact_email: empContactEmail,
       aadhaar_image_url: aadhaarUrl
     };
+
+    console.log('Saving employee with data:', employeeDetails);
+
+    // Create a blob for the employee data (like vendor implementation)
     const employeeBlob = new Blob([JSON.stringify(employeeDetails)], { type: 'application/json' });
     formData.append('employeeDetails', employeeBlob);
+
     if (empUpiQRImage) {
       formData.append('upi_qr_image', empUpiQRImage);
     }
+
     try {
       console.log('Sending save request to backend...');
       const response = await fetch('https://backendaab.in/aabuildersDash/api/employee_details/save', {
@@ -928,6 +1075,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       if (response.ok) {
         console.log('Employee data saved successfully!');
         setMessage('Employee Details saved successfully!');
+        // Reset all form fields
         setEmployeeName('');
         setMobileNumber('');
         setRoleOfEmployee('');
@@ -974,8 +1122,10 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const handleSubmitAccountDetails = async (e) => {
     e.preventDefault();
+    // Convert Base64 to proper format for backend
     let qrImageBase64 = null;
     if (qrImagePreview) {
+      // Remove data URL prefix if present and keep only Base64 data
       qrImageBase64 = qrImagePreview.includes(',') ? qrImagePreview.split(',')[1] : qrImagePreview;
     }
     const newAccountDetails = {
@@ -1031,6 +1181,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
+
   const handleSubmitEbServiceLink = async (e) => {
     e.preventDefault();
     const newEbServiceLink = {
@@ -1055,52 +1206,67 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
+
   const handleSubmitProject = async (e) => {
     e.preventDefault();
+
     try {
+      // Map frontend state to backend field names
       const payload = {
         projectName: newProject.projectName,
         projectAddress: newProject.projectAddress,
         projectId: newProject.projectId,
         projectCategory: newProject.projectCategory,
         projectReferenceName: newProject.projectReferenceName,
-        ownerDetails: newProject.ownerDetailsList,
-        propertyDetails: newProject.propertyDetailsList
+        ownerDetails: newProject.ownerDetailsList,      // map to backend
+        propertyDetails: newProject.propertyDetailsList // map to backend
       };
+
       const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+
       if (response.ok) {
+        // Sync with Project Names API
         try {
+          // Check if a Project Names record exists with the same projectId (as siteNo)
           const existingSiteName = siteNames.find(site => site.siteNo === newProject.projectId.toString());
+
           const siteNamePayload = {
             siteName: newProject.projectName,
             siteNo: newProject.projectId
           };
+
           if (existingSiteName) {
+            // Update existing Project Names record
             const siteNameResponse = await fetch(`https://backendaab.in/aabuilderDash/api/project_Names/edit/${existingSiteName.id}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(siteNamePayload),
             });
+
             if (siteNameResponse.ok) {
-              fetchSiteNames();
+              fetchSiteNames(); // Refresh site names list
             }
           } else {
+            // Create new Project Names record
             const siteNameResponse = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/save', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(siteNamePayload),
             });
+
             if (siteNameResponse.ok) {
-              fetchSiteNames();
+              fetchSiteNames(); // Refresh site names list
             }
           }
         } catch (syncError) {
           console.error('Error syncing with Project Names:', syncError);
+          // Don't fail the main operation if sync fails
         }
+
         setMessage('Project saved successfully!');
         closeProjectManagement();
         fetchProjects();
@@ -1342,13 +1508,17 @@ const MasterData = ({ username, userRoles = [] }) => {
         age: "",
         clientAddress: ""
       }],
-      propertyDetailsList: item.propertyDetails && item.propertyDetails.length > 0 ? item.propertyDetails : [{
+      propertyDetailsList: item.propertyDetails && item.propertyDetails.length > 0 ? item.propertyDetails.map(detail => ({
+        ...detail,
+        ebNoPhase: detail.ebNoPhase || "1P"
+      })) : [{
         projectType: "",
         floorName: "",
         shopNo: "",
         doorNo: "",
         area: "",
         ebNo: "",
+        ebNoPhase: "1P",
         ebNoFrequency: "",
         propertyTaxNo: "",
         propertyTaxFrequency: "",
@@ -1829,6 +1999,11 @@ const MasterData = ({ username, userRoles = [] }) => {
       }
     }
   };
+  // Filter functions
+  const filteredSiteNames = siteNames.filter((item) =>
+    item.siteName.toLowerCase().includes(siteNameSearch.toLowerCase()) ||
+    item.siteNo.toLowerCase().includes(siteNameSearch.toLowerCase())
+  );
   const filteredVendorNames = vendorNames.filter((item) =>
     item.vendorName.toLowerCase().includes(vendorNameSearch.toLowerCase())
   );
@@ -1850,6 +2025,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const filteredBankAccountTypes = bankAccountTypes.filter((item) =>
     item.bank_account_type.toLowerCase().includes(bankAccountTypeSearch.toLowerCase())
   );
+
   const filteredEbServiceLinks = ebServiceLinks.filter((item) =>
     (item.project_id?.toString() || '').toLowerCase().includes(ebServiceLinkSearch.toLowerCase()) ||
     (item.door_no || '').toLowerCase().includes(ebServiceLinkSearch.toLowerCase()) ||
@@ -1865,6 +2041,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     (item.gpay_number || '').toLowerCase().includes(accountDetailsSearch.toLowerCase()) ||
     (item.account_type || '').toLowerCase().includes(accountDetailsSearch.toLowerCase())
   );
+  // Hover event handlers for Account Details
   const handleAccountMouseEnter = (event, accountItem) => {
     const accountHolderName = accountItem.account_holder_name || '-';
     const bankName = accountItem.bank_name || '-';
@@ -1889,9 +2066,11 @@ const MasterData = ({ username, userRoles = [] }) => {
     setTooltipData(null);
     setTooltipTitle("");
   };
+  // QR Image upload handlers
   const handleQrImageUpload = (event) => {
     const file = event.target.files[0];
     if (file) {
+      // Check file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         alert('Image size should be less than 5MB');
         return;
@@ -1926,6 +2105,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const handleEditQrImageUpload = (event) => {
     const file = event.target.files[0];
     if (file) {
+      // Check file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         alert('Image size should be less than 5MB');
         return;
@@ -1950,6 +2130,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       reader.readAsDataURL(file);
     }
   };
+  // Contractor QR Image upload handlers
   const handleContractorQrImageUpload = (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -1972,8 +2153,10 @@ const MasterData = ({ username, userRoles = [] }) => {
       reader.readAsDataURL(file);
     }
   };
+  // PDF Generation Functions
   const handleVendorShare = (vendor) => {
     const doc = new jsPDF();
+    // Add title 
     doc.setFontSize(20);
     doc.setTextColor(191, 152, 83);
     doc.text('Vendor Information', 105, 20, { align: 'center' });
@@ -1981,7 +2164,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     doc.setTextColor(0, 0, 0);
     doc.setFont('helvetica', 'bold');
     doc.text('Bank Details', 14, 30);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('helvetica', 'normal'); // reset back to normal for table
     const vendorData = [
       ['Vendor Name', vendor.vendorName || 'N/A'],
       ['Account Holder Name', vendor.account_holder_name || 'N/A'],
@@ -2006,8 +2189,8 @@ const MasterData = ({ username, userRoles = [] }) => {
         0: {
           fontStyle: 'bold',
           textColor: [0, 0, 0],
-          font: 'helvetica',
-          fontSize: 11
+          font: 'helvetica', // use helvetica bold variant
+          fontSize: 11 // slightly larger for emphasis
         },
         1: {
           textColor: [50, 50, 50]
@@ -2015,6 +2198,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       },
       headStyles: { fillColor: [191, 152, 83] }
     });
+    // Add QR code if available
     if (vendor.upi_qr_image) {
       doc.addImage(
         `data:image/jpeg;base64,${vendor.upi_qr_image}`,
@@ -2027,10 +2211,12 @@ const MasterData = ({ username, userRoles = [] }) => {
       doc.setFontSize(10);
       doc.text('Scan to Pay', 105, doc.lastAutoTable.finalY + 75, { align: 'center' });
     }
+    // Download the PDF
     doc.save(`Vendor_${vendor.vendorName || 'Details'}.pdf`);
   };
   const handleContractorShare = (contractor) => {
     const doc = new jsPDF();
+    // Add title 
     doc.setFontSize(20);
     doc.setTextColor(191, 152, 83);
     doc.text('Contractor Information', 105, 20, { align: 'center' });
@@ -2038,7 +2224,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     doc.setTextColor(0, 0, 0);
     doc.setFont('helvetica', 'bold');
     doc.text('Bank Details', 14, 30);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('helvetica', 'normal'); // reset back to normal for table
     const contractorData = [
       ['Contractor Name', contractor.contractorName || 'N/A'],
       ['Account Holder Name', contractor.account_holder_name || 'N/A'],
@@ -2063,8 +2249,8 @@ const MasterData = ({ username, userRoles = [] }) => {
         0: {
           fontStyle: 'bold',
           textColor: [0, 0, 0],
-          font: 'helvetica',
-          fontSize: 11
+          font: 'helvetica', // use helvetica bold variant
+          fontSize: 11 // slightly larger for emphasis
         },
         1: {
           textColor: [50, 50, 50]
@@ -2072,6 +2258,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       },
       headStyles: { fillColor: [191, 152, 83] }
     });
+    // Add QR code if available
     if (contractor.upi_qr_image) {
       let qrImageData = contractor.upi_qr_image.replace(/\s/g, '');
       if (!qrImageData.startsWith('data:')) {
@@ -2087,8 +2274,10 @@ const MasterData = ({ username, userRoles = [] }) => {
       doc.setFontSize(10);
       doc.text('Scan to Pay', 105, doc.lastAutoTable.finalY + 75, { align: 'center' });
     }
+    // Download the PDF
     doc.save(`Contractor_${contractor.contractorName || 'Details'}.pdf`);
   };
+  // Copy to clipboard functionality
   const copyToClipboard = async (text, fieldName, buttonId) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -2104,6 +2293,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       setTimeout(() => setMessage(''), 2000);
     }
   };
+  // Copy button component
   const CopyButton = ({ text, fieldName, buttonId, className = "" }) => (
     <button
       type="button"
@@ -2121,6 +2311,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   );
   const handleEmployeeShare = (employee) => {
     const doc = new jsPDF();
+    // Add title 
     doc.setFontSize(20);
     doc.setTextColor(191, 152, 83);
     doc.text('Employee Information', 105, 20, { align: 'center' });
@@ -2128,7 +2319,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     doc.setTextColor(0, 0, 0);
     doc.setFont('helvetica', 'bold');
     doc.text('Employee Details', 14, 30);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('helvetica', 'normal'); // reset back to normal for table
     const employeeData = [
       ['Employee Name', employee.employee_name || 'N/A'],
       ['Mobile Number', employee.employee_mobile_number || 'N/A'],
@@ -2163,6 +2354,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       },
       headStyles: { fillColor: [191, 152, 83] }
     });
+    // Add QR code if available
     if (employee.upi_qr_image) {
       let qrImageData = employee.upi_qr_image.replace(/\s/g, '');
       if (!qrImageData.startsWith('data:')) {
@@ -2178,18 +2370,21 @@ const MasterData = ({ username, userRoles = [] }) => {
       doc.setFontSize(10);
       doc.text('Scan to Pay', 105, doc.lastAutoTable.finalY + 75, { align: 'center' });
     }
+    // Download the PDF
     doc.save(`Employee_${employee.employee_name || 'Details'}.pdf`);
   };
   const handleAccountShare = (account) => {
     const doc = new jsPDF();
+    // Add title
     doc.setFontSize(20);
-    doc.setTextColor(191, 152, 83);
+    doc.setTextColor(191, 152, 83); // #BF9853 color
     doc.text('Account Information', 105, 20, { align: 'center' });
+    // Add account details
     doc.setFontSize(12);
     doc.setTextColor(0, 0, 0);
     doc.setFont('helvetica', 'bold');
     doc.text('Bank Details', 14, 30);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('helvetica', 'normal'); // reset back to normal for table
     const accountData = [
       ['Account Holder Name', account.account_holder_name || 'N/A'],
       ['Account Number', account.account_number || 'N/A'],
@@ -2212,8 +2407,8 @@ const MasterData = ({ username, userRoles = [] }) => {
         0: {
           fontStyle: 'bold',
           textColor: [0, 0, 0],
-          font: 'helvetica',
-          fontSize: 11
+          font: 'helvetica', // use helvetica bold variant
+          fontSize: 11 // slightly larger for emphasis
         },
         1: {
           textColor: [50, 50, 50]
@@ -2221,18 +2416,23 @@ const MasterData = ({ username, userRoles = [] }) => {
       },
       headStyles: { fillColor: [191, 152, 83] }
     });
+    // Add QR code if available
     if (account.upi_qr_image) {
       doc.addImage(account.upi_qr_image, 'JPEG', 80, doc.lastAutoTable.finalY + 20, 50, 50);
       doc.setFontSize(10);
       doc.text('Scan to Pay', 105, doc.lastAutoTable.finalY + 75, { align: 'center' });
     }
+    // Download the PDF
     doc.save(`Account_${account.account_holder_name || 'Details'}.pdf`);
   };
+
+  // Export functionality handlers
   const handleDownloadIconClick = (dataType) => {
     setExportDataType(dataType);
     setExportProjectCategory('');
     setIsExportTypeModalOpen(true);
   };
+
   const handleExportTypeSelect = (type) => {
     setExportType(type);
     setIsExportTypeModalOpen(false);
@@ -2241,6 +2441,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     setExportSearchTerm('');
     setExportProjectCategory('');
   };
+
   const handleExportItemToggle = (itemId) => {
     setSelectedExportItems(prev => {
       if (prev.includes(itemId)) {
@@ -2250,6 +2451,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       }
     });
   };
+
   const handleSelectAllExportItems = () => {
     let dataList = [];
     if (exportDataType === 'vendor') {
@@ -2266,9 +2468,11 @@ const MasterData = ({ username, userRoles = [] }) => {
     const allIds = dataList.map(item => item.id);
     setSelectedExportItems(allIds);
   };
+
   const handleDeselectAllExportItems = () => {
     setSelectedExportItems([]);
   };
+
   const getFilteredExportData = () => {
     if (exportDataType === 'vendor') {
       return vendorNames.filter(item =>
@@ -2304,10 +2508,12 @@ const MasterData = ({ username, userRoles = [] }) => {
     }
     return [];
   };
+
   const filteredExportVendors = exportDataType === 'vendor' ? getFilteredExportData() : [];
   const filteredExportContractors = exportDataType === 'contractor' ? getFilteredExportData() : [];
   const filteredExportProjects = exportDataType === 'project' ? getFilteredExportData() : [];
   const filteredExportEbServiceLinks = exportDataType === 'ebServiceLink' ? getFilteredExportData() : [];
+
   const handleExportToPDF = () => {
     let selectedData = [];
     if (exportDataType === 'vendor') {
@@ -2321,10 +2527,12 @@ const MasterData = ({ username, userRoles = [] }) => {
     } else {
       selectedData = ebServiceLinks.filter(item => selectedExportItems.includes(item.id));
     }
+
     if (selectedData.length === 0) {
       alert('Please select at least one item to export');
       return;
     }
+
     const doc = new jsPDF('landscape');
     let title = 'Export List';
     if (exportDataType === 'vendor') {
@@ -2338,19 +2546,23 @@ const MasterData = ({ username, userRoles = [] }) => {
     } else {
       title = 'EB Service Link List';
     }
+
     doc.setFontSize(20);
     doc.setTextColor(191, 152, 83);
     doc.text(title, doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
+
     const formatId = (id, prefix) => {
       if (!id) return '';
       const paddedId = id.toString().padStart(4, '0');
       return `${prefix}${paddedId}`;
     };
+
     let tableHead = [];
     let tableData = [];
     let columnStyles = {};
     let projectCount = 0;
     let rowCounter = 1;
+
     if (exportDataType === 'ebServiceLink') {
       tableHead = [[
         'ID',
@@ -2526,6 +2738,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         12: { cellWidth: 15 }
       };
     }
+
     if (exportDataType === 'project' && projectCount) {
       doc.setFontSize(10);
       doc.setTextColor(80, 80, 80);
@@ -2533,6 +2746,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       doc.setFontSize(12);
       doc.setTextColor(0, 0, 0);
     }
+
     doc.autoTable({
       startY: 30,
       head: tableHead,
@@ -2552,9 +2766,11 @@ const MasterData = ({ username, userRoles = [] }) => {
       },
       columnStyles
     });
+
     doc.save(`${title.replace(' ', '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
     setIsExportSelectionModalOpen(false);
   };
+
   const handleExportToExcel = () => {
     let selectedData = [];
     if (exportDataType === 'vendor') {
@@ -2568,15 +2784,18 @@ const MasterData = ({ username, userRoles = [] }) => {
     } else {
       selectedData = ebServiceLinks.filter(item => selectedExportItems.includes(item.id));
     }
+
     if (selectedData.length === 0) {
       alert('Please select at least one item to export');
       return;
     }
+
     const formatId = (id, prefix) => {
       if (!id) return '';
       const paddedId = id.toString().padStart(4, '0');
       return `${prefix}${paddedId}`;
     };
+
     let worksheetData = [];
     let rowCounter = 1;
     let projectCount = 0;
@@ -2653,32 +2872,35 @@ const MasterData = ({ username, userRoles = [] }) => {
         };
       });
     }
+
     const worksheet = exportDataType === 'project'
       ? XLSX.utils.json_to_sheet(worksheetData, { origin: 'A3' })
       : XLSX.utils.json_to_sheet(worksheetData);
+
     if (exportDataType === 'project') {
       XLSX.utils.sheet_add_aoa(worksheet, [['Total Projects', projectCount]], { origin: 'A1' });
       XLSX.utils.sheet_add_aoa(worksheet, [['']], { origin: 'A2' });
     }
+
     const columnWidths = exportDataType === 'ebServiceLink' ? [
       { wch: 10 },
       { wch: 15 },
       { wch: 15 },
       { wch: 20 }
     ] : exportDataType === 'project' ? [
-      { wch: 8 },
-      { wch: 15 },
-      { wch: 25 },
-      { wch: 30 },
-      { wch: 22 },
-      { wch: 18 },
-      { wch: 18 },
-      { wch: 12 },
-      { wch: 12 },
-      { wch: 15 },
-      { wch: 20 },
-      { wch: 22 },
-      { wch: 22 }
+      { wch: 8 },   // S.No
+      { wch: 15 },  // Project ID
+      { wch: 25 },  // Project Name
+      { wch: 30 },  // Project Reference Name
+      { wch: 22 },  // Project Category
+      { wch: 18 },  // Project Type
+      { wch: 18 },  // Floor Name
+      { wch: 12 },  // Shop No
+      { wch: 12 },  // Door No
+      { wch: 15 },  // Area
+      { wch: 20 },  // EB No
+      { wch: 22 },  // Property Tax No
+      { wch: 22 }   // Water Tax No
     ] : [
       { wch: 12 },
       { wch: 25 },
@@ -2695,6 +2917,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       { wch: 12 }
     ];
     worksheet['!cols'] = columnWidths;
+
     const workbook = XLSX.utils.book_new();
     let sheetName = 'Export';
     if (exportDataType === 'vendor') {
@@ -2708,6 +2931,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     } else {
       sheetName = 'EB Service Links';
     }
+
     XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
     const fileName = `${sheetName}_${new Date().toISOString().split('T')[0]}.xlsx`;
     XLSX.writeFile(workbook, fileName);
@@ -2726,7 +2950,8 @@ const MasterData = ({ username, userRoles = [] }) => {
             <div className="flex items-center mb-10 mt-10">
               <h2 className="text-xl font-bold text-[#BF9853]">Master Tables</h2>
               {selectedTable && (
-                <button onClick={clearSelection}
+                <button
+                  onClick={clearSelection}
                   className="text-[#BF9853] border border-[#BF9853] px-4 ml-20 py-2 rounded-lg hover:bg-[#BF9853] hover:text-white transition-colors"
                 >
                   Clear
@@ -2770,7 +2995,9 @@ const MasterData = ({ username, userRoles = [] }) => {
             </div>
           </div>
           {getReorderedTableData().map((table, index) => (
-            <div key={table.id} className={selectedTable === table.id ? 'ring-4 ring-[#faf9f8] ring-opacity-50 rounded-lg shadow-lg' : ''}>
+            <div key={table.id}
+              className={selectedTable === table.id ? 'ring-4 ring-[#faf9f8] ring-opacity-50 rounded-lg shadow-lg' : ''}
+            >
               {table.id === 'project-management' && (
                 <div>
                   <div className="flex items-center mb-2 lg:mt-0 mt-3">
@@ -2801,6 +3028,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                     style={{ display: 'none' }}
                     onChange={(e) => handleProjectManagementBulkUpload(e)}
                   />
+
                   <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] mt-6'>
                     <div className="bg-[#FAF6ED]">
                       <table className="table-auto lg:w-[470px]">
@@ -2848,10 +3076,18 @@ const MasterData = ({ username, userRoles = [] }) => {
                               </td>
                               <td className="p-2 text-left font-semibold">
                                 <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  <button onClick={() => handleEditProject(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                  <button
+                                    onClick={() => handleEditProject(item)}
+                                    className="text-blue-600 hover:text-blue-800"
+                                    title="Edit"
+                                  >
                                     <img src={edit} alt="Edit" className="w-6 h-6" />
                                   </button>
-                                  <button onClick={() => handleDeleteProject(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                  <button
+                                    onClick={() => handleDeleteProject(item.id)}
+                                    className="text-red-600 hover:text-red-800"
+                                    title="Delete"
+                                  >
                                     <img src={deleteIcon} alt="Delete" className="w-6 h-6" />
                                   </button>
                                 </div>
@@ -2926,10 +3162,18 @@ const MasterData = ({ username, userRoles = [] }) => {
                                   <button onClick={() => handleVendorShare(item)}>
                                     <img src={share} alt='Share' className='w-4 h-4' />
                                   </button>
-                                  <button onClick={() => handleEditVendorName(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                  <button
+                                    onClick={() => handleEditVendorName(item)}
+                                    className="text-blue-600 hover:text-blue-800"
+                                    title="Edit"
+                                  >
                                     <img src={edit} alt="Edit" className="w-4 h-4" />
                                   </button>
-                                  <button onClick={() => handleDeleteVendorName(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                  <button
+                                    onClick={() => handleDeleteVendorName(item.id)}
+                                    className="text-red-600 hover:text-red-800"
+                                    title="Delete"
+                                  >
                                     <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
                                   </button>
                                 </div>
@@ -3002,10 +3246,18 @@ const MasterData = ({ username, userRoles = [] }) => {
                                   <button onClick={() => handleContractorShare(item)}>
                                     <img src={share} alt='Share' className='w-4 h-4' />
                                   </button>
-                                  <button onClick={() => handleEditContractorName(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                  <button
+                                    onClick={() => handleEditContractorName(item)}
+                                    className="text-blue-600 hover:text-blue-800"
+                                    title="Edit"
+                                  >
                                     <img src={edit} alt="Edit" className="w-4 h-4" />
                                   </button>
-                                  <button onClick={() => handleDeleteContractorName(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                  <button
+                                    onClick={() => handleDeleteContractorName(item.id)}
+                                    className="text-red-600 hover:text-red-800"
+                                    title="Delete"
+                                  >
                                     <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
                                   </button>
                                 </div>
@@ -3072,10 +3324,18 @@ const MasterData = ({ username, userRoles = [] }) => {
                                   {item.category}
                                 </div>
                                 <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  <button onClick={() => handleEditCategory(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                  <button
+                                    onClick={() => handleEditCategory(item)}
+                                    className="text-blue-600 hover:text-blue-800"
+                                    title="Edit"
+                                  >
                                     <img src={edit} alt="Edit" className="w-4 h-4" />
                                   </button>
-                                  <button onClick={() => handleDeleteCategory(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                  <button
+                                    onClick={() => handleDeleteCategory(item.id)}
+                                    className="text-red-600 hover:text-red-800"
+                                    title="Delete"
+                                  >
                                     <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
                                   </button>
                                 </div>
@@ -3101,7 +3361,8 @@ const MasterData = ({ username, userRoles = [] }) => {
                     <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
                       <img src={search} alt='search' className=' w-5 h-5' />
                     </button>
-                    <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]" onClick={openMachineTools}>
+                    <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
+                      onClick={openMachineTools}>
                       + Add
                     </button>
                   </div>
@@ -3141,10 +3402,18 @@ const MasterData = ({ username, userRoles = [] }) => {
                                   {item.machineTool}
                                 </div>
                                 <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  <button onClick={() => handleEditMachineTool(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                  <button
+                                    onClick={() => handleEditMachineTool(item)}
+                                    className="text-blue-600 hover:text-blue-800"
+                                    title="Edit"
+                                  >
                                     <img src={edit} alt="Edit" className="w-4 h-4" />
                                   </button>
-                                  <button onClick={() => handleDeleteMachineTool(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                  <button
+                                    onClick={() => handleDeleteMachineTool(item.id)}
+                                    className="text-red-600 hover:text-red-800"
+                                    title="Delete"
+                                  >
                                     <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
                                   </button>
                                 </div>
@@ -3219,10 +3488,18 @@ const MasterData = ({ username, userRoles = [] }) => {
                                   <button onClick={() => handleEmployeeShare(item)}>
                                     <img src={share} alt='Share' className='w-4 h-4' />
                                   </button>
-                                  <button onClick={() => handleEditEmployeeData(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                  <button
+                                    onClick={() => handleEditEmployeeData(item)}
+                                    className="text-blue-600 hover:text-blue-800"
+                                    title="Edit"
+                                  >
                                     <img src={edit} alt="Edit" className="w-4 h-4" />
                                   </button>
-                                  <button onClick={() => handleDeleteEmployeeData(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                  <button
+                                    onClick={() => handleDeleteEmployeeData(item.id)}
+                                    className="text-red-600 hover:text-red-800"
+                                    title="Delete"
+                                  >
                                     <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
                                   </button>
                                 </div>
@@ -3289,10 +3566,18 @@ const MasterData = ({ username, userRoles = [] }) => {
                                   {item.labour_name}
                                 </div>
                                 <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  <button onClick={() => handleEditLabourData(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                  <button
+                                    onClick={() => handleEditLabourData(item)}
+                                    className="text-blue-600 hover:text-blue-800"
+                                    title="Edit"
+                                  >
                                     <img src={edit} alt="Edit" className="w-4 h-4" />
                                   </button>
-                                  <button onClick={() => handleDeleteLabourData(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                  <button
+                                    onClick={() => handleDeleteLabourData(item.id)}
+                                    className="text-red-600 hover:text-red-800"
+                                    title="Delete"
+                                  >
                                     <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
                                   </button>
                                 </div>
@@ -3365,10 +3650,18 @@ const MasterData = ({ username, userRoles = [] }) => {
                                   <button onClick={() => handleAccountShare(item)}>
                                     <img src={share} alt='Share' className='w-4 h-4' />
                                   </button>
-                                  <button onClick={() => handleEditAccountDetails(item)} className="text-blue-600 hover:text-blue-800" title="Edit" >
+                                  <button
+                                    onClick={() => handleEditAccountDetails(item)}
+                                    className="text-blue-600 hover:text-blue-800"
+                                    title="Edit"
+                                  >
                                     <img src={edit} alt="Edit" className="w-4 h-4" />
                                   </button>
-                                  <button onClick={() => handleDeleteAccountDetails(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                  <button
+                                    onClick={() => handleDeleteAccountDetails(item.id)}
+                                    className="text-red-600 hover:text-red-800"
+                                    title="Delete"
+                                  >
                                     <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
                                   </button>
                                 </div>
@@ -3435,10 +3728,18 @@ const MasterData = ({ username, userRoles = [] }) => {
                                   {item.bank_account_type}
                                 </div>
                                 <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  <button onClick={() => handleEditBankAccountType(item)} className="text-blue-600 hover:text-blue-800" title="Edit" >
+                                  <button
+                                    onClick={() => handleEditBankAccountType(item)}
+                                    className="text-blue-600 hover:text-blue-800"
+                                    title="Edit"
+                                  >
                                     <img src={edit} alt="Edit" className="w-4 h-4" />
                                   </button>
-                                  <button onClick={() => handleDeleteBankAccountType(item.id)} className="text-red-600 hover:text-red-800" title="Delete" >
+                                  <button
+                                    onClick={() => handleDeleteBankAccountType(item.id)}
+                                    className="text-red-600 hover:text-red-800"
+                                    title="Delete"
+                                  >
                                     <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
                                   </button>
                                 </div>
@@ -3505,10 +3806,18 @@ const MasterData = ({ username, userRoles = [] }) => {
                                   {item.eb_service_no || ''}
                                 </div>
                                 <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  <button onClick={() => handleEditEbServiceLink(item)} className="text-blue-600 hover:text-blue-800" title="Edit" >
+                                  <button
+                                    onClick={() => handleEditEbServiceLink(item)}
+                                    className="text-blue-600 hover:text-blue-800"
+                                    title="Edit"
+                                  >
                                     <img src={edit} alt="Edit" className="w-4 h-4" />
                                   </button>
-                                  <button onClick={() => handleDeleteEbServiceLink(item.id)} className="text-red-600 hover:text-red-800" title="Delete" >
+                                  <button
+                                    onClick={() => handleDeleteEbServiceLink(item.id)}
+                                    className="text-red-600 hover:text-red-800"
+                                    title="Delete"
+                                  >
                                     <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
                                   </button>
                                 </div>
@@ -3521,10 +3830,12 @@ const MasterData = ({ username, userRoles = [] }) => {
                   </div>
                 </div>
               )}
+
             </div>
           ))}
         </div>
       </div>
+      {/* Modal Forms */}
       {isSiteNamesOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
           <div className="bg-white rounded-md w-[30rem] h-80 px-2 py-2">
@@ -4405,6 +4716,7 @@ const MasterData = ({ username, userRoles = [] }) => {
           </div>
         )
       }
+      {/* Edit Modal Forms */}
       {
         isEditSiteNameOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
@@ -5710,7 +6022,33 @@ const MasterData = ({ username, userRoles = [] }) => {
                       />
                     </div>
                     <div className="relative">
-                      <label className='block mb-1 text-lg font-medium '>EB.NO</label>
+                      <div className="flex items-center gap-2 mb-1">
+                        <label className='text-lg font-medium '>EB.NO</label>
+                        <div className="relative inline-flex bg-gray-200 rounded-lg p-0.5">
+                          <button
+                            type="button"
+                            onClick={() => handleNewDetailChange(index, 'ebNoPhase', '1P')}
+                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                              (detail.ebNoPhase || '1P') === '1P' 
+                                ? 'bg-[#BF9853] text-white shadow-sm' 
+                                : 'text-gray-600 hover:text-gray-800'
+                            }`}
+                          >
+                            1P
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleNewDetailChange(index, 'ebNoPhase', '3P')}
+                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                              detail.ebNoPhase === '3P' 
+                                ? 'bg-[#BF9853] text-white shadow-sm' 
+                                : 'text-gray-600 hover:text-gray-800'
+                            }`}
+                          >
+                            3P
+                          </button>
+                        </div>
+                      </div>
                       <div className="flex">
                         <input
                           type='text'
@@ -5829,8 +6167,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                       value={editProject.projectReferenceName}
                       onChange={(e) =>
                         setEditProject((prev) => ({ ...prev, projectReferenceName: e.target.value }))
-                      }>
-                    </input>
+                      }></input>
                   </div>
                   <div className="mb-4 pl-5">
                     <label className="block text-lg font-medium mb-2">Project Category</label>
@@ -5996,7 +6333,33 @@ const MasterData = ({ username, userRoles = [] }) => {
                       />
                     </div>
                     <div className="relative">
-                      <label className='block mb-1 text-lg font-medium '>EB.NO</label>
+                      <div className="flex items-center gap-2 mb-1">
+                        <label className='text-lg font-medium '>EB.NO</label>
+                        <div className="relative inline-flex bg-gray-200 rounded-lg p-0.5">
+                          <button
+                            type="button"
+                            onClick={() => handleEditDetailChange(index, 'ebNoPhase', '1P')}
+                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                              (detail.ebNoPhase || '1P') === '1P' 
+                                ? 'bg-[#BF9853] text-white shadow-sm' 
+                                : 'text-gray-600 hover:text-gray-800'
+                            }`}
+                          >
+                            1P
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleEditDetailChange(index, 'ebNoPhase', '3P')}
+                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                              detail.ebNoPhase === '3P' 
+                                ? 'bg-[#BF9853] text-white shadow-sm' 
+                                : 'text-gray-600 hover:text-gray-800'
+                            }`}
+                          >
+                            3P
+                          </button>
+                        </div>
+                      </div>
                       <div className="flex">
                         <input
                           type='text'
@@ -6053,10 +6416,17 @@ const MasterData = ({ username, userRoles = [] }) => {
                 <button type="button" className="text-[#E4572E] font-bold px-1 ml-3 border-dashed border-b-2 border-[#BF9853] " onClick={addEditPropertyDetail}>+ Add on</button>
               </div>
               <div className="flex justify-end space-x-2 mt-8 mb-4 mr-5">
-                <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
+                <button
+                  type="submit"
+                  className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
+                >
                   Update
                 </button>
-                <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={() => setIsProjectEditOpen(false)}>
+                <button
+                  type="button"
+                  className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
+                  onClick={() => setIsProjectEditOpen(false)}
+                >
                   Cancel
                 </button>
               </div>
@@ -6373,14 +6743,18 @@ const MasterData = ({ username, userRoles = [] }) => {
                             }}
                             className="hidden"
                           />
-                          <button type="button" onClick={() => document.getElementById('editEmployeeQrImageUpload').click()}
+                          <button
+                            type="button"
+                            onClick={() => document.getElementById('editEmployeeQrImageUpload').click()}
                             className="w-52 bg-[#BF9853] text-white px-4 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
                           >
                             Add Image
                           </button>
                         </div>
                         <div className="mb-4">
-                          <button type="button" onClick={() => setIsEmployeeEditMode(!isEmployeeEditMode)}
+                          <button
+                            type="button"
+                            onClick={() => setIsEmployeeEditMode(!isEmployeeEditMode)}
                             className="w-52 bg-[#BF9853] text-white px-4 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
                           >
                             {isEmployeeEditMode ? 'Disable Edit' : 'Edit Employee Details'}
@@ -6405,7 +6779,8 @@ const MasterData = ({ username, userRoles = [] }) => {
                         />
                         <div className="flex items-center gap-2">
                           <button
-                            type="button" onClick={() => document.getElementById('editAadhaarPdfUpload').click()}
+                            type="button"
+                            onClick={() => document.getElementById('editAadhaarPdfUpload').click()}
                             className="bg-[#BF9853] text-white px-2 py-2 w-48 -ml-14 rounded-lg hover:bg-yellow-800 font-semibold"
                           >
                             Select Aadhaar PDF
@@ -6743,14 +7118,18 @@ const MasterData = ({ username, userRoles = [] }) => {
                               onChange={handleEditQrImageUpload}
                               className="hidden"
                             />
-                            <button type="button" onClick={() => document.getElementById('editQrImageUpload').click()}
+                            <button
+                              type="button"
+                              onClick={() => document.getElementById('editQrImageUpload').click()}
                               className="w-52 bg-[#BF9853] text-white px-4 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
                             >
                               Add QR
                             </button>
                           </div>
                           <div className="mb-4">
-                            <button type="button" onClick={() => setIsAccountEditMode(!isAccountEditMode)}
+                            <button
+                              type="button"
+                              onClick={() => setIsAccountEditMode(!isAccountEditMode)}
                               className="w-52 bg-[#BF9853] text-white px-4 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
                             >
                               {isAccountEditMode ? 'Disable Edit' : 'Edit Account Details'}
@@ -6887,7 +7266,10 @@ const MasterData = ({ username, userRoles = [] }) => {
                     <div className="space-y-2">
                       {(exportDataType === 'vendor' ? filteredExportVendors : exportDataType === 'contractor' ? filteredExportContractors : exportDataType === 'employee' ? getFilteredExportData() : exportDataType === 'project' ? filteredExportProjects : filteredExportEbServiceLinks).map((item) => (
                         <label key={item.id} className="flex items-center p-3 hover:bg-[#FAF6ED] rounded-lg cursor-pointer transition-colors" >
-                          <input type="checkbox" checked={selectedExportItems.includes(item.id)} onChange={() => handleExportItemToggle(item.id)}
+                          <input
+                            type="checkbox"
+                            checked={selectedExportItems.includes(item.id)}
+                            onChange={() => handleExportItemToggle(item.id)}
                             className="w-5 h-5 text-[#BF9853] border-2 border-[#BF9853] rounded focus:ring-[#BF9853] cursor-pointer"
                           />
                           <span className="ml-3 text-base font-medium">
@@ -6956,7 +7338,8 @@ const MasterData = ({ username, userRoles = [] }) => {
                             }
                             if (!item) return null;
                             return (
-                              <tr key={itemId}
+                              <tr
+                                key={itemId}
                                 className={`border-b border-gray-200 hover:bg-[#FAF6ED] transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
                                   }`}
                               >
@@ -6994,13 +7377,15 @@ const MasterData = ({ username, userRoles = [] }) => {
               </div>
             </div>
             <div className="flex space-x-3 justify-end mt-6 pt-4 border-t border-gray-200">
-              <button onClick={exportType === 'pdf' ? handleExportToPDF : handleExportToExcel}
+              <button
+                onClick={exportType === 'pdf' ? handleExportToPDF : handleExportToExcel}
                 className="bg-[#BF9853] text-white px-8 py-3 rounded-lg hover:bg-yellow-800 font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={selectedExportItems.length === 0}
               >
                 Export {exportType === 'pdf' ? 'PDF' : 'Excel'} ({selectedExportItems.length} items)
               </button>
-              <button onClick={() => setIsExportSelectionModalOpen(false)}
+              <button
+                onClick={() => setIsExportSelectionModalOpen(false)}
                 className="px-8 py-3 border-2 border-[#BF9853] text-[#BF9853] rounded-lg hover:bg-[#FAF6ED] font-semibold transition-colors"
               >
                 Cancel

@@ -1644,7 +1644,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 )
             );
             setEditingPaymentId(null); 
-            console.log("Refund payment updated successfully");
         } catch (error) {
             console.error("Error updating refund payment:", error);
             alert("Error updating refund payment. Please try again.");

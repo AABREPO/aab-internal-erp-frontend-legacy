@@ -82,10 +82,25 @@ const PurchaseInputData = () => {
     siteIncharge: false,
     groupName: false
   });
+  const [openSearchFields, setOpenSearchFields] = useState({
+    itemName: false,
+    model: false,
+    brand: false,
+    type: false,
+    category: false,
+    siteIncharge: false,
+    groupName: false
+  });
   const toggleTable = (tableName) => {
     setExpandedTables(prev => ({
       ...prev,
       [tableName]: !prev[tableName]
+    }));
+  };
+  const toggleSearchField = (fieldName) => {
+    setOpenSearchFields(prev => ({
+      ...prev,
+      [fieldName]: !prev[fieldName]
     }));
   };
   const closeModelUpload = () => setIsModelUploadOpens(false);
@@ -1246,7 +1261,7 @@ const PurchaseInputData = () => {
   };
   return (
     <div className="p-4 bg-white ml-6 mr-8">
-      <div className='flex justify-between'>
+      <div className='lg:flex justify-between items-center text-left'>
         <div className="text-left">
           <h4 className=" font-semibold mb-2 ">Category</h4>
           <Select
@@ -1259,7 +1274,7 @@ const PurchaseInputData = () => {
             isClearable
           />
         </div>
-        <div className='mt-[42px]'>
+        <div className=' lg:mt-0 mt-4'>
           <button
             onClick={() => {
               fetchMappedCategories();
@@ -1277,8 +1292,8 @@ const PurchaseInputData = () => {
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}>
-        <div>
-          <div className="flex items-center mb-2">
+        <div className='lg:ml-0 ml-2 lg:mb-0 mb-4'>
+          <div className="lg:flex hidden items-center mb-2">
             <input
               type="text"
               className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-[250px] h-12 focus:outline-none"
@@ -1296,7 +1311,7 @@ const PurchaseInputData = () => {
               + Add
             </button>
           </div>
-          <button onClick={openItemNameUpload} className="text-[#E4572E] flex mb-6">
+          <button onClick={openItemNameUpload} className="text-[#E4572E] lg:flex hidden mb-6">
             <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' />
             <h1 className='mt-1.5 text-sm'>Import file</h1>
           </button>
@@ -1308,19 +1323,80 @@ const PurchaseInputData = () => {
               <table className="table-auto lg:w-[355px] w-full">
                 <thead className="bg-[#FAF6ED]">
                   <tr className="border-b">
-                    <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left w-72 text-xl font-bold">Item Name</th>
-                    <th className="p-2 text-right lg:hidden">
-                      <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => toggleTable('itemName')} className="text-gray-700">
-                          <span className="text-xl font-bold">
-                            {expandedTables.itemName ? '↑' : '↓'}
+                    <th className="p-2 text-left w-16 text-xl font-bold lg:table-cell hidden">S.No</th>
+                    <th className="p-2 text-left w-72 text-xl font-bold lg:cursor-default">
+                      {openSearchFields.itemName ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            className="border border-[#FAF6ED] border-r-2 bg-transparent border-l-2 border-b-2 border-t-2 rounded-lg p-1.5 flex-1 h-10 focus:outline-none text-sm"
+                            placeholder="Search Item Name.."
+                            value={poItemNameSearch}
+                            onChange={(e) => setPoItemNameSearch(e.target.value)}
+                            autoFocus
+                          />
+                          <button 
+                            onClick={() => toggleSearchField('itemName')}
+                            className="text-gray-500"
+                          >
+                            <img src={search} alt='search' className='w-4 h-4' />
+                          </button>
+                          <button 
+                            onClick={() => toggleTable('itemName')} 
+                            className="text-gray-700 lg:hidden"
+                          >
+                            <span className="text-xl font-bold">
+                              {expandedTables.itemName ? '↑' : '↓'}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => { setIsPopupOpen(true) }}
+                            className="text-black font-bold text-xl lg:hidden"
+                          >
+                            +
+                          </button>
+                          <button
+                            onClick={() => { setIsPopupOpen(true) }}
+                            className="text-black font-bold px-1 border-dashed border-b-2 border-[#BF9853] text-sm lg:block hidden"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <span 
+                            className="cursor-pointer lg:cursor-default"
+                            onClick={() => toggleSearchField('itemName')}
+                          >
+                            Item Name
                           </span>
-                        </button>
-                        <button>
-                          <img src={deleteIcon} alt='del' className='w-4 h-4' />
-                        </button>
-                      </div>
+                          <div className="flex items-center gap-2 lg:hidden">
+                            <button 
+                              onClick={() => toggleSearchField('itemName')}
+                              className="text-gray-500"
+                            >
+                              <img src={search} alt='search' className='w-4 h-4' />
+                            </button>
+                            <button onClick={() => toggleTable('itemName')} className="text-gray-700">
+                              <span className="text-xl font-bold">
+                                {expandedTables.itemName ? '↑' : '↓'}
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => { setIsPopupOpen(true) }}
+                              className="text-black font-bold text-xl"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </th>
+                    <th className="p-2 text-right lg:hidden">
+                      {!openSearchFields.itemName && (
+                        <div className="flex items-center justify-end gap-2">
+                        </div>
+                      )}
                     </th>
                   </tr>
                 </thead>
@@ -1331,7 +1407,7 @@ const PurchaseInputData = () => {
                 <tbody>
                   {filteredPoItemName.map((item, index) => (
                     <tr className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold">{(poItemName.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                      <td className="p-2 text-left font-semibold lg:table-cell hidden">{(poItemName.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
                       <td className="p-2 group flex justify-between items-center font-semibold">
                         {item.itemName}
                         <div className="flex flex-grow">
@@ -1357,8 +1433,8 @@ const PurchaseInputData = () => {
             </div>
           </div>
         </div>
-        <div>
-          <div className="flex items-center mb-2 lg:mt-0 mt-3">
+        <div className='lg:ml-0 ml-2 lg:mb-0 mb-4'>
+          <div className="lg:flex hidden items-center mb-2 lg:mt-0 mt-3">
             <input
               type="text"
               className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
@@ -1376,7 +1452,7 @@ const PurchaseInputData = () => {
               + Add
             </button>
           </div>
-          <button onClick={openModelUpload} className="text-[#E4572E] flex mb-6">
+          <button onClick={openModelUpload} className="text-[#E4572E] lg:flex hidden mb-6">
             <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' />
             <h1 className='mt-1.5 text-sm'>Import file</h1>
             </button>
@@ -1388,19 +1464,80 @@ const PurchaseInputData = () => {
               <table className="table-auto lg:w-[249px] w-full">
                 <thead className='bg-[#FAF6ED]'>
                   <tr className="border-b">
-                    <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left w-72 text-xl font-bold">Model</th>
-                    <th className="p-2 text-right lg:hidden">
-                      <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => toggleTable('model')} className="text-gray-700">
-                          <span className="text-xl font-bold">
-                            {expandedTables.model ? '↑' : '↓'}
+                    <th className="p-2 text-left w-16 text-xl font-bold lg:table-cell hidden">S.No</th>
+                    <th className="p-2 text-left w-72 text-xl font-bold lg:cursor-default">
+                      {openSearchFields.model ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            className="border border-[#FAF6ED] border-r-2 border-l-2 border-b-2 border-t-2 bg-transparent rounded-lg p-1.5 flex-1 h-10 focus:outline-none text-sm"
+                            placeholder="Search Model.."
+                            value={poModelSearch}
+                            onChange={(e) => setPoModelSearch(e.target.value)}
+                            autoFocus
+                          />
+                          <button 
+                            onClick={() => toggleSearchField('model')}
+                            className="text-gray-500"
+                          >
+                            <img src={search} alt='search' className='w-4 h-4' />
+                          </button>
+                          <button 
+                            onClick={() => toggleTable('model')} 
+                            className="text-gray-700 lg:hidden"
+                          >
+                            <span className="text-xl font-bold">
+                              {expandedTables.model ? '↑' : '↓'}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => setIsPopupOpen1(true)}
+                            className="text-black font-bold text-xl lg:hidden"
+                          >
+                            +
+                          </button>
+                          <button
+                            onClick={() => setIsPopupOpen1(true)}
+                            className="text-black font-bold px-1 border-dashed border-b-2 border-[#BF9853] text-sm lg:block hidden"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <span 
+                            className="cursor-pointer lg:cursor-default"
+                            onClick={() => toggleSearchField('model')}
+                          >
+                            Model
                           </span>
-                        </button>
-                        <button>
-                          <img src={deleteIcon} alt='del' className='w-4 h-4' />
-                        </button>
-                      </div>
+                          <div className="flex items-center gap-2 lg:hidden">
+                            <button 
+                              onClick={() => toggleSearchField('model')}
+                              className="text-gray-500"
+                            >
+                              <img src={search} alt='search' className='w-4 h-4' />
+                            </button>
+                            <button onClick={() => toggleTable('model')} className="text-gray-700">
+                              <span className="text-xl font-bold">
+                                {expandedTables.model ? '↑' : '↓'}
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => setIsPopupOpen1(true)}
+                              className="text-black font-bold text-xl"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </th>
+                    <th className="p-2 text-right lg:hidden">
+                      {!openSearchFields.model && (
+                        <div className="flex items-center justify-end gap-2">
+                        </div>
+                      )}
                     </th>
                   </tr>
                 </thead>
@@ -1418,7 +1555,7 @@ const PurchaseInputData = () => {
                         onMouseEnter={() => setHoveredModelName(modelItem.model)}
                         onMouseLeave={() => setHoveredModelName(null)}
                       >
-                        <td className="p-2 text-left font-semibold">
+                        <td className="p-2 text-left font-semibold lg:table-cell hidden">
                           {(poModel.findIndex(acc => acc.id === modelItem.id) + 1).toString().padStart(2, '0')}
                         </td>
                         <td className="p-2 text-left group flex font-semibold relative">
@@ -1449,8 +1586,8 @@ const PurchaseInputData = () => {
             </div>
           </div>
         </div>
-        <div>
-          <div className="flex items-center mb-2 lg:mt-0 mt-3">
+        <div className='lg:ml-0 ml-2 lg:mb-0 mb-4'>
+          <div className="lg:flex hidden items-center mb-2 lg:mt-0 mt-3">
             <input
               type="text"
               className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
@@ -1468,7 +1605,10 @@ const PurchaseInputData = () => {
               + Add
             </button>
           </div>
-          <button onClick={openBrandUpload} className="text-[#E4572E] flex mb-6"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' /><h1 className='mt-1.5 text-sm'>Import file</h1></button>
+          <button onClick={openBrandUpload} className="text-[#E4572E] lg:flex hidden mb-6">
+            <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' />
+            <h1 className='mt-1.5 text-sm'>Import file</h1>
+            </button>
           <button className="lg:block hidden">
             <img src={deleteIcon} alt='del' className='-mb-14 mt-5 ml-[17rem]' />
           </button>
@@ -1477,19 +1617,80 @@ const PurchaseInputData = () => {
               <table className="table-auto lg:w-[323px] w-full">
                 <thead className='bg-[#FAF6ED]'>
                   <tr className="border-b">
-                    <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left w-72 text-xl font-bold">Brand</th>
-                    <th className="p-2 text-right lg:hidden">
-                      <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => toggleTable('brand')} className="text-gray-700">
-                          <span className="text-xl font-bold">
-                            {expandedTables.brand ? '↑' : '↓'}
+                    <th className="p-2 text-left w-16 text-xl font-bold lg:table-cell hidden">S.No</th>
+                    <th className="p-2 text-left w-72 text-xl font-bold lg:cursor-default">
+                      {openSearchFields.brand ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            className="border border-[#FAF6ED] border-r-2 border-l-2 border-b-2 border-t-2 bg-transparent rounded-lg p-1.5 flex-1 h-10 focus:outline-none text-sm"
+                            placeholder="Search Brand.."
+                            value={poBrandSearch}
+                            onChange={(e) => setPoBrandSearch(e.target.value)}
+                            autoFocus
+                          />
+                          <button 
+                            onClick={() => toggleSearchField('brand')}
+                            className="text-gray-500"
+                          >
+                            <img src={search} alt='search' className='w-4 h-4' />
+                          </button>
+                          <button 
+                            onClick={() => toggleTable('brand')} 
+                            className="text-gray-700 lg:hidden"
+                          >
+                            <span className="text-xl font-bold">
+                              {expandedTables.brand ? '↑' : '↓'}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => setIsPopupOpen2(true)}
+                            className="text-black font-bold text-xl lg:hidden"
+                          >
+                            +
+                          </button>
+                          <button
+                            onClick={() => setIsPopupOpen2(true)}
+                            className="text-black font-bold px-1 border-dashed border-b-2 border-[#BF9853] text-sm lg:block hidden"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <span 
+                            className="cursor-pointer lg:cursor-default"
+                            onClick={() => toggleSearchField('brand')}
+                          >
+                            Brand
                           </span>
-                        </button>
-                        <button>
-                          <img src={deleteIcon} alt='del' className='w-4 h-4' />
-                        </button>
-                      </div>
+                          <div className="flex items-center gap-2 lg:hidden">
+                            <button 
+                              onClick={() => toggleSearchField('brand')}
+                              className="text-gray-500"
+                            >
+                              <img src={search} alt='search' className='w-4 h-4' />
+                            </button>
+                            <button onClick={() => toggleTable('brand')} className="text-gray-700">
+                              <span className="text-xl font-bold">
+                                {expandedTables.brand ? '↑' : '↓'}
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => setIsPopupOpen2(true)}
+                              className="text-black font-bold text-xl"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </th>
+                    <th className="p-2 text-right lg:hidden">
+                      {!openSearchFields.brand && (
+                        <div className="flex items-center justify-end gap-2">
+                        </div>
+                      )}
                     </th>
                   </tr>
                 </thead>
@@ -1500,7 +1701,7 @@ const PurchaseInputData = () => {
                 <tbody>
                   {filteredPoBrand.map((item, index) => (
                     <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold">{(poBrand.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                      <td className="p-2 text-left font-semibold lg:table-cell hidden">{(poBrand.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
                       <td className="p-2 text-left group flex font-semibold">
                         <div className="flex flex-grow">
                           {item.brand}
@@ -1521,8 +1722,8 @@ const PurchaseInputData = () => {
             </div>
           </div>
         </div>
-        <div>
-          <div className="flex items-center mb-2 lg:mt-0 mt-3">
+        <div className='lg:ml-0 ml-2 lg:mb-0 mb-4'>
+          <div className="lg:flex hidden items-center mb-2 lg:mt-0 mt-3">
             <input
               type="text"
               className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none "
@@ -1540,7 +1741,10 @@ const PurchaseInputData = () => {
               + Add
             </button>
           </div>
-          <button onClick={openTypeUpload} className="text-[#E4572E] flex mb-6"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' /><h1 className='mt-1.5 text-sm'>Import file</h1></button>
+          <button onClick={openTypeUpload} className="text-[#E4572E] lg:flex hidden mb-6">
+            <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' />
+            <h1 className='mt-1.5 text-sm'>Import file</h1>
+            </button>
           <button className="lg:block hidden">
             <img src={deleteIcon} alt='del' className='-mb-14 mt-5 ml-[13rem]' />
           </button>
@@ -1549,19 +1753,80 @@ const PurchaseInputData = () => {
               <table className="table-auto lg:w-[249px] w-full">
                 <thead className='bg-[#FAF6ED]'>
                   <tr className="border-b">
-                    <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left w-auto text-xl font-bold">Type</th>
-                    <th className="p-2 text-right lg:hidden">
-                      <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => toggleTable('type')} className="text-gray-700">
-                          <span className="text-xl font-bold">
-                            {expandedTables.type ? '↑' : '↓'}
+                    <th className="p-2 text-left w-16 text-xl font-bold lg:table-cell hidden">S.No</th>
+                    <th className="p-2 text-left w-72 text-xl font-bold lg:cursor-default">
+                      {openSearchFields.type ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            className="border border-[#FAF6ED] border-r-2 border-l-2 border-b-2 border-t-2 bg-transparent rounded-lg p-1.5 flex-1 h-10 focus:outline-none text-sm"
+                            placeholder="Search Type.."
+                            value={poTypeSearch}
+                            onChange={(e) => setPoTypeSearch(e.target.value)}
+                            autoFocus
+                          />
+                          <button 
+                            onClick={() => toggleSearchField('type')}
+                            className="text-gray-500"
+                          >
+                            <img src={search} alt='search' className='w-4 h-4' />
+                          </button>
+                          <button 
+                            onClick={() => toggleTable('type')} 
+                            className="text-gray-700 lg:hidden"
+                          >
+                            <span className="text-xl font-bold">
+                              {expandedTables.type ? '↑' : '↓'}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => setIsPopupOpen3(true)}
+                            className="text-black font-bold text-xl lg:hidden"
+                          >
+                            +
+                          </button>
+                          <button
+                            onClick={() => setIsPopupOpen3(true)}
+                            className="text-black font-bold px-1 border-dashed border-b-2 border-[#BF9853] text-sm lg:block hidden"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <span 
+                            className="cursor-pointer lg:cursor-default"
+                            onClick={() => toggleSearchField('type')}
+                          >
+                            Type
                           </span>
-                        </button>
-                        <button>
-                          <img src={deleteIcon} alt='del' className='w-4 h-4' />
-                        </button>
-                      </div>
+                          <div className="flex items-center gap-2 lg:hidden">
+                            <button 
+                              onClick={() => toggleSearchField('type')}
+                              className="text-gray-500"
+                            >
+                              <img src={search} alt='search' className='w-4 h-4' />
+                            </button>
+                            <button onClick={() => toggleTable('type')} className="text-gray-700">
+                              <span className="text-xl font-bold">
+                                {expandedTables.type ? '↑' : '↓'}
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => setIsPopupOpen3(true)}
+                              className="text-black font-bold text-xl"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </th>
+                    <th className="p-2 text-right lg:hidden">
+                      {!openSearchFields.type && (
+                        <div className="flex items-center justify-end gap-2">
+                        </div>
+                      )}
                     </th>
                   </tr>
                 </thead>
@@ -1572,7 +1837,7 @@ const PurchaseInputData = () => {
                 <tbody>
                   {filteredPoTypeColor.map((item, index) => (
                     <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold">{(poType.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                      <td className="p-2 text-left font-semibold lg:table-cell hidden">{(poType.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
                       <td className="p-2 text-left group flex font-semibold">
                         <div className="flex flex-grow">
                           {item.typeColor}
@@ -1593,8 +1858,8 @@ const PurchaseInputData = () => {
             </div>
           </div>
         </div>
-        <div>
-          <div className="flex items-center mb-2 mt-3">
+        <div className='lg:ml-0 ml-2 lg:mb-0 mb-4'>
+          <div className="lg:flex hidden items-center mb-2 lg:mt-0 mt-3">
             <input
               type="text"
               className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-[250px] h-12 focus:outline-none"
@@ -1612,8 +1877,8 @@ const PurchaseInputData = () => {
               + Add
             </button>
           </div>
-          <button className="text-[#E4572E] flex ">
-            <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' />
+          <button className="text-[#E4572E] lg:flex hidden ">
+            <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1 mb-6' />
             <h1 className='mt-1.5 text-sm'>Import file</h1>
           </button>
           <button className="lg:block hidden">
@@ -1624,19 +1889,80 @@ const PurchaseInputData = () => {
               <table className="table-auto lg:w-[355px] w-full">
                 <thead className="bg-[#FAF6ED]">
                   <tr className="border-b">
-                    <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left w-72 text-xl font-bold">Category</th>
-                    <th className="p-2 text-right lg:hidden">
-                      <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => toggleTable('category')} className="text-gray-700">
-                          <span className="text-xl font-bold">
-                            {expandedTables.category ? '↑' : '↓'}
+                    <th className="p-2 text-left w-16 text-xl font-bold lg:table-cell hidden">S.No</th>
+                    <th className="p-2 text-left w-72 text-xl font-bold lg:cursor-default">
+                      {openSearchFields.category ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            className="border border-[#FAF6ED] border-r-2 border-l-2 border-b-2 border-t-2 bg-transparent rounded-lg p-1.5 flex-1 h-10 focus:outline-none text-sm"
+                            placeholder="Search Category.."
+                            value={poCategorySearch}
+                            onChange={(e) => setPoCategorySearch(e.target.value)}
+                            autoFocus
+                          />
+                          <button 
+                            onClick={() => toggleSearchField('category')}
+                            className="text-gray-500"
+                          >
+                            <img src={search} alt='search' className='w-4 h-4' />
+                          </button>
+                          <button 
+                            onClick={() => toggleTable('category')} 
+                            className="text-gray-700 lg:hidden"
+                          >
+                            <span className="text-xl font-bold">
+                              {expandedTables.category ? '↑' : '↓'}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => setIsShowModal(true)}
+                            className="text-black font-bold text-xl lg:hidden"
+                          >
+                            +
+                          </button>
+                          <button
+                            className="text-black font-bold px-1 border-dashed border-b-2 border-[#BF9853] text-sm lg:block hidden"
+                            onClick={() => setIsShowModal(true)}
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <span 
+                            className="cursor-pointer lg:cursor-default"
+                            onClick={() => toggleSearchField('category')}
+                          >
+                            Category
                           </span>
-                        </button>
-                        <button>
-                          <img src={deleteIcon} alt='del' className='w-4 h-4' />
-                        </button>
-                      </div>
+                          <div className="flex items-center gap-2 lg:hidden">
+                            <button 
+                              onClick={() => toggleSearchField('category')}
+                              className="text-gray-500"
+                            >
+                              <img src={search} alt='search' className='w-4 h-4' />
+                            </button>
+                            <button onClick={() => toggleTable('category')} className="text-gray-700">
+                              <span className="text-xl font-bold">
+                                {expandedTables.category ? '↑' : '↓'}
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => setIsShowModal(true)}
+                              className="text-black font-bold text-xl"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </th>
+                    <th className="p-2 text-right lg:hidden">
+                      {!openSearchFields.category && (
+                        <div className="flex items-center justify-end gap-2">
+                        </div>
+                      )}
                     </th>
                   </tr>
                 </thead>
@@ -1647,7 +1973,7 @@ const PurchaseInputData = () => {
                 <tbody>
                   {filteredPocategory.map((item, index) => (
                     <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold">{(poCategory.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                      <td className="p-2 text-left font-semibold lg:table-cell hidden">{(poCategory.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
                       <td className="p-2 text-left group flex font-semibold">
                         <div className="flex flex-grow">
                           {item.category}
@@ -1668,8 +1994,8 @@ const PurchaseInputData = () => {
             </div>
           </div>
         </div>
-        <div>
-          <div className="flex items-center mb-2 mt-3">
+        <div className='lg:ml-0 ml-2 lg:mb-0 mb-4'>
+          <div className="lg:flex hidden items-center mb-2 lg:mt-0 mt-3">
             <input
               type="text"
               className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-[250px] h-12 focus:outline-none"
@@ -1684,8 +2010,8 @@ const PurchaseInputData = () => {
               + Add
             </button>
           </div>
-          <button className="text-[#E4572E] flex ">
-            <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' />
+          <button className="text-[#E4572E] lg:flex hidden ">
+            <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1 mb-6' />
             <h1 className='mt-1.5 text-sm'>Import file</h1>
           </button>
           <button className="lg:block hidden">
@@ -1696,19 +2022,80 @@ const PurchaseInputData = () => {
               <table className="table-auto lg:w-[355px] w-full">
                 <thead className="bg-[#FAF6ED]">
                   <tr className="border-b">
-                    <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left w-72 text-xl font-bold">Site Incharge</th>
-                    <th className="p-2 text-right lg:hidden">
-                      <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => toggleTable('siteIncharge')} className="text-gray-700">
-                          <span className="text-xl font-bold">
-                            {expandedTables.siteIncharge ? '↑' : '↓'}
+                    <th className="p-2 text-left w-16 text-xl font-bold lg:table-cell hidden">S.No</th>
+                    <th className="p-2 text-left w-72 text-xl font-bold lg:cursor-default">
+                      {openSearchFields.siteIncharge ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            className="border border-[#FAF6ED] border-r-2 border-l-2 border-b-2 border-t-2 rounded-lg p-1.5 flex-1 h-10 focus:outline-none text-sm"
+                            placeholder="Search Site Incharge Name.."
+                            value={siteInchargeSearch}
+                            onChange={(e) => setSiteInchargeSearch(e.target.value)}
+                            autoFocus
+                          />
+                          <button 
+                            onClick={() => toggleSearchField('siteIncharge')}
+                            className="text-gray-500"
+                          >
+                            <img src={search} alt='search' className='w-4 h-4' />
+                          </button>
+                          <button 
+                            onClick={() => toggleTable('siteIncharge')} 
+                            className="text-gray-700 lg:hidden"
+                          >
+                            <span className="text-xl font-bold">
+                              {expandedTables.siteIncharge ? '↑' : '↓'}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => setIsSiteInchargeAddPopupOpen(true)}
+                            className="text-black font-bold text-xl lg:hidden"
+                          >
+                            +
+                          </button>
+                          <button 
+                            onClick={() => setIsSiteInchargeAddPopupOpen(true)} 
+                            className="text-black font-bold px-1 border-dashed border-b-2 border-[#BF9853] text-sm lg:block hidden"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <span 
+                            className="cursor-pointer lg:cursor-default"
+                            onClick={() => toggleSearchField('siteIncharge')}
+                          >
+                            Site Incharge
                           </span>
-                        </button>
-                        <button>
-                          <img src={deleteIcon} alt='del' className='w-4 h-4' />
-                        </button>
-                      </div>
+                          <div className="flex items-center gap-2 lg:hidden">
+                            <button 
+                              onClick={() => toggleSearchField('siteIncharge')}
+                              className="text-gray-500"
+                            >
+                              <img src={search} alt='search' className='w-4 h-4' />
+                            </button>
+                            <button onClick={() => toggleTable('siteIncharge')} className="text-gray-700">
+                              <span className="text-xl font-bold">
+                                {expandedTables.siteIncharge ? '↑' : '↓'}
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => setIsSiteInchargeAddPopupOpen(true)}
+                              className="text-black font-bold text-xl"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </th>
+                    <th className="p-2 text-right lg:hidden">
+                      {!openSearchFields.siteIncharge && (
+                        <div className="flex items-center justify-end gap-2">
+                        </div>
+                      )}
                     </th>
                   </tr>
                 </thead>
@@ -1719,7 +2106,7 @@ const PurchaseInputData = () => {
                 <tbody>
                   {filteredSiteIncharge.map((item, index) => (
                     <tr className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold">{(siteIncharge.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                      <td className="p-2 text-left font-semibold lg:table-cell hidden">{(siteIncharge.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
                       <td className="p-2 group flex justify-between items-center font-semibold">
                         {item.siteEngineer}
                         <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
@@ -1741,8 +2128,8 @@ const PurchaseInputData = () => {
             </div>
           </div>
         </div>
-        <div>
-          <div className="flex items-center mb-2 mt-3">
+        <div className='lg:ml-0 ml-2 lg:mb-0 mb-4'>
+          <div className="lg:flex hidden items-center mb-2 lg:mt-0 mt-3">
             <input
               type="text"
               value={groupNameSearch}
@@ -1757,8 +2144,8 @@ const PurchaseInputData = () => {
               + Add
             </button>
           </div>
-          <button className="text-[#E4572E] flex ">
-            <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' />
+          <button className="text-[#E4572E] lg:flex hidden">
+            <img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1 mb-6' />
             <h1 className='mt-1.5 text-sm'>Import file</h1>
           </button>
           <button className="lg:block hidden">
@@ -1769,19 +2156,80 @@ const PurchaseInputData = () => {
               <table className="table-auto lg:w-[355px] w-full">
                 <thead className="bg-[#FAF6ED]">
                   <tr className="border-b">
-                    <th className="p-2 text-left w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left w-72 text-xl font-bold">Group Name</th>
-                    <th className="p-2 text-right lg:hidden">
-                      <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => toggleTable('groupName')} className="text-gray-700">
-                          <span className="text-xl font-bold">
-                            {expandedTables.groupName ? '↑' : '↓'}
+                    <th className="p-2 text-left w-16 text-xl font-bold lg:table-cell hidden">S.No</th>
+                    <th className="p-2 text-left w-72 text-xl font-bold lg:cursor-default">
+                      {openSearchFields.groupName ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            className="border border-[#FAF6ED] border-r-2 border-l-2 border-b-2 border-t-2 bg-transparent rounded-lg p-1.5 flex-1 h-10 focus:outline-none text-sm"
+                            placeholder="Search Group Name.."
+                            value={groupNameSearch}
+                            onChange={(e) => setGroupNameSearch(e.target.value)}
+                            autoFocus
+                          />
+                          <button 
+                            onClick={() => toggleSearchField('groupName')}
+                            className="text-gray-500"
+                          >
+                            <img src={search} alt='search' className='w-4 h-4' />
+                          </button>
+                          <button 
+                            onClick={() => toggleTable('groupName')} 
+                            className="text-gray-700 lg:hidden"
+                          >
+                            <span className="text-xl font-bold">
+                              {expandedTables.groupName ? '↑' : '↓'}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => setIsGroupNameAddPopupOpen(true)}
+                            className="text-black font-bold text-xl lg:hidden"
+                          >
+                            +
+                          </button>
+                          <button 
+                            onClick={() => setIsGroupNameAddPopupOpen(true)} 
+                            className="text-black font-bold px-1 border-dashed border-b-2 border-[#BF9853] text-sm lg:block hidden"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <span 
+                            className="cursor-pointer lg:cursor-default"
+                            onClick={() => toggleSearchField('groupName')}
+                          >
+                            Group Name
                           </span>
-                        </button>
-                        <button>
-                          <img src={deleteIcon} alt='del' className='w-4 h-4' />
-                        </button>
-                      </div>
+                          <div className="flex items-center gap-2 lg:hidden">
+                            <button 
+                              onClick={() => toggleSearchField('groupName')}
+                              className="text-gray-500"
+                            >
+                              <img src={search} alt='search' className='w-4 h-4' />
+                            </button>
+                            <button onClick={() => toggleTable('groupName')} className="text-gray-700">
+                              <span className="text-xl font-bold">
+                                {expandedTables.groupName ? '↑' : '↓'}
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => setIsGroupNameAddPopupOpen(true)}
+                              className="text-black font-bold text-xl"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </th>
+                    <th className="p-2 text-right lg:hidden">
+                      {!openSearchFields.groupName && (
+                        <div className="flex items-center justify-end gap-2">
+                        </div>
+                      )}
                     </th>
                   </tr>
                 </thead>
@@ -1792,7 +2240,7 @@ const PurchaseInputData = () => {
                 <tbody>
                   {filteredGroupName.map((item, index) => (
                     <tr className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold">{(groupNameList.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                      <td className="p-2 text-left font-semibold lg:table-cell hidden">{(groupNameList.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
                       <td className="p-2 group flex justify-between items-center font-semibold">
                         {item.groupName}
                         <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">

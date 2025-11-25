@@ -2986,7 +2986,7 @@ const InputData = ({ username, userRoles = [] }) => {
                 <img src={cross} alt="close" className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleSubmitEditProject}>
+            <form>
               <div className="overflow-y-auto h-[500px]">
                 <div className="flex gap-4">
                   <div className="mb-4 pl-5">
@@ -3271,6 +3271,7 @@ const InputData = ({ username, userRoles = [] }) => {
               <div className="flex justify-end space-x-2 mt-6 mb-4 mr-5">
                 <button
                   type="submit"
+                  onClick={handleSubmitEditProject}
                   className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
                 >
                   Update
@@ -3704,7 +3705,7 @@ const InputData = ({ username, userRoles = [] }) => {
                   <img src={cross} alt='cross' className='w-5 h-5' />
                 </button>
               </div>
-              <form className="space-y-2" onSubmit={handleEditTenantLinkSubmit}>
+              <form className="space-y-2" >
                 <h2 className="text-2xl font-bold">Tenant Details</h2>
                 <div className='text-left'>
                   <div className='flex gap-10'>
@@ -3805,7 +3806,7 @@ const InputData = ({ username, userRoles = [] }) => {
                           ))
                           : null;
                         return (
-                          <div key={sIndex} className="bg-gray-50 p-4 rounded-lg shadow-md mb-6 text-left w-[1220px]">
+                          <div key={sIndex} className="bg-gray-50 p-4 rounded-lg shadow-md mb-6 text-left w-[1250px]">
                             <div className="flex gap-2 mb-2 ">
                               <Select
                                 name="projectReferenceName"
@@ -3840,7 +3841,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                 placeholder="Property Name"
                                 isSearchable
                                 isClearable
-                                className="w-72 text-sm"
+                                className="w-60 text-sm"
                                 classNamePrefix="select"
                                 menuPortalTarget={document.body}
                                 styles={{
@@ -3998,7 +3999,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                 name="projectType"
                                 value={shopDetails?.projectType || ''}
                                 readOnly
-                                className="border-2 text-sm border-[#BF9853] w-32 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
+                                className="border-2 text-sm border-[#BF9853] w-16 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
                                 placeholder="Project type"
                               />
                               <input
@@ -4006,7 +4007,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                 name="floorName"
                                 value={shopDetails?.floorName || ''}
                                 readOnly
-                                className="border-2 text-sm border-[#BF9853] w-36 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
+                                className="border-2 text-sm border-[#BF9853] w-28 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
                                 placeholder="Floor"
                               />
                               <div className='flex gap-1'>
@@ -4023,7 +4024,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                       },
                                     });
                                   }}
-                                  className="border-2 text-sm border-[#BF9853] w-32 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
+                                  className="border-2 text-sm border-[#BF9853] w-28 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
                                   placeholder="Rent"
                                 />
                                 <input
@@ -4047,7 +4048,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                     },
                                   });
                                 }}
-                                className="border-2 text-sm border-[#BF9853] w-32 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
+                                className="border-2 text-sm border-[#BF9853] w-28 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
                                 placeholder="Advance"
                               />
                               <input
@@ -4063,7 +4064,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                     },
                                   });
                                 }}
-                                className="border-2 text-sm border-[#BF9853] w-32 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
+                                className="border-2 text-sm border-[#BF9853] w-28 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
                                 placeholder="Advance"
                               />
                               <div className="relative flex">
@@ -4080,11 +4081,11 @@ const InputData = ({ username, userRoles = [] }) => {
                                       },
                                     });
                                   }}
-                                  className="border-2 text-sm border-[#BF9853] w-32 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
+                                  className="border-2 text-sm border-[#BF9853] w-28 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
                                   placeholder="Closure Date"
                                 />
                                 {editTenantLinkFormData.shopNos.length > 1 && (
-                                  <button type="button" onClick={() => removeEditTenantLinkShop(sIndex)} className=" text-red-500 font-bold ml-3">
+                                  <button type="button" onClick={() => removeEditTenantLinkShop(sIndex)} className=" text-red-500 font-bold ml-">
                                     <img src={cross} alt='cross' className='w-5 h-5' />
                                   </button>
                                 )}
@@ -4104,7 +4105,7 @@ const InputData = ({ username, userRoles = [] }) => {
               </form>
             </div>
             <div className="flex justify-end space-x-2 mb-4">
-              <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
+              <button type="submit" onClick={handleEditTenantLinkSubmit} className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
                 Submit
               </button>
               <button

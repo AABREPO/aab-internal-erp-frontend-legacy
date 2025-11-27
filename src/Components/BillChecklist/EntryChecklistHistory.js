@@ -449,7 +449,7 @@ const History = () => {
                         >
                             <table className="table-fixed  min-w-[1765px] w-screen border-collapse">
                                 <thead>
-                                    <tr className="bg-[#FAF6ED]">
+                                    <tr className="bg-[#FAF6ED] sticky top-0 z-10">
                                         <th className="px-2 w-[240px] font-bold text-left">Time stamp</th>
                                         <th className="px-2 p-2 w-36 font-bold text-left">Date</th>
                                         <th className="px-2 w-[120px] font-bold text-left">E.No</th>

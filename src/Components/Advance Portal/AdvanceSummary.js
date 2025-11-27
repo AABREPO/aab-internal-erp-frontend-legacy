@@ -1547,9 +1547,9 @@ const AdvanceSummary = () => {
   }
 
   return (
-    <div className='bg-[#FAF6ED] min-h-screen w-full'>
+    <div className='bg-[#FAF6ED]'>
         <div className="flex flex-wrap gap-6">
-          <div className="bg-white rounded-lg w-full max-w-[1850px] h-[855px] p-4 ml-4 sm:ml-6 lg:ml-10 px-4 lg:px-14 mx-auto">
+          <div className="bg-white rounded-lg w-full max-w-[1850px] h-[793px] p-4 ml-4 sm:ml-6 lg:ml-10 px-4 lg:px-14 mx-auto">
           <div className="flex flex-col xl:flex-row gap-8">
             <div className="w-full xl:w-[calc(50%-12px)]">
               <div className="flex items-center mb-4 lg:justify-between">
@@ -1605,7 +1605,7 @@ const AdvanceSummary = () => {
               <div className="border-l-8 border-l-[#BF9853] rounded-lg h-[580px] overflow-auto">
                 <table className="w-full border-collapse ">
                   <thead>
-                    <tr className="bg-[#f8f1e5] text-left">
+                    <tr className="bg-[#f8f1e5] text-left sticky top-0 z-10">
                       <th className="p-2 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('projectName')}>
                         Project Name
                         {sortConfig.key === 'projectName' && (
@@ -1698,7 +1698,7 @@ const AdvanceSummary = () => {
               <div className="border-l-8 border-l-[#BF9853] rounded-lg h-[580px] overflow-auto">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-[#f8f1e5] text-left">
+                    <tr className="bg-[#f8f1e5] text-left sticky top-0 z-10">
                       <th className="p-2 cursor-pointer hover:bg-gray-200" onClick={() => handleSiteSort('name')} >
                         Contractor/Vendor
                         {siteSortConfig.key === 'name' && (

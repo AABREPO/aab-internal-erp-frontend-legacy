@@ -1983,10 +1983,10 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                         )}
                     </div>
                 </div>
-                <div className='border-l-8 border-l-[#BF9853] rounded-lg ml-5 mr-5'>
-                    <div className="overflow-x-auto">
+                <div className='border-l-8 overflow-y-auto border-l-[#BF9853] h-[500px] rounded-lg ml-5 mr-5'>
+                    <div className="">
                         <table className="w-full border-collapse">
-                            <thead className="bg-[#FAF6ED]">
+                            <thead className="bg-[#FAF6ED] sticky top-0 z-10">
                                 <tr>
                                     <th className="px-2 py-3 text-left font-semibold">SI.No</th>
                                     <th className="px-2 py-3 text-left font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200"

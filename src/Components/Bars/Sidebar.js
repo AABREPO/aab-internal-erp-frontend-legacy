@@ -79,6 +79,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
       '/purchaseorder': { menu: 'procurement', submenu: 'Purchase Order' },
       '/inventory': { menu: 'procurement', submenu: 'Inventory' },
       '/toolsTracker': { menu: 'procurement', submenu: 'Tools Tracker' },
+      '/testpurchaseorder': { menu: 'procurement', submenu: 'Test PurchaseOrder' },
 
       // Design Tools routes
       '/designtool/tileCalculate': { menu: 'designtools', submenu: 'Tile Calculator' },
@@ -466,6 +467,10 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
             <Link to="/testtoolsTracker" className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Test Tools Tracker' ? 'text-red-500' : ''
               }`} onClick={() => handleSubmenuItemClick('Test Tools Tracker')}>
               <p className="text-sm cursor-pointer"><li>Test Tools Tracker</li></p>
+            </Link>
+            <Link to="/testpurchaseorder" className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Test PurchaseOrder' ? 'text-red-500' : ''
+              }`} onClick={() => handleSubmenuItemClick('Test PurchaseOrder')}>
+              <p className="text-sm cursor-pointer"><li>Test PurchaseOrder</li></p>
             </Link>
           </div>
         )}

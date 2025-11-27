@@ -822,7 +822,7 @@ const Form = ({ username, userRoles = [] }) => {
                     contractor_id: contractorId,
                     vendor_id: vendorId,
                     employee_id: null,
-                    project_id: 10,
+                    project_id: projectId,
                     type: utilityType ,
                     amount: selectedAccountType === 'Bill Refund' ? -Math.abs(parseFloat(amount)) : parseFloat(amount),
                     status: true,

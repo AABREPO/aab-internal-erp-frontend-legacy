@@ -931,7 +931,7 @@ const Dashboard = () => {
     }, [filteredTableData, selectedMonth, selectedYear]);
 
     return (
-        <div className="w-full overflow-x-auto">
+        <div className="">
             <div className='mx-auto lg:w-[1750px] p-4 lg:pl-4 bg-white lg:ml-12 lg:mr-6 rounded-md text-left'>
                 <div className="flex flex-col lg:flex-row lg:items-end gap-4 lg:gap-3 p-4">
                     <div className="flex-shrink-0 mr-3">
@@ -1173,7 +1173,7 @@ const Dashboard = () => {
                 </div>
             </div>
             {/* Rent Table */}
-            <div className='mx-auto lg:w-[1750px] p-4 lg:pl-8 mt-6 bg-white lg:ml-12 mr-6 rounded-md'>
+            <div className='mx-auto lg:w-[1750px] p-4 lg:pl-8 mt-5 bg-white lg:ml-12 mr-6 rounded-md'>
                 <div className='flex flex-col lg:flex-row lg:justify-end gap-4 lg:gap-10 items-start lg:items-center mb-3'>
                     <div className="font-semibold flex flex-col sm:flex-row gap-1 sm:gap-2">
                         <span>Total Monthly Rent:</span>

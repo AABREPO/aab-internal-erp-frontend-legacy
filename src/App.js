@@ -18,6 +18,7 @@ import CHeading from './Components/CarpentryCalculation/CHeading';
 import LoginPage from './LoginPages/Login';
 import BillHeading from './Components/BillChecklist/BillHeading';
 import PurchaseHeading from './Components/Purchase/PurchaseHeading';
+import TestPurchaseOrder from './Components/Purchase/TestPurchaseOrder';
 import ManageHeading from './Components/ManageUsers/ManageHeading';
 import Attendancelog from './Components/Attendances/Attendancelog';
 import InventoryHeading from './Components/ProcurementInventory/InventoryHeading';
@@ -81,6 +82,7 @@ function App() {
             <Route path="/entrychecklist/*" element={<BillHeading username={user.username} userRoles={user?.userRoles || []}/>} />
             <Route path='/purchaseorder/*' element={<PurchaseHeading username={user.username} userRoles={user?.userRoles || []}/>} />
             <Route path='/inventory/*' element={<InventoryHeading username={user.username} userRoles={user?.userRoles || []}/>} />
+            <Route path='/testpurchaseorder' element={<TestPurchaseOrder />} />
             <Route path='/user_manage/*' element={<ManageHeading username={user.username} userRoles={user?.userRoles || []}/>} />
             <Route path='/attendance' element={<Attendancelog username={user.username} />}/>
             <Route path='/portal/*' element={<AdvanceHeading username={user.username} userRoles={user?.userRoles || []} />} />

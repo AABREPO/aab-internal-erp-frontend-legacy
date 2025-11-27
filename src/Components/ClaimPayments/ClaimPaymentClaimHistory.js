@@ -219,6 +219,10 @@ const ClaimPaymentClaimHistory = ({ username, userRoles = [] }) => {
         borderColor: 'rgba(191, 152, 83, 0.2)',
       }
     }),
+    menuPortal: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+    }),
   };
 
   const sortedSiteOptions = siteOption.sort((a, b) =>
@@ -327,7 +331,7 @@ const ClaimPaymentClaimHistory = ({ username, userRoles = [] }) => {
   return (
     <body>
       <div className="">
-        <div className='w-[1800px] bg-white h-[130px] rounded ml-10'>
+        <div className=' bg-white h-[130px] rounded ml-10 mr-10'>
           <div className="text-left p-7 ml-10">
             <label className="font-semibold mr-2 block mb-2">Project Name</label>
             <Select
@@ -338,11 +342,12 @@ const ClaimPaymentClaimHistory = ({ username, userRoles = [] }) => {
               onChange={setSelectedSite}
               styles={customStyles}
               isClearable
+              menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
               className="w-[380px] h-[45px] focus:outline-none"
             />
           </div>
         </div>
-        <div className='w-[1800px] h-[600px] bg-white mt-5 p-5 ml-10'>
+        <div className='h-[600px] bg-white mt-5 p-5 ml-10 mr-10'>
           <div className="flex justify-between items-center mb-3">
             <div className="flex items-center gap-2">
               <button
@@ -396,7 +401,7 @@ const ClaimPaymentClaimHistory = ({ username, userRoles = [] }) => {
               onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
             >
               <table className="w-full border rounded-lg overflow-auto">
-                <thead className="bg-[#FAF6ED]">
+                <thead className="bg-[#FAF6ED] sticky top-0 z-10">
                   <tr>
                     <th className="px-6 py-3 whitespace-nowrap min-w-[80px]">S.No</th>
                     <th
@@ -474,7 +479,7 @@ const ClaimPaymentClaimHistory = ({ username, userRoles = [] }) => {
                           type="date"
                           value={filterDate}
                           onChange={(e) => setFilterDate(e.target.value)}
-                          className="p-1 rounded-md bg-transparent -ml-6 w-32 border-[3px] border-[#007233] border-opacity-[20%] focus:outline-none"
+                          className="p-1 rounded-md bg-transparent -ml-6 w-32 border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
                           placeholder="Search Date..."
                         />
                       </th>
@@ -490,19 +495,24 @@ const ClaimPaymentClaimHistory = ({ username, userRoles = [] }) => {
                           placeholder="Project Name..."
                           isSearchable
                           isClearable
+                          menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                           styles={{
                             control: (provided, state) => ({
                               ...provided,
                               backgroundColor: 'transparent',
                               borderWidth: '3px',
                               borderColor: state.isFocused
-                                ? 'rgba(0, 114, 51, 0.2)'
-                                : 'rgba(0, 114, 51, 0.2)',
+                                ? 'rgba(191, 152, 83, 0.2)'
+                                : 'rgba(191, 152, 83, 0.2)',
                               borderRadius: '6px',
-                              boxShadow: state.isFocused ? '0 0 0 1px rgba(0, 114, 51, 0.5)' : 'none',
+                              boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
                               '&:hover': {
-                                borderColor: 'rgba(0, 114, 51, 0.2)',
+                                borderColor: 'rgba(191, 152, 83, 0.2)',
                               },
+                            }),
+                            menuPortal: (provided) => ({
+                              ...provided,
+                              zIndex: 9999,
                             }),
                             placeholder: (provided) => ({
                               ...provided,
@@ -536,7 +546,7 @@ const ClaimPaymentClaimHistory = ({ username, userRoles = [] }) => {
                         <select
                           value={filterCategory}
                           onChange={(e) => setFilterCategory(e.target.value)}
-                          className="p-1 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#007233] border-opacity-[20%] focus:outline-none text-xs"
+                          className="p-1 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
                           placeholder="Category..."
                         >
                           <option value=''>Select Category...</option>

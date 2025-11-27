@@ -375,6 +375,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                         projectName: project.projectName || '-',
                         category: property.projectType || project.projectCategory || '-',
                         doorNo: property.doorNo || '-',
+                        phase: property.ebNoPhase ? `Phase ${property.ebNoPhase.replace('P', '')}` : '-',
                         serviceNo: property.ebNo || '-'
                     };
 
@@ -399,13 +400,14 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         doc.setFontSize(14);
         doc.text('Electricity Projects Overview', 14, 20);
 
-        const headers = ['Sl.No', 'PID', 'Project Name', 'Category', 'Door No', 'Service No', ...monthLabels, 'Unpaid'];
+        const headers = ['Sl.No', 'PID', 'Project Name', 'Category', 'Door No', 'Phase', 'Service No', ...monthLabels, 'Unpaid'];
         const body = rows.map(row => [
             row.slNo,
             row.pid,
             row.projectName,
             row.category,
             row.doorNo,
+            row.phase,
             row.serviceNo,
             ...monthLabels.map(month => row[month]),
             row.unpaid
@@ -442,6 +444,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                 'Project Name': row.projectName,
                 Category: row.category,
                 'Door No': row.doorNo,
+                'Phase': row.phase,
                 'Service No': row.serviceNo
             };
 
@@ -739,6 +742,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                         <td className=" px-4 py-2 text-left font-semibold">Project Name</td>
                                         <td className=" px-4 py-2 text-left font-semibold"></td>
                                         <td className=" px-4 py-2 text-left font-semibold">D.No</td>
+                                        <td className=" px-4 py-2 text-left font-semibold">Phase</td>
                                         <td className=" px-4 py-2 text-left font-semibold">Service No</td>
                                         <td className=" px-4 py-2 text-left font-semibold">Jan</td>
                                         <td className=" px-4 py-2 text-left font-semibold">Feb</td>
@@ -760,19 +764,19 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                 <tbody>
                                     {loading ? (
                                         <tr>
-                                            <td colSpan="19" className="text-center py-4">
+                                            <td colSpan="20" className="text-center py-4">
                                                 Loading...
                                             </td>
                                         </tr>
                                     ) : error ? (
                                         <tr>
-                                            <td colSpan="19" className="text-center py-4 text-red-500">
+                                            <td colSpan="20" className="text-center py-4 text-red-500">
                                                 {error}
                                             </td>
                                         </tr>
                                     ) : filteredProjects.length === 0 ? (
                                         <tr>
-                                            <td colSpan="19" className="text-center py-4">
+                                            <td colSpan="20" className="text-center py-4">
                                                 No projects found with electricity connections
                                             </td>
                                         </tr>
@@ -784,10 +788,10 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                                     const rowIndex = projectIndex * project.propertyDetails.length + propertyIndex;
                                                     return (
                                                         <tr key={`${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
-                                                            <td className="px-4 py-2">{rowIndex + 1}</td>
-                                                            <td className="px-4 py-2">{project.projectId}</td>
-                                                            <td className="px-4 py-2 text-left">{project.projectName}</td>
-                                                            <td className="px-4 py-2">
+                                                            <td className="px-2 py-2">{rowIndex + 1}</td>
+                                                            <td className="px-2 py-2">{project.projectId}</td>
+                                                            <td className="px-2 py-2 text-left">{project.projectName}</td>
+                                                            <td className="px-2 py-2">
                                                                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${project.projectCategory === 'Client Project'
                                                                     ? 'bg-orange-100 text-orange-800'
                                                                     : project.projectCategory === 'Own Project'
@@ -797,8 +801,14 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                                                     {property.projectType || project.projectCategory || '-'}
                                                                 </span>
                                                             </td>
-                                                            <td className="px-4 py-2">{property.doorNo || '-'}</td>
-                                                            <td className="px-4 py-2 text-left">{property.ebNo}</td>
+                                                            <td className="px-2 py-2">{property.doorNo || '-'}</td>
+                                                            <td className="px-2 py-2">
+                                                                {property.ebNoPhase ? 
+                                                                    ` ${property.ebNoPhase.replace('P', '')}` : 
+                                                                    '-'
+                                                                }
+                                                            </td>
+                                                            <td className="px-2 py-2 text-left">{property.ebNo}</td>
                                                             {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map(month => {
                                                                 const paymentData = getPaymentData(property.ebNo, month, property.id);
                                                                 const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
@@ -822,12 +832,12 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                                                     </td>
                                                                 );
                                                             })}
-                                                            <td className="px-4 py-2">
+                                                            <td className="px-2 py-2">
                                                                 <span className="text-sm font-medium text-gray-700">
                                                                     {getUnpaidCount(property.ebNo, property.id)}
                                                                 </span>
                                                             </td>
-                                                            <td className="px-4 py-2">
+                                                            <td className="px-2 py-2">
                                                                 <button onClick={() => handleActivityEdit(project, property)}
                                                                     className="rounded-full transition duration-200 hover:scale-110 hover:brightness-110"
                                                                 >
@@ -838,7 +848,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                                                     />
                                                                 </button>
                                                             </td>
-                                                            <td className="px-4 py-2">
+                                                            <td className="px-2 py-2">
                                                                 <button onClick={() => toggleProjectHideStatus(project.id, true)} className="text-red-600 hover:text-red-800 text-sm" >
                                                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -882,6 +892,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                             <td className="px-4 py-2 text-left font-semibold">PID</td>
                                             <td className="px-4 py-2 text-left font-semibold">Project Name</td>
                                             <td className="px-4 py-2 text-left font-semibold">D.No</td>
+                                            <td className="px-4 py-2 text-left font-semibold">Phase</td>
                                             <td className="px-4 py-2 text-left font-semibold">Service No</td>
                                             <td className="px-4 py-2 text-left font-semibold">Unhide</td>
                                         </tr>
@@ -898,6 +909,12 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                                             <td className="px-4 py-2">{project.projectId}</td>
                                                             <td className="px-4 py-2">{project.projectName}</td>
                                                             <td className="px-4 py-2">{property.doorNo || '-'}</td>
+                                                            <td className="px-4 py-2">
+                                                                {property.ebNoPhase ? 
+                                                                    `Phase ${property.ebNoPhase.replace('P', '')}` : 
+                                                                    '-'
+                                                                }
+                                                            </td>
                                                             <td className="px-4 py-2">{property.ebNo}</td>
                                                             <td className="px-4 py-2">
                                                                 <button

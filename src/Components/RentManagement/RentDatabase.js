@@ -952,7 +952,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                         <span className=' text-[#BF9853] mr-4 font-semibold hover:underline'>Print</span>
                     </div>
                 </div>
-                <div className="w-full max-w-[1850px] ml-10 mr-10 p-4 bg-white">
+                <div className=" ml-10 mr-10 p-4 bg-white">
                     <div className="flex justify-between  sm:flex-row sm:items-center sm:space-x-3">
                         <div className='flex gap-4'>
                             <button className='pl-2' onClick={() => setDbShowFilters(!dbShowFilters)}>
@@ -1074,18 +1074,17 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                             </button>
                         </div>
                     </div>
-                    <div className="[@media(min-width:1484px)]:w-[1424px] [@media(min-width:1584px)]:w-[1524px] [@media(min-width:1684px)]:w-[1624px]
-                    [@media(min-width:1784px)]:w-[1774px] [@media(min-width:1884px)]:w-[1828px] w-[430px]  py-5 flex justify-between">
+                    <div className=" w-full  py-5 flex justify-between">
                         <div
                             ref={scrollRef}
-                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[760px] overflow-scroll select-none"
+                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[625px] overflow-scroll select-none"
                             onMouseDown={handleMouseDown}
                             onMouseMove={handleMouseMove}
                             onMouseUp={handleMouseUp}
                             onMouseLeave={handleMouseUp} >
                             <table className="table-auto min-w-[1165px] w-screen border-collapse">
                                 <thead>
-                                    <tr className="bg-[#FAF6ED] text-left">
+                                    <tr className="bg-[#FAF6ED] text-left sticky top-0 z-10">
                                         <th className="px-4 py-2 font-bold">Timestamp</th>
                                         <th className="px-4 py-2 font-bold cursor-pointer" onClick={() => handleSort('shopNo')} >
                                             Shop No {sortField === 'shopNo' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}

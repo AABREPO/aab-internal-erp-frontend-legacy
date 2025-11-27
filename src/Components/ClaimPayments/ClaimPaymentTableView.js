@@ -184,6 +184,10 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
         borderColor: 'rgba(191, 152, 83, 0.2)',
       }
     }),
+    menuPortal: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+    }),
   };
 
   const sortedSiteOptions = siteOption.sort((a, b) =>
@@ -303,7 +307,7 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
   return (
     <body>
       <div className="">
-        <div className='w-[1800px] bg-white h-[130px] rounded ml-10'>
+        <div className=' bg-white h-[130px] rounded ml-10 mr-10'>
           <div className="text-left p-7 ml-10">
             <label className="font-semibold mr-2 block mb-2">Project Name</label>
             <Select
@@ -314,11 +318,12 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
               onChange={setSelectedSite}
               styles={customStyles}
               isClearable
+              menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
               className="w-[380px] h-[45px] focus:outline-none"
             />
           </div>
         </div>
-        <div className='w-[1800px] bg-white mt-5 p-5 ml-10'>
+        <div className=' bg-white mt-5 p-5 ml-10 mr-10'>
           <div className="flex justify-between items-center mb-3">
             <div className="flex items-center gap-2">
               <button
@@ -368,58 +373,58 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
             )}
           </div>
           <div className="rounded-lg border-l-8 border-l-[#BF9853]">
-            <div ref={scrollRef} className='overflow-auto max-h-[600px] thin-scrollbar' onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
+            <div ref={scrollRef} className='overflow-auto max-h-[550px] thin-scrollbar' onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
             >
-            <table className="w-full border rounded-lg overflow-hidden">
-              <thead className="bg-[#FAF6ED]">
+            <table className="w-full border rounded-lg">
+              <thead className="bg-[#FAF6ED] sticky top-0 z-20">
                 <tr>
-                  <th className="px-4 py-2">S.No</th>
+                  <th className="px-4 py-2 sticky top-0 bg-[#FAF6ED] z-20">S.No</th>
                     <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
                       onClick={() => handleSort('date')}
                     >
                       Date {sortColumn === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
                       onClick={() => handleSort('siteName')}
                     >
                       Project Name {sortColumn === 'siteName' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
                       onClick={() => handleSort('partyName')}
                     >
                       Party Name {sortColumn === 'partyName' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
                       onClick={() => handleSort('amount')}
                     >
                       Amount {sortColumn === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
                       onClick={() => handleSort('category')}
                     >
                       Category {sortColumn === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
                       onClick={() => handleSort('comments')}
                     >
                       Reason {sortColumn === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
-                  <th className="px-4 py-2">Status</th>
+                  <th className="px-4 py-2 sticky top-0 bg-[#FAF6ED] z-20">Status</th>
                     <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none"
+                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
                       onClick={() => handleSort('eno')}
                     >
                       E.No {sortColumn === 'eno' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
-                  <th className="px-4 py-2">View</th>
-                    <th className="px-4 py-2">Details</th>
+                  <th className="px-4 py-2 sticky top-0 bg-[#FAF6ED] z-20">View</th>
+                    <th className="px-4 py-2 sticky top-0 bg-[#FAF6ED] z-20">Details</th>
                   </tr>
                   {showFilters && (
                     <tr className="bg-white border-b border-gray-200">
@@ -445,6 +450,7 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
                           placeholder="Project Name..."
                           isSearchable
                           isClearable
+                          menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                           styles={{
                             control: (provided, state) => ({
                               ...provided,

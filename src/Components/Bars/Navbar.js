@@ -10,7 +10,14 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
   const [isSidebarVisible, setIsSidebarVisible] = useState(false);
   const [isProfileDropdownVisible, setIsProfileDropdownVisible] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [isEditRequestsModalOpen, setIsEditRequestsModalOpen] = useState(false);
+  const [isEditRequestsDropdownOpen, setIsEditRequestsDropdownOpen] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [selectedRequestRecord, setSelectedRequestRecord] = useState(null);
+  const [requestRecordLoading, setRequestRecordLoading] = useState(false);
+  const [requestRecordError, setRequestRecordError] = useState('');
+  const [vendorLookup, setVendorLookup] = useState({});
+  const [contractorLookup, setContractorLookup] = useState({});
+  const [siteLookup, setSiteLookup] = useState({});
   const [editRequests, setEditRequests] = useState([]);
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const sidebarRef = useRef(null);
@@ -403,7 +410,15 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
     ) {
       setIsSidebarVisible(false);
       setIsProfileDropdownVisible(false);
+      setIsEditRequestsDropdownOpen(false);
     }
+  };
+
+  const closeSelectedRequestModal = () => {
+    setSelectedRequest(null);
+    setSelectedRequestRecord(null);
+    setRequestRecordError('');
+    setRequestRecordLoading(false);
   };
   useEffect(() => {
     document.addEventListener('mousedown', handleClickOutside);
@@ -412,12 +427,70 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
 
   // Fetch edit requests
   useEffect(() => {
-    if (canViewEditRequests) {
+    if (!canViewEditRequests) return;
+
+    fetchEditRequests();
+    // Poll for new requests every 30 seconds
+    const interval = setInterval(fetchEditRequests, 30000);
+
+    const handleExternalUpdate = () => {
       fetchEditRequests();
-      // Poll for new requests every 30 seconds
-      const interval = setInterval(fetchEditRequests, 30000);
-      return () => clearInterval(interval);
-    }
+    };
+    window.addEventListener('editRequestCreated', handleExternalUpdate);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('editRequestCreated', handleExternalUpdate);
+    };
+  }, [canViewEditRequests]);
+
+  useEffect(() => {
+    if (!canViewEditRequests) return;
+
+    const fetchReferenceData = async () => {
+      try {
+        const [vendorsRes, contractorsRes, sitesRes] = await Promise.all([
+          axios.get("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", { withCredentials: true }),
+          axios.get("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", { withCredentials: true }),
+          axios.get("https://backendaab.in/aabuilderDash/api/project_Names/getAll", { withCredentials: true }),
+        ]);
+
+        const buildLookup = (items = [], idKey, labelKey) =>
+          items.reduce((acc, item) => {
+            const id = item?.[idKey];
+            if (id !== undefined && item?.[labelKey]) {
+              acc[id] = item[labelKey];
+            }
+            return acc;
+          }, {});
+
+        setVendorLookup(buildLookup(vendorsRes.data || [], 'id', 'vendorName'));
+        setContractorLookup(buildLookup(contractorsRes.data || [], 'id', 'contractorName'));
+
+        const predefinedSites = [
+          { id: 1, siteName: "Mason Advance" },
+          { id: 2, siteName: "Material Advance" },
+          { id: 3, siteName: "Weekly Advance" },
+          { id: 4, siteName: "Excess Advance" },
+          { id: 5, siteName: "Material Rent" },
+          { id: 6, siteName: "Subhash Kumar - Kunnur" },
+          { id: 7, siteName: "Summary Bill" },
+          { id: 8, siteName: "Daily Wage" },
+          { id: 9, siteName: "Rent Management Portal" }
+        ];
+        const allSites = [...predefinedSites, ...(Array.isArray(sitesRes.data) ? sitesRes.data : [])];
+        setSiteLookup(allSites.reduce((acc, site) => {
+          if (site?.id !== undefined && site?.siteName) {
+            acc[site.id] = site.siteName;
+          }
+          return acc;
+        }, {}));
+      } catch (error) {
+        console.error('Error fetching lookup data:', error);
+      }
+    };
+
+    fetchReferenceData();
   }, [canViewEditRequests]);
 
   const fetchEditRequests = async () => {
@@ -433,6 +506,57 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
     } catch (error) {
       console.error('Error fetching edit requests:', error);
     }
+  };
+
+  const loadRequestRecord = async (request) => {
+    if (!request?.module_name_id || request.module_name !== 'Advance Portal') return;
+    try {
+      setRequestRecordLoading(true);
+      setRequestRecordError('');
+      const response = await axios.get(`https://backendaab.in/aabuildersDash/api/advance_portal/get/${request.module_name_id}`, {
+        withCredentials: true
+      });
+      const record = response.data;
+      if (record) {
+        setSelectedRequestRecord(record);
+      } else {
+        setRequestRecordError('Unable to locate record details.');
+      }
+    } catch (error) {
+      console.error('Error loading request record:', error);
+      setRequestRecordError('Failed to load record details.');
+    } finally {
+      setRequestRecordLoading(false);
+    }
+  };
+
+  const handleRequestCardClick = (request) => {
+    setSelectedRequest(request);
+    setSelectedRequestRecord(null);
+    setRequestRecordError('');
+    setIsEditRequestsDropdownOpen(false);
+    loadRequestRecord(request);
+  };
+
+  const getVendorNameById = (id) => vendorLookup?.[id] || '';
+  const getContractorNameById = (id) => contractorLookup?.[id] || '';
+  const getSiteNameById = (id) => {
+    if (id === null || id === undefined) return '';
+    return siteLookup?.[id] || '';
+  };
+
+  const getAssociateName = (record) => {
+    if (!record) return '';
+    if (record.vendor_id) return getVendorNameById(record.vendor_id);
+    if (record.contractor_id) return getContractorNameById(record.contractor_id);
+    return '';
+  };
+
+  const formatCurrency = (value) => {
+    if (value === null || value === undefined || value === '') return '';
+    const num = Number(value);
+    if (Number.isNaN(num)) return value;
+    return num.toLocaleString('en-IN', { maximumFractionDigits: 0 });
   };
 
   const handleApproveRequest = async (requestId, moduleNameId) => {
@@ -455,6 +579,8 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
       });
 
       alert('Edit request approved. User can now edit the record.');
+      closeSelectedRequestModal();
+      setIsEditRequestsDropdownOpen(false);
       fetchEditRequests();
     } catch (error) {
       console.error('Error approving request:', error);
@@ -472,6 +598,8 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
       });
 
       alert('Edit request rejected.');
+      closeSelectedRequestModal();
+      setIsEditRequestsDropdownOpen(false);
       fetchEditRequests();
     } catch (error) {
       console.error('Error rejecting request:', error);
@@ -497,9 +625,22 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
     }
   };
 
+  const formatDateOnly = (dateString) => {
+    if (!dateString) return '-';
+    try {
+      const date = new Date(dateString);
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}-${month}-${year}`;
+    } catch {
+      return dateString;
+    }
+  };
+
   return (
     <>
-      <nav className="navbar fixed w-full top-0 z-10 bg-white h-14 shadow-md">
+      <nav className="navbar fixed w-full top-0 z-50 bg-white h-14 shadow-md">
         <div className="flex justify-between items-center h-full px-4">
           <div className="flex items-center">
             <img
@@ -520,34 +661,83 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
               </button>
             )}
             {canViewEditRequests && (
-              <button
-                type="button"
-                onClick={() => {
-                  setIsEditRequestsModalOpen(true);
-                  fetchEditRequests();
-                }}
-                className="relative flex items-center border border-[#BF9853] rounded-md text-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors duration-150 p-2"
-                title="Edit Requests"
-              >
-                <img src={EditIcon} alt="Edit Requests" className="w-5 h-5" />
-                {pendingRequestsCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {pendingRequestsCount}
-                  </span>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const willOpen = !isEditRequestsDropdownOpen;
+                    setIsEditRequestsDropdownOpen(willOpen);
+                    setIsProfileDropdownVisible(false);
+                    if (willOpen) {
+                      fetchEditRequests();
+                    }
+                  }}
+                  className="relative flex items-center border border-[#BF9853] rounded-md text-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors duration-150 p-2"
+                  title="Edit Requests"
+                >
+                  <img src={EditIcon} alt="Edit Requests" className="w-5 h-5" />
+                  {pendingRequestsCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                      {pendingRequestsCount}
+                    </span>
+                  )}
+                </button>
+                {isEditRequestsDropdownOpen && (
+                  <div className="absolute right-0 top-12 w-96 bg-white shadow-2xl rounded-2xl border border-gray-200 p-4 z-[200]">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-semibold text-[#BF9853]">Pending Requests</h3>
+                      <span className="text-xs text-gray-500">
+                        {pendingRequestsCount} pending
+                      </span>
+                    </div>
+                    {editRequests.length === 0 ? (
+                      <div className="text-center text-sm text-gray-500 py-6">
+                        No pending edit requests
+                      </div>
+                    ) : (
+                      <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                        {editRequests.map((request) => (
+                          <div
+                            key={request.id}
+                            onClick={() => handleRequestCardClick(request)}
+                            className="border border-gray-200 rounded-xl p-2 cursor-pointer hover:shadow-md transition-colors duration-200 hover:border-[#BF9853]"
+                          >
+                            <div className="flex justify-between gap-5 text-sm text-gray-800 font-semibold">
+                              <div className="space-y-1">
+                                <p>{request.module_name || '-'}</p>
+                                <p className="text-[8px]">{request.request_send_by || '-'}</p>
+                              </div>
+                              <div className="text-right space-y-1">
+                                <p>{request.module_name_eno || '-'}</p>
+                                <p className="text-[8px]">{formatDate(request.timestamp)}</p>
+                              </div>
+                            </div>
+                            
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
-              </button>
+              </div>
             )}
             {userImage ? (
               <img
                 src={`data:image/jpeg;base64,${userImage}`}
                 alt="Profile"
                 className="w-10 h-10 rounded-full object-cover cursor-pointer"
-                onClick={() => setIsProfileDropdownVisible((prev) => !prev)}
+                onClick={() => {
+                  setIsProfileDropdownVisible((prev) => !prev);
+                  setIsEditRequestsDropdownOpen(false);
+                }}
               />
             ) : (
               <div
                 className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-white font-bold cursor-pointer"
-                onClick={() => setIsProfileDropdownVisible((prev) => !prev)}
+                onClick={() => {
+                  setIsProfileDropdownVisible((prev) => !prev);
+                  setIsEditRequestsDropdownOpen(false);
+                }}
               >
                 {username?.charAt(0).toUpperCase()}
               </div>
@@ -584,90 +774,95 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
           </div>
         </div>
       </nav>
-      {isEditRequestsModalOpen && (
+      {selectedRequest && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-white rounded-lg shadow-lg w-[90%] max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="bg-white rounded-2xl shadow-2xl w-[90%]  overflow-hidden">
             <div className="flex justify-between items-center p-4 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-[#BF9853]">Edit Requests</h2>
+              <h2 className="text-xl font-bold text-[#BF9853]">Edit Request Details</h2>
               <button
-                onClick={() => setIsEditRequestsModalOpen(false)}
+                onClick={closeSelectedRequestModal}
                 className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
               >
                 ×
               </button>
             </div>
-            <div className="overflow-y-auto flex-1 p-4">
-              {editRequests.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  No pending edit requests
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {editRequests.map((request) => {
-                    return (
-                      <div key={request.id} className="border border-gray-300 rounded-lg p-4 bg-white hover:bg-gray-50">
-                        <div className="grid grid-cols-2 gap-4 mb-3">
-                          <div>
-                            <p className="text-xs text-gray-500">Timestamp</p>
-                            <p className="text-sm font-semibold">{formatDate(request.timestamp)}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500">Module</p>
-                            <p className="text-sm font-semibold">{request.module_name || '-'}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500">Record ID</p>
-                            <p className="text-sm font-semibold">{request.module_name_id || '-'}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500">Entry No</p>
-                            <p className="text-sm font-semibold">{request.module_name_eno || '-'}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500">Requested By</p>
-                            <p className="text-sm font-semibold">{request.request_send_by || '-'}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500">Status</p>
-                            <span className={`inline-block px-2 py-1 rounded text-xs ${
-                              request.request_completed
-                                ? 'bg-green-100 text-green-800'
-                                : request.request_approval
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-red-100 text-red-800'
-                            }`}>
-                              {request.request_completed
-                                ? 'Completed'
-                                : request.request_approval
-                                ? 'Approved'
-                                : 'Pending'}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="mt-3 p-3 bg-blue-50 rounded border border-blue-200">
-                          <p className="text-xs text-blue-700">
-                            <strong>Permission Request:</strong> User is requesting permission to edit this record (Record ID: {request.module_name_id}, Entry No: {request.module_name_eno}).
-                          </p>
-                        </div>
-                        {!request.request_completed && (
-                          <div className="flex gap-2 mt-3">
-                            <button
-                              onClick={() => handleApproveRequest(request.id, request.module_name_id)}
-                              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm font-semibold"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => handleRejectRequest(request.id)}
-                              className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 text-sm font-semibold"
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+            <div className="p-4 space-y-4">
+              <div className="p-2 rounded-lg text-sm">
+                <strong>Permission Request:</strong> User is requesting permission to edit this record ( Entry No: {selectedRequest.module_name_eno}).
+              </div>
+              <div className="space-y-2">
+                {requestRecordLoading && (
+                  <div className="text-sm text-gray-500">Loading record details...</div>
+                )}
+                {requestRecordError && (
+                  <div className="text-sm text-red-500">{requestRecordError}</div>
+                )}
+                {!requestRecordLoading && selectedRequestRecord && (
+                  <div className=" border-l-8 border-l-[#BF9853] rounded-xl overflow-auto">
+                    <table className="min-w-[1000px] w-full text-sm">
+                      <thead className="bg-[#FAF6ED] text-[11px] uppercase">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Date</th>
+                          <th className="px-3 py-2 text-left">Contractor/Vendor</th>
+                          <th className="px-3 py-2 text-left">Project Name</th>
+                          <th className="px-3 py-2 text-left">Transfer Site</th>
+                          <th className="px-3 py-2 text-right">Advance</th>
+                          <th className="px-3 py-2 text-right">Bill Payment</th>
+                          <th className="px-3 py-2 text-right">Refund</th>
+                          <th className="px-3 py-2 text-left">Type</th>
+                          <th className="px-3 py-2 text-left">Description</th>
+                          <th className="px-3 py-2 text-left">Mode</th>
+                          <th className="px-3 py-2 text-left">Attached File</th>
+                          <th className="px-3 py-2 text-left">E.No</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="bg-white text-left">
+                          <td className="px-3 py-2 font-semibold">{formatDateOnly(selectedRequestRecord.date)}</td>
+                          <td className="px-3 py-2 font-semibold">{getAssociateName(selectedRequestRecord) || '-'}</td>
+                          <td className="px-3 py-2 font-semibold">{getSiteNameById(selectedRequestRecord.project_id) || '-'}</td>
+                          <td className="px-3 py-2 font-semibold">{getSiteNameById(selectedRequestRecord.transfer_site_id) || '-'}</td>
+                          <td className="px-3 py-2 text-right font-semibold">{formatCurrency(selectedRequestRecord.amount)}</td>
+                          <td className="px-3 py-2 text-right font-semibold">{formatCurrency(selectedRequestRecord.bill_amount)}</td>
+                          <td className="px-3 py-2 text-right font-semibold">{formatCurrency(selectedRequestRecord.refund_amount)}</td>
+                          <td className="px-3 py-2 font-semibold">{selectedRequestRecord.type || '-'}</td>
+                          <td className="px-3 py-2 font-semibold">{selectedRequestRecord.description || '-'}</td>
+                          <td className="px-3 py-2 font-semibold">{selectedRequestRecord.payment_mode || '-'}</td>
+                          <td className="px-3 py-2 font-semibold">
+                            {selectedRequestRecord.file_url ? (
+                              <a
+                                href={selectedRequestRecord.file_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-red-500 underline"
+                              >
+                                View
+                              </a>
+                            ) : (
+                              '-'
+                            )}
+                          </td>
+                          <td className="px-3 py-2 font-semibold">{selectedRequestRecord.entry_no || '-'}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+              {!selectedRequest.request_completed && (
+                <div className="flex gap-3 justify-end">
+                  <button
+                    onClick={() => handleRejectRequest(selectedRequest.id)}
+                    className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 text-sm font-semibold"
+                  >
+                    Reject
+                  </button>
+                  <button
+                    onClick={() => handleApproveRequest(selectedRequest.id, selectedRequest.module_name_id)}
+                    className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm font-semibold"
+                  >
+                    Approve
+                  </button>
                 </div>
               )}
             </div>

@@ -56,7 +56,7 @@ const RHeading = ({ username, userRoles = [] }) => {
 
   return (
     <div className="bg-[#FAF6ED] w-full h-auto min-h-screen">
-      <div className="topbar-title w-[350px] sm:w-[580px] lg:w-[1470px] overflow-x-auto no-scrollbar py-3">
+      <div className="topbar-title w-[350px] sm:w-[680px] lg:w-[1470px] overflow-x-auto no-scrollbar py-3">
         <h2
           className={`link whitespace-nowrap ${activeTab === 'form' ? 'active' : ''}`}
           onClick={() => setActiveTab('form')}

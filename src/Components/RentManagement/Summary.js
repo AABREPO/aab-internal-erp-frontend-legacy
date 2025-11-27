@@ -711,7 +711,7 @@ const Summary = () => {
     document.body.removeChild(link);
   };
   return (
-    <div className="flex justify-start p-10 ml-12 mr-12 bg-[#FFFFFF] min-h-screen">
+    <div className="flex justify-start p-10 ml-10 mr-10 h-[750px] bg-[#FFFFFF]">
       <div className="lg:flex gap-10 ml-3">
         <div>
           <div className="flex justify-between items-center mb-2.5">

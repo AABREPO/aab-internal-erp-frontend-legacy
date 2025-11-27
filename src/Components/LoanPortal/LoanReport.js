@@ -395,7 +395,7 @@ const LoanReport = () => {
                 </div>
                 <div
                     id="reportTable"
-                    className="border-l-8 border-l-[#BF9853] rounded-lg overflow-auto max-h-[600px]"
+                    className="border-l-8 border-l-[#BF9853] rounded-lg overflow-auto max-h-[500px]"
                 >
                     <table className="w-full min-w-[1400px] border-collapse">
                         <thead className="sticky top-0 z-10 bg-white">

@@ -1265,7 +1265,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
     );
   }
   return (
-    <div className='bg-[#FAF6ED] min-h-screen w-full'>
+    <div className='bg-[#FAF6ED]'>
       <div className='max-w-[1850px] w-full bg-white rounded-md ml-10 lg:h-[128px] px-4 lg:px-10 text-left flex flex-wrap justify-between items-center gap-5 pb-5'>
         <div className='flex lg:flex-wrap w-full lg:w-auto justify-between'>
           <div className='flex flex-wrap gap-[16px] p-4'>
@@ -1324,7 +1324,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
           <button onClick={() => setIsOpen(true)} className='w-28 h-[35px] border-2 bg-[#BF9853] border-opacity-25 rounded-lg mt-4 text-white'>Migrate</button>
         </div>
       </div>
-      <div className='max-w-[1850px] w-full ml-10 px-4 lg:px-10 bg-white rounded-md h-[650px] mt-5 pt-5'>
+      <div className='max-w-[1850px] w-full ml-10 px-4 lg:px-10 bg-white rounded-md h-[650px] mt-4 pt-5'>
         <div
           className={`text-left flex ${selectTimeStampDate || selectDatabaseDate || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseMode || selectDatabaseEntryNo || startDate || endDate
             ? 'flex-col sm:flex-row sm:justify-between'
@@ -1807,8 +1807,8 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
           </div>
         </div>
         {sortedData.length > 0 && (
-          <div className="flex flex-col sm:flex-row justify-between items-center px-5 py-4 bg-white border-t border-gray-200 mb-6">
-            <div className="flex items-center space-x-2 mb-4 sm:mb-0">
+          <div className="flex flex-col sm:flex-row justify-between items-center px-5 py-4 bg-white border-t border-gray-200">
+            <div className="flex items-center space-x-2">
               <label className="text-sm font-medium text-gray-700">Show:</label>
               <select
                 value={itemsPerPage}
@@ -1829,7 +1829,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
               </select>
               <span className="text-sm text-gray-700">entries</span>
             </div>
-            <div className="text-sm text-gray-700 mb-4 sm:mb-0">
+            <div className="text-sm text-gray-700">
               Showing {startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries
             </div>
             <div className="flex items-center space-x-2">

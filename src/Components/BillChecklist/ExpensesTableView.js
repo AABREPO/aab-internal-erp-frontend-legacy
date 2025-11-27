@@ -232,7 +232,7 @@ const ExpenseTableView = () => {
                         <span className=' text-[#BF9853] mr-9 font-semibold hover:underline'>Print</span>
                     </div>
                 </div>
-                <div className="w-full max-w-[1860px] mx-auto p-4 bg-white shadow-lg overflow-x-auto">
+                <div className="w-full max-w-[1860px] ml-10 p-4 bg-white overflow-x-auto">
                     <div
                         className={`text-left flex ${selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools
                             ? 'flex-col sm:flex-row sm:justify-between'
@@ -315,7 +315,7 @@ const ExpenseTableView = () => {
                     <div>
                         <div
                             ref={scrollRef}
-                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[760px] overflow-scroll select-none"
+                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[685px] overflow-scroll select-none"
                             onMouseDown={handleMouseDown}
                             onMouseMove={handleMouseMove}
                             onMouseUp={handleMouseUp}

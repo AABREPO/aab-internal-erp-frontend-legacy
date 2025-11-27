@@ -737,7 +737,7 @@ const LoanTableview = ({ username, userRoles = [] }) => {
           </div>
         </div>
         <div className='border-l-8 border-l-[#BF9853] rounded-lg mx-5'>
-          <div ref={scrollRef} className='overflow-auto max-h-[600px]'
+          <div ref={scrollRef} className='overflow-auto max-h-[500px]'
             onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
           >
             <table className="w-full min-w-[1400px] border-collapse">

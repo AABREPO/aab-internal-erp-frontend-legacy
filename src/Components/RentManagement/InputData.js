@@ -1989,7 +1989,7 @@ const InputData = ({ username, userRoles = [] }) => {
                 </thead>
               </table>
             </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+            <div className="overflow-y-auto max-h-[600px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
               <table className="table-auto w-96">
                 <tbody>
                   {filteredTenantLink.map((item, index) => (

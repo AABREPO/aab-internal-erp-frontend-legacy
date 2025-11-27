@@ -241,7 +241,7 @@ const Tenant = () => {
     return `${day}/${month}/${year}`;
   };
   return (
-    <div className="px-4 py-6 md:px-6 md:py-6 bg-white md:ml-6 lg:ml-6 md:mr-6 lg:mr-12">
+    <div className="px-4 py-6 md:px-6 md:py-6 bg-white h-[750px] md:ml-6 lg:ml-6 md:mr-6 lg:mr-12">
       <div className="p-0 md:p-4">
         <div className="flex flex-col gap-3 md:flex-row md:justify-between md:items-center mb-4">
           <div className="text-lg font-semibold text-gray-800">Tenant Agreements</div>

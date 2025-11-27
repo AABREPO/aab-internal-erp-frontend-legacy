@@ -1007,7 +1007,7 @@ const Table = () => {
                     <div className="w-full py-5">
                         <div
                             ref={scrollRef}
-                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[400px] sm:h-[600px] lg:h-[760px] overflow-x-auto select-none no-scrollbar"
+                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[400px] sm:h-[600px] lg:h-[650px] overflow-x-auto select-none no-scrollbar"
                             onMouseDown={handleMouseDown}
                             onMouseMove={handleMouseMove}
                             onMouseUp={handleMouseUp}
@@ -1015,7 +1015,7 @@ const Table = () => {
                         >
                             <table className="table-auto min-w-[1165px] w-full border-collapse">
                                 <thead>
-                                    <tr className="bg-[#FAF6ED] text-left">
+                                    <tr className="bg-[#FAF6ED] text-left sticky top-0 z-10">
                                         <th className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm"
                                             onClick={() => handleSort('shopNo')}
                                         >

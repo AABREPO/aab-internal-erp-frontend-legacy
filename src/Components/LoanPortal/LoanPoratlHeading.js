@@ -42,7 +42,7 @@ const LoanPoratlHeading = ({ username, userRoles = [] }) => {
         }
     };
     return (
-        <div className="bg-[#FAF6ED]">
+        <div className="bg-[#FAF6ED] w-full h-auto min-h-screen">
             <div className="topbar-title flex gap-[20px] w-[865px] flex-nowrap">
                 <div className="flex-shrink-0">
                     <h2

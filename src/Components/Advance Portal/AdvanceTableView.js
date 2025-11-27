@@ -846,6 +846,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
       }
 
       alert('Edit request sent successfully. Waiting for admin approval.');
+      window.dispatchEvent(new Event('editRequestCreated'));
       setIsRequestModalOpen(false);
       setRequestingEntry(null);
     } catch (error) {
@@ -1109,7 +1110,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     );
   }
   return (
-    <div className='bg-[#FAF6ED] min-h-screen w-full'>
+    <div className='bg-[#FAF6ED] '>
       <div>
         <div className='w-full max-w-[1850px] bg-white lg:h-[128px] rounded-md ml-4 mr-4 sm:ml-6 lg:ml-10 lg:mr-10 px-4 lg:px-10 text-left flex flex-wrap items-center pb-5 mx-auto'>
           <div className='flex flex-wrap gap-[16px] p-4'>
@@ -1166,7 +1167,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
             </div>
           </div>
         </div>
-        <div className='rounded-md w-full max-w-[1850px] ml-4 mr-4 sm:ml-6 lg:ml-10 lg:mr-10 px-4 lg:px-10 bg-white mt-5 pt-5 h-[650px]'>
+        <div className='rounded-md w-full max-w-[1850px] ml-4 mr-4 sm:ml-6 lg:ml-10 lg:mr-10 px-4 lg:px-10 bg-white mt-4 pt-5 h-[650px]'>
                       <div
               className={`text-left flex ${selectDate || selectContractororVendorName || selectProjectName || selectTransfer || selectType || selectMode || selectEntryNo || startDate || endDate
                 ? 'flex-col sm:flex-row sm:justify-between'
@@ -1613,8 +1614,8 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
             </div>
           </div>
           {sortedData.length > 0 && (
-            <div className="flex flex-col sm:flex-row justify-between items-center px-5 py-4 bg-white border-t border-gray-200">
-              <div className="flex items-center space-x-2 mb-4 sm:mb-0">
+            <div className="flex flex-col sm:flex-row justify-between items-center px-5 py-5 bg-white border-t border-gray-200">
+              <div className="flex items-center space-x-2">
                 <label className="text-sm font-medium text-gray-700">Show:</label>
                 <select
                   value={itemsPerPage}
@@ -1636,7 +1637,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                 </select>
                 <span className="text-sm text-gray-700">entries</span>
               </div>
-              <div className="text-sm text-gray-700 mb-4 sm:mb-0">
+              <div className="text-sm text-gray-700">
                 Showing {startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries
               </div>
               <div className="flex items-center space-x-2">

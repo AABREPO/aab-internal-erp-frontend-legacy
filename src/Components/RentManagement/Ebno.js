@@ -812,7 +812,7 @@ const Ebno = () => {
                         </h1>
                     </div>
                 </div>
-                <div className="rounded-lg border-l-8 border-[#BF9853] h-[500px] overflow-x-auto overflow-y-auto no-scrollbar">
+                <div className="rounded-lg border-l-8 border-[#BF9853] h-[550px] overflow-x-auto overflow-y-auto no-scrollbar">
                     <table className="border-collapse w-full text-left">
                         <thead className="h-10 sticky top-0 z-10 bg-[#FAF6ED]">
                             <tr className="bg-[#FAF6ED]">

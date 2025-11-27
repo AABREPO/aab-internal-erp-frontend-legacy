@@ -113,7 +113,7 @@ const ClaimPaymentCashRegister = () => {
   if (loading) {
     return (
       <body>
-        <div className='bg-white w-[1700px] h-[500px] p-10 ml-10 flex flex-col items-center justify-center'>
+        <div className='bg-white h-[500px] p-10 ml-10 mr-10 flex flex-col items-center justify-center'>
           <div className="text-lg mb-4">Loading cash register data...</div>
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#BF9853] mb-4"></div>
           <div className="text-sm text-gray-600">
@@ -148,7 +148,7 @@ const ClaimPaymentCashRegister = () => {
         </div>        
         <div className='border-l-8 border-l-[#BF9853] rounded-lg overflow-auto max-h-[400px]'>
           <table className="w-full rounded-lg">
-            <thead className="bg-[#FAF6ED] sticky top-0">
+            <thead className="bg-[#FAF6ED] sticky top-0 z-10">
               <tr>
                 <th className="px-4 py-2 text-left">S.No</th>
                 <th className="px-4 py-2 text-left">Time Stamp</th>

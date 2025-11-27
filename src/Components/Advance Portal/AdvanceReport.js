@@ -946,8 +946,8 @@ const AdvanceReport = () => {
     );
   }
   return (
-    <div className='bg-[#FAF6ED] min-h-screen w-full'>
-      <div className="flex flex-col xl:flex-row items-start justify-between bg-white p-4 ml-4 sm:ml-6 lg:ml-10 px-4 lg:px-14 lg:h-[128px] rounded-md shadow-sm max-w-[1850px] w-full mb-5">
+    <div className='bg-[#FAF6ED]'>
+      <div className="flex flex-col xl:flex-row items-start justify-between bg-white p-4 ml-4 sm:ml-6 lg:ml-10 px-4 lg:px-14 lg:h-[128px] rounded-md shadow-sm max-w-[1850px] w-full mb-4">
         <div className="flex flex-wrap space-x-6 text-left">
           <div>
             <label className="block font-semibold mb-1">Week No</label>
@@ -1059,7 +1059,7 @@ const AdvanceReport = () => {
           </div>
         </div>
       </div>
-      <div className='max-w-[1850px] w-full rounded-md ml-4 h-[650px] sm:ml-6 lg:ml-10 px-4 lg:px-10 bg-white p-4 mx-auto'>
+      <div className='max-w-[1850px] w-full rounded-md ml-4 h-[650px] sm:ml-6 lg:ml-10 px-4 lg:px-10 bg-white p-4'>
         <div className='space-x-6 flex justify-end'>
           <button onClick={handleExportPDF} className='text-sm text-[#E4572E] hover:underline font-bold'>Export PDF</button>
           <button onClick={handleExportExcel} className='text-sm text-[#007233] hover:underline font-bold'>Export XL</button>
@@ -1170,8 +1170,8 @@ const AdvanceReport = () => {
           </table>
         </div>
         {sortedData.length > 0 && (
-          <div className="flex flex-col sm:flex-row justify-between items-center px-5 py-4 bg-white border-t border-gray-200 mb-8">
-            <div className="flex items-center space-x-2 mb-4 sm:mb-0">
+          <div className="flex flex-col sm:flex-row justify-between items-center px-5 py-4 bg-white border-t border-gray-200">
+            <div className="flex items-center space-x-2">
               <label className="text-sm font-medium text-gray-700">Show:</label>
               <select
                 value={itemsPerPage}
@@ -1192,7 +1192,7 @@ const AdvanceReport = () => {
               </select>
               <span className="text-sm text-gray-700">entries</span>
             </div>
-            <div className="text-sm text-gray-700 mb-4 sm:mb-0">
+            <div className="text-sm text-gray-700">
               Showing {startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries
             </div>
             <div className="flex items-center space-x-2">

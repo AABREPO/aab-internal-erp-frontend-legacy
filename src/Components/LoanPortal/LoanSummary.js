@@ -348,7 +348,7 @@ const LoanSummary = () => {
           </div>
           <div className="rounded-lg border-l-8 border-l-[#BF9853]">
             <table className="w-full border-collapse">
-              <thead className="bg-[#FAF6ED]">
+              <thead className="bg-[#FAF6ED] sticky top-0 z-10">
                 <tr>
                   <th className="p-3 text-left font-semibold ">
                     Purpose
@@ -450,7 +450,7 @@ const LoanSummary = () => {
           </div>
           <div className="rounded-lg border-l-8 border-l-[#BF9853]">
             <table className="w-full border-collapse">
-              <thead className="bg-[#FAF6ED]">
+              <thead className="bg-[#FAF6ED] sticky top-0 z-10">
                 <tr>
                   <th className=" p-3 text-left font-semibold">
                     Contractor/Vendor

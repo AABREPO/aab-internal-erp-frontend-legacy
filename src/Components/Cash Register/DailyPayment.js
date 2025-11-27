@@ -711,14 +711,14 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     const handleRefundSubmit = async () => {
         try {
             // Check if it's a labour or employee refund
-            const isLabourOrEmployeeRefund = (newRefundReceived.labour_id && Number(newRefundReceived.labour_id) > 0) || 
-                                           (newRefundReceived.employee_id && Number(newRefundReceived.employee_id) > 0);
+            const isLabourOrEmployeeRefund = (newRefundReceived.labour_id && Number(newRefundReceived.labour_id) > 0) ||
+                (newRefundReceived.employee_id && Number(newRefundReceived.employee_id) > 0);
             // Check if it's a vendor or contractor refund
-            const isVendorOrContractorRefund = (newRefundReceived.vendor_id && Number(newRefundReceived.vendor_id) > 0) || 
-                                             (newRefundReceived.contractor_id && Number(newRefundReceived.contractor_id) > 0);
+            const isVendorOrContractorRefund = (newRefundReceived.vendor_id && Number(newRefundReceived.vendor_id) > 0) ||
+                (newRefundReceived.contractor_id && Number(newRefundReceived.contractor_id) > 0);
             if (isLabourOrEmployeeRefund) {
                 // Only send to staff-advance API for labour/employee refunds
-                const entryNo = await getLastEntryNumber();            
+                const entryNo = await getLastEntryNumber();
                 const staffAdvancePayload = {
                     date: selectedDate,
                     type: "Refund",
@@ -885,14 +885,14 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 file_url: editDailyExpenseData.file_url || null,  // 🔹 send url here
                 staff_advance_portal_id: editDailyExpenseData.staff_advance_portal_id || null,
             };
-            
+
             // Check if type changed from Staff Advance to another type
             const wasStaffAdvance = row.type === "Staff Advance";
             const isNowStaffAdvance = editDailyExpenseData.type === "Staff Advance";
             const typeChangedFromStaffAdvance = wasStaffAdvance && !isNowStaffAdvance;
             const typeChangedToStaffAdvance = !wasStaffAdvance && isNowStaffAdvance;
             const amountChanged = Number(row.amount) !== Number(editDailyExpenseData.amount);
-            
+
             // Check if anything actually changed first
             const isChanged = Object.keys(payload).some(
                 (key) => {
@@ -971,13 +971,13 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     console.error("Error updating staff advance portal amount:", error);
                 }
             }
-            
+
             // If no changes were made, exit edit mode without updating
             if (!isChanged) {
                 setEditingDailyExpenseRowId(null);
                 return;
             }
-            
+
             const response = await axios.put(
                 `https://backendaab.in/aabuildersDash/api/daily-payments/edit/${row.id}?username=${encodeURIComponent(username)}`,
                 payload,
@@ -1376,18 +1376,18 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         doc.text(dayText, 170, 27);
         doc.setLineWidth(0.5);
         doc.line(14, 15, pageWidth - 14, 15);
-        doc.line(14, 30, pageWidth - 14, 30); 
+        doc.line(14, 30, pageWidth - 14, 30);
         doc.setFont(undefined, 'normal');
         const filteredExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate && row.type !== "Staff Advance" && row.type !== "Diwali Bonus");
         const totalAmount = filteredExpenses.reduce(
             (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
             0
-        );        
+        );
         const advanceExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate && row.type === "Staff Advance");
         const totalAdvanceAmount = advanceExpenses.reduce(
             (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
             0
-        );        
+        );
         const diwaliBonusExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate && row.type === "Diwali Bonus");
         const totalDiwaliBonusAmount = diwaliBonusExpenses.reduce(
             (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
@@ -1466,7 +1466,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 textColor: [80, 80, 80],
             },
             headStyles: {
-                fillColor: [255, 248, 220], 
+                fillColor: [255, 248, 220],
                 textColor: [0, 0, 0],
                 fontStyle: 'bold',
                 lineColor: [200, 200, 200],
@@ -1474,12 +1474,12 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             },
             columnStyles: {
                 0: { cellWidth: 13, halign: 'center', fillColor: [255, 255, 255] },
-                1: { cellWidth: 47, halign: 'left' },  
-                2: { cellWidth: 30, halign: 'left' },     
-                3: { cellWidth: 12, halign: 'center' },  
-                4: { cellWidth: 25, halign: 'left' },   
-                5: { cellWidth: 20, halign: 'right' },    
-                6: { cellWidth: 35, halign: 'left' }     
+                1: { cellWidth: 47, halign: 'left' },
+                2: { cellWidth: 30, halign: 'left' },
+                3: { cellWidth: 12, halign: 'center' },
+                4: { cellWidth: 25, halign: 'left' },
+                5: { cellWidth: 20, halign: 'right' },
+                6: { cellWidth: 35, halign: 'left' }
             },
             bodyStyles: {
                 lineWidth: 0.1,
@@ -1533,7 +1533,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 textColor: [80, 80, 80],
             },
             headStyles: {
-                fillColor: [255, 248, 220], 
+                fillColor: [255, 248, 220],
                 textColor: [0, 0, 0],
                 fontStyle: 'bold',
                 lineColor: [200, 200, 200],
@@ -1546,17 +1546,17 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 fillColor: false,
             },
             columnStyles: {
-                0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },  
-                1: { cellWidth: 35, halign: 'left' },     
-                2: { cellWidth: 20, halign: 'right' }    
+                0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },
+                1: { cellWidth: 35, halign: 'left' },
+                2: { cellWidth: 20, halign: 'right' }
             },
             margin: { left: 14, right: 0 }
-        });        
+        });
         const refundTableEndY = doc.lastAutoTable.finalY;
         if (diwaliBonusExpenses.length > 0) {
             const diwaliBonusTableColumn = [
                 "SNO", "NAME", "AMOUNT"
-            ];        
+            ];
             const diwaliBonusTableRows = diwaliBonusExpenses
                 .map((row, index) => {
                     const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
@@ -1566,21 +1566,21 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     const name = [employee?.label, vendor?.label, contractor?.label, labour?.label]
                         .filter(Boolean).join(" | ") || "";
                     const amount = (row.amount || 0) + (row.extra_amount || 0);
-                    const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;                
+                    const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
                     return [
                         (index + 1).toString(),
                         name,
                         formattedAmount
                     ];
-                });        
+                });
             diwaliBonusTableRows.push([
                 "",
                 "TOTAL",
                 `${totalDiwaliBonusAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
-            ]);        
+            ]);
             doc.setFontSize(12);
             doc.setFont(undefined, 'bold');
-            doc.text('DIWALI BONUS', 14, refundTableEndY + 15);        
+            doc.text('DIWALI BONUS', 14, refundTableEndY + 15);
             doc.autoTable({
                 startY: refundTableEndY + 20,
                 head: [diwaliBonusTableColumn],
@@ -1608,16 +1608,16 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 },
                 columnStyles: {
                     0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },
-                    1: { cellWidth: 35, halign: 'left' }, 
-                    2: { cellWidth: 20, halign: 'right' } 
+                    1: { cellWidth: 35, halign: 'left' },
+                    2: { cellWidth: 20, halign: 'right' }
                 },
                 margin: { left: 14, right: 0 }
             });
-        }        
+        }
         if (advanceExpenses.length > 0) {
             const advanceTableColumn = [
                 "S.NO", "PROJECT NAME", "EMPLOYEE NAME", "TOTAL AMOUNT"
-            ];            
+            ];
             const advanceTableRows = advanceExpenses
                 .map((row, index) => {
                     const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
@@ -1635,16 +1635,16 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         name,
                         formattedAmount
                     ];
-                });            
+                });
             advanceTableRows.push([
                 "",
                 "TOTAL",
                 "",
                 `${totalAdvanceAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
-            ]);            
+            ]);
             doc.setFontSize(12);
             doc.setFont(undefined, 'bold');
-            doc.text('WAGE ADVANCE', 95, firstTableEndY + spaceBetweenTables - 2); 
+            doc.text('WAGE ADVANCE', 95, firstTableEndY + spaceBetweenTables - 2);
             doc.autoTable({
                 startY: firstTableEndY + spaceBetweenTables,
                 head: [advanceTableColumn],
@@ -1672,13 +1672,13 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 },
                 columnStyles: {
                     0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },
-                    1: { cellWidth: 35, halign: 'left' }, 
-                    2: { cellWidth: 35, halign: 'left' }, 
+                    1: { cellWidth: 35, halign: 'left' },
+                    2: { cellWidth: 35, halign: 'left' },
                     3: { cellWidth: 20, halign: 'right' }
                 },
                 margin: { left: 95, right: 0 }
             });
-        }        
+        }
         const fileName = `PS ${currentWeekNumber} - Daily Payment Statement ${formatDateOnly(selectedDate)}.pdf`;
         doc.save(fileName);
     };
@@ -1710,7 +1710,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             await axios.put(
                 `https://backendaab.in/aabuildersDash/api/daily-payments/edits/${entryId}?username=${encodeURIComponent(username)}`,
                 payload,
-                {headers: {"Content-Type": "application/json",},}
+                { headers: { "Content-Type": "application/json", }, }
             );
             alert("Description updated successfully!");
             setDailyExpenses(prev =>
@@ -1746,15 +1746,27 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         if (!selectedFileForPopup || !currentFileRow) return;
         try {
             const project = siteOptions.find(opt => opt.id === Number(currentFileRow.project_id));
-            const siteNo = project?.siteNo || "";
+            const siteNo = project?.sNo || "";
             const name =
                 laboursList.find(opt => opt.id === Number(currentFileRow.labour_id))?.label ||
                 vendorOptions.find(opt => opt.id === Number(currentFileRow.vendor_id))?.label ||
                 contractorOptions.find(opt => opt.id === Number(currentFileRow.contractor_id))?.label ||
                 employeeOptions.find(opt => opt.id === Number(currentFileRow.employee_id))?.label ||
                 "";
+            const now = new Date();
+            const timestamp = now.toLocaleString("en-GB", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true
+            })
+                .replace(",", "")
+                .replace(/\s/g, "-");
+
             const formData = new FormData();
-            const finalName = `${formatDateOnly(currentFileRow.date)}-${siteNo}-${name}`;
+            const finalName = `${timestamp}-${siteNo}-${name}`;
             formData.append("file", selectedFileForPopup);
             formData.append("file_name", finalName);
             const uploadResponse = await fetch(
@@ -2007,7 +2019,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                 <td className="py-2 text-left">
                                                     <Select
                                                         name="type"
-                                                        value={(isChangeButtonActive ? expensesCategory : weeklyTypes).find(option => 
+                                                        value={(isChangeButtonActive ? expensesCategory : weeklyTypes).find(option =>
                                                             (isChangeButtonActive ? option.category : option.type) === newDailyExpense.type
                                                         ) ? {
                                                             value: newDailyExpense.type,
@@ -2264,7 +2276,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                         {editingDailyExpenseRowId === row.id ? (
                                                             <Select
                                                                 name="type"
-                                                                value={(isChangeButtonActive ? expensesCategory : weeklyTypes).find(option => 
+                                                                value={(isChangeButtonActive ? expensesCategory : weeklyTypes).find(option =>
                                                                     (isChangeButtonActive ? option.category : option.type) === editDailyExpenseData.type
                                                                 ) ? {
                                                                     value: editDailyExpenseData.type,
@@ -2455,9 +2467,9 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                             </div>
                                                             {(() => {
                                                                 const hasLabourId = row.labour_id && Number(row.labour_id) > 0;
-                                                                const hasVendorOrContractorId = (row.vendor_id && Number(row.vendor_id) > 0) || 
-                                                                                                    (row.contractor_id && Number(row.contractor_id) > 0);
-                                                                if (!hasLabourId && !hasVendorOrContractorId) return null;                                                                
+                                                                const hasVendorOrContractorId = (row.vendor_id && Number(row.vendor_id) > 0) ||
+                                                                    (row.contractor_id && Number(row.contractor_id) > 0);
+                                                                if (!hasLabourId && !hasVendorOrContractorId) return null;
                                                                 return (
                                                                     <div className="bg-[#E3F2FD] text-[#1565C0] font-semibold px-3 py-[2px] text-xs rounded-full whitespace-nowrap">
                                                                         {hasLabourId ? 'Staff Portal' : 'Loan Portal'}

@@ -334,7 +334,7 @@ const History = () => {
                                         .map((checklistData, index) => {
                                             const { checklistNumber, timestamp, entryChecklistUrl } = checklistData;
                                             const formattedDate = timestamp
-                                                ? new Date(timestamp).toLocaleDateString('en-GB')
+                                                ? new Date(new Date(timestamp).getTime() - 330 * 60000).toLocaleDateString('en-GB')
                                                 : '';
                                             const serialNumber = (index + 1).toString().padStart(2, '0');
 
@@ -390,8 +390,6 @@ const History = () => {
                                             );
                                         })}
                                 </tbody>
-
-
                             </table>
                         ) : (
                             <p>No checklist URLs available</p>
@@ -533,7 +531,7 @@ const History = () => {
 export default History
 const formatDate = (dateString) => {
     const date = new Date(dateString);
-    date.setMinutes(date.getMinutes());
+    date.setMinutes(date.getMinutes() - 330);
 
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');

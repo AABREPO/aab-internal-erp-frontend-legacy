@@ -725,6 +725,55 @@ const MasterData = ({ username, userRoles = [] }) => {
     setNewProject((prev) => ({ ...prev, ownerDetailsList: updatedOwners }));
   };
 
+  const sortPropertyDetailsByShopNo = (details = []) => {
+    const parseShopNo = (shopNo = '') => {
+      const trimmed = shopNo.trim().toUpperCase();
+      const sanitized = trimmed.replace(/[\s-]+/g, '');
+      if (!trimmed) {
+        return { isEmpty: true, prefix: '', number: Number.MAX_SAFE_INTEGER, remainder: '' };
+      }
+
+      const alphaNumericMatch = sanitized.match(/^([A-Z]+)(\d+)/);
+      if (alphaNumericMatch) {
+        const [, prefix, numberPart] = alphaNumericMatch;
+        return {
+          isEmpty: false,
+          prefix,
+          number: parseInt(numberPart, 10),
+          remainder: sanitized.slice(alphaNumericMatch[0].length),
+        };
+      }
+
+      const numericMatch = sanitized.match(/^(\d+)/);
+      if (numericMatch) {
+        return {
+          isEmpty: false,
+          prefix: '',
+          number: parseInt(numericMatch[1], 10),
+          remainder: sanitized.slice(numericMatch[1].length),
+        };
+      }
+
+      return { isEmpty: false, prefix: sanitized || trimmed, number: Number.MAX_SAFE_INTEGER, remainder: '' };
+    };
+
+    return [...details].sort((a, b) => {
+      const shopA = parseShopNo(a.shopNo);
+      const shopB = parseShopNo(b.shopNo);
+
+      if (shopA.isEmpty !== shopB.isEmpty) {
+        return shopA.isEmpty ? 1 : -1;
+      }
+      if (shopA.prefix !== shopB.prefix) {
+        return shopA.prefix.localeCompare(shopB.prefix);
+      }
+      if (shopA.number !== shopB.number) {
+        return shopA.number - shopB.number;
+      }
+      return shopA.remainder.localeCompare(shopB.remainder);
+    });
+  };
+
   const handleNewDetailChange = (index, field, value) => {
     const updatedDetails = [...newProject.propertyDetailsList];
     updatedDetails[index][field] = value;
@@ -1508,23 +1557,29 @@ const MasterData = ({ username, userRoles = [] }) => {
         age: "",
         clientAddress: ""
       }],
-      propertyDetailsList: item.propertyDetails && item.propertyDetails.length > 0 ? item.propertyDetails.map(detail => ({
-        ...detail,
-        ebNoPhase: detail.ebNoPhase || "1P"
-      })) : [{
-        projectType: "",
-        floorName: "",
-        shopNo: "",
-        doorNo: "",
-        area: "",
-        ebNo: "",
-        ebNoPhase: "1P",
-        ebNoFrequency: "",
-        propertyTaxNo: "",
-        propertyTaxFrequency: "",
-        waterTaxNo: "",
-        waterTaxFrequency: ""
-      }]
+      propertyDetailsList: sortPropertyDetailsByShopNo(
+        item.propertyDetails && item.propertyDetails.length > 0
+          ? item.propertyDetails.map(detail => ({
+            ...detail,
+            ebNoPhase: detail.ebNoPhase || "1P"
+          }))
+          : [
+            {
+              projectType: "",
+              floorName: "",
+              shopNo: "",
+              doorNo: "",
+              area: "",
+              ebNo: "",
+              ebNoPhase: "1P",
+              ebNoFrequency: "",
+              propertyTaxNo: "",
+              propertyTaxFrequency: "",
+              waterTaxNo: "",
+              waterTaxFrequency: ""
+            }
+          ]
+      )
     });
     setIsProjectEditOpen(true);
   };
@@ -1565,6 +1620,8 @@ const MasterData = ({ username, userRoles = [] }) => {
   const handleSubmitEditProject = async (e) => {
     e.preventDefault();
     try {
+      // Sort property details only on submit
+      const sortedPropertyDetails = sortPropertyDetailsByShopNo(editProject.propertyDetailsList);
       const payload = {
         projectName: editProject.projectName,
         projectAddress: editProject.projectAddress,
@@ -1572,7 +1629,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         projectCategory: editProject.projectCategory,
         projectReferenceName: editProject.projectReferenceName,
         ownerDetails: editProject.ownerDetailsList,       // mapped for backend
-        propertyDetails: editProject.propertyDetailsList  // mapped for backend
+        propertyDetails: sortedPropertyDetails  // mapped for backend - sorted before submit
       };
       const response = await fetch(`https://backendaab.in/aabuilderDash/api/projects/edit/${selectedProjectId}`, {
         method: 'PUT',

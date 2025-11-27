@@ -1793,6 +1793,12 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         }
         return true;
     });
+    const clearFilters = () => {
+        setSelectDate('');
+        setSelectContractororVendorName('');
+        setSelectProjectName('');
+        setSelectType('');
+    };
     const handleSort = (key) => {
         let direction = 'asc';
         if (sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -2728,7 +2734,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                         placeholder="Type..."
                                                     >
                                                         <option value=''>Select Type...</option>
-                                                        {weeklyTypes.map((type, index) => (
+                                                        {weeklyTypes.filter(type => type.type !== "Staff Advance").map((type, index) => (
                                                             <option key={index} value={type.type}>
                                                                 {type.type}
                                                             </option>
@@ -2736,7 +2742,15 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                     </select>
                                                 </th>
                                                 <th className="pt-2 pb-2 w-[110px]"></th>
-                                                <th className="pt-2 pb-2 w-[120px]"></th>
+                                                <th className="pt-2 pb-2 w-[120px]">
+                                                    <button
+                                                        onClick={clearFilters}
+                                                        className="px-3 py-1.5 bg-[#BF9853] text-white rounded-lg hover:bg-[#A68B4A] transition-colors text-sm font-semibold"
+                                                        title="Clear all filters"
+                                                    >
+                                                        Clear
+                                                    </button>
+                                                </th>
                                             </tr>
                                         )}
                                         <tr className="bg-white border-b border-gray-200">
@@ -2991,7 +3005,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                     onKeyDown={handleKeyDownExpense}
                                                 >
                                                     <option value="">Select Type...</option>
-                                                    {weeklyTypes.map((type, index) => (
+                                                    {weeklyTypes.filter(type => type.type !== "Staff Salary").map((type, index) => (
                                                         <option key={index} value={type.type}>
                                                             {type.type}
                                                         </option>
@@ -3256,7 +3270,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                 value={editFormData.type} onChange={handleEditChange}
                                                             >
                                                                 <option value="">Select Type...</option>
-                                                                {weeklyTypes.map((type, index) => (
+                                                                {weeklyTypes.filter(type => type.type !== "Staff Advance").map((type, index) => (
                                                                     <option key={index} value={type.type}>
                                                                         {type.type}
                                                                     </option>

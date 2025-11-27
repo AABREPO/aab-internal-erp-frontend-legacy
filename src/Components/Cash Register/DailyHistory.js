@@ -1447,15 +1447,27 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         if (!selectedFileForPopup || !currentFileRow) return;
         try {
             const project = siteOptions.find(opt => opt.id === Number(currentFileRow.project_id));
-            const siteNo = project?.siteNo || "";
+            const siteNo = project?.sNo || "";
             const name =
                 laboursList.find(opt => opt.id === Number(currentFileRow.labour_id))?.label ||
                 vendorOptions.find(opt => opt.id === Number(currentFileRow.vendor_id))?.label ||
                 contractorOptions.find(opt => opt.id === Number(currentFileRow.contractor_id))?.label ||
                 employeeOptions.find(opt => opt.id === Number(currentFileRow.employee_id))?.label ||
                 "";
+            const now = new Date();
+            const timestamp = now.toLocaleString("en-GB", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true
+            })
+                .replace(",", "")
+                .replace(/\s/g, "-");
+
             const formData = new FormData();
-            const finalName = `${formatDateOnly(currentFileRow.date)}-${siteNo}-${name}`;
+            const finalName = `${timestamp}-${siteNo}-${name}`;
             formData.append("file", selectedFileForPopup);
             formData.append("file_name", finalName);
             const uploadResponse = await fetch(

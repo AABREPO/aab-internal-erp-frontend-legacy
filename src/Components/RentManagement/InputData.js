@@ -447,7 +447,7 @@ const InputData = ({ username, userRoles = [] }) => {
     updatedDetails[index][field] = value;
     setEditProject((prev) => ({
       ...prev,
-      propertyDetailsList: sortPropertyDetailsByShopNo(updatedDetails),
+      propertyDetailsList: updatedDetails,
     }));
   };
   const addEditOwner = () => {
@@ -466,7 +466,7 @@ const InputData = ({ username, userRoles = [] }) => {
   const addEditPropertyDetail = () => {
     setEditProject((prev) => ({
       ...prev,
-      propertyDetailsList: sortPropertyDetailsByShopNo([
+      propertyDetailsList: [
         ...prev.propertyDetailsList,
         {
           projectType: "",
@@ -482,7 +482,7 @@ const InputData = ({ username, userRoles = [] }) => {
           waterTaxNo: "",
           waterTaxFrequency: ""
         },
-      ]),
+      ],
     }));
   };
   const handleTenantChange = (e) => {
@@ -1706,6 +1706,8 @@ const InputData = ({ username, userRoles = [] }) => {
   const handleSubmitEditProject = async (e) => {
     e.preventDefault();
     try {
+      // Sort property details only on submit
+      const sortedPropertyDetails = sortPropertyDetailsByShopNo(editProject.propertyDetailsList);
       const payload = {
         projectName: editProject.projectName,
         projectAddress: editProject.projectAddress,
@@ -1713,7 +1715,7 @@ const InputData = ({ username, userRoles = [] }) => {
         projectCategory: editProject.projectCategory,
         projectReferenceName: editProject.projectReferenceName,
         ownerDetails: editProject.ownerDetailsList,       // mapped for backend
-        propertyDetails: editProject.propertyDetailsList  // mapped for backend
+        propertyDetails: sortedPropertyDetails  // mapped for backend - sorted before submit
       };
       const response = await fetch(`https://backendaab.in/aabuilderDash/api/projects/edit/${selectedProjectId}`, {
         method: 'PUT',
@@ -2290,7 +2292,8 @@ const InputData = ({ username, userRoles = [] }) => {
                         <option value="Shop">Shop</option>
                         <option value="House">House</option>
                         <option value="Land">Land</option>
-                        <option value="Flat">Flat</option>
+                        <option value="Office">Office</option>
+                        <option value="Construction">Construction</option>
                       </select>
                     </div>
                     <div>
@@ -2517,8 +2520,10 @@ const InputData = ({ username, userRoles = [] }) => {
                     >
                       <option value="">Select Type</option>
                       <option value="Shop">Shop</option>
-                      <option value="House">House</option>
-                      <option value="Land">Land</option>
+                        <option value="House">House</option>
+                        <option value="Land">Land</option>
+                        <option value="Office">Office</option>
+                        <option value="Construction">Construction</option>
                     </select>
                   </div>
                   <div>
@@ -2831,6 +2836,8 @@ const InputData = ({ username, userRoles = [] }) => {
                         <option value="Shop">Shop</option>
                         <option value="House">House</option>
                         <option value="Land">Land</option>
+                        <option value="Office">Office</option>
+                        <option value="Construction">Construction</option>
                       </select>
                     </div>
                     <div>
@@ -2883,22 +2890,20 @@ const InputData = ({ username, userRoles = [] }) => {
                           <button
                             type="button"
                             onClick={() => handleNewDetailChange(index, 'ebNoPhase', '1P')}
-                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
-                              (detail.ebNoPhase || '1P') === '1P'
+                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${(detail.ebNoPhase || '1P') === '1P'
                                 ? 'bg-[#BF9853] text-white shadow-sm'
                                 : 'text-gray-600 hover:text-gray-800'
-                            }`}
+                              }`}
                           >
                             1P
                           </button>
                           <button
                             type="button"
                             onClick={() => handleNewDetailChange(index, 'ebNoPhase', '3P')}
-                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
-                              detail.ebNoPhase === '3P'
+                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${detail.ebNoPhase === '3P'
                                 ? 'bg-[#BF9853] text-white shadow-sm'
                                 : 'text-gray-600 hover:text-gray-800'
-                            }`}
+                              }`}
                           >
                             3P
                           </button>
@@ -3140,6 +3145,8 @@ const InputData = ({ username, userRoles = [] }) => {
                         <option value="Shop">Shop</option>
                         <option value="House">House</option>
                         <option value="Land">Land</option>
+                        <option value="Office">Office</option>
+                        <option value="Construction">Construction</option>
                       </select>
                     </div>
                     <div>
@@ -3192,22 +3199,20 @@ const InputData = ({ username, userRoles = [] }) => {
                           <button
                             type="button"
                             onClick={() => handleEditDetailChange(index, 'ebNoPhase', '1P')}
-                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
-                              (detail.ebNoPhase || '1P') === '1P'
+                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${(detail.ebNoPhase || '1P') === '1P'
                                 ? 'bg-[#BF9853] text-white shadow-sm'
                                 : 'text-gray-600 hover:text-gray-800'
-                            }`}
+                              }`}
                           >
                             1P
                           </button>
                           <button
                             type="button"
                             onClick={() => handleEditDetailChange(index, 'ebNoPhase', '3P')}
-                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
-                              detail.ebNoPhase === '3P'
+                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${detail.ebNoPhase === '3P'
                                 ? 'bg-[#BF9853] text-white shadow-sm'
                                 : 'text-gray-600 hover:text-gray-800'
-                            }`}
+                              }`}
                           >
                             3P
                           </button>
@@ -3290,409 +3295,412 @@ const InputData = ({ username, userRoles = [] }) => {
       )}
       {isTenantLinkOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
-          <div className="bg-white rounded-md w-[85rem] h-[44rem] px-2 py-2 overflow-y-auto">
-            <div>
-              <button className="text-red-500 ml-[95%]" onClick={closeTenantLinkPopup}>
-                <img src={cross} alt='cross' className='w-5 h-5' />
-              </button>
-            </div>
-            <form onSubmit={handleTenantLinkSubmit} className="max-w-5xl mx-auto space-y-2">
-              <h2 className="text-2xl font-bold">Tenant Details</h2>
-              <div className='text-left mb-2'>
-                <div className='flex gap-10'>
-                  <div className='mt-3'>
-                    <label className='block font-semibold'>Tenant Name</label>
-                    <input
-                      type="text"
-                      name="tenantName"
-                      value={tenantLinkFormData.tenantName}
-                      onChange={handleTenantLinkChange}
-                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
-                      placeholder="Tenant Name"
-                    />
-                  </div>
-                  <div className='mt-3'>
-                    <label className='block font-semibold'>Tenant FullName</label>
-                    <input
-                      type="text"
-                      name="fullName"
-                      value={tenantLinkFormData.fullName}
-                      onChange={handleTenantLinkChange}
-                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
-                      placeholder="Full Name"
-                    />
-                  </div>
-                </div>
-                <div className='flex gap-10'>
-                  <div className='mt-3'>
-                    <label className='block font-semibold'>Tenant FatherName</label>
-                    <input
-                      type="text"
-                      name="tenantFatherName"
-                      value={tenantLinkFormData.tenantFatherName}
-                      onChange={handleTenantLinkChange}
-                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
-                      placeholder="Father Name"
-                    />
-                  </div>
-                  <div className='mt-3'>
-                    <label className='block font-semibold'>Tenant Age</label>
-                    <input
-                      type="text"
-                      name="age"
-                      value={tenantLinkFormData.age}
-                      onChange={handleTenantLinkChange}
-                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
-                      placeholder="Age"
-                    />
-                  </div>
-                </div>
-                <div className='flex gap-10'>
-                  <div className='mt-3'>
-                    <label className='block font-semibold'>Mobile Number</label>
-                    <input
-                      type="text"
-                      name="mobileNumber"
-                      value={tenantLinkFormData.mobileNumber}
-                      onChange={handleTenantLinkChange}
-                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
-                      placeholder="Mobile Number"
-                    />
-                  </div>
-                  <div className='mt-3'>
-                    <label className='block font-semibold'>Tenant Address</label>
-                    <input
-                      type="text"
-                      name="tenantAddress"
-                      value={tenantLinkFormData.tenantAddress}
-                      onChange={handleTenantLinkChange}
-                      className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
-                      placeholder="Tenant Address"
-                    />
-                  </div>
-                </div>
+          <div className="bg-white rounded-md w-[83rem] h-[44rem] px-6 py-4 pl-24">
+            <div className='overflow-y-auto h-[38rem]'>
+              <div className="flex justify-end mr-4">
+                <button className="text-red-500" onClick={closeTenantLinkPopup}>
+                  <img src={cross} alt='cross' className='w-5 h-5' />
+                </button>
               </div>
-              <h2 className="text-2xl font-bold">Shop Details</h2>
-              {(() => {
-                const projectRefNames = tenantLinkFormData.shopNos
-                  .map(shop => {
-                    const details = getShopDetailsById(shop.shopNoId);
-                    return details?.projectReferenceName;
-                  })
-                  .filter(name => name && name !== '')
-                  .filter((name, index, self) => self.indexOf(name) === index);
-                const showProjectAtTop = projectRefNames.length === 1 && projectRefNames[0];
-                return (
-                  <>
-                    {tenantLinkFormData.shopNos.map((shop, sIndex) => {
-                      const shopDetails = getShopDetailsById(shop.shopNoId);
-                      const filteredShops = getShopsByProjectReferenceName(shop.projectReferenceName);
-                      const selectedShopOption = filteredShops.find(option =>
-                        option.value === shop.shopNoId || option.id === shop.shopNoId ||
-                        String(option.value) === String(shop.shopNoId) || String(option.id) === String(shop.shopNoId)
-                      ) || getAllShopNumbers().find(option =>
-                        option.value === shop.shopNoId || option.id === shop.shopNoId ||
-                        String(option.value) === String(shop.shopNoId) || String(option.id) === String(shop.shopNoId)
-                      );
-                      return (
-                        <div key={sIndex} className="bg-gray-50 p-4 rounded-lg shadow-md mb-6 text-left w-[1150px]">
-                          <div className="flex gap-2 mb-2 ">
-                            <Select
-                              name="projectReferenceName"
-                              options={projectOptions}
-                              value={projectOptions.find(opt => opt.value === shop.projectReferenceName)}
-                              onChange={(selectedOption) => {
-                                const projectRefName = selectedOption?.value || '';
-                                handleTenantLinkShopChange(sIndex, {
-                                  target: {
-                                    name: 'projectReferenceName',
-                                    value: projectRefName
-                                  }
-                                });
-                                if (selectedShopOption && selectedShopOption.projectReferenceName !== projectRefName) {
+              <form onSubmit={handleTenantLinkSubmit} className=" space-y-2">
+                <h2 className="text-2xl font-bold">Tenant Details</h2>
+                <div className='text-left mb-2'>
+                  <div className='flex gap-10'>
+                    <div className='mt-3'>
+                      <label className='block font-semibold'>Tenant Name</label>
+                      <input
+                        type="text"
+                        name="tenantName"
+                        value={tenantLinkFormData.tenantName}
+                        onChange={handleTenantLinkChange}
+                        className="block w-[550px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                        placeholder="Tenant Name"
+                      />
+                    </div>
+                    <div className='mt-3'>
+                      <label className='block font-semibold'>Tenant FullName</label>
+                      <input
+                        type="text"
+                        name="fullName"
+                        value={tenantLinkFormData.fullName}
+                        onChange={handleTenantLinkChange}
+                        className="block w-[550px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                        placeholder="Full Name"
+                      />
+                    </div>
+                  </div>
+                  <div className='flex gap-10'>
+                    <div className='mt-3'>
+                      <label className='block font-semibold'>Tenant FatherName</label>
+                      <input
+                        type="text"
+                        name="tenantFatherName"
+                        value={tenantLinkFormData.tenantFatherName}
+                        onChange={handleTenantLinkChange}
+                        className="block w-[550px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                        placeholder="Father Name"
+                      />
+                    </div>
+                    <div className='mt-3'>
+                      <label className='block font-semibold'>Tenant Age</label>
+                      <input
+                        type="text"
+                        name="age"
+                        value={tenantLinkFormData.age}
+                        onChange={handleTenantLinkChange}
+                        className="block w-[550px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                        placeholder="Age"
+                      />
+                    </div>
+                  </div>
+                  <div className='flex gap-10'>
+                    <div className='mt-3'>
+                      <label className='block font-semibold'>Mobile Number</label>
+                      <input
+                        type="text"
+                        name="mobileNumber"
+                        value={tenantLinkFormData.mobileNumber}
+                        onChange={handleTenantLinkChange}
+                        className="block w-[550px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                        placeholder="Mobile Number"
+                      />
+                    </div>
+                    <div className='mt-3'>
+                      <label className='block font-semibold'>Tenant Address</label>
+                      <input
+                        type="text"
+                        name="tenantAddress"
+                        value={tenantLinkFormData.tenantAddress}
+                        onChange={handleTenantLinkChange}
+                        className="block w-[550px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                        placeholder="Tenant Address"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <h2 className="text-2xl font-bold">Shop Details</h2>
+                {(() => {
+                  const projectRefNames = tenantLinkFormData.shopNos
+                    .map(shop => {
+                      const details = getShopDetailsById(shop.shopNoId);
+                      return details?.projectReferenceName;
+                    })
+                    .filter(name => name && name !== '')
+                    .filter((name, index, self) => self.indexOf(name) === index);
+                  const showProjectAtTop = projectRefNames.length === 1 && projectRefNames[0];
+                  return (
+                    <>
+                      {tenantLinkFormData.shopNos.map((shop, sIndex) => {
+                        const shopDetails = getShopDetailsById(shop.shopNoId);
+                        const filteredShops = getShopsByProjectReferenceName(shop.projectReferenceName);
+                        const selectedShopOption = filteredShops.find(option =>
+                          option.value === shop.shopNoId || option.id === shop.shopNoId ||
+                          String(option.value) === String(shop.shopNoId) || String(option.id) === String(shop.shopNoId)
+                        ) || getAllShopNumbers().find(option =>
+                          option.value === shop.shopNoId || option.id === shop.shopNoId ||
+                          String(option.value) === String(shop.shopNoId) || String(option.id) === String(shop.shopNoId)
+                        );
+                        return (
+                          <div key={sIndex} className="bg-gray-50 p-4 rounded-lg shadow-md mb-6 text-left w-[1150px]">
+                            <div className="flex gap-2 mb-2 ">
+                              <Select
+                                name="projectReferenceName"
+                                options={projectOptions}
+                                value={projectOptions.find(opt => opt.value === shop.projectReferenceName)}
+                                onChange={(selectedOption) => {
+                                  const projectRefName = selectedOption?.value || '';
                                   handleTenantLinkShopChange(sIndex, {
                                     target: {
-                                      name: 'shopNoId',
-                                      value: ''
+                                      name: 'projectReferenceName',
+                                      value: projectRefName
                                     }
                                   });
-                                }
-                              }}
-                              placeholder="Property Name"
-                              isSearchable
-                              isClearable
-                              className="w-72 text-sm"
-                              classNamePrefix="select"
-                              menuPortalTarget={document.body}
-                              styles={{
-                                control: (provided, state) => ({
-                                  ...provided,
-                                  height: '44px',
-                                  minHeight: '44px',
-                                  backgroundColor: 'transparent',
-                                  borderWidth: '2px',
-                                  borderColor: state.isFocused
-                                    ? 'rgba(191, 152, 83, 0.5)'
-                                    : 'rgba(191, 152, 83, 0.25)',
-                                  borderRadius: '8px',
-                                  boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                                  '&:hover': {
-                                    borderColor: 'rgba(191, 152, 83, 0.4)',
-                                  },
-                                }),
-                                menuPortal: (base) => ({
-                                  ...base,
-                                  zIndex: 9999,
-                                }),
-                                menu: (provided) => ({
-                                  ...provided,
-                                  zIndex: 9999,
-                                }),
-                                option: (provided, state) => ({
-                                  ...provided,
-                                  backgroundColor: state.isSelected
-                                    ? 'rgba(191, 152, 83, 0.3)'
-                                    : state.isFocused
-                                      ? 'rgba(191, 152, 83, 0.1)'
-                                      : 'white',
-                                  color: 'black',
-                                  fontWeight: state.isSelected ? 'bold' : 'normal',
-                                }),
-                                singleValue: (provided) => ({
-                                  ...provided,
-                                  color: 'black',
-                                }),
-                                placeholder: (provided) => ({
-                                  ...provided,
-                                  color: '#999',
-                                }),
-                              }}
-                            />
-                            <Select
-                              name="shopNo"
-                              options={getShopsByProjectReferenceName(shop.projectReferenceName)}
-                              value={selectedShopOption}
-                              menuPlacement="auto"
-                              onMenuOpen={() => {
-                                if (selectedShopOption) {
-                                  setTimeout(() => {
-                                    const menu = document.querySelector('.select__menu');
-                                    if (menu) {
-                                      const menuList = menu.querySelector('.select__menu-list');
-                                      if (menuList) {
-                                        const options = menuList.querySelectorAll('.select__option');
-                                        options.forEach((option) => {
-                                          if (option.textContent === selectedShopOption.label ||
-                                            option.textContent === String(selectedShopOption.shopNo)) {
-                                            option.scrollIntoView({ block: 'center', behavior: 'auto' });
-                                          }
-                                        });
-                                      }
-                                    }
-                                  }, 50);
-                                }
-                              }}
-                              onChange={(selectedOption) => {
-                                if (selectedOption) {
-                                  const shopDetails = getShopDetailsById(selectedOption.value || selectedOption.id);
-                                  handleTenantLinkShopChange(sIndex, {
-                                    target: {
-                                      name: 'shopNoId',
-                                      value: selectedOption.value || selectedOption.id
-                                    }
-                                  });
-                                  // Auto-populate project reference name if not set
-                                  if (!shop.projectReferenceName && shopDetails?.projectReferenceName) {
+                                  if (selectedShopOption && selectedShopOption.projectReferenceName !== projectRefName) {
                                     handleTenantLinkShopChange(sIndex, {
                                       target: {
-                                        name: 'projectReferenceName',
-                                        value: shopDetails.projectReferenceName
+                                        name: 'shopNoId',
+                                        value: ''
                                       }
                                     });
                                   }
-                                } else {
-                                  // Handle clear
-                                  handleTenantLinkShopChange(sIndex, {
-                                    target: {
-                                      name: 'shopNoId',
-                                      value: ''
+                                }}
+                                placeholder="Property Name"
+                                isSearchable
+                                isClearable
+                                className="w-60 text-sm"
+                                classNamePrefix="select"
+                                menuPortalTarget={document.body}
+                                styles={{
+                                  control: (provided, state) => ({
+                                    ...provided,
+                                    height: '44px',
+                                    minHeight: '44px',
+                                    backgroundColor: 'transparent',
+                                    borderWidth: '2px',
+                                    borderColor: state.isFocused
+                                      ? 'rgba(191, 152, 83, 0.5)'
+                                      : 'rgba(191, 152, 83, 0.25)',
+                                    borderRadius: '8px',
+                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                    '&:hover': {
+                                      borderColor: 'rgba(191, 152, 83, 0.4)',
+                                    },
+                                  }),
+                                  menuPortal: (base) => ({
+                                    ...base,
+                                    zIndex: 9999,
+                                  }),
+                                  menu: (provided) => ({
+                                    ...provided,
+                                    zIndex: 9999,
+                                  }),
+                                  option: (provided, state) => ({
+                                    ...provided,
+                                    backgroundColor: state.isSelected
+                                      ? 'rgba(191, 152, 83, 0.3)'
+                                      : state.isFocused
+                                        ? 'rgba(191, 152, 83, 0.1)'
+                                        : 'white',
+                                    color: 'black',
+                                    fontWeight: state.isSelected ? 'bold' : 'normal',
+                                  }),
+                                  singleValue: (provided) => ({
+                                    ...provided,
+                                    color: 'black',
+                                  }),
+                                  placeholder: (provided) => ({
+                                    ...provided,
+                                    color: '#999',
+                                  }),
+                                }}
+                              />
+                              <Select
+                                name="shopNo"
+                                options={getShopsByProjectReferenceName(shop.projectReferenceName)}
+                                value={selectedShopOption}
+                                menuPlacement="auto"
+                                onMenuOpen={() => {
+                                  if (selectedShopOption) {
+                                    setTimeout(() => {
+                                      const menu = document.querySelector('.select__menu');
+                                      if (menu) {
+                                        const menuList = menu.querySelector('.select__menu-list');
+                                        if (menuList) {
+                                          const options = menuList.querySelectorAll('.select__option');
+                                          options.forEach((option) => {
+                                            if (option.textContent === selectedShopOption.label ||
+                                              option.textContent === String(selectedShopOption.shopNo)) {
+                                              option.scrollIntoView({ block: 'center', behavior: 'auto' });
+                                            }
+                                          });
+                                        }
+                                      }
+                                    }, 50);
+                                  }
+                                }}
+                                onChange={(selectedOption) => {
+                                  if (selectedOption) {
+                                    const shopDetails = getShopDetailsById(selectedOption.value || selectedOption.id);
+                                    handleTenantLinkShopChange(sIndex, {
+                                      target: {
+                                        name: 'shopNoId',
+                                        value: selectedOption.value || selectedOption.id
+                                      }
+                                    });
+                                    // Auto-populate project reference name if not set
+                                    if (!shop.projectReferenceName && shopDetails?.projectReferenceName) {
+                                      handleTenantLinkShopChange(sIndex, {
+                                        target: {
+                                          name: 'projectReferenceName',
+                                          value: shopDetails.projectReferenceName
+                                        }
+                                      });
                                     }
-                                  });
-                                }
-                              }}
-                              placeholder="Shop No"
-                              isSearchable
-                              isClearable
-                              className="w-44 text-sm"
-                              classNamePrefix="select"
-                              menuPortalTarget={document.body}
-                              styles={{
-                                control: (provided, state) => ({
-                                  ...provided,
-                                  height: '44px',
-                                  minHeight: '44px',
-                                  backgroundColor: 'transparent',
-                                  borderWidth: '2px',
-                                  borderColor: state.isFocused
-                                    ? 'rgba(191, 152, 83, 0.5)'
-                                    : 'rgba(191, 152, 83, 0.25)',
-                                  borderRadius: '8px',
-                                  boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                                  '&:hover': {
-                                    borderColor: 'rgba(191, 152, 83, 0.4)',
-                                  },
-                                }),
-                                menuPortal: (base) => ({
-                                  ...base,
-                                  zIndex: 9999,
-                                }),
-                                menu: (provided) => ({
-                                  ...provided,
-                                  zIndex: 9999,
-                                }),
-                                option: (provided, state) => ({
-                                  ...provided,
-                                  backgroundColor: state.isSelected
-                                    ? 'rgba(191, 152, 83, 0.3)'
-                                    : state.isFocused
-                                      ? 'rgba(191, 152, 83, 0.1)'
-                                      : 'white',
-                                  color: 'black',
-                                  fontWeight: state.isSelected ? 'bold' : 'normal',
-                                }),
-                                singleValue: (provided) => ({
-                                  ...provided,
-                                  color: 'black',
-                                }),
-                                placeholder: (provided) => ({
-                                  ...provided,
-                                  color: '#999',
-                                }),
-                              }}
-                            />
-                            <input
-                              type="text"
-                              name="doorNo"
-                              value={shopDetails?.doorNo || ''}
-                              readOnly
-                              className="border-2 text-sm border-[#BF9853] w-28 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
-                              placeholder="Door No"
-                            />
-                            <input
-                              type="text"
-                              name="projectType"
-                              value={shopDetails?.projectType || ''}
-                              readOnly
-                              className="border-2 text-sm border-[#BF9853] w-32 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
-                              placeholder="Project type"
-                            />
-                            <input
-                              type="text"
-                              name="floorName"
-                              value={shopDetails?.floorName || ''}
-                              readOnly
-                              className="border-2 text-sm border-[#BF9853] w-36 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
-                              placeholder="Floor"
-                            />
-                            <div className='flex gap-1'>
+                                  } else {
+                                    // Handle clear
+                                    handleTenantLinkShopChange(sIndex, {
+                                      target: {
+                                        name: 'shopNoId',
+                                        value: ''
+                                      }
+                                    });
+                                  }
+                                }}
+                                placeholder="Shop No"
+                                isSearchable
+                                isClearable
+                                className="w-44 text-sm"
+                                classNamePrefix="select"
+                                menuPortalTarget={document.body}
+                                styles={{
+                                  control: (provided, state) => ({
+                                    ...provided,
+                                    height: '44px',
+                                    minHeight: '44px',
+                                    backgroundColor: 'transparent',
+                                    borderWidth: '2px',
+                                    borderColor: state.isFocused
+                                      ? 'rgba(191, 152, 83, 0.5)'
+                                      : 'rgba(191, 152, 83, 0.25)',
+                                    borderRadius: '8px',
+                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                    '&:hover': {
+                                      borderColor: 'rgba(191, 152, 83, 0.4)',
+                                    },
+                                  }),
+                                  menuPortal: (base) => ({
+                                    ...base,
+                                    zIndex: 9999,
+                                  }),
+                                  menu: (provided) => ({
+                                    ...provided,
+                                    zIndex: 9999,
+                                  }),
+                                  option: (provided, state) => ({
+                                    ...provided,
+                                    backgroundColor: state.isSelected
+                                      ? 'rgba(191, 152, 83, 0.3)'
+                                      : state.isFocused
+                                        ? 'rgba(191, 152, 83, 0.1)'
+                                        : 'white',
+                                    color: 'black',
+                                    fontWeight: state.isSelected ? 'bold' : 'normal',
+                                  }),
+                                  singleValue: (provided) => ({
+                                    ...provided,
+                                    color: 'black',
+                                  }),
+                                  placeholder: (provided) => ({
+                                    ...provided,
+                                    color: '#999',
+                                  }),
+                                }}
+                              />
                               <input
                                 type="text"
-                                name="monthlyRent"
-                                value={formatINR(shop.monthlyRent)}
+                                name="doorNo"
+                                value={shopDetails?.doorNo || ''}
+                                readOnly
+                                className="border-2 text-sm border-[#BF9853] w-16 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
+                                placeholder="Door No"
+                              />
+                              <input
+                                type="text"
+                                name="projectType"
+                                value={shopDetails?.projectType || ''}
+                                readOnly
+                                className="border-2 text-sm border-[#BF9853] w-20 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
+                                placeholder="Project type"
+                              />
+                              <input
+                                type="text"
+                                name="floorName"
+                                value={shopDetails?.floorName || ''}
+                                readOnly
+                                className="border-2 text-sm border-[#BF9853] w-28 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
+                                placeholder="Floor"
+                              />
+                              <div className='flex gap-1'>
+                                <input
+                                  type="text"
+                                  name="monthlyRent"
+                                  value={formatINR(shop.monthlyRent)}
+                                  onChange={(e) => {
+                                    const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                                    handleTenantLinkShopChange(sIndex, {
+                                      target: {
+                                        name: 'monthlyRent',
+                                        value: rawValue,
+                                      },
+                                    });
+                                  }}
+                                  className="border-2 text-sm border-[#BF9853] w-28 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
+                                  placeholder="Rent"
+                                />
+                                <input
+                                  type="checkbox"
+                                  name="shouldCollectAdvance"
+                                  checked={shop.shouldCollectAdvance}
+                                  onChange={(e) => handleTenantLinkShopChange(sIndex, e)}
+                                  className="custom-checkbox cursor-pointer appearance-none w-4 h-4 mt-3 rounded bg-slate-200 checked:bg-[#E2F9E1] checked:border-[#034638] "
+                                />
+                              </div>
+                              <input
+                                type="text"
+                                name="advanceAmount"
+                                value={formatINR(shop.advanceAmount)}
                                 onChange={(e) => {
                                   const rawValue = e.target.value.replace(/[^0-9]/g, '');
                                   handleTenantLinkShopChange(sIndex, {
                                     target: {
-                                      name: 'monthlyRent',
+                                      name: 'advanceAmount',
                                       value: rawValue,
                                     },
                                   });
                                 }}
-                                className="border-2 text-sm border-[#BF9853] w-36 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
-                                placeholder="Rent"
-                              />
-                              <input
-                                type="checkbox"
-                                name="shouldCollectAdvance"
-                                checked={shop.shouldCollectAdvance}
-                                onChange={(e) => handleTenantLinkShopChange(sIndex, e)}
-                                className="custom-checkbox cursor-pointer appearance-none w-4 h-4 mt-3 rounded bg-slate-200 checked:bg-[#E2F9E1] checked:border-[#034638] "
-                              />
-                            </div>
-                            <input
-                              type="text"
-                              name="advanceAmount"
-                              value={formatINR(shop.advanceAmount)}
-                              onChange={(e) => {
-                                const rawValue = e.target.value.replace(/[^0-9]/g, '');
-                                handleTenantLinkShopChange(sIndex, {
-                                  target: {
-                                    name: 'advanceAmount',
-                                    value: rawValue,
-                                  },
-                                });
-                              }}
-                              className="border-2 text-sm border-[#BF9853] w-36 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
-                              placeholder="Advance"
-                            />
-                            <div className="relative flex">
-                              <input
-                                type="date"
-                                name="startingDate"
-                                value={shop.startingDate}
-                                onChange={(e) => {
-                                  const rawValue = e.target.value;
-                                  handleTenantLinkShopChange(sIndex, {
-                                    target: {
-                                      name: 'startingDate',
-                                      value: rawValue,
-                                    },
-                                  });
-                                }}
-                                className="border-2 text-sm border-[#BF9853] w-32 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
+                                className="border-2 text-sm border-[#BF9853] w-28 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
                                 placeholder="Advance"
                               />
-                              {tenantLinkFormData.shopNos.length > 1 && (
-                                <button
-                                  type="button"
-                                  onClick={() => removeTenantLinkShop(sIndex)}
-                                  className=" text-red-500 font-bold ml-3"
-                                >
-                                  <img src={cross} alt='cross' className='w-5 h-5' />
-                                </button>
-                              )}
+                              <div className="relative flex">
+                                <input
+                                  type="date"
+                                  name="startingDate"
+                                  value={shop.startingDate}
+                                  onChange={(e) => {
+                                    const rawValue = e.target.value;
+                                    handleTenantLinkShopChange(sIndex, {
+                                      target: {
+                                        name: 'startingDate',
+                                        value: rawValue,
+                                      },
+                                    });
+                                  }}
+                                  className="border-2 text-sm border-[#BF9853] w-28 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
+                                  placeholder="Advance"
+                                />
+                                {tenantLinkFormData.shopNos.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeTenantLinkShop(sIndex)}
+                                    className=" text-red-500 font-bold ml-3"
+                                  >
+                                    <img src={cross} alt='cross' className='w-5 h-5' />
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </>
-                );
-              })()}
-              <div className='text-left'>
-                <button
-                  type="button"
-                  onClick={addTenantLinkShop}
-                  className='text-[#E4572E] font-bold px-1  border-dashed border-b-2 border-[#BF9853]'
-                >
-                  + Add On
-                </button>
-              </div>
-              <div className="flex space-x-2 mt-6 mb-4">
-                <button
-                  type="submit"
-                  className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
-                >
-                  Submit
-                </button>
-                <button
-                  type="button"
-                  className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
-                  onClick={closeTenantLinkPopup}>
-                  Cancel
-                </button>
-              </div>
-            </form>
+                        );
+                      })}
+                    </>
+                  );
+                })()}
+                <div className='text-left'>
+                  <button
+                    type="button"
+                    onClick={addTenantLinkShop}
+                    className='text-[#E4572E] font-bold px-1  border-dashed border-b-2 border-[#BF9853]'
+                  >
+                    + Add On
+                  </button>
+                </div>
+              </form>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <button
+                type="submit"
+                onClick={handleTenantLinkSubmit}
+                className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
+              >
+                Submit
+              </button>
+              <button
+                type="button"
+                className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
+                onClick={closeTenantLinkPopup}>
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -3716,7 +3724,7 @@ const InputData = ({ username, userRoles = [] }) => {
                         name="tenantName"
                         value={editTenantLinkFormData.tenantName}
                         onChange={handleEditTenantLinkChange}
-                        className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                        className="block w-[600px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
                         placeholder="Tenant Name"
                       />
                     </div>
@@ -3727,7 +3735,7 @@ const InputData = ({ username, userRoles = [] }) => {
                         name="fullName"
                         value={editTenantLinkFormData.fullName}
                         onChange={handleEditTenantLinkChange}
-                        className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                        className="block w-[600px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
                         placeholder="Full Name"
                       />
                     </div>
@@ -3740,7 +3748,7 @@ const InputData = ({ username, userRoles = [] }) => {
                         name="tenantFatherName"
                         value={editTenantLinkFormData.tenantFatherName}
                         onChange={handleEditTenantLinkChange}
-                        className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                        className="block w-[600px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
                         placeholder="Father Name"
                       />
                     </div>
@@ -3751,7 +3759,7 @@ const InputData = ({ username, userRoles = [] }) => {
                         name="age"
                         value={editTenantLinkFormData.age}
                         onChange={handleEditTenantLinkChange}
-                        className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                        className="block w-[600px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
                         placeholder="Age"
                       />
                     </div>
@@ -3764,7 +3772,7 @@ const InputData = ({ username, userRoles = [] }) => {
                         name="mobileNumber"
                         value={editTenantLinkFormData.mobileNumber}
                         onChange={handleEditTenantLinkChange}
-                        className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                        className="block w-[600px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
                         placeholder="Mobile Number"
                       />
                     </div>
@@ -3775,7 +3783,7 @@ const InputData = ({ username, userRoles = [] }) => {
                         name="tenantAddress"
                         value={editTenantLinkFormData.tenantAddress}
                         onChange={handleEditTenantLinkChange}
-                        className="block w-[450px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
+                        className="block w-[600px] border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg focus:outline-none"
                         placeholder="Tenant Address"
                       />
                     </div>

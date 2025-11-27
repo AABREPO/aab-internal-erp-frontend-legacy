@@ -22,8 +22,6 @@ const Summary = () => {
   const [selectedPaymentModeMonth, setSelectedPaymentModeMonth] = useState("");
   const [monthTotal, setMonthTotal] = useState(0);
   const [filteredMonthTotal, setFilteredMonthTotal] = useState(0);
-  const [projects, setProjects] = useState([]);
-  const [tenantShopData, setTenantShopData] = useState([]);
   const [shopNoIdToShopNoMap, setShopNoIdToShopNoMap] = useState({});
   const [tenantNameIdToTenantNameMap, setTenantNameIdToTenantNameMap] = useState({});
   useEffect(() => {
@@ -68,7 +66,6 @@ const Summary = () => {
         const ownProjects = Array.isArray(data)
           ? data.filter(p => (p.projectCategory || '').toLowerCase() === 'own project')
           : [];
-        setProjects(ownProjects);
         const shopNoIdMap = {};
         ownProjects
           .filter(project => project.projectReferenceName)
@@ -93,7 +90,6 @@ const Summary = () => {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll');
       if (response.ok) {
         const data = await response.json();
-        setTenantShopData(data);
         const tenantNameIdMap = {};
         data.forEach(tenant => {
           if (tenant.id && tenant.tenantName) {
@@ -155,7 +151,6 @@ const Summary = () => {
       setFilteredByPaymentModeTotal(filteredTotal);
     }
   }, [fromDate, toDate, selectedPaymentMode, selectedTypes, rentForms]);
-
   useEffect(() => {
     if (selectedMonth) {
       const monthFiltered = rentForms.filter(
@@ -235,6 +230,20 @@ const Summary = () => {
       maximumFractionDigits: 0,
     }).format(amount);
   };
+  const toYearMonthString = (value) => {
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return null;
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+  };
+  const adjustYearMonth = (yearMonthStr, offsetMonths = 0) => {
+    if (!yearMonthStr) return null;
+    const [year, month] = yearMonthStr.split('-').map(Number);
+    if (Number.isNaN(year) || Number.isNaN(month)) return null;
+    const date = new Date(year, month - 1 + offsetMonths, 1);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  };
   const parsePaidOnDate = (dateString) => {
     if (!dateString) return null;
     if (dateString.includes('-')) {
@@ -291,7 +300,7 @@ const Summary = () => {
     });
     const previousMonthStr = formatMonth(getPreviousMonth(fromDate));
     const totalPreviousMonthAmount = mappedData
-      .filter(entry => formatMonth(entry.forTheMonthOf) === previousMonthStr)
+      .filter(entry => entry.forTheMonthOf && formatMonth(entry.forTheMonthOf) === previousMonthStr)
       .reduce((sum, entry) => sum + getEntryAmountValue(entry), 0);
     mappedData.sort((a, b) => a.shopNo.localeCompare(b.shopNo, undefined, { numeric: true }));
     let totalCash = 0;
@@ -311,22 +320,22 @@ const Summary = () => {
     const startX = 14;
     const startY = 15;
     const rowHeight = 12;
-    doc.rect(startX, startY, 15, rowHeight); 
+    doc.rect(startX, startY, 15, rowHeight);
     doc.rect(startX + 15, startY, 25, rowHeight);
     doc.rect(startX + 40, startY, 100, rowHeight * 2);
     doc.rect(startX + 40, startY, 22, rowHeight * 2);
     doc.rect(startX + 140, startY, 22, rowHeight);
-    doc.rect(startX + 162, startY, 22, rowHeight); 
+    doc.rect(startX + 162, startY, 22, rowHeight);
     doc.rect(startX + 184, startY, 36, rowHeight);
     doc.rect(startX + 220, startY, 28, rowHeight);
     doc.rect(startX + 248, startY, 21, rowHeight);
-    doc.rect(startX, startY + rowHeight, 15, rowHeight); 
+    doc.rect(startX, startY + rowHeight, 15, rowHeight);
     doc.rect(startX + 15, startY + rowHeight, 25, rowHeight);
     doc.rect(startX + 140, startY + rowHeight, 22, rowHeight);
     doc.rect(startX + 162, startY + rowHeight, 22, rowHeight);
     doc.rect(startX + 184, startY + rowHeight, 36, rowHeight);
     doc.rect(startX + 220, startY + rowHeight, 28, rowHeight);
-    doc.rect(startX + 248, startY + rowHeight, 21, rowHeight); 
+    doc.rect(startX + 248, startY + rowHeight, 21, rowHeight);
     doc.rect(startX + 40, startY + rowHeight, 100, rowHeight);
     doc.rect(startX + 40, startY + rowHeight, 22, rowHeight);
     doc.setFontSize(10);
@@ -368,10 +377,9 @@ const Summary = () => {
     doc.text(` DATE:`, 252, 36);
     doc.setFontSize(11);
     doc.text(`${formatDate(toDate)}`, 262.5, 33);
-    const tableColumn = ['S.No', 'Entry No', 'Date', 'Shop No', 'Tenant Name', 'Amount', 'Form Type', 'Paid On', 'For The Month Of', 'Mode'];
+    const tableColumn = ['S.No', 'Date', 'Shop No', 'Tenant Name', 'Amount', 'Form Type', 'Paid On', 'For The Month Of', 'Mode', 'Eno'];
     const tableRows = mappedData.map((entry, index) => [
-      index + 1,
-      entry.eno || entry.entryNo || '',
+      index + 1,      
       formatDateTime(entry.timestamp),
       entry.shopNo,
       entry.tenantName,
@@ -380,6 +388,7 @@ const Summary = () => {
       formatDateOnly(entry.paidOnDate),
       entry.forTheMonthOf ? formatMonth(entry.forTheMonthOf) : '',
       entry.paymentMode,
+      entry.eno || entry.entryNo || '',
     ]);
     autoTable(doc, {
       startY: 39.2,
@@ -402,8 +411,8 @@ const Summary = () => {
           const rightX = leftX + data.table.columns.reduce((acc, col) => acc + col.width, 0);
           doc.setDrawColor(0);
           doc.setLineWidth(0.3);
-          doc.line(leftX, y, leftX, y + h);     // Left border
-          doc.line(rightX, y, rightX, y + h);   // Right border (end of table)
+          doc.line(leftX, y, leftX, y + h);
+          doc.line(rightX, y, rightX, y + h); 
           doc.line(leftX, y, rightX, y);
         }
       }
@@ -449,8 +458,7 @@ const Summary = () => {
     });
     const totalAmount = totalCash + totalNetBanking;
     const tableHeaders = [
-      "S.No",
-      "Entry No",
+      "S.No",      
       "Date",
       "Shop No",
       "Tenant Name",
@@ -458,13 +466,13 @@ const Summary = () => {
       "Form Type",
       "Paid On",
       "For The Month Of",
-      "Payment Mode"
+      "Payment Mode",
+      "Entry No"
     ];
     const tableRows = mappedData.map((entry, index) => {
       const amountValue = getEntryAmountValue(entry);
       return [
-        index + 1,
-        entry.eno || entry.entryNo || "",
+        index + 1,        
         formatDateTime(entry.timestamp),
         entry.shopNo,
         entry.tenantName,
@@ -472,7 +480,8 @@ const Summary = () => {
         entry.formType,
         formatDateOnly(entry.paidOnDate),
         entry.forTheMonthOf ? formatMonth(entry.forTheMonthOf) : "",
-        entry.paymentMode
+        entry.paymentMode,
+        entry.eno || entry.entryNo || ""
       ];
     });
     const summarySection = [
@@ -502,8 +511,10 @@ const Summary = () => {
     const startX = 14;
     const startY = 15;
     const rowHeight = 12;
+    const targetMonth = selectedMonth ? toYearMonthString(selectedMonth) : null;
     const dataToUse = rentForms.filter(entry => {
-      const matchMonth = entry.forTheMonthOf === selectedMonth;
+      const entryMonth = entry.forTheMonthOf ? toYearMonthString(entry.forTheMonthOf) : null;
+      const matchMonth = targetMonth ? entryMonth === targetMonth : true;
       const matchType = selectedType ? entry.formType === selectedType : true;
       const matchMode = selectedPaymentModeMonth ? entry.paymentMode === selectedPaymentModeMonth : true;
       return matchMonth && matchType && matchMode;
@@ -521,82 +532,87 @@ const Summary = () => {
         tenantName: tenantName
       };
     });
-    const totalCash = mappedData
-      .filter(entry => entry.paymentMode === 'Cash')
-      .reduce((sum, entry) => sum + getEntryAmountValue(entry), 0);
-    const totalNetBanking = mappedData
-      .filter(entry => entry.paymentMode === 'Net Banking')
-      .reduce((sum, entry) => sum + getEntryAmountValue(entry), 0);
+    let totalCash = 0;
+    let totalNetBanking = 0;
+    mappedData.forEach((entry) => {
+      const amountValue = getEntryAmountValue(entry);
+      if (entry.paymentMode === 'Cash') {
+        totalCash += amountValue;
+      }
+      if (entry.paymentMode === 'Net Banking') {
+        totalNetBanking += amountValue;
+      }
+    });
     const totalAmount = totalCash + totalNetBanking;
     mappedData.sort((a, b) => a.shopNo.localeCompare(b.shopNo, undefined, { numeric: true }));
-    doc.rect(startX, startY, 15, rowHeight); // "MONTH"
-    doc.rect(startX + 15, startY, 25, rowHeight); // Value
-    doc.rect(startX + 40, startY, 104, rowHeight * 2); // Heading
-    doc.rect(startX + 40, startY, 26, rowHeight * 2);
-    doc.rect(startX + 144, startY, 15, rowHeight); // CASH
-    doc.rect(startX + 159, startY, 25, rowHeight); // NET BANKING
+    doc.rect(startX, startY, 15, rowHeight);
+    doc.rect(startX + 15, startY, 25, rowHeight);
+    doc.rect(startX + 40, startY, 100, rowHeight * 2);
+    doc.rect(startX + 40, startY, 22, rowHeight * 2);
+    doc.rect(startX + 140, startY, 22, rowHeight);
+    doc.rect(startX + 162, startY, 22, rowHeight);
     doc.rect(startX + 184, startY, 36, rowHeight);
-    doc.rect(startX, startY + rowHeight, 15, rowHeight); // "DATE"
+    doc.rect(startX + 220, startY, 28, rowHeight);
+    doc.rect(startX + 248, startY, 21, rowHeight);
+    doc.rect(startX, startY + rowHeight, 15, rowHeight);
     doc.rect(startX + 15, startY + rowHeight, 25, rowHeight);
-    doc.rect(startX + 144, startY + rowHeight, 15, rowHeight);
-    doc.rect(startX + 159, startY + rowHeight, 25, rowHeight);
+    doc.rect(startX + 140, startY + rowHeight, 22, rowHeight);
+    doc.rect(startX + 162, startY + rowHeight, 22, rowHeight);
     doc.rect(startX + 184, startY + rowHeight, 36, rowHeight);
-    doc.rect(startX + 40, startY + rowHeight, 104, rowHeight);
-    doc.rect(startX + 40, startY + rowHeight, 26, rowHeight);
-    doc.rect(startX + 220, startY, 28, rowHeight); // COLLECTION START label
-    doc.rect(startX + 248, startY, 21, rowHeight); 
-    doc.rect(startX + 220, startY + rowHeight, 28, rowHeight); // COLLECTION END label
-    doc.rect(startX + 248, startY + rowHeight, 21, rowHeight); 
-    doc.setFontSize(8);
-    doc.text(`COLLECTION `, 243, 20);
-    doc.text(`START DATE:`, 243, 25);
-    doc.setFontSize(11);
-    doc.text(``, 262.5, 24); 
-    doc.setFontSize(8);
-    doc.text(`COLLECTION END`, 236, 32);
-    doc.text(`DATE:`, 252, 36);
-    doc.setFontSize(11);
-    doc.text(``, 262.5, 33); 
+    doc.rect(startX + 220, startY + rowHeight, 28, rowHeight);
+    doc.rect(startX + 248, startY + rowHeight, 21, rowHeight);
+    doc.rect(startX + 40, startY + rowHeight, 100, rowHeight);
+    doc.rect(startX + 40, startY + rowHeight, 22, rowHeight);
     doc.setFontSize(10);
-    doc.text('PROPERTY RENT COLLECTION STATEMENT', 81, 23);
+    doc.text('PROPERTY RENT COLLECTION STATEMENT', 77, 23);
     doc.setFontSize(9);
-    doc.text(`MONTH`, 16, 23);
-    doc.setFontSize(12);
+    doc.text(`MONTH `, 16, 23);
+    doc.setFontSize(10);
     doc.text(`${formatMonth(selectedMonth)}`, 30, 23);
     doc.setFontSize(9);
     doc.text(`DATE`, 18, 33);
     doc.setFontSize(12);
-    doc.text(`${formatDate(new Date())}`, 30, 33);
+    doc.text(`${formatDate(new Date())}`, 32, 33);
     doc.setFontSize(9);
     doc.text(`VACANT`, 57, 32);
     doc.text(`SHOPS:`, 57, 36);
-    doc.setFontSize(12);
-    doc.text(`Rs.${formatINRPlain(totalAmount)}`, 55, 23);
+    doc.setFontSize(10);
+    doc.text(`Rs.${formatINRPlain(totalAmount)}`, 54.5, 23);
     doc.setFontSize(8);
-    doc.text(`CASH`, 161, 23);
+    doc.text(`CASH`, 155, 23);
     doc.setFontSize(11);
-    doc.text(`${formatINRPlain(totalCash)}`, 160, 33);
+    doc.text(`${formatINRPlain(totalCash)}`, 155, 33);
     doc.setFontSize(8);
-    doc.text(`NET BANKING`, 175, 23);
+    doc.text(`NET BANKING `, 177, 23);
     doc.setFontSize(11);
-    doc.text(`${formatINRPlain(totalNetBanking)}`, 180, 33);
+    doc.text(`${formatINRPlain(totalNetBanking)}`, 178, 33);
     doc.setFontSize(8);
     doc.text(`TOTAL RENT COLLECTED`, 198, 20);
     doc.text(`IN THIS MONTH`, 206, 25);
     doc.setFontSize(11);
     doc.text(`${formatINRPlain(totalAmount)}`, 205, 33);
-    const tableColumn = ['S.No', 'Entry No', 'Date', 'Shop No', 'Tenant Name', 'Amount', 'Form Type', 'Paid On', 'For The Month Of', 'Mode'];
+    doc.setFontSize(8);
+    doc.text(`COLLECTION `, 243, 20);
+    doc.text(`START DATE:`, 243, 25);
+    doc.setFontSize(11);
+    doc.text(``, 262.5, 24);
+    doc.setFontSize(8);
+    doc.text(`COLLECTION END `, 236, 32);
+    doc.text(` DATE:`, 252, 36);
+    doc.setFontSize(11);
+    doc.text(``, 262.5, 33);
+    const tableColumn = ['S.No', 'Date', 'Shop No', 'Tenant Name', 'Amount', 'Form Type', 'Paid On', 'For The Month Of', 'Mode', 'Eno'];
     const tableRows = mappedData.map((entry, index) => [
-      index + 1,
-      entry.eno || entry.entryNo || '',
+      index + 1,      
       formatDateTime(entry.timestamp),
       entry.shopNo,
       entry.tenantName,
       formatINRPlain(getEntryAmountValue(entry)),
       entry.formType,
       formatDateOnly(entry.paidOnDate),
-      formatMonth(entry.forTheMonthOf),
+      entry.forTheMonthOf ? formatMonth(entry.forTheMonthOf) : '',
       entry.paymentMode,
+      entry.eno || entry.entryNo || '',
     ]);
     autoTable(doc, {
       startY: 39.2,
@@ -619,16 +635,19 @@ const Summary = () => {
           const rightX = leftX + data.table.columns.reduce((acc, col) => acc + col.width, 0);
           doc.setDrawColor(0);
           doc.setLineWidth(0.3);
-          doc.line(leftX, y, leftX, y + h);     // Left
-          doc.line(rightX, y, rightX, y + h);   // Right
+          doc.line(leftX, y, leftX, y + h);
+          doc.line(rightX, y, rightX, y + h); 
+          doc.line(leftX, y, rightX, y);
         }
       }
     });
     doc.save('transactions_by_month.pdf');
   };
   const exportExportMonthlyExcel = () => {
+    const targetMonth = selectedMonth ? toYearMonthString(selectedMonth) : null;
     const dataToUse = rentForms.filter(entry => {
-      const matchMonth = entry.forTheMonthOf === selectedMonth;
+      const entryMonth = entry.forTheMonthOf ? toYearMonthString(entry.forTheMonthOf) : null;
+      const matchMonth = targetMonth ? entryMonth === targetMonth : true;
       const matchType = selectedType ? entry.formType === selectedType : true;
       const matchMode = selectedPaymentModeMonth ? entry.paymentMode === selectedPaymentModeMonth : true;
       return matchMonth && matchType && matchMode;
@@ -662,20 +681,20 @@ const Summary = () => {
       ["DATE", formatDate(new Date()), "", "", "COLLECTION START", "", "COLLECTION END", ""],
       [],
     ];
-    const tableHeaders = ['S.No', 'Entry No', 'Date', 'Shop No', 'Tenant Name', 'Amount', 'Form Type', 'Paid On', 'For The Month Of', 'Mode'];
+    const tableHeaders = ['S.No', 'Date', 'Shop No', 'Tenant Name', 'Amount', 'Form Type', 'Paid On', 'For The Month Of', 'Mode', 'Entry No'];
     const tableRows = mappedData.map((entry, index) => {
       const amount = getEntryAmountValue(entry);
       return [
-        index + 1,
-        entry.eno || entry.entryNo || '',
+        index + 1,        
         formatDateTime(entry.timestamp),
         entry.shopNo,
         entry.tenantName,
         amount.toFixed(2),
         entry.formType,
         formatDateOnly(entry.paidOnDate),
-        formatMonth(entry.forTheMonthOf),
-        entry.paymentMode
+        entry.forTheMonthOf ? formatMonth(entry.forTheMonthOf) : '',
+        entry.paymentMode,
+        entry.eno || entry.entryNo || '',
       ];
     });
     const allRows = [...summaryHeader, tableHeaders, ...tableRows];
@@ -698,16 +717,10 @@ const Summary = () => {
           <div className="flex justify-between items-center mb-2.5">
             <h2 className="text-lg font-bold">Date to Date Transaction</h2>
             <div className="flex gap-3">
-              <button
-                className="text-[#007233] text-sm font-semibold hover:underline cursor-pointer flex items-center"
-                onClick={exportExportExcel}
-              >
+              <button className="text-[#007233] text-sm font-semibold hover:underline cursor-pointer flex items-center" onClick={exportExportExcel}>
                 Export XL
               </button>
-              <button
-                className="text-red-500 text-sm font-semibold hover:underline cursor-pointer flex items-center"
-                onClick={exportDateRangePDF}
-              >
+              <button className="text-red-500 text-sm font-semibold hover:underline cursor-pointer flex items-center" onClick={exportDateRangePDF}>
                 Export PDF
               </button>
             </div>
@@ -772,6 +785,8 @@ const Summary = () => {
                   <option value="Rent">Rent</option>
                   <option value="Advance">Advance</option>
                   <option value="Shop Closure">Shop Closure</option>
+                  <option value="Refund">Refund</option>
+                  <option value="Pending Rent">Pending Rent</option>
                 </select>
               </div>
             </div>
@@ -794,25 +809,17 @@ const Summary = () => {
             </div>
           </div>
         </div>
-        {/* Month Transaction */}
         <div>
           <div className="flex justify-between items-center mb-2.5">
             <h2 className="text-lg ml-6 font-bold text-left">Rent Month Transaction</h2>
             <div className="flex gap-3">
-              <button
-                className="text-[#007233] text-sm font-semibold hover:underline cursor-pointer flex items-center"
-                onClick={exportExportMonthlyExcel}
-              >
+              <button className="text-[#007233] text-sm font-semibold hover:underline cursor-pointer flex items-center" onClick={exportExportMonthlyExcel} >
                 Export XL
               </button>
-              <button
-                className="text-red-500 text-sm font-semibold hover:underline cursor-pointer flex items-center"
-                onClick={exportMonthlyPDF}
-              >
+              <button className="text-red-500 text-sm font-semibold hover:underline cursor-pointer flex items-center" onClick={exportMonthlyPDF} >
                 Export PDF
               </button>
             </div>
-
           </div>
           <div className="bg-[#FAF6ED] p-6 ml-6 rounded shadow-md w-[478px] h-[325px]">
             <div className="flex flex-col gap-4 text-left">
@@ -839,9 +846,7 @@ const Summary = () => {
                   }
                   className="border-2 border-opacity-[0.22] border-[#BF9853] p-2 rounded-lg w-[150px] h-[45px] focus:outline-none"
                 />
-                <select
-                  value={selectedPaymentModeMonth}
-                  onChange={(e) => setSelectedPaymentModeMonth(e.target.value)}
+                <select value={selectedPaymentModeMonth} onChange={(e) => setSelectedPaymentModeMonth(e.target.value)}
                   className="border-2 border-opacity-[0.22] font-semibold border-[#BF9853] p-2 rounded-lg text-sm w-[136px] h-[45px] focus:outline-none"
                 >
                   <option value="">Select Mode</option>
@@ -859,6 +864,8 @@ const Summary = () => {
                   <option value="Rent">Rent</option>
                   <option value="Advance">Advance</option>
                   <option value="Shop Closure">Shop Closure</option>
+                  <option value="Refund">Refund</option>
+                  <option value="Pending Rent">Pending Rent</option>
                 </select>
               </div>
               <label className="text-base mt-[-4px] font-bold">Total Amount</label>

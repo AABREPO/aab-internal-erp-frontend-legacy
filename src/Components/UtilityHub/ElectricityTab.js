@@ -730,9 +730,9 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                         </div>
                     </div>
                     <div className="border-l-8 border-l-[#BF9853] rounded-lg">
-                        <div className="overflow-x-auto">
-                            <table className="w-full border-collapse">
-                                <thead>
+                        <div className="overflow-y-auto h-[480px]">
+                            <table className="w-full border-collapse ">
+                                <thead className="sticky top-0 z-10">
                                     <tr className="bg-[#FAF6ED]">
                                         <td className=" px-4 py-2 text-left font-semibold">Sl.No</td>
                                         <td className=" px-4 py-2 text-left font-semibold">PID</td>

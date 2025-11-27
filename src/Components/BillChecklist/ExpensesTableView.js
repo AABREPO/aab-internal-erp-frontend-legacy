@@ -702,7 +702,7 @@ const ExpenseTableView = () => {
 export default ExpenseTableView;
 const formatDate = (dateString) => {
     const date = new Date(dateString);
-    date.setMinutes(date.getMinutes() + 330);
+    date.setMinutes(date.getMinutes());
 
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');

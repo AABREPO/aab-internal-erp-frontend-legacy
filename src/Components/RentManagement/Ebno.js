@@ -358,28 +358,57 @@ const Ebno = () => {
             setSortOrder('asc');
         }
     };
-    const sortedEbProperties = [...filteredEbProperties].sort((a, b) => {
+
+    const parseDashboardStyleShopNo = (shopNoValue) => {
+        if (!shopNoValue) return { letters: '', number: 0, suffix: '' };
+        const normalized = shopNoValue.toString().replace(/\s+/g, '').toUpperCase();
+        const baseValue = normalized.split(',')[0];
+        const letterMatch = baseValue.match(/^([A-Z]{1,2})/);
+        const numberMatch = baseValue.match(/(\d+)/);
+        const suffixStartIndex = numberMatch
+            ? baseValue.indexOf(numberMatch[1]) + numberMatch[1].length
+            : (letterMatch ? letterMatch[1].length : 0);
+        const suffix = baseValue.slice(suffixStartIndex) || '';
+        return {
+            letters: letterMatch ? letterMatch[1] : '',
+            number: numberMatch ? parseInt(numberMatch[1], 10) : 0,
+            suffix
+        };
+    };
+
+    const sortedEbProperties = useMemo(() => {
         const getValue = (obj) => {
             if (!sortField) return '';
             if (sortField === 'propertyName') return obj.property.projectReferenceName || '';
             if (sortField === 'ownerName') return obj.owner.clientName || ''; // Use clientName from ownerDetails
-            // Handle projectType mapping
             if (sortField === 'propertyType') return obj.detail.projectType || '';
             return obj.detail[sortField] || '';
         };
 
-        let valA = getValue(a)?.toString().toLowerCase();
-        let valB = getValue(b)?.toString().toLowerCase();
+        return [...filteredEbProperties].sort((a, b) => {
+            let valA = getValue(a);
+            let valB = getValue(b);
 
-        if (sortField === 'shopNo') {
-            valA = valA.charAt(0);
-            valB = valB.charAt(0);
-        }
+            if (sortField === 'shopNo') {
+                const parsedA = parseDashboardStyleShopNo(valA);
+                const parsedB = parseDashboardStyleShopNo(valB);
+                if (parsedA.letters < parsedB.letters) return sortOrder === 'asc' ? -1 : 1;
+                if (parsedA.letters > parsedB.letters) return sortOrder === 'asc' ? 1 : -1;
+                if (parsedA.number < parsedB.number) return sortOrder === 'asc' ? -1 : 1;
+                if (parsedA.number > parsedB.number) return sortOrder === 'asc' ? 1 : -1;
+                if (parsedA.suffix < parsedB.suffix) return sortOrder === 'asc' ? -1 : 1;
+                if (parsedA.suffix > parsedB.suffix) return sortOrder === 'asc' ? 1 : -1;
+                return 0;
+            }
 
-        if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-        if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
-        return 0;
-    });
+            const normalizedA = valA?.toString().toLowerCase() || '';
+            const normalizedB = valB?.toString().toLowerCase() || '';
+
+            if (normalizedA < normalizedB) return sortOrder === 'asc' ? -1 : 1;
+            if (normalizedA > normalizedB) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }, [filteredEbProperties, sortField, sortOrder]);
     const generatePdf = () => {
         const doc = new jsPDF();
         // ✅ Add heading at the top (centered)
@@ -783,9 +812,9 @@ const Ebno = () => {
                         </h1>
                     </div>
                 </div>
-                <div className="rounded-lg border-l-8 border-[#BF9853] h-[500px] overflow-x-auto no-scrollbar">
+                <div className="rounded-lg border-l-8 border-[#BF9853] h-[500px] overflow-x-auto overflow-y-auto no-scrollbar">
                     <table className="border-collapse w-full text-left">
-                        <thead className="h-10">
+                        <thead className="h-10 sticky top-0 z-10 bg-[#FAF6ED]">
                             <tr className="bg-[#FAF6ED]">
                                 <th className="pl-3">S.No</th>
                                 <th onClick={() => handleSort('propertyName')} className="cursor-pointer px-4 py-2 font-semibold">

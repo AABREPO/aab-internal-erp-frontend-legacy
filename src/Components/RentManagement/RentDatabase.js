@@ -17,7 +17,6 @@ const RentDatabase = ({ username, userRoles = [] }) => {
     const [dbShowFilters, setDbShowFilters] = useState(false);
     const [selectedFile, setSelectedFile] = useState(null);
     const [message, setMessage] = useState("");
-    const [editRentForm, setEditRentForm] = useState(false);
     const [selectedDbDate, setSelectedDbDate] = useState('');
     const [shopNoOption, setShopNoOption] = useState([]);
     const [tenantNameOption, setTenantNameOption] = useState([]);
@@ -30,7 +29,6 @@ const RentDatabase = ({ username, userRoles = [] }) => {
     const [dbTenantName, setDbTenantName] = useState('');
     const [dbPaymentMode, setDbPaymentMode] = useState('');
     const [dbFormType, setDbFormType] = useState('');
-    const [eno, setEno] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [audits, setAudits] = useState([]);
     const [selectedDbMonth, setSelectedDbMonth] = useState('');
@@ -111,8 +109,6 @@ const RentDatabase = ({ username, userRoles = [] }) => {
     const [userPermissions, setUserPermissions] = useState([]);
     const [sortField, setSortField] = useState('');
     const [sortOrder, setSortOrder] = useState('asc');
-    const [uploadFile, setUploadFile] = useState(null);
-    const [uploadStatus, setUploadStatus] = useState(null);
     const fileInputRef = useRef(null);
     const currentItems = filteredRentForm;
     const handleSort = (field) => {
@@ -127,23 +123,19 @@ const RentDatabase = ({ username, userRoles = [] }) => {
         ? [...currentItems].sort((a, b) => {
             const valA = a[sortField];
             const valB = b[sortField];
-            // Numeric comparison if both values are numbers
             if (!isNaN(valA) && !isNaN(valB)) {
                 return sortOrder === 'asc' ? valA - valB : valB - valA;
             }
-            // Sort by "For the Month Of" as date
             if (sortField === 'forTheMonthOf') {
                 const dateA = new Date(valA + '-01');
                 const dateB = new Date(valB + '-01');
                 return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
             }
-            // ✅ Sort by Paid On Date
             if (sortField === 'paidOnDate') {
                 const dateA = new Date(valA);
                 const dateB = new Date(valB);
                 return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
             }
-            // Default string comparison
             const strA = valA?.toString().toLowerCase() || '';
             const strB = valB?.toString().toLowerCase() || '';
             return sortOrder === 'asc'
@@ -169,17 +161,14 @@ const RentDatabase = ({ username, userRoles = [] }) => {
             const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
             if (response.ok) {
                 const data = await response.json();
-                // Filter for "own project" category
                 const ownProjects = Array.isArray(data)
                     ? data.filter(p => (p.projectCategory || '').toLowerCase() === 'own project')
                     : [];
                 setProjects(ownProjects);
-                // Extract shop data from projects (only include projects with projectReferenceName)
                 const extractedShops = [];
                 ownProjects
-                    .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
+                    .filter(project => project.projectReferenceName) 
                     .forEach(project => {
-                        // Convert Set to Array if needed
                         const propertyDetailsArray = Array.isArray(project.propertyDetails)
                             ? project.propertyDetails
                             : Array.from(project.propertyDetails || []);
@@ -188,7 +177,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                                 extractedShops.push({
                                     shopNo: shop.shopNo,
                                     doorNo: shop.doorNo || '',
-                                    propertyName: project.projectReferenceName || '', // Use projectReferenceName
+                                    propertyName: project.projectReferenceName || '',
                                     advance: null,
                                     tenantName: null,
                                     tenantId: null,
@@ -199,13 +188,11 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                         });
                     });
                 setAllShops(extractedShops);
-                console.log('Fetched projects:', ownProjects.length, 'projects');
             } else {
                 console.log('Error fetching projects.');
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching projects.');
         }
     };
     const moduleName = "Rent Management";
@@ -230,7 +217,6 @@ const RentDatabase = ({ username, userRoles = [] }) => {
             fetchUserRoles();
         }
     }, [userRoles]);
-    // Function to check if shopNoId is linked to tenantNameId in tenant link data
     const isShopLinkedToTenant = (shopNoId, tenantNameId) => {
         if (!shopNoId || !tenantNameId) return false;
         return tenantShopData.some(tenant => 
@@ -239,25 +225,18 @@ const RentDatabase = ({ username, userRoles = [] }) => {
             tenant.shopNos.some(shop => shop.shopNoId === shopNoId && !shop.shopClosureDate)
         );
     };
-    
     const handleEditClick = (rent) => {
-        // Prevent editing Shop Closure or Refund forms
         if (rent.formType === 'Shop Closure' || rent.formType === 'Refund') {
             alert('Cannot edit Shop Closure or Refund forms');
             return;
         }
-        
-        // Check if shopNoId is linked to tenantNameId
         if (rent.shopNoId && rent.tenantNameId) {
             if (!isShopLinkedToTenant(rent.shopNoId, rent.tenantNameId)) {
                 alert('Cannot edit: Shop is not linked to this tenant in tenant link data');
                 return;
             }
         }
-        
         setEditId(rent.id);
-        // Convert paidOnDate from DD-MM-YYYY to YYYY-MM-DD for date input
-        // Use shopNoId and tenantNameId instead of shopNo and tenantName
         const convertedRent = {
             ...rent,
             paidOnDate: convertDDMMYYYYToYYYYMMDD(rent.paidOnDate),
@@ -279,7 +258,6 @@ const RentDatabase = ({ username, userRoles = [] }) => {
             const response = await fetch('https://backendaab.in/aabuildersDash/api/payment_mode/getAll');
             if (response.ok) {
                 const data = await response.json();
-                // Transform into { value, label } format
                 const formattedOptions = data.map(mode => ({
                     value: mode.modeOfPayment,
                     label: mode.modeOfPayment
@@ -344,7 +322,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
         const displayShopNo = rent.shopNoId && shopNoIdToShopNoMap[rent.shopNoId] ? shopNoIdToShopNoMap[rent.shopNoId] : rent.shopNo;
         const displayTenantName = rent.tenantNameId && tenantNameIdToTenantNameMap[rent.tenantNameId] ? tenantNameIdToTenantNameMap[rent.tenantNameId] : rent.tenantName;
         const matchingShop = allShops.find(shop => shop.shopNo === displayShopNo);
-        const projectReferenceName = matchingShop?.propertyName || 'N/A'; // propertyName stores projectReferenceName
+        const projectReferenceName = matchingShop?.propertyName || 'N/A';
         const qrCodeImage = QRCode;
         const receiptHtml = `
     <html>
@@ -494,7 +472,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                 const sortedExpenses = response.data.sort((a, b) => {
                     const enoA = parseInt(a.id, 10);
                     const enoB = parseInt(b.id, 10);
-                    return enoB - enoA; // descending order
+                    return enoB - enoA;
                 });
                 setRentForms(sortedExpenses);
                 setFilteredRentForm(sortedExpenses);
@@ -527,7 +505,6 @@ const RentDatabase = ({ username, userRoles = [] }) => {
             const matchesTenantName = dbTenantName ? rent.tenantName === dbTenantName : true;
             const matchesPaymentMode = dbPaymentMode ? rent.paymentMode === dbPaymentMode : true;
             const matchesFormType = dbFormType ? rent.formType === dbFormType : true;
-            // Convert selectedDbDate (YYYY-MM-DD) to DD-MM-YYYY for comparison with backend format
             const formattedSelectedDate = selectedDbDate ? convertYYYYMMDDToDDMMYYYY(selectedDbDate) : '';
             const matchesDate = selectedDbDate ? rent.paidOnDate === formattedSelectedDate : true;
             const matchesENo = selectedDbENo ? rent.eno === selectedDbENo : true;
@@ -563,21 +540,17 @@ const RentDatabase = ({ username, userRoles = [] }) => {
         });
         setMonthOptions(formattedMonths);
     }, [dbShopNo, dbTenantName, dbPaymentMode, dbFormType, selectedDbMonth, selectedDbDate, rentForms, selectedDbENo]);
-    // Helper function to convert DD-MM-YYYY to YYYY-MM-DD for date input
     const convertDDMMYYYYToYYYYMMDD = (dateString) => {
         if (!dateString) return '';
-        // If already in YYYY-MM-DD format, return as is
         if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
             return dateString;
         }
-        // Convert from DD-MM-YYYY to YYYY-MM-DD
         if (dateString.includes('-')) {
             const parts = dateString.split('-');
             if (parts.length === 3 && parts[0].length === 2) {
                 return `${parts[2]}-${parts[1]}-${parts[0]}`;
             }
         }
-        // Try parsing as date and converting
         const date = new Date(dateString);
         if (!isNaN(date.getTime())) {
             const year = date.getFullYear();
@@ -587,22 +560,17 @@ const RentDatabase = ({ username, userRoles = [] }) => {
         }
         return dateString;
     };
-
-    // Helper function to convert YYYY-MM-DD to DD-MM-YYYY
     const convertYYYYMMDDToDDMMYYYY = (dateString) => {
         if (!dateString) return '';
-        // If already in DD-MM-YYYY format, return as is
         if (dateString.includes('-') && dateString.split('-')[0].length === 2) {
             return dateString;
         }
-        // Convert from YYYY-MM-DD to DD-MM-YYYY
         if (dateString.includes('-')) {
             const parts = dateString.split('-');
             if (parts.length === 3 && parts[0].length === 4) {
                 return `${parts[2]}-${parts[1]}-${parts[0]}`;
             }
         }
-        // Try parsing as date and converting
         const date = new Date(dateString);
         if (!isNaN(date.getTime())) {
             const day = String(date.getDate()).padStart(2, '0');
@@ -612,19 +580,15 @@ const RentDatabase = ({ username, userRoles = [] }) => {
         }
         return dateString;
     };
-
     const formatDateOnly = (dateString) => {
         if (!dateString) return '';
-        // If already in DD-MM-YYYY format, just replace - with /
         if (dateString.includes('-') && dateString.split('-')[0].length === 2) {
             return dateString.replace(/-/g, '/');
         }
-        // If in YYYY-MM-DD format, convert to DD/MM/YYYY
         if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
             const parts = dateString.split('-');
             return `${parts[2]}/${parts[1]}/${parts[0]}`;
         }
-        // Try parsing as date
         const date = new Date(dateString);
         if (!isNaN(date.getTime())) {
             const day = String(date.getDate()).padStart(2, '0');
@@ -643,28 +607,22 @@ const RentDatabase = ({ username, userRoles = [] }) => {
             if (response.ok) {
                 const data = await response.json();
                 setTenantShopData(data);
-                // Build mapping from shopNoId to shopNo from projects (project management)
                 const shopNoIdToShopNoMap = {};
                 projects
-                    .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
+                    .filter(project => project.projectReferenceName)
                     .forEach(project => {
-                        // Convert Set to Array if needed
                         const propertyDetailsArray = Array.isArray(project.propertyDetails)
                             ? project.propertyDetails
                             : Array.from(project.propertyDetails || []);
-
                         propertyDetailsArray.forEach(detail => {
                             if (detail.shopNo && detail.id) {
                                 shopNoIdToShopNoMap[detail.id] = detail.shopNo;
                             }
                         });
                     });
-
-                // Map all tenant-shop combinations from tenant link data
-                // Filter out shops with shopClosureDate (closed shops)
                 const options = data.flatMap(t =>
                     (t.shopNos || [])
-                        .filter(shop => !shop.shopClosureDate) // Exclude closed shops
+                        .filter(shop => !shop.shopClosureDate) 
                         .map(shop => {
                             const shopNo = shop.shopNoId ? shopNoIdToShopNoMap[shop.shopNoId] : null;
                             return {
@@ -675,13 +633,12 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                                 shopNoId: shop.shopNoId || null
                             };
                         })
-                        .filter(opt => opt.shopNo) // Only include options with valid shopNo
+                        .filter(opt => opt.shopNo)
                 );
                 const tenantOptionsUnique = options.filter(
                     (t, i, arr) => t.label && arr.findIndex(x => x.value === t.value) === i
                 );
                 setTenantOptions(tenantOptionsUnique);
-                // Get unique shop numbers with their IDs
                 const shopMap = new Map();
                 options.forEach(o => {
                     if (o.shopNo && !shopMap.has(o.shopNo)) {
@@ -694,16 +651,12 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                     shopNoId: shopNoId
                 }));
                 setShopNoOptions(shopOptions);
-                
-                // Create ID-based options for edit popup
                 const editShopOptions = Array.from(shopMap.entries()).map(([shopNo, shopNoId]) => ({
                     label: shopNo,
-                    value: shopNoId, // Use shopNoId as value
+                    value: shopNoId, 
                     shopNo: shopNo
                 }));
                 setEditShopNoOptions(editShopOptions);
-                
-                // Create ID-based tenant options for edit popup from tenant link data
                 const editTenantOptions = data.flatMap(t =>
                     (t.shopNos || [])
                         .filter(shop => !shop.shopClosureDate)
@@ -711,7 +664,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                             const shopNo = shop.shopNoId ? shopNoIdToShopNoMap[shop.shopNoId] : null;
                             return {
                                 label: t.tenantName,
-                                value: t.id, // Use tenant ID as value
+                                value: t.id, 
                                 tenantName: t.tenantName,
                                 shopNoId: shop.shopNoId || null,
                                 shopNo: shopNo
@@ -719,7 +672,6 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                         })
                         .filter(opt => opt.shopNo)
                 );
-                // Remove duplicates based on tenant ID
                 const uniqueEditTenantOptions = editTenantOptions.filter(
                     (t, i, arr) => arr.findIndex(x => x.value === t.value) === i
                 );
@@ -732,19 +684,14 @@ const RentDatabase = ({ username, userRoles = [] }) => {
             console.log('Error fetching tenant link data.');
         }
     };
-
-    // Build mapping from IDs to actual values
     useEffect(() => {
-        // Build shopNoId -> shopNo mapping from projects (project management)
         const shopNoIdMap = {};
         projects
-            .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
+            .filter(project => project.projectReferenceName) 
             .forEach(project => {
-                // Convert Set to Array if needed
                 const propertyDetailsArray = Array.isArray(project.propertyDetails)
                     ? project.propertyDetails
                     : Array.from(project.propertyDetails || []);
-
                 propertyDetailsArray.forEach(detail => {
                     if (detail.id && detail.shopNo) {
                         shopNoIdMap[detail.id] = detail.shopNo;
@@ -752,8 +699,6 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                 });
             });
         setShopNoIdToShopNoMap(shopNoIdMap);
-
-        // Build tenantNameId -> tenantName mapping from tenantLinkData
         const tenantNameIdMap = {};
         tenantShopData.forEach(tenant => {
             if (tenant.id && tenant.tenantName) {
@@ -764,9 +709,8 @@ const RentDatabase = ({ username, userRoles = [] }) => {
     }, [projects, tenantShopData]);
     const handleChange = (e) => {
         const { name, type, value, files } = e.target;
-        // Prevent clearing the date field
         if (name === "paidOnDate" && value === "") {
-            return; // Don't update formData if date is being cleared
+            return; 
         }
         setRentFormData({
             ...rentFormData,
@@ -786,31 +730,26 @@ const RentDatabase = ({ username, userRoles = [] }) => {
     };
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
-        // Validate that shopNoId is linked to tenantNameId
         if (rentFormData.shopNoId && rentFormData.tenantNameId) {
             if (!isShopLinkedToTenant(rentFormData.shopNoId, rentFormData.tenantNameId)) {
                 alert('Cannot save: Selected shop is not linked to selected tenant in tenant link data');
                 return;
             }
         }
-        
         const {
             formType, shopNoId, tenantNameId, amount,
             refundAmount, paymentMode, paidOnDate,
             forTheMonthOf, attachedFile
         } = rentFormData;
-        // Convert paidOnDate from YYYY-MM-DD to DD-MM-YYYY for backend
         const formattedPaidOnDate = convertYYYYMMDDToDDMMYYYY(paidOnDate);
-        // Get shopNo and tenantName from IDs for display purposes (optional, backend may not need them)
         const shopNo = shopNoId && shopNoIdToShopNoMap[shopNoId] ? shopNoIdToShopNoMap[shopNoId] : '';
         const tenantName = tenantNameId && tenantNameIdToTenantNameMap[tenantNameId] ? tenantNameIdToTenantNameMap[tenantNameId] : '';
         const payload = {
             formType,
-            shopNo: shopNo, // Keep for backward compatibility
-            shopNoId: shopNoId, // Primary identifier
-            tenantName: tenantName, // Keep for backward compatibility
-            tenantNameId: tenantNameId, // Primary identifier
+            shopNo: shopNo,
+            shopNoId: shopNoId,
+            tenantName: tenantName, 
+            tenantNameId: tenantNameId,
             amount,
             refundAmount,
             paymentMode,
@@ -1003,36 +942,11 @@ const RentDatabase = ({ username, userRoles = [] }) => {
             <div>
                 <div className='md:mt-[-35px] mb-3 text-left max-w-[1850px] md:text-right md:items-center items-start cursor-default flex flex-col sm:flex-row justify-between table-auto  overflow-auto  gap-2 sm:gap-0'>
                     <div></div>
-                    <div className='flex items-center gap-4 mt-12'>
-                        <div className='flex items-center gap-2'>
-                            <input
-                                type="file"
-                                accept=".csv"
-                                onChange={handleFileChange}
-                                className="mb-4"
-                            />
-                            <button
-                                onClick={handleUpload}
-                                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                            >
-                                Upload
-                            </button>
-
-
-                            {message && (
-                                <p className="mt-4 text-lg font-semibold">{message}</p>
-                            )}
-                        </div>
-                        <span
-                            className='text-[#E4572E] mr-4 font-semibold hover:underline cursor-pointer'
-                            onClick={handleExportPDF}
-                        >
+                    <div className='flex items-center gap-4'>
+                        <span className='text-[#E4572E] mr-4 font-semibold hover:underline cursor-pointer' onClick={handleExportPDF}>
                             Export pdf
                         </span>
-                        <span
-                            className='text-[#007233] mr-4 font-semibold hover:underline cursor-pointer'
-                            onClick={handleExportExcel}
-                        >
+                        <span className='text-[#007233] mr-4 font-semibold hover:underline cursor-pointer' onClick={handleExportExcel}>
                             Export XL
                         </span>
                         <span className=' text-[#BF9853] mr-4 font-semibold hover:underline'>Print</span>
@@ -1102,9 +1016,57 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                                 </div>
                             )}
                         </div>
+                        <div className='mb-4 flex items-center gap-3'>
+                            <label className='flex items-center gap-2 px-4 py-2 border border-[#BF9853] rounded-lg cursor-pointer hover:bg-[#BF9853]/5 transition-colors'>
+                                <svg className='w-5 h-5 text-[#BF9853]' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                                    <path strokeLinecap='round' strokeLinejoin='round' strokeWidth='2' d='M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12'></path>
+                                </svg>
+                                <span className='text-sm font-medium text-gray-700'>Choose CSV File</span>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept=".csv"
+                                    onChange={handleFileChange}
+                                    className='hidden'
+                                />
+                            </label>
+                            {selectedFile && (
+                                <span className='text-sm text-gray-600 flex items-center gap-2'>
+                                    <svg className='w-4 h-4 text-[#BF9853]' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                                        <path strokeLinecap='round' strokeLinejoin='round' strokeWidth='2' d='M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'></path>
+                                    </svg>
+                                    <span className='max-w-xs truncate'>{selectedFile.name}</span>
+                                    <button
+                                        onClick={() => {
+                                            setSelectedFile(null);
+                                            if (fileInputRef.current) {
+                                                fileInputRef.current.value = '';
+                                            }
+                                        }}
+                                        className='text-gray-400 hover:text-red-500 ml-1'
+                                        type='button'
+                                    >
+                                        ×
+                                    </button>
+                                </span>
+                            )}
+                            <button onClick={handleUpload} disabled={!selectedFile}
+                                className='bg-[#BF9853] text-white px-4 py-2 rounded-lg font-medium text-sm hover:bg-[#BF9853]/90 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors'
+                            >
+                                Upload
+                            </button>
+                            {message && (
+                                <span className={`text-sm font-medium ${
+                                    message.includes('failed') || message.includes('Please select') 
+                                        ? 'text-red-600' 
+                                        : 'text-green-600'
+                                }`}>
+                                    {message}
+                                </span>
+                            )}
+                        </div>
                         <div>
-                            <button
-                                onClick={resetFilters}
+                            <button onClick={resetFilters}
                                 className='w-36 h-9 border border-[#BF9853] rounded-md font-semibold text-sm text-[#BF9853] flex items-center justify-center gap-2'
                             >
                                 <img className='w-4 h-4' src={Reload} alt="Reload" />
@@ -1125,50 +1087,28 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                                 <thead>
                                     <tr className="bg-[#FAF6ED] text-left">
                                         <th className="px-4 py-2 font-bold">Timestamp</th>
-                                        <th
-                                            className="px-4 py-2 font-bold cursor-pointer"
-                                            onClick={() => handleSort('shopNo')}
-                                        >
+                                        <th className="px-4 py-2 font-bold cursor-pointer" onClick={() => handleSort('shopNo')} >
                                             Shop No {sortField === 'shopNo' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
-                                        <th
-                                            className="px-4 py-2 font-bold"
-                                            onClick={() => handleSort('tenantName')}>
+                                        <th className="px-4 py-2 font-bold" onClick={() => handleSort('tenantName')}>
                                             Tenant Name {sortField === 'tenantName' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
                                         <th className="px-4 py-2 font-bold">Amount</th>
-                                        <th
-                                            className="px-4 py-2 font-bold cursor-pointer"
-                                            onClick={() => handleSort('paidOnDate')}
-                                        >
+                                        <th className="px-4 py-2 font-bold cursor-pointer" onClick={() => handleSort('paidOnDate')} >
                                             Paid on {sortField === 'paidOnDate' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
-                                        <th
-                                            className="px-4 py-2 font-bold cursor-pointer"
-                                            onClick={() => handleSort('eno')}
-                                        >
+                                        <th className="px-4 py-2 font-bold cursor-pointer" onClick={() => handleSort('eno')} >
                                             E No {sortField === 'eno' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
-
-                                        <th
-                                            className="px-4 py-2 font-bold cursor-pointer"
-                                            onClick={() => handleSort('forTheMonthOf')}
-                                        >
+                                        <th className="px-4 py-2 font-bold cursor-pointer" onClick={() => handleSort('forTheMonthOf')} >
                                             For the month of {sortField === 'forTheMonthOf' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
-                                        <th
-                                            className="px-4 py-2 font-bold"
-                                            onClick={() => handleSort('paymentMode')}
-                                        >
+                                        <th className="px-4 py-2 font-bold" onClick={() => handleSort('paymentMode')} >
                                             Payment mode {sortField === 'paymentMode' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
-                                        <th
-                                            className="px-4 py-2 font-bold cursor-pointer"
-                                            onClick={() => handleSort('formType')}
-                                        >
+                                        <th className="px-4 py-2 font-bold cursor-pointer" onClick={() => handleSort('formType')} >
                                             Type {sortField === 'formType' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
-
                                         <th className="px-4 py-2 font-bold">Activity</th>
                                         <th className="px-1 py-2 font-bold">Print</th>
                                     </tr>
@@ -1656,7 +1596,6 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                                             value={editShopNoOptions.find(option => option.value === rentFormData.shopNoId)}
                                             onChange={(selectedOption) => {
                                                 const newShopNoId = selectedOption?.value || null;
-                                                // Validate if new shop is linked to current tenant
                                                 if (newShopNoId && rentFormData.tenantNameId) {
                                                     if (!isShopLinkedToTenant(newShopNoId, rentFormData.tenantNameId)) {
                                                         alert('Selected shop is not linked to the selected tenant in tenant link data');
@@ -1701,7 +1640,6 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                                             value={editTenantOptions.find(opt => opt.value === rentFormData.tenantNameId)}
                                             onChange={(selectedOption) => {
                                                 const newTenantNameId = selectedOption?.value || null;
-                                                // Validate if current shop is linked to new tenant
                                                 if (rentFormData.shopNoId && newTenantNameId) {
                                                     if (!isShopLinkedToTenant(rentFormData.shopNoId, newTenantNameId)) {
                                                         alert('Selected tenant is not linked to the selected shop in tenant link data');
@@ -1850,7 +1788,6 @@ const formatDate = (dateString) => {
 };
 const AuditModal = ({ show, onClose, audits }) => {
     if (!show) return null;
-
     const fields = [
         { key: "TenantName", label: "Tenant Name" },
         { key: "ShopNo", label: "Shop No" },
@@ -1862,11 +1799,10 @@ const AuditModal = ({ show, onClose, audits }) => {
         { key: "AttachedFile", label: "File" },
         { key: "Amount", label: "Amount" },
     ];
-
     const formatDate = (dateString) => {
         if (!dateString) return "-";
         const date = new Date(dateString);
-        date.setMinutes(date.getMinutes()); // IST offset
+        date.setMinutes(date.getMinutes());
         const day = String(date.getDate()).padStart(2, '0');
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const year = date.getFullYear();
@@ -1885,9 +1821,8 @@ const AuditModal = ({ show, onClose, audits }) => {
         if (!dateStr) return "-";
         const date = new Date(dateStr);
         if (isNaN(date)) return "-";
-        return date.toLocaleDateString("en-GB"); // en-GB gives dd/MM/yyyy
+        return date.toLocaleDateString("en-GB");
     };
-
     return (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
             <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1400px] mx-4 p-4">
@@ -1911,7 +1846,6 @@ const AuditModal = ({ show, onClose, audits }) => {
                         <tbody>
                             {audits.map((audit, index) => (
                                 <React.Fragment key={index}>
-                                    {/* OLD row */}
                                     <tr className="odd:bg-white even:bg-[#FAF6ED]">
                                         <td style={{ width: '130px' }} className="border pl-2 text-sm text-left whitespace-nowrap">
                                             {formatDate(audit.editedDate)}
@@ -1921,21 +1855,16 @@ const AuditModal = ({ show, onClose, audits }) => {
                                         </td>
                                         {fields.map(({ key }, i) => {
                                             let oldVal = audit[`old${key}`];
-
-                                            // Format amount fields
                                             if (key.toLowerCase().includes("amount")) {
                                                 oldVal = oldVal && !isNaN(oldVal)
                                                     ? Number(oldVal).toLocaleString("en-IN")
                                                     : "-";
                                             }
-
-                                            // Format paidOnDate fields
                                             if (key.toLowerCase().includes("paidondate")) {
                                                 oldVal = oldVal
-                                                    ? new Date(oldVal).toLocaleDateString("en-GB") // dd/MM/yyyy
+                                                    ? new Date(oldVal).toLocaleDateString("en-GB")
                                                     : "-";
                                             }
-
                                             return (
                                                 <td
                                                     key={key}
@@ -1947,8 +1876,6 @@ const AuditModal = ({ show, onClose, audits }) => {
                                             );
                                         })}
                                     </tr>
-
-                                    {/* NEW row */}
                                     <tr className="odd:bg-white even:bg-[#FAF6ED]">
                                         <td style={{ width: '130px' }} className="border pl-2 text-sm text-left whitespace-nowrap">
                                             {formatDate(audit.editedDate)}
@@ -1959,8 +1886,6 @@ const AuditModal = ({ show, onClose, audits }) => {
                                         {fields.map(({ key }, i) => {
                                             let oldVal = audit[`old${key}`];
                                             let newVal = audit[`new${key}`];
-
-                                            // Format amount fields
                                             if (key.toLowerCase().includes("amount")) {
                                                 oldVal = oldVal && !isNaN(oldVal)
                                                     ? Number(oldVal).toLocaleString("en-IN")
@@ -1969,15 +1894,11 @@ const AuditModal = ({ show, onClose, audits }) => {
                                                     ? Number(newVal).toLocaleString("en-IN")
                                                     : "-";
                                             }
-
-                                            // Format paidOnDate fields
                                             if (key.toLowerCase().includes("paidondate")) {
                                                 oldVal = formatDateDDMMYYYY(oldVal);
                                                 newVal = formatDateDDMMYYYY(newVal);
                                             }
-
                                             const changed = oldVal !== newVal;
-
                                             return (
                                                 <td
                                                     key={key}
@@ -1989,7 +1910,6 @@ const AuditModal = ({ show, onClose, audits }) => {
                                             );
                                         })}
                                     </tr>
-
                                 </React.Fragment>
                             ))}
                         </tbody>

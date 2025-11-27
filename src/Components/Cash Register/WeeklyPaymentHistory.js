@@ -979,6 +979,26 @@ const History = ({ username, userRoles = [] }) => {
             alert("Please fill all fields except date");
             return;
         }
+        if (newExpense.type === "Staff Advance") {
+            if (selectedContractor || selectedVendor) {
+                alert("Staff Advance type only allows Employee. Please select an Employee and remove Contractor/Vendor selection.");
+                return;
+            }
+            if (!selectedEmployee) {
+                alert("Staff Advance type requires an Employee to be selected.");
+                return;
+            }
+        }
+        if (newExpense.type === "Project Advance") {
+            if (selectedEmployee) {
+                alert("Project Advance type only allows Contractor or Vendor. Please select a Contractor/Vendor and remove Employee selection.");
+                return;
+            }
+            if (!selectedContractor && !selectedVendor) {
+                alert("Project Advance type requires either a Contractor or Vendor to be selected.");
+                return;
+            }
+        }
         const payload = {
             date: newExpense.date,
             created_at: new Date().toISOString(),
@@ -1152,7 +1172,7 @@ const History = ({ username, userRoles = [] }) => {
             alert("Error: Data not loaded properly. Please refresh the page and try again.");
             return;
         }
-        const totalExpenses = filteredExpenses.reduce((t, e) => t + Number(e.amount || 0), 0);
+        const totalExpenses = expenses.reduce((t, e) => t + Number(e.amount || 0), 0);
         const totalPayments = payments.reduce((t, p) => t + Number(p.amount || 0), 0);
         const balance = totalPayments - totalExpenses;
         const drawHeader = (doc, titleText = "") => {
@@ -1192,7 +1212,7 @@ const History = ({ username, userRoles = [] }) => {
         };
         drawHeader(doc, "WEEKLY PAYMENT REPORT");
         const expensesHeaders = [["SNO", "Date", "Contractor/Vendor", "Site Name", "Type", "Amount", "AC", "C", ""]];
-        const pdfFilteredExpenses = filteredExpenses.filter(row => row.type !== "Project Advance" && row.type !== "Staff Advance" && row.type !== "Staff Salary" && row.type !== "Daily" && row.type !== "Diwali Bonus");
+        const pdfFilteredExpenses = expenses.filter(row => row.type !== "Project Advance" && row.type !== "Staff Advance" && row.type !== "Staff Salary" && row.type !== "Daily" && row.type !== "Diwali Bonus");
         const expensesData = pdfFilteredExpenses.map((row, idx) => [
             String(idx + 1 || ""),
             String(row.date ? formatDateOnly(row.date) : ""),
@@ -1304,7 +1324,7 @@ const History = ({ username, userRoles = [] }) => {
         doc.line(dividerX, headerBottomY, dividerX, pageHeight - 0);
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
-        const dailyExpenses = filteredExpenses.filter(expense => expense.type === "Daily");
+        const dailyExpenses = expenses.filter(expense => expense.type === "Daily");
         const dailyExpenseData = dailyExpenses.map(expense => [
             String(expense.date ? formatDateOnly(expense.date) : ""), 
             String(Number(expense.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
@@ -1372,7 +1392,7 @@ const History = ({ username, userRoles = [] }) => {
             acc[typeObj.type] = { count: 0, total: 0 };
             return acc;
         }, {});
-        filteredExpenses
+        expenses
             .filter(expense => Number(expense.amount) > 0)
             .forEach(expense => {
                 const type = expense.type;
@@ -1466,7 +1486,7 @@ const History = ({ username, userRoles = [] }) => {
         );
         const newTableX = 520;
         let newTableY = baseY;
-        const staffAdvanceEntries = filteredExpenses.filter(e => e.type === "Staff Advance");
+        const staffAdvanceEntries = expenses.filter(e => e.type === "Staff Advance");
         const staffAdvanceCount = staffAdvanceEntries.length;
         const staffAdvanceTotal = staffAdvanceEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
         const staffAdvanceHead = [[
@@ -1504,7 +1524,7 @@ const History = ({ username, userRoles = [] }) => {
             }
         });
         newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
-        const staffSalaryEntries = filteredExpenses.filter(e => e.type === "Staff Salary");
+        const staffSalaryEntries = expenses.filter(e => e.type === "Staff Salary");
         const staffSalaryCount = staffSalaryEntries.length;
         const staffSalaryTotal = staffSalaryEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
         const staffSalaryHead = [[
@@ -1537,7 +1557,7 @@ const History = ({ username, userRoles = [] }) => {
             }
         });
         newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
-        const diwaliBonusEntries = filteredExpenses.filter(e => e.type === "Diwali Bonus");
+        const diwaliBonusEntries = expenses.filter(e => e.type === "Diwali Bonus");
         const diwaliBonusCount = diwaliBonusEntries.length;
         const diwaliBonusTotal = diwaliBonusEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
         const diwaliBonusY = newTableY + 30; 
@@ -1628,6 +1648,26 @@ const History = ({ username, userRoles = [] }) => {
     };
     const saveEditedExpense = async (row) => {
         try {
+            if (row.type === "Staff Advance") {
+                if (row.contractor_id || row.vendor_id) {
+                    alert("Staff Advance type only allows Employee. Please select an Employee and remove Contractor/Vendor selection.");
+                    return;
+                }
+                if (!row.employee_id) {
+                    alert("Staff Advance type requires an Employee to be selected.");
+                    return;
+                }
+            }
+            if (row.type === "Project Advance") {
+                if (row.employee_id) {
+                    alert("Project Advance type only allows Contractor or Vendor. Please select a Contractor/Vendor and remove Employee selection.");
+                    return;
+                }
+                if (!row.contractor_id && !row.vendor_id) {
+                    alert("Project Advance type requires either a Contractor or Vendor to be selected.");
+                    return;
+                }
+            }
             const originalExpense =
                 editingOriginalRow && editingOriginalRow.id === row.id
                     ? editingOriginalRow
@@ -1890,7 +1930,7 @@ const History = ({ username, userRoles = [] }) => {
                                             <th className="pt-2 w-[120px] font-bold text-left">Activity</th>
                                         </tr>
                                         {showFilters && (
-                                            <tr className="bg-white border-b border-gray-200">
+                                            <tr className="bg-[#FAF6ED] border-b border-gray-200">
                                                 <th className="pt-2 pb-2 w-[60px]"></th>
                                                 <th className="pt-2 pb-2 w-[120px] sm:w-[140px]">
                                                     <input
@@ -2047,7 +2087,15 @@ const History = ({ username, userRoles = [] }) => {
                                                     </select>
                                                 </th>
                                                 <th className="pt-2 pb-2 w-[110px]"></th>
-                                                <th className="pt-2 pb-2 w-[120px]"></th>
+                                                <th className="pt-2 pb-2 w-[120px]">
+                                                    <button
+                                                        onClick={clearFilters}
+                                                        className="px-3 py-1.5 bg-[#BF9853] text-white rounded-lg hover:bg-[#A68B4A] transition-colors text-sm font-semibold"
+                                                        title="Clear all filters"
+                                                    >
+                                                        Clear
+                                                    </button>
+                                                </th>
                                             </tr>
                                         )}
                                     </thead>

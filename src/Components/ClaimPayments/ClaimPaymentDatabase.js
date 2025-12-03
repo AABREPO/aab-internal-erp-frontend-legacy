@@ -9,7 +9,7 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
   const [receivedAmounts, setReceivedAmounts] = useState({});
   const [discountAmounts, setDiscountAmounts] = useState({});
   const [sortColumn, setSortColumn] = useState('date');
-  const [sortDirection, setSortDirection] = useState('desc'); // Default to newest first
+  const [sortDirection, setSortDirection] = useState('desc');
   const [showFilters, setShowFilters] = useState(false);
   const [filterDate, setFilterDate] = useState('');
   const [filterProjectName, setFilterProjectName] = useState('');
@@ -17,8 +17,6 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
   const [showModal, setShowModal] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
   const [claimPaymentsData, setClaimPaymentsData] = useState([]);
-
-  // Drag and scroll functionality
   const scrollRef = useRef(null);
   const isDragging = useRef(false);
   const start = useRef({ x: 0, y: 0 });
@@ -26,8 +24,6 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
   const velocity = useRef({ x: 0, y: 0 });
   const animationFrame = useRef(null);
   const lastMove = useRef({ time: 0, x: 0, y: 0 });
-
-  // Fetch claim data
   useEffect(() => {
     fetch('https://backendaab.in/aabuilderDash/expenses_form/get_form')
       .then((response) => {
@@ -37,7 +33,6 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
         return response.json();
       })
       .then((data) => {
-        // Filter only items with accountType = 'Claim'
         const filteredData = data.filter(item => item.accountType === 'Claim');
         setClaimDataList(filteredData);
       })
@@ -45,8 +40,6 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
         console.error(err.message);
       });
   }, []);
-
-  // Fetch sites
   useEffect(() => {
     const fetchSites = async () => {
       try {
@@ -74,12 +67,9 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
     };
     fetchSites();
   }, []);
-
   const filteredData = selectedSite
     ? claimDataList.filter(item => item.siteName === selectedSite.value)
     : claimDataList;
-
-  // Fetch received amounts and discounts
   useEffect(() => {
     const fetchReceivedAmounts = async () => {
       const amounts = {};
@@ -88,10 +78,8 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
         try {
           const res = await fetch(`https://backendaab.in/aabuildersDash/api/claim_payments/get/${row.id}`);
           const payments = await res.json();
-
           const totalReceived = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
           const totalDiscount = payments.reduce((sum, payment) => sum + (payment.discount_amount || 0), 0);
-
           amounts[row.id] = totalReceived;
           discounts[row.id] = totalDiscount;
         } catch (error) {
@@ -107,8 +95,6 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
       fetchReceivedAmounts();
     }
   }, [filteredData]);
-
-  // Apply additional filters (showing all data, not just fully received)
   const filteredDataWithFilters = filteredData.filter((row) => {
     if (filterDate) {
       const [year, month, day] = filterDate.split("-");
@@ -120,8 +106,6 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
     if (filterCategory && row.category !== filterCategory) return false;
     return true;
   });
-
-  // Sorting function
   const handleSort = (column) => {
     if (sortColumn === column) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -130,8 +114,6 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
       setSortDirection('asc');
     }
   };
-
-  // Sort the data
   const sortedData = [...filteredDataWithFilters].sort((a, b) => {
     if (!sortColumn) return 0;
     let aValue, bValue;
@@ -172,7 +154,6 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
     if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
     return 0;
   });
-
   const customStyles = {
     control: (provided, state) => ({
       ...provided,
@@ -189,11 +170,9 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
       zIndex: 9999,
     }),
   };
-
   const sortedSiteOptions = siteOption.sort((a, b) =>
     a.label.localeCompare(b.label)
   );
-
   const formatDateOnly = (dateString) => {
     const date = new Date(dateString);
     const day = String(date.getDate()).padStart(2, '0');
@@ -201,7 +180,6 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
     const year = date.getFullYear();
     return `${day}-${month}-${year}`;
   };
-
   const formatIndianCurrency = (amount) => {
     if (!amount || isNaN(amount)) return '₹0';
     const numAmount = parseFloat(amount);
@@ -212,13 +190,11 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
       maximumFractionDigits: 2
     }).format(numAmount);
   };
-
   const clearAllFilters = () => {
     setFilterDate('');
     setFilterProjectName('');
     setFilterCategory('');
   };
-
   const handleViewDetails = async (row) => {
     setSelectedRow(row);
     try {
@@ -230,8 +206,6 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
       console.error("Error fetching claim payments:", error);
     }
   };
-
-  // Drag and scroll event handlers
   const handleMouseDown = (e) => {
     if (!scrollRef.current) return;
     isDragging.current = true;
@@ -249,7 +223,6 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
     scrollRef.current.style.userSelect = 'none';
     cancelMomentum();
   };
-
   const handleMouseMove = (e) => {
     if (!isDragging.current || !scrollRef.current) return;
     const dx = e.clientX - start.current.x;
@@ -268,7 +241,6 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
       y: e.clientY,
     };
   };
-
   const handleMouseUp = () => {
     if (!isDragging.current || !scrollRef.current) return;
     isDragging.current = false;
@@ -276,14 +248,12 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
     scrollRef.current.style.userSelect = '';
     applyMomentum();
   };
-
   const cancelMomentum = () => {
     if (animationFrame.current) {
       cancelAnimationFrame(animationFrame.current);
       animationFrame.current = null;
     }
   };
-
   const applyMomentum = () => {
     if (!scrollRef.current) return;
     const friction = 0.95;
@@ -303,7 +273,6 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
     };
     animationFrame.current = requestAnimationFrame(step);
   };
-
   return (
     <body>
       <div className="">
@@ -326,10 +295,7 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
         <div className='h-[600px] bg-white mt-5 p-5 ml-10 mr-10'>
           <div className="flex justify-between items-center mb-3">
             <div className="flex items-center gap-2">
-              <button
-                className='pl-2'
-                onClick={() => setShowFilters(!showFilters)}
-              >
+              <button className='pl-2' onClick={() => setShowFilters(!showFilters)}>
                 <img
                   src={Filter}
                   alt="Toggle Filter"
@@ -363,8 +329,7 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
                     <button onClick={() => setFilterCategory('')} className="text-[#BF9853] text-2xl ml-1">×</button>
                   </span>
                 )}
-                <button
-                  onClick={clearAllFilters}
+                <button onClick={clearAllFilters}
                   className="text-[#BF9853] border border-[#BF9853] rounded px-3 py-1 text-sm font-medium hover:bg-[#BF9853] hover:text-white transition-colors"
                 >
                   Clear All
@@ -376,54 +341,47 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
             <div ref={scrollRef} className='overflow-auto max-h-[500px] thin-scrollbar' onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
             >
-            <table className="w-full border rounded-lg">
-            <thead className="bg-[#FAF6ED] sticky top-0 z-20">
-              <tr>
-                  <th className="px-4 py-2 sticky top-0 bg-[#FAF6ED] z-20">S.No</th>
-                    <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
+              <table className="w-full border rounded-lg">
+                <thead className="bg-[#FAF6ED] sticky top-0 z-90">
+                  <tr>
+                    <th className="px-4 py-2 sticky top-0 bg-[#FAF6ED] z-20">S.No</th>
+                    <th className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
                       onClick={() => handleSort('date')}
                     >
                       Date {sortColumn === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
+                    <th className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
                       onClick={() => handleSort('siteName')}
                     >
                       Project Name {sortColumn === 'siteName' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
+                    <th className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
                       onClick={() => handleSort('partyName')}
                     >
                       Party Name {sortColumn === 'partyName' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
+                    <th className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
                       onClick={() => handleSort('amount')}
                     >
                       Amount {sortColumn === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
+                    <th className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
                       onClick={() => handleSort('category')}
                     >
                       Category {sortColumn === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
+                    <th className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
                       onClick={() => handleSort('comments')}
                     >
                       Reason {sortColumn === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
-                  <th className="px-4 py-2 sticky top-0 bg-[#FAF6ED] z-20">Status</th>
-                    <th
-                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
+                    <th className="px-4 py-2 sticky top-0 bg-[#FAF6ED] z-20">Status</th>
+                    <th className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
                       onClick={() => handleSort('eno')}
                     >
                       E.No {sortColumn === 'eno' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
-                  <th className="px-4 py-2 sticky top-0 bg-[#FAF6ED] z-20">View</th>
+                    <th className="px-4 py-2 sticky top-0 bg-[#FAF6ED] z-20">View</th>
                     <th className="px-4 py-2 sticky top-0 bg-[#FAF6ED] z-20">Details</th>
                   </tr>
                   {showFilters && (
@@ -511,165 +469,154 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
                       <th className="pt-2 pb-2"></th>
                       <th className="pt-2 pb-2"></th>
                       <th className="pt-2 pb-2"></th>
-              </tr>
+                    </tr>
                   )}
-            </thead>
-            <tbody>
+                </thead>
+                <tbody>
                   {sortedData.map((row, index) => {
-                  const received = receivedAmounts[row.id] || 0;
-                  const discount = discountAmounts[row.id] || 0;
+                    const received = receivedAmounts[row.id] || 0;
+                    const discount = discountAmounts[row.id] || 0;
                     const isClaimed = (received + discount) >= row.amount;
-                  
-                return (
+                    return (
                       <tr key={index} className={`even:bg-[#FAF6ED] odd:bg-[#FFFFFF] font-bold text-[14px]`}>
-                      <td className="px-4 py-2">{index + 1}</td>
-                      <td className="px-4 py-2">{formatDateOnly(row.date)}</td>
-                      <td className="px-4 py-2">{row.siteName}</td>
-                      <td className="px-4 py-2">{row.vendor || row.contractor}</td>
-                      <td className="px-4 py-2">{formatIndianCurrency(row.amount)}</td>
-                      <td className="px-4 py-2">{row.category}</td>
-                      <td className="px-4 py-2">{row.comments}</td>
+                        <td className="px-4 py-2">{index + 1}</td>
+                        <td className="px-4 py-2">{formatDateOnly(row.date)}</td>
+                        <td className="px-4 py-2">{row.siteName}</td>
+                        <td className="px-4 py-2">{row.vendor || row.contractor}</td>
+                        <td className="px-4 py-2">{formatIndianCurrency(row.amount)}</td>
+                        <td className="px-4 py-2">{row.category}</td>
+                        <td className="px-4 py-2">{row.comments}</td>
                         <td className={`px-4 py-2 font-semibold ${isClaimed ? 'text-[#007233]' : 'text-[#E4572E]'}`}>
                           {isClaimed ? '✓ Claimed' : 'Not Claimed'}
-                    </td>
-                      <td className="px-4 py-2">{row.eno}</td>
-                      <td className="px-4 py-2">
-                        {row.billCopy ? (
-                          <a
-                            href={row.billCopy}
-                            className="text-red-500 underline"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            View
-                          </a>
-                        ) : (
-                          <span></span>
-                        )}
-                      </td>
+                        </td>
+                        <td className="px-4 py-2">{row.eno}</td>
                         <td className="px-4 py-2">
-                          <button
-                            onClick={() => handleViewDetails(row)}
-                            className="border px-3 py-1 rounded-full bg-[#BF9853] text-white hover:bg-[#a57f3f]"
-                          >
+                          {row.billCopy ? (
+                            <a
+                              href={row.billCopy}
+                              className="text-red-500 underline"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              View
+                            </a>
+                          ) : (
+                            <span></span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2">
+                          <button onClick={() => handleViewDetails(row)} className="border px-3 py-1 rounded-full bg-[#BF9853] text-white hover:bg-[#a57f3f]">
                             Details
                           </button>
-                      </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-        </div>
-        {/* Details Modal */}
         {showModal && (
           <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
             <div className="bg-white text-left rounded-xl p-6 w-[900px] max-h-[700px] flex flex-col">
               <h3 className="text-lg font-semibold mb-4 text-center">Claim Payment Details</h3>
-                    <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 overflow-y-auto">
                 <div className="space-y-4">
-                  {/* Claim Information */}
                   <div className="border-2 border-[#BF9853] border-opacity-25 rounded-lg p-4">
                     <h4 className="text-md font-semibold mb-3 text-[#BF9853]">Claim Information</h4>
                     <div className="grid grid-cols-2 gap-4">
-                              <div>
+                      <div>
                         <span className="text-gray-600 text-sm">Date:</span>
                         <p className="font-semibold">{formatDateOnly(selectedRow.date)}</p>
-                              </div>
-                              <div>
+                      </div>
+                      <div>
                         <span className="text-gray-600 text-sm">Project:</span>
                         <p className="font-semibold">{selectedRow.siteName}</p>
-                    </div>
-                              <div>
+                      </div>
+                      <div>
                         <span className="text-gray-600 text-sm">Party Name:</span>
                         <p className="font-semibold">{selectedRow.vendor || selectedRow.contractor}</p>
-                            </div>
-                                        <div>
+                      </div>
+                      <div>
                         <span className="text-gray-600 text-sm">Category:</span>
                         <p className="font-semibold">{selectedRow.category}</p>
-                                        </div>
-                                        <div>
+                      </div>
+                      <div>
                         <span className="text-gray-600 text-sm">Total Amount:</span>
                         <p className="font-semibold text-[#BF9853]">{formatIndianCurrency(selectedRow.amount)}</p>
-                                      </div>
-                                      <div>
+                      </div>
+                      <div>
                         <span className="text-gray-600 text-sm">E.No:</span>
                         <p className="font-semibold">{selectedRow.eno}</p>
-                                      </div>
+                      </div>
                       {selectedRow.comments && (
                         <div className="col-span-2">
                           <span className="text-gray-600 text-sm">Reason:</span>
                           <p className="font-semibold">{selectedRow.comments}</p>
-                                </div>
-                              )}
-                          </div>
                         </div>
-
-                  {/* Payment History */}
-                        <div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
                     <h4 className="text-md font-semibold mb-3 text-[#BF9853]">Payment History ({claimPaymentsData.length})</h4>
                     <div className="space-y-3 max-h-[350px] overflow-y-auto">
-                              {claimPaymentsData.map((payment, index) => (
+                      {claimPaymentsData.map((payment, index) => (
                         <div key={index} className="border-2 border-[#BF9853] border-opacity-25 rounded-lg p-4">
-                                    <div className="grid grid-cols-3 gap-4">
-                                      <div>
+                          <div className="grid grid-cols-3 gap-4">
+                            <div>
                               <span className="text-gray-600 text-sm">Date:</span>
                               <p className="font-semibold">{formatDateOnly(payment.date)}</p>
-                                      </div>
-                                      <div>
+                            </div>
+                            <div>
                               <span className="text-gray-600 text-sm">Amount:</span>
                               <p className="font-semibold">{formatIndianCurrency(payment.amount)}</p>
-                                      </div>
-                                      <div>
+                            </div>
+                            <div>
                               <span className="text-gray-600 text-sm">Mode:</span>
                               <p className="font-semibold">{payment.payment_mode}</p>
-                      </div>
+                            </div>
                             {payment.discount_amount > 0 && (
                               <div>
                                 <span className="text-gray-600 text-sm">Discount:</span>
                                 <p className="font-semibold text-orange-600">{formatIndianCurrency(payment.discount_amount)}</p>
-                                      </div>
+                              </div>
                             )}
                             {payment.cheque_number && (
                               <>
                                 <div>
                                   <span className="text-gray-600 text-sm">Cheque No:</span>
                                   <p className="font-semibold">{payment.cheque_number}</p>
-                                    </div>
-                                                <div>
+                                </div>
+                                <div>
                                   <span className="text-gray-600 text-sm">Cheque Date:</span>
                                   <p className="font-semibold">{formatDateOnly(payment.cheque_date)}</p>
-                                                </div>
+                                </div>
                               </>
                             )}
                             {payment.transaction_number && (
-                                                <div>
+                              <div>
                                 <span className="text-gray-600 text-sm">Transaction No:</span>
                                 <p className="font-semibold">{payment.transaction_number}</p>
-                                              </div>
-                                            )}
+                              </div>
+                            )}
                             {payment.account_number && (
-                                              <div>
+                              <div>
                                 <span className="text-gray-600 text-sm">Account No:</span>
                                 <p className="font-semibold">{payment.account_number}</p>
-                                        </div>
-                                      )}
-                                  </div>
-                                </div>
-                              ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
               </div>
               <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-gray-200">
-                    <button
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 bg-[#BF9853] text-white rounded-lg hover:bg-[#a57f3f]"
-                >
+                <button onClick={() => setShowModal(false)} className="px-4 py-2 bg-[#BF9853] text-white rounded-lg hover:bg-[#a57f3f]">
                   Close
-                  </button>
+                </button>
               </div>
             </div>
           </div>
@@ -678,5 +625,4 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
     </body>
   );
 }
-
 export default ClaimPaymentDatabase;

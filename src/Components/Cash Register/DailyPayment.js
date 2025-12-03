@@ -14,6 +14,7 @@ import { type } from '@testing-library/user-event/dist/type';
 import { e } from 'mathjs';
 import NotesStart from '../Images/notes _start.png';
 import NotesEnd from '../Images/notes_end.png';
+import Filter from '../Images/filter (3).png';
 const DailyPayment = ({ username, userRoles = [] }) => {
     const [expenses, setExpenses] = useState([]);
     const [dailyExpenses, setDailyExpenses] = useState([]);
@@ -145,6 +146,12 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         key: null,
         direction: 'asc'
     });
+    // Filter state variables
+    const [showFilters, setShowFilters] = useState(false);
+    const [selectDate, setSelectDate] = useState('');
+    const [selectContractororVendorName, setSelectContractororVendorName] = useState('');
+    const [selectProjectName, setSelectProjectName] = useState('');
+    const [selectType, setSelectType] = useState('');
     // Click and drag scrolling functionality
     const scrollRef = useRef(null);
     const isDragging = useRef(false);
@@ -222,6 +229,124 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         };
         animationFrame.current = requestAnimationFrame(step);
     };
+    // Filter functions
+    const clearFilters = () => {
+        setSelectDate('');
+        setSelectContractororVendorName('');
+        setSelectProjectName('');
+        setSelectType('');
+    };
+
+    const getVendorName = (id) =>
+        vendorOptions.find(v => String(v.id) === String(id))?.value || "";
+
+    const getContractorName = (id) =>
+        contractorOptions.find(c => String(c.id) === String(id))?.value || "";
+
+    const getEmployeeName = (id) =>
+        employeeOptions.find(e => String(e.id) === String(id))?.value || "";
+
+    const getSiteName = (id) =>
+        siteOptions.find(s => String(s.id) === String(id))?.value || "";
+
+    // Filtered data based on selected filters
+    const filteredExpenses = React.useMemo(() => {
+        return dailyExpenses.filter((entry) => {
+            // Date filter (exact match since it's type="date")
+            if (selectDate) {
+                // Convert selectDate (YYYY-MM-DD) → DD-M-YYYY
+                const [year, month, day] = selectDate.split("-");
+                const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
+                // Convert entry.date to DD-M-YYYY
+                const entryDateObj = new Date(entry.date);
+                const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
+                if (formattedEntryDate !== formattedSelectDate) return false;
+            }
+            // Contractor/Vendor/Labour filter
+            if (selectContractororVendorName) {
+                const name =
+                    entry.vendor_id
+                        ? getVendorName(entry.vendor_id)
+                        : entry.contractor_id
+                        ? getContractorName(entry.contractor_id)
+                        : entry.employee_id
+                        ? getEmployeeName(entry.employee_id)
+                        : entry.labour_id
+                        ? laboursList.find(l => l.id === Number(entry.labour_id))?.label || ""
+                        : "";
+                if (name.toLowerCase() !== selectContractororVendorName.toLowerCase())
+                    return false;
+            }
+            // Project Name filter
+            if (selectProjectName) {
+                const projectName = getSiteName(entry.project_id) || "";
+                if (projectName.toLowerCase() !== selectProjectName.toLowerCase())
+                    return false;
+            }
+            // Type filter
+            if (selectType) {
+                if (entry.type?.toLowerCase() !== selectType.toLowerCase()) return false;
+            }
+            return true; // passes all filters
+        });
+    }, [dailyExpenses, selectDate, selectContractororVendorName, selectProjectName, selectType, vendorOptions, contractorOptions, employeeOptions, siteOptions, laboursList]);
+
+    const contractorVendorFilterOptions = React.useMemo(() => {
+        const ids = new Set();
+        const options = [];
+        
+        // Add contractor/vendor/employee options
+        filteredExpenses.forEach(exp => {
+            const option =
+                combinedOptions.find(
+                    opt =>
+                        (opt.type === "Contractor" && opt.id === Number(exp.contractor_id)) ||
+                        (opt.type === "Vendor" && opt.id === Number(exp.vendor_id)) ||
+                        (opt.type === "Employee" && opt.id === Number(exp.employee_id))
+                );
+            if (option && !ids.has(option.id)) {
+                ids.add(option.id);
+                options.push({ value: option.label, label: option.label });
+            }
+        });
+        
+        // Add labour options
+        filteredExpenses.forEach(exp => {
+            const labourOption = laboursList.find(opt => opt.id === Number(exp.labour_id));
+            if (labourOption && !ids.has(labourOption.id)) {
+                ids.add(labourOption.id);
+                options.push({ value: labourOption.label, label: labourOption.label });
+            }
+        });
+        
+        return options;
+    }, [filteredExpenses, combinedOptions, laboursList]);
+
+    const projectFilterOptions = React.useMemo(() => {
+        const ids = new Set();
+        return filteredExpenses.map(exp => {
+            const option = siteOptions.find(opt => opt.id === Number(exp.project_id));
+            if (option && !ids.has(option.id)) {
+                ids.add(option.id);
+                return { value: option.label, label: option.label };
+            }
+            return null;
+        }).filter(Boolean);
+    }, [filteredExpenses, siteOptions]);
+
+    const typeFilterOptions = React.useMemo(() => {
+        const types = new Set();
+        filteredExpenses.forEach(exp => {
+            if (exp.type) {
+                types.add(exp.type);
+            }
+        });
+        return Array.from(types).map(type => ({
+            value: type,
+            label: type
+        }));
+    }, [filteredExpenses]);
+
     // Sorting functions
     const handleSort = (key) => {
         let direction = 'asc';
@@ -231,7 +356,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         setSortConfig({ key, direction });
     };
     const sortedDailyExpenses = React.useMemo(() => {
-        let sortableData = [...dailyExpenses];
+        let sortableData = [...filteredExpenses];
         if (sortConfig.key) {
             sortableData.sort((a, b) => {
                 let aValue, bValue;
@@ -293,7 +418,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             });
         }
         return sortableData;
-    }, [dailyExpenses, sortConfig, laboursList, siteOptions, isChangeButtonActive, combinedOptions, employeeOptions, vendorOptions, contractorOptions]);
+    }, [filteredExpenses, sortConfig, laboursList, siteOptions, isChangeButtonActive, combinedOptions, employeeOptions, vendorOptions, contractorOptions]);
     const getCurrentWeekNumber = () => {
         const date = new Date();
         const firstJan = new Date(date.getFullYear(), 0, 1);
@@ -706,6 +831,67 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             console.error("Error fetching last entry number:", error);
             return 1; // Default to 1 if API call fails
         }
+    };
+
+    // Clear Loan Portal entry function
+    const clearLoanPortalEntry = async (loanPortalId, date) => {
+        if (!loanPortalId) return;
+        const payload = {
+            loanPortalId,
+            type: "",
+            date,
+            amount: 0,
+            loan_refund_amount: 0,
+            loan_payment_mode: "",
+            from_purpose_id: 0,
+            to_purpose_id: 0,
+            vendor_id: 0,
+            contractor_id: 0,
+            employee_id: 0,
+            project_id: 0,
+            transfer_Project_id: 0,
+            entry_no: 0,
+            description: "",
+        };
+        const response = await fetch(`https://backendaab.in/aabuildersDash/api/loans/${loanPortalId}?editedBy=${encodeURIComponent(username)}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+            throw new Error("Failed to clear Loan Portal entry");
+        }
+    };
+
+    // Clear Staff Advance Portal entry function
+    const clearStaffAdvancePortalEntry = async (staffAdvancePortalId, date) => {
+        if (!staffAdvancePortalId) return;
+        const clearedData = {
+            date: date || new Date().toISOString().split("T")[0],
+            amount: null,
+            employee_id: null,
+            labour_id: null,
+            description: null,
+            type: null,
+            week_no: null,
+            from_purpose_id: null,
+            staff_payment_mode: null,
+            file_url: null,
+            staff_refund_amount: null,
+            entry_no: null,
+        };
+        const response = await fetch(
+            `https://backendaab.in/aabuildersDash/api/staff-advance/${staffAdvancePortalId}?editedBy=${encodeURIComponent(username)}`,
+            {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(clearedData),
+            }
+        );
+        if (!response.ok) {
+            throw new Error("Failed to clear Staff Advance Portal entry");
+        }
+        return response.json();
     };
 
     const handleRefundSubmit = async () => {
@@ -1124,16 +1310,29 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         if (confirmed) {
             try {
                 const refundData = refundPayments.find(refund => refund.id === id);
+                
+                // Clear Staff Advance Portal entry if exists
                 if (refundData && refundData.staff_advance_portal_id) {
                     try {
-                        await axios.delete(
-                            `https://backendaab.in/aabuildersDash/api/staff-advance/${refundData.staff_advance_portal_id}`,
-                            { headers: { "Content-Type": "application/json" } }
-                        );
+                        await clearStaffAdvancePortalEntry(refundData.staff_advance_portal_id, refundData.date);
                     } catch (error) {
-                        console.error("Error deleting staff advance portal for refund:", error);
+                        console.error("Error clearing staff advance portal for refund:", error);
+                        alert("Failed to clear the associated Staff Advance Portal entry. Please try again.");
+                        return;
                     }
                 }
+                
+                // Clear Loan Portal entry if exists
+                if (refundData && refundData.loan_portal_id) {
+                    try {
+                        await clearLoanPortalEntry(refundData.loan_portal_id, refundData.date);
+                    } catch (error) {
+                        console.error("Error clearing loan portal for refund:", error);
+                        alert("Failed to clear the associated Loan Portal entry. Please try again.");
+                        return;
+                    }
+                }
+                
                 const response = await fetch(`https://backendaab.in/aabuildersDash/api/refund_received/delete/${id}`, {
                     method: 'DELETE',
                 });
@@ -1157,7 +1356,8 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             const hasAnyId =
                 (newDailyExpense.labour_id && Number(newDailyExpense.labour_id) > 0) ||
                 (newDailyExpense.contractor_id && Number(newDailyExpense.contractor_id) > 0) ||
-                (newDailyExpense.vendor_id && Number(newDailyExpense.vendor_id) > 0);
+                (newDailyExpense.vendor_id && Number(newDailyExpense.vendor_id) > 0) ||
+                (newDailyExpense.employee_id && Number(newDailyExpense.employee_id) > 0);
             if (!hasAnyId || !newDailyExpense.project_id || !newDailyExpense.type || !newDailyExpense.amount) {
                 alert("Please select all requried details.");
                 return;
@@ -1342,7 +1542,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             : currentWeekDays[0].toISOString().split("T")[0];
         handleDateClick(defaultDate);
     }
-    const totalAmount = dailyExpenses
+    const totalAmount = filteredExpenses
         .filter(row => row.date === selectedDate)
         .reduce((sum, row) => sum + (Number(row.amount || 0) + Number(row.extra_amount || 0)), 0);
     const totalRefund = refundPayments
@@ -1351,6 +1551,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         .reduce((sum, p) => sum + Number(p.amount || 0), 0);
     const netBalance = totalAmount - totalRefund;
     const balance = totalPayments - expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
     const generateExpensesPDF = () => {
         if (!selectedDate || dailyExpenses.length === 0) {
             alert("No data available to generate PDF");
@@ -1378,17 +1579,18 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         doc.line(14, 15, pageWidth - 14, 15);
         doc.line(14, 30, pageWidth - 14, 30);
         doc.setFont(undefined, 'normal');
-        const filteredExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate && row.type !== "Staff Advance" && row.type !== "Diwali Bonus");
+        // Use dailyExpenses directly (unfiltered by UI filters) - only filter by date and type
+        const filteredExpenses = dailyExpenses.filter(row => row.date === selectedDate && row.type !== "Staff Advance" && row.type !== "Diwali Bonus");
         const totalAmount = filteredExpenses.reduce(
             (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
             0
         );
-        const advanceExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate && row.type === "Staff Advance");
+        const advanceExpenses = dailyExpenses.filter(row => row.date === selectedDate && row.type === "Staff Advance");
         const totalAdvanceAmount = advanceExpenses.reduce(
             (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
             0
         );
-        const diwaliBonusExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate && row.type === "Diwali Bonus");
+        const diwaliBonusExpenses = dailyExpenses.filter(row => row.date === selectedDate && row.type === "Diwali Bonus");
         const totalDiwaliBonusAmount = diwaliBonusExpenses.reduce(
             (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
             0
@@ -1486,6 +1688,14 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             },
             alternateRowStyles: {
                 fillColor: false,
+            },
+            didParseCell: function (data) {
+                // Make the total row bold
+                if (data.row.index === expensesTableRows.length - 1) {
+                    data.cell.styles.fontStyle = 'bold';
+                    data.cell.styles.fillColor = [255, 255, 255];
+                    data.cell.styles.textColor = [0, 0, 0];
+                }
             }
         });
         const firstTableEndY = doc.lastAutoTable.finalY;
@@ -1852,7 +2062,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         </div>
                     </div>
                 </div>
-                <div className="mr-5">
+                <div className="mr-5 flex gap-3">                    
                     <button onClick={generateExpensesPDF} className='font-semibold mt-4 mr-5 hover:text-[#E4572E]'>Report</button>
                 </div>
             </div>
@@ -1871,6 +2081,15 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                             <h1 className="font-bold text-base mr-16">
                                 Expenses:<span style={{ color: "#E4572E" }}>{Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}</span>
                             </h1>
+                        </div>
+                        <div className="text-left mb-4">
+                            <button onClick={() => setShowFilters(!showFilters)}>
+                                <img
+                                    src={Filter}
+                                    alt="Toggle Filter"
+                                    className="w-7 h-7 border border-[#BF9853] rounded-md"
+                                />
+                            </button>
                         </div>
                         <div className="w-full h-[590px] rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden ">
                             <div ref={scrollRef} className="overflow-auto max-h-[600px] thin-scrollbar" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
@@ -1898,6 +2117,216 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                             <th className="py-2 px-1 text-left w-[60px]">Qty</th>
                                             <th className="py-2 px-1 text-left w-[80px]">Activity</th>
                                         </tr>
+                                        {showFilters && (
+                                            <tr className="bg-white border-b border-gray-200">
+                                                <th className="pt-2 pb-2 w-[60px]"></th>
+                                                <th className="pt-2 pb-2 w-[120px] sm:w-[140px]">
+                                                    <Select
+                                                        options={contractorVendorFilterOptions}
+                                                        value={selectContractororVendorName ? { value: selectContractororVendorName, label: selectContractororVendorName } : null}
+                                                        onChange={(opt) => setSelectContractororVendorName(opt ? opt.value : "")}
+                                                        className="text-xs focus:outline-none"
+                                                        placeholder="Name..."
+                                                        isSearchable
+                                                        isClearable
+                                                        styles={{
+                                                            control: (provided, state) => ({
+                                                                ...provided,
+                                                                backgroundColor: 'transparent',
+                                                                borderWidth: '3px',
+                                                                borderColor: state.isFocused
+                                                                    ? 'rgba(191, 152, 83, 0.2)'
+                                                                    : 'rgba(191, 152, 83, 0.2)',
+                                                                borderRadius: '6px',
+                                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                                '&:hover': {
+                                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                                },
+                                                            }),
+                                                            placeholder: (provided) => ({
+                                                                ...provided,
+                                                                color: '#999',
+                                                                textAlign: 'left',
+                                                            }),
+                                                            menu: (provided) => ({
+                                                                ...provided,
+                                                                zIndex: 9,
+                                                            }),
+                                                            option: (provided, state) => ({
+                                                                ...provided,
+                                                                textAlign: 'left',
+                                                                fontWeight: 'normal',
+                                                                fontSize: '15px',
+                                                                backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                                color: 'black',
+                                                            }),
+                                                            singleValue: (provided) => ({
+                                                                ...provided,
+                                                                textAlign: 'left',
+                                                                fontWeight: 'normal',
+                                                                color: 'black',
+                                                            }),
+                                                            indicatorSeparator: () => ({
+                                                                display: 'none'
+                                                            }),
+                                                            indicatorsContainer: (provided) => ({
+                                                                ...provided,
+                                                                height: '40px',
+                                                                gap: '0px'
+                                                            }),
+                                                            clearIndicator: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px'
+                                                            }),
+                                                            dropdownIndicator: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px'
+                                                            })
+                                                        }}
+                                                    />
+                                                </th>
+                                                <th className="pt-2 pb-2 w-[160px] sm:w-[170px]">
+                                                    <Select
+                                                        options={projectFilterOptions}
+                                                        value={selectProjectName ? { value: selectProjectName, label: selectProjectName } : null}
+                                                        onChange={(opt) => setSelectProjectName(opt ? opt.value : "")}
+                                                        className="focus:outline-none text-xs"
+                                                        placeholder="Project..."
+                                                        isSearchable
+                                                        isClearable
+                                                        styles={{
+                                                            control: (provided, state) => ({
+                                                                ...provided,
+                                                                backgroundColor: 'transparent',
+                                                                borderWidth: '3px',
+                                                                borderColor: state.isFocused
+                                                                    ? 'rgba(191, 152, 83, 0.2)'
+                                                                    : 'rgba(191, 152, 83, 0.2)',
+                                                                borderRadius: '6px',
+                                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                                '&:hover': {
+                                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                                },
+                                                            }),
+                                                            placeholder: (provided) => ({
+                                                                ...provided,
+                                                                color: '#999',
+                                                                textAlign: 'left',
+                                                            }),
+                                                            menu: (provided) => ({
+                                                                ...provided,
+                                                                zIndex: 9,
+                                                            }),
+                                                            option: (provided, state) => ({
+                                                                ...provided,
+                                                                textAlign: 'left',
+                                                                fontWeight: 'normal',
+                                                                fontSize: '15px',
+                                                                backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                                color: 'black',
+                                                            }),
+                                                            singleValue: (provided) => ({
+                                                                ...provided,
+                                                                textAlign: 'left',
+                                                                fontWeight: 'normal',
+                                                                color: 'black',
+                                                            }),
+                                                            indicatorSeparator: () => ({
+                                                                display: 'none'
+                                                            }),
+                                                            indicatorsContainer: (provided) => ({
+                                                                ...provided,
+                                                                height: '40px',
+                                                                gap: '0px'
+                                                            }),
+                                                            clearIndicator: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px'
+                                                            }),
+                                                            dropdownIndicator: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px'
+                                                            })
+                                                        }}
+                                                    />
+                                                </th>
+                                                <th className="pt-2 pb-2 w-[100px] sm:w-[120px]"></th>
+                                                <th className="pt-2 pb-2 w-[100px] sm:w-[120px]">
+                                                    <Select
+                                                        options={typeFilterOptions}
+                                                        value={selectType ? { value: selectType, label: selectType } : null}
+                                                        onChange={(opt) => setSelectType(opt ? opt.value : "")}
+                                                        className="focus:outline-none text-xs"
+                                                        placeholder="Type..."
+                                                        isSearchable
+                                                        isClearable
+                                                        styles={{
+                                                            control: (provided, state) => ({
+                                                                ...provided,
+                                                                backgroundColor: 'transparent',
+                                                                borderWidth: '3px',
+                                                                borderColor: state.isFocused
+                                                                    ? 'rgba(191, 152, 83, 0.2)'
+                                                                    : 'rgba(191, 152, 83, 0.2)',
+                                                                borderRadius: '6px',
+                                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                                '&:hover': {
+                                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                                },
+                                                            }),
+                                                            placeholder: (provided) => ({
+                                                                ...provided,
+                                                                color: '#999',
+                                                                textAlign: 'left',
+                                                            }),
+                                                            menu: (provided) => ({
+                                                                ...provided,
+                                                                zIndex: 10,
+                                                            }),
+                                                            option: (provided, state) => ({
+                                                                ...provided,
+                                                                textAlign: 'left',
+                                                                fontWeight: 'normal',
+                                                                fontSize: '15px',
+                                                                backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                                color: 'black',
+                                                            }),
+                                                            singleValue: (provided) => ({
+                                                                ...provided,
+                                                                textAlign: 'left',
+                                                                fontWeight: 'normal',
+                                                                color: 'black',
+                                                            }),
+                                                            indicatorSeparator: () => ({
+                                                                display: 'none'
+                                                            }),
+                                                            indicatorsContainer: (provided) => ({
+                                                                ...provided,
+                                                                height: '40px',
+                                                                gap: '0px'
+                                                            }),
+                                                            clearIndicator: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px'
+                                                            }),
+                                                            dropdownIndicator: (provided) => ({
+                                                                ...provided,
+                                                                padding: '2px'
+                                                            })
+                                                        }}
+                                                    />
+                                                </th>
+                                                <th className="pt-2 pb-2 w-[50px] sm:w-[60px]"></th>
+                                                <th className="pt-2 pb-2 w-[70px] sm:w-[80px]">
+                                                    <button
+                                                        onClick={clearFilters}
+                                                        className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 focus:outline-none"
+                                                    >
+                                                        Clear
+                                                    </button>
+                                                </th>
+                                            </tr>
+                                        )}
                                         {Number(currentWeekNumber) === Number(currentWeekNumber) ? (
                                             <tr className="bg-white border-b border-gray-200">
                                                 <td className="px-1 py-2 font-bold">{dailyExpenses.length + 1}.</td>

@@ -340,6 +340,14 @@ const AdvanceSummary = () => {
         borderColor: 'rgba(191, 152, 83, 0.2)',
       }
     }),
+    menu: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+    }),
+    menuPortal: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+    }),
   };
   const [selectedAdvanceSite, setSelectedAdvanceSite] = useState(null);
   const [projectData, setProjectData] = useState([]);
@@ -1565,6 +1573,7 @@ const AdvanceSummary = () => {
                       placeholder="Select..."
                       className="w-[253px] h-[45px] rounded-lg focus:outline-none"
                       isClearable
+                      menuPortalTarget={document.body}
                       styles={customStyles}
                     />
                   </div>
@@ -1580,6 +1589,7 @@ const AdvanceSummary = () => {
                       className="w-[273px] h-[45px] rounded-lg focus:outline-none"
                       isClearable
                       isSearchable
+                      menuPortalTarget={document.body}
                       styles={customStyles}
                     />
                   </div>
@@ -1680,6 +1690,7 @@ const AdvanceSummary = () => {
                     onChange={setSelectedAdvanceSite}
                     styles={customStyles}
                     isClearable
+                    menuPortalTarget={document.body}
                     className="w-[270px] h-[45px] focus:outline-none"
                   />
                 </div>

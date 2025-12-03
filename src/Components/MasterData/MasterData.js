@@ -6879,7 +6879,7 @@ const MasterData = ({ username, userRoles = [] }) => {
             <form onSubmit={async (e) => {
               e.preventDefault();
               try {
-                const response = await fetch(`https://backendaab.in/aabuildersDash/api/labours-details/update/${selectedLabourDataId}`, {
+                const response = await fetch(`https://backendaab.in/aabuildersDash/api/labours-details/edit/${selectedLabourDataId}`, {
                   method: 'PUT',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
@@ -6934,10 +6934,10 @@ const MasterData = ({ username, userRoles = [] }) => {
       {isAccountDetailsEditOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
           <div className="bg-white rounded-md px-2 py-2 text-left w-[1100px]">
-            <div className='p-4'>
+            <div className='p-2'>
               <div>
-                <button className="text-red-500 ml-[95%]" onClick={resetAccountData}>
-                  <img src={cross} alt='cross' className='w-5 h-5' />
+                <button className="text-red-500 ml-[98%] " onClick={resetAccountData}>
+                  <img src={cross} alt='cross' className='w-5 h-5 -mt-7 ml-2' />
                 </button>
               </div>
               <div className="flex justify-between">
@@ -7131,20 +7131,27 @@ const MasterData = ({ username, userRoles = [] }) => {
                           <div className="mb-4">
                             <label className="block text-lg font-medium mb-2">Account Type</label>
                             <div className="relative">
-                              <select
-                                className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 pr-12 rounded-lg h-14 focus:outline-none"
-                                value={editAccountType}
-                                onChange={(e) => setEditAccountType(e.target.value)}
-                                disabled={!isAccountEditMode}
-                                required
-                              >
-                                <option value="">Select Account Type</option>
-                                {bankAccountTypes.map((type) => (
-                                  <option key={type.id} value={type.bank_account_type}>
-                                    {type.bank_account_type}
-                                  </option>
-                                ))}
-                              </select>
+                              {isAccountEditMode ? (
+                                <select
+                                  className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 pr-12 rounded-lg h-14 focus:outline-none"
+                                  value={editAccountType}
+                                  onChange={(e) => setEditAccountType(e.target.value)}
+                                  required
+                                >
+                                  <option value="">Select Account Type</option>
+                                  {bankAccountTypes.map((type) => (
+                                    <option key={type.id} value={type.bank_account_type}>
+                                      {type.bank_account_type}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <div className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 pr-12 rounded-lg h-14 bg-gray-50 flex items-center text-gray-800">
+                                  <span className={`truncate ${editAccountType ? '' : 'text-gray-400 '}`}>
+                                    {editAccountType || 'Select Account Type'}
+                                  </span>
+                                </div>
+                              )}
                               {!isAccountEditMode && (
                                 <CopyButton
                                   text={editAccountType}
@@ -7159,7 +7166,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                       <div className="w-52 mt-10">
                         <div>
                           <div className="mb-4">
-                            <div className="w-48 h-48 border-2 border-[#BF9853] border-opacity-35 rounded-lg flex items-center justify-center bg-gray-50">
+                            <div className="w-52 h-52 border-2 border-[#BF9853] border-opacity-35 rounded-lg flex items-center justify-center bg-gray-50">
                               {editQrImagePreview ? (
                                 <img src={editQrImagePreview} alt="QR Preview" className="w-full h-full object-contain rounded-lg" />
                               ) : (

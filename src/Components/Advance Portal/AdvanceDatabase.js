@@ -45,22 +45,20 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   const [progress, setProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState(null);
   const fileInputRef = useRef(null);
+  const adminUsernames = ['Mahalingam M', 'Admin'];
+  const normalizedUsername = (username || '').trim().toLowerCase();
+  const isAdminUser = adminUsernames.some(name => name.toLowerCase() === normalizedUsername);
+  const isAdmin = isAdminUser ;
 
-  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
 
-  // Load filters from sessionStorage on mount
   useEffect(() => {
-    // Check if this is a page refresh or navigation
     const isPageRefresh = sessionStorage.getItem('advanceDatabasePageLoaded') === null;
-
     if (isPageRefresh) {
-      // First load or manual refresh - clear filters
       sessionStorage.removeItem('advanceDatabaseFilters');
       sessionStorage.setItem('advanceDatabasePageLoaded', 'true');
     } else {
-      // Navigation from another page - restore filters
       const savedFilters = sessionStorage.getItem('advanceDatabaseFilters');
       if (savedFilters) {
         try {
@@ -81,18 +79,13 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
         }
       }
     }
-
-    // Set flag to indicate page is loaded
     return () => {
-      // On unmount (when navigating away), keep the flag
       sessionStorage.setItem('advanceDatabasePageLoaded', 'true');
     };
   }, []);
 
-  // Detect page refresh and clear the flag
   useEffect(() => {
     const handleBeforeUnload = () => {
-      // Check if it's a refresh (reload)
       const entries = performance.getEntriesByType('navigation');
       const navigationType = entries.length > 0 ? entries[0].type : null;
 
@@ -100,15 +93,12 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
         sessionStorage.removeItem('advanceDatabasePageLoaded');
       }
     };
-
     window.addEventListener('beforeunload', handleBeforeUnload);
-
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, []);
 
-  // Save filters to sessionStorage whenever they change
   useEffect(() => {
     const filters = {
       selectTimeStampDate,
@@ -125,7 +115,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
     };
     sessionStorage.setItem('advanceDatabaseFilters', JSON.stringify(filters));
   }, [selectTimeStampDate, selectDatabaseDate, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseMode, selectDatabaseEntryNo, startDate, endDate, showFilters]);
-
   const scrollRef = useRef(null);
   const isDragging = useRef(false);
   const start = useRef({ x: 0, y: 0 });
@@ -133,7 +122,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   const velocity = useRef({ x: 0, y: 0 });
   const animationFrame = useRef(null);
   const lastMove = useRef({ time: 0, x: 0, y: 0 });
-
   const handleMouseDown = (e) => {
     if (!scrollRef.current) return;
     isDragging.current = true;
@@ -234,10 +222,8 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   const handleSort = (key) => {
     setSortConfig((prev) => {
       if (prev.key === key) {
-        // Toggle direction if clicking the same column
         return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
       }
-      // Default to ascending if switching column
       return { key, direction: 'asc' };
     });
   };
@@ -303,9 +289,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   }, []);
   useEffect(() => { setCombinedOptions([...vendorOptions, ...contractorOptions]); }, [vendorOptions, contractorOptions]);
   const exportPDF = () => {
-    const doc = new jsPDF("l", "pt", "a4"); // landscape mode
-
-    // Table column headers (same order as your table)
+    const doc = new jsPDF("l", "pt", "a4");
     const headers = [
       [
         "Time Stamp",
@@ -322,8 +306,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
         "E.No"
       ]
     ];
-
-    // Map only filtered table data
     const rows = sortedData.map((entry) => [
       formatDate(entry.timestamp),
       formatDateOnly(entry.date),
@@ -346,12 +328,8 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       entry.payment_mode,
       entry.entry_no
     ]);
-
-    // Add Title
     doc.setFontSize(16);
     doc.text("Transaction Report", 24, 18);
-
-    // AutoTable
     doc.autoTable({
       head: [headers[0]],
       body: rows,
@@ -359,19 +337,19 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       styles: {
         fontSize: 8,
         cellPadding: 2,
-        lineWidth: 0.3, // border thickness
-        lineColor: [100, 100, 100], // border color (black)
+        lineWidth: 0.3, 
+        lineColor: [100, 100, 100],
         halign: "left"
       },
       headStyles: {
-        fillColor: false, // remove background color
-        textColor: [0, 0, 0], // black text
+        fillColor: false, 
+        textColor: [0, 0, 0],
         fontStyle: "bold",
         lineWidth: 0.3,
         lineColor: [100, 100, 100]
       },
       bodyStyles: {
-        fillColor: false, // no row background color
+        fillColor: false,
         textColor: [0, 0, 0],
         lineWidth: 0.3,
         lineColor: [100, 100, 100]
@@ -379,12 +357,11 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       tableLineWidth: 0.3,
       tableLineColor: [100, 100, 100],
       columnStyles: {
-        5: { halign: 'right' }, // Advance
-        6: { halign: 'right' }, // Bill Payment
-        7: { halign: 'right' }  // Refund
+        5: { halign: 'right' },
+        6: { halign: 'right' }, 
+        7: { halign: 'right' } 
       }
     });
-
     doc.save("Transaction_Report.pdf");
   };
   const exportCSV = () => {
@@ -402,7 +379,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       "Mode",
       "E.No"
     ];
-
     const rows = sortedData.map(entry => [
       formatDate(entry.timestamp),
       formatDateOnly(entry.date),
@@ -425,11 +401,9 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       entry.payment_mode || "",
       entry.entry_no || ""
     ]);
-
     let csvContent = "data:text/csv;charset=utf-8,"
       + headers.join(",") + "\n"
       + rows.map(row => row.map(value => `"${value}"`).join(",")).join("\n");
-
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -601,10 +575,8 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
         setLoading(false);
       }
     };
-
     fetchData();
   }, []);
-
   const sortedSiteOptions = siteOptions.sort((a, b) =>
     a.label.localeCompare(b.label)
   );
@@ -623,7 +595,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
   };
-
   const handleEditFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -901,13 +872,11 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
     }
   };
   const handleEditClick = (entry) => {
-    // Check if editing is allowed - if not, show request popup
-    if (entry.not_allow_to_edit || entry.allow_to_edit === false) {
+    if (!isAdmin && (entry.not_allow_to_edit || entry.allow_to_edit === false)) {
       setRequestingEntry(entry);
       setIsRequestModalOpen(true);
       return;
     }
-    
     setEditingId(entry.advancePortalId);
     setSelectedFile(null); 
     setEditFormData({
@@ -934,10 +903,8 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
     setSelectedOption(preSelected || null);
     setIsEditModalOpen(true);
   };
-
   const handleSendEditRequest = async () => {
     if (!requestingEntry) return;
-    
     try {
       const requestData = {
         module_name: 'Advance Portal',
@@ -947,19 +914,16 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
         request_approval: false,
         request_completed: false
       };
-
       const response = await fetch('https://backendaab.in/aabuildersDash/api/edit_requests/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(requestData)
       });
-
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(errorText || 'Failed to create edit request');
       }
-
       alert('Edit request sent successfully. Waiting for admin approval.');
       setIsRequestModalOpen(false);
       setRequestingEntry(null);
@@ -968,16 +932,13 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       alert('Failed to send edit request. Please try again.');
     }
   };
- 
   const handleUpdate = async () => {
     try {
-      // Check if editing is allowed
       const currentEntry = advanceData.find(entry => entry.advancePortalId === editingId);
       if (currentEntry && currentEntry.not_allow_to_edit) {
         alert('Editing is not allowed for this record. Please request permission to edit.');
         return;
       }
-
       let fileUrl = editFormData.file_url || '';
       if (selectedFile) {
         try {
@@ -1073,7 +1034,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
         }
         return null;
       };
-
       const setAllowToEdit = async (id, allow) => {
         try {
           const res = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/allow/${id}?allow=${allow}`, {
@@ -1109,7 +1069,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
               updateRecord(editedRecord.advancePortalId, updatedEdited),
               updateRecord(otherRecord.advancePortalId, updatedOther)
             ]);
-            // Set allowToEdit to false after successful update
             await Promise.all([
               setAllowToEdit(editedRecord.advancePortalId, false),
               setAllowToEdit(otherRecord.advancePortalId, false)
@@ -1129,7 +1088,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
             console.warn('Transfer pair incomplete for entry_no:', editFormData.entry_no);
             const fallbackPayload = buildPayload({}, 'Transfer');
             await updateRecord(editingId, fallbackPayload);
-            // Set allowToEdit to false after successful update
             await setAllowToEdit(editingId, false);
             setAdvanceData(prev =>
               prev.map(item =>
@@ -1141,7 +1099,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
           console.warn('Could not find both Transfer records for entry_no:', editFormData.entry_no);
           const fallbackPayload = buildPayload({}, 'Transfer');
           await updateRecord(editingId, fallbackPayload);
-          // Set allowToEdit to false after successful update
           await setAllowToEdit(editingId, false);
           setAdvanceData(prev =>
             prev.map(item =>
@@ -1152,7 +1109,6 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       } else {
         const payload = buildPayload();
         const updatedRecord = await updateRecord(editingId, payload);
-        // Set allowToEdit to false after successful update
         await setAllowToEdit(editingId, false);
         setAdvanceData(prev =>
           prev.map(item =>
@@ -1443,7 +1399,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
           <div ref={scrollRef} className='overflow-auto max-h-[485px] thin-scrollbar'
             onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
           >
-            <table className="min-w-[1865px] w-full border-collapse">
+            <table className="min-w-[1805px] w-full border-collapse">
               <thead className="sticky top-0 z-10 bg-white">
                 <tr className="bg-[#FAF6ED]">
                   <th className="py-2 pl-3 w-[340px] font-bold text-left cursor-pointer hover:bg-gray-200"
@@ -1472,7 +1428,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                     Transfer Site {sortConfig.key === 'transfer' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
                   <th className="px-2 w-[100px] font-bold text-right">Advance</th>
-                  <th className="px-2 w-[180px] font-bold text-right whitespace-nowrap">Bill Payment</th>
+                  <th className="px-2 w-[100px] font-bold text-right whitespace-nowrap">Bill Payment</th>
                   <th className="px-2 w-[120px] font-bold text-right">Refund</th>
                   <th className="px-2 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200"
                     onClick={() => handleSort('type')}
@@ -1485,7 +1441,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                   >
                     Mode {sortConfig.key === 'mode' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="px-2 w-[220px] font-bold text-left whitespace-nowrap">Attached file</th>
+                  <th className="px-2 w-[80px] font-bold text-left whitespace-nowrap">File</th>
                   <th className="px-2 w-[140px] font-bold text-left cursor-pointer hover:bg-gray-200"
                     onClick={() => handleSort('entry_no')}
                   >
@@ -1664,7 +1620,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                       />
                     </th>
                     <th className='w-[100px] pt-2 pb-2 text-right'>{totals.amount.toLocaleString("en-IN")}</th>
-                    <th className='w-[180px] pt-2 pb-2 text-right'>{totals.bill_amount.toLocaleString("en-IN")}</th>
+                    <th className='w-[150px] pt-2 pb-2 text-right'>{totals.bill_amount.toLocaleString("en-IN")}</th>
                     <th className='w-[120px] pt-2 pb-2 text-right'>{totals.refund_amount.toLocaleString("en-IN")}</th>
                     <th className="">
                       <select
@@ -1681,12 +1637,12 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                         <option value='Transfer'>Transfer</option>
                       </select>
                     </th>
-                    <th className='w-[120px]'></th>
+                    <th className='w-[80px]'></th>
                     <th className="">
                       <select
                         value={selectDatabaseMode}
                         onChange={(e) => setSelectDatabaseMode(e.target.value)}
-                        className="p-1  mt-3 mb-3 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                        className="mt-3 mb-3 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
                         placeholder="Mode..."
                         menuPortalTarget={document.body}
                       >
@@ -1696,13 +1652,13 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                         <option value='Net Banking'>Net Banking</option>
                       </select>
                     </th>
-                    <th className='w-[220px] '></th>
+                    <th className='w-[80px] '></th>
                     <th className='w-[140px] '>
                       <input
                         type="text"
                         value={selectDatabaseEntryNo}
                         onChange={(e) => setSelectDatabaseEntryNo(e.target.value)}
-                        className="p-1 mt-3 mb-3 rounded-md bg-transparent w-[140px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                        className="mt-3 mb-3 rounded-md bg-transparent w-[140px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
                         placeholder="Entry No..."
                       />
                     </th>
@@ -1745,7 +1701,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                       <td className="text-sm text-left font-semibold">{entry.type}</td>
                       <td className="text-sm text-left font-semibold">{entry.description}</td>
                       <td className="text-sm text-left font-semibold">{entry.payment_mode}</td>
-                      <td className="text-sm text-left pl-3">
+                      <td className="text-sm text-left pl-1">
                         {entry.file_url ? (
                           <a
                             href={entry.file_url}
@@ -1762,14 +1718,14 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                       <td className="text-sm text-left pl-3 font-semibold">{entry.entry_no}</td>
                       <td className=" flex w-[100px] justify-between py-2">
                         <button
-                          className={`rounded-full transition duration-200 ml-2 mr-3 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
-                          disabled={entry.not_allow_to_edit}
+                          className={`rounded-full transition duration-200 ml-2 mr-3 ${entry.not_allow_to_edit && !isAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          disabled={entry.not_allow_to_edit && !isAdmin}
                         >
                           <img
                             src={edit}
-                            onClick={entry.not_allow_to_edit ? undefined : () => handleEditClick(entry)}
+                            onClick={entry.not_allow_to_edit && !isAdmin ? undefined : () => handleEditClick(entry)}
                             alt="Edit"
-                            className={`w-4 h-6 transition duration-200 ${entry.not_allow_to_edit ? '' : 'transform hover:scale-110 hover:brightness-110'}`}
+                            className={`w-4 h-6 transition duration-200 ${entry.not_allow_to_edit && !isAdmin ? '' : 'transform hover:scale-110 hover:brightness-110'}`}
                           />
                         </button>
                         <button className={`-ml-5 -mr-2 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -2094,28 +2050,12 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
         )}
         {isRequestModalOpen && requestingEntry && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-            <div className="bg-white p-6 rounded-lg w-[500px]">
-              <h2 className="text-lg font-bold mb-4 text-[#BF9853]">Request Edit Permission</h2>
-              <div className="mb-4">
-                <p className="text-gray-700 mb-2">
-                  You need admin approval to edit this record.
-                </p>
-                <div className="bg-gray-50 p-3 rounded border">
-                  <p className="text-sm text-gray-600">
-                    <strong>Record ID:</strong> {requestingEntry.advancePortalId}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    <strong>Entry No:</strong> {requestingEntry.entry_no}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    <strong>Date:</strong> {formatDateOnly(requestingEntry.date)}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    <strong>Type:</strong> {requestingEntry.type || '-'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex justify-end gap-3 mt-4">
+            <div className="bg-white p-6 rounded-lg w-[400px] text-center">
+              <h2 className="text-lg font-bold mb-2 text-[#BF9853]">Request Edit Permission</h2>
+              <p className="text-gray-700 mb-6">
+                You need admin approval to edit this record.
+              </p>
+              <div className="flex justify-center gap-3">
                 <button
                   onClick={() => {
                     setIsRequestModalOpen(false);
@@ -2127,7 +2067,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                 </button>
                 <button
                   onClick={handleSendEditRequest}
-                  className="px-4 py-2 bg-[#BF9853] w-[100px] h-[45px] text-white rounded"
+                  className="px-4 py-2 bg-[#BF9853] w-[160px] h-[45px] text-white rounded"
                 >
                   Send Request
                 </button>

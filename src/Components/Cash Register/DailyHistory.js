@@ -89,6 +89,8 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     const [weeklyPaymentExpensesAudits, setWeeklyPaymentExpensesAudits] = useState([]);
     const [showWeeklyPaymentReceivedModal, setShowWeeklyPaymentReceivedModal] = useState(false);
     const [weeklyPaymentReceivedAudits, setWeeklyPaymentReceivedAudits] = useState([]);
+    const [sendingToExpensesEntry, setSendingToExpensesEntry] = useState(false);
+    const [sendingProgress, setSendingProgress] = useState({ current: 0, total: 0 });
     
     // Filter state variables
     const [showFilters, setShowFilters] = useState(false);
@@ -112,6 +114,9 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     const startYear = 2000;
     const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i);
     const lastWeekNumber = weeks.length > 0 ? Math.max(...weeks.map(week => week.number)) : 0;
+    
+    // Check if user has permission to edit/delete (Admin role or Mahalingam M username)
+    const canEditDelete = userRoles.includes('Admin') || username === 'Mahalingam M';
     
     // Drag and scroll handler functions
     const handleMouseDown = (e, ref) => {
@@ -276,7 +281,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching Labour names.');
         }
     };
     const fetchSites = async () => {
@@ -923,17 +927,18 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         doc.line(14, 15, pageWidth - 14, 15); // Line above
         doc.line(14, 30, pageWidth - 14, 30);
         doc.setFont(undefined, 'normal');
-        const filteredExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate && row.type !== "Staff Advance" && row.type !== "Diwali Bonus");
+        // Use dailyExpenses directly (unfiltered by UI filters) - only filter by date and type
+        const filteredExpenses = dailyExpenses.filter(row => row.date === selectedDate && row.type !== "Staff Advance" && row.type !== "Diwali Bonus");
         const totalAmount = filteredExpenses.reduce(
             (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
             0
         );
-        const advanceExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate && row.type === "Staff Advance");
+        const advanceExpenses = dailyExpenses.filter(row => row.date === selectedDate && row.type === "Staff Advance");
         const totalAdvanceAmount = advanceExpenses.reduce(
             (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
             0
         );
-        const diwaliBonusExpenses = sortedDailyExpenses.filter(row => row.date === selectedDate && row.type === "Diwali Bonus");
+        const diwaliBonusExpenses = dailyExpenses.filter(row => row.date === selectedDate && row.type === "Diwali Bonus");
         const totalDiwaliBonusAmount = diwaliBonusExpenses.reduce(
             (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
             0
@@ -1031,6 +1036,14 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             },
             alternateRowStyles: {
                 fillColor: false,
+            },
+            didParseCell: function (data) {
+                // Make the total row bold
+                if (data.row.index === expensesTableRows.length - 1) {
+                    data.cell.styles.fontStyle = 'bold';
+                    data.cell.styles.fillColor = [255, 255, 255];
+                    data.cell.styles.textColor = [0, 0, 0];
+                }
             }
         });
         const firstTableEndY = doc.lastAutoTable.finalY;
@@ -1053,7 +1066,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         
         // Prepare WAGE REFUND table data
         const refundTableColumn = [
-            "SNO", "NAME", "AMOUNT"
+            "SNO", "NAME", "","BALANCE"
         ];
         const refundTableRows = refundPayments
             .reverse()
@@ -1106,9 +1119,10 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 fillColor: false,
             },
             columnStyles: {
-                0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },   
-                1: { cellWidth: 35, halign: 'left' },    
-                2: { cellWidth: 20, halign: 'right' }      
+                0: { cellWidth: 10, halign: 'center', fillColor: [255, 255, 255] },   
+                1: { cellWidth: 30, halign: 'left' },    
+                2: { cellWidth: 20, halign: 'right' },      
+                3: { cellWidth: 20, halign: 'right' }      
             },
             margin: { left: 14, right: 0 }
         });        
@@ -1117,7 +1131,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         // Render WAGE ADVANCE table at the same Y position (right side)
         if (advanceExpenses.length > 0) {
             const advanceTableColumn = [
-                "S.NO", "PROJECT NAME", "EMPLOYEE NAME", "TOTAL AMOUNT"
+                "S.NO", "PROJECT NAME", "STAFF NAME", "TOTAL AMOUNT"
             ];            
             const advanceTableRows = advanceExpenses
                 .map((row, index) => {
@@ -1146,7 +1160,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             ]);                 
             doc.setFontSize(12);
             doc.setFont(undefined, 'bold');
-            doc.text('WAGE ADVANCE', 95, sideBySideStartY - 2);    
+            doc.text('STAFF ADVANCE', 99, sideBySideStartY - 2);    
             doc.autoTable({
                 startY: sideBySideStartY,
                 head: [advanceTableColumn],
@@ -1173,15 +1187,14 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     fillColor: false,
                 },
                 columnStyles: {
-                    0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },   
-                    1: { cellWidth: 35, halign: 'left' },      
-                    2: { cellWidth: 35, halign: 'left' },      
+                    0: { cellWidth: 11, halign: 'center', fillColor: [255, 255, 255] },   
+                    1: { cellWidth: 34, halign: 'left' },      
+                    2: { cellWidth: 32, halign: 'left' },      
                     3: { cellWidth: 20, halign: 'right' }      
                 },
-                margin: { left: 95, right: 0 }
+                margin: { left: 99, right: 0 }
             });
-        }
-        
+        }       
         if (diwaliBonusExpenses.length > 0) {
             const diwaliBonusTableColumn = [
                 "SNO", "NAME", "AMOUNT"
@@ -1716,6 +1729,404 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             console.error("Error fetching audit details:", error);
         }
     };
+
+    const handleSendToExpensesEntry = async () => {
+        try {
+            // Try to fetch all daily payments, fallback to current date's expenses if endpoint doesn't exist
+            let allDailyPayments = [];
+            try {
+                const allDailyPaymentsResponse = await axios.get(
+                    "https://backendaab.in/aabuildersDash/api/daily-payments/getAll"
+                );
+                allDailyPayments = allDailyPaymentsResponse.data || [];
+            } catch (error) {
+                console.warn("getAll endpoint not available, using current date's expenses:", error);
+                // Fallback to current date's expenses
+                allDailyPayments = dailyExpenses;
+            }
+            
+            // Calculate actual current week number (week 49)
+            const getCurrentWeekNumber = () => {
+                const now = new Date();
+                const startOfYear = new Date(now.getFullYear(), 0, 1);
+                const days = Math.floor((now - startOfYear) / (24 * 60 * 60 * 1000));
+                return Math.ceil((days + startOfYear.getDay() + 1) / 7);
+            };
+            
+            const actualCurrentWeekNumber = getCurrentWeekNumber();
+            const currentYear = new Date().getFullYear();
+            
+            // Get date range for actual current week (week 49)
+            const actualCurrentWeek = getStartAndEndDateOfWeek(actualCurrentWeekNumber, currentYear);
+            
+            // Get last week (highest week number) from weeks array
+            const lastWeekNumber = weeks.length > 0 ? Math.max(...weeks.map(w => w.number)) : null;
+            
+            // Find last week from weeks array
+            const lastWeek = weeks.find(w => w.number === lastWeekNumber);
+            
+            // Filter out expenses from actual current week (week 49) and last week immediately after fetching
+            allDailyPayments = allDailyPayments.filter(expense => {
+                if (!expense.date) return true; // Keep expenses without dates for now
+                
+                const expenseDate = new Date(expense.date);
+                expenseDate.setHours(0, 0, 0, 0);
+                
+                // Check if expense is in actual current week (week 49)
+                const currentWeekStart = new Date(actualCurrentWeek.start);
+                currentWeekStart.setHours(0, 0, 0, 0);
+                const currentWeekEnd = new Date(actualCurrentWeek.end);
+                currentWeekEnd.setHours(23, 59, 59, 999);
+                
+                if (expenseDate >= currentWeekStart && expenseDate <= currentWeekEnd) {
+                    return false; // Exclude actual current week (week 49)
+                }
+                
+                // Check if expense is in last week (highest week number from weeks array)
+                if (lastWeek) {
+                    const lastWeekStart = new Date(lastWeek.start);
+                    lastWeekStart.setHours(0, 0, 0, 0);
+                    const lastWeekEnd = new Date(lastWeek.end);
+                    lastWeekEnd.setHours(23, 59, 59, 999);
+                    
+                    if (expenseDate >= lastWeekStart && expenseDate <= lastWeekEnd) {
+                        return false; // Exclude last week
+                    }
+                }
+                
+                return true; // Include this expense
+            });
+            
+            // Filter expenses where send_to_expenses_entry is false (only send false data)
+            let expensesToSend = allDailyPayments.filter(expense => 
+                expense.send_to_expenses_entry === false || expense.send_to_expenses_entry === undefined || expense.send_to_expenses_entry === null
+            );
+            
+            // Store original count before processing
+            const originalExpenseCount = expensesToSend.length;
+            
+            // Find Company Labour contractor
+            const companyLabourContractor = contractorOptions.find(opt => opt.label === "Company Labour");
+            
+            // Filter out Staff Advance expenses - they should not be sent to Expenses Entry
+            expensesToSend = expensesToSend.filter(expense => expense.type !== "Staff Advance");
+            
+            // First, group Wage and Diwali Bonus expenses by date and project_id (combining different labour_ids)
+            const wageExpenseGroups = new Map();
+            const diwaliBonusExpenseGroups = new Map();
+            const otherExpenses = [];
+            
+            expensesToSend.forEach(expense => {
+                // Check if expense is Wage type with labour_id
+                if (expense.type === "Wage" && expense.labour_id && expense.project_id && expense.date) {
+                    // Group by date and project_id (same date, same project, different labour_ids)
+                    const key = `${expense.date}_${expense.project_id}_Wage`;
+                    
+                    if (!wageExpenseGroups.has(key)) {
+                        wageExpenseGroups.set(key, []);
+                    }
+                    wageExpenseGroups.get(key).push(expense);
+                } 
+                // Check if expense is Diwali Bonus type with labour_id
+                else if (expense.type === "Diwali Bonus" && expense.labour_id && expense.project_id && expense.date) {
+                    // Group by date and project_id (same date, same project, different labour_ids)
+                    const key = `${expense.date}_${expense.project_id}_DiwaliBonus`;
+                    
+                    if (!diwaliBonusExpenseGroups.has(key)) {
+                        diwaliBonusExpenseGroups.set(key, []);
+                    }
+                    diwaliBonusExpenseGroups.get(key).push(expense);
+                } 
+                else {
+                    // Other expenses go to separate processing
+                    otherExpenses.push(expense);
+                }
+            });
+            
+            const processedExpenses = [];
+            
+            // Process Wage expenses grouped by date and project_id (combining different labour_ids)
+            wageExpenseGroups.forEach((group, key) => {
+                if (group.length > 0) {
+                    const firstExpense = group[0];
+                    const totalAmount = group.reduce((sum, exp) => 
+                        sum + Number(exp.amount || 0) + Number(exp.extra_amount || 0), 0
+                    );
+                    const entryCount = group.length;
+                    
+                    // Create combined expense for Wage type
+                    const combinedWageExpense = {
+                        ...firstExpense,
+                        amount: totalAmount,
+                        extra_amount: 0,
+                        quantity: entryCount,
+                        labour_id: null, // Clear labour_id
+                        contractor_id: companyLabourContractor?.id || null,
+                        type: "Wage",
+                        // Store original expenses for marking as sent later
+                        _originalExpenses: group
+                    };
+                    
+                    processedExpenses.push(combinedWageExpense);
+                }
+            });
+            
+            // Process Diwali Bonus expenses grouped by date and project_id (combining different labour_ids)
+            diwaliBonusExpenseGroups.forEach((group, key) => {
+                if (group.length > 0) {
+                    const firstExpense = group[0];
+                    const totalAmount = group.reduce((sum, exp) => 
+                        sum + Number(exp.amount || 0) + Number(exp.extra_amount || 0), 0
+                    );
+                    const entryCount = group.length;
+                    
+                    // Create combined expense for Diwali Bonus type
+                    const combinedDiwaliBonusExpense = {
+                        ...firstExpense,
+                        amount: totalAmount,
+                        extra_amount: 0,
+                        quantity: entryCount,
+                        labour_id: null, // Clear labour_id
+                        contractor_id: companyLabourContractor?.id || null,
+                        type: "Diwali Bonus",
+                        // Store original expenses for marking as sent later
+                        _originalExpenses: group
+                    };
+                    
+                    processedExpenses.push(combinedDiwaliBonusExpense);
+                }
+            });
+            
+            // Now process other expenses: group by date, project_id, and labour_id
+            const expenseGroups = new Map();
+            
+            otherExpenses.forEach(expense => {
+                // Only process expenses with labour_id
+                if (expense.labour_id) {
+                    const key = `${expense.date}_${expense.project_id}_${expense.labour_id}`;
+                    
+                    if (!expenseGroups.has(key)) {
+                        expenseGroups.set(key, []);
+                    }
+                    expenseGroups.get(key).push(expense);
+                } else {
+                    // Expenses without labour_id are added directly (no grouping needed)
+                    processedExpenses.push(expense);
+                }
+            });
+            
+            // Process grouped other expenses
+            expenseGroups.forEach((group, key) => {
+                if (group.length > 1) {
+                    // Multiple entries: combine them
+                    const firstExpense = group[0];
+                    const totalAmount = group.reduce((sum, exp) => 
+                        sum + Number(exp.amount || 0) + Number(exp.extra_amount || 0), 0
+                    );
+                    const entryCount = group.length;
+                    
+                    // Create combined expense
+                    const combinedExpense = {
+                        ...firstExpense,
+                        amount: totalAmount,
+                        extra_amount: 0,
+                        quantity: entryCount,
+                        labour_id: null, // Clear labour_id
+                        contractor_id: companyLabourContractor?.id || null,
+                        // Store original expenses for marking as sent later
+                        _originalExpenses: group
+                    };
+                    
+                    processedExpenses.push(combinedExpense);
+                } else {
+                    // Single entry: add as is
+                    processedExpenses.push(group[0]);
+                }
+            });
+            
+            // Replace expensesToSend with processed expenses
+            expensesToSend = processedExpenses;
+            
+            if (expensesToSend.length === 0) {
+                alert("No expenses to send. All expenses have already been sent to Expenses Entry, or all remaining expenses are from the current or previous week.");
+                return;
+            }
+            
+            const combinedCount = expensesToSend.filter(exp => exp._originalExpenses && exp._originalExpenses.length > 0).length;
+            const combinedMessage = combinedCount > 0 
+                ? `\n\nNote: ${combinedCount} group(s) of expenses with same labour, project, and date will be combined into single entries with "Company Labour" as contractor.`
+                : "";
+            
+            const confirmed = window.confirm(
+                `Are you sure you want to send ${expensesToSend.length} expense entry/entries (from ${originalExpenseCount} original expense(s)) to Expenses Entry?\n\nNote: Expenses from the actual current week (Week ${actualCurrentWeekNumber}) and last week (Week ${lastWeekNumber}) will be excluded.${combinedMessage}`
+            );
+            if (!confirmed) {
+                return;
+            }
+
+            // Set loading state
+            setSendingToExpensesEntry(true);
+            setSendingProgress({ current: 0, total: expensesToSend.length });
+            
+            // Fetch the latest ENO from Expenses Entry (similar to Form.js)
+            let currentEno = null;
+            try {
+                const enoResponse = await fetch('https://backendaab.in/aabuilderDash/expenses_form/get_form');
+                if (enoResponse.ok) {
+                    const enoData = await enoResponse.json();
+                    if (enoData.length > 0) {
+                        const sortedData = enoData.sort((a, b) => b.eno - a.eno);
+                        const lastEno = sortedData[0].eno;
+                        currentEno = lastEno + 1;
+                    } else {
+                        currentEno = 54173; // Default starting ENO if no data exists
+                    }
+                } else {
+                    console.warn("Failed to fetch ENO, using default");
+                    currentEno = 54173;
+                }
+            } catch (error) {
+                console.error('Error fetching latest ENo:', error);
+                currentEno = 54173; // Fallback to default
+            }
+            
+            // Send each expense to Expenses Entry API
+            let successCount = 0;
+            let errorCount = 0;
+            const successfullySentExpenses = []; // Track successfully sent expenses
+            for (let i = 0; i < expensesToSend.length; i++) {
+                const expense = expensesToSend[i];
+                try {
+                    // Update progress
+                    setSendingProgress({ current: i + 1, total: expensesToSend.length });
+
+                    // Get project name
+                    const project = siteOptions.find(opt => opt.id === Number(expense.project_id));
+                    const siteName = project?.label || "";
+                    
+                    // Get vendor/contractor/employee/labour name
+                    const employee = employeeOptions.find(opt => opt.id === Number(expense.employee_id));
+                    const vendor = vendorOptions.find(opt => opt.id === Number(expense.vendor_id));
+                    const contractor = contractorOptions.find(opt => opt.id === Number(expense.contractor_id));
+                    const labour = laboursList.find(opt => opt.id === Number(expense.labour_id));
+                    const vendorName = vendor?.label || "";
+                    const contractorName = contractor?.label || "";
+                    const employeeName = employee?.label || "";
+                    const labourName = labour?.label || "";
+                    
+                    // For combined expenses, use "Company Labour" as contractor
+                    const finalContractorName = expense.contractor_id && contractorOptions.find(opt => opt.id === Number(expense.contractor_id))?.label === "Company Labour" 
+                        ? "Company Labour" 
+                        : contractorName;
+                    
+                    // Create payload for Expenses Entry
+                    const expensesPayload = {
+                        accountType: "Daily Wage",
+                        eno: currentEno,
+                        date: expense.date,
+                        siteName: siteName,
+                        projectId: Number(expense.project_id) || null,
+                        vendor: vendorName,
+                        vendorId: Number(expense.vendor_id) || null,
+                        contractor: finalContractorName,
+                        contractorId: Number(expense.contractor_id) || null,
+                        employeeId: Number(expense.employee_id) || null,
+                        labourId: Number(expense.labour_id) || null, // Will be null for combined expenses
+                        quantity: expense.quantity || "",
+                        amount: Number(expense.amount || 0) + Number(expense.extra_amount || 0),
+                        category: expense.type || "",
+                        comments: expense.description || "",
+                        machineTools: "",
+                        billCopyUrl: expense.file_url || "",
+                        source: "Cash Register",
+                        paymentMode: "Cash"
+                    };
+                    
+                    const expensesResponse = await fetch(
+                        "https://backendaab.in/aabuilderDash/expenses_form/save_fixed",
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify(expensesPayload),
+                        }
+                    );
+                    
+                    if (!expensesResponse.ok) {
+                        const errorText = await expensesResponse.text();
+                        console.error(`Failed to save expense ${expense.id}:`, errorText);
+                        errorCount++;
+                    } else {
+                        successCount++;
+                        // For combined expenses, track all original expenses
+                        if (expense._originalExpenses && expense._originalExpenses.length > 0) {
+                            // This is a combined expense, add all original expenses to tracking
+                            successfullySentExpenses.push(...expense._originalExpenses);
+                        } else {
+                            // Single expense
+                            successfullySentExpenses.push(expense);
+                        }
+                        // Increment ENO for next expense (similar to Form.js)
+                        currentEno = currentEno + 1;
+                    }
+                } catch (error) {
+                    console.error(`Error sending expense ${expense.id} to Expenses Entry:`, error);
+                    errorCount++;
+                }
+            }
+            
+            // After sending all expenses, mark them as sent
+            if (successCount > 0) {
+                try {
+                    // Mark only the successfully sent expenses as sent using the send-to-expenses endpoint
+                    let markedCount = 0;
+                    for (const expense of successfullySentExpenses) {
+                        try {
+                            // Use the send-to-expenses endpoint to mark each expense as sent
+                            const markResponse = await axios.put(
+                                `https://backendaab.in/aabuildersDash/api/daily-payments/send-to-expenses/${expense.id}`
+                            );
+                            if (markResponse.status === 200) {
+                                markedCount++;
+                            }
+                        } catch (error) {
+                            console.error(`Error marking expense ${expense.id} as sent:`, error);
+                        }
+                    }
+                    
+                    if (markedCount < successfullySentExpenses.length) {
+                        console.warn(`Only ${markedCount} out of ${successfullySentExpenses.length} expenses were marked as sent.`);
+                    }
+                    
+                    alert(
+                        `Successfully sent ${successCount} expense(s) to Expenses Entry.` +
+                        (errorCount > 0 ? ` ${errorCount} expense(s) failed.` : "")
+                    );
+                    
+                    // Refresh the data
+                    if (selectedDate) {
+                        await handleDateClick(selectedDate);
+                    }
+                } catch (error) {
+                    console.error("Error marking expenses as sent:", error);
+                    alert(
+                        `Expenses sent to Expenses Entry, but failed to mark as sent. ` +
+                        `Please contact support. Success: ${successCount}, Failed: ${errorCount}`
+                    );
+                }
+            } else {
+                alert(`Failed to send expenses to Expenses Entry. ${errorCount} error(s) occurred.`);
+            }
+        } catch (error) {
+            console.error("Error in handleSendToExpensesEntry:", error);
+            alert("An error occurred while sending expenses to Expenses Entry. Please try again.");
+        } finally {
+            // Reset loading state
+            setSendingToExpensesEntry(false);
+            setSendingProgress({ current: 0, total: 0 });
+        }
+    };
     return (
         <body>
             <h1 className="font-bold text-xl flex justify-end mr-5 -mt-7">
@@ -1796,6 +2207,13 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                         disabled={loading}
                     >
                         {loading ? 'Generating...' : 'Export Excel'}
+                    </button>
+                    <button 
+                        onClick={handleSendToExpensesEntry} 
+                        className={`font-semibold mt-4 mr-5 hover:text-[#E4572E] ${sendingToExpensesEntry ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        disabled={sendingToExpensesEntry}
+                    >
+                        {sendingToExpensesEntry ? 'Sending...' : 'Send To Expenses Entry'}
                     </button>
                 </div>
             </div>
@@ -2420,18 +2838,22 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                                                     <td className="px-1 py-2 relative">
                                                         {Number(selectedWeek) === Number(lastWeekNumber) && (
                                                             <div className="flex gap-2 w-[80px]">
-                                                                {editingDailyExpenseRowId === row.id ? (
-                                                                    <button className="text-green-600 font-bold text-lg relative z-10" onClick={() => saveEditedExpense(row)}>
-                                                                        ✓
-                                                                    </button>
-                                                                ) : (
-                                                                    <button onClick={() => handleEditClick(row)}>
-                                                                        <img className="w-5 h-4" src={Edit} alt="Edit" />
-                                                                    </button>
+                                                                {canEditDelete && (
+                                                                    <>
+                                                                        {editingDailyExpenseRowId === row.id ? (
+                                                                            <button className="text-green-600 font-bold text-lg relative z-10" onClick={() => saveEditedExpense(row)}>
+                                                                                ✓
+                                                                            </button>
+                                                                        ) : (
+                                                                            <button onClick={() => handleEditClick(row)}>
+                                                                                <img className="w-5 h-4" src={Edit} alt="Edit" />
+                                                                            </button>
+                                                                        )}
+                                                                        <button onClick={() => handleDailyExpensesDelete(row.id)}>
+                                                                            <img src={Delete} className="w-5 h-4" alt="Delete" />
+                                                                        </button>
+                                                                    </>
                                                                 )}
-                                                                <button onClick={() => handleDailyExpensesDelete(row.id)}>
-                                                                    <img src={Delete} className="w-5 h-4" alt="Delete" />
-                                                                </button>
                                                                 <button onClick={() => fetchAuditDetailsForDailyExpense(row.id)}>
                                                                     <img src={history} className="w-5 h-4" alt="History" />
                                                                 </button>
@@ -2515,19 +2937,23 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                                                 <td className="py-2">
                                                     {Number(selectedWeek) === Number(lastWeekNumber) && (
                                                         <div className="flex">
-                                                            {editingPaymentId === row.id ? (
-                                                                <button className="text-green-600 font-bold text-lg" onClick={() => saveEditedRefundPayment(row.id)}>
-                                                                    ✓
-                                                                </button>
-                                                            ) : (
-                                                                <button onClick={() => handleEditRefundClick(row)}>
-                                                                    <img className="w-5 h-4" src={Edit} alt="Edit" />
-                                                                </button>
+                                                            {canEditDelete && (
+                                                                <>
+                                                                    {editingPaymentId === row.id ? (
+                                                                        <button className="text-green-600 font-bold text-lg" onClick={() => saveEditedRefundPayment(row.id)}>
+                                                                            ✓
+                                                                        </button>
+                                                                    ) : (
+                                                                        <button onClick={() => handleEditRefundClick(row)}>
+                                                                            <img className="w-5 h-4" src={Edit} alt="Edit" />
+                                                                        </button>
+                                                                    )}
+                                                                    <button className="pl-3" onClick={() => handleRefundPaymentsDelete(row.id)}>
+                                                                        <img src={Delete} className="w-5 h-4" alt="Delete" />
+                                                                    </button>
+                                                                </>
                                                             )}
-                                                            <button className="pl-3" onClick={() => handleRefundPaymentsDelete(row.id)}>
-                                                                <img src={Delete} className="w-5 h-4" alt="Delete" />
-                                                            </button>
-                                                            <button onClick={() => fetchAuditDetailsForRefundPaymentReceived(row.id)} className="pl-3">
+                                                            <button onClick={() => fetchAuditDetailsForRefundPaymentReceived(row.id)} className={canEditDelete ? "pl-3" : ""}>
                                                                 <img src={history} className="w-5 h-4" alt="History" />
                                                             </button>
                                                         </div>
@@ -2818,6 +3244,29 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                                     ))}
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {sendingToExpensesEntry && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                    <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
+                        <h3 className="text-lg font-semibold mb-4 text-center">Sending to Expenses Entry</h3>
+                        <div className="mb-4">
+                            <div className="flex justify-between mb-2">
+                                <span className="text-sm text-gray-600">
+                                    Processing expense {sendingProgress.current} of {sendingProgress.total}
+                                </span>
+                                <span className="text-sm text-gray-600">
+                                    {sendingProgress.total > 0 ? Math.round((sendingProgress.current / sendingProgress.total) * 100) : 0}%
+                                </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                <div
+                                    className="bg-[#BF9853] h-2.5 rounded-full transition-all duration-300"
+                                    style={{ width: `${(sendingProgress.current / sendingProgress.total) * 100}%` }}
+                                ></div>
+                            </div>
                         </div>
                     </div>
                 </div>

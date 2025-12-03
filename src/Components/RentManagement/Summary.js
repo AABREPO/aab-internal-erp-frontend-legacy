@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from 'axios';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-const Summary = () => {
+const Summary = ({ username, userRoles = [] }) => {
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const today = new Date();
     const previousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
@@ -24,6 +24,7 @@ const Summary = () => {
   const [filteredMonthTotal, setFilteredMonthTotal] = useState(0);
   const [shopNoIdToShopNoMap, setShopNoIdToShopNoMap] = useState({});
   const [tenantNameIdToTenantNameMap, setTenantNameIdToTenantNameMap] = useState({});
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   useEffect(() => {
     const today = new Date();
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -710,6 +711,58 @@ const Summary = () => {
     link.click();
     document.body.removeChild(link);
   };
+  const generateMissedReport = async () => {
+    if (!selectedMonth) {
+      alert('Please select a month first.');
+      return;
+    }
+    // Parse selectedMonth (format: "YYYY-MM") to get year and month
+    const [year, month] = selectedMonth.split('-').map(Number);
+    if (!year || !month || month < 1 || month > 12) {
+      alert('Invalid month selected. Please select a valid month.');
+      return;
+    }
+    setIsGeneratingReport(true);
+    try {
+      const response = await axios.post(
+        'https://backendaab.in/aabuildersDash/api/rental_forms/generate-missed-report',
+        null,
+        {
+          params: {
+            year: year,
+            month: month
+          }
+        }
+      );
+      if (response.status === 200) {
+        alert(`Success: ${response.data}`);
+        // Optionally refresh the rent forms data
+        const refreshResponse = await axios.get('https://backendaab.in/aabuildersDash/api/rental_forms/getAll');
+        if (refreshResponse.data) {
+          const sortedExpenses = refreshResponse.data.sort((a, b) => {
+            const enoA = parseInt(a.eno, 10);
+            const enoB = parseInt(b.eno, 10);
+            return enoB - enoA;
+          });
+          setRentForms(sortedExpenses);
+        }
+      }
+    } catch (error) {
+      if (error.response) {
+        // Server responded with error status
+        alert(`Error: ${error.response.data || error.response.statusText || 'Failed to generate report'}`);
+      } else if (error.request) {
+        // Request was made but no response received
+        alert('Error: No response from server. Please check your connection.');
+      } else {
+        // Something else happened
+        alert(`Error: ${error.message}`);
+      }
+      console.error('Error generating missed report:', error);
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
   return (
     <div className="flex justify-start p-10 ml-10 mr-10 h-[750px] bg-[#FFFFFF]">
       <div className="lg:flex gap-10 ml-3">
@@ -813,6 +866,15 @@ const Summary = () => {
           <div className="flex justify-between items-center mb-2.5">
             <h2 className="text-lg ml-6 font-bold text-left">Rent Month Transaction</h2>
             <div className="flex gap-3">
+              {username === "Mahalingam M" && (
+                <button 
+                  className="text-blue-600 text-sm font-semibold hover:underline cursor-pointer flex items-center disabled:opacity-50 disabled:cursor-not-allowed" 
+                  onClick={generateMissedReport}
+                  disabled={isGeneratingReport}
+                >
+                  {isGeneratingReport ? 'Generating...' : 'Generate Report'}
+                </button>
+              )}
               <button className="text-[#007233] text-sm font-semibold hover:underline cursor-pointer flex items-center" onClick={exportExportMonthlyExcel} >
                 Export XL
               </button>

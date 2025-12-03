@@ -37,10 +37,13 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
   const fileInputRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
+  const adminUsernames = ['Mahalingam M', 'Admin'];
+  const normalizedUsername = (username || '').trim().toLowerCase();
+  const isAdminUser = adminUsernames.some(name => name.toLowerCase() === normalizedUsername);
+  const isAdmin = isAdminUser;
 
   useEffect(() => {
     const isPageRefresh = sessionStorage.getItem('advanceTableViewPageLoaded') === null;
-
     if (isPageRefresh) {
       sessionStorage.removeItem('advanceTableViewFilters');
       sessionStorage.setItem('advanceTableViewPageLoaded', 'true');
@@ -786,13 +789,12 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     return sum;
   }, 0);
   const handleEditClick = (entry) => {
-    // Check if editing is allowed - if not, show request popup
-    if (entry.not_allow_to_edit || entry.allow_to_edit === false) {
+    // Non-admin users must request permission when editing is disabled
+    if (!isAdmin && (entry.not_allow_to_edit || entry.allow_to_edit === false)) {
       setRequestingEntry(entry);
       setIsRequestModalOpen(true);
       return;
     }
-    
     setEditingId(entry.advancePortalId);
     setSelectedFile(null);
     setEditFormData({
@@ -822,7 +824,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
 
   const handleSendEditRequest = async () => {
     if (!requestingEntry) return;
-    
     try {
       const requestData = {
         module_name: 'Advance Portal',
@@ -832,19 +833,16 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
         request_approval: false,
         request_completed: false
       };
-
       const response = await fetch('https://backendaab.in/aabuildersDash/api/edit_requests/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(requestData)
       });
-
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(errorText || 'Failed to create edit request');
       }
-
       alert('Edit request sent successfully. Waiting for admin approval.');
       window.dispatchEvent(new Event('editRequestCreated'));
       setIsRequestModalOpen(false);
@@ -869,16 +867,13 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
       }
     }),
   };
-
   const handleUpdate = async () => {
     try {
-      // Check if editing is allowed
       const currentEntry = advanceData.find(entry => entry.advancePortalId === editingId);
       if (currentEntry && currentEntry.not_allow_to_edit) {
         alert('Editing is not allowed for this record. Please request permission to edit.');
         return;
       }
-
       let fileUrl = editFormData.file_url || '';
       if (selectedFile) {
         try {
@@ -974,7 +969,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
         }
         return null;
       };
-
       const setAllowToEdit = async (id, allow) => {
         try {
           const res = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/allow/${id}?allow=${allow}`, {
@@ -1010,7 +1004,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
               updateRecord(editedRecord.advancePortalId, updatedEdited),
               updateRecord(otherRecord.advancePortalId, updatedOther)
             ]);
-            // Set allowToEdit to false after successful update
             await Promise.all([
               setAllowToEdit(editedRecord.advancePortalId, false),
               setAllowToEdit(otherRecord.advancePortalId, false)
@@ -1030,7 +1023,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
             console.warn('Transfer pair incomplete for entry_no:', editFormData.entry_no);
             const fallbackPayload = buildPayload({}, 'Transfer');
             await updateRecord(editingId, fallbackPayload);
-            // Set allowToEdit to false after successful update
             await setAllowToEdit(editingId, false);
             setAdvanceData(prev =>
               prev.map(item =>
@@ -1042,7 +1034,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
           console.warn('Could not find both Transfer records for entry_no:', editFormData.entry_no);
           const fallbackPayload = buildPayload({}, 'Transfer');
           await updateRecord(editingId, fallbackPayload);
-          // Set allowToEdit to false after successful update
           await setAllowToEdit(editingId, false);
           setAdvanceData(prev =>
             prev.map(item =>
@@ -1053,7 +1044,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
       } else {
         const payload = buildPayload();
         const updatedRecord = await updateRecord(editingId, payload);
-        // Set allowToEdit to false after successful update
         await setAllowToEdit(editingId, false);
         setAdvanceData(prev =>
           prev.map(item =>
@@ -1283,50 +1273,32 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
             >
-              <table className="min-w-[1985px] w-full border-collapse">
+              <table className="min-w-[1805px] w-full border-collapse">
                 <thead className="sticky top-0 z-10 bg-white ">
                   <tr className="bg-[#FAF6ED]">
-                    <th
-                      className="pt-2 pl-3 w-60 font-bold text-left cursor-pointer hover:bg-gray-200"
-                      onClick={() => handleSort('date')}
-                    >
+                    <th className="pt-2 pl-3 w-44 font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('date')}>
                       Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th
-                      className="px-2 w-[320px] font-bold text-left cursor-pointer hover:bg-gray-200"
-                      onClick={() => handleSort('vendor')}
-                    >
+                    <th className="px-2 w-[320px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('vendor')}>
                       Contractor/Vendor {sortConfig.key === 'vendor' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th
-                      className="px-2 w-[400px] font-bold text-left cursor-pointer hover:bg-gray-200"
-                      onClick={() => handleSort('project')}
-                    >
+                    <th className="px-2 w-[400px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('project')}>
                       Project Name {sortConfig.key === 'project' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th
-                      className="px-2 w-[450px] font-bold text-left cursor-pointer hover:bg-gray-200"
-                      onClick={() => handleSort('transfer')}
-                    >
+                    <th className="px-2 w-[450px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('transfer')}>
                       Transfer Site {sortConfig.key === 'transfer' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="px-2 w-[100px] font-bold text-right">Advance</th>
                     <th className="px-2 w-[170px] font-bold text-right">Bill Payment</th>
                     <th className="px-2 w-[120px] font-bold text-right">Refund</th>
-                    <th
-                      className="px-2 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200"
-                      onClick={() => handleSort('type')}
-                    >
+                    <th className="px-2 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('type')}>
                       Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="px-2 w-[120px] font-bold text-left">Description</th>
-                    <th
-                      className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200"
-                      onClick={() => handleSort('mode')}
-                    >
+                    <th className="px-2 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('mode')}>
                       Mode {sortConfig.key === 'mode' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="px-2 w-[220px] font-bold text-left">Attached file</th>
+                    <th className="px-2 w-[80px] font-bold text-left">File</th>
                     <th className="px-2 w-[80px] font-bold text-left">E.No</th>
                     <th className="px-2 w-[120px] font-bold text-left">Activity</th>
                   </tr>
@@ -1337,7 +1309,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                           type="date"
                           value={selectDate}
                           onChange={(e) => setSelectDate(e.target.value)}
-                          className="p-1 rounded-md bg-transparent -ml-6 w-32 border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
+                          className="rounded-md bg-transparent -ml-4 w-32 border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
                           placeholder="Search Date..."
                         />
                       </th>
@@ -1498,7 +1470,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                         <select
                           value={selectType}
                           onChange={(e) => setSelectType(e.target.value)}
-                          className="p-1 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                          className="rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
                           placeholder="Type..."
                           menuPortalTarget={document.body}
                         >
@@ -1514,7 +1486,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                         <select
                           value={selectMode}
                           onChange={(e) => setSelectMode(e.target.value)}
-                          className="p-1 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                          className="rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
                           placeholder="Mode..."
                           menuPortalTarget={document.body}
                         >
@@ -1524,13 +1496,13 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                           <option value='Net Banking'>Net Banking</option>
                         </select>
                       </th>
-                      <th className='w-[220px] pt-2 pb-2'></th>
+                      <th className='w-[80px] pt-2 pb-2'></th>
                       <th className="pt-2 pb-2">
                         <input
                           type="text"
                           value={selectEntryNo}
                           onChange={(e) => setSelectEntryNo(e.target.value)}
-                          className="p-1 rounded-md bg-transparent w-[80px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                          className="rounded-md bg-transparent w-[80px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
                           placeholder="Entry No..."
                         />
                       </th>
@@ -1542,7 +1514,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                   {currentData.length > 0 ? (
                     currentData.map((entry) => (
                       <tr key={entry.id} className="odd:bg-white even:bg-[#FAF6ED]">
-                        <td className="text-sm text-left p-2 w-40 font-semibold">{formatDateOnly(entry.date)}</td>
+                        <td className="text-sm text-left p-2 w-32 font-semibold">{formatDateOnly(entry.date)}</td>
                         <td className="text-sm text-left w-[150px] font-semibold">
                           {entry.vendor_id
                             ? getVendorName(entry.vendor_id)
@@ -1572,7 +1544,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                         <td className="text-sm text-left font-semibold">{entry.type}</td>
                         <td className="text-sm text-left font-semibold">{entry.description}</td>
                         <td className="text-sm text-left font-semibold">{entry.payment_mode}</td>
-                        <td className="text-sm text-left pl-3">
+                        <td className="text-sm text-left pl-">
                           {entry.file_url ? (
                             <a
                               href={entry.file_url}
@@ -1589,14 +1561,14 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                         <td className="text-sm text-left pl-3 font-semibold">{entry.entry_no}</td>
                         <td className="flex py-2">
                           <button
-                            className={`rounded-full transition duration-200 ml-2 mr-3 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            disabled={entry.not_allow_to_edit}
+                            className={`rounded-full transition duration-200 ml-2 mr-3 ${entry.not_allow_to_edit && !isAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={entry.not_allow_to_edit && !isAdmin}
                           >
                             <img
                               src={edit}
-                              onClick={entry.not_allow_to_edit ? undefined : () => handleEditClick(entry)}
+                              onClick={entry.not_allow_to_edit && !isAdmin ? undefined : () => handleEditClick(entry)}
                               alt="Edit"
-                              className={`w-4 h-6 transition duration-200 ${entry.not_allow_to_edit ? '' : 'transform hover:scale-110 hover:brightness-110'}`}
+                              className={`w-4 h-6 transition duration-200 ${entry.not_allow_to_edit && !isAdmin ? '' : 'transform hover:scale-110 hover:brightness-110'}`}
                             />
                           </button>
                         </td>
@@ -1877,28 +1849,12 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
           )}
           {isRequestModalOpen && requestingEntry && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-              <div className="bg-white p-6 rounded-lg w-[500px]">
-                <h2 className="text-lg font-bold mb-4 text-[#BF9853]">Request Edit Permission</h2>
-                <div className="mb-4">
-                  <p className="text-gray-700 mb-2">
-                    You need admin approval to edit this record.
-                  </p>
-                  <div className="bg-gray-50 p-3 rounded border">
-                    <p className="text-sm text-gray-600">
-                      <strong>Record ID:</strong> {requestingEntry.advancePortalId}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      <strong>Entry No:</strong> {requestingEntry.entry_no}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      <strong>Date:</strong> {formatDateOnly(requestingEntry.date)}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      <strong>Type:</strong> {requestingEntry.type || '-'}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex justify-end gap-3 mt-4">
+              <div className="bg-white p-6 rounded-lg w-[400px] text-center">
+                <h2 className="text-lg font-bold mb-2 text-[#BF9853]">Request Edit Permission</h2>
+                <p className="text-gray-700 mb-6">
+                  You need admin approval to edit this record.
+                </p>
+                <div className="flex justify-center gap-3">
                   <button
                     onClick={() => {
                       setIsRequestModalOpen(false);
@@ -1910,7 +1866,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                   </button>
                   <button
                     onClick={handleSendEditRequest}
-                    className="px-4 py-2 bg-[#BF9853] w-[100px] h-[45px] text-white rounded"
+                    className="px-4 py-2 bg-[#BF9853] w-[160px] h-[45px] text-white rounded"
                   >
                     Send Request
                   </button>

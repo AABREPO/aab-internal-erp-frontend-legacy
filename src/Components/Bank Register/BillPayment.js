@@ -285,10 +285,10 @@ const BillPayment = ({ username, userRoles = [] }) => {
                         sNo: "9"
                     },
                     {
-                        value:"Multi-Project Batch",
-                        label:"Multi-Project Batch",
-                        id:10,
-                        sNo:"10"
+                        value: "Multi-Project Batch",
+                        label: "Multi-Project Batch",
+                        id: 10,
+                        sNo: "10"
                     }
                 ];
                 // Combine backend data with predefined options
@@ -299,7 +299,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
             console.error("Error fetching project options:", error);
         }
     }, []);
-    
+
     // Fetch purpose options from API
     const fetchPurposeOptions = useCallback(async () => {
         try {
@@ -338,7 +338,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
             if (response.ok) {
                 const data = await response.json();
                 setTenantShopData(data);
-                
+
                 // Build tenant options from tenant link shop data (unique tenant names)
                 const tenantOptionsUnique = data
                     .filter(t => t.tenantName)
@@ -349,7 +349,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
                         tenantId: t.id
                     }))
                     .filter((t, i, arr) => arr.findIndex(x => x.value === t.value) === i);
-                
+
                 setTenantOptions(tenantOptionsUnique);
             }
         } catch (error) {
@@ -358,7 +358,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
             setTenantShopData([]);
         }
     }, []);
-    
+
     const handleDeleteBillPayment = async (item) => {
         try {
             let successMessage = "Bill payment deleted successfully!";
@@ -503,7 +503,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
         fetchPurposeOptions();
         fetchTenantOptions();
     }, [fetchBillPayments, fetchVendorOptions, fetchContractorOptions, fetchEmployeeOptions, fetchProjectOptions, fetchPurposeOptions, fetchTenantOptions]);
-    
+
     // Reset to first page when filters change
     useEffect(() => {
         setCurrentPage(1);
@@ -511,28 +511,28 @@ const BillPayment = ({ username, userRoles = [] }) => {
     const getProjectName = (projectId) => {
         const project = siteOptions.find(option => option.id === projectId);
         return project ? project.label : '-';
-    };    
+    };
     // New function to get project name or purpose name
     const getProjectOrPurposeName = (item) => {
         // Check if this is a tenant - if so, show tenant_complex_name directly from the data
         const partyData = getPartyNameAndType(item);
         if (partyData.type === 'Tenant' && item.tenant_complex_name) {
             return item.tenant_complex_name;
-        }        
+        }
         // First try to get project name
         if (item.project_id) {
             const projectName = getProjectName(item.project_id);
             if (projectName !== '-') {
                 return projectName;
             }
-        }        
+        }
         // If no project_id or project not found, try to get purpose name
         if (item.purpose_id) {
             const purposeName = getPurposeName(item.purpose_id);
             if (purposeName !== '-') {
                 return purposeName;
             }
-        }        
+        }
         return '-';
     };
     const getVendorName = (vendorId) => {
@@ -663,7 +663,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
         }
         return filtered;
     };
-    const filteredData = getFilteredData();    
+    const filteredData = getFilteredData();
     // Pagination logic
     const totalPages = Math.ceil(filteredData.length / itemsPerPage);
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -676,7 +676,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
             value: type,
             label: type
         }));
-    };    
+    };
     const calculatePaymentTotals = () => {
         let upiTotal = 0;
         let netBankingTotal = 0;
@@ -1059,15 +1059,23 @@ const BillPayment = ({ username, userRoles = [] }) => {
                                                 {startIndex + index + 1}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                                {new Date(item.created_at).toLocaleDateString('en-GB', {
-                                                    day: '2-digit',
-                                                    month: '2-digit',
-                                                    year: 'numeric'
-                                                }) + ' ' + new Date(item.created_at).toLocaleTimeString('en-US', {
-                                                    hour: '2-digit',
-                                                    minute: '2-digit',
-                                                    hour12: true
-                                                })}
+                                                {(() => {
+                                                    const date = new Date(item.created_at);
+                                                    date.setMinutes(date.getMinutes() + 330);
+                                                    return (
+                                                        date.toLocaleDateString('en-GB', {
+                                                            day: '2-digit',
+                                                            month: '2-digit',
+                                                            year: 'numeric'
+                                                        }) +
+                                                        ' ' +
+                                                        date.toLocaleTimeString('en-US', {
+                                                            hour: '2-digit',
+                                                            minute: '2-digit',
+                                                            hour12: true
+                                                        })
+                                                    );
+                                                })()}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                 {new Date(item.date).toLocaleDateString()}
@@ -1105,23 +1113,15 @@ const BillPayment = ({ username, userRoles = [] }) => {
                                             </td>
                                             <td className="">
                                                 <div className="flex">
-                                                    <button
-                                                        onClick={() => showPaymentPopupHandler(item)}
-                                                        className="inline-flex items-center text-sm font-medium rounded-md text-white  focus:outline-none mr-4"
-                                                    >
+                                                    <button onClick={() => showPaymentPopupHandler(item)} className="inline-flex items-center text-sm font-medium rounded-md text-white  focus:outline-none mr-4">
                                                         <img src={Edit} alt="Edit" className="w-4 h-4" />
                                                         Edit
                                                     </button>
-                                                    <button
-                                                        onClick={() => showDeleteConfirmation(item)}
-                                                        className="inline-flex items-centert text-sm  font-medium rounded-md text-white focus:outline-none"
-                                                    >
+                                                    <button onClick={() => showDeleteConfirmation(item)} className="inline-flex items-centert text-sm  font-medium rounded-md text-white focus:outline-none">
                                                         <img src={Delete} alt="Delete" className="w-4 h-4" />
                                                         Delete
                                                     </button>
-                                                    <button
-                                                        className="inline-flex items-center text-sm  font-medium rounded-md text-white focus:outline-none"
-                                                    >
+                                                    <button className="inline-flex items-center text-sm  font-medium rounded-md text-white focus:outline-none">
                                                         <img src={history} alt="Delete" className="w-4 h-4" />
                                                         History
                                                     </button>
@@ -1132,8 +1132,6 @@ const BillPayment = ({ username, userRoles = [] }) => {
                                 </tbody>
                             </table>
                         </div>
-                        
-                        {/* Pagination Controls */}
                         <div className="flex items-center justify-between mt-4 px-4 py-3 bg-white border-t border-gray-200">
                             <div className="flex items-center space-x-2">
                                 <span className="text-sm text-gray-700">Items per page:</span>
@@ -1154,7 +1152,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
                                     Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} entries
                                 </span>
                             </div>
-                            
+
                             <div className="flex items-center space-x-1">
                                 <button
                                     onClick={() => setCurrentPage(currentPage - 1)}
@@ -1163,8 +1161,6 @@ const BillPayment = ({ username, userRoles = [] }) => {
                                 >
                                     Previous
                                 </button>
-                                
-                                {/* Page numbers */}
                                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                                     let pageNum;
                                     if (totalPages <= 5) {
@@ -1176,21 +1172,19 @@ const BillPayment = ({ username, userRoles = [] }) => {
                                     } else {
                                         pageNum = currentPage - 2 + i;
                                     }
-                                    
                                     return (
                                         <button
                                             key={pageNum}
                                             onClick={() => setCurrentPage(pageNum)}
-                                            className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${
-                                                currentPage === pageNum
+                                            className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${currentPage === pageNum
                                                     ? 'bg-[#BF9853] text-white border-[#BF9853]'
                                                     : 'border-gray-300 hover:bg-[#BF9853] hover:text-white'
-                                            }`}
+                                                }`}
                                         >
                                             {pageNum}
                                         </button>
                                     );
-                                })}                                
+                                })}
                                 <button
                                     onClick={() => setCurrentPage(currentPage + 1)}
                                     disabled={currentPage === totalPages}
@@ -1265,14 +1259,12 @@ const BillPayment = ({ username, userRoles = [] }) => {
                                         </div>
                                     )}
                                     <div className="flex gap-3">
-                                        <button
-                                            onClick={cancelDelete}
+                                        <button onClick={cancelDelete}
                                             className="flex-1 px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
                                         >
                                             Cancel
                                         </button>
-                                        <button
-                                            onClick={confirmDelete}
+                                        <button onClick={confirmDelete}
                                             className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
                                         >
                                             Delete

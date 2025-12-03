@@ -377,7 +377,7 @@ const ClaimPaymentTableView = ({ username, userRoles = [] }) => {
               onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
             >
             <table className="w-full border rounded-lg">
-              <thead className="bg-[#FAF6ED] sticky top-0 z-20">
+              <thead className="bg-[#FAF6ED] sticky top-0 z-90">
                 <tr>
                   <th className="px-4 py-2 sticky top-0 bg-[#FAF6ED] z-20">S.No</th>
                     <th

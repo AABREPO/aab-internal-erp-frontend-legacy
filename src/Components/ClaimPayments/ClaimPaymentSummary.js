@@ -681,7 +681,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
               onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
             >
               <table className="w-full border rounded-lg table-fixed">
-                <thead className="bg-[#FAF6ED] sticky top-0 z-20">
+                <thead className="bg-[#FAF6ED] sticky top-0 z-99">
                   <tr>
                     <th className="px-2 py-2 w-16 text-center sticky top-0 bg-[#FAF6ED] z-20">S.No</th>
                     <th

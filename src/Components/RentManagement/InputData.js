@@ -3814,8 +3814,8 @@ const InputData = ({ username, userRoles = [] }) => {
                           ))
                           : null;
                         return (
-                          <div key={sIndex} className="bg-gray-50 p-4 rounded-lg shadow-md mb-6 text-left w-[1250px]">
-                            <div className="flex gap-2 mb-2 ">
+                          <div key={sIndex} className="bg-gray-50 p-2 rounded-lg shadow-md mb-6 text-left w-[1250px]">
+                            <div className="flex gap-1 mb-2 ">
                               <Select
                                 name="projectReferenceName"
                                 options={projectOptions}
@@ -4007,7 +4007,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                 name="projectType"
                                 value={shopDetails?.projectType || ''}
                                 readOnly
-                                className="border-2 text-sm border-[#BF9853] w-16 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
+                                className="border-2 text-sm border-[#BF9853] w-24 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none bg-gray-100"
                                 placeholder="Project type"
                               />
                               <input
@@ -4072,7 +4072,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                     },
                                   });
                                 }}
-                                className="border-2 text-sm border-[#BF9853] w-28 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
+                                className="border-2 text-sm border-[#BF9853] w-[122px] h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
                                 placeholder="Advance"
                               />
                               <div className="relative flex">
@@ -4089,7 +4089,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                       },
                                     });
                                   }}
-                                  className="border-2 text-sm border-[#BF9853] w-28 h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
+                                  className="border-2 text-sm border-[#BF9853] w-[122px] h-11 border-opacity-25 p-2 rounded-lg focus:outline-none"
                                   placeholder="Closure Date"
                                 />
                                 {editTenantLinkFormData.shopNos.length > 1 && (

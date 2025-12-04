@@ -202,60 +202,60 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
         // Add predefined site options with IDs 001, 002, 003, 004
         const predefinedSiteOptions = [
           {
-              value: "Mason Advance",
-              label: "Mason Advance",
-              id: 1,
-              sNo: "1"
+            value: "Mason Advance",
+            label: "Mason Advance",
+            id: 1,
+            sNo: "1"
           },
           {
-              value: "Material Advance",
-              label: "Material Advance",
-              id: 2,
-              sNo: "2"
+            value: "Material Advance",
+            label: "Material Advance",
+            id: 2,
+            sNo: "2"
           },
           {
-              value: "Weekly Advance",
-              label: "Weekly Advance",
-              id: 3,
-              sNo: "3"
+            value: "Weekly Advance",
+            label: "Weekly Advance",
+            id: 3,
+            sNo: "3"
           },
           {
-              value: "Excess Advance",
-              label: "Excess Advance",
-              id: 4,
-              sNo: "4"
+            value: "Excess Advance",
+            label: "Excess Advance",
+            id: 4,
+            sNo: "4"
           },
           {
-              value: "Material Rent",
-              label: "Material Rent",
-              id: 5,
-              sNo: "5"
+            value: "Material Rent",
+            label: "Material Rent",
+            id: 5,
+            sNo: "5"
           },
           {
-              value: "Subhash Kumar - Kunnur",
-              label: "Subhash Kumar - Kunnur",
-              id: 6,
-              sNo: "6"
+            value: "Subhash Kumar - Kunnur",
+            label: "Subhash Kumar - Kunnur",
+            id: 6,
+            sNo: "6"
           },
           {
-              value: "Summary Bill",
-              label: "Summary Bill",
-              id: 7,
-              sNo: "7"
+            value: "Summary Bill",
+            label: "Summary Bill",
+            id: 7,
+            sNo: "7"
           },
           {
-              value: "Daily Wage",
-              label: "Daily Wage",
-              id: 8,
-              sNo: "8"
+            value: "Daily Wage",
+            label: "Daily Wage",
+            id: 8,
+            sNo: "8"
           },
           {
-              value: "Rent Management Portal",
-              label: "Rent Management Portal",
-              id: 9,
-              sNo: "9"
+            value: "Rent Management Portal",
+            label: "Rent Management Portal",
+            id: 9,
+            sNo: "9"
           }
-      ];
+        ];
         // Combine backend data with predefined options
         const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
         setSiteOptions(combinedSiteOptions);
@@ -265,60 +265,60 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
         // Fallback: if API fails, still show predefined options
         const predefinedSiteOptions = [
           {
-              value: "Mason Advance",
-              label: "Mason Advance",
-              id: 1,
-              sNo: "1"
+            value: "Mason Advance",
+            label: "Mason Advance",
+            id: 1,
+            sNo: "1"
           },
           {
-              value: "Material Advance",
-              label: "Material Advance",
-              id: 2,
-              sNo: "2"
+            value: "Material Advance",
+            label: "Material Advance",
+            id: 2,
+            sNo: "2"
           },
           {
-              value: "Weekly Advance",
-              label: "Weekly Advance",
-              id: 3,
-              sNo: "3"
+            value: "Weekly Advance",
+            label: "Weekly Advance",
+            id: 3,
+            sNo: "3"
           },
           {
-              value: "Excess Advance",
-              label: "Excess Advance",
-              id: 4,
-              sNo: "4"
+            value: "Excess Advance",
+            label: "Excess Advance",
+            id: 4,
+            sNo: "4"
           },
           {
-              value: "Material Rent",
-              label: "Material Rent",
-              id: 5,
-              sNo: "5"
+            value: "Material Rent",
+            label: "Material Rent",
+            id: 5,
+            sNo: "5"
           },
           {
-              value: "Subhash Kumar - Kunnur",
-              label: "Subhash Kumar - Kunnur",
-              id: 6,
-              sNo: "6"
+            value: "Subhash Kumar - Kunnur",
+            label: "Subhash Kumar - Kunnur",
+            id: 6,
+            sNo: "6"
           },
           {
-              value: "Summary Bill",
-              label: "Summary Bill",
-              id: 7,
-              sNo: "7"
+            value: "Summary Bill",
+            label: "Summary Bill",
+            id: 7,
+            sNo: "7"
           },
           {
-              value: "Daily Wage",
-              label: "Daily Wage",
-              id: 8,
-              sNo: "8"
+            value: "Daily Wage",
+            label: "Daily Wage",
+            id: 8,
+            sNo: "8"
           },
           {
-              value: "Rent Management Portal",
-              label: "Rent Management Portal",
-              id: 9,
-              sNo: "9"
+            value: "Rent Management Portal",
+            label: "Rent Management Portal",
+            id: 9,
+            sNo: "9"
           }
-      ];
+        ];
         setSiteOptions(predefinedSiteOptions);
       }
     };
@@ -732,7 +732,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
             comments: description,
             machineTools: '',
             billCopyUrl: fileUrl || '',
-            source:"Advance Portal",
+            source: "Advance Portal",
           };
           const expensesResponse = await fetch("https://backendaab.in/aabuilderDash/expenses_form/save", {
             method: "POST",
@@ -1062,10 +1062,10 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
   const vendorOrContractorLabel = selectedOption?.label || '-';
   const formattedAdvanceAmount = advanceAmount ? formatWithCommas(advanceAmount) : '-';
   const formattedBillAmount = billAmount ? formatWithCommas(billAmount) : '-';
-  const transferSiteLabel = selectedType === 'Transfer' && transferSiteId 
+  const transferSiteLabel = selectedType === 'Transfer' && transferSiteId
     ? sortedSiteOptions.find(option => option.id === parseInt(transferSiteId))?.label || '-'
     : '-';
-  
+
   const reviewDetails = [
     { label: 'Type', value: selectedType || '-' },
     { label: 'Date', value: formatDateForReview(dateValue) || '-' },
@@ -1074,14 +1074,14 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
     { label: 'Project Name', value: selectedSite?.label || '-' },
     { label: 'Project ID', value: selectedSite?.id || '-' },
   ];
-  
+
   if (selectedType === 'Bill Settlement') {
     reviewDetails.push(
       { label: 'Bill Amount', value: formattedBillAmount },
       { label: 'Category', value: selectedCategory?.label || '-' }
     );
   }
-  
+
   if (selectedType === 'Transfer') {
     reviewDetails.push(
       { label: 'Transfer Amount', value: formattedAdvanceAmount },
@@ -1106,7 +1106,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
       );
     }
   }
-  
+
   reviewDetails.push(
     { label: 'Description', value: description || '-' },
     { label: 'File Attached', value: selectedAdvanceFile ? selectedAdvanceFile.name : 'No file attached' }
@@ -1190,7 +1190,18 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
             const year = date.getFullYear();
             return `${day}-${month}-${year}`;
           };
-          const finalName = `${formatDateOnly(paymentModalData.date)} ${selectedSite.sNo} ${selectedOption.label}`;
+          const now = new Date();
+          const timestamp = now.toLocaleString("en-GB", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true
+          })
+            .replace(",", "")
+            .replace(/\s/g, "-");
+          const finalName = `${timestamp} ${selectedSite.sNo} ${selectedOption.label}`;
           formData.append('file', selectedAdvanceFile);
           formData.append('file_name', finalName);
           const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
@@ -1819,19 +1830,19 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                                           className="cursor-pointer"
                                           title="View File"
                                         >
-                                          <img 
-                                            src={file} 
-                                            className="w-5 h-4 transform hover:scale-110 transition duration-200" 
+                                          <img
+                                            src={file}
+                                            className="w-5 h-4 transform hover:scale-110 transition duration-200"
                                             alt="View File"
                                             style={{ filter: 'invert(0%) brightness(0%)' }}
                                           />
                                         </a>
                                       ) : (
                                         <div className="opacity-30">
-                                          <img 
-                                            src={file} 
-                                            className="w-5 h-4" 
-                                            alt="No File" 
+                                          <img
+                                            src={file}
+                                            className="w-5 h-4"
+                                            alt="No File"
                                             title="No file attached"
                                             style={{ filter: 'invert(0%) brightness(0%)' }}
                                           />
@@ -1993,7 +2004,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                       </div>
                     </div>
                   </div>
-                  
+
                   {(paymentModalData.paymentMode === "GPay" || paymentModalData.paymentMode === "PhonePe" ||
                     paymentModalData.paymentMode === "Net Banking" || paymentModalData.paymentMode === "Cheque") && (
                       <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">

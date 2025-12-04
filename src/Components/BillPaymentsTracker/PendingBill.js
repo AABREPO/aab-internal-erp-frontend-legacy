@@ -2233,13 +2233,23 @@ const PendingBill = ({ username, userRoles = [] }) => {
         try {
             // Convert image to PDF if it's an image
             const processedFile = await convertImageToPdf(file);
-            
+            const now = new Date();
+            const timestamp = now.toLocaleString("en-GB", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true
+              })
+                .replace(",", "")
+                .replace(/\s/g, "-");
             // Find the payment details to generate a proper filename
             const payment = existingPaymentDetails?.find(p => p.id === paymentId);
             const formData = new FormData();
             const vendorName = getVendorNameById(selectedPaymentBill?.vendor_id);
             const finalName = payment
-                ? `${payment.date} ${vendorName !== '-' ? vendorName : 'Payment'} ${payment.vendor_bill_payment_mode || ''}`
+                ? `${timestamp} ${vendorName !== '-' ? vendorName : 'Payment'} ${payment.vendor_bill_payment_mode || ''}`
                 : processedFile.name;
             formData.append('file', processedFile);
             formData.append('file_name', finalName);
@@ -2310,12 +2320,23 @@ const PendingBill = ({ username, userRoles = [] }) => {
             // Upload file to Google Drive
             const formData = new FormData();
             const vendorName = getVendorNameById(selectedPaymentBill?.vendor_id);
+            const now = new Date();
+            const timestamp = now.toLocaleString("en-GB", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true
+              })
+                .replace(",", "")
+                .replace(/\s/g, "-");
             // Format date as DD-MM-YYYY
             const billDate = selectedPaymentBill.bill_arrival_date || new Date().toISOString().split('T')[0];
             const dateObj = new Date(billDate);
             const formattedDate = `${String(dateObj.getDate()).padStart(2, '0')}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${dateObj.getFullYear()}`;
             const displayVendorName = vendorName !== '-' ? vendorName : 'Overall Payment';
-            const fileName = `${formattedDate} ${displayVendorName} - summary bill.pdf`;
+            const fileName = `${timestamp} ${displayVendorName} - summary bill.pdf`;
             formData.append('file', processedFile);
             formData.append('file_name', fileName);
 
@@ -2412,7 +2433,18 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 if (entry.attachedFile) {
                     try {
                         const formData = new FormData();
-                        const finalName = `${entry.date} ${selectedPaymentBill.vendor_name || 'Payment'} ${entry.mode}`;
+                        const now = new Date();
+                        const timestamp = now.toLocaleString("en-GB", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hour12: true
+                        })
+                            .replace(",", "")
+                            .replace(/\s/g, "-");
+                        const finalName = `${timestamp} ${selectedPaymentBill.vendor_name || 'Payment'} ${entry.mode}`;
                         formData.append('file', entry.attachedFile);
                         formData.append('file_name', finalName);
                         const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {

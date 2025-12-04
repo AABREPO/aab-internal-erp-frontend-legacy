@@ -952,7 +952,18 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
           };
           const selectedSite = siteOptions.find(site => site.id === editFormData.project_id);
           const contractorOrVendor = selectedOption ? selectedOption.label : '';
-          const finalName = `${formatDateOnly(editFormData.date)} ${selectedSite?.sNo || ''} ${contractorOrVendor}`;
+          const now = new Date();
+          const timestamp = now.toLocaleString("en-GB", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true
+          })
+            .replace(",", "")
+            .replace(/\s/g, "-");
+          const finalName = `${timestamp} ${selectedSite?.sNo || ''} ${contractorOrVendor}`;
           formData.append('file', selectedFile);
           formData.append('file_name', finalName);
           const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {

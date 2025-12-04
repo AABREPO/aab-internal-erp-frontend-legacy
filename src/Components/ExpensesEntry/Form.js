@@ -247,34 +247,34 @@ const Form = ({ username, userRoles = [] }) => {
         fetchAccountDetails();
     }, []);
     useEffect(() => { setCombinedOptions([...vendorOptions, ...contractorOptions]); }, [vendorOptions, contractorOptions]);
-    
+
     useEffect(() => {
         const prefillDataStr = localStorage.getItem('expenseEntryPrefill');
         if (prefillDataStr && siteOptions.length > 0 && accountTypeOptions.length > 0) {
             try {
                 const prefillData = JSON.parse(prefillDataStr);
-                
+
                 const utilityBillsOption = accountTypeOptions.find(opt => opt.value === 'Utility Bills');
                 if (utilityBillsOption) {
                     setSelectedAccountType('Utility Bills');
                 }
-                
+
                 setUtilityType('Electricity');
-                
+
                 const siteOption = siteOptions.find(opt => opt.label === prefillData.siteName);
                 if (siteOption) {
                     setSelectedSite(siteOption);
                 }
-                
+
                 const fetchPreviousEntry = async () => {
                     try {
                         const response = await axios.get('https://backendaab.in/aabuilderDash/expenses_form/utility/electricity');
                         const electricityEntries = Array.isArray(response.data) ? response.data : [];
-                        
+
                         const previousEntry = electricityEntries
                             .filter(entry => entry.utilityTypeNumber === prefillData.ebNo)
                             .sort((a, b) => new Date(b.date || b.timestamp) - new Date(a.date || a.timestamp))[0];
-                        
+
                         if (previousEntry) {
                             if (previousEntry.category && categoryOptions.length > 0) {
                                 const categoryOption = categoryOptions.find(opt => opt.value === previousEntry.category);
@@ -282,23 +282,23 @@ const Form = ({ username, userRoles = [] }) => {
                                     setSelectedCategory(categoryOption);
                                 }
                             }
-                            
+
                             if (previousEntry.quantity) {
                                 setQuantity(previousEntry.quantity);
                             }
-                            
+
                             if (previousEntry.comments) {
                                 setComments(previousEntry.comments);
                             }
-                            
+
                             if (previousEntry.paymentMode) {
                                 setPaymentMode(previousEntry.paymentMode);
                             }
-                            
+
                             if (previousEntry.utilityValidityDays) {
                                 setThirdInput(previousEntry.utilityValidityDays);
                             }
-                            
+
                             setTimeout(() => {
                                 if (siteOption && projectData) {
                                 }
@@ -306,14 +306,14 @@ const Form = ({ username, userRoles = [] }) => {
                         }
                         const setTNEBContractor = () => {
                             if (contractorOptions.length > 0) {
-                                const tnebOption = contractorOptions.find(opt => 
+                                const tnebOption = contractorOptions.find(opt =>
                                     opt.label === 'TNEB' || opt.value === 'TNEB'
                                 );
                                 if (tnebOption) {
                                     setSelectedOption(tnebOption);
                                     setSelectedType('Contractor');
                                 } else {
-                                    const tnebInCombined = combinedOptions.find(opt => 
+                                    const tnebInCombined = combinedOptions.find(opt =>
                                         (opt.label === 'TNEB' || opt.value === 'TNEB') && opt.type === 'Contractor'
                                     );
                                     if (tnebInCombined) {
@@ -325,7 +325,7 @@ const Form = ({ username, userRoles = [] }) => {
                                             value: 'TNEB',
                                             label: 'TNEB',
                                             type: 'Contractor',
-                                            id: null 
+                                            id: null
                                         };
                                         setSelectedOption(tnebContractor);
                                         setSelectedType('Contractor');
@@ -476,15 +476,15 @@ const Form = ({ username, userRoles = [] }) => {
                         const pdfHeight = 297; // A4 height in mm
                         const imgWidth = img.width;
                         const imgHeight = img.height;
-                        
+
                         // Calculate aspect ratio
                         const imgAspectRatio = imgWidth / imgHeight;
                         const pdfAspectRatio = pdfWidth / pdfHeight;
-                        
+
                         // Determine orientation
                         const orientation = imgWidth > imgHeight ? 'landscape' : 'portrait';
                         let finalWidth, finalHeight;
-                        
+
                         if (orientation === 'landscape') {
                             // Use landscape dimensions
                             if (imgAspectRatio > pdfAspectRatio) {
@@ -508,7 +508,7 @@ const Form = ({ username, userRoles = [] }) => {
                                 finalWidth = pdfHeight * imgAspectRatio;
                             }
                         }
-                        
+
                         // Center the image on the page
                         const xOffset = (pdfWidth - finalWidth) / 2;
                         const yOffset = (pdfHeight - finalHeight) / 2;
@@ -533,7 +533,7 @@ const Form = ({ username, userRoles = [] }) => {
 
                         // Convert PDF to blob
                         const pdfBlob = pdf.output('blob');
-                        
+
                         // Create a File object from the blob with .pdf extension
                         const pdfFile = new File([pdfBlob], file.name.replace(/\.[^/.]+$/, '') + '.pdf', {
                             type: 'application/pdf',
@@ -700,7 +700,18 @@ const Form = ({ username, userRoles = [] }) => {
             if (selectedFile) {
                 try {
                     const formData = new FormData();
-                    const finalName = `${formatDateOnly(date)} ${selectedSite.sNo} ${vendor || contractor}`;
+                    const now = new Date();
+                    const timestamp = now.toLocaleString("en-GB", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: true
+                    })
+                        .replace(",", "")
+                        .replace(/\s/g, "-");
+                    const finalName = `${timestamp} ${selectedSite.sNo} ${vendor || contractor}`;
                     formData.append('file', selectedFile);
                     formData.append('file_name', finalName);
                     const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
@@ -823,7 +834,7 @@ const Form = ({ username, userRoles = [] }) => {
                     vendor_id: vendorId,
                     employee_id: null,
                     project_id: projectId,
-                    type: utilityType ,
+                    type: utilityType,
                     amount: selectedAccountType === 'Bill Refund' ? -Math.abs(parseFloat(amount)) : parseFloat(amount),
                     status: true,
                     weekly_number: getCurrentWeekNumber(),
@@ -928,7 +939,18 @@ const Form = ({ username, userRoles = [] }) => {
             if (selectedFile) {
                 try {
                     const formData = new FormData();
-                    const finalName = `${formatDateOnly(paymentModalData.date)} ${selectedSite.sNo} ${selectedOption.label}`;
+                    const now = new Date();
+                    const timestamp = now.toLocaleString("en-GB", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: true
+                    })
+                        .replace(",", "")
+                        .replace(/\s/g, "-");
+                    const finalName = `${timestamp} ${selectedSite.sNo} ${selectedOption.label}`;
                     formData.append('file', selectedFile);
                     formData.append('file_name', finalName);
                     const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
@@ -1313,52 +1335,52 @@ const Form = ({ username, userRoles = [] }) => {
                                     </div>
                                 )}
                             </div>
-                             {selectedAccountType === 'Utility Bills' && (
-                                 <>
-                                     <div className='flex gap-10 mb-3'>
-                                         <div className='text-left'>
-                                             <label className="text-md font-semibold mb-2 block">
-                                                 {utilityType === 'Electricity' ? 'EB Number' : 
-                                                  utilityType === 'Property' ? 'Property Tax Number' : 
-                                                  utilityType === 'Water' ? 'Water Tax Number' : 'Number'}
-                                             </label>
-                                             <Select
-                                                 options={ebNumberOptions}
-                                                 value={selectedEbNumber}
-                                                 onChange={setSelectedEbNumber}
-                                                 styles={customStyles}
-                                                 isClearable
-                                                 placeholder={`Select ${utilityType === 'Electricity' ? 'EB Number' : 
-                                                           utilityType === 'Property' ? 'Property Tax Number' : 
-                                                           utilityType === 'Water' ? 'Water Tax Number' : 'Number'}...`}
-                                                 className="custom-select rounded-lg w-[290px] h-[45px]"
-                                             />
-                                         </div>
-                                         <div className='text-left'>
-                                             <label className="text-md font-semibold mb-2 block">Months</label>
-                                             <input
-                                                 type="month"
-                                                 value={selectedMonths}
-                                                 onChange={(e) => setSelectedMonths(e.target.value)}
-                                                 placeholder="Enter months..."
-                                                 className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[45px] focus:outline-none border-opacity-[0.20]"
-                                             />
-                                         </div>
-                                     </div>
-                                     {(utilityType === 'Telecom' || utilityType === 'Subscription') && (
-                                         <div className='text-left'>
-                                             <label className="text-md font-semibold mb-2 block">Additional Input</label>
-                                             <input
-                                                 type="text"
-                                                 value={thirdInput}
-                                                 onChange={(e) => setThirdInput(e.target.value)}
-                                                 placeholder="Enter additional information..."
-                                                 className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[45px] focus:outline-none border-opacity-[0.20]"
-                                             />
-                                         </div>
-                                     )}
-                                 </>
-                             )}
+                            {selectedAccountType === 'Utility Bills' && (
+                                <>
+                                    <div className='flex gap-10 mb-3'>
+                                        <div className='text-left'>
+                                            <label className="text-md font-semibold mb-2 block">
+                                                {utilityType === 'Electricity' ? 'EB Number' :
+                                                    utilityType === 'Property' ? 'Property Tax Number' :
+                                                        utilityType === 'Water' ? 'Water Tax Number' : 'Number'}
+                                            </label>
+                                            <Select
+                                                options={ebNumberOptions}
+                                                value={selectedEbNumber}
+                                                onChange={setSelectedEbNumber}
+                                                styles={customStyles}
+                                                isClearable
+                                                placeholder={`Select ${utilityType === 'Electricity' ? 'EB Number' :
+                                                    utilityType === 'Property' ? 'Property Tax Number' :
+                                                        utilityType === 'Water' ? 'Water Tax Number' : 'Number'}...`}
+                                                className="custom-select rounded-lg w-[290px] h-[45px]"
+                                            />
+                                        </div>
+                                        <div className='text-left'>
+                                            <label className="text-md font-semibold mb-2 block">Months</label>
+                                            <input
+                                                type="month"
+                                                value={selectedMonths}
+                                                onChange={(e) => setSelectedMonths(e.target.value)}
+                                                placeholder="Enter months..."
+                                                className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[45px] focus:outline-none border-opacity-[0.20]"
+                                            />
+                                        </div>
+                                    </div>
+                                    {(utilityType === 'Telecom' || utilityType === 'Subscription') && (
+                                        <div className='text-left'>
+                                            <label className="text-md font-semibold mb-2 block">Additional Input</label>
+                                            <input
+                                                type="text"
+                                                value={thirdInput}
+                                                onChange={(e) => setThirdInput(e.target.value)}
+                                                placeholder="Enter additional information..."
+                                                className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[45px] focus:outline-none border-opacity-[0.20]"
+                                            />
+                                        </div>
+                                    )}
+                                </>
+                            )}
                         </div>
                         {showMachineTools && (
                             <div className='text-left lg:ml-[-570px]'>

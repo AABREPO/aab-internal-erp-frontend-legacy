@@ -832,7 +832,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             startY: 30,
             margin: { left: 10, right: 10, top: 30 },
             theme: 'grid',
-            headStyles: { 
+            headStyles: {
                 fillColor: [250, 246, 237],
                 textColor: 0,
                 fontStyle: 'bold',
@@ -854,7 +854,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                 4: { cellWidth: 28 },
                 5: { cellWidth: 27 },
                 6: { cellWidth: 18 },
-                7: { cellWidth: 26 , halign: 'right' },
+                7: { cellWidth: 26, halign: 'right' },
                 8: { cellWidth: 20 },
                 9: { cellWidth: 30 }
             },
@@ -902,15 +902,15 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                         const pdfHeight = 297; // A4 height in mm
                         const imgWidth = img.width;
                         const imgHeight = img.height;
-                        
+
                         // Calculate aspect ratio
                         const imgAspectRatio = imgWidth / imgHeight;
                         const pdfAspectRatio = pdfWidth / pdfHeight;
-                        
+
                         // Determine orientation
                         const orientation = imgWidth > imgHeight ? 'landscape' : 'portrait';
                         let finalWidth, finalHeight;
-                        
+
                         if (orientation === 'landscape') {
                             // Use landscape dimensions
                             if (imgAspectRatio > pdfAspectRatio) {
@@ -934,7 +934,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                 finalWidth = pdfHeight * imgAspectRatio;
                             }
                         }
-                        
+
                         // Center the image on the page
                         const xOffset = (pdfWidth - finalWidth) / 2;
                         const yOffset = (pdfHeight - finalHeight) / 2;
@@ -959,7 +959,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
 
                         // Convert PDF to blob
                         const pdfBlob = pdf.output('blob');
-                        
+
                         // Create a File object from the blob with .pdf extension
                         const pdfFile = new File([pdfBlob], file.name.replace(/\.[^/.]+$/, '') + '.pdf', {
                             type: 'application/pdf',
@@ -1007,13 +1007,24 @@ const BillDatabase = ({ username, userRoles = [] }) => {
         try {
             // Convert image to PDF if it's an image
             const processedFile = await convertImageToPdf(file);
-            
+
             // Find the payment details to generate a proper filename
             const payment = existingPaymentDetails?.find(p => p.id === paymentId);
+            const now = new Date();
+            const timestamp = now.toLocaleString("en-GB", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true
+              })
+                .replace(",", "")
+                .replace(/\s/g, "-");
             const formData = new FormData();
             const vendorName = getVendorNameById(selectedPaymentBill?.vendor_id);
             const finalName = payment
-                ? `${payment.date} ${vendorName !== '-' ? vendorName : 'Payment'} ${payment.vendor_bill_payment_mode || ''}`
+                ? `${timestamp} ${vendorName !== '-' ? vendorName : 'Payment'} ${payment.vendor_bill_payment_mode || ''}`
                 : processedFile.name;
             formData.append('file', processedFile);
             formData.append('file_name', finalName);
@@ -1081,7 +1092,17 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             // Convert image to PDF if it's an image
             const processedFile = await convertImageToPdf(file);
             setOverallPaymentPdfFile(processedFile);
-
+            const now = new Date();
+            const timestamp = now.toLocaleString("en-GB", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true
+              })
+                .replace(",", "")
+                .replace(/\s/g, "-");
             // Upload file to Google Drive
             const formData = new FormData();
             const vendorName = getVendorNameById(selectedPaymentBill?.vendor_id);
@@ -1090,7 +1111,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             const dateObj = new Date(billDate);
             const formattedDate = `${String(dateObj.getDate()).padStart(2, '0')}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${dateObj.getFullYear()}`;
             const displayVendorName = vendorName !== '-' ? vendorName : 'Overall Payment';
-            const fileName = `${formattedDate} ${displayVendorName} - summary bill.pdf`;
+            const fileName = `${timestamp} ${displayVendorName} - summary bill.pdf`;
             formData.append('file', processedFile);
             formData.append('file_name', fileName);
 
@@ -1203,10 +1224,21 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                 if (entry.attachedFile) {
                     try {
                         // Convert image to PDF if it's an image (already converted in handleFileAttachment, but double-check)
+                        const now = new Date();
+                        const timestamp = now.toLocaleString("en-GB", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hour12: true
+                        })
+                            .replace(",", "")
+                            .replace(/\s/g, "-");
                         const processedFile = await convertImageToPdf(entry.attachedFile);
                         const formData = new FormData();
                         const vendorName = getVendorNameById(selectedPaymentBill?.vendor_id);
-                        const finalName = `${entry.date} ${vendorName !== '-' ? vendorName : 'Payment'} ${entry.mode}`;
+                        const finalName = `${timestamp} ${vendorName !== '-' ? vendorName : 'Payment'} ${entry.mode}`;
                         formData.append('file', processedFile);
                         formData.append('file_name', finalName);
                         const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
@@ -2591,120 +2623,120 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                                                 <span className="text-sm font-bold text-gray-700">Payment - {paymentNumber}</span>
                                                             </div>
                                                             <div className={`flex gap-4 border border-[#BF9853] border-opacity-35 rounded-md p-4 ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-50' : ''}`}>
-                                                            <div className="flex-1">
-                                                                <label className="block font-semibold mb-1 text-sm">Date</label>
-                                                                <input
-                                                                    type="date"
-                                                                    value={entry.date}
-                                                                    onChange={(e) => handlePaymentEntryChange(entry.id, 'date', e.target.value)}
-                                                                    disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
-                                                                    className={`w-[150px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                                                                />
-                                                            </div>
-                                                            <div className="flex-1">
-                                                                <label className="block font-semibold mb-1 text-sm">Amount</label>
-                                                                <input
-                                                                    type="text"
-                                                                    placeholder="Enter Amount"
-                                                                    value={entry.amount}
-                                                                    onChange={(e) => handlePaymentEntryChange(entry.id, 'amount', e.target.value)}
-                                                                    disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
-                                                                    className={`w-[150px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                                                                />
-                                                            </div>
-                                                            <div className="flex-1">
-                                                                <label className="block font-semibold mb-1 text-sm">Mode</label>
-                                                                <select
-                                                                    value={entry.mode}
-                                                                    onChange={(e) => handlePaymentEntryChange(entry.id, 'mode', e.target.value)}
-                                                                    disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
-                                                                    className={`w-[180px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                                                                >
-                                                                    <option value="">Select</option>
-                                                                    <option value="Cash">Cash</option>
-                                                                    <option value="Net Banking">Net Banking</option>
-                                                                    <option value="Gpay">Gpay</option>
-                                                                    <option value="PhonePe">PhonePe</option>
-                                                                    <option value="Cheque">Cheque</option>
-                                                                </select>
-                                                                <div className="mt-1 px-6">
-                                                                    <button className="text-[#E4572E] text-sm flex items-center gap-1"
-                                                                        onClick={() => document.getElementById(`file-input-${entry.id}`).click()}
-                                                                    >
-                                                                        Attach file
-                                                                    </button>
+                                                                <div className="flex-1">
+                                                                    <label className="block font-semibold mb-1 text-sm">Date</label>
                                                                     <input
-                                                                        id={`file-input-${entry.id}`}
-                                                                        type="file"
-                                                                        accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp,application/pdf,image/*"
-                                                                        className="hidden"
-                                                                        onChange={(e) => handleFileAttachment(entry.id, e.target.files[0])}
+                                                                        type="date"
+                                                                        value={entry.date}
+                                                                        onChange={(e) => handlePaymentEntryChange(entry.id, 'date', e.target.value)}
+                                                                        disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
+                                                                        className={`w-[150px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                                                                     />
                                                                 </div>
-                                                            </div>
-                                                        </div>
-                                                        {(entry.mode === "Gpay" || entry.mode === "PhonePe" || entry.mode === "Net Banking" || entry.mode === "Cheque") && (
-                                                            <div className="mt-4 p-4 border border-[#BF9853] border-opacity-25 rounded-lg">
-                                                                <div className="space-y-4">
-                                                                    {entry.mode === "Cheque" && (
-                                                                        <div className="grid grid-cols-2 gap-4">
-                                                                            <div>
-                                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No</label>
-                                                                                <input
-                                                                                    type="text"
-                                                                                    value={entry.chequeNo}
-                                                                                    onChange={(e) => handlePaymentEntryChange(entry.id, 'chequeNo', e.target.value)}
-                                                                                    placeholder="Enter cheque number"
-                                                                                    disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
-                                                                                    className={`w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-25 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                                                                                />
-                                                                            </div>
-                                                                            <div>
-                                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date</label>
-                                                                                <input
-                                                                                    type="date"
-                                                                                    value={entry.chequeDate}
-                                                                                    onChange={(e) => handlePaymentEntryChange(entry.id, 'chequeDate', e.target.value)}
-                                                                                    disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
-                                                                                    className={`w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-25 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                                                                                />
-                                                                            </div>
-                                                                        </div>
-                                                                    )}
-                                                                    <div className="grid grid-cols-2 gap-4">
-                                                                        <div>
-                                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
-                                                                            <input
-                                                                                type="text"
-                                                                                value={entry.transactionNumber}
-                                                                                onChange={(e) => handlePaymentEntryChange(entry.id, 'transactionNumber', e.target.value)}
-                                                                                placeholder="Enter transaction number"
-                                                                                disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
-                                                                                className={`w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-25 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                                                                            />
-                                                                        </div>
-                                                                        <div>
-                                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
-                                                                            <select
-                                                                                value={entry.accountNumber}
-                                                                                onChange={(e) => handlePaymentEntryChange(entry.id, 'accountNumber', e.target.value)}
-                                                                                disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
-                                                                                className={`w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-25 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                                                                            >
-                                                                                <option value="">Select Account</option>
-                                                                                {accountDetails.map((account) => (
-                                                                                    <option key={account.id} value={account.account_number}>
-                                                                                        {account.account_number}
-                                                                                    </option>
-                                                                                ))}
-                                                                            </select>
-                                                                        </div>
+                                                                <div className="flex-1">
+                                                                    <label className="block font-semibold mb-1 text-sm">Amount</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="Enter Amount"
+                                                                        value={entry.amount}
+                                                                        onChange={(e) => handlePaymentEntryChange(entry.id, 'amount', e.target.value)}
+                                                                        disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
+                                                                        className={`w-[150px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                                                    />
+                                                                </div>
+                                                                <div className="flex-1">
+                                                                    <label className="block font-semibold mb-1 text-sm">Mode</label>
+                                                                    <select
+                                                                        value={entry.mode}
+                                                                        onChange={(e) => handlePaymentEntryChange(entry.id, 'mode', e.target.value)}
+                                                                        disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
+                                                                        className={`w-[180px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                                                    >
+                                                                        <option value="">Select</option>
+                                                                        <option value="Cash">Cash</option>
+                                                                        <option value="Net Banking">Net Banking</option>
+                                                                        <option value="Gpay">Gpay</option>
+                                                                        <option value="PhonePe">PhonePe</option>
+                                                                        <option value="Cheque">Cheque</option>
+                                                                    </select>
+                                                                    <div className="mt-1 px-6">
+                                                                        <button className="text-[#E4572E] text-sm flex items-center gap-1"
+                                                                            onClick={() => document.getElementById(`file-input-${entry.id}`).click()}
+                                                                        >
+                                                                            Attach file
+                                                                        </button>
+                                                                        <input
+                                                                            id={`file-input-${entry.id}`}
+                                                                            type="file"
+                                                                            accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp,application/pdf,image/*"
+                                                                            className="hidden"
+                                                                            onChange={(e) => handleFileAttachment(entry.id, e.target.files[0])}
+                                                                        />
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                );
+                                                            {(entry.mode === "Gpay" || entry.mode === "PhonePe" || entry.mode === "Net Banking" || entry.mode === "Cheque") && (
+                                                                <div className="mt-4 p-4 border border-[#BF9853] border-opacity-25 rounded-lg">
+                                                                    <div className="space-y-4">
+                                                                        {entry.mode === "Cheque" && (
+                                                                            <div className="grid grid-cols-2 gap-4">
+                                                                                <div>
+                                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No</label>
+                                                                                    <input
+                                                                                        type="text"
+                                                                                        value={entry.chequeNo}
+                                                                                        onChange={(e) => handlePaymentEntryChange(entry.id, 'chequeNo', e.target.value)}
+                                                                                        placeholder="Enter cheque number"
+                                                                                        disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
+                                                                                        className={`w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-25 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                                                                    />
+                                                                                </div>
+                                                                                <div>
+                                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date</label>
+                                                                                    <input
+                                                                                        type="date"
+                                                                                        value={entry.chequeDate}
+                                                                                        onChange={(e) => handlePaymentEntryChange(entry.id, 'chequeDate', e.target.value)}
+                                                                                        disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
+                                                                                        className={`w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-25 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                                                                    />
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                        <div className="grid grid-cols-2 gap-4">
+                                                                            <div>
+                                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={entry.transactionNumber}
+                                                                                    onChange={(e) => handlePaymentEntryChange(entry.id, 'transactionNumber', e.target.value)}
+                                                                                    placeholder="Enter transaction number"
+                                                                                    disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
+                                                                                    className={`w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-25 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                                                                />
+                                                                            </div>
+                                                                            <div>
+                                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
+                                                                                <select
+                                                                                    value={entry.accountNumber}
+                                                                                    onChange={(e) => handlePaymentEntryChange(entry.id, 'accountNumber', e.target.value)}
+                                                                                    disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
+                                                                                    className={`w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-25 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                                                                >
+                                                                                    <option value="">Select Account</option>
+                                                                                    {accountDetails.map((account) => (
+                                                                                        <option key={account.id} value={account.account_number}>
+                                                                                            {account.account_number}
+                                                                                        </option>
+                                                                                    ))}
+                                                                                </select>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
                                                 })}
                                                 {paymentStatuses[selectedPaymentBill?.id] !== '✓ Paid' && (
                                                     <div className="flex py-3">
@@ -2727,120 +2759,120 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                                     const totalPayments = existingPaymentDetails.length;
                                                     const paymentNumber = totalPayments - index;
                                                     return (
-                                                    <div key={payment.id || index} className="text-left p-4 shadow-lg rounded-lg mb-4">
-                                                        <div className="mb-2">
-                                                            <span className="text-sm font-bold text-gray-700">Payment - {paymentNumber}</span>
-                                                        </div>
-                                                        <div className=" border border-[#BF9853] border-opacity-35 rounded-md p-4">
-                                                            <div className='grid grid-cols-3 gap-4'>
-                                                                <div>
-                                                                    <label className="block font-semibold mb-1 text-sm">Date</label>
-                                                                    <input
-                                                                        type="date"
-                                                                        value={payment.date}
-                                                                        readOnly
-                                                                        className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm "
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <label className="block font-semibold mb-1 text-sm">Amount</label>
-                                                                    <input
-                                                                        type="text"
-                                                                        value={payment.amount?.toLocaleString() || ''}
-                                                                        readOnly
-                                                                        className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm "
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <label className="block font-semibold mb-1 text-sm">Mode</label>
-                                                                    <input
-                                                                        type="text"
-                                                                        value={payment.vendor_bill_payment_mode || ''}
-                                                                        readOnly
-                                                                        className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm "
-                                                                    />
-                                                                </div>
+                                                        <div key={payment.id || index} className="text-left p-4 shadow-lg rounded-lg mb-4">
+                                                            <div className="mb-2">
+                                                                <span className="text-sm font-bold text-gray-700">Payment - {paymentNumber}</span>
                                                             </div>
-                                                            <div className='grid grid-cols-2 gap-4 mt-2'>
-                                                                {payment.cheque_number && (
+                                                            <div className=" border border-[#BF9853] border-opacity-35 rounded-md p-4">
+                                                                <div className='grid grid-cols-3 gap-4'>
                                                                     <div>
-                                                                        <label className="block font-semibold mb-1 text-sm">Cheque No</label>
-                                                                        <input
-                                                                            type="text"
-                                                                            value={payment.cheque_number}
-                                                                            readOnly
-                                                                            className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm "
-                                                                        />
-                                                                    </div>
-                                                                )}
-                                                                {payment.cheque_date && (
-                                                                    <div>
-                                                                        <label className="block font-semibold mb-1 text-sm">Cheque Date</label>
+                                                                        <label className="block font-semibold mb-1 text-sm">Date</label>
                                                                         <input
                                                                             type="date"
-                                                                            value={payment.cheque_date}
+                                                                            value={payment.date}
                                                                             readOnly
                                                                             className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm "
                                                                         />
                                                                     </div>
-                                                                )}
-                                                                {payment.transaction_number && (
                                                                     <div>
-                                                                        <label className="block font-semibold mb-1 text-sm">Transaction No</label>
+                                                                        <label className="block font-semibold mb-1 text-sm">Amount</label>
                                                                         <input
                                                                             type="text"
-                                                                            value={payment.transaction_number}
+                                                                            value={payment.amount?.toLocaleString() || ''}
                                                                             readOnly
                                                                             className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm "
                                                                         />
                                                                     </div>
-                                                                )}
-                                                                {payment.account_number && (
                                                                     <div>
-                                                                        <label className="block font-semibold mb-1 text-sm">Account No</label>
+                                                                        <label className="block font-semibold mb-1 text-sm">Mode</label>
                                                                         <input
                                                                             type="text"
-                                                                            value={payment.account_number}
+                                                                            value={payment.vendor_bill_payment_mode || ''}
                                                                             readOnly
-                                                                            className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm"
+                                                                            className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm "
                                                                         />
                                                                     </div>
-                                                                )}
-                                                            </div>
-                                                            <div className="mt-4 pt-4 border-t border-[#BF9853] border-opacity-20">
-                                                                {payment.bill_url ? (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            if (payment.bill_url) {
-                                                                                window.open(payment.bill_url, '_blank', 'noopener,noreferrer');
-                                                                            }
-                                                                        }}
-                                                                        className="px-4 py-2 text-sm font-medium text-[#BF9853] hover:underline cursor-pointer rounded-lg transition-colors duration-200"
-                                                                    >
-                                                                        View
-                                                                    </button>
-                                                                ) : (
-                                                                    <div>
-                                                                        <input
-                                                                            id={`existing-payment-file-${payment.id}`}
-                                                                            type="file"
-                                                                            accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp,application/pdf,image/*"
-                                                                            className="hidden"
-                                                                            onChange={(e) => handleExistingPaymentFileUpload(payment.id, e.target.files[0])}
-                                                                        />
+                                                                </div>
+                                                                <div className='grid grid-cols-2 gap-4 mt-2'>
+                                                                    {payment.cheque_number && (
+                                                                        <div>
+                                                                            <label className="block font-semibold mb-1 text-sm">Cheque No</label>
+                                                                            <input
+                                                                                type="text"
+                                                                                value={payment.cheque_number}
+                                                                                readOnly
+                                                                                className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm "
+                                                                            />
+                                                                        </div>
+                                                                    )}
+                                                                    {payment.cheque_date && (
+                                                                        <div>
+                                                                            <label className="block font-semibold mb-1 text-sm">Cheque Date</label>
+                                                                            <input
+                                                                                type="date"
+                                                                                value={payment.cheque_date}
+                                                                                readOnly
+                                                                                className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm "
+                                                                            />
+                                                                        </div>
+                                                                    )}
+                                                                    {payment.transaction_number && (
+                                                                        <div>
+                                                                            <label className="block font-semibold mb-1 text-sm">Transaction No</label>
+                                                                            <input
+                                                                                type="text"
+                                                                                value={payment.transaction_number}
+                                                                                readOnly
+                                                                                className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm "
+                                                                            />
+                                                                        </div>
+                                                                    )}
+                                                                    {payment.account_number && (
+                                                                        <div>
+                                                                            <label className="block font-semibold mb-1 text-sm">Account No</label>
+                                                                            <input
+                                                                                type="text"
+                                                                                value={payment.account_number}
+                                                                                readOnly
+                                                                                className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm"
+                                                                            />
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <div className="mt-4 pt-4 border-t border-[#BF9853] border-opacity-20">
+                                                                    {payment.bill_url ? (
                                                                         <button
                                                                             type="button"
-                                                                            onClick={() => document.getElementById(`existing-payment-file-${payment.id}`).click()}
-                                                                            className="px-4 py-2 text-sm font-medium text-[#E4572E] hover:underline  transition-colors duration-200"
+                                                                            onClick={() => {
+                                                                                if (payment.bill_url) {
+                                                                                    window.open(payment.bill_url, '_blank', 'noopener,noreferrer');
+                                                                                }
+                                                                            }}
+                                                                            className="px-4 py-2 text-sm font-medium text-[#BF9853] hover:underline cursor-pointer rounded-lg transition-colors duration-200"
                                                                         >
-                                                                            Attach File
+                                                                            View
                                                                         </button>
-                                                                    </div>
-                                                                )}
+                                                                    ) : (
+                                                                        <div>
+                                                                            <input
+                                                                                id={`existing-payment-file-${payment.id}`}
+                                                                                type="file"
+                                                                                accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp,application/pdf,image/*"
+                                                                                className="hidden"
+                                                                                onChange={(e) => handleExistingPaymentFileUpload(payment.id, e.target.files[0])}
+                                                                            />
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => document.getElementById(`existing-payment-file-${payment.id}`).click()}
+                                                                                className="px-4 py-2 text-sm font-medium text-[#E4572E] hover:underline  transition-colors duration-200"
+                                                                            >
+                                                                                Attach File
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
                                                     );
                                                 })}
                                             </div>

@@ -554,7 +554,18 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         if (selectedFile) {
             try {
                 const uploadFormData = new FormData();
-                const finalName = `${formatDateOnly(formData.date)} - ${formData.siteName} - ${formData.vendor || formData.contractor} `;
+                const now = new Date();
+                const timestamp = now.toLocaleString("en-GB", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: true
+                  })
+                    .replace(",", "")
+                    .replace(/\s/g, "-");
+                const finalName = `${timestamp} - ${formData.siteName} - ${formData.vendor || formData.contractor} `;
                 uploadFormData.append('file', selectedFile);
                 uploadFormData.append('file_name', finalName);
                 const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {

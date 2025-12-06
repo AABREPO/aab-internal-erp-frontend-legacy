@@ -91,15 +91,11 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     const [weeklyPaymentReceivedAudits, setWeeklyPaymentReceivedAudits] = useState([]);
     const [sendingToExpensesEntry, setSendingToExpensesEntry] = useState(false);
     const [sendingProgress, setSendingProgress] = useState({ current: 0, total: 0 });
-    
-    // Filter state variables
     const [showFilters, setShowFilters] = useState(false);
     const [selectDate, setSelectDate] = useState('');
     const [selectContractororVendorName, setSelectContractororVendorName] = useState('');
     const [selectProjectName, setSelectProjectName] = useState('');
     const [selectType, setSelectType] = useState('');
-    
-    // Click and drag scrolling functionality
     const scrollRef = useRef(null);
     const refundScrollRef = useRef(null);
     const isDragging = useRef(false);
@@ -108,17 +104,12 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     const velocity = useRef({ x: 0, y: 0 });
     const animationFrame = useRef(null);
     const lastMove = useRef({ time: 0, x: 0, y: 0 });
-    
     const currentYear = new Date().getFullYear();
     const currentWeek = weeks.find((w) => w.number === Number(selectedWeek));
     const startYear = 2000;
     const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i);
     const lastWeekNumber = weeks.length > 0 ? Math.max(...weeks.map(week => week.number)) : 0;
-    
-    // Check if user has permission to edit/delete (Admin role or Mahalingam M username)
     const canEditDelete = userRoles.includes('Admin') || username === 'Mahalingam M';
-    
-    // Drag and scroll handler functions
     const handleMouseDown = (e, ref) => {
         if (!ref.current) return;
         isDragging.current = true;
@@ -136,7 +127,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         ref.current.style.userSelect = 'none';
         cancelMomentum();
     };
-
     const handleMouseMove = (e, ref) => {
         if (!isDragging.current || !ref.current) return;
         const dx = e.clientX - start.current.x;
@@ -155,7 +145,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             y: e.clientY,
         };
     };
-
     const handleMouseUp = (ref) => {
         if (!isDragging.current || !ref.current) return;
         isDragging.current = false;
@@ -163,14 +152,12 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         ref.current.style.userSelect = '';
         applyMomentum();
     };
-
     const cancelMomentum = () => {
         if (animationFrame.current) {
             cancelAnimationFrame(animationFrame.current);
             animationFrame.current = null;
         }
     };
-
     const applyMomentum = () => {
         if (!scrollRef.current && !refundScrollRef.current) return;
         const friction = 0.95;
@@ -191,14 +178,13 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         };
         animationFrame.current = requestAnimationFrame(step);
     };
-    
     function getStartAndEndDateOfWeek(weekNumber, year) {
         const simple = new Date(year, 0, 1 + (weekNumber - 1) * 7);
         const dayOfWeek = simple.getDay();
         const ISOWeekStart = new Date(simple);
-        ISOWeekStart.setDate(simple.getDate() - ((dayOfWeek + 7) % 9)); 
+        ISOWeekStart.setDate(simple.getDate() - ((dayOfWeek + 7) % 9));
         const ISOWeekEnd = new Date(ISOWeekStart);
-        ISOWeekEnd.setDate(ISOWeekStart.getDate() + 6); 
+        ISOWeekEnd.setDate(ISOWeekStart.getDate() + 6);
         return {
             number: weekNumber,
             start: ISOWeekStart.toISOString().split("T")[0],
@@ -222,9 +208,9 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     }, []);
     useEffect(() => {
         if (weeks.length > 0) {
-            setSelectedWeek(weeks[weeks.length - 1].number); 
+            setSelectedWeek(weeks[weeks.length - 1].number);
         }
-        }, [weeks]);
+    }, [weeks]);
     useEffect(() => {
         const fetchWeekData = async () => {
             if (!selectedWeek) return;
@@ -256,8 +242,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     useEffect(() => {
         setCombinedOptions([...vendorOptions, ...contractorOptions, ...employeeOptions]);
     }, [vendorOptions, contractorOptions, employeeOptions]);
-    
-    // Cleanup effect for drag and scroll
     useEffect(() => {
         return () => {
             cancelMomentum();
@@ -303,54 +287,17 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 sNo: item.siteNo
             }));
             const predefinedSiteOptions = [
-                {
-                    value: "Mason Advance",
-                    label: "Mason Advance",
-                    id: 1,
-                    sNo: "1"
-                },
-                {
-                    value: "Material Advance",
-                    label: "Material Advance",
-                    id: 2,
-                    sNo: "2"
-                },
-                {
-                    value: "Weekly Advance",
-                    label: "Weekly Advance",
-                    id: 3,
-                    sNo: "3"
-                },
-                {
-                    value: "Excess Advance",
-                    label: "Excess Advance",
-                    id: 4,
-                    sNo: "4"
-                },
-                {
-                    value: "Material Rent",
-                    label: "Material Rent",
-                    id: 5,
-                    sNo: "5"
-                },
-                {
-                    value: "Subhash Kumar - Kunnur",
-                    label: "Subhash Kumar - Kunnur",
-                    id: 6,
-                    sNo: "6"
-                },
-                {
-                    value: "Summary Bill",
-                    label: "Summary Bill",
-                    id: 7,
-                    sNo: "7"
-                },
-                {
-                    value: "Daily Wage",
-                    label: "Daily Wage",
-                    id: 8,
-                    sNo: "8"
-                }
+                { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
+                { value: "Material Advance", label: "Material Advance", id: 2, sNo: "2" },
+                { value: "Weekly Advance", label: "Weekly Advance", id: 3, sNo: "3" },
+                { value: "Excess Advance", label: "Excess Advance", id: 4, sNo: "4" },
+                { value: "Material Rent", label: "Material Rent", id: 5, sNo: "5" },
+                { value: "Subhash Kumar - Kunnur", label: "Subhash Kumar - Kunnur", id: 6, sNo: "6" },
+                { value: "Summary Bill", label: "Summary Bill", id: 7, sNo: "7" },
+                { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
+                { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
+                { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
+                { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
             ];
             const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
             setSiteOptions(combinedSiteOptions);
@@ -495,7 +442,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             const defaultDate = weekDays[0].toISOString().split("T")[0];
             setSelectedDate(defaultDate);
             setNewRefundReceived((prev) => ({ ...prev, date: defaultDate }));
-            
             // Fetch data for the first day of the week
             const fetchDataForDate = async (dateStr) => {
                 try {
@@ -511,7 +457,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     setRefundPayments([]);
                 }
             };
-            
+
             fetchDataForDate(defaultDate);
         }
     }, [currentWeek]);
@@ -586,7 +532,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             employee_id: selected && selected.type === "Employee" ? selected.id : "",
         }));
     };
-
     const handleRefundChangeButtonClick = () => {
         setIsRefundChangeButtonActive((prev) => {
             const next = !prev;
@@ -708,7 +653,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         const year = date.getFullYear();
         return `${day}-${month}-${year}`;
     };
-
     // Filter functions
     const clearFilters = () => {
         setSelectDate('');
@@ -716,19 +660,14 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         setSelectProjectName('');
         setSelectType('');
     };
-
     const getVendorName = (id) =>
         vendorOptions.find(v => String(v.id) === String(id))?.value || "";
-
     const getContractorName = (id) =>
         contractorOptions.find(c => String(c.id) === String(id))?.value || "";
-
     const getEmployeeName = (id) =>
         employeeOptions.find(e => String(e.id) === String(id))?.value || "";
-
     const getSiteName = (id) =>
         siteOptions.find(s => String(s.id) === String(id))?.value || "";
-
     // Filtered data based on selected filters
     const filteredExpenses = dailyExpenses.filter((entry) => {
         // Date filter (exact match since it's type="date")
@@ -747,12 +686,12 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 entry.vendor_id
                     ? getVendorName(entry.vendor_id)
                     : entry.contractor_id
-                    ? getContractorName(entry.contractor_id)
-                    : entry.employee_id
-                    ? getEmployeeName(entry.employee_id)
-                    : entry.labour_id
-                    ? laboursList.find(l => l.id === Number(entry.labour_id))?.label || ""
-                    : "";
+                        ? getContractorName(entry.contractor_id)
+                        : entry.employee_id
+                            ? getEmployeeName(entry.employee_id)
+                            : entry.labour_id
+                                ? laboursList.find(l => l.id === Number(entry.labour_id))?.label || ""
+                                : "";
             if (name.toLowerCase() !== selectContractororVendorName.toLowerCase())
                 return false;
         }
@@ -768,11 +707,9 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         }
         return true; // passes all filters
     });
-
     const contractorVendorFilterOptions = React.useMemo(() => {
         const ids = new Set();
         const options = [];
-        
         // Add contractor/vendor/employee options
         filteredExpenses.forEach(exp => {
             const option =
@@ -787,7 +724,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 options.push({ value: option.label, label: option.label });
             }
         });
-        
         // Add labour options
         filteredExpenses.forEach(exp => {
             const labourOption = laboursList.find(opt => opt.id === Number(exp.labour_id));
@@ -796,10 +732,8 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 options.push({ value: labourOption.label, label: labourOption.label });
             }
         });
-        
         return options;
     }, [filteredExpenses, combinedOptions, laboursList]);
-
     const projectFilterOptions = React.useMemo(() => {
         const ids = new Set();
         return filteredExpenses.map(exp => {
@@ -811,7 +745,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             return null;
         }).filter(Boolean);
     }, [filteredExpenses, siteOptions]);
-
     const typeFilterOptions = React.useMemo(() => {
         const types = new Set();
         filteredExpenses.forEach(exp => {
@@ -824,7 +757,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             label: type
         }));
     }, [filteredExpenses]);
-
     const refundSelectOptions = React.useMemo(() => {
         const unique = new Map();
         [...laboursList, ...combinedOptions].forEach((option) => {
@@ -835,7 +767,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         });
         return Array.from(unique.values());
     }, [laboursList, combinedOptions]);
-
     const sortedDailyExpenses = React.useMemo(() => {
         let sortableData = [...filteredExpenses];
         if (sortConfig.key) {
@@ -894,12 +825,11 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             sortableData.sort((a, b) => {
                 const dateA = new Date(a.date);
                 const dateB = new Date(b.date);
-                return dateB - dateA; 
+                return dateB - dateA;
             });
         }
         return sortableData;
     }, [filteredExpenses, sortConfig, laboursList, siteOptions, isChangeButtonActive, combinedOptions, employeeOptions, vendorOptions, contractorOptions]);
-
     const generateExpensesPDF = () => {
         if (!selectedDate || dailyExpenses.length === 0) {
             alert("No data available to generate PDF");
@@ -1016,20 +946,20 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 textColor: [80, 80, 80],
             },
             headStyles: {
-                fillColor: [255, 248, 220], 
+                fillColor: [255, 248, 220],
                 textColor: [0, 0, 0],
                 fontStyle: 'bold',
                 lineColor: [200, 200, 200],
                 lineWidth: 0.1,
             },
             columnStyles: {
-                0: { cellWidth: 13, halign: 'center', fillColor: [255, 255, 255] },  
-                1: { cellWidth: 47, halign: 'left' },     
-                2: { cellWidth: 30, halign: 'left' },     
+                0: { cellWidth: 13, halign: 'center', fillColor: [255, 255, 255] },
+                1: { cellWidth: 47, halign: 'left' },
+                2: { cellWidth: 30, halign: 'left' },
                 3: { cellWidth: 12, halign: 'center' },
-                4: { cellWidth: 25, halign: 'left' },    
-                5: { cellWidth: 20, halign: 'right' },   
-                6: { cellWidth: 35, halign: 'left' } 
+                4: { cellWidth: 25, halign: 'left' },
+                5: { cellWidth: 20, halign: 'right' },
+                6: { cellWidth: 35, halign: 'left' }
             },
             bodyStyles: {
                 lineWidth: 0.1,
@@ -1047,26 +977,36 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             }
         });
         const firstTableEndY = doc.lastAutoTable.finalY;
-        const spaceBetweenTables = 10;
+        const spaceBetweenTables = 10;        
+        // Calculate and display NET BALANCE on first page only
         const netBalance = totalAmount - totalRefundAmount;
+        doc.setPage(1);
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
-        doc.text(`NET BALANCE: ${netBalance.toLocaleString('en-IN')}`, 155, 38);
-        
-        // Calculate Y position for side-by-side tables
-        let sideBySideStartY = firstTableEndY + spaceBetweenTables;
-        
-        // Check if we need a new page for the side-by-side tables
-        const pageHeight = doc.internal.pageSize.height;
-        const margin = 30; // Bottom margin to ensure table fits
-        if (sideBySideStartY > pageHeight - margin) {
-            doc.addPage();
-            sideBySideStartY = 20; // Start at top of new page
-        }
-        
+        doc.text(`NET BALANCE: ${netBalance.toLocaleString('en-IN')}`, 155, 38);        
+        // Helper function to add header to new pages
+        const addHeaderToPage = (pageNum) => {
+            doc.setPage(pageNum);
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            doc.text(headerText1, 60, 24);
+            doc.text(headerText2, 170, 20);
+            doc.text(headerText, 14, 20);
+            doc.setFontSize(10);
+            doc.text(dayText, 170, 27);
+            doc.setLineWidth(0.5);
+            doc.line(14, 15, pageWidth - 14, 15);
+            doc.line(14, 30, pageWidth - 14, 30);
+        };        
+        // Add a new page for other tables
+        doc.addPage();
+        addHeaderToPage(doc.internal.getNumberOfPages());        
+        // Calculate start position for second page tables (side by side layout)
+        const secondPageStartY = 40;
+        const sideBySideStartY = secondPageStartY;
         // Prepare WAGE REFUND table data
         const refundTableColumn = [
-            "SNO", "NAME", "","BALANCE"
+            "SNO", "NAME", "", "BALANCE"
         ];
         const refundTableRows = refundPayments
             .reverse()
@@ -1080,7 +1020,8 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 return [
                     (index + 1).toString(),
                     name,
-                    formattedAmount
+                    formattedAmount,
+                    ""
                 ];
             });
         refundTableRows.push([
@@ -1088,8 +1029,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             "TOTAL",
             `${totalRefundAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
         ]);
-        
-        // Render WAGE REFUND heading and table together
+        // Render WAGE REFUND heading and table (left side)
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
         doc.text('WAGE REFUND', 14, sideBySideStartY - 2);
@@ -1106,7 +1046,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 textColor: [80, 80, 80],
             },
             headStyles: {
-                fillColor: [255, 248, 220], 
+                fillColor: [255, 248, 220],
                 textColor: [0, 0, 0],
                 fontStyle: 'bold',
                 lineColor: [200, 200, 200],
@@ -1119,20 +1059,24 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 fillColor: false,
             },
             columnStyles: {
-                0: { cellWidth: 10, halign: 'center', fillColor: [255, 255, 255] },   
-                1: { cellWidth: 30, halign: 'left' },    
-                2: { cellWidth: 20, halign: 'right' },      
-                3: { cellWidth: 20, halign: 'right' }      
+                0: { cellWidth: 10, halign: 'center', fillColor: [255, 255, 255] },
+                1: { cellWidth: 30, halign: 'left' },
+                2: { cellWidth: 20, halign: 'right' },
+                3: { cellWidth: 20, halign: 'right' }
             },
-            margin: { left: 14, right: 0 }
-        });        
+            margin: { left: 14, right: 95 },
+            didDrawPage: function(data) {
+                if (data.pageNumber > 1) {
+                    addHeaderToPage(data.pageNumber);
+                }
+            }
+        });
         const refundTableEndY = doc.lastAutoTable.finalY;
-        
-        // Render WAGE ADVANCE table at the same Y position (right side)
+        // Render STAFF ADVANCE table (right side, same Y position)
         if (advanceExpenses.length > 0) {
             const advanceTableColumn = [
                 "S.NO", "PROJECT NAME", "STAFF NAME", "TOTAL AMOUNT"
-            ];            
+            ];
             const advanceTableRows = advanceExpenses
                 .map((row, index) => {
                     const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
@@ -1144,28 +1088,28 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     const projectName = siteOptions.find(opt => opt.id === Number(row.project_id))?.label || "";
                     const amount = (row.amount || 0) + (row.extra_amount || 0);
                     const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
-                    
+
                     return [
                         (index + 1).toString(),
                         projectName,
                         name,
                         formattedAmount
                     ];
-                });            
+                });
             advanceTableRows.push([
                 "",
                 "TOTAL",
                 "",
                 `${totalAdvanceAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
-            ]);                 
+            ]);
             doc.setFontSize(12);
             doc.setFont(undefined, 'bold');
-            doc.text('STAFF ADVANCE', 99, sideBySideStartY - 2);    
+            doc.text('STAFF ADVANCE', 100, sideBySideStartY - 2);
             doc.autoTable({
                 startY: sideBySideStartY,
                 head: [advanceTableColumn],
                 body: advanceTableRows,
-                tableWidth: 'wrap', 
+                tableWidth: 'wrap',
                 styles: {
                     fontSize: 8,
                     cellPadding: 2,
@@ -1174,7 +1118,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     textColor: [80, 80, 80],
                 },
                 headStyles: {
-                    fillColor: [255, 248, 220], 
+                    fillColor: [255, 248, 220],
                     textColor: [0, 0, 0],
                     fontStyle: 'bold',
                     lineColor: [200, 200, 200],
@@ -1187,14 +1131,20 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     fillColor: false,
                 },
                 columnStyles: {
-                    0: { cellWidth: 11, halign: 'center', fillColor: [255, 255, 255] },   
-                    1: { cellWidth: 34, halign: 'left' },      
-                    2: { cellWidth: 32, halign: 'left' },      
-                    3: { cellWidth: 20, halign: 'right' }      
+                    0: { cellWidth: 11, halign: 'center', fillColor: [255, 255, 255] },
+                    1: { cellWidth: 34, halign: 'left' },
+                    2: { cellWidth: 32, halign: 'left' },
+                    3: { cellWidth: 20, halign: 'right' }
                 },
-                margin: { left: 99, right: 0 }
+                margin: { left: 100, right: 0 },
+                didDrawPage: function(data) {
+                    if (data.pageNumber > 1) {
+                        addHeaderToPage(data.pageNumber);
+                    }
+                }
             });
-        }       
+        }
+        // Arrange DIWALI BONUS - side by side with WAGE REFUND if no STAFF ADVANCE, otherwise below
         if (diwaliBonusExpenses.length > 0) {
             const diwaliBonusTableColumn = [
                 "SNO", "NAME", "AMOUNT"
@@ -1220,11 +1170,28 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 "TOTAL",
                 `${totalDiwaliBonusAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
             ]);
-            doc.setFontSize(12);
-            doc.setFont(undefined, 'bold');
-            doc.text('DIWALI BONUS', 14, refundTableEndY + 15);
+            
+            // If no STAFF ADVANCE, place DIWALI BONUS side by side with WAGE REFUND
+            // Otherwise, place it below
+            let diwaliY = sideBySideStartY;
+            let diwaliX = 100; // Right side position
+            
+            if (advanceExpenses.length === 0) {
+                // No STAFF ADVANCE, so DIWALI BONUS goes on the right side
+                doc.setFontSize(12);
+                doc.setFont(undefined, 'bold');
+                doc.text('DIWALI BONUS', diwaliX, sideBySideStartY - 2);
+            } else {
+                // STAFF ADVANCE exists, so DIWALI BONUS goes below
+                diwaliY = Math.max(refundTableEndY, doc.lastAutoTable.finalY) + 15;
+                diwaliX = 14; // Left side position
+                doc.setFontSize(12);
+                doc.setFont(undefined, 'bold');
+                doc.text('DIWALI BONUS', diwaliX, diwaliY - 2);
+            }
+            
             doc.autoTable({
-                startY: refundTableEndY + 20,
+                startY: diwaliY,
                 head: [diwaliBonusTableColumn],
                 body: diwaliBonusTableRows,
                 tableWidth: 'wrap',
@@ -1236,7 +1203,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     textColor: [80, 80, 80],
                 },
                 headStyles: {
-                    fillColor: [255, 248, 220], 
+                    fillColor: [255, 248, 220],
                     textColor: [0, 0, 0],
                     fontStyle: 'bold',
                     lineColor: [200, 200, 200],
@@ -1249,17 +1216,21 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     fillColor: false,
                 },
                 columnStyles: {
-                    0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },   
-                    1: { cellWidth: 35, halign: 'left' },   
-                    2: { cellWidth: 20, halign: 'right' }      
+                    0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },
+                    1: { cellWidth: 35, halign: 'left' },
+                    2: { cellWidth: 20, halign: 'right' }
                 },
-                margin: { left: 14, right: 0 }
+                margin: { left: diwaliX, right: 0 },
+                didDrawPage: function(data) {
+                    if (data.pageNumber > 1) {
+                        addHeaderToPage(data.pageNumber);
+                    }
+                }
             });
         }
         const fileName = `PS ${selectedWeek} - Daily Payment Statement ${formatDateOnly(selectedDate)}.pdf`;
         doc.save(fileName);
     };
-
     const generateWeekDataExcel = async () => {
         if (!weeks || weeks.length === 0) {
             alert("No weeks data available to export");
@@ -1268,7 +1239,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
 
         try {
             setLoading(true);
-            
+
             const allDailyExpenses = [];
             const allRefundPayments = [];
 
@@ -1305,14 +1276,14 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             // Sheet 1: Daily Expenses (All Weeks)
             const dailyExpensesHeaders = ['S.No', 'Date', 'Week Number', 'Name', 'Project Name', 'Amount', 'Extra Amount', 'Type', 'Quantity', 'Description', 'Created At'];
             const dailyExpensesRows = allDailyExpenses.map((row, idx) => {
-                const name = 
+                const name =
                     laboursList.find(opt => opt.id === Number(row.labour_id))?.label ||
                     vendorOptions.find(opt => opt.id === Number(row.vendor_id))?.label ||
                     contractorOptions.find(opt => opt.id === Number(row.contractor_id))?.label ||
                     employeeOptions.find(opt => opt.id === Number(row.employee_id))?.label ||
                     "";
                 const projectName = siteOptions.find(opt => opt.id === Number(row.project_id))?.label || "";
-                
+
                 // Find which week this date belongs to
                 const rowDate = row.date ? new Date(row.date) : null;
                 let weekNumber = "";
@@ -1324,7 +1295,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     });
                     weekNumber = matchingWeek ? matchingWeek.number : "";
                 }
-                
+
                 // Format created_at
                 let createdAt = "";
                 if (row.created_at) {
@@ -1338,7 +1309,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                         second: "2-digit"
                     });
                 }
-                
+
                 return [
                     idx + 1,
                     row.date ? new Date(row.date).toLocaleDateString("en-GB") : "",
@@ -1356,22 +1327,22 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             const dailyExpensesData = [dailyExpensesHeaders, ...dailyExpensesRows];
             const dailyExpensesWs = XLSX.utils.aoa_to_sheet(dailyExpensesData);
             dailyExpensesWs['!cols'] = [
-                { wch: 8 }, 
-                { wch: 12 }, 
-                { wch: 12 },  
-                { wch: 25 },  
-                { wch: 25 },  
-                { wch: 15 },  
-                { wch: 15 }, 
-                { wch: 20 }, 
-                { wch: 10 }, 
-                { wch: 40 }, 
-                { wch: 20 }  
+                { wch: 8 },
+                { wch: 12 },
+                { wch: 12 },
+                { wch: 25 },
+                { wch: 25 },
+                { wch: 15 },
+                { wch: 15 },
+                { wch: 20 },
+                { wch: 10 },
+                { wch: 40 },
+                { wch: 20 }
             ];
             XLSX.utils.book_append_sheet(workbook, dailyExpensesWs, 'Daily Expenses');
             const refundPaymentsHeaders = ['S.No', 'Date', 'Week Number', 'Name', 'Amount', 'Created At'];
             const refundPaymentsRows = allRefundPayments.map((row, idx) => {
-                const name = 
+                const name =
                     laboursList.find(opt => opt.id === Number(row.labour_id))?.label ||
                     vendorOptions.find(opt => opt.id === Number(row.vendor_id))?.label ||
                     contractorOptions.find(opt => opt.id === Number(row.contractor_id))?.label ||
@@ -1386,7 +1357,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                         return rowDate >= weekStart && rowDate <= weekEnd;
                     });
                     weekNumber = matchingWeek ? matchingWeek.number : "";
-                }                
+                }
                 let createdAt = "";
                 if (row.created_at) {
                     const createdDate = new Date(row.created_at);
@@ -1411,12 +1382,12 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             const refundPaymentsData = [refundPaymentsHeaders, ...refundPaymentsRows];
             const refundPaymentsWs = XLSX.utils.aoa_to_sheet(refundPaymentsData);
             refundPaymentsWs['!cols'] = [
-                { wch: 8 },  
-                { wch: 12 },  
-                { wch: 12 },  
-                { wch: 25 },  
-                { wch: 15 },  
-                { wch: 20 } 
+                { wch: 8 },
+                { wch: 12 },
+                { wch: 12 },
+                { wch: 25 },
+                { wch: 15 },
+                { wch: 20 }
             ];
             XLSX.utils.book_append_sheet(workbook, refundPaymentsWs, 'Refund Payments');
             const firstWeek = weeks[0];
@@ -1436,7 +1407,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     const handleDescriptionClick = (row) => {
         if (row.description) {
             setDescription(row.description);
-            setEntryId(null); 
+            setEntryId(null);
             setShowPopups(true);
         } else {
             setEntryId(row.id);
@@ -1478,7 +1449,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             })
                 .replace(",", "")
                 .replace(/\s/g, "-");
-
             const formData = new FormData();
             const finalName = `${timestamp}-${siteNo}-${name}`;
             formData.append("file", selectedFileForPopup);
@@ -1668,7 +1638,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     row.id === id ? { ...row, ...payload } : row
                 )
             );
-            setEditingPaymentId(null); 
+            setEditingPaymentId(null);
         } catch (error) {
             console.error("Error updating refund payment:", error);
             alert("Error updating refund payment. Please try again.");
@@ -1718,7 +1688,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             console.error("Error fetching audit details:", error);
         }
     };
-
     const fetchAuditDetailsForRefundPaymentReceived = async (receivedId) => {
         try {
             const response = await fetch(`https://backendaab.in/aabuildersDash/api/daily_entry_audit/refund/${receivedId}`);
@@ -1729,10 +1698,8 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             console.error("Error fetching audit details:", error);
         }
     };
-
     const handleSendToExpensesEntry = async () => {
         try {
-            // Try to fetch all daily payments, fallback to current date's expenses if endpoint doesn't exist
             let allDailyPayments = [];
             try {
                 const allDailyPaymentsResponse = await axios.get(
@@ -1741,234 +1708,160 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 allDailyPayments = allDailyPaymentsResponse.data || [];
             } catch (error) {
                 console.warn("getAll endpoint not available, using current date's expenses:", error);
-                // Fallback to current date's expenses
                 allDailyPayments = dailyExpenses;
             }
-            
-            // Calculate actual current week number (week 49)
             const getCurrentWeekNumber = () => {
                 const now = new Date();
                 const startOfYear = new Date(now.getFullYear(), 0, 1);
                 const days = Math.floor((now - startOfYear) / (24 * 60 * 60 * 1000));
                 return Math.ceil((days + startOfYear.getDay() + 1) / 7);
             };
-            
             const actualCurrentWeekNumber = getCurrentWeekNumber();
             const currentYear = new Date().getFullYear();
-            
-            // Get date range for actual current week (week 49)
             const actualCurrentWeek = getStartAndEndDateOfWeek(actualCurrentWeekNumber, currentYear);
-            
-            // Get last week (highest week number) from weeks array
             const lastWeekNumber = weeks.length > 0 ? Math.max(...weeks.map(w => w.number)) : null;
-            
-            // Find last week from weeks array
             const lastWeek = weeks.find(w => w.number === lastWeekNumber);
-            
-            // Filter out expenses from actual current week (week 49) and last week immediately after fetching
             allDailyPayments = allDailyPayments.filter(expense => {
-                if (!expense.date) return true; // Keep expenses without dates for now
-                
+                if (!expense.date) return true;
                 const expenseDate = new Date(expense.date);
                 expenseDate.setHours(0, 0, 0, 0);
-                
-                // Check if expense is in actual current week (week 49)
                 const currentWeekStart = new Date(actualCurrentWeek.start);
                 currentWeekStart.setHours(0, 0, 0, 0);
                 const currentWeekEnd = new Date(actualCurrentWeek.end);
                 currentWeekEnd.setHours(23, 59, 59, 999);
-                
                 if (expenseDate >= currentWeekStart && expenseDate <= currentWeekEnd) {
                     return false; // Exclude actual current week (week 49)
                 }
-                
-                // Check if expense is in last week (highest week number from weeks array)
                 if (lastWeek) {
                     const lastWeekStart = new Date(lastWeek.start);
                     lastWeekStart.setHours(0, 0, 0, 0);
                     const lastWeekEnd = new Date(lastWeek.end);
                     lastWeekEnd.setHours(23, 59, 59, 999);
-                    
                     if (expenseDate >= lastWeekStart && expenseDate <= lastWeekEnd) {
-                        return false; // Exclude last week
+                        return false;
                     }
                 }
-                
-                return true; // Include this expense
+                return true;
             });
-            
-            // Filter expenses where send_to_expenses_entry is false (only send false data)
-            let expensesToSend = allDailyPayments.filter(expense => 
+            let expensesToSend = allDailyPayments.filter(expense =>
                 expense.send_to_expenses_entry === false || expense.send_to_expenses_entry === undefined || expense.send_to_expenses_entry === null
             );
-            
-            // Store original count before processing
             const originalExpenseCount = expensesToSend.length;
-            
-            // Find Company Labour contractor
             const companyLabourContractor = contractorOptions.find(opt => opt.label === "Company Labour");
-            
-            // Filter out Staff Advance expenses - they should not be sent to Expenses Entry
             expensesToSend = expensesToSend.filter(expense => expense.type !== "Staff Advance");
-            
-            // First, group Wage and Diwali Bonus expenses by date and project_id (combining different labour_ids)
             const wageExpenseGroups = new Map();
             const diwaliBonusExpenseGroups = new Map();
             const otherExpenses = [];
-            
             expensesToSend.forEach(expense => {
-                // Check if expense is Wage type with labour_id
                 if (expense.type === "Wage" && expense.labour_id && expense.project_id && expense.date) {
-                    // Group by date and project_id (same date, same project, different labour_ids)
                     const key = `${expense.date}_${expense.project_id}_Wage`;
-                    
                     if (!wageExpenseGroups.has(key)) {
                         wageExpenseGroups.set(key, []);
                     }
                     wageExpenseGroups.get(key).push(expense);
-                } 
-                // Check if expense is Diwali Bonus type with labour_id
+                }
                 else if (expense.type === "Diwali Bonus" && expense.labour_id && expense.project_id && expense.date) {
-                    // Group by date and project_id (same date, same project, different labour_ids)
                     const key = `${expense.date}_${expense.project_id}_DiwaliBonus`;
-                    
                     if (!diwaliBonusExpenseGroups.has(key)) {
                         diwaliBonusExpenseGroups.set(key, []);
                     }
                     diwaliBonusExpenseGroups.get(key).push(expense);
-                } 
+                }
                 else {
-                    // Other expenses go to separate processing
                     otherExpenses.push(expense);
                 }
             });
-            
             const processedExpenses = [];
-            
-            // Process Wage expenses grouped by date and project_id (combining different labour_ids)
             wageExpenseGroups.forEach((group, key) => {
                 if (group.length > 0) {
                     const firstExpense = group[0];
-                    const totalAmount = group.reduce((sum, exp) => 
+                    const totalAmount = group.reduce((sum, exp) =>
                         sum + Number(exp.amount || 0) + Number(exp.extra_amount || 0), 0
                     );
                     const entryCount = group.length;
-                    
-                    // Create combined expense for Wage type
                     const combinedWageExpense = {
                         ...firstExpense,
                         amount: totalAmount,
                         extra_amount: 0,
                         quantity: entryCount,
-                        labour_id: null, // Clear labour_id
+                        labour_id: null,
                         contractor_id: companyLabourContractor?.id || null,
                         type: "Wage",
-                        // Store original expenses for marking as sent later
                         _originalExpenses: group
                     };
-                    
                     processedExpenses.push(combinedWageExpense);
                 }
             });
-            
-            // Process Diwali Bonus expenses grouped by date and project_id (combining different labour_ids)
             diwaliBonusExpenseGroups.forEach((group, key) => {
                 if (group.length > 0) {
                     const firstExpense = group[0];
-                    const totalAmount = group.reduce((sum, exp) => 
+                    const totalAmount = group.reduce((sum, exp) =>
                         sum + Number(exp.amount || 0) + Number(exp.extra_amount || 0), 0
                     );
                     const entryCount = group.length;
-                    
-                    // Create combined expense for Diwali Bonus type
                     const combinedDiwaliBonusExpense = {
                         ...firstExpense,
                         amount: totalAmount,
                         extra_amount: 0,
                         quantity: entryCount,
-                        labour_id: null, // Clear labour_id
+                        labour_id: null,
                         contractor_id: companyLabourContractor?.id || null,
                         type: "Diwali Bonus",
-                        // Store original expenses for marking as sent later
                         _originalExpenses: group
                     };
-                    
                     processedExpenses.push(combinedDiwaliBonusExpense);
                 }
             });
-            
-            // Now process other expenses: group by date, project_id, and labour_id
             const expenseGroups = new Map();
-            
             otherExpenses.forEach(expense => {
-                // Only process expenses with labour_id
                 if (expense.labour_id) {
                     const key = `${expense.date}_${expense.project_id}_${expense.labour_id}`;
-                    
                     if (!expenseGroups.has(key)) {
                         expenseGroups.set(key, []);
                     }
                     expenseGroups.get(key).push(expense);
                 } else {
-                    // Expenses without labour_id are added directly (no grouping needed)
                     processedExpenses.push(expense);
                 }
             });
-            
-            // Process grouped other expenses
             expenseGroups.forEach((group, key) => {
                 if (group.length > 1) {
-                    // Multiple entries: combine them
                     const firstExpense = group[0];
-                    const totalAmount = group.reduce((sum, exp) => 
+                    const totalAmount = group.reduce((sum, exp) =>
                         sum + Number(exp.amount || 0) + Number(exp.extra_amount || 0), 0
                     );
                     const entryCount = group.length;
-                    
-                    // Create combined expense
                     const combinedExpense = {
                         ...firstExpense,
                         amount: totalAmount,
                         extra_amount: 0,
                         quantity: entryCount,
-                        labour_id: null, // Clear labour_id
+                        labour_id: null,
                         contractor_id: companyLabourContractor?.id || null,
-                        // Store original expenses for marking as sent later
                         _originalExpenses: group
                     };
-                    
                     processedExpenses.push(combinedExpense);
                 } else {
-                    // Single entry: add as is
                     processedExpenses.push(group[0]);
                 }
             });
-            
-            // Replace expensesToSend with processed expenses
             expensesToSend = processedExpenses;
-            
             if (expensesToSend.length === 0) {
                 alert("No expenses to send. All expenses have already been sent to Expenses Entry, or all remaining expenses are from the current or previous week.");
                 return;
             }
-            
             const combinedCount = expensesToSend.filter(exp => exp._originalExpenses && exp._originalExpenses.length > 0).length;
-            const combinedMessage = combinedCount > 0 
+            const combinedMessage = combinedCount > 0
                 ? `\n\nNote: ${combinedCount} group(s) of expenses with same labour, project, and date will be combined into single entries with "Company Labour" as contractor.`
                 : "";
-            
             const confirmed = window.confirm(
                 `Are you sure you want to send ${expensesToSend.length} expense entry/entries (from ${originalExpenseCount} original expense(s)) to Expenses Entry?\n\nNote: Expenses from the actual current week (Week ${actualCurrentWeekNumber}) and last week (Week ${lastWeekNumber}) will be excluded.${combinedMessage}`
             );
             if (!confirmed) {
                 return;
             }
-
-            // Set loading state
             setSendingToExpensesEntry(true);
             setSendingProgress({ current: 0, total: expensesToSend.length });
-            
-            // Fetch the latest ENO from Expenses Entry (similar to Form.js)
             let currentEno = null;
             try {
                 const enoResponse = await fetch('https://backendaab.in/aabuilderDash/expenses_form/get_form');
@@ -1979,7 +1872,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                         const lastEno = sortedData[0].eno;
                         currentEno = lastEno + 1;
                     } else {
-                        currentEno = 54173; // Default starting ENO if no data exists
+                        currentEno = 54173;
                     }
                 } else {
                     console.warn("Failed to fetch ENO, using default");
@@ -1987,24 +1880,17 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 }
             } catch (error) {
                 console.error('Error fetching latest ENo:', error);
-                currentEno = 54173; // Fallback to default
+                currentEno = 54173;
             }
-            
-            // Send each expense to Expenses Entry API
             let successCount = 0;
             let errorCount = 0;
-            const successfullySentExpenses = []; // Track successfully sent expenses
+            const successfullySentExpenses = [];
             for (let i = 0; i < expensesToSend.length; i++) {
                 const expense = expensesToSend[i];
                 try {
-                    // Update progress
                     setSendingProgress({ current: i + 1, total: expensesToSend.length });
-
-                    // Get project name
                     const project = siteOptions.find(opt => opt.id === Number(expense.project_id));
                     const siteName = project?.label || "";
-                    
-                    // Get vendor/contractor/employee/labour name
                     const employee = employeeOptions.find(opt => opt.id === Number(expense.employee_id));
                     const vendor = vendorOptions.find(opt => opt.id === Number(expense.vendor_id));
                     const contractor = contractorOptions.find(opt => opt.id === Number(expense.contractor_id));
@@ -2013,13 +1899,9 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     const contractorName = contractor?.label || "";
                     const employeeName = employee?.label || "";
                     const labourName = labour?.label || "";
-                    
-                    // For combined expenses, use "Company Labour" as contractor
-                    const finalContractorName = expense.contractor_id && contractorOptions.find(opt => opt.id === Number(expense.contractor_id))?.label === "Company Labour" 
-                        ? "Company Labour" 
+                    const finalContractorName = expense.contractor_id && contractorOptions.find(opt => opt.id === Number(expense.contractor_id))?.label === "Company Labour"
+                        ? "Company Labour"
                         : contractorName;
-                    
-                    // Create payload for Expenses Entry
                     const expensesPayload = {
                         accountType: "Daily Wage",
                         eno: currentEno,
@@ -2041,9 +1923,8 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                         source: "Cash Register",
                         paymentMode: "Cash"
                     };
-                    
                     const expensesResponse = await fetch(
-                        "https://backendaab.in/aabuilderDash/expenses_form/save_fixed",
+                        "https://backendaab.in/aabuilderDash/expenses_form/save",
                         {
                             method: "POST",
                             headers: {
@@ -2052,22 +1933,17 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                             body: JSON.stringify(expensesPayload),
                         }
                     );
-                    
                     if (!expensesResponse.ok) {
                         const errorText = await expensesResponse.text();
                         console.error(`Failed to save expense ${expense.id}:`, errorText);
                         errorCount++;
                     } else {
                         successCount++;
-                        // For combined expenses, track all original expenses
                         if (expense._originalExpenses && expense._originalExpenses.length > 0) {
-                            // This is a combined expense, add all original expenses to tracking
                             successfullySentExpenses.push(...expense._originalExpenses);
                         } else {
-                            // Single expense
                             successfullySentExpenses.push(expense);
                         }
-                        // Increment ENO for next expense (similar to Form.js)
                         currentEno = currentEno + 1;
                     }
                 } catch (error) {
@@ -2075,15 +1951,11 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     errorCount++;
                 }
             }
-            
-            // After sending all expenses, mark them as sent
             if (successCount > 0) {
                 try {
-                    // Mark only the successfully sent expenses as sent using the send-to-expenses endpoint
                     let markedCount = 0;
                     for (const expense of successfullySentExpenses) {
                         try {
-                            // Use the send-to-expenses endpoint to mark each expense as sent
                             const markResponse = await axios.put(
                                 `https://backendaab.in/aabuildersDash/api/daily-payments/send-to-expenses/${expense.id}`
                             );
@@ -2094,17 +1966,13 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                             console.error(`Error marking expense ${expense.id} as sent:`, error);
                         }
                     }
-                    
                     if (markedCount < successfullySentExpenses.length) {
                         console.warn(`Only ${markedCount} out of ${successfullySentExpenses.length} expenses were marked as sent.`);
                     }
-                    
                     alert(
                         `Successfully sent ${successCount} expense(s) to Expenses Entry.` +
                         (errorCount > 0 ? ` ${errorCount} expense(s) failed.` : "")
                     );
-                    
-                    // Refresh the data
                     if (selectedDate) {
                         await handleDateClick(selectedDate);
                     }
@@ -2122,7 +1990,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             console.error("Error in handleSendToExpensesEntry:", error);
             alert("An error occurred while sending expenses to Expenses Entry. Please try again.");
         } finally {
-            // Reset loading state
             setSendingToExpensesEntry(false);
             setSendingProgress({ current: 0, total: 0 });
         }
@@ -2201,15 +2068,15 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 </div>
                 <div className="mr-5">
                     <button onClick={generateExpensesPDF} className='font-semibold mt-4 mr-5 hover:text-[#E4572E]'>Report</button>
-                    <button 
-                        onClick={generateWeekDataExcel} 
+                    <button
+                        onClick={generateWeekDataExcel}
                         className='font-semibold mt-4 mr-5 hover:text-[#E4572E]'
                         disabled={loading}
                     >
                         {loading ? 'Generating...' : 'Export Excel'}
                     </button>
-                    <button 
-                        onClick={handleSendToExpensesEntry} 
+                    <button
+                        onClick={handleSendToExpensesEntry}
                         className={`font-semibold mt-4 mr-5 hover:text-[#E4572E] ${sendingToExpensesEntry ? 'opacity-50 cursor-not-allowed' : ''}`}
                         disabled={sendingToExpensesEntry}
                     >
@@ -2259,7 +2126,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                                             </th>
                                             <th className="py-2 px-1 text-left w-[120px] cursor-pointer hover:bg-gray-200" onClick={() => handleSort('amount')}>
                                                 Amount {sortConfig.key === 'amount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                            </th>                                            
+                                            </th>
                                             <th className="py-2 px-1 text-left w-[120px] cursor-pointer hover:bg-gray-200" onClick={() => handleSort('type')}>
                                                 Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                             </th>
@@ -2477,112 +2344,87 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                                             </tr>
                                         )}
                                         {Number(selectedWeek) === Number(lastWeekNumber) && (
-                                        <tr className="bg-white border-b border-gray-200">
-                                            <td className="px-1 py-2 font-bold">{sortedDailyExpenses.filter(row => row.date === selectedDate).length + 1}.</td>
-                                            <td className="flex items-center gap-2 py-2">
-                                                <div>
+                                            <tr className="bg-white border-b border-gray-200">
+                                                <td className="px-1 py-2 font-bold">{sortedDailyExpenses.filter(row => row.date === selectedDate).length + 1}.</td>
+                                                <td className="flex items-center gap-2 py-2">
+                                                    <div>
+                                                        <Select
+                                                            name="labour_id"
+                                                            className="w-[265px]"
+                                                            placeholder={isChangeButtonActive ? "Vendor/Contractor" : "Labour Name"}
+                                                            isSearchable
+                                                            isClearable
+                                                            options={isChangeButtonActive ? combinedOptions : laboursList}
+                                                            styles={customStyles}
+                                                            menuPortalTarget={document.body}
+                                                            value={
+                                                                isChangeButtonActive
+                                                                    ? combinedOptions.find(opt =>
+                                                                        (opt.type === "Employee" && opt.id === Number(newDailyExpense.employee_id)) ||
+                                                                        (opt.type === "Vendor" && opt.id === Number(newDailyExpense.vendor_id)) ||
+                                                                        (opt.type === "Contractor" && opt.id === Number(newDailyExpense.contractor_id))
+                                                                    ) || null
+                                                                    : laboursList.find(opt => opt.id === Number(newDailyExpense.labour_id)) || null
+                                                            }
+                                                            onChange={(selectedOption) => {
+                                                                if (selectedOption) {
+                                                                    const { type, id, label, salary } = selectedOption;
+                                                                    setNewDailyExpense(prev => ({
+                                                                        ...prev,
+                                                                        labour_id: type === "Labour" ? id : "",
+                                                                        vendor_id: type === "Vendor" ? id : "",
+                                                                        contractor_id: type === "Contractor" ? id : "",
+                                                                        employee_id: type === "Employee" ? id : "",
+                                                                        labour_name: label,
+                                                                        amount: type === "Labour" ? salary : ""
+                                                                    }));
+                                                                } else {
+                                                                    setNewDailyExpense(prev => ({
+                                                                        ...prev,
+                                                                        labour_id: "",
+                                                                        vendor_id: "",
+                                                                        contractor_id: "",
+                                                                        employee_id: "",
+                                                                        labour_name: "",
+                                                                        amount: ""
+                                                                    }));
+                                                                }
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <button onClick={handleChangeButtonClick}>
+                                                            <img src={Change} className={`w-4 h-4 ${isChangeButtonActive ? 'opacity-10' : ''}`} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                                <td className="px-1 py-2">
                                                     <Select
-                                                        name="labour_id"
-                                                        className="w-[265px]"
-                                                        placeholder={isChangeButtonActive ? "Vendor/Contractor" : "Labour Name"}
+                                                        name="project"
+                                                        value={siteOptions.find(opt => opt.id === Number(newDailyExpense.project_id)) || null}
+                                                        onChange={(selectedOption) => {
+                                                            setNewDailyExpense(prev => ({
+                                                                ...prev,
+                                                                project_id: selectedOption ? selectedOption.id : ""
+                                                            }));
+                                                        }}
+                                                        options={siteOptions}
+                                                        menuPortalTarget={document.body}
+                                                        className="w-[260px]"
+                                                        placeholder="Select Site"
                                                         isSearchable
                                                         isClearable
-                                                        options={isChangeButtonActive ? combinedOptions : laboursList}
                                                         styles={customStyles}
-                                                        menuPortalTarget={document.body}
-                                                        value={
-                                                            isChangeButtonActive
-                                                                ? combinedOptions.find(opt =>
-                                                                    (opt.type === "Employee" && opt.id === Number(newDailyExpense.employee_id)) ||
-                                                                    (opt.type === "Vendor" && opt.id === Number(newDailyExpense.vendor_id)) ||
-                                                                    (opt.type === "Contractor" && opt.id === Number(newDailyExpense.contractor_id))
-                                                                ) || null
-                                                                : laboursList.find(opt => opt.id === Number(newDailyExpense.labour_id)) || null
-                                                        }
-                                                        onChange={(selectedOption) => {
-                                                            if (selectedOption) {
-                                                                const { type, id, label, salary } = selectedOption;
-                                                                setNewDailyExpense(prev => ({
-                                                                    ...prev,
-                                                                    labour_id: type === "Labour" ? id : "",
-                                                                    vendor_id: type === "Vendor" ? id : "",
-                                                                    contractor_id: type === "Contractor" ? id : "",
-                                                                    employee_id: type === "Employee" ? id : "",
-                                                                    labour_name: label,
-                                                                    amount: type === "Labour" ? salary : ""
-                                                                }));
-                                                            } else {
-                                                                setNewDailyExpense(prev => ({
-                                                                    ...prev,
-                                                                    labour_id: "",
-                                                                    vendor_id: "",
-                                                                    contractor_id: "",
-                                                                    employee_id: "",
-                                                                    labour_name: "",
-                                                                    amount: ""
-                                                                }));
-                                                            }
-                                                        }}
                                                     />
-                                                </div>
-                                                <div>
-                                                    <button onClick={handleChangeButtonClick}>
-                                                        <img src={Change} className={`w-4 h-4 ${isChangeButtonActive ? 'opacity-10' : ''}`} />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                            <td className="px-1 py-2">
-                                                <Select
-                                                    name="project"
-                                                    value={siteOptions.find(opt => opt.id === Number(newDailyExpense.project_id)) || null}
-                                                    onChange={(selectedOption) => {
-                                                        setNewDailyExpense(prev => ({
-                                                            ...prev,
-                                                            project_id: selectedOption ? selectedOption.id : ""
-                                                        }));
-                                                    }}
-                                                    options={siteOptions}
-                                                    menuPortalTarget={document.body}
-                                                    className="w-[260px]"
-                                                    placeholder="Select Site"
-                                                    isSearchable
-                                                    isClearable
-                                                    styles={customStyles}
-                                                />
-                                            </td>
-                                            <td className="px-1 py-2 text-left flex items-center gap-2">
-                                                <div>
-                                                    <input
-                                                        type="number"
-                                                        name="amount"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[90px] h-[40px] rounded-lg focus:outline-none no-spinner"
-                                                        value={newDailyExpense.amount || ""}
-                                                        onChange={(e) => setNewDailyExpense(prev => ({ ...prev, amount: e.target.value }))}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === "Enter") {
-                                                                e.preventDefault();
-                                                                handleAddExpense();
-                                                            }
-                                                        }}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <button className="font-semibold text-[25px]" onClick={() => setShowExtraAmount(prev => !prev)} type="button">
-                                                        +
-                                                    </button>
-                                                </div>
-                                                {showExtraAmount && (
+                                                </td>
+                                                <td className="px-1 py-2 text-left flex items-center gap-2">
                                                     <div>
                                                         <input
                                                             type="number"
-                                                            name="extra_amount"
+                                                            name="amount"
                                                             className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[90px] h-[40px] rounded-lg focus:outline-none no-spinner"
-                                                            placeholder="Extra"
-                                                            value={newDailyExpense.extra_amount || ""}
-                                                            onChange={(e) => setNewDailyExpense(prev => ({
-                                                                ...prev,
-                                                                extra_amount: e.target.value
-                                                            }))}
+                                                            value={newDailyExpense.amount || ""}
+                                                            onChange={(e) => setNewDailyExpense(prev => ({ ...prev, amount: e.target.value }))}
                                                             onKeyDown={(e) => {
                                                                 if (e.key === "Enter") {
                                                                     e.preventDefault();
@@ -2591,41 +2433,66 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                                                             }}
                                                         />
                                                     </div>
-                                                )}
-                                            </td>                                            
-                                            <td className="px-1 py-2 text-left">
-                                                <select
-                                                    name="type"
-                                                    value={newDailyExpense.type}
-                                                    onChange={handleInputChange}
-                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[120px] h-[40px] rounded-lg focus:outline-none"
-                                                >
-                                                    <option value="">Select</option>
-                                                    {(isChangeButtonActive ? expensesCategory : weeklyTypes).map((type, index) => (
-                                                        <option key={index} value={isChangeButtonActive ? type.category : type.type}>
-                                                            {isChangeButtonActive ? type.category : type.type}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </td>
-                                            <td className="px-1 py-2">
-                                                <input
-                                                    type="number"
-                                                    name="quantity"
-                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[60px] h-[40px] rounded-lg focus:outline-none no-spinner"
-                                                    value={newDailyExpense.quantity || ""}
-                                                    onChange={(e) => setNewDailyExpense(prev => ({ ...prev, quantity: e.target.value }))}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === "Enter") {
-                                                            e.preventDefault();
-                                                            handleAddExpense();
-                                                        }
-                                                    }}
-                                                />
-                                            </td>
-                                            <td className="px-1 py-2">
-                                            </td>
-                                        </tr>
+                                                    <div>
+                                                        <button className="font-semibold text-[25px]" onClick={() => setShowExtraAmount(prev => !prev)} type="button">
+                                                            +
+                                                        </button>
+                                                    </div>
+                                                    {showExtraAmount && (
+                                                        <div>
+                                                            <input
+                                                                type="number"
+                                                                name="extra_amount"
+                                                                className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[90px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                                placeholder="Extra"
+                                                                value={newDailyExpense.extra_amount || ""}
+                                                                onChange={(e) => setNewDailyExpense(prev => ({
+                                                                    ...prev,
+                                                                    extra_amount: e.target.value
+                                                                }))}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === "Enter") {
+                                                                        e.preventDefault();
+                                                                        handleAddExpense();
+                                                                    }
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-1 py-2 text-left">
+                                                    <select
+                                                        name="type"
+                                                        value={newDailyExpense.type}
+                                                        onChange={handleInputChange}
+                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[120px] h-[40px] rounded-lg focus:outline-none"
+                                                    >
+                                                        <option value="">Select</option>
+                                                        {(isChangeButtonActive ? expensesCategory : weeklyTypes).map((type, index) => (
+                                                            <option key={index} value={isChangeButtonActive ? type.category : type.type}>
+                                                                {isChangeButtonActive ? type.category : type.type}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </td>
+                                                <td className="px-1 py-2">
+                                                    <input
+                                                        type="number"
+                                                        name="quantity"
+                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[60px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                        value={newDailyExpense.quantity || ""}
+                                                        onChange={(e) => setNewDailyExpense(prev => ({ ...prev, quantity: e.target.value }))}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === "Enter") {
+                                                                e.preventDefault();
+                                                                handleAddExpense();
+                                                            }
+                                                        }}
+                                                    />
+                                                </td>
+                                                <td className="px-1 py-2">
+                                                </td>
+                                            </tr>
                                         )}
                                     </thead>
                                     <tbody>
@@ -2682,11 +2549,11 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                                                                 />
                                                             ) : (
                                                                 (() => {
-                                                                const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
-                                                                const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
-                                                                const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
-                                                                const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
-                                                                return employee?.label || vendor?.label || contractor?.label || labour?.label || "";
+                                                                    const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
+                                                                    const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
+                                                                    const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
+                                                                    const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
+                                                                    return employee?.label || vendor?.label || contractor?.label || labour?.label || "";
                                                                 })()
                                                             )}
                                                         </div>
@@ -2738,63 +2605,63 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                                                                 </div>
                                                             ) : (
                                                                 <>
-                                                            <div className="w-[120px] h-[40px] flex flex-col justify-center leading-tight cursor-default">
-                                                                <span>
-                                                                    {Number((row.amount || 0) + (row.extra_amount || 0)).toLocaleString("en-IN")}
-                                                                </span>
-                                                                <div className="absolute left-0 top-full mt-1 hidden group-hover:block bg-black text-white text-xs rounded p-2 z-50 shadow-lg whitespace-nowrap">
-                                                                    Amount: {Number(row.amount || 0).toLocaleString('en-IN')} <br />
-                                                                    Extra Amount: {Number(row.extra_amount || 0).toLocaleString('en-IN')}
-                                                                </div>
-                                                            </div>
-                                                            <div className="w-[80px] h-[40px] flex items-center gap-2">
-                                                            <div className="flex items-center gap-1">
-                                                                {row.description ? (
-                                                                    <div className="flex items-center justify-center w-full">
-                                                                        <img
-                                                                            src={NotesEnd}
-                                                                            alt="View Description"
-                                                                            className="w-4 h-4 cursor-pointer opacity-60 hover:opacity-100 flex-shrink-0"
-                                                                            onClick={() => handleDescriptionClick(row)}
-                                                                        />
+                                                                    <div className="w-[120px] h-[40px] flex flex-col justify-center leading-tight cursor-default">
+                                                                        <span>
+                                                                            {Number((row.amount || 0) + (row.extra_amount || 0)).toLocaleString("en-IN")}
+                                                                        </span>
+                                                                        <div className="absolute left-0 top-full mt-1 hidden group-hover:block bg-black text-white text-xs rounded p-2 z-50 shadow-lg whitespace-nowrap">
+                                                                            Amount: {Number(row.amount || 0).toLocaleString('en-IN')} <br />
+                                                                            Extra Amount: {Number(row.extra_amount || 0).toLocaleString('en-IN')}
+                                                                        </div>
                                                                     </div>
-                                                                ) : (
-                                                                    <div className="flex items-center justify-center w-full">
-                                                                        <img
-                                                                            src={NotesStart}
-                                                                            alt="Add Description"
-                                                                            className="w-4 h-4 cursor-pointer opacity-60 hover:opacity-100"
-                                                                            onClick={() => handleDescriptionClick(row)}
-                                                                        />
+                                                                    <div className="w-[80px] h-[40px] flex items-center gap-2">
+                                                                        <div className="flex items-center gap-1">
+                                                                            {row.description ? (
+                                                                                <div className="flex items-center justify-center w-full">
+                                                                                    <img
+                                                                                        src={NotesEnd}
+                                                                                        alt="View Description"
+                                                                                        className="w-4 h-4 cursor-pointer opacity-60 hover:opacity-100 flex-shrink-0"
+                                                                                        onClick={() => handleDescriptionClick(row)}
+                                                                                    />
+                                                                                </div>
+                                                                            ) : (
+                                                                                <div className="flex items-center justify-center w-full">
+                                                                                    <img
+                                                                                        src={NotesStart}
+                                                                                        alt="Add Description"
+                                                                                        className="w-4 h-4 cursor-pointer opacity-60 hover:opacity-100"
+                                                                                        onClick={() => handleDescriptionClick(row)}
+                                                                                    />
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="ml-3 flex items-center gap-1">
+                                                                            {row.file_url ? (
+                                                                                <a
+                                                                                    href={row.file_url}
+                                                                                    target="_blank"
+                                                                                    rel="noopener noreferrer"
+                                                                                    className="cursor-pointer"
+                                                                                    title="View File"
+                                                                                >
+                                                                                    <img src={file} className="w-4 h-4" alt="Open File" />
+                                                                                </a>
+                                                                            ) : (
+                                                                                <button
+                                                                                    onClick={() => handleFileUploadClick(row)}
+                                                                                    className="cursor-pointer"
+                                                                                    title="Upload File"
+                                                                                >
+                                                                                    <img
+                                                                                        src={fileUpload}
+                                                                                        className="w-4 h-4 opacity-70 hover:opacity-100"
+                                                                                        alt="Upload File"
+                                                                                    />
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
                                                                     </div>
-                                                                )}
-                                                            </div>
-                                                            <div className="ml-3 flex items-center gap-1">
-                                                                {row.file_url ? (
-                                                                    <a
-                                                                        href={row.file_url}
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
-                                                                        className="cursor-pointer"
-                                                                        title="View File"
-                                                                    >
-                                                                        <img src={file} className="w-4 h-4" alt="Open File" />
-                                                                    </a>
-                                                                ) : (
-                                                                    <button
-                                                                        onClick={() => handleFileUploadClick(row)}
-                                                                        className="cursor-pointer"
-                                                                        title="Upload File"
-                                                                    >
-                                                                        <img
-                                                                            src={fileUpload}
-                                                                            className="w-4 h-4 opacity-70 hover:opacity-100"
-                                                                            alt="Upload File"
-                                                                        />
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                        </div>
                                                                 </>
                                                             )}
                                                         </div>
@@ -2834,7 +2701,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                                                                 row.quantity || "-"
                                                             )}
                                                         </div>
-                                                    </td>                                                    
+                                                    </td>
                                                     <td className="px-1 py-2 relative">
                                                         {Number(selectedWeek) === Number(lastWeekNumber) && (
                                                             <div className="flex gap-2 w-[80px]">
@@ -2962,55 +2829,55 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                                             </tr>
                                         ))}
                                         {Number(selectedWeek) === Number(lastWeekNumber) && (
-                                        <tr>
-                                            <td className="py-2 text-left">
-                                                <div className="flex items-center gap-2">
-                                                    <Select
-                                                        name="refund_party"
-                                                        className="w-[265px] text-left"
-                                                        placeholder={isRefundChangeButtonActive ? "Vendor/Contractor/Employee" : "Labour Name"}
-                                                        isSearchable
-                                                        isClearable
-                                                        value={
-                                                            isRefundChangeButtonActive
-                                                                ? combinedOptions.find(opt =>
-                                                                    (opt.type === "Employee" && String(opt.id) === String(newRefundReceived.employee_id)) ||
-                                                                    (opt.type === "Vendor" && String(opt.id) === String(newRefundReceived.vendor_id)) ||
-                                                                    (opt.type === "Contractor" && String(opt.id) === String(newRefundReceived.contractor_id))
-                                                                ) || null
-                                                                : laboursList.find(opt => String(opt.id) === String(newRefundReceived.labour_id)) || null
-                                                        }
-                                                        onChange={handleRefundSelectChange}
-                                                        onKeyDown={handleKeyDown}
-                                                        options={isRefundChangeButtonActive ? combinedOptions : laboursList}
-                                                        styles={customStyles}
-                                                        menuPortalTarget={document.body}
-                                                    />
-                                                    <button onClick={handleRefundChangeButtonClick}>
-                                                        <img
-                                                            src={Change}
-                                                            className={`w-4 h-4 ${isRefundChangeButtonActive ? 'opacity-10' : ''}`}
-                                                            alt="Toggle options"
+                                            <tr>
+                                                <td className="py-2 text-left">
+                                                    <div className="flex items-center gap-2">
+                                                        <Select
+                                                            name="refund_party"
+                                                            className="w-[265px] text-left"
+                                                            placeholder={isRefundChangeButtonActive ? "Vendor/Contractor/Employee" : "Labour Name"}
+                                                            isSearchable
+                                                            isClearable
+                                                            value={
+                                                                isRefundChangeButtonActive
+                                                                    ? combinedOptions.find(opt =>
+                                                                        (opt.type === "Employee" && String(opt.id) === String(newRefundReceived.employee_id)) ||
+                                                                        (opt.type === "Vendor" && String(opt.id) === String(newRefundReceived.vendor_id)) ||
+                                                                        (opt.type === "Contractor" && String(opt.id) === String(newRefundReceived.contractor_id))
+                                                                    ) || null
+                                                                    : laboursList.find(opt => String(opt.id) === String(newRefundReceived.labour_id)) || null
+                                                            }
+                                                            onChange={handleRefundSelectChange}
+                                                            onKeyDown={handleKeyDown}
+                                                            options={isRefundChangeButtonActive ? combinedOptions : laboursList}
+                                                            styles={customStyles}
+                                                            menuPortalTarget={document.body}
                                                         />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                            <td className="py-2">
-                                                <input
-                                                    type="number"
-                                                    name="amount"
-                                                    value={newRefundReceived.amount}
-                                                    onChange={handleNewPaymentChange}
-                                                    onKeyDown={handleKeyDown}
-                                                    className="border-2 border-[#BF9853] border-opacity-25 rounded-lg w-[90px] h-[40px] focus:outline-none no-spinner"
-                                                    min="0"
-                                                    step="any"
-                                                    onWheel={(e) => e.preventDefault()}
-                                                />
-                                            </td>
-                                            <td className="py-2">
-                                            </td>
-                                        </tr>
+                                                        <button onClick={handleRefundChangeButtonClick}>
+                                                            <img
+                                                                src={Change}
+                                                                className={`w-4 h-4 ${isRefundChangeButtonActive ? 'opacity-10' : ''}`}
+                                                                alt="Toggle options"
+                                                            />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                                <td className="py-2">
+                                                    <input
+                                                        type="number"
+                                                        name="amount"
+                                                        value={newRefundReceived.amount}
+                                                        onChange={handleNewPaymentChange}
+                                                        onKeyDown={handleKeyDown}
+                                                        className="border-2 border-[#BF9853] border-opacity-25 rounded-lg w-[90px] h-[40px] focus:outline-none no-spinner"
+                                                        min="0"
+                                                        step="any"
+                                                        onWheel={(e) => e.preventDefault()}
+                                                    />
+                                                </td>
+                                                <td className="py-2">
+                                                </td>
+                                            </tr>
                                         )}
                                     </tbody>
                                 </table>

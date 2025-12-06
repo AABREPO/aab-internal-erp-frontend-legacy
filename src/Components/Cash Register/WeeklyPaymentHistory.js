@@ -586,6 +586,7 @@ const History = ({ username, userRoles = [] }) => {
             { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
             { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
             { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
+            { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
         ];
         const fetchSites = async () => {
             try {
@@ -734,7 +735,7 @@ const History = ({ username, userRoles = [] }) => {
             // Validate type selection against current party selection
             const allowedTypesForClient = ["Loan", "Bank", "Claim"];
             const isClientTypeAllowed = allowedTypesForClient.includes(value);
-            
+
             if (value === "Staff Advance") {
                 // Staff Advance only allows Employee
                 if (selectedContractor || selectedVendor || selectedClient) {
@@ -748,7 +749,7 @@ const History = ({ username, userRoles = [] }) => {
                     return; // Prevent type change
                 }
             }
-            
+
             // If type doesn't allow client selection and client toggle is active, disable it and clear client selection
             if (!isClientTypeAllowed && isClientToggleActive) {
                 setIsClientToggleActive(false);
@@ -764,7 +765,7 @@ const History = ({ username, userRoles = [] }) => {
                 }));
                 return;
             }
-            
+
             // If validation passes, update the type
             setNewExpense((prev) => ({ ...prev, [name]: value }));
         } else {
@@ -1430,7 +1431,7 @@ const History = ({ username, userRoles = [] }) => {
             const row = expenses.find(exp => exp.id === id);
             const allowedTypesForClient = ["Loan", "Bank", "Claim"];
             const isClientTypeAllowed = allowedTypesForClient.includes(value);
-            
+
             if (value === "Staff Advance") {
                 // Staff Advance only allows Employee
                 if (row?.contractor_id || row?.vendor_id || row?.client_id) {
@@ -1444,7 +1445,7 @@ const History = ({ username, userRoles = [] }) => {
                     return; // Prevent type change
                 }
             }
-            
+
             // If type doesn't allow client selection and client toggle is active, disable it and clear client selection
             if (!isClientTypeAllowed && isClientToggleActive && row?.client_id) {
                 setIsClientToggleActive(false);
@@ -1460,7 +1461,7 @@ const History = ({ username, userRoles = [] }) => {
                 );
                 return;
             }
-            
+
             // If validation passes, update the type
             setExpenses((prevExpenses) =>
                 prevExpenses.map((expense) =>
@@ -1550,18 +1551,18 @@ const History = ({ username, userRoles = [] }) => {
             alert("Error: Data not loaded properly. Please refresh the page and try again.");
             return;
         }
-        
+
         let advancePortalData = [];
         let staffAdvanceData = [];
         let loanPortalData = [];
-        
+
         try {
             const [advanceRes, staffAdvanceRes, loanRes] = await Promise.all([
                 fetch("https://backendaab.in/aabuildersDash/api/advance_portal/getAll").catch(() => null),
                 fetch("https://backendaab.in/aabuildersDash/api/staff-advance/all").catch(() => null),
                 fetch("https://backendaab.in/aabuildersDash/api/loans/all").catch(() => null)
             ]);
-            
+
             if (advanceRes && advanceRes.ok) {
                 advancePortalData = await advanceRes.json();
             }
@@ -1574,7 +1575,7 @@ const History = ({ username, userRoles = [] }) => {
         } catch (error) {
             console.error("Error fetching portal data:", error);
         }
-        
+
         // Helper function to check if date is in week range
         const isDateInWeek = (dateStr) => {
             if (!dateStr) return false;
@@ -1582,21 +1583,21 @@ const History = ({ username, userRoles = [] }) => {
             date.setHours(0, 0, 0, 0);
             return date >= start && date <= end;
         };
-        
+
 
         // Get Staff Advance total from staff advance portal (Cash payment mode, within week)
         const staffAdvanceTotalFromPortal = staffAdvanceData
-            .filter(entry => 
-                entry.staff_payment_mode === "Cash" && 
+            .filter(entry =>
+                entry.staff_payment_mode === "Cash" &&
                 entry.type === "Advance" &&
                 isDateInWeek(entry.date)
             )
             .reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
-        
+
         // Get Loan total from loan portal (Cash payment mode, within week)
         const loanTotalFromPortal = loanPortalData
-            .filter(entry => 
-                (entry.loan_payment_mode === "Cash" || entry.payment_mode === "Cash") && 
+            .filter(entry =>
+                (entry.loan_payment_mode === "Cash" || entry.payment_mode === "Cash") &&
                 entry.type === "Loan" &&
                 isDateInWeek(entry.date)
             )
@@ -1828,7 +1829,7 @@ const History = ({ username, userRoles = [] }) => {
         // Get all expense types from all expenses (excluding Project Advance)
         const allExpenseTypes = [...new Set(
             expenses
-                .filter(expense => expense.type )
+                .filter(expense => expense.type)
                 .map(e => e.type)
                 .filter(Boolean)
         )];
@@ -1841,7 +1842,7 @@ const History = ({ username, userRoles = [] }) => {
             }
         });
         expenses
-            .filter(expense => Number(expense.amount) > 0 )
+            .filter(expense => Number(expense.amount) > 0)
             .forEach(expense => {
                 const type = expense.type;
                 const amount = Number(expense.amount);
@@ -1852,7 +1853,7 @@ const History = ({ username, userRoles = [] }) => {
                     }
                 }
             });
-        
+
         // Update totals from portal data for specific types
         if (summaryMap["Staff Advance"]) {
             summaryMap["Staff Advance"].total = staffAdvanceTotalFromPortal;
@@ -1860,7 +1861,7 @@ const History = ({ username, userRoles = [] }) => {
         if (summaryMap["Loan"]) {
             summaryMap["Loan"].total = loanTotalFromPortal;
         }
-        
+
         const summaryData = Object.entries(summaryMap)
             .map(([type, { count, total }]) => [
                 String(type || ""),
@@ -1946,108 +1947,112 @@ const History = ({ username, userRoles = [] }) => {
         const newTableX = 520;
         let newTableY = baseY;
         const staffAdvanceEntries = expenses.filter(e => e.type === "Staff Advance");
-        const staffAdvanceCount = staffAdvanceEntries.length;
-        const staffAdvanceTotal = staffAdvanceEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-        const staffAdvanceY = newTableY + 10;
-        // Add title above the table like DIWALI BONUS
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.text("STAFF ADVANCE", newTableX, staffAdvanceY - 25);
-        
-        const staffAdvanceHead = [[
-            String(staffAdvanceCount || "0"),
-            "PARTY",
-            "PROJECT NAME",
-            String(staffAdvanceTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
-        ]];
-        const staffAdvanceBody = staffAdvanceEntries.map(e => [
-            String(e.date ? formatDateOnly(e.date) : ""),
-            String(getPartyDisplayName(e) || ""),
-            String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
-            String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
-        ]);
-        autoTable(doc, {
-            head: staffAdvanceHead,
-            body: staffAdvanceBody,
-            startY: staffAdvanceY - 20,
-            margin: { left: newTableX },
-            tableWidth: 310,
-            theme: "grid",
-            styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
-            headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
-            bodyStyles: { fontStyle: 'bold' },
-            columnStyles: {
-                3: { halign: 'right' }
-            },
-            didParseCell: (data) => {
-                if (data.section === 'head' && data.column.index === 3) {
-                    data.cell.styles.halign = 'right';
+        if (staffAdvanceEntries.length > 0) {
+            const staffAdvanceCount = staffAdvanceEntries.length;
+            const staffAdvanceTotal = staffAdvanceEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+            const staffAdvanceY = newTableY + 10;
+            // Add title above the table like DIWALI BONUS
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text("STAFF ADVANCE", newTableX, staffAdvanceY - 25);
+
+            const staffAdvanceHead = [[
+                String(staffAdvanceCount || "0"),
+                "PARTY",
+                "PROJECT NAME",
+                String(staffAdvanceTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+            ]];
+            const staffAdvanceBody = staffAdvanceEntries.map(e => [
+                String(e.date ? formatDateOnly(e.date) : ""),
+                String(getPartyDisplayName(e) || ""),
+                String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
+                String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+            ]);
+            autoTable(doc, {
+                head: staffAdvanceHead,
+                body: staffAdvanceBody,
+                startY: staffAdvanceY - 20,
+                margin: { left: newTableX },
+                tableWidth: 310,
+                theme: "grid",
+                styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
+                headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+                bodyStyles: { fontStyle: 'bold' },
+                columnStyles: {
+                    3: { halign: 'right' }
+                },
+                didParseCell: (data) => {
+                    if (data.section === 'head' && data.column.index === 3) {
+                        data.cell.styles.halign = 'right';
+                    }
+                },
+                didDrawPage: () => {
+                    drawHeader(doc);
                 }
-            },
-            didDrawPage: () => {
-                drawHeader(doc);
-            }
-        });
-        newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
+            });
+            newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
+        }
         const staffSalaryEntries = expenses.filter(e => e.type === "Staff Salary");
-        const staffSalaryCount = staffSalaryEntries.length;
-        const staffSalaryTotal = staffSalaryEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-        const staffSalaryY = newTableY + 30;
-        // Add title above the table like DIWALI BONUS
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.text("STAFF SALARY", newTableX, staffSalaryY - 25);
-        
-        const staffSalaryHead = [[
-            String(staffSalaryCount || "0"),
-            "PARTY",
-            "PROJECT NAME",
-            String(staffSalaryTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
-        ]];
-        const staffSalaryBody = staffSalaryEntries.map(e => [
-            String(e.date ? formatDateOnly(e.date) : ""),
-            String(getPartyDisplayName(e) || ""),
-            String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
-            String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
-        ]);
-        autoTable(doc, {
-            head: staffSalaryHead,
-            body: staffSalaryBody,
-            startY: staffSalaryY - 20,
-            margin: { left: newTableX },
-            tableWidth: 310,
-            theme: "grid",
-            styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
-            headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
-            bodyStyles: { fontStyle: 'bold' },
-            columnStyles: {
-                3: { halign: 'right' }
-            },
-            didParseCell: (data) => {
-                if (data.section === 'head' && data.column.index === 3) {
-                    data.cell.styles.halign = 'right';
+        if (staffSalaryEntries.length > 0) {
+            const staffSalaryCount = staffSalaryEntries.length;
+            const staffSalaryTotal = staffSalaryEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+            const staffSalaryY = newTableY + 30;
+            // Add title above the table like DIWALI BONUS
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text("STAFF SALARY", newTableX, staffSalaryY - 25);
+
+            const staffSalaryHead = [[
+                String(staffSalaryCount || "0"),
+                "PARTY",
+                "PROJECT NAME",
+                String(staffSalaryTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+            ]];
+            const staffSalaryBody = staffSalaryEntries.map(e => [
+                String(e.date ? formatDateOnly(e.date) : ""),
+                String(getPartyDisplayName(e) || ""),
+                String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
+                String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+            ]);
+            autoTable(doc, {
+                head: staffSalaryHead,
+                body: staffSalaryBody,
+                startY: staffSalaryY - 20,
+                margin: { left: newTableX },
+                tableWidth: 310,
+                theme: "grid",
+                styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
+                headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+                bodyStyles: { fontStyle: 'bold' },
+                columnStyles: {
+                    3: { halign: 'right' }
+                },
+                didParseCell: (data) => {
+                    if (data.section === 'head' && data.column.index === 3) {
+                        data.cell.styles.halign = 'right';
+                    }
+                },
+                didDrawPage: () => {
+                    drawHeader(doc);
                 }
-            },
-            didDrawPage: () => {
-                drawHeader(doc);
-            }
-        });
-        newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
+            });
+            newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
+        }
         const excludedTypes = ["Bill", "Wage", "Project Advance", "Staff Advance", "Staff Salary", "Daily", "Diwali Bonus"];
         const otherExpenseTypes = [...new Set(expenses.map(e => e.type).filter(type => type && !excludedTypes.includes(type)))];
-        
+
         otherExpenseTypes.forEach((expenseType) => {
             const typeEntries = expenses.filter(e => e.type === expenseType);
             if (typeEntries.length === 0) return;
-            
+
             const typeCount = typeEntries.length;
             const typeTotal = typeEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
             const typeY = newTableY + 30;
-            
+
             doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
             doc.text(expenseType.toUpperCase(), newTableX, typeY - 25);
-            
+
             const typeHead = [[
                 String(typeCount || "0"),
                 "PARTY",
@@ -2060,13 +2065,13 @@ const History = ({ username, userRoles = [] }) => {
                 String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
                 String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
             ]);
-            
+
             if (newTableY > doc.internal.pageSize.getHeight() - 150) {
                 doc.addPage();
                 drawHeader(doc, "WEEKLY PAYMENT STATEMENT");
                 newTableY = baseY;
             }
-            
+
             autoTable(doc, {
                 head: typeHead,
                 body: typeBody,
@@ -2092,48 +2097,50 @@ const History = ({ username, userRoles = [] }) => {
             newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
         });
         const diwaliBonusEntries = expenses.filter(e => e.type === "Diwali Bonus");
-        const diwaliBonusCount = diwaliBonusEntries.length;
-        const diwaliBonusTotal = diwaliBonusEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-        const diwaliBonusY = newTableY + 30;
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.text("DIWALI BONUS", newTableX, diwaliBonusY - 25);
-        const diwaliBonusHead = [[
-            String(diwaliBonusCount || "0"),
-            "PARTY",
-            "AMOUNT",
-            String(diwaliBonusTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
-        ]];
-        const diwaliBonusBody = diwaliBonusEntries.map(e => [
-            String(e.date ? formatDateOnly(e.date) : ""),
-            String(getPartyDisplayName(e) || ""),
-            String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
-            ""
-        ]);
-        autoTable(doc, {
-            head: diwaliBonusHead,
-            body: diwaliBonusBody,
-            startY: diwaliBonusY - 20,
-            margin: { left: newTableX },
-            tableWidth: 310,
-            theme: "grid",
-            styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
-            headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
-            bodyStyles: { fontStyle: 'bold' },
-            columnStyles: {
-                2: { halign: 'right' },
-                3: { halign: 'right' }
-            },
-            didParseCell: (data) => {
-                if (data.section === 'head' && data.column.index === 3) {
-                    data.cell.styles.halign = 'right';
+        if (diwaliBonusEntries.length > 0) {
+            const diwaliBonusCount = diwaliBonusEntries.length;
+            const diwaliBonusTotal = diwaliBonusEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+            const diwaliBonusY = newTableY + 30;
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text("DIWALI BONUS", newTableX, diwaliBonusY - 25);
+            const diwaliBonusHead = [[
+                String(diwaliBonusCount || "0"),
+                "PARTY",
+                "AMOUNT",
+                String(diwaliBonusTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+            ]];
+            const diwaliBonusBody = diwaliBonusEntries.map(e => [
+                String(e.date ? formatDateOnly(e.date) : ""),
+                String(getPartyDisplayName(e) || ""),
+                String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
+                ""
+            ]);
+            autoTable(doc, {
+                head: diwaliBonusHead,
+                body: diwaliBonusBody,
+                startY: diwaliBonusY - 20,
+                margin: { left: newTableX },
+                tableWidth: 310,
+                theme: "grid",
+                styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
+                headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+                bodyStyles: { fontStyle: 'bold' },
+                columnStyles: {
+                    2: { halign: 'right' },
+                    3: { halign: 'right' }
+                },
+                didParseCell: (data) => {
+                    if (data.section === 'head' && data.column.index === 3) {
+                        data.cell.styles.halign = 'right';
+                    }
+                },
+                didDrawPage: () => {
+                    drawHeader(doc);
                 }
-            },
-            didDrawPage: () => {
-                drawHeader(doc);
-            }
-        });
-        newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
+            });
+            newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
+        }
         const lastPeriodEndDate = expenses
             .map(exp => exp.period_end_date)
             .filter(Boolean)
@@ -3029,8 +3036,8 @@ const History = ({ username, userRoles = [] }) => {
                                                                 }),
                                                             }}
                                                         />
-                                                        <button 
-                                                            type="button" 
+                                                        <button
+                                                            type="button"
                                                             onClick={handlePartySourceToggle}
                                                         >
                                                             <img

@@ -60,6 +60,7 @@ const EditModal = memo(({
   employees,
   laboursList,
   purposes,
+  paymentModeOptions,
   onClose,
   onUpdate,
   formatWithCommas
@@ -271,9 +272,11 @@ const EditModal = memo(({
                 onChange={(e) => handleInputChange('staff_payment_mode', e.target.value)}
                 className='w-[263px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'>
                 <option value=''>Select</option>
-                <option value='Cash'>Cash</option>
-                <option value='GPay'>GPay</option>
-                <option value='Net Banking'>Net Banking</option>
+                {paymentModeOptions && paymentModeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             )}
           </div>
@@ -302,7 +305,7 @@ const EditModal = memo(({
 
 EditModal.displayName = 'EditModal';
 
-const TableView = ({ username, userRoles = [] }) => {
+const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   const [vendorOptions, setVendorOptions] = useState([]);
   const [contractorOptions, setContractorOptions] = useState([]);
   const [combinedOptions, setCombinedOptions] = useState([]);
@@ -508,6 +511,52 @@ const TableView = ({ username, userRoles = [] }) => {
     });
     return Array.from(uniqueNames).map(name => ({ value: name, label: name }));
   }, [records, getEmployeeName, getLabourName]);
+
+  // Get unique purpose options from records for filter dropdown
+  const purposeOptions = useMemo(() => {
+    const uniquePurposes = new Set();
+    records.forEach((entry) => {
+      const purposeName = getPurposeName(entry.from_purpose_id);
+      if (purposeName && purposeName !== entry.from_purpose_id) {
+        uniquePurposes.add(purposeName);
+      }
+    });
+    return Array.from(uniquePurposes).map(purpose => ({ value: purpose, label: purpose, id: records.find(r => getPurposeName(r.from_purpose_id) === purpose)?.from_purpose_id }));
+  }, [records, getPurposeName]);
+
+  // Get unique transfer to options from records for filter dropdown
+  const transferToOptions = useMemo(() => {
+    const uniqueTransferTo = new Set();
+    records.forEach((entry) => {
+      const transferToName = getPurposeName(entry.to_purpose_id);
+      if (transferToName && transferToName !== entry.to_purpose_id) {
+        uniqueTransferTo.add(transferToName);
+      }
+    });
+    return Array.from(uniqueTransferTo).map(transferTo => ({ value: transferTo, label: transferTo, id: records.find(r => getPurposeName(r.to_purpose_id) === transferTo)?.to_purpose_id }));
+  }, [records, getPurposeName]);
+
+  // Get unique type options from records for filter dropdown
+  const typeOptions = useMemo(() => {
+    const uniqueTypes = new Set();
+    records.forEach((entry) => {
+      if (entry.type) {
+        uniqueTypes.add(entry.type);
+      }
+    });
+    return Array.from(uniqueTypes).sort();
+  }, [records]);
+
+  // Get unique mode options from records for filter dropdown
+  const modeOptions = useMemo(() => {
+    const uniqueModes = new Set();
+    records.forEach((entry) => {
+      if (entry.staff_payment_mode) {
+        uniqueModes.add(entry.staff_payment_mode);
+      }
+    });
+    return Array.from(uniqueModes).sort();
+  }, [records]);
 
   const handleSort = useCallback((key) => {
     setSortConfig((prev) => {
@@ -809,13 +858,26 @@ const TableView = ({ username, userRoles = [] }) => {
   // Calculate totals from filtered records
   const advanceTotal = filteredRecords
     .filter(r => r.type === 'Advance')
-    .reduce((acc, r) => acc + (r.amount || 0), 0);
+    .reduce((acc, r) => {
+      const amount = parseFloat(r.amount) || 0;
+      // If amount is negative, it will subtract automatically
+      return acc + amount;
+    }, 0);
   const transferTotal = filteredRecords
     .filter(r => r.type === 'Transfer')
-    .reduce((acc, r) => acc + (r.amount > 0 ? r.amount : 0), 0);
+    .reduce((acc, r) => {
+      const amount = parseFloat(r.amount) || 0;
+      // For transfer records, the amount field already contains the correct sign
+      // Negative amount means money going out, positive means money coming in
+      return acc + amount;
+    }, 0);
   const refundTotal = filteredRecords
     .filter(r => r.type === 'Refund')
-    .reduce((acc, r) => acc + (r.staff_refund_amount || 0), 0);
+    .reduce((acc, r) => {
+      const refund = parseFloat(r.staff_refund_amount) || 0;
+      // Subtract refund amount
+      return acc + refund; // Refund amounts are positive, so we add them (they represent money returned)
+    }, 0);
 
   // Sorted data (moved after filteredRecords initialization)
   const sortedData = useMemo(() => {
@@ -856,10 +918,18 @@ const TableView = ({ username, userRoles = [] }) => {
         return 0;
       });
     } else {
+      // Default sort: newest entries first (by date descending, then by entry_no/id descending)
       sortableData.sort((a, b) => {
         const dateA = new Date(a.date);
         const dateB = new Date(b.date);
-        return dateB - dateA;
+        // First sort by date (newest first)
+        if (dateB.getTime() !== dateA.getTime()) {
+          return dateB - dateA;
+        }
+        // If dates are the same, sort by entry_no or id (newest first)
+        const idA = a.staffAdvancePortalId || a.id || a.entry_no || a.entryNo || 0;
+        const idB = b.staffAdvancePortalId || b.id || b.entry_no || b.entryNo || 0;
+        return idB - idA;
       });
     }
     return sortableData;
@@ -885,20 +955,20 @@ const TableView = ({ username, userRoles = [] }) => {
     ];
     const rows = sortedData.map((entry, index) => [
       index + 1,
-      formatDateOnly(entry.date),
-      getEmployeeName(entry.employee_id),
-      getPurposeName(entry.from_purpose_id),
-      getPurposeName(entry.to_purpose_id),
+      entry.date ? formatDateOnly(entry.date) : "",
+      getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || "",
+      getPurposeName(entry.from_purpose_id) || "",
+      getPurposeName(entry.to_purpose_id) || "",
       entry.amount != null && entry.amount !== ""
         ? Number(entry.amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
         : "",
       entry.staff_refund_amount != null && entry.staff_refund_amount !== ""
         ? Number(entry.staff_refund_amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
         : "",
-      entry.type,
-      entry.staff_payment_mode,
-      entry.description,
-      entry.entryNo
+      entry.type || "",
+      entry.staff_payment_mode || "",
+      entry.description || "",
+      entry.entry_no || ""
     ]);
     doc.setFontSize(12);
     doc.text("Staff Advance Data Table", 40, 30);
@@ -926,7 +996,7 @@ const TableView = ({ username, userRoles = [] }) => {
       }
     });
     doc.save("StaffAdvanceData.pdf");
-  }, [sortedData, formatDateOnly, getEmployeeName, getPurposeName]);
+  }, [sortedData, formatDateOnly, getEmployeeName, getLabourName, getPurposeName]);
 
   const exportCSV = useCallback(() => {
     const csvHeaders = [
@@ -945,27 +1015,31 @@ const TableView = ({ username, userRoles = [] }) => {
     ];
     const csvRows = sortedData.map((entry, index) => [
       index + 1,
-      formatDateOnly(entry.date),
-      getEmployeeName(entry.employee_id),
-      getPurposeName(entry.from_purpose_id),
-      getPurposeName(entry.to_purpose_id),
+      entry.date ? formatDateOnly(entry.date) : "",
+      getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || "",
+      getPurposeName(entry.from_purpose_id) || "",
+      getPurposeName(entry.to_purpose_id) || "",
       entry.amount != null && entry.amount !== ""
         ? Number(entry.amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
         : "",
       entry.staff_refund_amount != null && entry.staff_refund_amount !== ""
         ? Number(entry.staff_refund_amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
         : "",
-      entry.type,
-      entry.staff_payment_mode,
-      entry.description,
+      entry.type || "",
+      entry.staff_payment_mode || "",
+      entry.description || "",
       "",
-      entry.entryNo
+      entry.entry_no || ""
     ]);
     const csvString = [
       csvHeaders.join(","),
       ...csvRows.map(row =>
         row
-          .map(value => `"${String(value).replace(/"/g, '""')}"`)
+          .map(value => {
+            // Convert null/undefined to empty string, then handle quotes
+            const stringValue = value == null ? "" : String(value);
+            return `"${stringValue.replace(/"/g, '""')}"`;
+          })
           .join(",")
       )
     ].join("\n");
@@ -976,7 +1050,7 @@ const TableView = ({ username, userRoles = [] }) => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  }, [sortedData, formatDateOnly, getEmployeeName, getPurposeName]);
+  }, [sortedData, formatDateOnly, getEmployeeName, getLabourName, getPurposeName]);
 
   // Virtual scrolling logic for large datasets (moved after sortedData initialization)
   const totalPages = Math.ceil(sortedData.length / itemsPerPage);
@@ -1061,8 +1135,8 @@ const TableView = ({ username, userRoles = [] }) => {
     );
   }
   return (
-    <div className="min-h-screen bg-[#faf6ed]">
-      <div className='w-full max-w-[1750px] h-auto bg-white text-left lg:flex gap-5 p-5 ml-10 shadow-sm rounded-lg'>
+    <div className="bg-[#faf6ed]">
+      <div className='w-full max-w-[1850px] bg-white text-left lg:flex gap-5 p-5 ml-10 mr-10 shadow-sm rounded'>
         <div className=''>
           <label className='block mb-2 font-semibold'>Advance Amount</label>
           <input
@@ -1094,7 +1168,7 @@ const TableView = ({ username, userRoles = [] }) => {
           <p>{error}</p>
         </div>
       )}
-      <div className='w-full max-w-[1750px] bg-white mt-5 pt-5 ml-10'>
+      <div className='w-full max-w-[1850px] bg-white mt-5 pt-5 ml-10'>
         <div
           className={`text-left flex ${selectDate || selectEmployeeName || selectPurpose || selectTransferTo || selectType || selectMode
             ? 'flex-col sm:flex-row sm:justify-between'
@@ -1164,7 +1238,7 @@ const TableView = ({ username, userRoles = [] }) => {
         <div className='border-l-8 border-l-[#BF9853] rounded-lg ml-5 mr-5'>
           <div
             ref={scrollRef}
-            className='overflow-auto max-h-[600px]'
+            className='overflow-auto max-h-[500px]'
             style={{ willChange: 'scroll-position' }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
@@ -1273,7 +1347,7 @@ const TableView = ({ username, userRoles = [] }) => {
                     </th>
                     <th className="pt-2 pb-2 w-[300px]">
                       <Select
-                        options={purposes}
+                        options={purposeOptions}
                         value={selectPurpose ? { value: selectPurpose, label: selectPurpose } : null}
                         onChange={(opt) => setSelectPurpose(opt ? opt.value : "")}
                         className="focus:outline-none text-xs"
@@ -1322,7 +1396,7 @@ const TableView = ({ username, userRoles = [] }) => {
                     </th>
                     <th className="pt-2 pb-2 w-[350px]">
                       <Select
-                        options={purposes}
+                        options={transferToOptions}
                         value={selectTransferTo ? { value: selectTransferTo, label: selectTransferTo } : null}
                         onChange={(opt) => setSelectTransferTo(opt ? opt.value : "")}
                         className="focus:outline-none text-xs"
@@ -1377,9 +1451,9 @@ const TableView = ({ username, userRoles = [] }) => {
                         placeholder="Type..."
                       >
                         <option value=''>Select Type...</option>
-                        <option value='Advance'>Advance</option>
-                        <option value='Transfer'>Transfer</option>
-                        <option value='Refund'>Refund</option>
+                        {typeOptions.map(type => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
                       </select>
                     </th>
                     <th className="pt-2 pb-2">
@@ -1388,9 +1462,9 @@ const TableView = ({ username, userRoles = [] }) => {
                         placeholder="Mode..."
                       >
                         <option value=''>Select</option>
-                        <option value='Cash'>Cash</option>
-                        <option value='GPay'>GPay</option>
-                        <option value='Net Banking'>Net Banking</option>
+                        {modeOptions.map(mode => (
+                          <option key={mode} value={mode}>{mode}</option>
+                        ))}
                       </select>
                     </th>
                     <th className="pt-2 pb-2"></th>
@@ -1426,7 +1500,7 @@ const TableView = ({ username, userRoles = [] }) => {
           </div>
         </div>
         {sortedData.length > 0 && (
-          <div className="flex flex-col sm:flex-row justify-between items-center px-5 py-4 bg-white border-t border-gray-200">
+          <div className="flex flex-col sm:flex-row justify-between items-center px-5 py-4 bg-white">
             <div className="flex items-center space-x-2 mb-4 sm:mb-0">
               <label className="text-sm font-medium text-gray-700">Show:</label>
               <select value={itemsPerPage} onChange={handleItemsPerPageChange}
@@ -1506,6 +1580,7 @@ const TableView = ({ username, userRoles = [] }) => {
             laboursList={laboursList}
             staffAdvanceCombinedOptions={staffAdvanceCombinedOptions}
             purposes={purposes}
+            paymentModeOptions={paymentModeOptions}
             onClose={() => setIsEditModalOpen(false)}
             onUpdate={handleUpdate}
             formatWithCommas={formatWithCommas}

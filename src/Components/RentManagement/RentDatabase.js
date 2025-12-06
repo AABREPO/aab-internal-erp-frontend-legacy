@@ -1084,7 +1084,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                             onMouseLeave={handleMouseUp} >
                             <table className="table-auto min-w-[1165px] w-screen border-collapse">
                                 <thead>
-                                    <tr className="bg-[#FAF6ED] text-left sticky top-0 z-10">
+                                    <tr className="bg-[#FAF6ED] text-left sticky top-0 z-90">
                                         <th className="px-4 py-2 font-bold">Timestamp</th>
                                         <th className="px-4 py-2 font-bold cursor-pointer" onClick={() => handleSort('shopNo')} >
                                             Shop No {sortField === 'shopNo' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}

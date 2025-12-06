@@ -8,7 +8,17 @@ import 'react-toastify/dist/ReactToastify.css';
 import edit from '../Images/Edit.svg';
 import file from '../Images/file.png';
 
-const AdvancePortal = ({ username, userRoles = [] }) => {
+const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
+  // Use paymentModeOptions from props, fallback to default if not provided
+  const defaultPaymentModeOptions = [
+    { value: 'Cash', label: 'Cash' },
+    { value: 'GPay', label: 'GPay' },
+    { value: 'PhonePe', label: 'PhonePe' },
+    { value: 'Net Banking', label: 'Net Banking' },
+    { value: 'Cheque', label: 'Cheque' }
+  ];
+  const finalPaymentModeOptions = paymentModeOptions.length > 0 ? paymentModeOptions : defaultPaymentModeOptions;
+
   const [selectedType, setSelectedType] = useState('Advance')
   const [selectedOption, setSelectedOption] = useState(null);
   const [combinedOptions, setCombinedOptions] = useState([]);
@@ -107,8 +117,12 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
     if (description) sessionStorage.setItem('description', JSON.stringify(description));
   }, [selectedType, selectedOption, selectedSite, overallAdvance, billAmount, advanceAmount, transferSiteId, paymentMode, description]);
   const formatWithCommas = (value) => {
-    if (!value) return "";
-    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    if (value === '' || value === null || value === undefined) return "";
+    const numericValue = typeof value === 'number' ? value : Number(value);
+    if (Number.isNaN(numericValue)) {
+      return value.toString();
+    }
+    return numericValue.toLocaleString("en-IN", { maximumFractionDigits: 0 });
   };
   const handleAmountChange = (e) => {
     const rawValue = e.target.value.replace(/,/g, "");
@@ -198,126 +212,36 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
           id: item.id,
           sNo: item.siteNo
         }));
-
-        // Add predefined site options with IDs 001, 002, 003, 004
         const predefinedSiteOptions = [
-          {
-            value: "Mason Advance",
-            label: "Mason Advance",
-            id: 1,
-            sNo: "1"
-          },
-          {
-            value: "Material Advance",
-            label: "Material Advance",
-            id: 2,
-            sNo: "2"
-          },
-          {
-            value: "Weekly Advance",
-            label: "Weekly Advance",
-            id: 3,
-            sNo: "3"
-          },
-          {
-            value: "Excess Advance",
-            label: "Excess Advance",
-            id: 4,
-            sNo: "4"
-          },
-          {
-            value: "Material Rent",
-            label: "Material Rent",
-            id: 5,
-            sNo: "5"
-          },
-          {
-            value: "Subhash Kumar - Kunnur",
-            label: "Subhash Kumar - Kunnur",
-            id: 6,
-            sNo: "6"
-          },
-          {
-            value: "Summary Bill",
-            label: "Summary Bill",
-            id: 7,
-            sNo: "7"
-          },
-          {
-            value: "Daily Wage",
-            label: "Daily Wage",
-            id: 8,
-            sNo: "8"
-          },
-          {
-            value: "Rent Management Portal",
-            label: "Rent Management Portal",
-            id: 9,
-            sNo: "9"
-          }
+          { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
+          { value: "Material Advance", label: "Material Advance", id: 2, sNo: "2" },
+          { value: "Weekly Advance", label: "Weekly Advance", id: 3, sNo: "3" },
+          { value: "Excess Advance", label: "Excess Advance", id: 4, sNo: "4" },
+          { value: "Material Rent", label: "Material Rent", id: 5, sNo: "5" },
+          { value: "Subhash Kumar - Kunnur", label: "Subhash Kumar - Kunnur", id: 6, sNo: "6" },
+          { value: "Summary Bill", label: "Summary Bill", id: 7, sNo: "7" },
+          { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
+          { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
+          { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
+          { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
         ];
         // Combine backend data with predefined options
         const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
         setSiteOptions(combinedSiteOptions);
       } catch (error) {
         console.error("Fetch error: ", error);
-
-        // Fallback: if API fails, still show predefined options
         const predefinedSiteOptions = [
-          {
-            value: "Mason Advance",
-            label: "Mason Advance",
-            id: 1,
-            sNo: "1"
-          },
-          {
-            value: "Material Advance",
-            label: "Material Advance",
-            id: 2,
-            sNo: "2"
-          },
-          {
-            value: "Weekly Advance",
-            label: "Weekly Advance",
-            id: 3,
-            sNo: "3"
-          },
-          {
-            value: "Excess Advance",
-            label: "Excess Advance",
-            id: 4,
-            sNo: "4"
-          },
-          {
-            value: "Material Rent",
-            label: "Material Rent",
-            id: 5,
-            sNo: "5"
-          },
-          {
-            value: "Subhash Kumar - Kunnur",
-            label: "Subhash Kumar - Kunnur",
-            id: 6,
-            sNo: "6"
-          },
-          {
-            value: "Summary Bill",
-            label: "Summary Bill",
-            id: 7,
-            sNo: "7"
-          },
-          {
-            value: "Daily Wage",
-            label: "Daily Wage",
-            id: 8,
-            sNo: "8"
-          },
-          {
-            value: "Rent Management Portal",
-            label: "Rent Management Portal",
-            id: 9,
-            sNo: "9"
-          }
+          { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
+          { value: "Material Advance", label: "Material Advance", id: 2, sNo: "2" },
+          { value: "Weekly Advance", label: "Weekly Advance", id: 3, sNo: "3" },
+          { value: "Excess Advance", label: "Excess Advance", id: 4, sNo: "4" },
+          { value: "Material Rent", label: "Material Rent", id: 5, sNo: "5" },
+          { value: "Subhash Kumar - Kunnur", label: "Subhash Kumar - Kunnur", id: 6, sNo: "6" },
+          { value: "Summary Bill", label: "Summary Bill", id: 7, sNo: "7" },
+          { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
+          { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
+          { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
+          { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
         ];
         setSiteOptions(predefinedSiteOptions);
       }
@@ -505,12 +429,66 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
     control: (provided, state) => ({
       ...provided,
       borderWidth: '2px',
+      height: '45px',
       borderRadius: '8px',
       borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'rgba(191, 152, 83, 0.2)',
       boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
       '&:hover': {
         borderColor: 'rgba(191, 152, 83, 0.2)',
       }
+    }),
+    indicatorSeparator: () => ({
+      display: 'none',
+    }),
+    dropdownIndicator: () => ({
+      display: 'none',
+    }),
+    clearIndicator: (provided) => ({
+      ...provided,
+      cursor: 'pointer',
+    }),
+    menu: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+      maxHeight: '300px',
+    }),
+    menuPortal: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+    }),
+    menuList: (provided) => ({
+      ...provided,
+      maxHeight: '250px',
+      overflowY: 'auto',
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      fontWeight: '500',
+      backgroundColor: state.isSelected 
+        ? 'rgba(191, 152, 83, 0.3)' 
+        : state.isFocused 
+          ? 'rgba(191, 152, 83, 0.1)' 
+          : 'white',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    input: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    placeholder: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: '#999',
+      textAlign: 'left',
     }),
   };
   const fetchAdvanceData = async () => {
@@ -586,8 +564,9 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
     if (!validateFormFields()) {
       return;
     }
-    // Check if payment mode requires popup details
-    if (["GPay", "PhonePe", "Net Banking", "Cheque"].includes(paymentMode)) {
+    // Check if payment mode requires popup details (all modes except Cash)
+    const requiresPaymentDetails = paymentMode && paymentMode !== 'Cash' && finalPaymentModeOptions.some(opt => opt.value === paymentMode);
+    if (requiresPaymentDetails) {
       // Set up payment modal data and show popup
       setPaymentModalData({
         date: dateValue,
@@ -682,24 +661,75 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
       });
       if (selectedType === 'Transfer') {
         const amountValue = parseFloat(advanceAmount) || 0;
-        const firstPayload = createPayload({ amount: -Math.abs(amountValue) });
-        const secondPayload = createPayload({
-          project_id: parseInt(transferSiteId),
-          transfer_site_id: selectedSite?.id || 0,
-          amount: Math.abs(amountValue)
-        });
-        await Promise.all([
-          fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
+        const transferSiteIdInt = parseInt(transferSiteId);
+        
+        // Check if transferring to Loan Portal (id = 11)
+        if (transferSiteIdInt === 11) {
+          // First, create loan entry in LoanPortal
+          const loanPayload = {
+            type: "Loan",
+            date: dateValue,
+            amount: Math.abs(amountValue),
+            loan_payment_mode: "",
+            loan_refund_amount: 0,
+            from_purpose_id: 1, // Set to 1 as per requirement
+            transfer_Project_id: 0,
+            to_purpose_id: 0,
+            vendor_id: selectedOption?.type === "Vendor" ? selectedOption.id : 0,
+            contractor_id: selectedOption?.type === "Contractor" ? selectedOption.id : 0,
+            employee_id: 0,
+            labour_id: 0,
+            project_id: 0,
+            description: "Transfer from Advance Portal",
+            file_url: ""
+          };
+
+          // Save to LoanPortal
+          const loanResponse = await fetch("https://backendaab.in/aabuildersDash/api/loans/save", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(loanPayload)
+          });
+
+          if (!loanResponse.ok) {
+            throw new Error('Failed to save loan portal data');
+          }
+
+          const loanResult = await loanResponse.json();
+          const loanPortalId = loanResult.id || loanResult.loanPortalId;
+
+          // Now save advance portal entry with negative amount and loan_portal_id
+          const advancePayload = createPayload({ 
+            amount: -Math.abs(amountValue),
+            loan_portal_id: loanPortalId
+          });
+
+          await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(firstPayload)
-          }),
-          fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(secondPayload)
-          })
-        ]);
+            body: JSON.stringify(advancePayload)
+          });
+        } else {
+          // Normal transfer logic for other sites
+          const firstPayload = createPayload({ amount: -Math.abs(amountValue) });
+          const secondPayload = createPayload({
+            project_id: transferSiteIdInt,
+            transfer_site_id: selectedSite?.id || 0,
+            amount: Math.abs(amountValue)
+          });
+          await Promise.all([
+            fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(firstPayload)
+            }),
+            fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(secondPayload)
+            })
+          ]);
+        }
       } else {
         const payload = createPayload();
         await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
@@ -1429,12 +1459,12 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
     }
   };
   return (
-    <div className='bg-[#FAF6ED]  w-full h-auto min-h-screen pb-10'>
-      <div className='overflow-hidden min-h-screen bg-[#FAF6ED] w-full'>
+    <div className='bg-[#FAF6ED] pb-10'>
+      <div className='overflow-hidden bg-[#FAF6ED] w-full'>
         <div className='px-4 sm:px-6 lg:px-10 overflow-hidden'>
-          <div className='flex flex-col xl:flex-row gap-4 xl:gap-10 text-left max-w-[1850px] '>
-            <div className='bg-white w-full xl:flex-1 p-4 px-4 sm:px-8 lg:px-16 rounded-md text-left flex flex-wrap items-center pb-6 gap-[16px] -mt-4'>
-              <div className='space-y-2 flex-1 min-w-[150px]'>
+          <div className='flex flex-col xl:flex-row gap-4 xl:gap-10 text-left '>
+            <div className='bg-white w-[1000px] p-4 px-4 sm:px-8 lg:px-12 rounded-md text-left flex  items-center pb-6 gap-[16px] -mt-4'>
+              <div className='space-y-2 flex-1 min-w-[100px]'>
                 <h2 className='font-semibold text-sm sm:text-base'>From Date</h2>
                 <input
                   type='date'
@@ -1443,7 +1473,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                   className='border-2 border-[#BF9853] border-opacity-30 rounded-lg px-2 py-1 w-full min-w-[150px] h-[45px] focus:outline-none text-sm'
                 />
               </div>
-              <div className='space-y-2 flex-1 min-w-[150px]'>
+              <div className='space-y-2 flex-1 min-w-[100px]'>
                 <h2 className='font-semibold text-sm sm:text-base'>To Date</h2>
                 <input
                   type='date'
@@ -1452,7 +1482,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                   className='border-2 border-[#BF9853] border-opacity-30 rounded-lg px-2 py-1 w-full min-w-[150px] h-[45px] focus:outline-none text-sm'
                 />
               </div>
-              <div className='space-y-2 flex-1 min-w-[120px]'>
+              <div className='space-y-2 flex-1 min-w-[100px]'>
                 <h2 className='font-semibold text-sm sm:text-base'>Amount Given</h2>
                 <input
                   readOnly
@@ -1460,39 +1490,38 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                   className='bg-[#F2F2F2] rounded-lg p-2 w-full min-w-[120px] h-[45px] focus:outline-none text-sm'
                 />
               </div>
-              <div className='space-y-2 flex-1 min-w-[150px]'>
+              <div className='space-y-2 flex-1 min-w-[100px]'>
                 <h2 className='font-semibold text-sm sm:text-base'>Payment Mode</h2>
-                <select
-                  value={filteredPaymentMode}
-                  onChange={(e) => setFilteredPaymentMode(e.target.value)}
-                  className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
-                >
-                  <option value=''>Select</option>
-                  <option value='Cash'>Cash</option>
-                  <option value='GPay'>GPay</option>
-                  <option value='PhonePe'>PhonePe</option>
-                  <option value='Net Banking'>Net Banking</option>
-                  <option value='Cheque'>Cheque</option>
-                </select>
+                <Select
+                  options={finalPaymentModeOptions}
+                  value={filteredPaymentMode ? { value: filteredPaymentMode, label: filteredPaymentMode } : null}
+                  onChange={(selected) => setFilteredPaymentMode(selected ? selected.value : '')}
+                  placeholder="Select"
+                  isSearchable
+                  isClearable
+                  menuPortalTarget={document.body}
+                  styles={customStyles}
+                  className='w-full rounded-lg focus:outline-none'
+                />
               </div>
             </div>
-            <div className='flex flex-col sm:flex-row bg-white w-full xl:w-auto xl:min-w-[500px] h-auto lg:h-[128px] rounded-md p-4 gap-[16px] px-4 sm:px-8 lg:px-16'>
-              <div className='space-y-2 flex-1'>
+            <div className='flex flex-col sm:flex-row bg-white w-[800px] xl:min-w-[500px] h-auto lg:h-[128px] rounded-md p-4 gap-[16px] px-4 sm:px-8 lg:px-16'>
+              <div className='space-y-2'>
                 <h2 className='font-semibold text-sm sm:text-base'>Today Amount</h2>
                 <input
                   readOnly
                   type='text'
                   value={todayAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                  className='bg-[#F2F2F2] rounded-lg p-2 w-full h-[45px] focus:outline-none text-sm'
+                  className='bg-[#F2F2F2] rounded-lg p-2 w-[144px] h-[45px] focus:outline-none text-sm'
                 />
               </div>
-              <div className='space-y-2 flex-1'>
+              <div className='space-y-2'>
                 <h2 className='font-semibold text-sm sm:text-base'>Total Outstanding</h2>
                 <input
                   readOnly
                   type='text'
                   value={totalOutstanding.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                  className='bg-[#F2F2F2] p-2 rounded-lg w-full h-[45px] focus:outline-none text-sm'
+                  className='bg-[#F2F2F2] p-2 rounded-lg w-[144px] h-[45px] focus:outline-none text-sm'
                 />
               </div>
             </div>
@@ -1500,29 +1529,33 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
         </div>
         <div className='px-4 sm:px-6 lg:px-10 mt-5 overflow-hidden'>
           <div className='bg-white w-full max-w-[1850px] p-4 lg:p-6 rounded-md shadow-sm'>
-            <div className='flex flex-col xl:flex-row gap-6 px-4 sm:px-6 lg:px-10'>
-              <div className='flex-1 xl:max-w-[600px]'>
+            <div className='flex px-4 sm:px-6 lg:px-8 gap-10'>
+              <div className='flex-1'>
                 <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 text-left'>
-                  <div className='space-y-2'>
-                    <label className='font-semibold text-[#E4572E] text-sm sm:text-base'>Select Type</label>
-                    <select
-                      value={selectedType}
-                      onChange={(e) => {
-                        const newType = e.target.value;
+                  <div className='space-y-2 flex items-center  '>
+                    <label className='font-semibold text-[#E4572E] text-sm sm:text-base w-40'>Select Type</label>
+                    <Select
+                      options={[
+                        { value: 'Advance', label: 'Advance' },
+                        { value: 'Bill Settlement', label: 'Bill Settlement' },
+                        { value: 'Refund', label: 'Refund' },
+                        { value: 'Transfer', label: 'Transfer' }
+                      ]}
+                      value={selectedType ? { value: selectedType, label: selectedType } : null}
+                      onChange={(selected) => {
+                        const newType = selected ? selected.value : '';
                         setSelectedType(newType);
                         setAdvanceAmount('');
                         setBillAmount('');
                       }}
-                      className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
-                    >
-                      <option value=''>Select Type...</option>
-                      <option value='Advance'>Advance</option>
-                      <option value='Bill Settlement'>Bill Settlement</option>
-                      <option value='Refund'>Refund</option>
-                      <option value='Transfer'>Transfer</option>
-                    </select>
+                      placeholder="Select Type..."
+                      isSearchable
+                      isClearable
+                      styles={customStyles}
+                      className='w-full rounded-lg focus:outline-none'
+                    />
                   </div>
-                  <div className='space-y-2'>
+                  <div className='space-y-2 flex gap-3 items-center '>
                     <label className='font-semibold text-[#E4572E] text-sm sm:text-base'>Date</label>
                     <input
                       type='date'
@@ -1540,6 +1573,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                       onChange={handleChange}
                       className='w-full rounded-lg focus:outline-none'
                       isClearable
+                      isSearchable
                       styles={customStyles}
                     />
                   </div>
@@ -1594,6 +1628,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                         onChange={setSelectedCategory}
                         styles={customStyles}
                         isClearable
+                        isSearchable
                         placeholder="Select a category..."
                         className='w-full rounded-lg focus:outline-none'
                       />
@@ -1625,23 +1660,23 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                           onChange={(selected) => setTransferSiteId(selected ? selected.id : '')}
                           styles={customStyles}
                           isClearable
+                          menuPortalTarget={document.body}
                           className='w-full rounded-lg focus:outline-none'
                         />
                       </>
                     ) : (
                       <>
                         <label className='font-semibold block text-sm sm:text-base'>Payment Mode</label>
-                        <select
-                          value={paymentMode}
-                          onChange={(e) => setPaymentMode(e.target.value)}
-                          className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'>
-                          <option value=''>Select</option>
-                          <option value='Cash'>Cash</option>
-                          <option value='GPay'>GPay</option>
-                          <option value='PhonePe'>PhonePe</option>
-                          <option value='Net Banking'>Net Banking</option>
-                          <option value='Cheque'>Cheque</option>
-                        </select>
+                        <Select
+                          options={finalPaymentModeOptions}
+                          value={paymentMode ? { value: paymentMode, label: paymentMode } : null}
+                          onChange={(selected) => setPaymentMode(selected ? selected.value : '')}
+                          placeholder="Select"
+                          isSearchable
+                          isClearable
+                          styles={customStyles}
+                          className='w-full rounded-lg focus:outline-none'
+                        />
                       </>
                     )}
                   </div>
@@ -1685,7 +1720,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                   </div>
                 </div>
               </div>
-              <div className='flex-1 xl:ml-6 xl:min-w-[800px]'>
+              <div className='flex-1 xl:min-w-[1000px]'>
                 <div className='flex flex-col sm:flex-row items-start sm:items-center justify-end mb-4 gap-4'>
                   <div className='flex items-center gap-2'>
                     <input
@@ -1700,8 +1735,8 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                     <span className='text-[#BF9853] font-semibold hover:underline cursor-pointer text-sm'>Print</span>
                   </div>
                 </div>
-                <div className='border-l-8 border-l-[#BF9853] rounded-lg overflow-hidden'>
-                  <div className='overflow-x-auto'>
+                <div className='border-l-8 border-l-[#BF9853] rounded-lg'>
+                  <div className=''>
                     <table className="w-full">
                       <thead className="bg-[#FAF6ED] text-left">
                         <tr>
@@ -1899,32 +1934,36 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                   </div>
                   <div>
                     <label className="block mb-2 font-semibold text-sm">Type</label>
-                    <select
-                      value={editFormData.type}
-                      onChange={(e) => setEditFormData({ ...editFormData, type: e.target.value })}
-                      className="border-2 border-[#BF9853] border-opacity-30 w-full h-[45px] rounded-lg focus:outline-none text-sm"
-                    >
-                      <option value="">Select Type</option>
-                      <option value="Advance">Advance</option>
-                      <option value="Bill Settlement">Bill Settlement</option>
-                      <option value="Refund">Refund</option>
-                      <option value="Transfer">Transfer</option>
-                    </select>
+                    <Select
+                      options={[
+                        { value: 'Advance', label: 'Advance' },
+                        { value: 'Bill Settlement', label: 'Bill Settlement' },
+                        { value: 'Refund', label: 'Refund' },
+                        { value: 'Transfer', label: 'Transfer' }
+                      ]}
+                      value={editFormData.type ? { value: editFormData.type, label: editFormData.type } : null}
+                      onChange={(selected) => setEditFormData({ ...editFormData, type: selected ? selected.value : '' })}
+                      placeholder="Select Type"
+                      isSearchable
+                      isClearable
+                      styles={customStyles}
+                      className="w-full focus:outline-none"
+                    />
                   </div>
                 </div>
                 <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4'>
                   <div>
                     <label className="block mb-2 font-semibold text-sm">Payment Mode</label>
-                    <select
-                      value={editFormData.payment_mode}
-                      onChange={(e) => setEditFormData({ ...editFormData, payment_mode: e.target.value })}
-                      className="border-2 border-[#BF9853] border-opacity-30 w-full h-[45px] rounded-lg focus:outline-none text-sm"
-                    >
-                      <option value="">Select</option>
-                      <option value="Cash">Cash</option>
-                      <option value="GPay">GPay</option>
-                      <option value="Net Banking">Net Banking</option>
-                    </select>
+                    <Select
+                      options={finalPaymentModeOptions}
+                      value={editFormData.payment_mode ? { value: editFormData.payment_mode, label: editFormData.payment_mode } : null}
+                      onChange={(selected) => setEditFormData({ ...editFormData, payment_mode: selected ? selected.value : '' })}
+                      placeholder="Select"
+                      isSearchable
+                      isClearable
+                      styles={customStyles}
+                      className="w-full focus:outline-none"
+                    />
                   </div>
                   <div>
                     <label className="block mb-2 font-semibold text-sm">Refund Amount</label>
@@ -2045,18 +2084,19 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                             </div>
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-2">Account Number<span className="text-red-500">*</span></label>
-                              <select
-                                value={paymentModalData.accountNumber}
-                                onChange={(e) => setPaymentModalData(prev => ({ ...prev, accountNumber: e.target.value }))}
-                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                              >
-                                <option value="">Select Account</option>
-                                {accountDetails.map((account) => (
-                                  <option key={account.id} value={account.account_number}>
-                                    {account.account_number}
-                                  </option>
-                                ))}
-                              </select>
+                              <Select
+                                options={accountDetails.map((account) => ({
+                                  value: account.account_number,
+                                  label: account.account_number
+                                }))}
+                                value={paymentModalData.accountNumber ? { value: paymentModalData.accountNumber, label: paymentModalData.accountNumber } : null}
+                                onChange={(selected) => setPaymentModalData(prev => ({ ...prev, accountNumber: selected ? selected.value : '' }))}
+                                placeholder="Select Account"
+                                isSearchable
+                                isClearable
+                                styles={customStyles}
+                                className="w-full focus:outline-none"
+                              />
                             </div>
                           </div>
                         </div>
@@ -2108,22 +2148,26 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="text-sm font-semibold mb-1 block">Type</label>
-                          <select
-                            className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
-                            value={selectedType}
-                            onChange={(e) => {
-                              const newType = e.target.value;
+                          <Select
+                            options={[
+                              { value: 'Advance', label: 'Advance' },
+                              { value: 'Bill Settlement', label: 'Bill Settlement' },
+                              { value: 'Refund', label: 'Refund' },
+                              { value: 'Transfer', label: 'Transfer' }
+                            ]}
+                            value={selectedType ? { value: selectedType, label: selectedType } : null}
+                            onChange={(selected) => {
+                              const newType = selected ? selected.value : '';
                               setSelectedType(newType);
                               setAdvanceAmount('');
                               setBillAmount('');
                             }}
-                          >
-                            <option value="">Select Type...</option>
-                            <option value="Advance">Advance</option>
-                            <option value="Bill Settlement">Bill Settlement</option>
-                            <option value="Refund">Refund</option>
-                            <option value="Transfer">Transfer</option>
-                          </select>
+                            placeholder="Select Type..."
+                            isSearchable
+                            isClearable
+                            styles={customStyles}
+                            className="custom-select rounded-lg"
+                          />
                         </div>
                         <div>
                           <label className="text-sm font-semibold mb-1 block">Date</label>
@@ -2142,6 +2186,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                             onChange={handleChange}
                             styles={customStyles}
                             isClearable
+                            isSearchable
                             className="custom-select rounded-lg"
                           />
                         </div>
@@ -2176,6 +2221,7 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                                 onChange={setSelectedCategory}
                                 styles={customStyles}
                                 isClearable
+                                isSearchable
                                 placeholder="Select a category..."
                                 className="custom-select rounded-lg"
                               />
@@ -2185,18 +2231,16 @@ const AdvancePortal = ({ username, userRoles = [] }) => {
                         {selectedType !== 'Transfer' && selectedType !== 'Bill Settlement' && (
                           <div>
                             <label className="text-sm font-semibold mb-1 block">Payment Mode</label>
-                            <select
-                              value={paymentMode}
-                              onChange={(e) => setPaymentMode(e.target.value)}
-                              className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
-                            >
-                              <option value="">Select</option>
-                              <option value="Cash">Cash</option>
-                              <option value="GPay">GPay</option>
-                              <option value="PhonePe">PhonePe</option>
-                              <option value="Net Banking">Net Banking</option>
-                              <option value="Cheque">Cheque</option>
-                            </select>
+                            <Select
+                              options={finalPaymentModeOptions}
+                              value={paymentMode ? { value: paymentMode, label: paymentMode } : null}
+                              onChange={(selected) => setPaymentMode(selected ? selected.value : '')}
+                              placeholder="Select"
+                              isSearchable
+                              isClearable
+                              styles={customStyles}
+                              className="custom-select rounded-lg"
+                            />
                           </div>
                         )}
                         <div>

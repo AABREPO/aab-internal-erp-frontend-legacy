@@ -230,66 +230,17 @@ const BillPayment = ({ username, userRoles = [] }) => {
                     sNo: item.siteNo
                 }));
                 const predefinedSiteOptions = [
-                    {
-                        value: "Mason Advance",
-                        label: "Mason Advance",
-                        id: 1,
-                        sNo: "1"
-                    },
-                    {
-                        value: "Material Advance",
-                        label: "Material Advance",
-                        id: 2,
-                        sNo: "2"
-                    },
-                    {
-                        value: "Weekly Advance",
-                        label: "Weekly Advance",
-                        id: 3,
-                        sNo: "3"
-                    },
-                    {
-                        value: "Excess Advance",
-                        label: "Excess Advance",
-                        id: 4,
-                        sNo: "4"
-                    },
-                    {
-                        value: "Material Rent",
-                        label: "Material Rent",
-                        id: 5,
-                        sNo: "5"
-                    },
-                    {
-                        value: "Subhash Kumar - Kunnur",
-                        label: "Subhash Kumar - Kunnur",
-                        id: 6,
-                        sNo: "6"
-                    },
-                    {
-                        value: "Summary Bill",
-                        label: "Summary Bill",
-                        id: 7,
-                        sNo: "7"
-                    },
-                    {
-                        value: "Daily Wage",
-                        label: "Daily Wage",
-                        id: 8,
-                        sNo: "8"
-                    },
-                    {
-                        value: "Rent Management Portal",
-                        label: "Rent Management Portal",
-                        id: 9,
-                        sNo: "9"
-                    },
-                    {
-                        value: "Multi-Project Batch",
-                        label: "Multi-Project Batch",
-                        id: 10,
-                        sNo: "10"
-                    }
+                    { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
+                    { value: "Material Advance", label: "Material Advance", id: 2, sNo: "2" },
+                    { value: "Weekly Advance", label: "Weekly Advance", id: 3, sNo: "3" },
+                    { value: "Excess Advance", label: "Excess Advance", id: 4, sNo: "4" },
+                    { value: "Material Rent", label: "Material Rent", id: 5, sNo: "5" },
+                    { value: "Subhash Kumar - Kunnur", label: "Subhash Kumar - Kunnur", id: 6, sNo: "6" },
+                    { value: "Summary Bill", label: "Summary Bill", id: 7, sNo: "7" },
+                    { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
+                    { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
+                    { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
+                    { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
                 ];
                 // Combine backend data with predefined options
                 const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
@@ -1177,8 +1128,8 @@ const BillPayment = ({ username, userRoles = [] }) => {
                                             key={pageNum}
                                             onClick={() => setCurrentPage(pageNum)}
                                             className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${currentPage === pageNum
-                                                    ? 'bg-[#BF9853] text-white border-[#BF9853]'
-                                                    : 'border-gray-300 hover:bg-[#BF9853] hover:text-white'
+                                                ? 'bg-[#BF9853] text-white border-[#BF9853]'
+                                                : 'border-gray-300 hover:bg-[#BF9853] hover:text-white'
                                                 }`}
                                         >
                                             {pageNum}

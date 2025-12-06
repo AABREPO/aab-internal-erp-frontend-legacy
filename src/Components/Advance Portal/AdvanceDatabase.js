@@ -434,60 +434,17 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
           sNo: item.siteNo
         }));
         const predefinedSiteOptions = [
-          {
-            value: "Mason Advance",
-            label: "Mason Advance",
-            id: 1,
-            sNo: "1"
-          },
-          {
-            value: "Material Advance",
-            label: "Material Advance",
-            id: 2,
-            sNo: "2"
-          },
-          {
-            value: "Weekly Advance",
-            label: "Weekly Advance",
-            id: 3,
-            sNo: "3"
-          },
-          {
-            value: "Excess Advance",
-            label: "Excess Advance",
-            id: 4,
-            sNo: "4"
-          },
-          {
-            value: "Material Rent",
-            label: "Material Rent",
-            id: 5,
-            sNo: "5"
-          },
-          {
-            value: "Subhash Kumar - Kunnur",
-            label: "Subhash Kumar - Kunnur",
-            id: 6,
-            sNo: "6"
-          },
-          {
-            value: "Summary Bill",
-            label: "Summary Bill",
-            id: 7,
-            sNo: "7"
-          },
-          {
-            value: "Daily Wage",
-            label: "Daily Wage",
-            id: 8,
-            sNo: "8"
-          },
-          {
-            value: "Rent Management Portal",
-            label: "Rent Management Portal",
-            id: 9,
-            sNo: "9"
-          }
+          { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
+          { value: "Material Advance", label: "Material Advance", id: 2, sNo: "2" },
+          { value: "Weekly Advance", label: "Weekly Advance", id: 3, sNo: "3" },
+          { value: "Excess Advance", label: "Excess Advance", id: 4, sNo: "4" },
+          { value: "Material Rent", label: "Material Rent", id: 5, sNo: "5" },
+          { value: "Subhash Kumar - Kunnur", label: "Subhash Kumar - Kunnur", id: 6, sNo: "6" },
+          { value: "Summary Bill", label: "Summary Bill", id: 7, sNo: "7" },
+          { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
+          { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
+          { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
+          { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
         ];
         // Combine backend data with predefined options
         const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
@@ -496,60 +453,17 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
       } catch (error) {
         console.error("Fetch error: ", error);
         const predefinedSiteOptions = [
-          {
-            value: "Mason Advance",
-            label: "Mason Advance",
-            id: 1,
-            sNo: "1"
-          },
-          {
-            value: "Material Advance",
-            label: "Material Advance",
-            id: 2,
-            sNo: "2"
-          },
-          {
-            value: "Weekly Advance",
-            label: "Weekly Advance",
-            id: 3,
-            sNo: "3"
-          },
-          {
-            value: "Excess Advance",
-            label: "Excess Advance",
-            id: 4,
-            sNo: "4"
-          },
-          {
-            value: "Material Rent",
-            label: "Material Rent",
-            id: 5,
-            sNo: "5"
-          },
-          {
-            value: "Subhash Kumar - Kunnur",
-            label: "Subhash Kumar - Kunnur",
-            id: 6,
-            sNo: "6"
-          },
-          {
-            value: "Summary Bill",
-            label: "Summary Bill",
-            id: 7,
-            sNo: "7"
-          },
-          {
-            value: "Daily Wage",
-            label: "Daily Wage",
-            id: 8,
-            sNo: "8"
-          },
-          {
-            value: "Rent Management Portal",
-            label: "Rent Management Portal",
-            id: 9,
-            sNo: "9"
-          }
+          { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
+          { value: "Material Advance", label: "Material Advance", id: 2, sNo: "2" },
+          { value: "Weekly Advance", label: "Weekly Advance", id: 3, sNo: "3" },
+          { value: "Excess Advance", label: "Excess Advance", id: 4, sNo: "4" },
+          { value: "Material Rent", label: "Material Rent", id: 5, sNo: "5" },
+          { value: "Subhash Kumar - Kunnur", label: "Subhash Kumar - Kunnur", id: 6, sNo: "6" },
+          { value: "Summary Bill", label: "Summary Bill", id: 7, sNo: "7" },
+          { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
+          { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
+          { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
+          { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
         ];
         setSiteOptions(predefinedSiteOptions);
         setProgress(75);
@@ -708,6 +622,94 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
     }
     return true;
   });
+  // Extract unique values from table data for filter options
+  const filterOptionsFromData = React.useMemo(() => {
+    const uniqueVendors = new Set();
+    const uniqueContractors = new Set();
+    const uniqueProjectIds = new Set();
+    const uniqueTransferSiteIds = new Set();
+    const uniqueTypes = new Set();
+    const uniqueModes = new Set();
+    const uniqueEntryNos = new Set();
+
+    advanceData.forEach(entry => {
+      // Extract vendors and contractors
+      if (entry.vendor_id) {
+        const vendorName = getVendorName(entry.vendor_id);
+        if (vendorName) uniqueVendors.add(vendorName);
+      }
+      if (entry.contractor_id) {
+        const contractorName = getContractorName(entry.contractor_id);
+        if (contractorName) uniqueContractors.add(contractorName);
+      }
+      
+      // Extract project IDs
+      if (entry.project_id) {
+        const projectName = getSiteName(entry.project_id);
+        if (projectName) uniqueProjectIds.add(projectName);
+      }
+      
+      // Extract transfer site IDs
+      if (entry.transfer_site_id) {
+        const transferName = getSiteName(entry.transfer_site_id);
+        if (transferName) uniqueTransferSiteIds.add(transferName);
+      }
+      
+      // Extract types
+      if (entry.type) {
+        uniqueTypes.add(entry.type);
+      }
+      
+      // Extract payment modes
+      if (entry.payment_mode) {
+        uniqueModes.add(entry.payment_mode);
+      }
+      
+      // Extract entry numbers
+      if (entry.entry_no) {
+        uniqueEntryNos.add(entry.entry_no.toString());
+      }
+    });
+
+    // Create options arrays for Select components
+    const vendorContractorOptions = [
+      ...Array.from(uniqueVendors).map(name => {
+        const vendor = vendorOptions.find(v => v.value === name);
+        return vendor || { value: name, label: name, type: 'Vendor' };
+      }),
+      ...Array.from(uniqueContractors).map(name => {
+        const contractor = contractorOptions.find(c => c.value === name);
+        return contractor || { value: name, label: name, type: 'Contractor' };
+      })
+    ].sort((a, b) => a.label.localeCompare(b.label));
+
+    const projectOptions = Array.from(uniqueProjectIds)
+      .map(name => {
+        const site = siteOptions.find(s => s.value === name);
+        return site || { value: name, label: name, id: null };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label));
+
+    const transferSiteOptions = Array.from(uniqueTransferSiteIds)
+      .map(name => {
+        const site = siteOptions.find(s => s.value === name);
+        return site || { value: name, label: name, id: null };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label));
+
+    const typeOptions = Array.from(uniqueTypes).sort();
+    const modeOptions = Array.from(uniqueModes).sort();
+    const entryNoOptions = Array.from(uniqueEntryNos).sort((a, b) => Number(a) - Number(b));
+
+    return {
+      vendorContractorOptions,
+      projectOptions,
+      transferSiteOptions,
+      typeOptions,
+      modeOptions,
+      entryNoOptions
+    };
+  }, [advanceData, vendorOptions, contractorOptions, siteOptions]);
   const sortedData = React.useMemo(() => {
     let sortableData = [...filteredData];
     if (sortConfig.key) {
@@ -1482,7 +1484,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                     </th>
                     <th className="">
                       <Select
-                        options={combinedOptions}
+                        options={filterOptionsFromData.vendorContractorOptions}
                         value={selectDatabaseContractororVendorName ? { value: selectDatabaseContractororVendorName, label: selectDatabaseContractororVendorName } : null}
                         onChange={(opt) => setSelectDatabaseContractororVendorName(opt ? opt.value : "")}
                         className=" w-[220px] focus:outline-none text-xs"
@@ -1532,7 +1534,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                     </th>
                     <th className="">
                       <Select
-                        options={siteOptions}
+                        options={filterOptionsFromData.projectOptions}
                         value={selectDatabaseProjectName ? { value: selectDatabaseProjectName, label: selectDatabaseProjectName } : null}
                         onChange={(opt) => setSelectDatabaseProjectName(opt ? opt.value : "")}
                         className="w-[250px] focus:outline-none text-xs"
@@ -1582,7 +1584,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                     </th>
                     <th className="">
                       <Select
-                        options={siteOptions}
+                        options={filterOptionsFromData.transferSiteOptions}
                         value={selectDatabaseTransfer ? { value: selectDatabaseTransfer, label: selectDatabaseTransfer } : null}
                         onChange={(opt) => setSelectDatabaseTransfer(opt ? opt.value : "")}
                         className="w-[250px] focus:outline-none text-xs"
@@ -1642,10 +1644,9 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                         menuPortalTarget={document.body}
                       >
                         <option value=''>Select Type...</option>
-                        <option value='Advance'>Advance</option>
-                        <option value='Bill Settlement'>Bill Settlement</option>
-                        <option value='Refund'>Refund</option>
-                        <option value='Transfer'>Transfer</option>
+                        {filterOptionsFromData.typeOptions.map(type => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
                       </select>
                     </th>
                     <th className='w-[80px]'></th>
@@ -1658,9 +1659,9 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                         menuPortalTarget={document.body}
                       >
                         <option value=''>Select</option>
-                        <option value='Cash'>Cash</option>
-                        <option value='GPay'>GPay</option>
-                        <option value='Net Banking'>Net Banking</option>
+                        {filterOptionsFromData.modeOptions.map(mode => (
+                          <option key={mode} value={mode}>{mode}</option>
+                        ))}
                       </select>
                     </th>
                     <th className='w-[80px] '></th>

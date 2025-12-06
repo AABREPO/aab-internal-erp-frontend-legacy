@@ -182,44 +182,18 @@ const AdvanceReport = () => {
 
         // Add predefined site options with IDs 001, 002, 003, 004
         const predefinedSiteOptions = [
-          {
-            value: "Mason Advance",
-            label: "Mason Advance",
-            id: "1",
-            sNo: "1"
-          },
-          {
-            value: "Material Advance",
-            label: "Material Advance",
-            id: "2",
-            sNo: "2"
-          },
-          {
-            value: "Weekly Advance",
-            label: "Weekly Advance",
-            id: "3",
-            sNo: "3"
-          },
-          {
-            value: "Excess Advance",
-            label: "Excess Advance",
-            id: "4",
-            sNo: "4"
-          },
-          {
-            value: "Material Rent",
-            label: "Material Rent",
-            id: "",
-            sNo: "5"
-          },
-          {
-            value: "Subhash Kumar - Kunnur",
-            label: "Subhash Kumar - Kunnur",
-            id: "6",
-            sNo: "6"
-          }
+          { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
+          { value: "Material Advance", label: "Material Advance", id: 2, sNo: "2" },
+          { value: "Weekly Advance", label: "Weekly Advance", id: 3, sNo: "3" },
+          { value: "Excess Advance", label: "Excess Advance", id: 4, sNo: "4" },
+          { value: "Material Rent", label: "Material Rent", id: 5, sNo: "5" },
+          { value: "Subhash Kumar - Kunnur", label: "Subhash Kumar - Kunnur", id: 6, sNo: "6" },
+          { value: "Summary Bill", label: "Summary Bill", id: 7, sNo: "7" },
+          { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
+          { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
+          { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
+          { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
         ];
-
         // Combine backend data with predefined options
         const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
         setSiteOptions(combinedSiteOptions);
@@ -229,42 +203,17 @@ const AdvanceReport = () => {
 
         // Fallback: if API fails, still show predefined options
         const predefinedSiteOptions = [
-          {
-            value: "Mason Advance",
-            label: "Mason Advance",
-            id: "1",
-            sNo: "1"
-          },
-          {
-            value: "Material Advance",
-            label: "Material Advance",
-            id: "2",
-            sNo: "2"
-          },
-          {
-            value: "Weekly Advance",
-            label: "Weekly Advance",
-            id: "3",
-            sNo: "3"
-          },
-          {
-            value: "Excess Advance",
-            label: "Excess Advance",
-            id: "4",
-            sNo: "4"
-          },
-          {
-            value: "Material Rent",
-            label: "Material Rent",
-            id: "",
-            sNo: "5"
-          },
-          {
-            value: "Subhash Kumar - Kunnur",
-            label: "Subhash Kumar - Kunnur",
-            id: "6",
-            sNo: "6"
-          }
+          { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
+          { value: "Material Advance", label: "Material Advance", id: 2, sNo: "2" },
+          { value: "Weekly Advance", label: "Weekly Advance", id: 3, sNo: "3" },
+          { value: "Excess Advance", label: "Excess Advance", id: 4, sNo: "4" },
+          { value: "Material Rent", label: "Material Rent", id: 5, sNo: "5" },
+          { value: "Subhash Kumar - Kunnur", label: "Subhash Kumar - Kunnur", id: 6, sNo: "6" },
+          { value: "Summary Bill", label: "Summary Bill", id: 7, sNo: "7" },
+          { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
+          { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
+          { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
+          { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
         ];
         setSiteOptions(predefinedSiteOptions);
         setProgress(75);
@@ -1083,51 +1032,51 @@ const AdvanceReport = () => {
                   S.No <SortIcon columnKey="sno" />
                 </th>
                 <th
-                  className="pt-2 pl-3 w-36 font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                  className="pt-2 pl-3 w-32 font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
                   onClick={() => requestSort("date")}
                 >
                   Date <SortIcon columnKey="date" />
                 </th>
                 <th
-                  className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                  className="px-2 w-[200px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
                   onClick={() => requestSort("cv")}
                 >
                   Contractor/Vendor <SortIcon columnKey="cv" />
                 </th>
                 <th
-                  className="px-2 w-[270px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                  className="px-2 w-[240px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
                   onClick={() => requestSort("project")}
                 >
                   Project Name <SortIcon columnKey="project" />
                 </th>
                 <th className="px-2 w-[100px] font-bold text-right">Advance</th>
-                <th className="px-2 w-[120px] font-bold text-right">Bill Amount</th>
-                <th className="px-2 w-[120px] font-bold text-right">Refund Amount</th>
+                <th className="px-2 w-[100px] font-bold text-right">Bill Amount</th>
+                <th className="px-2 w-[100px] font-bold text-right">Refund Amount</th>
                 <th
-                  className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                  className="px-2 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
                   onClick={() => requestSort("transfer")}
                 >
                   Transfer <SortIcon columnKey="transfer" />
                 </th>
                 <th
-                  className="px-2 w-[160px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                  className="px-2 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
                   onClick={() => requestSort("type")}
                 >
                   Type <SortIcon columnKey="type" />
                 </th>
                 <th
-                  className="px-2 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                  className="px-2 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
                   onClick={() => requestSort("payment_mode")}
                 >
                   Mode <SortIcon columnKey="payment_mode" />
                 </th>
                 <th
-                  className="px-2 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                  className="px-2 w-[200px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
                   onClick={() => requestSort("description")}
                 >
                   Description <SortIcon columnKey="description" />
                 </th>
-                <th className="px-2 w-[200px] font-bold text-left whitespace-nowrap">Attached file</th>
+                <th className="px-2 w-[100px] font-bold text-left whitespace-nowrap">File</th>
               </tr>
             </thead>
             <tbody>

@@ -6,6 +6,7 @@ import Filter from '../Images/filter (3).png'
 import Reload from '../Images/rotate-right.png'
 import edit from '../Images/Edit.svg';
 import Attach from '../Images/Attachfile.svg';
+import cross from '../Images/cross.png';
 const AdvanceTableView = ({ username, userRoles = [] }) => {
   const [vendorOptions, setVendorOptions] = useState([]);
   const [contractorOptions, setContractorOptions] = useState([]);
@@ -264,7 +265,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     }
   };
   const exportPDF = () => {
-    const doc = new jsPDF("l", "pt", "a4"); 
+    const doc = new jsPDF("l", "pt", "a4");
     const headers = [
       [
         "S.No",
@@ -282,7 +283,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
       ]
     ];
     const rows = sortedData.map((entry, index) => [
-      index + 1, 
+      index + 1,
       formatDateOnly(entry.date),
       entry.vendor_id
         ? getVendorName(entry.vendor_id)
@@ -375,7 +376,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
       entry.entry_no
     ]);
     const csvString = [
-      csvHeaders.join(","), 
+      csvHeaders.join(","),
       ...csvRows.map(row =>
         row
           .map(value => `"${String(value).replace(/"/g, '""')}"`)
@@ -476,60 +477,17 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
           sNo: item.siteNo
         }));
         const predefinedSiteOptions = [
-          {
-            value: "Mason Advance",
-            label: "Mason Advance",
-            id: 1,
-            sNo: "1"
-          },
-          {
-            value: "Material Advance",
-            label: "Material Advance",
-            id: 2,
-            sNo: "2"
-          },
-          {
-            value: "Weekly Advance",
-            label: "Weekly Advance",
-            id: 3,
-            sNo: "3"
-          },
-          {
-            value: "Excess Advance",
-            label: "Excess Advance",
-            id: 4,
-            sNo: "4"
-          },
-          {
-            value: "Material Rent",
-            label: "Material Rent",
-            id: 5,
-            sNo: "5"
-          },
-          {
-            value: "Subhash Kumar - Kunnur",
-            label: "Subhash Kumar - Kunnur",
-            id: 6,
-            sNo: "6"
-          },
-          {
-            value: "Summary Bill",
-            label: "Summary Bill",
-            id: 7,
-            sNo: "7"
-          },
-          {
-            value: "Daily Wage",
-            label: "Daily Wage",
-            id: 8,
-            sNo: "8"
-          },
-          {
-            value: "Rent Management Portal",
-            label: "Rent Management Portal",
-            id: 9,
-            sNo: "9"
-          }
+          { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
+          { value: "Material Advance", label: "Material Advance", id: 2, sNo: "2" },
+          { value: "Weekly Advance", label: "Weekly Advance", id: 3, sNo: "3" },
+          { value: "Excess Advance", label: "Excess Advance", id: 4, sNo: "4" },
+          { value: "Material Rent", label: "Material Rent", id: 5, sNo: "5" },
+          { value: "Subhash Kumar - Kunnur", label: "Subhash Kumar - Kunnur", id: 6, sNo: "6" },
+          { value: "Summary Bill", label: "Summary Bill", id: 7, sNo: "7" },
+          { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
+          { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
+          { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
+          { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
         ];
         const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
         setSiteOptions(combinedSiteOptions);
@@ -537,60 +495,17 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
       } catch (error) {
         console.error("Fetch error: ", error);
         const predefinedSiteOptions = [
-          {
-            value: "Mason Advance",
-            label: "Mason Advance",
-            id: 1,
-            sNo: "1"
-          },
-          {
-            value: "Material Advance",
-            label: "Material Advance",
-            id: 2,
-            sNo: "2"
-          },
-          {
-            value: "Weekly Advance",
-            label: "Weekly Advance",
-            id: 3,
-            sNo: "3"
-          },
-          {
-            value: "Excess Advance",
-            label: "Excess Advance",
-            id: 4,
-            sNo: "4"
-          },
-          {
-            value: "Material Rent",
-            label: "Material Rent",
-            id: 5,
-            sNo: "5"
-          },
-          {
-            value: "Subhash Kumar - Kunnur",
-            label: "Subhash Kumar - Kunnur",
-            id: 6,
-            sNo: "6"
-          },
-          {
-            value: "Summary Bill",
-            label: "Summary Bill",
-            id: 7,
-            sNo: "7"
-          },
-          {
-            value: "Daily Wage",
-            label: "Daily Wage",
-            id: 8,
-            sNo: "8"
-          },
-          {
-            value: "Rent Management Portal",
-            label: "Rent Management Portal",
-            id: 9,
-            sNo: "9"
-          }
+          { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
+          { value: "Material Advance", label: "Material Advance", id: 2, sNo: "2" },
+          { value: "Weekly Advance", label: "Weekly Advance", id: 3, sNo: "3" },
+          { value: "Excess Advance", label: "Excess Advance", id: 4, sNo: "4" },
+          { value: "Material Rent", label: "Material Rent", id: 5, sNo: "5" },
+          { value: "Subhash Kumar - Kunnur", label: "Subhash Kumar - Kunnur", id: 6, sNo: "6" },
+          { value: "Summary Bill", label: "Summary Bill", id: 7, sNo: "7" },
+          { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
+          { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
+          { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
+          { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
         ];
         setSiteOptions(predefinedSiteOptions);
         setProgress(75);
@@ -686,6 +601,95 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     }
     return true;
   });
+  // Extract unique values from table data for filter options
+  const filterOptionsFromData = React.useMemo(() => {
+    const uniqueVendors = new Set();
+    const uniqueContractors = new Set();
+    const uniqueProjectIds = new Set();
+    const uniqueTransferSiteIds = new Set();
+    const uniqueTypes = new Set();
+    const uniqueModes = new Set();
+    const uniqueEntryNos = new Set();
+
+    advanceData.forEach(entry => {
+      // Extract vendors and contractors
+      if (entry.vendor_id) {
+        const vendorName = getVendorName(entry.vendor_id);
+        if (vendorName) uniqueVendors.add(vendorName);
+      }
+      if (entry.contractor_id) {
+        const contractorName = getContractorName(entry.contractor_id);
+        if (contractorName) uniqueContractors.add(contractorName);
+      }
+
+      // Extract project IDs
+      if (entry.project_id) {
+        const projectName = getSiteName(entry.project_id);
+        if (projectName) uniqueProjectIds.add(projectName);
+      }
+
+      // Extract transfer site IDs
+      if (entry.transfer_site_id) {
+        const transferName = getSiteName(entry.transfer_site_id);
+        if (transferName) uniqueTransferSiteIds.add(transferName);
+      }
+
+      // Extract types
+      if (entry.type) {
+        uniqueTypes.add(entry.type);
+      }
+
+      // Extract payment modes
+      if (entry.payment_mode) {
+        uniqueModes.add(entry.payment_mode);
+      }
+
+      // Extract entry numbers
+      if (entry.entry_no) {
+        uniqueEntryNos.add(entry.entry_no.toString());
+      }
+    });
+
+    // Create options arrays for Select components
+    const vendorContractorOptions = [
+      ...Array.from(uniqueVendors).map(name => {
+        const vendor = vendorOptions.find(v => v.value === name);
+        return vendor || { value: name, label: name, type: 'Vendor' };
+      }),
+      ...Array.from(uniqueContractors).map(name => {
+        const contractor = contractorOptions.find(c => c.value === name);
+        return contractor || { value: name, label: name, type: 'Contractor' };
+      })
+    ].sort((a, b) => a.label.localeCompare(b.label));
+
+    const projectOptions = Array.from(uniqueProjectIds)
+      .map(name => {
+        const site = siteOptions.find(s => s.value === name);
+        return site || { value: name, label: name, id: null };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label));
+
+    const transferSiteOptions = Array.from(uniqueTransferSiteIds)
+      .map(name => {
+        const site = siteOptions.find(s => s.value === name);
+        return site || { value: name, label: name, id: null };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label));
+
+    const typeOptions = Array.from(uniqueTypes).sort();
+    const modeOptions = Array.from(uniqueModes).sort();
+    const entryNoOptions = Array.from(uniqueEntryNos).sort((a, b) => Number(a) - Number(b));
+
+    return {
+      vendorContractorOptions,
+      projectOptions,
+      transferSiteOptions,
+      typeOptions,
+      modeOptions,
+      entryNoOptions
+    };
+  }, [advanceData, vendorOptions, contractorOptions, siteOptions]);
+
   const sortedData = React.useMemo(() => {
     let sortableData = [...filteredData];
     if (sortConfig.key) {
@@ -859,12 +863,66 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     control: (provided, state) => ({
       ...provided,
       borderWidth: '2px',
+      height: '45px',
       borderRadius: '8px',
       borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'rgba(191, 152, 83, 0.2)',
       boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
       '&:hover': {
         borderColor: 'rgba(191, 152, 83, 0.2)',
       }
+    }),
+    indicatorSeparator: () => ({
+      display: 'none',
+    }),
+    dropdownIndicator: () => ({
+      display: 'none',
+    }),
+    clearIndicator: (provided) => ({
+      ...provided,
+      cursor: 'pointer',
+    }),
+    menu: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+      maxHeight: '300px',
+    }),
+    menuPortal: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+    }),
+    menuList: (provided) => ({
+      ...provided,
+      maxHeight: '250px',
+      overflowY: 'auto',
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      fontWeight: '500',
+      backgroundColor: state.isSelected 
+        ? 'rgba(191, 152, 83, 0.3)' 
+        : state.isFocused 
+          ? 'rgba(191, 152, 83, 0.1)' 
+          : 'white',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    input: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    placeholder: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: '#999',
+      textAlign: 'left',
     }),
   };
   const handleUpdate = async () => {
@@ -1169,11 +1227,11 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
           </div>
         </div>
         <div className='rounded-md w-full max-w-[1850px] ml-4 mr-4 sm:ml-6 lg:ml-10 lg:mr-10 px-4 lg:px-10 bg-white mt-4 pt-5 h-[650px]'>
-                      <div
-              className={`text-left flex ${selectDate || selectContractororVendorName || selectProjectName || selectTransfer || selectType || selectMode || selectEntryNo || startDate || endDate
-                ? 'flex-col sm:flex-row sm:justify-between'
-                : 'flex-row justify-between items-center'
-                } mb-3 gap-2`}>
+          <div
+            className={`text-left flex ${selectDate || selectContractororVendorName || selectProjectName || selectTransfer || selectType || selectMode || selectEntryNo || startDate || endDate
+              ? 'flex-col sm:flex-row sm:justify-between'
+              : 'flex-row justify-between items-center'
+              } mb-3 gap-2`}>
             <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3">
               <button className='pl-2' onClick={() => setShowFilters(!showFilters)}>
                 <img
@@ -1326,7 +1384,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                       </th>
                       <th className="pt-2 pb-2">
                         <Select
-                          options={combinedOptions}
+                          options={filterOptionsFromData.vendorContractorOptions}
                           value={selectContractororVendorName ? { value: selectContractororVendorName, label: selectContractororVendorName } : null}
                           onChange={(opt) => setSelectContractororVendorName(opt ? opt.value : "")}
                           className="text-xs focus:outline-none w-[180px]"
@@ -1360,23 +1418,38 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                             option: (provided, state) => ({
                               ...provided,
                               textAlign: 'left',
-                              fontWeight: 'normal',
+                              fontWeight: '600',
                               fontSize: '15px',
-                              backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                              backgroundColor: state.isSelected 
+                                ? 'rgba(191, 152, 83, 0.3)' 
+                                : state.isFocused 
+                                  ? 'rgba(191, 152, 83, 0.1)' 
+                                  : 'white',
                               color: 'black',
                             }),
                             singleValue: (provided) => ({
                               ...provided,
                               textAlign: 'left',
-                              fontWeight: 'normal',
+                              fontWeight: '600',
                               color: 'black',
+                            }),
+                            input: (provided) => ({
+                              ...provided,
+                              fontWeight: '600',
+                              color: 'black',
+                              textAlign: 'left',
+                            }),
+                            placeholder: (provided) => ({
+                              ...provided,
+                              fontWeight: '600',
+                              color: '#999',
                             }),
                           }}
                         />
                       </th>
                       <th className="pt-2 pb-2">
                         <Select
-                          options={siteOptions}
+                          options={filterOptionsFromData.projectOptions}
                           value={selectProjectName ? { value: selectProjectName, label: selectProjectName } : null}
                           onChange={(opt) => setSelectProjectName(opt ? opt.value : "")}
                           className="focus:outline-none text-xs"
@@ -1410,23 +1483,38 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                             option: (provided, state) => ({
                               ...provided,
                               textAlign: 'left',
-                              fontWeight: 'normal',
+                              fontWeight: '600',
                               fontSize: '15px',
-                              backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                              backgroundColor: state.isSelected 
+                                ? 'rgba(191, 152, 83, 0.3)' 
+                                : state.isFocused 
+                                  ? 'rgba(191, 152, 83, 0.1)' 
+                                  : 'white',
                               color: 'black',
                             }),
                             singleValue: (provided) => ({
                               ...provided,
                               textAlign: 'left',
-                              fontWeight: 'normal',
+                              fontWeight: '600',
                               color: 'black',
+                            }),
+                            input: (provided) => ({
+                              ...provided,
+                              fontWeight: '600',
+                              color: 'black',
+                              textAlign: 'left',
+                            }),
+                            placeholder: (provided) => ({
+                              ...provided,
+                              fontWeight: '600',
+                              color: '#999',
                             }),
                           }}
                         />
                       </th>
                       <th className="pt-2 pb-2">
                         <Select
-                          options={siteOptions}
+                          options={filterOptionsFromData.transferSiteOptions}
                           value={selectTransfer ? { value: selectTransfer, label: selectTransfer } : null}
                           onChange={(opt) => setSelectTransfer(opt ? opt.value : "")}
                           className="focus:outline-none text-xs"
@@ -1460,16 +1548,31 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                             option: (provided, state) => ({
                               ...provided,
                               textAlign: 'left',
-                              fontWeight: 'normal',
+                              fontWeight: '600',
                               fontSize: '15px',
-                              backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                              backgroundColor: state.isSelected 
+                                ? 'rgba(191, 152, 83, 0.3)' 
+                                : state.isFocused 
+                                  ? 'rgba(191, 152, 83, 0.1)' 
+                                  : 'white',
                               color: 'black',
                             }),
                             singleValue: (provided) => ({
                               ...provided,
                               textAlign: 'left',
-                              fontWeight: 'normal',
+                              fontWeight: '600',
                               color: 'black',
+                            }),
+                            input: (provided) => ({
+                              ...provided,
+                              fontWeight: '600',
+                              color: 'black',
+                              textAlign: 'left',
+                            }),
+                            placeholder: (provided) => ({
+                              ...provided,
+                              fontWeight: '600',
+                              color: '#999',
                             }),
                           }}
                         />
@@ -1486,10 +1589,9 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                           menuPortalTarget={document.body}
                         >
                           <option value=''>Select Type...</option>
-                          <option value='Advance'>Advance</option>
-                          <option value='Bill Settlement'>Bill Settlement</option>
-                          <option value='Refund'>Refund</option>
-                          <option value='Transfer'>Transfer</option>
+                          {filterOptionsFromData.typeOptions.map(type => (
+                            <option key={type} value={type}>{type}</option>
+                          ))}
                         </select>
                       </th>
                       <th className="pt-2 pb-2"></th>
@@ -1502,9 +1604,9 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                           menuPortalTarget={document.body}
                         >
                           <option value=''>Select</option>
-                          <option value='Cash'>Cash</option>
-                          <option value='GPay'>GPay</option>
-                          <option value='Net Banking'>Net Banking</option>
+                          {filterOptionsFromData.modeOptions.map(mode => (
+                            <option key={mode} value={mode}>{mode}</option>
+                          ))}
                         </select>
                       </th>
                       <th className='w-[80px] pt-2 pb-2'></th>
@@ -1675,167 +1777,201 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
           )}
           {isEditModalOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-              <div className="bg-white p-6 rounded-lg w-[700px]">
-                <h2 className="text-lg font-bold mb-4">Edit Entry</h2>
-                <div className='grid grid-cols-2 gap-4 text-left ml-5'>
-                  <div className='flex items-center gap-3'>
-                    <label className='font-semibold text-[#E4572E]'>Select Type</label>
-                    <select
-                      value={editFormData.type}
-                      onChange={(e) => {
-                        const newType = e.target.value;
-                        setEditFormData(prev => {
-                          const updated = { ...prev, type: newType };
-                          if (newType === 'Refund') {
-                            updated.amount = '';
-                            updated.bill_amount = '';
-                          } else if (newType === 'Advance') {
-                            updated.refund_amount = '';
-                            updated.bill_amount = '';
-                          } else if (newType === 'Bill Settlement') {
-                            updated.refund_amount = '';
-                            updated.amount = '';
-                          } else if (newType === 'Transfer') {
-                            updated.refund_amount = '';
-                            updated.bill_amount = '';
-                            updated.payment_mode = '';
-                          }
-                          return updated;
-                        });
-                      }}
-                      className='w-[163px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
-                    >
-                      <option value=''>Select Type...</option>
-                      <option value='Advance'>Advance</option>
-                      <option value='Bill Settlement'>Bill Settlement</option>
-                      <option value='Refund'>Refund</option>
-                      <option value='Transfer'>Transfer</option>
-                    </select>
-                  </div>
-                  <div className='flex items-center gap-3'>
-                    <label className='font-semibold text-[#E4572E]'>Date</label>
-                    <input
-                      type='date'
-                      placeholder='dd-mm-yyyy'
-                      value={editFormData.date}
-                      onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
-                      className='w-[144px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
-                    />
-                  </div>
-                  <div className=''>
-                    <div className='flex'>
-                      <label className='font-semibold block'>Contractor/Vendor</label>
-                    </div>
-                    <Select
-                      options={combinedOptions}
-                      value={selectedOption}
-                      onChange={handleChange}
-                      className='w-[263px] h-[45px] rounded-lg focus:outline-none'
-                      isClearable
-                      styles={customStyles}
-                    />
-                  </div>
-                  <div>
-                    <label className='font-semibold block'>Project Name</label>
-                    <Select
-                      options={sortedSiteOptions || []}
-                      placeholder="Select a site..."
-                      isSearchable={true}
-                      value={sortedSiteOptions.find(site => site.id === editFormData.project_id) || null}
-                      onChange={(selected) => setEditFormData({ ...editFormData, project_id: selected?.id || '' })}
-                      styles={customStyles}
-                      isClearable
-                      className='w-[263px] h-[45px] focus:outline-none' />
-                  </div>
-                  {editFormData.type === 'Bill Settlement' && (
-                    <div>
-                      <label className='font-semibold block'>Bill Amount</label>
-                      <input
-                        value={editFormData.bill_amount}
-                        onChange={(e) => setEditFormData({ ...editFormData, bill_amount: e.target.value })}
-                        className='w-[263px] h-[45px] px-2 py-1 rounded-lg border-2 border-[#BF9853] border-opacity-30 focus:outline-none'
-                      />
-                    </div>
-                  )}
-                  <div>
-                    <label className='font-semibold block'>
-                      {editFormData.type === 'Transfer'
-                        ? 'Transfer Amount'
-                        : editFormData.type === 'Refund'
-                          ? 'Refund Amount'
-                          : 'Amount Given'}
-                    </label>
-                    <input
-                      value={editFormData.type === 'Refund' ? formatWithCommas(editFormData.refund_amount) : formatWithCommas(editFormData.amount)}
-                      onChange={handleAmountChange}
-                      className='w-[263px] h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
-                    />
-                  </div>
-                  <div className=''>
-                    {editFormData.type === 'Transfer' ? (
-                      <>
-                        <label className='font-semibold block'>Site Name</label>
-                        <Select
-                          options={sortedSiteOptions}
-                          placeholder="Select a site..."
-                          isSearchable
-                          value={sortedSiteOptions.find(site => site.id === editFormData.transfer_site_id) || null}
-                          onChange={(selected) => setEditFormData({ ...editFormData, transfer_site_id: selected?.id || '' })}
-                          styles={customStyles}
-                          isClearable
-                          className='w-[263px] h-[45px] focus:outline-none'
-                        />
-                      </>
-                    ) : (
-                      <div className='flex gap-14'>
-                        <div className='space-y-2'>
-                          <label className='font-semibold block'>Payment Mode</label>
-                          <select
-                            value={editFormData.payment_mode}
-                            onChange={(e) => setEditFormData({ ...editFormData, payment_mode: e.target.value })}
-                            className='w-[263px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'>
-                            <option value=''>Select</option>
-                            <option value='Cash'>Cash</option>
-                            <option value='GPay'>GPay</option>
-                            <option value='Net Banking'>Net Banking</option>
-                          </select>
+              <div className="bg-white rounded-md w-[65rem] px-6">
+                <div className="flex justify-end">
+                  <button className="text-red-500 mt-3" onClick={() => {
+                    setIsEditModalOpen(false);
+                    setSelectedFile(null);
+                    if (fileInputRef.current) {
+                      fileInputRef.current.value = '';
+                    }
+                  }}>
+                    <img src={cross} alt='cross' className='w-5 h-5' />
+                  </button>
+                </div>
+                <div className='overflow-y-auto  pl-[50px] pr-[50px]'>
+                  <form className="">
+                    <h2 className="text-2xl font-bold mb-5">Edit Entry</h2>
+                    <div className='text-left'>
+                      <div className='grid grid-cols-2 gap-5'>
+                        <div className=''>
+                          <label className='block font-semibold mb-2'>Select Type</label>
+                          <Select
+                            options={[
+                              { value: 'Advance', label: 'Advance' },
+                              { value: 'Bill Settlement', label: 'Bill Settlement' },
+                              { value: 'Refund', label: 'Refund' },
+                              { value: 'Transfer', label: 'Transfer' }
+                            ]}
+                            value={editFormData.type ? { value: editFormData.type, label: editFormData.type } : null}
+                            onChange={(selected) => {
+                              const newType = selected ? selected.value : '';
+                              setEditFormData(prev => {
+                                const updated = { ...prev, type: newType };
+                                if (newType === 'Refund') {
+                                  updated.amount = '';
+                                  updated.bill_amount = '';
+                                } else if (newType === 'Advance') {
+                                  updated.refund_amount = '';
+                                  updated.bill_amount = '';
+                                } else if (newType === 'Bill Settlement') {
+                                  updated.refund_amount = '';
+                                  updated.amount = '';
+                                } else if (newType === 'Transfer') {
+                                  updated.refund_amount = '';
+                                  updated.bill_amount = '';
+                                  updated.payment_mode = '';
+                                }
+                                return updated;
+                              });
+                            }}
+                            placeholder="Select Type..."
+                            isSearchable
+                            isClearable
+                            styles={customStyles}
+                            menuPortalTarget={document.body}
+                            menuPosition="fixed"
+                            className='w-full focus:outline-none'
+                          />
+                        </div>
+                        <div className=''>
+                          <label className='block font-semibold mb-2'>Date</label>
+                          <input
+                            type='date'
+                            placeholder='dd-mm-yyyy'
+                            value={editFormData.date}
+                            onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
+                            className='block w-full border-2 border-[#BF9853] border-opacity-25 font-[600px] p-2 rounded-lg focus:outline-none h-[45px]'
+                          />
+                        </div>
+                        <div className=''>
+                          <label className='block font-semibold mb-2'>Contractor/Vendor</label>
+                          <Select
+                            options={combinedOptions}
+                            value={selectedOption}
+                            onChange={handleChange}
+                            className='w-full rounded-lg focus:outline-none'
+                            isSearchable
+                            isClearable
+                            styles={customStyles}
+                            menuPortalTarget={document.body}
+                            menuPosition="fixed"
+                          />
+                        </div>
+                        <div className=''>
+                          <label className='block font-semibold mb-2'>Project Name</label>
+                          <Select
+                            options={sortedSiteOptions || []}
+                            placeholder="Select a site..."
+                            isSearchable={true}
+                            value={sortedSiteOptions.find(site => site.id === editFormData.project_id) || null}
+                            onChange={(selected) => setEditFormData({ ...editFormData, project_id: selected?.id || '' })}
+                            styles={customStyles}
+                            isClearable
+                            className='w-full focus:outline-none'
+                            menuPortalTarget={document.body}
+                            menuPosition="fixed"
+                          />
                         </div>
                         {editFormData.type === 'Bill Settlement' && (
-                          <div className='space-y-2 mt-6'>
-                            <div className="">
-                              <label htmlFor="editFileInput" className="cursor-pointer flex w-40 items-center  text-orange-600 text-sm font-semibold">
-                                <img className='w-5 h-4 mr-1' alt='' src={Attach}></img>
-                                Attach File
-                              </label>
-                              <input
-                                type="file"
-                                id="editFileInput"
-                                ref={fileInputRef}
-                                className="hidden"
-                                onChange={handleFileChange}
-                              />
-                            </div>
-                            {selectedFile && (
-                              <span className="text-gray-600 text-sm">{selectedFile.name}</span>
-                            )}
+                          <div className=''>
+                            <label className='block font-semibold mb-2'>Bill Amount</label>
+                            <input
+                              value={editFormData.bill_amount}
+                              onChange={(e) => setEditFormData({ ...editFormData, bill_amount: e.target.value })}
+                              className='block w-full border-2 border-[#BF9853] font-[600px] border-opacity-25 p-2 rounded-lg focus:outline-none h-[45px]'
+                            />
                           </div>
                         )}
+                        <div className=''>
+                          <label className='block font-semibold mb-2'>
+                            {editFormData.type === 'Transfer'
+                              ? 'Transfer Amount'
+                              : editFormData.type === 'Refund'
+                                ? 'Refund Amount'
+                                : 'Amount Given'}
+                          </label>
+                          <input
+                            value={editFormData.type === 'Refund' ? formatWithCommas(editFormData.refund_amount) : formatWithCommas(editFormData.amount)}
+                            onChange={handleAmountChange}
+                            className='block w-full no-spinner border-2 border-[#BF9853] border-opacity-25 font-[600px] p-2 rounded-lg focus:outline-none h-[45px]'
+                          />
+                        </div>
+                        {editFormData.type === 'Transfer' ? (
+                          <div className=''>
+                            <label className='block font-semibold mb-2'>Transfer To</label>
+                            <Select
+                              options={sortedSiteOptions}
+                              placeholder="Select a site..."
+                              isSearchable
+                              value={sortedSiteOptions.find(site => site.id === editFormData.transfer_site_id) || null}
+                              onChange={(selected) => setEditFormData({ ...editFormData, transfer_site_id: selected?.id || '' })}
+                              styles={customStyles}
+                              isClearable
+                              className='w-full focus:outline-none'
+                              menuPortalTarget={document.body}
+                              menuPosition="fixed"
+                            />
+                          </div>
+                        ) : (
+                          <>
+                            <div className=''>
+                              <label className='block font-semibold mb-2'>Payment Mode</label>
+                              <Select
+                                options={[
+                                  { value: 'Cash', label: 'Cash' },
+                                  { value: 'GPay', label: 'GPay' },
+                                  { value: 'Net Banking', label: 'Net Banking' }
+                                ]}
+                                value={editFormData.payment_mode ? { value: editFormData.payment_mode, label: editFormData.payment_mode } : null}
+                                onChange={(selected) => setEditFormData({ ...editFormData, payment_mode: selected ? selected.value : '' })}
+                                placeholder="Select"
+                                isSearchable
+                                isClearable
+                                styles={customStyles}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                className='w-full focus:outline-none'
+                              />
+                            </div>
+                            {editFormData.type === 'Bill Settlement' && (
+                              <div className='mt-3'>
+                                <label className='block font-semibold mb-2'>Attach File</label>
+                                <div className="flex items-center gap-2">
+                                  <label htmlFor="editFileInput" className="cursor-pointer flex items-center text-orange-600 text-sm font-semibold">
+                                    <img className='w-5 h-4 mr-1' alt='' src={Attach}></img>
+                                    Attach File
+                                  </label>
+                                  <input
+                                    type="file"
+                                    id="editFileInput"
+                                    ref={fileInputRef}
+                                    className="hidden"
+                                    onChange={handleFileChange}
+                                  />
+                                  {selectedFile && (
+                                    <span className="text-gray-600 text-sm">{selectedFile.name}</span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  {/* Description */}
-                  <div className='col-span-2'>
-                    <label className='font-semibold block'>Description</label>
-                    <textarea
-                      rows={2}
-                      value={editFormData.description}
-                      onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
-                      className='w-[590px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'>
-                    </textarea>
-                  </div>
-
+                      {/* Description */}
+                      <div className=' mt-8'>
+                        <label className='block font-semibold mb-2'>Description</label>
+                        <textarea
+                          rows={3}
+                          value={editFormData.description}
+                          onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                          className='block w-full h-[45px] border-2 border-[#BF9853] border-opacity-25 font-[600px] p-2 rounded-lg focus:outline-none'>
+                        </textarea>
+                      </div>
+                    </div>
+                  </form>
                 </div>
-                <div className="flex justify-end gap-3 mt-4">
+                <div className="flex justify-end gap-3 mt-4 mb-5">
                   <button
                     onClick={() => {
                       setIsEditModalOpen(false);

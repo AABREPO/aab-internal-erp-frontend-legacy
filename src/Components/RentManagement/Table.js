@@ -1015,41 +1015,27 @@ const Table = () => {
                         >
                             <table className="table-auto min-w-[1165px] w-full border-collapse">
                                 <thead>
-                                    <tr className="bg-[#FAF6ED] text-left sticky top-0 z-10">
-                                        <th className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm"
-                                            onClick={() => handleSort('shopNo')}
-                                        >
+                                    <tr className="bg-[#FAF6ED] text-left sticky top-0 z-900">
+                                        <th className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm" onClick={() => handleSort('shopNo')}>
                                             Shop No {sortField === 'shopNo' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
-                                        <th className="px-2 sm:px-4 py-2 font-bold text-xs sm:text-sm"
-                                            onClick={() => handleSort('tenantName')}>
+                                        <th className="px-2 sm:px-4 py-2 font-bold text-xs sm:text-sm" onClick={() => handleSort('tenantName')}>
                                             Tenant Name {sortField === 'tenantName' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
                                         <th className="px-2 sm:px-4 py-2 font-bold text-xs sm:text-sm">Amount</th>
-                                        <th className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm"
-                                            onClick={() => handleSort('paidOnDate')}
-                                        >
+                                        <th className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm" onClick={() => handleSort('paidOnDate')}>
                                             Paid on {sortField === 'paidOnDate' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
-                                        <th className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm"
-                                            onClick={() => handleSort('eno')}
-                                        >
+                                        <th className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm" onClick={() => handleSort('eno')}>
                                             E No {sortField === 'eno' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
-
-                                        <th className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm"
-                                            onClick={() => handleSort('forTheMonthOf')}
-                                        >
+                                        <th className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm" onClick={() => handleSort('forTheMonthOf')}>
                                             For the month of {sortField === 'forTheMonthOf' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
-                                        <th className="px-2 sm:px-4 py-2 font-bold text-xs sm:text-sm"
-                                            onClick={() => handleSort('paymentMode')}
-                                        >
+                                        <th className="px-2 sm:px-4 py-2 font-bold text-xs sm:text-sm" onClick={() => handleSort('paymentMode')}>
                                             Payment mode {sortField === 'paymentMode' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
-                                        <th className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm"
-                                            onClick={() => handleSort('formType')}
-                                        >
+                                        <th className="px-2 sm:px-4 py-2 font-bold cursor-pointer text-xs sm:text-sm" onClick={() => handleSort('formType')}>
                                             Type {sortField === 'formType' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
                                         <th className="px-1 sm:px-2 py-2 font-bold text-xs sm:text-sm">Activity</th>
@@ -1480,10 +1466,7 @@ const Table = () => {
                                                 </button>
                                             </td>
                                             <td className="text-xs sm:text-sm text-left px-1 sm:px-2 py-2 font-semibold">
-                                                <button
-                                                    className="text-blue-600 underline text-xs sm:text-sm"
-                                                    onClick={() => handlePrint(rent)}
-                                                >
+                                                <button className="text-blue-600 underline text-xs sm:text-sm" onClick={() => handlePrint(rent)}>
                                                     Print
                                                 </button>
                                             </td>
@@ -1521,7 +1504,6 @@ const Table = () => {
                                             value={editShopNoOptions.find(option => option.value === rentFormData.shopNoId)}
                                             onChange={(selectedOption) => {
                                                 const newShopNoId = selectedOption?.value || null;
-                                                // Validate if new shop is linked to current tenant
                                                 if (newShopNoId && rentFormData.tenantNameId) {
                                                     if (!isShopLinkedToTenant(newShopNoId, rentFormData.tenantNameId)) {
                                                         alert('Selected shop is not linked to the selected tenant in tenant link data');
@@ -1566,7 +1548,6 @@ const Table = () => {
                                             value={editTenantOptions.find(opt => opt.value === rentFormData.tenantNameId)}
                                             onChange={(selectedOption) => {
                                                 const newTenantNameId = selectedOption?.value || null;
-                                                // Validate if current shop is linked to new tenant
                                                 if (rentFormData.shopNoId && newTenantNameId) {
                                                     if (!isShopLinkedToTenant(rentFormData.shopNoId, newTenantNameId)) {
                                                         alert('Selected tenant is not linked to the selected shop in tenant link data');
@@ -1697,5 +1678,4 @@ const Table = () => {
         </body>
     )
 }
-
 export default Table;

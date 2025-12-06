@@ -7,7 +7,7 @@ import 'jspdf-autotable';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import axios from 'axios';
-const StaffAdvance = () => {
+const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   // Form state management
   const [formData, setFormData] = useState({
     fromDate: '',
@@ -53,6 +53,12 @@ const StaffAdvance = () => {
     accountNumber: ""
   });
   const [pendingFormData, setPendingFormData] = useState(null);
+  // Review modal state
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [isReviewEditMode, setIsReviewEditMode] = useState(false);
+  const [filePreviewUrl, setFilePreviewUrl] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const fileInputRef = useRef(null);
   // Employee options state
   const [employeeOptions, setEmployeeOptions] = useState([]);
   const [laboursList, setLaboursList] = useState([]);
@@ -114,6 +120,26 @@ const StaffAdvance = () => {
   };
 
   useEffect(() => { setStaffAdvanceCombinedOptions([...employeeOptions, ...laboursList]); }, [employeeOptions, laboursList]);
+  
+  // File change handler
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+    e.target.value = '';
+  };
+
+  // File preview URL effect
+  useEffect(() => {
+    if (!selectedFile) {
+      setFilePreviewUrl(null);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(selectedFile);
+    setFilePreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [selectedFile]);
 
   const [purposeOptions, setPurposeOptions] = useState([]);
   // Fetch purpose options from backend on component mount
@@ -183,14 +209,7 @@ const StaffAdvance = () => {
         };
     }
   }, [formData.selectedType]);
-  // Memoized payment mode options
-  const paymentModeOptions = useMemo(() => [
-    { value: 'Cash', label: 'Cash' },
-    { value: 'GPay', label: 'GPay' },
-    { value: 'PhonePe', label: 'PhonePe' },
-    { value: 'Net Banking', label: 'Net Banking' },
-    { value: 'Cheque', label: 'Cheque' }
-  ], []);
+  // Payment mode options are now passed as prop from StaffHeading
   // Memoized select type options
   const selectTypeOptions = useMemo(() => [
     { value: 'Advance', label: 'Advance' },
@@ -227,9 +246,16 @@ const StaffAdvance = () => {
       return;
     }
     const filtered = tableData.filter(record => {
-      const matchesEmployee = record.employee_name === formData.empName.value ||
-        record.employee_id === formData.empName.id ||
-        record.labour_id === formData.empName.id;
+      // Check if the selected option is an Employee or Labour
+      let matchesEmployee = false;
+      if (formData.empName.type === "Employee") {
+        // Only check employee_id for Employee type
+        matchesEmployee = record.employee_name === formData.empName.value ||
+          record.employee_id === formData.empName.id;
+      } else if (formData.empName.type === "Labour") {
+        // Only check labour_id for Labour type
+        matchesEmployee = record.labour_id === formData.empName.id;
+      }
       const matchesPurpose = record.purpose === formData.purpose.value ||
         record.purpose_id === formData.purpose.id ||
         record.from_purpose_id === formData.purpose.id;
@@ -253,18 +279,33 @@ const StaffAdvance = () => {
     }
 
     const employeeRecords = tableData.filter(record => {
-      // Check for employee match - try different possible field names
-      return record.employee_name === formData.empName.value ||
-        record.employee_id === formData.empName.id ||
-        record.labour_id === formData.empName.id ||
-        record.emp_name === formData.empName.value;
+      // Check if the selected option is an Employee or Labour
+      if (formData.empName.type === "Employee") {
+        // Only check employee_id for Employee type
+        return record.employee_name === formData.empName.value ||
+          record.employee_id === formData.empName.id ||
+          record.emp_name === formData.empName.value;
+      } else if (formData.empName.type === "Labour") {
+        // Only check labour_id for Labour type
+        return record.labour_id === formData.empName.id;
+      }
+      return false;
     });
 
     const totalAdvance = employeeRecords.reduce((total, record) => {
+      const amount = parseFloat(record.amount) || 0;
+      const refund = parseFloat(record.staff_refund_amount) || 0;
+      
       if (record.type === 'Advance') {
-        return total + (parseFloat(record.amount) || 0);
+        // Add amount (if negative, it will subtract automatically)
+        return total + amount;
       } else if (record.type === 'Refund') {
-        return total - (parseFloat(record.staff_refund_amount) || 0);
+        // Subtract refund amount
+        return total - refund;
+      } else if (record.type === 'Transfer') {
+        // For transfer records, the amount field already contains the correct sign
+        // Negative amount means money going out, positive means money coming in
+        return total + amount;
       }
       return total;
     }, 0);
@@ -289,11 +330,17 @@ const StaffAdvance = () => {
     const purposeId = formData.purpose.id;
     const employeeId = formData.empName.id;
     const purposeRecords = tableData.filter(record => {
-      // Check for employee match first
-      const employeeMatch = record.employee_name === formData.empName.value ||
-        record.employee_id === employeeId ||
-        record.labour_id === employeeId ||
-        record.emp_name === formData.empName.value;
+      // Check if the selected option is an Employee or Labour
+      let employeeMatch = false;
+      if (formData.empName.type === "Employee") {
+        // Only check employee_id for Employee type
+        employeeMatch = record.employee_name === formData.empName.value ||
+          record.employee_id === employeeId ||
+          record.emp_name === formData.empName.value;
+      } else if (formData.empName.type === "Labour") {
+        // Only check labour_id for Labour type
+        employeeMatch = record.labour_id === employeeId;
+      }
       if (!employeeMatch) return false;
       // Check if purpose matches (only from_purpose_id for all record types)
       return record.purpose === formData.purpose.value ||
@@ -348,9 +395,11 @@ const StaffAdvance = () => {
       );
     }
     // Calculate total amount given (only Advance amounts, no subtraction of refunds)
+    // Negative amounts will subtract automatically
     const totalAmount = filteredRecords.reduce((total, record) => {
       if (record.type === 'Advance') {
-        return total + (parseFloat(record.amount) || 0);
+        const amount = parseFloat(record.amount) || 0;
+        return total + amount; // If amount is negative, it will subtract
       }
       return total;
     }, 0);
@@ -382,7 +431,8 @@ const StaffAdvance = () => {
     });
     const todayAmount = todayRecords.reduce((total, record) => {
       if (record.type === 'Advance') {
-        return total + (parseFloat(record.amount) || 0);
+        const amount = parseFloat(record.amount) || 0;
+        return total + amount; // If amount is negative, it will subtract
       }
       return total;
     }, 0);
@@ -394,10 +444,19 @@ const StaffAdvance = () => {
       return 0;
     }
     const totalOutstanding = tableData.reduce((total, record) => {
+      const amount = parseFloat(record.amount) || 0;
+      const refund = parseFloat(record.staff_refund_amount) || 0;
+      
       if (record.type === 'Advance') {
-        return total + (parseFloat(record.amount) || 0);
+        // Add amount (if negative, it will subtract automatically)
+        return total + amount;
       } else if (record.type === 'Refund') {
-        return total - (parseFloat(record.staff_refund_amount) || 0);
+        // Subtract refund amount
+        return total - refund;
+      } else if (record.type === 'Transfer') {
+        // For transfer records, the amount field already contains the correct sign
+        // Negative amount means money going out, positive means money coming in
+        return total + amount;
       }
       return total;
     }, 0);
@@ -439,27 +498,58 @@ const StaffAdvance = () => {
       return;
     }
 
-    // Check if payment mode requires popup
-    if ((formData.selectedType === 'Advance' || formData.selectedType === 'Refund') && 
-        ['GPay', 'PhonePe', 'Net Banking', 'Cheque'].includes(formData.paymentMode)) {
-      // Store form data and show payment popup
-      setPendingFormData({ ...formData });
-      setPaymentPopupData(prev => ({
-        ...prev,
-        amount: formData.amountGivenInput,
-        paymentMode: formData.paymentMode
-      }));
-      setShowPaymentModal(true);
-      return;
-    }
-
-    // For other payment modes, proceed with normal submission
-    await submitFormData(formData);
+    // Show review modal first
+    setShowReviewModal(true);
+    setIsReviewEditMode(false);
   }, [formData]);
 
   const submitFormData = useCallback(async (dataToSubmit, paymentDetails = null) => {
     setIsSubmitting(true);
     try {
+      // Upload file if exists
+      let fileUrl = '';
+      if (selectedFile) {
+        try {
+          const formData = new FormData();
+          const formatDateOnly = (dateString) => {
+            const date = new Date(dateString);
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}-${month}-${year}`;
+          };
+          const now = new Date();
+          const timestamp = now.toLocaleString("en-GB", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true
+          })
+            .replace(",", "")
+            .replace(/\s/g, "-");
+          const employeeName = dataToSubmit.empName?.label || '';
+          const finalName = `${timestamp} ${employeeName}`;
+          formData.append('file', selectedFile);
+          formData.append('file_name', finalName);
+          const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+            method: "POST",
+            body: formData,
+          });
+          if (!uploadResponse.ok) {
+            throw new Error('File upload failed');
+          }
+          const uploadResult = await uploadResponse.json();
+          fileUrl = uploadResult.url;
+        } catch (error) {
+          console.error('Error during file upload:', error);
+          alert('Error during file upload. Please try again.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       const resAll = await fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all');
       let allData = [];
       if (resAll.ok) {
@@ -480,7 +570,7 @@ const StaffAdvance = () => {
             ? parseFloat(dataToSubmit.amountGivenInput) || 0
             : 0,
         description: dataToSubmit.description,
-        file_url: dataToSubmit.fileUrl || null,
+        file_url: fileUrl || null,
         entryNo: nextEntryNo,
         weekNo: 0,
       };
@@ -567,7 +657,7 @@ const StaffAdvance = () => {
     } finally {
       setIsSubmitting(false);
     }
-  }, []);
+  }, [selectedFile, fetchRecords]);
 
   // Handle payment popup submission
   const handlePaymentSubmit = useCallback(async () => {
@@ -626,6 +716,10 @@ const StaffAdvance = () => {
       transferAmount: '',
       description: ''
     }));
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   }, []);
   // Delete table row
   const deleteRow = useCallback((id) => {
@@ -919,6 +1013,114 @@ const StaffAdvance = () => {
     // Add print logic
   }, []);
 
+  // Review modal handlers
+  const handleReviewConfirm = useCallback(() => {
+    if (isReviewEditMode) {
+      return;
+    }
+    // Validate again before proceeding
+    if (!formData.selectedType || !formData.date || !formData.empName) {
+      alert('Please fill in Type, Date, and Employee Name');
+      return;
+    }
+    if ((formData.selectedType === 'Advance' || formData.selectedType === 'Refund') &&
+      (!formData.amountGivenInput || (formData.selectedType === 'Advance' && !formData.paymentMode))) {
+      alert('Please fill the amount and payment mode');
+      return;
+    }
+    if (formData.selectedType === 'Transfer' &&
+      (!formData.purpose || !formData.transferPurpose || !formData.transferAmount)) {
+      alert('Please fill all transfer details');
+      return;
+    }
+
+    // Check if payment mode requires popup
+    if ((formData.selectedType === 'Advance' || formData.selectedType === 'Refund') && 
+        ['GPay', 'PhonePe', 'Net Banking', 'Cheque'].includes(formData.paymentMode)) {
+      // Store form data and show payment popup
+      setPendingFormData({ ...formData });
+      setPaymentPopupData(prev => ({
+        ...prev,
+        amount: formData.amountGivenInput,
+        paymentMode: formData.paymentMode
+      }));
+      setShowPaymentModal(true);
+      setShowReviewModal(false);
+      return;
+    }
+
+    // For other payment modes, proceed with normal submission
+    submitFormData(formData);
+    setShowReviewModal(false);
+  }, [formData, isReviewEditMode, submitFormData]);
+
+  const handleReviewClose = useCallback(() => {
+    setShowReviewModal(false);
+    setIsReviewEditMode(false);
+  }, []);
+
+  const handleReviewSave = useCallback(() => {
+    // Validate before saving
+    if (!formData.selectedType || !formData.date || !formData.empName) {
+      alert('Please fill in Type, Date, and Employee Name');
+      return;
+    }
+    setIsReviewEditMode(false);
+  }, [formData]);
+
+  const renderReviewRow = useCallback((label, value) => (
+    <div className="flex justify-between gap-4 border border-gray-100 rounded-lg px-4 py-2" key={label}>
+      <span className="text-sm font-semibold text-gray-600">{label}</span>
+      <span className="text-sm text-gray-800 text-right break-words">{value || '-'}</span>
+    </div>
+  ), []);
+
+  const formatDateForReview = useCallback((dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }, []);
+
+  const handleChangeAttachment = useCallback(() => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  }, []);
+
+  const isPdfPreview = selectedFile?.type?.toLowerCase().includes('pdf');
+
+  // Prepare review details
+  const reviewDetails = [
+    { label: 'Type', value: formData.selectedType || '-' },
+    { label: 'Date', value: formatDateForReview(formData.date) || '-' },
+    { label: 'Employee/Labour Name', value: formData.empName?.label || '-' },
+    { label: 'Overall Advance', value: formData.overallAdvance ? `₹${formData.overallAdvance}` : '-' },
+    { label: 'Purpose', value: formData.purpose?.label || '-' },
+    { label: 'Advance Amount', value: formData.advanceAmount ? `₹${formData.advanceAmount}` : '-' },
+  ];
+
+  if (formData.selectedType === 'Transfer') {
+    reviewDetails.push(
+      { label: 'Transfer Amount', value: formData.transferAmount ? `₹${formData.transferAmount}` : '-' },
+      { label: 'Transfer To Purpose', value: formData.transferPurpose?.label || '-' }
+    );
+  } else if (formData.selectedType === 'Refund') {
+    reviewDetails.push(
+      { label: 'Refund Amount', value: formData.amountGivenInput ? `₹${formData.amountGivenInput}` : '-' },
+      { label: 'Payment Mode', value: formData.paymentMode || '-' }
+    );
+  } else if (formData.selectedType === 'Advance') {
+    reviewDetails.push(
+      { label: 'Amount Given', value: formData.amountGivenInput ? `₹${formData.amountGivenInput}` : '-' },
+      { label: 'Payment Mode', value: formData.paymentMode || '-' }
+    );
+  }
+
+  reviewDetails.push(
+    { label: 'Description', value: formData.description || '-' },
+    { label: 'File Attached', value: selectedFile ? selectedFile.name : 'No file attached' }
+  );
+
   // Edit functionality
   const handleEditClick = useCallback((record) => {
     setEditingId(record.id);
@@ -975,7 +1177,7 @@ const StaffAdvance = () => {
   }, [editingId, editFormData, fetchRecords]);
   return (
     <div className=" bg-[#FAF6ED]">
-      <div className='bg-white max-w-[1768px] h-auto text-left shadow-sm rounded ml-10 mr-5'>
+      <div className='bg-white max-w-[1850px] text-left shadow-sm rounded ml-10 mr-10'>
         <div className='flex flex-wrap p-6 gap-4 w-full h-full items-start'>
           <div className='flex-shrink-0'>
             <h2 className='font-semibold text-sm mb-1'>From Date</h2>
@@ -1040,13 +1242,13 @@ const StaffAdvance = () => {
           </div>
         </div>
       </div>
-      <div className='p-4 max-w-[1800px] ml-6'>
+      <div className='p-4 max-w-[1900px] ml-6 mr-6'>
         {/* Form */}
         <form onSubmit={handleSubmit} onKeyPress={handleKeyPress} className='bg-white w-full p-6 h-auto rounded shadow-sm'>
           <div className='flex flex-col xl:flex-row '>
             <div className='grid grid-cols-1 md:grid-cols-2 gap-6 text-left '>
               {/* Select Type */}
-              <div className='space-y-2'>
+              <div className=''>
                 <label className='font-semibold text-[#E4572E] block'>
                   Select Type {isRequired('selectedType') && <span className="text-red-500">*</span>}
                 </label>
@@ -1065,7 +1267,7 @@ const StaffAdvance = () => {
                 </select>
               </div>
               {/* Date */}
-              <div className='space-y-2'>
+              <div className=''>
                 <label className='font-semibold text-[#E4572E] block'>
                   Date {isRequired('date') && <span className="text-red-500">*</span>}
                 </label>
@@ -1079,7 +1281,7 @@ const StaffAdvance = () => {
                 />
               </div>
               {/* EMP Name */}
-              <div className='space-y-2'>
+              <div className=''>
                 <label className='font-semibold block'>
                   EMP Name {isRequired('empName') && <span className="text-red-500">*</span>}
                 </label>
@@ -1100,7 +1302,7 @@ const StaffAdvance = () => {
                   }}
                 />
               </div>
-              <div className='space-y-2'>
+              <div className=''>
                 <label className='font-semibold block'>Overall Advance</label>
                 <input
                   value={formData.overallAdvance}
@@ -1110,7 +1312,7 @@ const StaffAdvance = () => {
                 />
               </div>
               {/* Purpose */}
-              <div className='space-y-2'>
+              <div className=''>
                 <label className='font-semibold block'>{fieldConfig.purposeLabel}</label>
                 <Select
                   value={formData.purpose}
@@ -1130,7 +1332,7 @@ const StaffAdvance = () => {
                 />
               </div>
               {/* Advance Amount */}
-              <div className='space-y-2'>
+              <div className=''>
                 <label className='font-semibold block'>
                   Advance Amount {isRequired('advanceAmount') && <span className="text-red-500">*</span>}
                 </label>
@@ -1142,7 +1344,7 @@ const StaffAdvance = () => {
                 />
               </div>
               {/* Amount Given / Purpose To */}
-              <div className='space-y-2'>
+              <div className=''>
                 <label className='font-semibold block'>{fieldConfig.amountGivenLabel}</label>
                 {formData.selectedType === 'Transfer' ? (
                   <Select
@@ -1165,7 +1367,7 @@ const StaffAdvance = () => {
                 )}
               </div>
               {/* Conditional Payment Mode/Transfer Amount */}
-              <div className='space-y-2'>
+              <div className=''>
                 <label className='font-semibold block'>{fieldConfig.paymentModeLabel}</label>
                 {formData.selectedType === 'Transfer' ? (
                   <input
@@ -1191,7 +1393,7 @@ const StaffAdvance = () => {
                 )}
               </div>
               {/* Description */}
-              <div className='col-span-1 md:col-span-2 space-y-2'>
+              <div className='col-span-1 md:col-span-2 '>
                 <label className='font-semibold block'>Description</label>
                 <textarea
                   value={formData.description}
@@ -1203,8 +1405,8 @@ const StaffAdvance = () => {
                 />
               </div>
               {/* File Attachment and Submit */}
-              <div className='col-span-1 md:col-span-2 space-y-4'>
-                <div className="flex items-center">
+              <div className=''>
+                <div className="flex items-center mb-4">
                   <label htmlFor="fileInput" className="cursor-pointer flex items-center text-orange-600 hover:text-orange-700 transition-colors">
                     <img className='w-5 h-4 mr-2' alt='' src={Attach} />
                     Attach file
@@ -1212,9 +1414,11 @@ const StaffAdvance = () => {
                   <input
                     type="file"
                     id="fileInput"
+                    ref={fileInputRef}
                     className="hidden"
-                    onChange={(e) => console.log('File selected:', e.target.files[0])}
+                    onChange={handleFileChange}
                   />
+                  {selectedFile && <span className="text-gray-600 text-sm ml-2">{selectedFile.name}</span>}
                 </div>
                 <div className='flex gap-3'>
                   <button
@@ -1273,7 +1477,7 @@ const StaffAdvance = () => {
                   </div>
                 </div>
               </div>
-              <div className='border-l-8 border-l-[#BF9853] rounded-lg h-[500px] overflow-auto shadow-sm bg-white'>
+              <div className='border-l-8 border-l-[#BF9853] rounded-lg h-[450px] overflow-auto shadow-sm bg-white'>
                 <table className="w-full min-w-[800px]">
                   <thead className="bg-[#FAF6ED] text-left sticky top-0 z-10">
                     <tr>
@@ -1557,13 +1761,15 @@ const StaffAdvance = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>
                       <select
                         value={paymentPopupData.paymentMode}
+                        onChange={(e) => setPaymentPopupData({ ...paymentPopupData, paymentMode: e.target.value })}
                         className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none bg-gray-100"
                       >
                         <option value="">---Select---</option>
-                        <option value="GPay">GPay</option>
-                        <option value="PhonePe">PhonePe</option>
-                        <option value="Net Banking">Net Banking</option>
-                        <option value="Cheque">Cheque</option>
+                        {paymentModeOptions && paymentModeOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -1670,6 +1876,221 @@ const StaffAdvance = () => {
             >
               ×
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Review Modal */}
+      {showReviewModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white text-left rounded-xl p-6 w-[1400px] h-[680px] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Review Submission</h3>
+              <button onClick={handleReviewClose} className="text-2xl font-bold text-gray-400 hover:text-gray-700">
+                ×
+              </button>
+            </div>
+            <div className="flex flex-1 gap-6 overflow-hidden">
+              <div className="flex-[0.40] flex flex-col">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-base font-semibold text-gray-700">Staff Advance Details</h4>
+                  <button
+                    type="button"
+                    onClick={() => setIsReviewEditMode((prev) => !prev)}
+                    className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg hover:bg-[#FFF8EE]"
+                  >
+                    {isReviewEditMode ? 'Cancel Edit' : 'Edit'}
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto pr-4">
+                  {isReviewEditMode ? (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-semibold mb-1 block">Type</label>
+                        <select
+                          className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                          value={formData.selectedType}
+                          onChange={(e) => handleInputChange('selectedType', e.target.value)}
+                        >
+                          <option value="">Select Type...</option>
+                          {selectTypeOptions.map(option => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-sm font-semibold mb-1 block">Date</label>
+                        <input
+                          type="date"
+                          value={formData.date}
+                          onChange={(e) => handleInputChange('date', e.target.value)}
+                          className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-semibold mb-1 block">Employee/Labour Name</label>
+                        <Select
+                          options={staffAdvanceCombinedOptions}
+                          value={formData.empName}
+                          onChange={(value) => handleInputChange('empName', value)}
+                          styles={customStyles}
+                          isClearable
+                          className="custom-select rounded-lg"
+                          isSearchable={true}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-semibold mb-1 block">Purpose</label>
+                        <Select
+                          options={purposeOptions}
+                          value={formData.purpose}
+                          onChange={(value) => handleInputChange('purpose', value)}
+                          styles={customStyles}
+                          isClearable
+                          className="custom-select rounded-lg"
+                          isSearchable={true}
+                        />
+                      </div>
+                      {formData.selectedType === 'Transfer' && (
+                        <>
+                          <div>
+                            <label className="text-sm font-semibold mb-1 block">Transfer To Purpose</label>
+                            <Select
+                              options={purposeOptions}
+                              value={formData.transferPurpose}
+                              onChange={(value) => handleInputChange('transferPurpose', value)}
+                              styles={customStyles}
+                              isClearable
+                              className="custom-select rounded-lg"
+                              isSearchable={true}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-semibold mb-1 block">Transfer Amount</label>
+                            <input
+                              value={formData.transferAmount}
+                              onChange={(e) => handleInputChange('transferAmount', e.target.value)}
+                              className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                            />
+                          </div>
+                        </>
+                      )}
+                      {formData.selectedType !== 'Transfer' && (
+                        <>
+                          <div>
+                            <label className="text-sm font-semibold mb-1 block">
+                              {formData.selectedType === 'Refund' ? 'Refund Amount' : 'Amount Given'}
+                            </label>
+                            <input
+                              value={formData.amountGivenInput}
+                              onChange={(e) => handleInputChange('amountGivenInput', e.target.value)}
+                              className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                            />
+                          </div>
+                          {formData.selectedType === 'Advance' && (
+                            <div>
+                              <label className="text-sm font-semibold mb-1 block">Payment Mode</label>
+                              <select
+                                value={formData.paymentMode}
+                                onChange={(e) => handleInputChange('paymentMode', e.target.value)}
+                                className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                              >
+                                <option value="">Select</option>
+                                {paymentModeOptions.map(option => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      <div className="col-span-2">
+                        <label className="text-sm font-semibold mb-1 block">Description</label>
+                        <textarea
+                          rows={2}
+                          value={formData.description}
+                          onChange={(e) => handleInputChange('description', e.target.value)}
+                          placeholder="Type your text here..."
+                          className="w-full border-2 border-[#BF9853] rounded-lg px-3 py-2 border-opacity-20"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {reviewDetails.map((detail) => renderReviewRow(detail.label, detail.value))}
+                    </div>
+                  )}
+                </div>
+                {isReviewEditMode && (
+                  <div className="flex justify-end gap-3 mt-4">
+                    <button
+                      type="button"
+                      onClick={() => setIsReviewEditMode(false)}
+                      className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg"
+                    >
+                      Discard
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleReviewSave}
+                      className="px-4 py-2 bg-[#BF9853] text-white rounded-lg"
+                    >
+                      Save Changes
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="w-px bg-gray-200"></div>
+              <div className="flex-[0.65] flex flex-col">
+                <h4 className="text-base font-semibold text-gray-700 mb-3">Preview</h4>
+                <div className="flex-1 border-2 border-dashed border-gray-200 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50">
+                  {filePreviewUrl ? (
+                    isPdfPreview ? (
+                      <iframe
+                        src={`${filePreviewUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                        title="Attachment preview"
+                        className="w-full h-full rounded-lg border-none"
+                      />
+                    ) : (
+                      <img src={filePreviewUrl} alt="Attachment preview" className="w-full h-full object-contain" />
+                    )
+                  ) : (
+                    <p className="text-sm text-gray-500">No file selected</p>
+                  )}
+                </div>
+                {selectedFile && (
+                  <p className="text-xs text-gray-500 mt-2 break-words">{selectedFile.name}</p>
+                )}
+                <button
+                  type="button"
+                  onClick={handleChangeAttachment}
+                  className="mt-4 px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg hover:bg-[#FFF8EE]"
+                >
+                  Change Attachfile
+                </button>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={handleReviewClose}
+                className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={handleReviewConfirm}
+                disabled={isSubmitting || isReviewEditMode}
+                className={`px-4 py-2 rounded-lg text-white ${isSubmitting || isReviewEditMode ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#BF9853]'}`}
+              >
+                {isSubmitting ? 'Submitting...' : 'Confirm & Submit'}
+              </button>
+            </div>
           </div>
         </div>
       )}

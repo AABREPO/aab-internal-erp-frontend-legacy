@@ -8,7 +8,7 @@ import edit from '../Images/Edit.svg';
 import history from '../Images/History.svg';
 import remove from '../Images/Delete.svg';
 
-const StaffDatabase = ({ username, userRoles = [] }) => {
+const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   const [records, setRecords] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [purposes, setPurposes] = useState([]);
@@ -242,17 +242,194 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
   const getLabourName = (id) => laboursList.find(l => l.id === id)?.label || id;
   const getPurposeName = (id) => purposes.find(p => p.id === id)?.label || id;
 
-  // Get unique employee names from records for filter dropdown
+  // Get unique employee names from current table data for filter dropdown
   const employeeNameOptions = useMemo(() => {
     const uniqueNames = new Set();
-    records.forEach((entry) => {
+    // Use filteredRecords but exclude employee filter to show all available employees in current view
+    records.filter((entry) => {
+      // Apply all filters except employee filter
+      if (selectDate) {
+        const [year, month, day] = selectDate.split("-");
+        const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
+        const entryDateObj = new Date(entry.date);
+        const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
+        if (formattedEntryDate !== formattedSelectDate) return false;
+      }
+      if (selectPurpose) {
+        const purposeName = String(getPurposeName(entry.from_purpose_id) || "");
+        if (purposeName.toLowerCase() !== selectPurpose.toLowerCase()) return false;
+      }
+      if (selectTransferTo) {
+        const transferToName = String(getPurposeName(entry.to_purpose_id) || "");
+        if (transferToName.toLowerCase() !== selectTransferTo.toLowerCase()) return false;
+      }
+      if (selectType) {
+        if (String(entry.type || "").toLowerCase() !== selectType.toLowerCase()) return false;
+      }
+      if (selectMode) {
+        if (String(entry.staff_payment_mode || "").toLowerCase() !== selectMode.toLowerCase()) return false;
+      }
+      return true;
+    }).forEach((entry) => {
       const name = getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id);
       if (name) {
         uniqueNames.add(name);
       }
     });
     return Array.from(uniqueNames).map(name => ({ value: name, label: name }));
-  }, [records, getEmployeeName, getLabourName]);
+  }, [records, selectDate, selectPurpose, selectTransferTo, selectType, selectMode, getEmployeeName, getLabourName, getPurposeName]);
+
+  // Get unique purpose options from current table data
+  const purposeOptions = useMemo(() => {
+    const uniquePurposes = new Set();
+    records.filter((entry) => {
+      // Apply all filters except purpose filter
+      if (selectDate) {
+        const [year, month, day] = selectDate.split("-");
+        const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
+        const entryDateObj = new Date(entry.date);
+        const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
+        if (formattedEntryDate !== formattedSelectDate) return false;
+      }
+      if (selectEmployeeName) {
+        const employeeName = String(getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || "");
+        if (employeeName.toLowerCase() !== selectEmployeeName.toLowerCase()) return false;
+      }
+      if (selectTransferTo) {
+        const transferToName = String(getPurposeName(entry.to_purpose_id) || "");
+        if (transferToName.toLowerCase() !== selectTransferTo.toLowerCase()) return false;
+      }
+      if (selectType) {
+        if (String(entry.type || "").toLowerCase() !== selectType.toLowerCase()) return false;
+      }
+      if (selectMode) {
+        if (String(entry.staff_payment_mode || "").toLowerCase() !== selectMode.toLowerCase()) return false;
+      }
+      return true;
+    }).forEach((entry) => {
+      const purposeName = getPurposeName(entry.from_purpose_id);
+      if (purposeName && purposeName !== entry.from_purpose_id) {
+        uniquePurposes.add(purposeName);
+      }
+    });
+    return Array.from(uniquePurposes).map(purpose => ({ 
+      value: purpose, 
+      label: purpose, 
+      id: records.find(r => getPurposeName(r.from_purpose_id) === purpose)?.from_purpose_id 
+    }));
+  }, [records, selectDate, selectEmployeeName, selectTransferTo, selectType, selectMode, getPurposeName, getEmployeeName, getLabourName]);
+
+  // Get unique transfer to options from current table data
+  const transferToOptions = useMemo(() => {
+    const uniqueTransferTo = new Set();
+    records.filter((entry) => {
+      // Apply all filters except transferTo filter
+      if (selectDate) {
+        const [year, month, day] = selectDate.split("-");
+        const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
+        const entryDateObj = new Date(entry.date);
+        const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
+        if (formattedEntryDate !== formattedSelectDate) return false;
+      }
+      if (selectEmployeeName) {
+        const employeeName = String(getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || "");
+        if (employeeName.toLowerCase() !== selectEmployeeName.toLowerCase()) return false;
+      }
+      if (selectPurpose) {
+        const purposeName = String(getPurposeName(entry.from_purpose_id) || "");
+        if (purposeName.toLowerCase() !== selectPurpose.toLowerCase()) return false;
+      }
+      if (selectType) {
+        if (String(entry.type || "").toLowerCase() !== selectType.toLowerCase()) return false;
+      }
+      if (selectMode) {
+        if (String(entry.staff_payment_mode || "").toLowerCase() !== selectMode.toLowerCase()) return false;
+      }
+      return true;
+    }).forEach((entry) => {
+      const transferToName = getPurposeName(entry.to_purpose_id);
+      if (transferToName && transferToName !== entry.to_purpose_id) {
+        uniqueTransferTo.add(transferToName);
+      }
+    });
+    return Array.from(uniqueTransferTo).map(transferTo => ({ 
+      value: transferTo, 
+      label: transferTo, 
+      id: records.find(r => getPurposeName(r.to_purpose_id) === transferTo)?.to_purpose_id 
+    }));
+  }, [records, selectDate, selectEmployeeName, selectPurpose, selectType, selectMode, getPurposeName, getEmployeeName, getLabourName]);
+
+  // Get unique type options from current table data
+  const typeOptions = useMemo(() => {
+    const uniqueTypes = new Set();
+    records.filter((entry) => {
+      // Apply all filters except type filter
+      if (selectDate) {
+        const [year, month, day] = selectDate.split("-");
+        const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
+        const entryDateObj = new Date(entry.date);
+        const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
+        if (formattedEntryDate !== formattedSelectDate) return false;
+      }
+      if (selectEmployeeName) {
+        const employeeName = String(getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || "");
+        if (employeeName.toLowerCase() !== selectEmployeeName.toLowerCase()) return false;
+      }
+      if (selectPurpose) {
+        const purposeName = String(getPurposeName(entry.from_purpose_id) || "");
+        if (purposeName.toLowerCase() !== selectPurpose.toLowerCase()) return false;
+      }
+      if (selectTransferTo) {
+        const transferToName = String(getPurposeName(entry.to_purpose_id) || "");
+        if (transferToName.toLowerCase() !== selectTransferTo.toLowerCase()) return false;
+      }
+      if (selectMode) {
+        if (String(entry.staff_payment_mode || "").toLowerCase() !== selectMode.toLowerCase()) return false;
+      }
+      return true;
+    }).forEach((entry) => {
+      if (entry.type) {
+        uniqueTypes.add(entry.type);
+      }
+    });
+    return Array.from(uniqueTypes).sort();
+  }, [records, selectDate, selectEmployeeName, selectPurpose, selectTransferTo, selectMode, getEmployeeName, getLabourName, getPurposeName]);
+
+  // Get unique mode options from current table data
+  const modeOptions = useMemo(() => {
+    const uniqueModes = new Set();
+    records.filter((entry) => {
+      // Apply all filters except mode filter
+      if (selectDate) {
+        const [year, month, day] = selectDate.split("-");
+        const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
+        const entryDateObj = new Date(entry.date);
+        const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
+        if (formattedEntryDate !== formattedSelectDate) return false;
+      }
+      if (selectEmployeeName) {
+        const employeeName = String(getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || "");
+        if (employeeName.toLowerCase() !== selectEmployeeName.toLowerCase()) return false;
+      }
+      if (selectPurpose) {
+        const purposeName = String(getPurposeName(entry.from_purpose_id) || "");
+        if (purposeName.toLowerCase() !== selectPurpose.toLowerCase()) return false;
+      }
+      if (selectTransferTo) {
+        const transferToName = String(getPurposeName(entry.to_purpose_id) || "");
+        if (transferToName.toLowerCase() !== selectTransferTo.toLowerCase()) return false;
+      }
+      if (selectType) {
+        if (String(entry.type || "").toLowerCase() !== selectType.toLowerCase()) return false;
+      }
+      return true;
+    }).forEach((entry) => {
+      if (entry.staff_payment_mode) {
+        uniqueModes.add(entry.staff_payment_mode);
+      }
+    });
+    return Array.from(uniqueModes).sort();
+  }, [records, selectDate, selectEmployeeName, selectPurpose, selectTransferTo, selectType, getEmployeeName, getLabourName, getPurposeName]);
 
   // Advanced filtering logic
   const filteredRecords = useMemo(() => {
@@ -392,13 +569,26 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
   // Calculate summary totals dynamically for filtered records
   const advanceTotal = filteredRecords
     .filter(r => r.type === 'Advance')
-    .reduce((acc, r) => acc + (r.amount || 0), 0);
+    .reduce((acc, r) => {
+      const amount = parseFloat(r.amount) || 0;
+      // If amount is negative, it will subtract automatically
+      return acc + amount;
+    }, 0);
   const transferTotal = filteredRecords
     .filter(r => r.type === 'Transfer')
-    .reduce((acc, r) => acc + (r.amount > 0 ? r.amount : 0), 0);
+    .reduce((acc, r) => {
+      const amount = parseFloat(r.amount) || 0;
+      // For transfer records, the amount field already contains the correct sign
+      // Negative amount means money going out, positive means money coming in
+      return acc + amount;
+    }, 0);
   const refundTotal = filteredRecords
     .filter(r => r.type === 'Refund')
-    .reduce((acc, r) => acc + (r.staff_refund_amount || 0), 0);
+    .reduce((acc, r) => {
+      const refund = parseFloat(r.staff_refund_amount) || 0;
+      // Subtract refund amount
+      return acc + refund; // Refund amounts are positive, so we add them (they represent money returned)
+    }, 0);
 
   // Export functionality
   const exportPDF = () => {
@@ -406,6 +596,7 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
     const headers = [
       [
         "S.No",
+        "Timestamp",
         "Date",
         "Employee Name",
         "Purpose",
@@ -420,6 +611,7 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
     ];
     const rows = sortedData.map((entry, index) => [
       index + 1,
+      entry.timestamp ? formatDate(entry.timestamp) : "",
       formatDateOnly(entry.date),
       getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id),
       getPurposeName(entry.from_purpose_id),
@@ -466,6 +658,7 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
   const exportCSV = () => {
     const csvHeaders = [
       "S.No",
+      "Timestamp",
       "Date",
       "Employee Name",
       "Purpose",
@@ -480,28 +673,33 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
     ];
     const csvRows = sortedData.map((entry, index) => [
       index + 1,
-      formatDateOnly(entry.date),
-      getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id),
-      getPurposeName(entry.from_purpose_id),
-      getPurposeName(entry.to_purpose_id),
+      entry.timestamp ? formatDate(entry.timestamp) : "",
+      entry.date ? formatDateOnly(entry.date) : "",
+      getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || "",
+      getPurposeName(entry.from_purpose_id) || "",
+      getPurposeName(entry.to_purpose_id) || "",
       entry.amount != null && entry.amount !== ""
         ? Number(entry.amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
         : "",
       entry.staff_refund_amount != null && entry.staff_refund_amount !== ""
         ? Number(entry.staff_refund_amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
         : "",
-      entry.type,
-      entry.staff_payment_mode,
-      entry.description,
+      entry.type || "",
+      entry.staff_payment_mode || "",
+      entry.description || "",
       "",
-      entry.entry_no
+      entry.entry_no || ""
     ]);
 
     const csvString = [
       csvHeaders.join(","),
       ...csvRows.map(row =>
         row
-          .map(value => `"${String(value).replace(/"/g, '""')}"`)
+          .map(value => {
+            // Convert null/undefined to empty string, then handle quotes
+            const stringValue = value == null ? "" : String(value);
+            return `"${stringValue.replace(/"/g, '""')}"`;
+          })
           .join(",")
       )
     ].join("\n");
@@ -676,7 +874,7 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
 
   return (
     <body>
-      <div className='w-full max-w-[1750px] h-auto bg-white text-left flex  sm:flex-row gap-3 p-3 sm:p-5 mx-2 ml-10 mr-10'>
+      <div className='w-full max-w-[1850px] h-auto bg-white text-left flex  sm:flex-row gap-3 p-3 sm:p-5 mx-2 ml-10 mr-10'>
         <div className=''>
           <label className='block mb-2 font-semibold text-sm sm:text-base'>Advance Amount</label>
           <input
@@ -709,7 +907,7 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
           <p>{error}</p>
         </div>
       )}
-      <div className='w-full max-w-[1750px] bg-white mt-3 sm:mt-5 pt-3 sm:pt-5 mx-2 ml-10 mr-5'>
+      <div className='w-full max-w-[1850px] bg-white mt-3 sm:mt-5 pt-3 sm:pt-5 mx-2 ml-10 mr-5'>
         <div
           className={`text-left flex ${selectDate || selectEmployeeName || selectPurpose || selectTransferTo || selectType || selectMode
             ? 'flex-col lg:flex-row lg:justify-between'
@@ -780,7 +978,7 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
           {/* Single Table with Scrollable Container */}
           <div
             ref={scrollRef}
-            className='overflow-auto max-h-[400px] sm:max-h-[600px]'
+            className='overflow-auto max-h-[400px] sm:max-h-[500px]'
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
@@ -924,7 +1122,7 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
                     </th>
                     <th className="pt-2 pb-2 min-w-[180px] sm:w-[300px]">
                       <Select
-                        options={purposes}
+                        options={purposeOptions}
                         value={selectPurpose ? { value: selectPurpose, label: selectPurpose } : null}
                         onChange={(opt) => setSelectPurpose(opt ? opt.value : "")}
                         className="focus:outline-none text-xs"
@@ -977,7 +1175,7 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
                     </th>
                     <th className="pt-2 pb-2 min-w-[200px] sm:w-[350px]">
                       <Select
-                        options={purposes}
+                        options={transferToOptions}
                         value={selectTransferTo ? { value: selectTransferTo, label: selectTransferTo } : null}
                         onChange={(opt) => setSelectTransferTo(opt ? opt.value : "")}
                         className="focus:outline-none text-xs"
@@ -1038,9 +1236,11 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
                         placeholder="Type..."
                       >
                         <option value=''>Select Type...</option>
-                        <option value='Advance'>Advance</option>
-                        <option value='Transfer'>Transfer</option>
-                        <option value='Refund'>Refund</option>
+                        {typeOptions.map((type) => (
+                          <option key={type} value={type}>
+                            {type}
+                          </option>
+                        ))}
                       </select>
                     </th>
                     <th className="pt-2 pb-2 min-w-[100px]">
@@ -1051,9 +1251,11 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
                         placeholder="Mode..."
                       >
                         <option value=''>Select</option>
-                        <option value='Cash'>Cash</option>
-                        <option value='GPay'>GPay</option>
-                        <option value='Net Banking'>Net Banking</option>
+                        {modeOptions.map((mode) => (
+                          <option key={mode} value={mode}>
+                            {mode}
+                          </option>
+                        ))}
                       </select>
                     </th>
                     <th className="pt-2 pb-2"></th>
@@ -1162,7 +1364,7 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
         </div>
         {/* Pagination Controls */}
         {sortedData.length > 0 && (
-          <div className="flex flex-col sm:flex-row justify-between items-center px-3 sm:px-5 py-3 sm:py-4 bg-white border-t border-gray-200 mx-2 sm:mx-0">
+          <div className="flex flex-col sm:flex-row justify-between items-center px-3 sm:px-5 py-3 sm:py-4 bg-white mx-2 sm:mx-0">
             {/* Items per page selector */}
             <div className="flex items-center space-x-2 mb-3 sm:mb-0">
               <label className="text-xs sm:text-sm font-medium text-gray-700">Show:</label>
@@ -1458,9 +1660,11 @@ const StaffDatabase = ({ username, userRoles = [] }) => {
                       onChange={(e) => setEditFormData({ ...editFormData, staff_payment_mode: e.target.value })}
                       className='w-full sm:w-[263px] h-[40px] sm:h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'>
                       <option value=''>Select</option>
-                      <option value='Cash'>Cash</option>
-                      <option value='GPay'>GPay</option>
-                      <option value='Net Banking'>Net Banking</option>
+                      {paymentModeOptions && paymentModeOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
                     </select>
                   )}
                 </div>

@@ -696,7 +696,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
                     { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
                     { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
-                ];
+                    { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
+                  ];
                 const projectClientMapTemp = {};
                 const projectClientNameTemp = {};
                 const projectOptions = Array.isArray(data)
@@ -2575,89 +2576,93 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         const newTableX = 520;
         let newTableY = baseY;
         const staffAdvanceEntries = expenses.filter(e => e.type === "Staff Advance");
-        const staffAdvanceCount = staffAdvanceEntries.length;
-        const staffAdvanceTotal = staffAdvanceEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-        const staffAdvanceY = newTableY + 10;
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.text("STAFF ADVANCE", newTableX, staffAdvanceY - 25);
-        const staffAdvanceHead = [[
-            String(staffAdvanceCount || "0"),
-            "PARTY",
-            "PROJECT NAME",
-            String(staffAdvanceTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
-        ]];
-        const staffAdvanceBody = staffAdvanceEntries.map(e => [
-            String(e.date ? formatDateOnly(e.date) : ""),
-            String(getPartyDisplayName(e) || ""),
-            String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
-            String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
-        ]);
-        autoTable(doc, {
-            head: staffAdvanceHead,
-            body: staffAdvanceBody,
-            startY: staffAdvanceY - 20,
-            margin: { left: newTableX },
-            tableWidth: 310,
-            theme: "grid",
-            styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
-            headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
-            bodyStyles: { fontStyle: 'bold' },
-            columnStyles: {
-                3: { halign: 'right' }
-            },
-            didParseCell: (data) => {
-                if (data.section === 'head' && data.column.index === 3) {
-                    data.cell.styles.halign = 'right';
+        if (staffAdvanceEntries.length > 0) {
+            const staffAdvanceCount = staffAdvanceEntries.length;
+            const staffAdvanceTotal = staffAdvanceEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+            const staffAdvanceY = newTableY + 10;
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text("STAFF ADVANCE", newTableX, staffAdvanceY - 25);
+            const staffAdvanceHead = [[
+                String(staffAdvanceCount || "0"),
+                "PARTY",
+                "PROJECT NAME",
+                String(staffAdvanceTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+            ]];
+            const staffAdvanceBody = staffAdvanceEntries.map(e => [
+                String(e.date ? formatDateOnly(e.date) : ""),
+                String(getPartyDisplayName(e) || ""),
+                String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
+                String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+            ]);
+            autoTable(doc, {
+                head: staffAdvanceHead,
+                body: staffAdvanceBody,
+                startY: staffAdvanceY - 20,
+                margin: { left: newTableX },
+                tableWidth: 310,
+                theme: "grid",
+                styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
+                headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+                bodyStyles: { fontStyle: 'bold' },
+                columnStyles: {
+                    3: { halign: 'right' }
+                },
+                didParseCell: (data) => {
+                    if (data.section === 'head' && data.column.index === 3) {
+                        data.cell.styles.halign = 'right';
+                    }
+                },
+                didDrawPage: () => {
+                    drawHeader(doc);
                 }
-            },
-            didDrawPage: () => {
-                drawHeader(doc);
-            }
-        });
-        newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
+            });
+            newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
+        }
         const staffSalaryEntries = expenses.filter(e => e.type === "Staff Salary");
-        const staffSalaryCount = staffSalaryEntries.length;
-        const staffSalaryTotal = staffSalaryEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-        const staffSalaryY = newTableY + 30;
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.text("STAFF SALARY", newTableX, staffSalaryY - 25);        
-        const staffSalaryHead = [[
-            String(staffSalaryCount || "0"),
-            "PARTY",
-            "PROJECT NAME",
-            String(staffSalaryTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
-        ]];
-        const staffSalaryBody = staffSalaryEntries.map(e => [
-            String(e.date ? formatDateOnly(e.date) : ""),
-            String(getPartyDisplayName(e) || ""),
-            String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
-            String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
-        ]);
-        autoTable(doc, {
-            head: staffSalaryHead,
-            body: staffSalaryBody,
-            startY: staffSalaryY - 20,
-            margin: { left: newTableX },
-            tableWidth: 310,
-            theme: "grid",
-            styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
-            headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
-            bodyStyles: { fontStyle: 'bold' },
-            columnStyles: {
-                3: { halign: 'right' }
-            },
-            didParseCell: (data) => {
-                if (data.section === 'head' && data.column.index === 3) {
-                    data.cell.styles.halign = 'right';
+        if (staffSalaryEntries.length > 0) {
+            const staffSalaryCount = staffSalaryEntries.length;
+            const staffSalaryTotal = staffSalaryEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+            const staffSalaryY = newTableY + 30;
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text("STAFF SALARY", newTableX, staffSalaryY - 25);        
+            const staffSalaryHead = [[
+                String(staffSalaryCount || "0"),
+                "PARTY",
+                "PROJECT NAME",
+                String(staffSalaryTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+            ]];
+            const staffSalaryBody = staffSalaryEntries.map(e => [
+                String(e.date ? formatDateOnly(e.date) : ""),
+                String(getPartyDisplayName(e) || ""),
+                String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
+                String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+            ]);
+            autoTable(doc, {
+                head: staffSalaryHead,
+                body: staffSalaryBody,
+                startY: staffSalaryY - 20,
+                margin: { left: newTableX },
+                tableWidth: 310,
+                theme: "grid",
+                styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
+                headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+                bodyStyles: { fontStyle: 'bold' },
+                columnStyles: {
+                    3: { halign: 'right' }
+                },
+                didParseCell: (data) => {
+                    if (data.section === 'head' && data.column.index === 3) {
+                        data.cell.styles.halign = 'right';
+                    }
+                },
+                didDrawPage: () => {
+                    drawHeader(doc);
                 }
-            },
-            didDrawPage: () => {
-                drawHeader(doc);
-            }
-        });
-        newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
+            });
+            newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
+        }
         const excludedTypes = ["Bill", "Wage", "Project Advance", "Staff Advance", "Staff Salary", "Daily", "Diwali Bonus"];
         const otherExpenseTypes = [...new Set(expenses.map(e => e.type).filter(type => type && !excludedTypes.includes(type)))];        
         otherExpenseTypes.forEach((expenseType) => {
@@ -2711,48 +2716,50 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
         });
         const diwaliBonusEntries = expenses.filter(e => e.type === "Diwali Bonus");
-        const diwaliBonusCount = diwaliBonusEntries.length;
-        const diwaliBonusTotal = diwaliBonusEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-        const diwaliBonusY = newTableY + 30;
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.text("DIWALI BONUS", newTableX, diwaliBonusY - 25);
-        const diwaliBonusHead = [[
-            String(diwaliBonusCount || "0"),
-            "PARTY",
-            "AMOUNT",
-            String(diwaliBonusTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
-        ]];
-        const diwaliBonusBody = diwaliBonusEntries.map(e => [
-            String(e.date ? formatDateOnly(e.date) : ""),
-            String(getPartyDisplayName(e) || ""),
-            String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
-            ""
-        ]);
-        autoTable(doc, {
-            head: diwaliBonusHead,
-            body: diwaliBonusBody,
-            startY: diwaliBonusY - 20,
-            margin: { left: newTableX },
-            tableWidth: 310,
-            theme: "grid",
-            styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
-            headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
-            bodyStyles: { fontStyle: 'bold' },
-            columnStyles: {
-                2: { halign: 'right' },
-                3: { halign: 'right' }
-            },
-            didParseCell: (data) => {
-                if (data.section === 'head' && data.column.index === 3) {
-                    data.cell.styles.halign = 'right';
+        if (diwaliBonusEntries.length > 0) {
+            const diwaliBonusCount = diwaliBonusEntries.length;
+            const diwaliBonusTotal = diwaliBonusEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+            const diwaliBonusY = newTableY + 30;
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text("DIWALI BONUS", newTableX, diwaliBonusY - 25);
+            const diwaliBonusHead = [[
+                String(diwaliBonusCount || "0"),
+                "PARTY",
+                "AMOUNT",
+                String(diwaliBonusTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+            ]];
+            const diwaliBonusBody = diwaliBonusEntries.map(e => [
+                String(e.date ? formatDateOnly(e.date) : ""),
+                String(getPartyDisplayName(e) || ""),
+                String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
+                ""
+            ]);
+            autoTable(doc, {
+                head: diwaliBonusHead,
+                body: diwaliBonusBody,
+                startY: diwaliBonusY - 20,
+                margin: { left: newTableX },
+                tableWidth: 310,
+                theme: "grid",
+                styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
+                headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+                bodyStyles: { fontStyle: 'bold' },
+                columnStyles: {
+                    2: { halign: 'right' },
+                    3: { halign: 'right' }
+                },
+                didParseCell: (data) => {
+                    if (data.section === 'head' && data.column.index === 3) {
+                        data.cell.styles.halign = 'right';
+                    }
+                },
+                didDrawPage: () => {
+                    drawHeader(doc);
                 }
-            },
-            didDrawPage: () => {
-                drawHeader(doc);
-            }
-        });
-        newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
+            });
+            newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
+        }
         const lastPeriodEndDate = expenses
             .map(exp => exp.period_end_date)
             .filter(Boolean)
@@ -2849,14 +2856,10 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                     <thead className="sticky top-0 z-10 bg-white">
                                         <tr className="bg-[#FAF6ED]">
                                             <th className="pt-2 pl-2 w-[60px] font-bold text-left">Sl.No</th>
-                                            <th className="pt-2 w-[135px] font-bold text-left cursor-pointer hover:bg-gray-200"
-                                                onClick={() => handleSort('date')}
-                                            >
+                                            <th className="pt-2 w-[135px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('date')}>
                                                 Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                             </th>
-                                            <th className="px-1 w-[200px] font-bold text-left cursor-pointer hover:bg-gray-200"
-                                                onClick={() => handleSort('contractor_vendor')}
-                                            >
+                                            <th className="px-1 w-[200px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('contractor_vendor')}>
                                                 <div className="flex items-center gap-2">
                                                     <span>{isClientToggleActive ? 'Client Name' : 'Contractor/Vendor/Employee'}</span>
                                                     {sortConfig.key === 'contractor_vendor' && (
@@ -2864,14 +2867,10 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                     )}
                                                 </div>
                                             </th>
-                                            <th className="px-1 w-[240px] font-bold text-left cursor-pointer hover:bg-gray-200"
-                                                onClick={() => handleSort('project_name')}
-                                            >
+                                            <th className="px-1 w-[240px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('project_name')}>
                                                 Project Name {sortConfig.key === 'project_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                             </th>
-                                            <th className="px-1 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200"
-                                                onClick={() => handleSort('type')}
-                                            >
+                                            <th className="px-1 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('type')}>
                                                 Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                             </th>
                                             <th className="px-1 w-[110px] font-bold text-left">Amount</th>

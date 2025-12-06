@@ -293,7 +293,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
             if (!bill) {
                 return; // Skip if no corresponding bill found
             }
-            const vendorName = bill.vendor_name || getVendorNameById(bill.vendor_id);
+            const vendorName = getVendorNameById(bill.vendor_id) || bill.vendor_name;
             const billAmount = parseFloat(bill.total_amount) || 0;
             if (vendorName && billAmount > 0) {
                 const enteredDates = [...new Set(billEntriesForTracker.map(entry => entry.entered_date).filter(Boolean))];

@@ -6,6 +6,16 @@ import LoanPortal from './LoanPortal';
 import LoanReport from './LoanReport';
 import LoanSummary from './LoanSummary';
 
+// Payment Mode options
+const paymentModeOptions = [
+    { value: 'Cash', label: 'Cash' },
+    { value: 'GPay', label: 'GPay' },
+    { value: 'PhonePe', label: 'PhonePe' },
+    { value: 'Net Banking', label: 'Net Banking' },
+    { value: 'Cheque', label: 'Cheque' },
+    { value: 'Advance Transfer', label: 'Advance Transfer' }
+];
+
 const LoanPoratlHeading = ({ username, userRoles = [] }) => {
     const [activeTab, setActiveTab] = useState(() => {
         const savedTab = localStorage.getItem('activePaintTab');
@@ -26,19 +36,19 @@ const LoanPoratlHeading = ({ username, userRoles = [] }) => {
     const renderContent = () => {
         switch (activeTab) {
             case 'loanportal':
-                return <LoanPortal username={username} userRoles={userRoles} />;
+                return <LoanPortal username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
             case 'loantableview':
-                return <LoanTableview username={username} userRoles={userRoles} />;
+                return <LoanTableview username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
             case 'loandatabase':
-                return <LoanDatabase username={username} userRoles={userRoles} />;
+                return <LoanDatabase username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
             case 'loanaddinput':
-                return <LoanAddInput username={username} userRoles={userRoles} />;
+                return <LoanAddInput username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
             case 'loanreport':
-                return <LoanReport username={username} userRoles={userRoles} />;
+                return <LoanReport username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
             case 'loansummary':
-                return <LoanSummary username={username} userRoles={userRoles} />;
+                return <LoanSummary username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
             default:
-                return <LoanPortal />;
+                return <LoanPortal paymentModeOptions={paymentModeOptions} />;
         }
     };
     return (

@@ -6,6 +6,15 @@ import StaffReport from './StaffReport';
 import StaffSummary from './StaffSummary';
 import StaffAddInput from './StaffAddInput';
 
+// Payment Mode options
+const paymentModeOptions = [
+    { value: 'Cash', label: 'Cash' },
+    { value: 'GPay', label: 'GPay' },
+    { value: 'PhonePe', label: 'PhonePe' },
+    { value: 'Net Banking', label: 'Net Banking' },
+    { value: 'Cheque', label: 'Cheque' }
+];
+
 const StaffHeading = ({ username, userRoles = [] }) => {
     const [activeTab, setActiveTab] = useState(() => {
         const savedTab = localStorage.getItem('activePaintTab');
@@ -24,48 +33,36 @@ const StaffHeading = ({ username, userRoles = [] }) => {
     const renderContent = () => {
         switch (activeTab) {
             case 'staffAdvance':
-                return <StaffAdvance username={username} userRoles={userRoles} />;
+                return <StaffAdvance username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
             case 'staffTablview':
-                return <StaffTableview username={username} userRoles={userRoles} />;
+                return <StaffTableview username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
             case 'staffDatabase':
-                return <StaffDatabase username={username} userRoles={userRoles} />;
+                return <StaffDatabase username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
             case 'staffInput':
-                return <StaffAddInput username={username} userRoles={userRoles} />;
+                return <StaffAddInput username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
             case 'staffReport':
-                return <StaffReport username={username} userRoles={userRoles} />;
+                return <StaffReport username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
             case 'staffSummary':
-                return <StaffSummary username={username} userRoles={userRoles} />;
+                return <StaffSummary username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
             default:
-                return <StaffAdvance />;
+                return <StaffAdvance paymentModeOptions={paymentModeOptions} />;
         }
     };
     return (
-        <div className="bg-[#FAF6ED]">
+        <div className="bg-[#FAF6ED] w-full h-auto min-h-screen">
             <div className="topbar-title">
-                <h2
-                    className={`link ${activeTab === 'staffAdvance' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('staffAdvance')}
-                >
+                <h2 className={`link ${activeTab === 'staffAdvance' ? 'active' : ''}`} onClick={() => setActiveTab('staffAdvance')} >
                     Advance
                 </h2>
-                <h2
-                    className={`link ${activeTab === 'staffTablview' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('staffTablview')}
-                >
+                <h2 className={`link ${activeTab === 'staffTablview' ? 'active' : ''}`} onClick={() => setActiveTab('staffTablview')} >
                     Table View
                 </h2>
                 {(username === 'Mahalingam M' || username === 'Admin') && (
-                    <h2
-                        className={`link ${activeTab === 'staffDatabase' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('staffDatabase')}
-                    >
+                    <h2 className={`link ${activeTab === 'staffDatabase' ? 'active' : ''}`} onClick={() => setActiveTab('staffDatabase')} >
                         Database
                     </h2>
                 )}
-                <h2
-                    className={`link ${activeTab === 'staffInput' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('staffInput')}
-                >
+                <h2 className={`link ${activeTab === 'staffInput' ? 'active' : ''}`} onClick={() => setActiveTab('staffInput')} >
                     Add Input
                 </h2>
                 <h2

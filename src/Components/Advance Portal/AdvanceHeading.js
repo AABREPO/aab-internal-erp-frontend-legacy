@@ -5,6 +5,15 @@ import AdvanceDatabase from './AdvanceDatabase';
 import AdvanceReport from './AdvanceReport';
 import AdvanceSummary from './AdvanceSummary';
 
+// Payment Mode options
+const paymentModeOptions = [
+    { value: 'Cash', label: 'Cash' },
+    { value: 'GPay', label: 'GPay' },
+    { value: 'PhonePe', label: 'PhonePe' },
+    { value: 'Net Banking', label: 'Net Banking' },
+    { value: 'Cheque', label: 'Cheque' }
+];
+
 const AdvanceHeading = ({ username, userRoles = [] }) => {
 
     const [activeTab, setActiveTab] = useState(() => {
@@ -26,17 +35,17 @@ const AdvanceHeading = ({ username, userRoles = [] }) => {
     const renderContent = () => {
         switch (activeTab) {
             case 'advanceportal':
-                return <AdvancePortal username={username} userRoles={userRoles}/>;
+                return <AdvancePortal username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
             case 'advacetablview':
-                return <AdvanceTableView username={username} userRoles={userRoles}/>;
+                return <AdvanceTableView username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
             case 'advancedatabase':
-                return <AdvanceDatabase username={username} userRoles={userRoles}/>;
+                return <AdvanceDatabase username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
             case 'advancereport':
-                return <AdvanceReport username={username} userRoles={userRoles}/>;
+                return <AdvanceReport username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
             case 'advancesummary':
-                return <AdvanceSummary username={username} userRoles={userRoles}/>;
+                return <AdvanceSummary username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
             default:
-                return <AdvancePortal />;
+                return <AdvancePortal paymentModeOptions={paymentModeOptions} />;
         }
     };
     return (

@@ -5,7 +5,7 @@ import cross from '../Images/cross.png';
 import edit from '../Images/Edit.svg';
 import deleteIcon from '../Images/Delete.svg';
 
-const StaffAddInput = ({ username, userRoles = [] }) => {
+const StaffAddInput = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     const [isStaffTypeOpen, setIsStaffTypeOpen] = useState(false);
     const [staffTypeSearch, setStaffTypeSearch] = useState('');
     const [staffType, setStaffType] = useState('');

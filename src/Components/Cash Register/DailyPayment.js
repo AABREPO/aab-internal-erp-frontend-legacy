@@ -268,12 +268,12 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     entry.vendor_id
                         ? getVendorName(entry.vendor_id)
                         : entry.contractor_id
-                        ? getContractorName(entry.contractor_id)
-                        : entry.employee_id
-                        ? getEmployeeName(entry.employee_id)
-                        : entry.labour_id
-                        ? laboursList.find(l => l.id === Number(entry.labour_id))?.label || ""
-                        : "";
+                            ? getContractorName(entry.contractor_id)
+                            : entry.employee_id
+                                ? getEmployeeName(entry.employee_id)
+                                : entry.labour_id
+                                    ? laboursList.find(l => l.id === Number(entry.labour_id))?.label || ""
+                                    : "";
                 if (name.toLowerCase() !== selectContractororVendorName.toLowerCase())
                     return false;
             }
@@ -294,7 +294,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     const contractorVendorFilterOptions = React.useMemo(() => {
         const ids = new Set();
         const options = [];
-        
+
         // Add contractor/vendor/employee options
         filteredExpenses.forEach(exp => {
             const option =
@@ -309,7 +309,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 options.push({ value: option.label, label: option.label });
             }
         });
-        
+
         // Add labour options
         filteredExpenses.forEach(exp => {
             const labourOption = laboursList.find(opt => opt.id === Number(exp.labour_id));
@@ -318,7 +318,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 options.push({ value: labourOption.label, label: labourOption.label });
             }
         });
-        
+
         return options;
     }, [filteredExpenses, combinedOptions, laboursList]);
 
@@ -731,54 +731,17 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     sNo: item.siteNo
                 }));
                 const predefinedSiteOptions = [
-                    {
-                        value: "Mason Advance",
-                        label: "Mason Advance",
-                        id: 1,
-                        sNo: "1"
-                    },
-                    {
-                        value: "Material Advance",
-                        label: "Material Advance",
-                        id: 2,
-                        sNo: "2"
-                    },
-                    {
-                        value: "Weekly Advance",
-                        label: "Weekly Advance",
-                        id: 3,
-                        sNo: "3"
-                    },
-                    {
-                        value: "Excess Advance",
-                        label: "Excess Advance",
-                        id: 4,
-                        sNo: "4"
-                    },
-                    {
-                        value: "Material Rent",
-                        label: "Material Rent",
-                        id: 5,
-                        sNo: "5"
-                    },
-                    {
-                        value: "Subhash Kumar - Kunnur",
-                        label: "Subhash Kumar - Kunnur",
-                        id: 6,
-                        sNo: "6"
-                    },
-                    {
-                        value: "Summary Bill",
-                        label: "Summary Bill",
-                        id: 7,
-                        sNo: "7"
-                    },
-                    {
-                        value: "Daily Wage",
-                        label: "Daily Wage",
-                        id: 8,
-                        sNo: "8"
-                    }
+                    { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
+                    { value: "Material Advance", label: "Material Advance", id: 2, sNo: "2" },
+                    { value: "Weekly Advance", label: "Weekly Advance", id: 3, sNo: "3" },
+                    { value: "Excess Advance", label: "Excess Advance", id: 4, sNo: "4" },
+                    { value: "Material Rent", label: "Material Rent", id: 5, sNo: "5" },
+                    { value: "Subhash Kumar - Kunnur", label: "Subhash Kumar - Kunnur", id: 6, sNo: "6" },
+                    { value: "Summary Bill", label: "Summary Bill", id: 7, sNo: "7" },
+                    { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
+                    { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
+                    { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
+                    { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
                 ];
                 // Combine backend data with predefined options
                 const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
@@ -1310,7 +1273,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         if (confirmed) {
             try {
                 const refundData = refundPayments.find(refund => refund.id === id);
-                
+
                 // Clear Staff Advance Portal entry if exists
                 if (refundData && refundData.staff_advance_portal_id) {
                     try {
@@ -1321,7 +1284,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         return;
                     }
                 }
-                
+
                 // Clear Loan Portal entry if exists
                 if (refundData && refundData.loan_portal_id) {
                     try {
@@ -1332,7 +1295,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         return;
                     }
                 }
-                
+
                 const response = await fetch(`https://backendaab.in/aabuildersDash/api/refund_received/delete/${id}`, {
                     method: 'DELETE',
                 });
@@ -1699,9 +1662,36 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             }
         });
         const firstTableEndY = doc.lastAutoTable.finalY;
-        const spaceBetweenTables = 10;
+        const spaceBetweenTables = 10;        
+        // Calculate and display NET BALANCE on first page only
+        const netBalance = totalAmount - totalRefundAmount;
+        doc.setPage(1);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(`NET BALANCE: ${netBalance.toLocaleString('en-IN')}`, 155, 38);        
+        // Helper function to add header to new pages
+        const addHeaderToPage = (pageNum) => {
+            doc.setPage(pageNum);
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            doc.text(headerText1, 60, 24);
+            doc.text(headerText2, 170, 20);
+            doc.text(headerText, 14, 20);
+            doc.setFontSize(10);
+            doc.text(dayText, 170, 27);
+            doc.setLineWidth(0.5);
+            doc.line(14, 15, pageWidth - 14, 15);
+            doc.line(14, 30, pageWidth - 14, 30);
+        };
+        // Add a new page for other tables
+        doc.addPage();
+        addHeaderToPage(doc.internal.getNumberOfPages());
+        // Calculate start position for second page tables (side by side layout)
+        const secondPageStartY = 40;
+        const sideBySideStartY = secondPageStartY;
+        // Prepare WAGE REFUND table data
         const refundTableColumn = [
-            "SNO", "NAME", "AMOUNT"
+           "SNO", "NAME", "", "BALANCE"
         ];
         const refundTableRows = refundPayments
             .reverse()
@@ -1723,15 +1713,12 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             "TOTAL",
             `${totalRefundAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
         ]);
-        const netBalance = totalAmount - totalRefundAmount;
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
-        doc.text(`NET BALANCE: ${netBalance.toLocaleString('en-IN')}`, 155, 38);
+        // Render WAGE REFUND heading and table (left side)
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
-        doc.text('WAGE REFUND', 14, firstTableEndY + spaceBetweenTables - 2);
+        doc.text('WAGE REFUND', 14, sideBySideStartY - 2);
         doc.autoTable({
-            startY: firstTableEndY + spaceBetweenTables,
+            startY: sideBySideStartY,
             head: [refundTableColumn],
             body: refundTableRows,
             tableWidth: 'wrap',
@@ -1756,13 +1743,91 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 fillColor: false,
             },
             columnStyles: {
-                0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },
-                1: { cellWidth: 35, halign: 'left' },
-                2: { cellWidth: 20, halign: 'right' }
+                0: { cellWidth: 10, halign: 'center', fillColor: [255, 255, 255] },
+                1: { cellWidth: 30, halign: 'left' },
+                2: { cellWidth: 20, halign: 'right' },
+                3: { cellWidth: 20, halign: 'right' }
             },
-            margin: { left: 14, right: 0 }
+            margin: { left: 14, right: 95 },
+            didDrawPage: function(data) {
+                if (data.pageNumber > 1) {
+                    addHeaderToPage(data.pageNumber);
+                }
+            }
         });
         const refundTableEndY = doc.lastAutoTable.finalY;
+        // Render WAGE ADVANCE table (right side, same Y position)
+        if (advanceExpenses.length > 0) {
+            const advanceTableColumn = [
+                "S.NO", "PROJECT NAME", "STAFF NAME", "TOTAL AMOUNT"
+            ];
+            const advanceTableRows = advanceExpenses
+                .map((row, index) => {
+                    const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
+                    const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
+                    const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
+                    const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
+                    const name = [employee?.label, vendor?.label, contractor?.label, labour?.label]
+                        .filter(Boolean).join(" | ") || "";
+                    const projectName = siteOptions.find(opt => opt.id === Number(row.project_id))?.label || "";
+                    const amount = (row.amount || 0) + (row.extra_amount || 0);
+                    const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
+                    return [
+                        (index + 1).toString(),
+                        projectName,
+                        name,
+                        formattedAmount
+                    ];
+                });
+            advanceTableRows.push([
+                "",
+                "TOTAL",
+                "",
+                `${totalAdvanceAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
+            ]);
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text('STAFF ADVANCE', 100, sideBySideStartY - 2);
+            doc.autoTable({
+                startY: sideBySideStartY,
+                head: [advanceTableColumn],
+                body: advanceTableRows,
+                tableWidth: 'wrap',
+                styles: {
+                    fontSize: 8,
+                    cellPadding: 2,
+                    halign: 'left',
+                    valign: 'middle',
+                    textColor: [80, 80, 80],
+                },
+                headStyles: {
+                    fillColor: [255, 248, 220],
+                    textColor: [0, 0, 0],
+                    fontStyle: 'bold',
+                    lineColor: [200, 200, 200],
+                    lineWidth: 0.1,
+                },
+                bodyStyles: {
+                    lineWidth: 0.1,
+                },
+                alternateRowStyles: {
+                    fillColor: false,
+                },
+                columnStyles: {
+                    0: { cellWidth: 11, halign: 'center', fillColor: [255, 255, 255] },
+                    1: { cellWidth: 34, halign: 'left' },
+                    2: { cellWidth: 32, halign: 'left' },
+                    3: { cellWidth: 20, halign: 'right' }
+                },
+                margin: { left: 100, right: 0 },
+                didDrawPage: function(data) {
+                    if (data.pageNumber > 1) {
+                        addHeaderToPage(data.pageNumber);
+                    }
+                }
+            });
+        }
+        // Arrange DIWALI BONUS - side by side with WAGE REFUND if no WAGE ADVANCE, otherwise below
         if (diwaliBonusExpenses.length > 0) {
             const diwaliBonusTableColumn = [
                 "SNO", "NAME", "AMOUNT"
@@ -1787,12 +1852,24 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 "",
                 "TOTAL",
                 `${totalDiwaliBonusAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
-            ]);
-            doc.setFontSize(12);
-            doc.setFont(undefined, 'bold');
-            doc.text('DIWALI BONUS', 14, refundTableEndY + 15);
+            ]);            
+            let diwaliY = sideBySideStartY;
+            let diwaliX = 100; // Right side position            
+            if (advanceExpenses.length === 0) {
+                // No WAGE ADVANCE, so DIWALI BONUS goes on the right side
+                doc.setFontSize(12);
+                doc.setFont(undefined, 'bold');
+                doc.text('DIWALI BONUS', diwaliX, sideBySideStartY - 2);
+            } else {
+                // WAGE ADVANCE exists, so DIWALI BONUS goes below
+                diwaliY = Math.max(refundTableEndY, doc.lastAutoTable.finalY) + 15;
+                diwaliX = 14; // Left side position
+                doc.setFontSize(12);
+                doc.setFont(undefined, 'bold');
+                doc.text('DIWALI BONUS', diwaliX, diwaliY - 2);
+            }            
             doc.autoTable({
-                startY: refundTableEndY + 20,
+                startY: diwaliY,
                 head: [diwaliBonusTableColumn],
                 body: diwaliBonusTableRows,
                 tableWidth: 'wrap',
@@ -1821,72 +1898,12 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     1: { cellWidth: 35, halign: 'left' },
                     2: { cellWidth: 20, halign: 'right' }
                 },
-                margin: { left: 14, right: 0 }
-            });
-        }
-        if (advanceExpenses.length > 0) {
-            const advanceTableColumn = [
-                "S.NO", "PROJECT NAME", "EMPLOYEE NAME", "TOTAL AMOUNT"
-            ];
-            const advanceTableRows = advanceExpenses
-                .map((row, index) => {
-                    const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
-                    const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
-                    const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
-                    const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
-                    const name = [employee?.label, vendor?.label, contractor?.label, labour?.label]
-                        .filter(Boolean).join(" | ") || "";
-                    const projectName = siteOptions.find(opt => opt.id === Number(row.project_id))?.label || "";
-                    const amount = (row.amount || 0) + (row.extra_amount || 0);
-                    const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
-                    return [
-                        (index + 1).toString(),
-                        projectName,
-                        name,
-                        formattedAmount
-                    ];
-                });
-            advanceTableRows.push([
-                "",
-                "TOTAL",
-                "",
-                `${totalAdvanceAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
-            ]);
-            doc.setFontSize(12);
-            doc.setFont(undefined, 'bold');
-            doc.text('WAGE ADVANCE', 95, firstTableEndY + spaceBetweenTables - 2);
-            doc.autoTable({
-                startY: firstTableEndY + spaceBetweenTables,
-                head: [advanceTableColumn],
-                body: advanceTableRows,
-                tableWidth: 'wrap',
-                styles: {
-                    fontSize: 8,
-                    cellPadding: 2,
-                    halign: 'left',
-                    valign: 'middle',
-                    textColor: [80, 80, 80],
-                },
-                headStyles: {
-                    fillColor: [255, 248, 220],
-                    textColor: [0, 0, 0],
-                    fontStyle: 'bold',
-                    lineColor: [200, 200, 200],
-                    lineWidth: 0.1,
-                },
-                bodyStyles: {
-                    lineWidth: 0.1,
-                },
-                alternateRowStyles: {
-                    fillColor: false,
-                },
-                columnStyles: {
-                    0: { cellWidth: 12, halign: 'center', fillColor: [255, 255, 255] },
-                    1: { cellWidth: 35, halign: 'left' },
-                    2: { cellWidth: 35, halign: 'left' },
-                    3: { cellWidth: 20, halign: 'right' }
-                },
-                margin: { left: 95, right: 0 }
+                margin: { left: diwaliX, right: 0 },
+                didDrawPage: function(data) {
+                    if (data.pageNumber > 1) {
+                        addHeaderToPage(data.pageNumber);
+                    }
+                }
             });
         }
         const fileName = `PS ${currentWeekNumber} - Daily Payment Statement ${formatDateOnly(selectedDate)}.pdf`;
@@ -2062,7 +2079,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         </div>
                     </div>
                 </div>
-                <div className="mr-5 flex gap-3">                    
+                <div className="mr-5 flex gap-3">
                     <button onClick={generateExpensesPDF} className='font-semibold mt-4 mr-5 hover:text-[#E4572E]'>Report</button>
                 </div>
             </div>

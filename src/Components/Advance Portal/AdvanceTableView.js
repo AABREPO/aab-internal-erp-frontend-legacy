@@ -1143,7 +1143,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
   if (loading) {
     return (
       <body className='bg-[#FAF6ED]'>
-        <div className='bg-white w-full max-w-[1850px] h-[500px] rounded-md p-10 ml-4 mr-4 sm:ml-6 lg:ml-10 lg:mr-10 flex flex-col items-center justify-center mx-auto'>
+        <div className='bg-white w-full max-w-[1850px] h-[500px] rounded-md p-10 ml-4 mr-4 sm:ml-6 lg:ml-10 lg:mr-10 flex flex-col items-center justify-center'>
           <div className="text-lg mb-4">Loading advance table data...</div>
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#BF9853] mb-4"></div>
           <div className="text-sm text-gray-600">
@@ -1162,7 +1162,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
   if (error) {
     return (
       <body className='bg-[#FAF6ED]'>
-        <div className='bg-white w-full max-w-[1850px] h-[500px] rounded-md p-10 ml-4 mr-4 sm:ml-6 lg:ml-10 lg:mr-10 flex items-center justify-center mx-auto'>
+        <div className='bg-white w-full max-w-[1850px] h-[500px] rounded-md p-10 ml-4 mr-4 sm:ml-6 lg:ml-10 lg:mr-10 flex items-center justify-center'>
           <div className="text-lg text-red-600">{error}</div>
         </div>
       </body>
@@ -1171,12 +1171,12 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
   return (
     <div className='bg-[#FAF6ED] '>
       <div>
-        <div className='w-full max-w-[1850px] bg-white lg:h-[128px] rounded-md ml-4 mr-4 sm:ml-6 lg:ml-10 lg:mr-10 px-4 lg:px-10 text-left flex flex-wrap items-center pb-5 mx-auto'>
+        <div className=' max-w-[1850px] bg-white xl:h-[128px] rounded-md ml-10 mr-10 px-4 py-2 text-left flex flex-wrap items-center '>
           <div className='flex flex-wrap gap-[16px] p-4'>
             <div>
               <label className='block mb-2 font-semibold'>Advance Amount</label>
               <input
-                className='w-[183px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
+                className='w-full h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
                 value={`₹${totalAdvance.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
                 readOnly
               />
@@ -1184,7 +1184,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
             <div>
               <label className='block mb-2 font-semibold'>Bill Amount</label>
               <input
-                className='w-[183px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
+                className='w-full h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
                 value={`₹${totalBill.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
                 readOnly
               />
@@ -1194,25 +1194,25 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
               <input
                 value={`₹${totalTransfer.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
                 readOnly
-                className='w-[183px] lg:w-[220px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2' />
+                className='w-full h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2' />
             </div>
             <div>
               <label className='block mb-2 font-semibold'>Refund Amount</label>
               <input
-                className='w-[183px] lg:w-[220px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
+                className='w-full h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
                 value={`₹${totalRefund.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
                 readOnly
               />
             </div>
           </div>
-          <div className='flex flex-wrap gap-5'>
+          <div className='flex flex-wrap gap-5 xl:px-0 px-4'>
             <div>
               <label className='block mb-2 font-semibold'>Start Date</label>
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className='w-[168px] h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2'
+                className='w-full h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2'
               />
             </div>
             <div>
@@ -1221,12 +1221,12 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className='w-[168px] h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2'
+                className='w-full h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2'
               />
             </div>
           </div>
         </div>
-        <div className='rounded-md w-full max-w-[1850px] ml-4 mr-4 sm:ml-6 lg:ml-10 lg:mr-10 px-4 lg:px-10 bg-white mt-4 pt-5 h-[650px]'>
+        <div className='rounded-md max-w-[1850px] ml-10 mr-10 px-4 bg-white mt-4 pt-5 h-[650px]'>
           <div
             className={`text-left flex ${selectDate || selectContractororVendorName || selectProjectName || selectTransfer || selectType || selectMode || selectEntryNo || startDate || endDate
               ? 'flex-col sm:flex-row sm:justify-between'
@@ -1345,7 +1345,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
               <table className="min-w-[1805px] w-full border-collapse">
                 <thead className="sticky top-0 z-10 bg-white ">
                   <tr className="bg-[#FAF6ED]">
-                    <th className="pt-2 pl-3 w-44 font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('date')}>
+                    <th className="pt-2 pl-3 py-2 w-44 font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('date')}>
                       Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="px-2 w-[320px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('vendor')}>

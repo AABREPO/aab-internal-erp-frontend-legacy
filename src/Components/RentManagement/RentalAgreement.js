@@ -481,7 +481,7 @@ const RentalAgreement = () => {
             
                       (15) The Tenant shall not claim any compensation or any other amount at the time of vacating the rented portion except the advance amount.
             
-                      (16) The period of tenancy for ${Agreementvalidity} (${agreementValidityInWords}) months, commencing from Rs.${formattedMonthlyRent}/- (${rentInWords} Rupees), rent is to be enhanced ${selectedPercent}% for every three years from the previous rent;
+                      (16) The period of tenancy for ${Agreementvalidity} (${agreementValidityInWords}) months, commencing from Rs.${formattedMonthlyRent}/- (${rentInWords} Rupees), rent is to be enhanced ${selectedPercent}% for every three years from the previous rent.
                 `.trim();
 
         const firstLineMargin = 40;
@@ -500,6 +500,90 @@ const RentalAgreement = () => {
             });
             cursorY += 3;
         });
+        
+        // Render clause 17 with bold text - keep as single paragraph
+        if (cursorY > pageHeight - 20) {
+            doc.addPage();
+            isFirstPage = false;
+            cursorY = defaultMarginTop;
+        }
+        const clause17Prefix = "(17) If the Tenant fails to ";
+        const clause17Bold = "pay the monthly rent on or before the 5th of any month";
+        const clause17Suffix = ", the Tenant agrees to vacate the premises within the same month without any objection.";
+        
+        // Calculate actual available width for first line
+        const firstLineAvailableWidth = pageWidth - firstLineMargin - marginRight;
+        
+        // Combine all text to get natural wrapping
+        const fullText = clause17Prefix + clause17Bold + clause17Suffix;
+        doc.setFont("helvetica", "normal");
+        const wrappedLines = doc.splitTextToSize(fullText, firstLineAvailableWidth);
+        
+        // Track accumulated text to find where bold starts/ends
+        let accumulatedText = '';
+        const prefixLength = clause17Prefix.length;
+        const boldLength = clause17Bold.length;
+        const boldStart = prefixLength;
+        const boldEnd = prefixLength + boldLength;
+        
+        // Render each wrapped line with proper formatting
+        wrappedLines.forEach((line, lineIndex) => {
+            if (cursorY > pageHeight - 20) {
+                doc.addPage();
+                cursorY = defaultMarginTop;
+            }
+            
+            const currentMargin = lineIndex === 0 ? firstLineMargin : marginLeft;
+            let currentX = currentMargin;
+            
+            // Find where this line starts and ends in the original text
+            const lineStartInFull = accumulatedText.length;
+            const lineEndInFull = accumulatedText.length + line.length;
+            
+            // Determine which parts are in this line
+            if (lineStartInFull < prefixLength) {
+                // Prefix is in this line
+                const prefixStartInLine = 0;
+                const prefixEndInLine = Math.min(line.length, prefixLength - lineStartInFull);
+                const prefixInLine = line.substring(prefixStartInLine, prefixEndInLine);
+                
+                if (prefixInLine) {
+                    doc.setFont("helvetica", "normal");
+                    doc.text(prefixInLine, currentX, cursorY);
+                    currentX += doc.getTextWidth(prefixInLine);
+                }
+            }
+            
+            // Check if bold text is in this line
+            if (lineStartInFull < boldEnd && lineEndInFull > boldStart) {
+                const boldStartInLine = Math.max(0, boldStart - lineStartInFull);
+                const boldEndInLine = Math.min(line.length, boldEnd - lineStartInFull);
+                const boldInLine = line.substring(boldStartInLine, boldEndInLine);
+                
+                if (boldInLine) {
+                    doc.setFont("helvetica", "bold");
+                    doc.text(boldInLine, currentX, cursorY);
+                    currentX += doc.getTextWidth(boldInLine);
+                }
+            }
+            
+            // Check if suffix is in this line
+            if (lineEndInFull > boldEnd) {
+                const suffixStartInLine = Math.max(0, boldEnd - lineStartInFull);
+                const suffixInLine = line.substring(suffixStartInLine);
+                
+                if (suffixInLine) {
+                    doc.setFont("helvetica", "normal");
+                    doc.text(suffixInLine, currentX, cursorY);
+                }
+            }
+            
+            // Update accumulated text for next iteration
+            accumulatedText += line;
+            cursorY += lineHeight;
+        });
+        
+        cursorY += 3;
         doc.addPage();
         cursorY = defaultMarginTop;
         const scheduleTitle = "SCHEDULE";

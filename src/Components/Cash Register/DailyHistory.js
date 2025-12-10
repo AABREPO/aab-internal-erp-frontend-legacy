@@ -2776,16 +2776,32 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                                                             styles={customStyles}
                                                         />
                                                     ) : (
-                                                        (() => {
-                                                            const employee = getEmployeeName(row.employee_id);
-                                                            const vendor = getVendorName(row.vendor_id);
-                                                            const contractor = getContractorName(row.contractor_id);
-                                                            const labour = laboursList.find(opt => String(opt.id) === String(row.labour_id))?.label || "";
-                                                            return employee || vendor || contractor || labour || "";
-                                                        })()
+                                                        <div className="flex items-center justify-between w-full gap-2">
+                                                            <div className="truncate pr-2">
+                                                                {(() => {
+                                                                    const employee = getEmployeeName(row.employee_id);
+                                                                    const vendor = getVendorName(row.vendor_id);
+                                                                    const contractor = getContractorName(row.contractor_id);
+                                                                    const labour = laboursList.find(opt => String(opt.id) === String(row.labour_id))?.label || "";
+                                                                    const labels = [employee, vendor, contractor, labour].filter(Boolean);
+                                                                    return labels.join(", ") || "";
+                                                                })()}
+                                                            </div>
+                                                            {(() => {
+                                                                const hasLabourId = row.labour_id && Number(row.labour_id) > 0;
+                                                                const hasVendorOrContractorId = (row.vendor_id && Number(row.vendor_id) > 0) ||
+                                                                    (row.contractor_id && Number(row.contractor_id) > 0);
+                                                                if (!hasLabourId && !hasVendorOrContractorId) return null;
+                                                                return (
+                                                                    <div className="bg-[#E3F2FD] text-[#1565C0] font-semibold px-3 py-[2px] text-xs rounded-full whitespace-nowrap">
+                                                                        {hasLabourId ? 'Staff Portal' : 'Loan Portal'}
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
                                                     )}
                                                 </td>
-                                                <td className="py-2">
+                                                <td className="py-2 text-center">
                                                     {editingPaymentId === row.id && Number(selectedWeek) === Number(lastWeekNumber) ? (
                                                         <input
                                                             type="number"

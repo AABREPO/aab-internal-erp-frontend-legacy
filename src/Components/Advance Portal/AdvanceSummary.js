@@ -50,18 +50,18 @@ const AdvanceSummary = () => {
   // Function to convert Google Drive URL to viewable format for opening in new tab
   const convertToViewableUrl = (url) => {
     if (!url) return url;
-    
+
     // Check if it's a Google Drive URL
     if (url.includes('drive.google.com')) {
       // Extract file ID from various Google Drive URL formats
       let fileId = null;
-      
+
       // Format: https://drive.google.com/file/d/FILE_ID/view?usp=sharing
       const match1 = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
       if (match1) {
         fileId = match1[1];
       }
-      
+
       // Format: https://drive.google.com/open?id=FILE_ID
       if (!fileId) {
         const match2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
@@ -69,7 +69,7 @@ const AdvanceSummary = () => {
           fileId = match2[1];
         }
       }
-      
+
       // Format: https://drive.google.com/uc?id=FILE_ID
       if (!fileId) {
         const match3 = url.match(/\/uc\?id=([a-zA-Z0-9_-]+)/);
@@ -77,13 +77,13 @@ const AdvanceSummary = () => {
           fileId = match3[1];
         }
       }
-      
+
       if (fileId) {
         // Return view URL for opening in new tab
         return `https://drive.google.com/file/d/${fileId}/view`;
       }
     }
-    
+
     // If not a Google Drive URL or couldn't extract ID, return original URL
     return url;
   };
@@ -247,20 +247,63 @@ const AdvanceSummary = () => {
     control: (provided, state) => ({
       ...provided,
       borderWidth: '2px',
+      lineHeight: '20px',
+      fontSize: '14px',
+      minHeight: '45px',
+      height: '45px',
       borderRadius: '8px',
-      borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'rgba(191, 152, 83, 0.2)',
-      boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
+      borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.5)' : 'rgba(191, 152, 83, 0.25)',
+      boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
       '&:hover': {
-        borderColor: 'rgba(191, 152, 83, 0.2)',
-      }
+        borderColor: 'rgba(191, 152, 83, 0.5)',
+      },
+    }),
+    clearIndicator: (provided) => ({
+      ...provided,
+      cursor: 'pointer',
     }),
     menu: (provided) => ({
       ...provided,
       zIndex: 9999,
+      maxHeight: '300px',
     }),
     menuPortal: (provided) => ({
       ...provided,
       zIndex: 9999,
+    }),
+    menuList: (provided) => ({
+      ...provided,
+      maxHeight: '250px',
+      overflowY: 'auto',
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      fontWeight: '500',
+      backgroundColor: state.isSelected 
+        ? 'rgba(191, 152, 83, 0.3)' 
+        : state.isFocused 
+          ? 'rgba(191, 152, 83, 0.1)' 
+          : 'white',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    input: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    placeholder: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: '#999',
+      textAlign: 'left',
     }),
   };
   const [selectedAdvanceSite, setSelectedAdvanceSite] = useState(null);
@@ -1093,7 +1136,7 @@ const AdvanceSummary = () => {
     document.body.removeChild(link);
   };
 
-    // Export Bill Status Popup PDF
+  // Export Bill Status Popup PDF
   const exportBillStatusPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(14);
@@ -1448,7 +1491,7 @@ const AdvanceSummary = () => {
             Progress: {progress}%
           </div>
           <div className="w-64 bg-gray-200 rounded-full h-2 mt-2">
-            <div 
+            <div
               className="bg-[#BF9853] h-2 rounded-full transition-all duration-300"
               style={{ width: `${progress}%` }}
             ></div>
@@ -1470,10 +1513,10 @@ const AdvanceSummary = () => {
 
   return (
     <div className='bg-[#FAF6ED]'>
-        <div className="flex flex-wrap gap-6">
-          <div className="bg-white rounded-lg w-full max-w-[1850px] h-[793px] p-4 ml-4 sm:ml-6 lg:ml-10 px-4 lg:px-14 mx-auto">
-          <div className="flex flex-col xl:flex-row gap-8">
-            <div className="w-full xl:w-[calc(50%-12px)]">
+      <div className="flex flex-wrap gap-6">
+        <div className="bg-white rounded xl:w-[1850px] xl:h-[793px] p-4 ml-10 mr-10 px-4 lg:px-14">
+          <div className="xl:flex space-y-4 xl:space-y-0 gap-8">
+            <div className="w-full">
               <div className="flex items-center mb-4 lg:justify-between">
                 <div className='lg:flex lg:gap-3 gap-1'>
                   <div className="text-left">
@@ -1530,7 +1573,7 @@ const AdvanceSummary = () => {
                 <table className="w-full border-collapse ">
                   <thead>
                     <tr className="bg-[#f8f1e5] text-left sticky top-0 z-10">
-                      <th className="p-2 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('projectName')}>
+                      <th className="p-2 py-2 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('projectName')}>
                         Project Name
                         {sortConfig.key === 'projectName' && (
                           <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
@@ -1592,8 +1635,8 @@ const AdvanceSummary = () => {
                 </table>
               </div>
             </div>
-            <div className="rounded-lg w-full xl:w-[calc(50%-12px)]">
-              <div className="flex justify-between items-center mb-4">
+            <div className=" w-full">
+              <div className="flex items-center mb-4 lg:justify-between">
                 <div className="text-left">
                   <label className="block font-semibold mb-2">Project Name</label>
                   <Select
@@ -1624,7 +1667,7 @@ const AdvanceSummary = () => {
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="bg-[#f8f1e5] text-left sticky top-0 z-10">
-                      <th className="p-2 cursor-pointer hover:bg-gray-200" onClick={() => handleSiteSort('name')} >
+                      <th className="p-2 py-2 cursor-pointer hover:bg-gray-200" onClick={() => handleSiteSort('name')} >
                         Contractor/Vendor
                         {siteSortConfig.key === 'name' && (
                           <span className="ml-1">{siteSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
@@ -2172,7 +2215,7 @@ const AdvanceSummary = () => {
                         <td className={`p-3 text-right font-semibold ${entry.advanceAmount < 0 ? 'text-red-600' : ''}`}>
                           {entry.advanceAmount !== 0 ? `₹${entry.advanceAmount.toLocaleString('en-IN')}` : '-'}
                         </td>
-                        <td 
+                        <td
                           className={`p-3 text-right font-semibold ${entry.billAmount !== 0 && entry.file_url ? 'cursor-pointer hover:underline' : ''}`}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -2181,7 +2224,7 @@ const AdvanceSummary = () => {
                               window.open(viewableUrl, '_blank', 'noopener,noreferrer');
                             }
                           }}
-                          style={entry.billAmount !== 0 && entry.file_url ? { 
+                          style={entry.billAmount !== 0 && entry.file_url ? {
                             cursor: 'pointer'
                           } : {}}
                           title={entry.billAmount !== 0 && entry.file_url ? 'Click to open bill document in new tab' : ''}

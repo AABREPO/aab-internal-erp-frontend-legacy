@@ -33,9 +33,9 @@ const Userroleandpermission = () => {
       level: "Level 2",
     },
     {
-      id:5,
-      name:"Invoice",
-      level:"level 3",
+      id: 5,
+      name: "Invoice",
+      level: "level 3",
     },
     {
       id: 6,
@@ -59,8 +59,8 @@ const Userroleandpermission = () => {
     },
     {
       id: 10,
-      name:"Vendor Payments Tracker",
-      level:"level 3",
+      name: "Vendor Payments Tracker",
+      level: "level 3",
     },
     {
       id: 11,
@@ -84,8 +84,8 @@ const Userroleandpermission = () => {
     },
     {
       id: 15,
-      name:"Weekly Payment Register",
-      level:"level 3",
+      name: "Weekly Payment Register",
+      level: "level 3",
     },
     {
       id: 16,
@@ -104,8 +104,8 @@ const Userroleandpermission = () => {
     },
     {
       id: 20,
-      name:"Tile Calculator",
-      level:"level 3",
+      name: "Tile Calculator",
+      level: "level 3",
     },
     {
       id: 21,
@@ -124,8 +124,8 @@ const Userroleandpermission = () => {
     },
     {
       id: 24,
-      name:"Switch Matrix",
-      level:"level 3",
+      name: "Switch Matrix",
+      level: "level 3",
     },
     {
       id: 25,
@@ -149,8 +149,8 @@ const Userroleandpermission = () => {
     },
     {
       id: 29,
-      name:"Staff Advance",
-      level:"level 3",
+      name: "Staff Advance",
+      level: "level 3",
     },
     {
       id: 30,
@@ -169,10 +169,25 @@ const Userroleandpermission = () => {
     },
     {
       id: 33,
-      name:"Bank Reconciliation",
-      level:"level 1",
+      name: "Bank Reconciliation",
+      level: "level 1",
+    },
+    {
+      id: 34,
+      name: "Master Data",
+      level: "Level 1",
+    },
+    {
+      id: 35,
+      name: "Dashboard",
+      level: "Level 1",
+    },
+    {
+      id: 36,
+      name: "Directory",
+      level: "Level 1",
     }
-    
+
   ];
   const [availableModules, setAvailableModules] = useState(modules);
   const [selectedModuleToAdd, setSelectedModuleToAdd] = useState(""); // module selected in dropdown
@@ -371,29 +386,27 @@ const Userroleandpermission = () => {
       display: 'none',
     }),
   };
-
   const handleSubmitRoleName = async () => {
-  const newRoleName = { roleName };
-  try {
-    const response = await fetch('https://backendaab.in/aabuilderDash/api/roles/save', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(newRoleName),
-    });
-    if (response.ok) {
-      setMessage('Role Name saved successfully!');
-      window.location.reload();
-    } else {
+    const newRoleName = { roleName };
+    try {
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/roles/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newRoleName),
+      });
+      if (response.ok) {
+        setMessage('Role Name saved successfully!');
+        window.location.reload();
+      } else {
+        setMessage('Error saving role name.');
+      }
+    } catch (error) {
+      console.error('Error:', error);
       setMessage('Error saving role name.');
     }
-  } catch (error) {
-    console.error('Error:', error);
-    setMessage('Error saving role name.');
-  }
-};
-
+  };
   const fetchRoleNames = async () => {
     try {
       const response = await fetch('https://backendaab.in/aabuilderDash/api/roles/all');
@@ -408,7 +421,6 @@ const Userroleandpermission = () => {
       setMessage('Error fetching role names.');
     }
   };
-
   useEffect(() => {
     fetchRoleNames();
   }, []);

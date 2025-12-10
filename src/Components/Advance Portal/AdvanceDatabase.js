@@ -9,6 +9,7 @@ import edit from '../Images/Edit.svg';
 import history from '../Images/History.svg';
 import remove from '../Images/Delete.svg';
 import Attach from '../Images/Attachfile.svg';
+import cross from '../Images/cross.png';
 
 const AdvanceDatabase = ({ username, userRoles = [] }) => {
   const [isUploading, setIsUploading] = useState(false);
@@ -498,12 +499,66 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
     control: (provided, state) => ({
       ...provided,
       borderWidth: '2px',
+      height: '45px',
       borderRadius: '8px',
       borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'rgba(191, 152, 83, 0.2)',
       boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
       '&:hover': {
         borderColor: 'rgba(191, 152, 83, 0.2)',
       }
+    }),
+    indicatorSeparator: () => ({
+      display: 'none',
+    }),
+    dropdownIndicator: () => ({
+      display: 'none',
+    }),
+    clearIndicator: (provided) => ({
+      ...provided,
+      cursor: 'pointer',
+    }),
+    menu: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+      maxHeight: '300px',
+    }),
+    menuPortal: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+    }),
+    menuList: (provided) => ({
+      ...provided,
+      maxHeight: '250px',
+      overflowY: 'auto',
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      fontWeight: '500',
+      backgroundColor: state.isSelected 
+        ? 'rgba(191, 152, 83, 0.3)' 
+        : state.isFocused 
+          ? 'rgba(191, 152, 83, 0.1)' 
+          : 'white',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    input: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    placeholder: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: '#999',
+      textAlign: 'left',
     }),
   };
   const handleFileChange = (e) => {
@@ -1235,13 +1290,13 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   }
   return (
     <div className='bg-[#FAF6ED]'>
-      <div className='max-w-[1850px] w-full bg-white rounded-md ml-10 lg:h-[128px] px-4 lg:px-10 text-left flex flex-wrap justify-between items-center gap-5 pb-5'>
-        <div className='flex lg:flex-wrap w-full lg:w-auto justify-between'>
+      <div className='max-w-[1850px] bg-white rounded-md ml-10 xl:h-[128px] h-auto mr-10 px-4 text-left flex flex-wrap justify-between items-center gap-5'>
+        <div className='w-full xl:w-auto xl:justify-between'>
           <div className='flex flex-wrap gap-[16px] p-4'>
             <div className=''>
               <label className='block mb-2 font-semibold'>Advance Amount</label>
               <input
-                className='w-[183px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
+                className='w-full h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
                 value={`₹${totalAdvance.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
                 readOnly
               />
@@ -1249,7 +1304,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
             <div className=''>
               <label className='block mb-2 font-semibold'>Bill Amount</label>
               <input
-                className='w-[183px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
+                className='w-full h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
                 value={`₹${totalBill.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
                 readOnly
               />
@@ -1259,12 +1314,12 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
               <input
                 value={`₹${totalTransfer.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
                 readOnly
-                className='w-[183px] lg:w-[220px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2' />
+                className='w-full h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2' />
             </div>
             <div className=''>
               <label className='block mb-2 font-semibold'>Refund Amount</label>
               <input
-                className='w-[183px] lg:w-[220px] h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
+                className='w-full h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
                 value={`₹${totalRefund.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
                 readOnly
               />
@@ -1275,7 +1330,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className='w-[168px] h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2'
+                className='w-full h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2'
               />
             </div>
             <div className=''>
@@ -1284,16 +1339,16 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className='w-[168px] h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2'
+                className='w-full h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2'
               />
             </div>
           </div>
         </div>
-        <div className='mr-0 lg:mr-10'>
-          <button onClick={() => setIsOpen(true)} className='w-28 h-[35px] border-2 bg-[#BF9853] border-opacity-25 rounded-lg mt-4 text-white'>Migrate</button>
+        <div className='mr-0 lg:mr-10 xl:px-0 px-4 xl:mb-0 mb-4'>
+          <button onClick={() => setIsOpen(true)} className='w-28 h-[35px] border-2 bg-[#BF9853] border-opacity-25 rounded-lg xl:mt-4 text-white'>Migrate</button>
         </div>
       </div>
-      <div className='max-w-[1850px] w-full ml-10 px-4 lg:px-10 bg-white rounded-md h-[650px] mt-4 pt-5'>
+      <div className='max-w-[1850px] ml-10 mr-10 px-4 bg-white rounded-md h-[650px] mt-4 pt-5'>
         <div
           className={`text-left flex ${selectTimeStampDate || selectDatabaseDate || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseMode || selectDatabaseEntryNo || startDate || endDate
             ? 'flex-col sm:flex-row sm:justify-between'
@@ -1882,165 +1937,201 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
         )}
         {isEditModalOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-            <div className="bg-white p-6 rounded-lg w-[700px]">
-              <h2 className="text-lg font-bold mb-4">Edit Entry</h2>
-              <div className='grid grid-cols-2 gap-4 text-left ml-5'>
-                <div className='flex items-center gap-3'>
-                  <label className='font-semibold text-[#E4572E]'>Select Type</label>
-                  <select
-                    value={editFormData.type}
-                    onChange={(e) => {
-                      const newType = e.target.value;
-                      setEditFormData(prev => {
-                        const updated = { ...prev, type: newType };
-                        if (newType === 'Refund') {
-                          updated.amount = '';
-                          updated.bill_amount = '';
-                        } else if (newType === 'Advance') {
-                          updated.refund_amount = '';
-                          updated.bill_amount = '';
-                        } else if (newType === 'Bill Settlement') {
-                          updated.refund_amount = '';
-                          updated.amount = '';
-                        } else if (newType === 'Transfer') {
-                          updated.refund_amount = '';
-                          updated.bill_amount = '';
-                          updated.payment_mode = '';
-                        }
-                        return updated;
-                      });
-                    }}
-                    className='w-[163px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
-                  >
-                    <option value=''>Select Type...</option>
-                    <option value='Advance'>Advance</option>
-                    <option value='Bill Settlement'>Bill Settlement</option>
-                    <option value='Refund'>Refund</option>
-                    <option value='Transfer'>Transfer</option>
-                  </select>
-                </div>
-                <div className='flex items-center gap-3'>
-                  <label className='font-semibold text-[#E4572E]'>Date</label>
-                  <input
-                    type='date'
-                    placeholder='dd-mm-yyyy'
-                    value={editFormData.date}
-                    onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
-                    className='w-[144px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
-                  />
-                </div>
-                <div className=''>
-                  <div className='flex'>
-                    <label className='font-semibold block'>Contractor/Vendor</label>
-                  </div>
-                  <Select
-                    options={combinedOptions}
-                    value={selectedOption}
-                    onChange={handleChange}
-                    className='w-[263px] h-[45px] rounded-lg focus:outline-none'
-                    isClearable
-                    styles={customStyles}
-                  />
-                </div>
-                <div>
-                  <label className='font-semibold block'>Project Name</label>
-                  <Select
-                    options={sortedSiteOptions || []}
-                    placeholder="Select a site..."
-                    isSearchable={true}
-                    value={sortedSiteOptions.find(site => site.id === editFormData.project_id) || null}
-                    onChange={(selected) => setEditFormData({ ...editFormData, project_id: selected?.id || '' })}
-                    styles={customStyles}
-                    isClearable
-                    className='w-[263px] h-[45px] focus:outline-none' />
-                </div>
-                {editFormData.type === 'Bill Settlement' && (
-                  <div>
-                    <label className='font-semibold block'>Bill Amount</label>
-                    <input
-                      value={editFormData.bill_amount}
-                      onChange={(e) => setEditFormData({ ...editFormData, bill_amount: e.target.value })}
-                      className='w-[263px] h-[45px] px-2 py-1 rounded-lg border-2 border-[#BF9853] border-opacity-30 focus:outline-none'
-                    />
-                  </div>
-                )}
-                <div>
-                  <label className='font-semibold block'>
-                    {editFormData.type === 'Transfer'
-                      ? 'Transfer Amount'
-                      : editFormData.type === 'Refund'
-                        ? 'Refund Amount'
-                        : 'Amount Given'}
-                  </label>
-                  <input
-                    value={editFormData.type === 'Refund' ? formatWithCommas(editFormData.refund_amount) : formatWithCommas(editFormData.amount)}
-                    onChange={handleAmountChange}
-                    className='w-[263px] h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'
-                  />
-                </div>
-                <div className=''>
-                  {editFormData.type === 'Transfer' ? (
-                    <>
-                      <label className='font-semibold block'>Site Name</label>
-                      <Select
-                        options={sortedSiteOptions}
-                        placeholder="Select a site..."
-                        isSearchable
-                        value={sortedSiteOptions.find(site => site.id === editFormData.transfer_site_id) || null}
-                        onChange={(selected) => setEditFormData({ ...editFormData, transfer_site_id: selected?.id || '' })}
-                        styles={customStyles}
-                        isClearable
-                        className='w-[263px] h-[45px] focus:outline-none'
-                      />
-                    </>
-                  ) : (
-                    <div className='flex gap-14'>
-                      <div className='space-y-2'>
-                        <label className='font-semibold block'>Payment Mode</label>
-                        <select
-                          value={editFormData.payment_mode}
-                          onChange={(e) => setEditFormData({ ...editFormData, payment_mode: e.target.value })}
-                          className='w-[263px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'>
-                          <option value=''>Select</option>
-                          <option value='Cash'>Cash</option>
-                          <option value='GPay'>GPay</option>
-                          <option value='Net Banking'>Net Banking</option>
-                        </select>
+            <div className="bg-white rounded-md w-[65rem] px-6">
+              <div className="flex justify-end">
+                <button className="text-red-500 mt-3" onClick={() => {
+                  setIsEditModalOpen(false);
+                  setSelectedFile(null);
+                  if (fileInputRef.current) {
+                    fileInputRef.current.value = '';
+                  }
+                }}>
+                  <img src={cross} alt='cross' className='w-5 h-5' />
+                </button>
+              </div>
+              <div className='overflow-y-auto pl-[50px] pr-[50px]'>
+                <form className="">
+                  <h2 className="text-2xl font-bold mb-5">Edit Entry</h2>
+                  <div className='text-left'>
+                    <div className='grid grid-cols-2 gap-5'>
+                      <div className=''>
+                        <label className='block font-semibold mb-2'>Select Type</label>
+                        <Select
+                          options={[
+                            { value: 'Advance', label: 'Advance' },
+                            { value: 'Bill Settlement', label: 'Bill Settlement' },
+                            { value: 'Refund', label: 'Refund' },
+                            { value: 'Transfer', label: 'Transfer' }
+                          ]}
+                          value={editFormData.type ? { value: editFormData.type, label: editFormData.type } : null}
+                          onChange={(selected) => {
+                            const newType = selected ? selected.value : '';
+                            setEditFormData(prev => {
+                              const updated = { ...prev, type: newType };
+                              if (newType === 'Refund') {
+                                updated.amount = '';
+                                updated.bill_amount = '';
+                              } else if (newType === 'Advance') {
+                                updated.refund_amount = '';
+                                updated.bill_amount = '';
+                              } else if (newType === 'Bill Settlement') {
+                                updated.refund_amount = '';
+                                updated.amount = '';
+                              } else if (newType === 'Transfer') {
+                                updated.refund_amount = '';
+                                updated.bill_amount = '';
+                                updated.payment_mode = '';
+                              }
+                              return updated;
+                            });
+                          }}
+                          placeholder="Select Type..."
+                          isSearchable
+                          isClearable
+                          styles={customStyles}
+                          menuPortalTarget={document.body}
+                          menuPosition="fixed"
+                          className='w-full focus:outline-none'
+                        />
+                      </div>
+                      <div className=''>
+                        <label className='block font-semibold mb-2'>Date</label>
+                        <input
+                          type='date'
+                          placeholder='dd-mm-yyyy'
+                          value={editFormData.date}
+                          onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
+                          className='block w-full border-2 border-[#BF9853] border-opacity-25 font-[600px] p-2 rounded-lg focus:outline-none h-[45px]'
+                        />
+                      </div>
+                      <div className=''>
+                        <label className='block font-semibold mb-2'>Contractor/Vendor</label>
+                        <Select
+                          options={combinedOptions}
+                          value={selectedOption}
+                          onChange={handleChange}
+                          className='w-full rounded-lg focus:outline-none'
+                          isSearchable
+                          isClearable
+                          styles={customStyles}
+                          menuPortalTarget={document.body}
+                          menuPosition="fixed"
+                        />
+                      </div>
+                      <div className=''>
+                        <label className='block font-semibold mb-2'>Project Name</label>
+                        <Select
+                          options={sortedSiteOptions || []}
+                          placeholder="Select a site..."
+                          isSearchable={true}
+                          value={sortedSiteOptions.find(site => site.id === editFormData.project_id) || null}
+                          onChange={(selected) => setEditFormData({ ...editFormData, project_id: selected?.id || '' })}
+                          styles={customStyles}
+                          isClearable
+                          className='w-full focus:outline-none'
+                          menuPortalTarget={document.body}
+                          menuPosition="fixed"
+                        />
                       </div>
                       {editFormData.type === 'Bill Settlement' && (
-                        <div className='space-y-2 mt-6'>
-                          <div className="">
-                            <label htmlFor="editFileInput" className="cursor-pointer flex w-40 items-center  text-orange-600 text-sm font-semibold">
-                              <img className='w-5 h-4 mr-1' alt='' src={Attach}></img>
-                              Attach File
-                            </label>
-                            <input
-                              type="file"
-                              id="editFileInput"
-                              ref={fileInputRef}
-                              className="hidden"
-                              onChange={handleEditFileChange}
-                            />
-                          </div>
-                          {selectedFile && (
-                            <span className="text-gray-600 text-sm">{selectedFile.name}</span>
-                          )}
+                        <div className=''>
+                          <label className='block font-semibold mb-2'>Bill Amount</label>
+                          <input
+                            value={editFormData.bill_amount}
+                            onChange={(e) => setEditFormData({ ...editFormData, bill_amount: e.target.value })}
+                            className='block w-full border-2 border-[#BF9853] font-[600px] border-opacity-25 p-2 rounded-lg focus:outline-none h-[45px]'
+                          />
                         </div>
                       )}
+                      <div className=''>
+                        <label className='block font-semibold mb-2'>
+                          {editFormData.type === 'Transfer'
+                            ? 'Transfer Amount'
+                            : editFormData.type === 'Refund'
+                              ? 'Refund Amount'
+                              : 'Amount Given'}
+                        </label>
+                        <input
+                          value={editFormData.type === 'Refund' ? formatWithCommas(editFormData.refund_amount) : formatWithCommas(editFormData.amount)}
+                          onChange={handleAmountChange}
+                          className='block w-full no-spinner border-2 border-[#BF9853] border-opacity-25 font-[600px] p-2 rounded-lg focus:outline-none h-[45px]'
+                        />
+                      </div>
+                      {editFormData.type === 'Transfer' ? (
+                        <div className=''>
+                          <label className='block font-semibold mb-2'>Transfer To</label>
+                          <Select
+                            options={sortedSiteOptions}
+                            placeholder="Select a site..."
+                            isSearchable
+                            value={sortedSiteOptions.find(site => site.id === editFormData.transfer_site_id) || null}
+                            onChange={(selected) => setEditFormData({ ...editFormData, transfer_site_id: selected?.id || '' })}
+                            styles={customStyles}
+                            isClearable
+                            className='w-full focus:outline-none'
+                            menuPortalTarget={document.body}
+                            menuPosition="fixed"
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          <div className=''>
+                            <label className='block font-semibold mb-2'>Payment Mode</label>
+                            <Select
+                              options={[
+                                { value: 'Cash', label: 'Cash' },
+                                { value: 'GPay', label: 'GPay' },
+                                { value: 'Net Banking', label: 'Net Banking' }
+                              ]}
+                              value={editFormData.payment_mode ? { value: editFormData.payment_mode, label: editFormData.payment_mode } : null}
+                              onChange={(selected) => setEditFormData({ ...editFormData, payment_mode: selected ? selected.value : '' })}
+                              placeholder="Select"
+                              isSearchable
+                              isClearable
+                              styles={customStyles}
+                              menuPortalTarget={document.body}
+                              menuPosition="fixed"
+                              className='w-full focus:outline-none'
+                            />
+                          </div>
+                          {editFormData.type === 'Bill Settlement' && (
+                            <div className='mt-3'>
+                              <label className='block font-semibold mb-2'>Attach File</label>
+                              <div className="flex items-center gap-2">
+                                <label htmlFor="editFileInput" className="cursor-pointer flex items-center text-orange-600 text-sm font-semibold">
+                                  <img className='w-5 h-4 mr-1' alt='' src={Attach}></img>
+                                  Attach File
+                                </label>
+                                <input
+                                  type="file"
+                                  id="editFileInput"
+                                  ref={fileInputRef}
+                                  className="hidden"
+                                  onChange={handleEditFileChange}
+                                />
+                                {selectedFile && (
+                                  <span className="text-gray-600 text-sm">{selectedFile.name}</span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
-                  )}
-                </div>
-                <div className='col-span-2'>
-                  <label className='font-semibold block'>Description</label>
-                  <textarea
-                    rows={2}
-                    value={editFormData.description}
-                    onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
-                    className='w-[590px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none'>
-                  </textarea>
-                </div>
+                    {/* Description */}
+                    <div className=' mt-8'>
+                      <label className='block font-semibold mb-2'>Description</label>
+                      <textarea
+                        rows={3}
+                        value={editFormData.description}
+                        onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                        className='block w-full h-[45px] border-2 border-[#BF9853] border-opacity-25 font-[600px] p-2 rounded-lg focus:outline-none'>
+                      </textarea>
+                    </div>
+                  </div>
+                </form>
               </div>
-              <div className="flex justify-end gap-3 mt-4">
+              <div className="flex justify-end gap-3 mt-4 mb-5">
                 <button
                   onClick={() => {
                     setIsEditModalOpen(false);
@@ -2053,7 +2144,10 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                 >
                   Cancel
                 </button>
-                <button onClick={handleUpdate} className="px-4 py-2 bg-[#BF9853] w-[100px] h-[45px] text-white rounded">
+                <button
+                  onClick={handleUpdate}
+                  className="px-4 py-2 bg-[#BF9853] w-[100px] h-[45px] text-white rounded"
+                >
                   Save
                 </button>
               </div>

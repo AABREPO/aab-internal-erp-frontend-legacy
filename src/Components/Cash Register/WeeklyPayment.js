@@ -70,6 +70,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     const [weeklyPaymentReceivedAudits, setWeeklyPaymentReceivedAudits] = useState([]);
     const [allRefundAmount, setAllRefundAmount] = useState([]);
     const [popup, setPopup] = useState({ show: false, message: "", type: "", dateStr: "", editRowId: null, editIndex: null, originalDate: "" });
+    const [isSubmitting, setIsSubmitting] = useState(false);
     // Expenses
     const [expenses, setExpenses] = useState([]);
     const [weeklyReceivedTypes, setWeeklyReceivedTypes] = useState([]);
@@ -316,7 +317,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             // Validate type selection against current party selection
             const allowedTypesForClient = ["Loan", "Bank", "Claim"];
             const isClientTypeAllowed = allowedTypesForClient.includes(value);
-            
+
             if (value === "Staff Advance") {
                 // Staff Advance only allows Employee
                 if (editFormData.contractor_id || editFormData.vendor_id || editFormData.client_id) {
@@ -330,7 +331,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     return; // Prevent type change
                 }
             }
-            
+
             // If type doesn't allow client selection and client toggle is active, disable it and clear client selection
             if (!isClientTypeAllowed && isClientToggleActive) {
                 setIsClientToggleActive(false);
@@ -344,7 +345,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 }));
                 return;
             }
-            
+
             // If validation passes, update the type
             setEditFormData((prev) => ({ ...prev, [name]: value }));
         }
@@ -475,7 +476,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             })
                 .replace(",", "")
                 .replace(/\s/g, "-");
-
             const formData = new FormData();
             const finalName = `${timestamp}-${siteNo}-${name}`;
             formData.append("file", selectedFileForPopup);
@@ -497,7 +497,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ billCopyUrl: pdfUrl })
+                body: JSON.stringify(pdfUrl)
             });
             if (!updateResponse.ok) {
                 throw new Error("Failed to update bill copy URL");
@@ -561,7 +561,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     const handleEditPaymentChange = (e) => {
         const { name, value } = e.target;
         if (name === "date") {
-            // Validate date against current week range
             if (!value || !currentWeekNumber) {
                 setEditPaymentData((prev) => ({ ...prev, date: value }));
                 return;
@@ -581,7 +580,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     editIndex: paymentIndex !== -1 ? paymentIndex : null,
                     originalDate: editPaymentData.date || ""
                 });
-                return; // Prevent date change
+                return;
             }
             setEditPaymentData((prev) => ({ ...prev, date: value }));
         } else {
@@ -697,7 +696,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
                     { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
                     { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
-                  ];
+                ];
                 const projectClientMapTemp = {};
                 const projectClientNameTemp = {};
                 const projectOptions = Array.isArray(data)
@@ -999,30 +998,24 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             if (isNaN(numericValue)) numericValue = "";
             if (numericValue > balance) {
                 alert(`Amount cannot exceed balance: ${balance}`);
-                numericValue = "";   // clear instead of clamping
+                numericValue = "";
             }
             if (numericValue < 0) numericValue = 0;
             setNewExpense((prev) => ({ ...prev, amount: numericValue }));
         } else if (name === "type") {
-            // Validate type selection against current party selection
             const allowedTypesForClient = ["Loan", "Bank", "Claim"];
             const isClientTypeAllowed = allowedTypesForClient.includes(value);
-            
             if (value === "Staff Advance") {
-                // Staff Advance only allows Employee
                 if (selectedContractor || selectedVendor || selectedClient) {
                     alert("Staff Advance type only allows Employee. Please select an Employee or clear the Contractor/Vendor/Client selection.");
-                    return; // Prevent type change
+                    return;
                 }
             } else if (value === "Project Advance") {
-                // Project Advance only allows Contractor or Vendor
                 if (selectedEmployee || selectedClient) {
                     alert("Project Advance type only allows Contractor or Vendor. Please select a Contractor or Vendor or clear the Employee/Client selection.");
-                    return; // Prevent type change
+                    return;
                 }
             }
-            
-            // If type doesn't allow client selection and client toggle is active, disable it and clear client selection
             if (!isClientTypeAllowed && isClientToggleActive) {
                 setIsClientToggleActive(false);
                 setSelectedClient(null);
@@ -1036,7 +1029,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 setSelectedProjectName(null);
                 return;
             }
-            
             setNewExpense((prev) => ({ ...prev, [name]: value }));
         } else {
             setNewExpense((prev) => ({ ...prev, [name]: value }));
@@ -1271,7 +1263,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         }
         return response.json();
     };
-    // Immediate date validation for Expense
     const validateExpenseDate = (dateStr) => {
         if (!dateStr || !currentWeekNumber) return;
         const year = new Date().getFullYear();
@@ -1292,9 +1283,12 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             setNewExpense((prev) => ({ ...prev, date: dateStr }));
         }
     };
-    // Expense save on Enter with date checked previously
     const handleKeyDownExpense = async (e) => {
         if (e.key !== "Enter") return;
+        if (isSubmitting) {
+            alert("Please wait for the previous submission to complete.");
+            return;
+        }
         if (!newExpense.date) {
             alert("Please select a date");
             return;
@@ -1303,7 +1297,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             alert("Please fill all fields except date");
             return;
         }
-        // Validation for Staff Advance: only employee_id allowed
+        setIsSubmitting(true);
         if (newExpense.type === "Staff Advance") {
             if (selectedContractor || selectedVendor) {
                 alert("Staff Advance type only allows Employee. Please select an Employee and remove Contractor/Vendor selection.");
@@ -1314,7 +1308,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 return;
             }
         }
-        // Validation for Project Advance: only contractor_id or vendor_id allowed
         if (newExpense.type === "Project Advance") {
             if (selectedEmployee) {
                 alert("Project Advance type only allows Contractor or Vendor. Please select a Contractor/Vendor and remove Employee selection.");
@@ -1326,7 +1319,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             }
         }
         try {
-            // ---------- Common object for weekly-expenses ----------
             const expenseForBackend = {
                 date: newExpense.date,
                 contractor_id: selectedContractor ? Number(selectedContractor.id) : null,
@@ -1340,8 +1332,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 weekly_number: currentWeekNumber,
                 status: false,
                 created_at: new Date().toISOString(),
-                advance_portal_id: null, // will be filled if Project Advance
-                staff_advance_portal_id: null, // will be filled if Staff Advance
+                advance_portal_id: null,
+                staff_advance_portal_id: null,
                 loan_portal_id: null,
             };
             if (newExpense.type === "Loan") {
@@ -1357,7 +1349,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 expenseForBackend.loan_portal_id = loanResponse?.id || loanResponse?.loanPortalId || null;
             }
             if (newExpense.type === "Project Advance") {
-                // ---------- Save to advance_portal ----------
                 const res = await fetch("https://backendaab.in/aabuildersDash/api/advance_portal/getAll");
                 if (!res.ok) throw new Error("Failed to fetch entry numbers");
                 const allData = await res.json();
@@ -1371,7 +1362,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     const start = new Date(now.getFullYear(), 0, 1);
                     const diff =
                         now - start + (start.getTimezoneOffset() - now.getTimezoneOffset()) * 60000;
-                    const oneWeek = 604800000; // ms in a week
+                    const oneWeek = 604800000;
                     return Math.floor(diff / oneWeek) + 1;
                 };
                 const advancePayload = {
@@ -1390,7 +1381,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     description: "",
                     file_url: "",
                 };
-                // Ensure employee_id is null for Project Advance
                 expenseForBackend.employee_id = null;
                 const saveAdvance = await fetch("https://backendaab.in/aabuildersDash/api/advance_portal/save", {
                     method: "POST",
@@ -1399,9 +1389,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 });
                 if (!saveAdvance.ok) throw new Error("Failed to save advance");
                 const savedAdvance = await saveAdvance.json();
-                // ✅ use correct field name from backend
                 expenseForBackend.advance_portal_id = savedAdvance.advancePortalId;
-                // ---------- Save to weekly-expenses ----------
                 const saveWeekly = await fetch("https://backendaab.in/aabuildersDash/api/weekly-expenses/save", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -1411,13 +1399,11 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 const savedWeekly = await saveWeekly.json();
                 setExpenses((prev) => {
                     const newExpenses = [savedAdvance, savedWeekly, ...prev];
-                    // Fetch descriptions for the new Project Advance rows
                     fetchPortalDescriptions(newExpenses);
                     return newExpenses;
                 });
                 window.location.reload();
             } else if (newExpense.type === "Staff Advance") {
-                // ---------- Save to staff-advance ----------
                 const res = await fetch("https://backendaab.in/aabuildersDash/api/staff-advance/all");
                 if (!res.ok) throw new Error("Failed to fetch staff advance entry numbers");
                 const allData = await res.json();
@@ -1443,8 +1429,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 });
                 if (!saveStaffAdvance.ok) throw new Error("Failed to save staff advance");
                 const savedStaffAdvance = await saveStaffAdvance.json();
-                // ---------- Save to weekly-expenses ----------
-                // Ensure contractor_id and vendor_id are null for Staff Advance
                 expenseForBackend.contractor_id = null;
                 expenseForBackend.vendor_id = null;
                 expenseForBackend.staff_advance_portal_id = savedStaffAdvance.staffAdvancePortalId;
@@ -1457,13 +1441,11 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 const savedWeekly = await saveWeekly.json();
                 setExpenses((prev) => {
                     const newExpenses = [savedStaffAdvance, savedWeekly, ...prev];
-                    // Fetch descriptions for the new Staff Advance rows
                     fetchStaffAdvanceDescriptions(newExpenses);
                     return newExpenses;
                 });
                 window.location.reload();
             } else {
-                // ---------- Normal case (not Project Advance or Staff Advance) ----------
                 const res = await fetch("https://backendaab.in/aabuildersDash/api/weekly-expenses/save", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -1473,13 +1455,11 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 const saved = await res.json();
                 setExpenses((prev) => {
                     const newExpenses = [saved, ...prev];
-                    // Fetch descriptions for the new Project Advance rows
                     fetchPortalDescriptions(newExpenses);
                     return newExpenses;
                 });
                 window.location.reload();
             }
-            // ---------- Reset fields ----------
             setNewExpense({
                 date: "",
                 contractor: "",
@@ -1500,10 +1480,10 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             setSelectedClient(null);
             setSelectedProjectName(null);
         } catch (err) {
+            setIsSubmitting(false);
             alert("Error saving expense: " + err.message);
         }
     };
-    // Payment input change with immediate date validation
     const handlePaymentChange = (e) => {
         const { name, value } = e.target;
         if (name === "date") {
@@ -1512,7 +1492,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             setNewPayment((prev) => ({ ...prev, [name]: value }));
         }
     };
-    // Immediate date validation for Payment
     const validatePaymentDate = (dateStr) => {
         if (!dateStr || !currentWeekNumber) return;
         const year = new Date().getFullYear();
@@ -1532,9 +1511,12 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             setNewPayment((prev) => ({ ...prev, date: dateStr }));
         }
     };
-    // Payment save on Enter with date checked previously
     const handleKeyDownPayment = (e) => {
         if (e.key !== "Enter") return;
+        if (isSubmitting) {
+            alert("Please wait for the previous submission to complete.");
+            return;
+        }
         if (!newPayment.date) {
             alert("Please select a date");
             return;
@@ -1543,6 +1525,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             alert("Please fill Amount and Type");
             return;
         }
+        setIsSubmitting(true);
         const payload = {
             date: newPayment.date,
             amount: Number(newPayment.amount),
@@ -1564,9 +1547,11 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 setNewPayment({ date: "", amount: "", type: "Weekly" });
                 window.location.reload();
             })
-            .catch((err) => alert("Error saving payment: " + err.message));
+            .catch((err) => {
+                setIsSubmitting(false);
+                alert("Error saving payment: " + err.message);
+            });
     };
-    // Open Account Closure popup
     const openAccountClosure = () => {
         setCarryForwardBalance(balance.toFixed(2));
         setShowPopup(true);
@@ -1597,7 +1582,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     const mergedExpenses = Object.entries(groupedExpenses).map(([type, amount]) => ({ type, amount }));
     const saveEditedExpense = async (row) => {
         try {
-            // Validation for Staff Advance: only employee_id allowed
             if (editFormData.type === "Staff Advance") {
                 if (editFormData.contractor_id || editFormData.vendor_id) {
                     alert("Staff Advance type only allows Employee. Please select an Employee and remove Contractor/Vendor selection.");
@@ -1608,7 +1592,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     return;
                 }
             }
-            // Validation for Project Advance: only contractor_id or vendor_id allowed
             if (editFormData.type === "Project Advance") {
                 if (editFormData.employee_id) {
                     alert("Project Advance type only allows Contractor or Vendor. Please select a Contractor/Vendor and remove Employee selection.");
@@ -1636,8 +1619,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             const isNowProjectAdvance = editFormData.type === "Project Advance";
             const wasStaffAdvance = row.type === "Staff Advance";
             const isNowStaffAdvance = editFormData.type === "Staff Advance";
-            
-            // Handle Project Advance Portal clearing when changing from Project Advance to another type
             if (wasProjectAdvance && !isNowProjectAdvance && row.advance_portal_id) {
                 try {
                     await clearAdvancePortalEntry(row.advance_portal_id, editFormData.date);
@@ -1646,8 +1627,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 }
                 editFormData.advance_portal_id = null;
             }
-            
-            // Handle Staff Advance Portal clearing when changing from Staff Advance to another type
             if (wasStaffAdvance && !isNowStaffAdvance && row.staff_advance_portal_id) {
                 try {
                     await clearStaffAdvancePortalEntry(row.staff_advance_portal_id, editFormData.date);
@@ -1656,8 +1635,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 }
                 editFormData.staff_advance_portal_id = null;
             }
-            
-            // Handle Project Advance Portal
             if (isNowProjectAdvance) {
                 const advancePayload = {
                     date: editFormData.date,
@@ -1711,8 +1688,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     editFormData.advance_portal_id = savedAdvance.advancePortalId;
                 }
             }
-            
-            // Handle Staff Advance Portal
             if (isNowStaffAdvance) {
                 const staffAdvancePayload = {
                     date: editFormData.date,
@@ -1926,7 +1901,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             console.log("Deletion cancelled.");
         }
     };
-
     const buildClientKey = (name = "", father = "", mobile = "") => {
         const normalizedName = (name || "").trim().toLowerCase();
         if (!normalizedName) return "";
@@ -2153,7 +2127,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         }
         const totalExpenses = expenses.reduce((t, e) => t + Number(e.amount || 0), 0);
         const totalPayments = payments.reduce((t, p) => t + Number(p.amount || 0), 0);
-        const balance = totalPayments - totalExpenses;        
+        const balance = totalPayments - totalExpenses;
         let advancePortalData = [];
         let staffAdvanceData = [];
         let loanPortalData = [];
@@ -2180,17 +2154,17 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             const date = new Date(dateStr);
             date.setHours(0, 0, 0, 0);
             return date >= weekDates.startDate && date <= weekDates.endDate;
-        };        
+        };
         const staffAdvanceTotalFromPortal = staffAdvanceData
-            .filter(entry => 
-                entry.staff_payment_mode === "Cash" && 
+            .filter(entry =>
+                entry.staff_payment_mode === "Cash" &&
                 entry.type === "Advance" &&
                 isDateInWeek(entry.date)
             )
             .reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
         const loanTotalFromPortal = loanPortalData
-            .filter(entry => 
-                (entry.loan_payment_mode === "Cash" || entry.payment_mode === "Cash") && 
+            .filter(entry =>
+                (entry.loan_payment_mode === "Cash" || entry.payment_mode === "Cash") &&
                 entry.type === "Loan" &&
                 isDateInWeek(entry.date)
             )
@@ -2261,9 +2235,11 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
             doc.text("EXPENSES", 660, 37);
+            const amountX = 800;
             doc.text(
                 String(totalExpenses.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
-                730, 37
+                amountX, 37,
+                { align: "right" }
             );
             doc.setFillColor(250, 220, 220);
             doc.rect(620, 44, 190, 18.5, "F");
@@ -2272,7 +2248,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             doc.text("BALANCE", 660, 58);
             doc.text(
                 String(balance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
-                740, 58
+                amountX, 58,
+                { align: "right" }
             );
         };
         drawHeader(doc, "WEEKLY PAYMENT REPORT");
@@ -2463,7 +2440,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         }, {});
         const allExpenseTypes = [...new Set(
             expenses
-                .filter(expense => expense.type )
+                .filter(expense => expense.type)
                 .map(e => e.type)
                 .filter(Boolean)
         )];
@@ -2474,7 +2451,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             }
         });
         expenses
-            .filter(expense => Number(expense.amount) > 0 )
+            .filter(expense => Number(expense.amount) > 0)
             .forEach(expense => {
                 const type = expense.type;
                 const amount = Number(expense.amount);
@@ -2626,7 +2603,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             const staffSalaryY = newTableY + 30;
             doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
-            doc.text("STAFF SALARY", newTableX, staffSalaryY - 25);        
+            doc.text("STAFF SALARY", newTableX, staffSalaryY - 25);
             const staffSalaryHead = [[
                 String(staffSalaryCount || "0"),
                 "PARTY",
@@ -2664,16 +2641,16 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
         }
         const excludedTypes = ["Bill", "Wage", "Project Advance", "Staff Advance", "Staff Salary", "Daily", "Diwali Bonus"];
-        const otherExpenseTypes = [...new Set(expenses.map(e => e.type).filter(type => type && !excludedTypes.includes(type)))];        
+        const otherExpenseTypes = [...new Set(expenses.map(e => e.type).filter(type => type && !excludedTypes.includes(type)))];
         otherExpenseTypes.forEach((expenseType) => {
             const typeEntries = expenses.filter(e => e.type === expenseType);
-            if (typeEntries.length === 0) return;            
+            if (typeEntries.length === 0) return;
             const typeCount = typeEntries.length;
             const typeTotal = typeEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
             const typeY = newTableY + 30;
             doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
-            doc.text(expenseType.toUpperCase(), newTableX, typeY - 25);            
+            doc.text(expenseType.toUpperCase(), newTableX, typeY - 25);
             const typeHead = [[
                 String(typeCount || "0"),
                 "PARTY",
@@ -2690,7 +2667,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 doc.addPage();
                 drawHeader(doc, "WEEKLY PAYMENT STATEMENT");
                 newTableY = baseY;
-            }            
+            }
             autoTable(doc, {
                 head: typeHead,
                 body: typeBody,
@@ -3067,12 +3044,14 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                     value={newExpense.date}
                                                     onChange={handleExpenseChange}
                                                     onKeyDown={handleKeyDownExpense}
+                                                    disabled={isSubmitting}
                                                 />
                                             </td>
                                             <td className="pt-2 pb-2 w-[200px]">
                                                 <div className="flex items-center gap-2 w-full">
                                                     <Select
                                                         name="party"
+                                                        isDisabled={isSubmitting}
                                                         value={isClientToggleActive
                                                             ? (selectedClient || null)
                                                             : (selectedContractor || selectedVendor || selectedEmployee || null)}
@@ -3221,13 +3200,14 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             })
                                                         }}
                                                     />
-                                                    <button 
-                                                        type="button" 
+                                                    <button
+                                                        type="button"
                                                         onClick={handlePartySourceToggle}
-                                                        >
+                                                        disabled={isSubmitting}
+                                                    >
                                                         <img
                                                             src={Change}
-                                                            className={`w-4 h-4 ${isClientToggleActive ? 'opacity-100' : 'opacity-60'}`}
+                                                            className={`w-4 h-4 ${isClientToggleActive ? 'opacity-100' : 'opacity-60'} ${isSubmitting ? 'opacity-40' : ''}`}
                                                             alt="Toggle party type"
                                                         />
                                                     </button>
@@ -3236,6 +3216,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                             <td className="pt-2 pb-2 w-[240px]">
                                                 <Select
                                                     name="project"
+                                                    isDisabled={isSubmitting}
                                                     value={selectedProjectName}
                                                     onChange={(selectedOption) => {
                                                         setSelectedProjectName(selectedOption);
@@ -3308,6 +3289,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                     value={newExpense.type}
                                                     onChange={handleExpenseChange}
                                                     onKeyDown={handleKeyDownExpense}
+                                                    disabled={isSubmitting}
                                                 >
                                                     <option value="">Select Type...</option>
                                                     {weeklyTypes.map((type, index) => (
@@ -3325,7 +3307,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                     value={newExpense.amount}
                                                     onChange={handleExpenseChange}
                                                     onKeyDown={handleKeyDownExpense}
-                                                    disabled={!newExpense.date || !selectedProjectName}
+                                                    disabled={isSubmitting || !newExpense.date || !selectedProjectName}
                                                     min="0"
                                                     step="any"
                                                 />
@@ -3928,13 +3910,15 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                 value={newPayment.date}
                                                 onChange={handlePaymentChange}
                                                 onKeyDown={handleKeyDownPayment}
+                                                disabled={isSubmitting}
                                             />
                                         </td>
                                         <td className="px-2 py-2">
                                             <select
                                                 name="type"
                                                 className="border-2 border-[#BF9853] border-opacity-25 w-[90px] h-[40px] rounded-lg focus:outline-none"
-                                                value={newPayment.type} onChange={handlePaymentChange} onKeyDown={handleKeyDownPayment}>
+                                                value={newPayment.type} onChange={handlePaymentChange} onKeyDown={handleKeyDownPayment}
+                                                disabled={isSubmitting}>
                                                 <option value="">Select</option>
                                                 {weeklyReceivedTypes.map((type, index) => (
                                                     <option key={index} value={type.received_type}>
@@ -3954,6 +3938,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                 min="0"
                                                 step="any"
                                                 onWheel={(e) => e.preventDefault()}
+                                                disabled={isSubmitting}
                                             />
                                         </td>
                                     </tr>

@@ -13,6 +13,7 @@ import fileUpload from '../Images/file_upload.png';
 import file from '../Images/file.png';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { i } from 'mathjs';
 function cleanUrl(url) {
     if (!url) return url;
     let cleanedUrl = url.replace(/^["']|["']$/g, '');
@@ -271,6 +272,32 @@ const History = ({ username, userRoles = [] }) => {
         const normalizedMobile = (mobile || "").trim();
         return `${normalizedName}|${normalizedFather}|${normalizedMobile}`;
     };
+    const [laboursList, setLaboursList] = useState([]);
+    useEffect(() => {
+            fetchLaboursList();
+        }, []);
+        const fetchLaboursList = async () => {
+            try {
+                const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
+                if (response.ok) {
+                    const data = await response.json();
+                    const formattedData = data.map(item => ({
+                        value: item.labour_name,
+                        label: item.labour_name,
+                        id: item.id,
+                        type: "Labour",
+                        salary: item.labour_salary,
+                        extra: item.extra_amount
+                    }));
+                    setLaboursList(formattedData);
+                } else {
+                    console.log('Error fetching Labour names.');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                console.log('Error fetching Labour names.');
+            }
+        };
     const getClientName = (entry) => {
         if (!entry) return "";
         if (entry.client_name) return entry.client_name;
@@ -786,6 +813,8 @@ const History = ({ username, userRoles = [] }) => {
         employeeOptions.find(c => c.id === id)?.value || "";
     const getSiteName = (id) =>
         siteOptions.find(s => String(s.id) === String(id))?.value || "";
+    const getLabourName = (id) =>
+        laboursList.find(l => l.id === id)?.value || "";
     const getPartyDisplayName = (entry) => {
         const hasContractorVendorEmployee = entry.contractor_id || entry.vendor_id || entry.employee_id;
         if (!hasContractorVendorEmployee && entry.type === "Loan") {
@@ -795,6 +824,7 @@ const History = ({ username, userRoles = [] }) => {
         if (entry.vendor_id) return getVendorName(entry.vendor_id);
         if (entry.contractor_id) return getContractorName(entry.contractor_id);
         if (entry.employee_id) return getEmployeeName(entry.employee_id);
+        if (entry.labour_id) return getLabourName(entry.labour_id);
         return "";
     };
     const filteredExpenses = expenses.filter((entry) => {
@@ -1427,33 +1457,26 @@ const History = ({ username, userRoles = [] }) => {
             );
             return;
         } else if (field === "type") {
-            // Validate type selection against current party selection in the row being edited
             const row = expenses.find(exp => exp.id === id);
             const allowedTypesForClient = ["Loan", "Bank", "Claim"];
             const isClientTypeAllowed = allowedTypesForClient.includes(value);
-
             if (value === "Staff Advance") {
-                // Staff Advance only allows Employee
                 if (row?.contractor_id || row?.vendor_id || row?.client_id) {
                     alert("Staff Advance type only allows Employee. Please select an Employee or clear the Contractor/Vendor/Client selection.");
-                    return; // Prevent type change
+                    return;
                 }
             } else if (value === "Project Advance") {
-                // Project Advance only allows Contractor or Vendor
                 if (row?.employee_id || row?.client_id) {
                     alert("Project Advance type only allows Contractor or Vendor. Please select a Contractor or Vendor or clear the Employee/Client selection.");
-                    return; // Prevent type change
+                    return;
                 }
             }
-
-            // If type doesn't allow client selection and client toggle is active, disable it and clear client selection
             if (!isClientTypeAllowed && isClientToggleActive && row?.client_id) {
                 setIsClientToggleActive(false);
                 setSelectedClient(null);
                 setClientProjectOptions([]);
                 setSelectedProjectName(null);
                 setSelectedProjectOption(null);
-                // Clear client selection from the row
                 setExpenses((prevExpenses) =>
                     prevExpenses.map((expense) =>
                         expense.id === id ? { ...expense, [field]: value, client_name: "", client_id: "" } : expense
@@ -1461,8 +1484,6 @@ const History = ({ username, userRoles = [] }) => {
                 );
                 return;
             }
-
-            // If validation passes, update the type
             setExpenses((prevExpenses) =>
                 prevExpenses.map((expense) =>
                     expense.id === id ? { ...expense, [field]: value } : expense
@@ -1478,7 +1499,6 @@ const History = ({ username, userRoles = [] }) => {
     };
     const handleEditPayment = (index, field, value) => {
         if (field === "date") {
-            // Validate date against selected week range
             const row = payments[index];
             if (!value || !selectedWeek) {
                 setPayments((prevPayments) =>
@@ -1503,7 +1523,7 @@ const History = ({ username, userRoles = [] }) => {
                     editIndex: index,
                     originalDate: row?.date || ""
                 });
-                return; // Prevent date change
+                return;
             }
             setPayments((prevPayments) =>
                 prevPayments.map((payment, i) =>
@@ -1551,18 +1571,15 @@ const History = ({ username, userRoles = [] }) => {
             alert("Error: Data not loaded properly. Please refresh the page and try again.");
             return;
         }
-
         let advancePortalData = [];
         let staffAdvanceData = [];
         let loanPortalData = [];
-
         try {
             const [advanceRes, staffAdvanceRes, loanRes] = await Promise.all([
                 fetch("https://backendaab.in/aabuildersDash/api/advance_portal/getAll").catch(() => null),
                 fetch("https://backendaab.in/aabuildersDash/api/staff-advance/all").catch(() => null),
                 fetch("https://backendaab.in/aabuildersDash/api/loans/all").catch(() => null)
             ]);
-
             if (advanceRes && advanceRes.ok) {
                 advancePortalData = await advanceRes.json();
             }
@@ -1575,17 +1592,12 @@ const History = ({ username, userRoles = [] }) => {
         } catch (error) {
             console.error("Error fetching portal data:", error);
         }
-
-        // Helper function to check if date is in week range
         const isDateInWeek = (dateStr) => {
             if (!dateStr) return false;
             const date = new Date(dateStr);
             date.setHours(0, 0, 0, 0);
             return date >= start && date <= end;
         };
-
-
-        // Get Staff Advance total from staff advance portal (Cash payment mode, within week)
         const staffAdvanceTotalFromPortal = staffAdvanceData
             .filter(entry =>
                 entry.staff_payment_mode === "Cash" &&
@@ -1593,8 +1605,6 @@ const History = ({ username, userRoles = [] }) => {
                 isDateInWeek(entry.date)
             )
             .reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
-
-        // Get Loan total from loan portal (Cash payment mode, within week)
         const loanTotalFromPortal = loanPortalData
             .filter(entry =>
                 (entry.loan_payment_mode === "Cash" || entry.payment_mode === "Cash") &&
@@ -1625,10 +1635,12 @@ const History = ({ username, userRoles = [] }) => {
             doc.rect(620, 25, 190, 18.5, "F");
             doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
+            const amountX = 800;
             doc.text("EXPENSES", 660, 37);
             doc.text(
                 String(totalExpenses.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
-                730, 37
+                amountX, 37,
+                { align: "right" }
             );
             doc.setFillColor(250, 220, 220);
             doc.rect(620, 44, 190, 18.5, "F");
@@ -1637,7 +1649,8 @@ const History = ({ username, userRoles = [] }) => {
             doc.text("BALANCE", 660, 58);
             doc.text(
                 String(balance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"),
-                740, 58
+                amountX, 58,
+                { align: "right" }
             );
         };
         drawHeader(doc, "WEEKLY PAYMENT REPORT");
@@ -1826,16 +1839,13 @@ const History = ({ username, userRoles = [] }) => {
             acc[typeObj.type] = { count: 0, total: 0 };
             return acc;
         }, {});
-        // Get all expense types from all expenses (excluding Project Advance)
         const allExpenseTypes = [...new Set(
             expenses
                 .filter(expense => expense.type)
                 .map(e => e.type)
                 .filter(Boolean)
         )];
-        // Get fixed types from weeklyTypes
         const fixedTypes = weeklyTypes.map(typeObj => typeObj.type);
-        // Add any expense types that are not in weeklyTypes
         allExpenseTypes.forEach(type => {
             if (!fixedTypes.includes(type)) {
                 summaryMap[type] = { count: 0, total: 0 };
@@ -1853,15 +1863,12 @@ const History = ({ username, userRoles = [] }) => {
                     }
                 }
             });
-
-        // Update totals from portal data for specific types
         if (summaryMap["Staff Advance"]) {
             summaryMap["Staff Advance"].total = staffAdvanceTotalFromPortal;
         }
         if (summaryMap["Loan"]) {
             summaryMap["Loan"].total = loanTotalFromPortal;
         }
-
         const summaryData = Object.entries(summaryMap)
             .map(([type, { count, total }]) => [
                 String(type || ""),
@@ -1951,11 +1958,9 @@ const History = ({ username, userRoles = [] }) => {
             const staffAdvanceCount = staffAdvanceEntries.length;
             const staffAdvanceTotal = staffAdvanceEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
             const staffAdvanceY = newTableY + 10;
-            // Add title above the table like DIWALI BONUS
             doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
             doc.text("STAFF ADVANCE", newTableX, staffAdvanceY - 25);
-
             const staffAdvanceHead = [[
                 String(staffAdvanceCount || "0"),
                 "PARTY",
@@ -1997,11 +2002,9 @@ const History = ({ username, userRoles = [] }) => {
             const staffSalaryCount = staffSalaryEntries.length;
             const staffSalaryTotal = staffSalaryEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
             const staffSalaryY = newTableY + 30;
-            // Add title above the table like DIWALI BONUS
             doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
             doc.text("STAFF SALARY", newTableX, staffSalaryY - 25);
-
             const staffSalaryHead = [[
                 String(staffSalaryCount || "0"),
                 "PARTY",
@@ -2040,19 +2043,15 @@ const History = ({ username, userRoles = [] }) => {
         }
         const excludedTypes = ["Bill", "Wage", "Project Advance", "Staff Advance", "Staff Salary", "Daily", "Diwali Bonus"];
         const otherExpenseTypes = [...new Set(expenses.map(e => e.type).filter(type => type && !excludedTypes.includes(type)))];
-
         otherExpenseTypes.forEach((expenseType) => {
             const typeEntries = expenses.filter(e => e.type === expenseType);
             if (typeEntries.length === 0) return;
-
             const typeCount = typeEntries.length;
             const typeTotal = typeEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
             const typeY = newTableY + 30;
-
             doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
             doc.text(expenseType.toUpperCase(), newTableX, typeY - 25);
-
             const typeHead = [[
                 String(typeCount || "0"),
                 "PARTY",
@@ -2065,13 +2064,11 @@ const History = ({ username, userRoles = [] }) => {
                 String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
                 String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
             ]);
-
             if (newTableY > doc.internal.pageSize.getHeight() - 150) {
                 doc.addPage();
                 drawHeader(doc, "WEEKLY PAYMENT STATEMENT");
                 newTableY = baseY;
             }
-
             autoTable(doc, {
                 head: typeHead,
                 body: typeBody,
@@ -2213,7 +2210,6 @@ const History = ({ username, userRoles = [] }) => {
                 editingOriginalRow && editingOriginalRow.id === row.id
                     ? editingOriginalRow
                     : expenses.find((exp) => exp.id === row.id);
-            // Check if any changes were made
             if (originalExpense) {
                 const normalize = (val) => {
                     if (val === null || val === undefined || val === "") return "";

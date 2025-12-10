@@ -971,7 +971,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                     </div>
                     <div>
                         <div ref={scrollRef}
-                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[600px] overflow-scroll select-none thin-scrollbar"
+                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[440px] overflow-scroll select-none thin-scrollbar"
                             onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
                         >
                             <table className="table-fixed  min-w-[1765px] w-screen border-collapse">
@@ -1414,7 +1414,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                 <tbody>
                                     {currentItems.map((expense, index) => (
                                         <tr key={expense.id} className="odd:bg-white even:bg-[#FAF6ED]">
-                                            <td className=" text-sm text-left pl-3 w-32 ">{formatDateOnly(expense.date)}</td>
+                                            <td className=" text-sm text-left pl-3 w-32 py-2">{formatDateOnly(expense.date)}</td>
                                             <td className=" text-sm text-left w-60 ">{getDisplaySiteName(expense)}</td>
                                             <td className=" text-sm text-left ">{getDisplayVendorName(expense)}</td>
                                             <td className=" text-sm text-left ">{getDisplayContractorName(expense)}</td>

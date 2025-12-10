@@ -1065,7 +1065,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                     <div>
                         <div
                             ref={scrollRef}
-                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[600px] overflow-x-auto select-none thin-scrollbar"
+                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[440px] overflow-x-auto select-none thin-scrollbar"
                             onMouseDown={handleMouseDown}
                             onMouseMove={handleMouseMove}
                             onMouseUp={handleMouseUp}
@@ -1506,13 +1506,15 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                             </th>
                                             <th></th>
                                             <th></th>
+                                            <th></th>
+                                            <th></th>
                                         </tr>
                                     )}
                                 </thead>
                                 <tbody>
                                     {currentItems.map((expense, index) => (
                                         <tr key={expense.id} className="odd:bg-white even:bg-[#FAF6ED]">
-                                            <td className="px-3 text-sm text-left ">{formatDate(expense.timestamp)}</td>
+                                            <td className="px-3 text-sm text-left py-2">{formatDate(expense.timestamp)}</td>
                                             <td className=" text-sm text-left w-32 ">{formatDateOnly(expense.date)}</td>
                                             <td className=" text-sm text-left w-60 ">{getDisplaySiteName(expense)}</td>
                                             <td className=" text-sm text-left ">{getDisplayVendorName(expense)}</td>

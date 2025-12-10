@@ -3,6 +3,7 @@ import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+import Select from "react-select";
 
 Date.prototype.getWeekNumber = function () {
   const firstDay = new Date(this.getFullYear(), 0, 1);
@@ -10,7 +11,17 @@ Date.prototype.getWeekNumber = function () {
   return Math.ceil((pastDaysOfYear + firstDay.getDay() + 1) / 7);
 };
 
-const AdvanceReport = () => {
+const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
+  // Use paymentModeOptions from props, fallback to default if not provided
+  const defaultPaymentModeOptions = [
+    { value: 'Cash', label: 'Cash' },
+    { value: 'GPay', label: 'GPay' },
+    { value: 'PhonePe', label: 'PhonePe' },
+    { value: 'Net Banking', label: 'Net Banking' },
+    { value: 'Cheque', label: 'Cheque' }
+  ];
+  const finalPaymentModeOptions = paymentModeOptions.length > 0 ? paymentModeOptions : defaultPaymentModeOptions;
+
   const [week, setWeek] = useState("");
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [vendorOptions, setVendorOptions] = useState([]);
@@ -41,6 +52,71 @@ const AdvanceReport = () => {
   const velocity = useRef({ x: 0, y: 0 });
   const animationFrame = useRef(null);
   const lastMove = useRef({ time: 0, x: 0, y: 0 });
+
+  // Custom styles for react-select
+  const customStyles = {
+    control: (provided, state) => ({
+      ...provided,
+      borderWidth: '2px',
+      lineHeight: '20px',
+      fontSize: '14px',
+      minHeight: '45px',
+      height: '45px',
+      borderRadius: '8px',
+      borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.5)' : 'rgba(191, 152, 83, 0.25)',
+      boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+      '&:hover': {
+        borderColor: 'rgba(191, 152, 83, 0.5)',
+      },
+    }),
+    clearIndicator: (provided) => ({
+      ...provided,
+      cursor: 'pointer',
+    }),
+    menu: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+      maxHeight: '300px',
+    }),
+    menuPortal: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+    }),
+    menuList: (provided) => ({
+      ...provided,
+      maxHeight: '250px',
+      overflowY: 'auto',
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      fontWeight: '500',
+      backgroundColor: state.isSelected 
+        ? 'rgba(191, 152, 83, 0.3)' 
+        : state.isFocused 
+          ? 'rgba(191, 152, 83, 0.1)' 
+          : 'white',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    input: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    placeholder: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: '#999',
+      textAlign: 'left',
+    }),
+  };
 
   const handleMouseDown = (e) => {
     if (!scrollRef.current) return;
@@ -423,11 +499,6 @@ const AdvanceReport = () => {
     if (currentPage > 1) {
       setCurrentPage(currentPage - 1);
     }
-  };
-  const handleItemsPerPageChange = (e) => {
-    const newItemsPerPage = parseInt(e.target.value);
-    setItemsPerPage(newItemsPerPage);
-    setCurrentPage(1);
   };
   const handleExportPDF = () => {
     if (!filteredData.length) {
@@ -896,38 +967,46 @@ const AdvanceReport = () => {
   }
   return (
     <div className='bg-[#FAF6ED]'>
-      <div className="flex flex-col xl:flex-row items-start justify-between bg-white p-4 ml-4 sm:ml-6 lg:ml-10 px-4 lg:px-14 lg:h-[128px] rounded-md shadow-sm max-w-[1850px] w-full mb-4">
-        <div className="flex flex-wrap space-x-6 text-left">
+      <div className="flex flex-wrap flex-col xl:space-y-0 space-y-4 xl:flex-row items-start justify-between bg-white p-4 ml-10 mr-10 px-8 lg:h-[128px] rounded-md shadow-sm max-w-[1850px] mb-4">
+        <div className="flex flex-wrap gap-4 text-left">
           <div>
             <label className="block font-semibold mb-1">Week No</label>
-            <select
-              value={week}
-              onChange={(e) => {
-                setWeek(e.target.value);
+            <Select
+              value={week ? { value: week, label: week } : null}
+              onChange={(selectedOption) => {
+                const value = selectedOption ? selectedOption.value : "";
+                setWeek(value);
                 setStartDate("");
                 setEndDate("");
               }}
-              className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 focus:outline-none w-[168px] h-[45px]"
-            >
-              <option value="">Select</option>
-              {Array.from({ length: getCurrentWeekNumber() }, (_, i) => (
-                <option key={i} value={`Week ${String(i + 1).padStart(2, "0")}`}>
-                  Week {String(i + 1).padStart(2, "0")}
-                </option>
-              ))}
-            </select>
+              options={Array.from({ length: getCurrentWeekNumber() }, (_, i) => ({
+                value: `Week ${String(i + 1).padStart(2, "0")}`,
+                label: `Week ${String(i + 1).padStart(2, "0")}`,
+              }))}
+              placeholder="Select"
+              isSearchable
+              isClearable
+              styles={customStyles}
+              className="w-full h-[45px]"
+              classNamePrefix="select"
+            />
           </div>
           <div>
             <label className="block font-semibold mb-1">Year</label>
-            <select
-              value={year}
-              onChange={(e) => setYear(e.target.value)}
-              className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[168px] h-[45px] focus:outline-none"
-            >
-              {years.map((y) => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
+            <Select
+              value={year ? { value: year, label: year } : null}
+              onChange={(selectedOption) => setYear(selectedOption ? selectedOption.value : "")}
+              options={years.map((y) => ({
+                value: y.toString(),
+                label: y.toString(),
+              }))}
+              placeholder="Select Year"
+              isSearchable
+              isClearable
+              styles={customStyles}
+              className="w-full h-[45px]"
+              classNamePrefix="select"
+            />
           </div>
           <div>
             <label className="block font-semibold mb-1">Start Date</label>
@@ -938,7 +1017,7 @@ const AdvanceReport = () => {
                 setStartDate(e.target.value);
                 setWeek("");
               }}
-              className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[168px] h-[45px] focus:outline-none"
+              className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-full h-[45px] focus:outline-none"
             />
           </div>
           <div>
@@ -950,36 +1029,41 @@ const AdvanceReport = () => {
                 setEndDate(e.target.value);
                 setWeek("");
               }}
-              className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[168px] h-[45px] focus:outline-none"
+              className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-full h-[45px] focus:outline-none"
             />
           </div>
           <div>
             <label className="block font-semibold mb-1">Payment Mode</label>
-            <select
-              value={paymentModeFilter}
-              onChange={(e) => setPaymentModeFilter(e.target.value)}
-              className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[168px] h-[45px] focus:outline-none"
-            >
-              <option value="">All Modes</option>
-              <option value="Cash">Cash</option>
-              <option value="GPay">GPay</option>
-              <option value="Net Banking">Net Banking</option>
-              <option value="Cheque">Cheque</option>
-            </select>
+            <Select
+              value={paymentModeFilter ? { value: paymentModeFilter, label: paymentModeFilter } : null}
+              onChange={(selectedOption) => setPaymentModeFilter(selectedOption ? selectedOption.value : "")}
+              options={finalPaymentModeOptions}
+              placeholder="All Modes"
+              isSearchable
+              isClearable
+              styles={customStyles}
+              className="w-[168px]"
+              classNamePrefix="select"
+            />
           </div>
           <div>
             <label className="block font-semibold mb-1">Type</label>
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[168px] h-[45px] focus:outline-none"
-            >
-              <option value="">All Types</option>
-              <option value="Advance">Advance</option>
-              <option value="Bill Settlement">Bill Settlement</option>
-              <option value="Refund">Refund</option>
-              <option value="Transfer">Transfer</option>
-            </select>
+            <Select
+              value={typeFilter ? { value: typeFilter, label: typeFilter } : null}
+              onChange={(selectedOption) => setTypeFilter(selectedOption ? selectedOption.value : "")}
+              options={[
+                { value: "Advance", label: "Advance" },
+                { value: "Bill Settlement", label: "Bill Settlement" },
+                { value: "Refund", label: "Refund" },
+                { value: "Transfer", label: "Transfer" },
+              ]}
+              placeholder="All Types"
+              isSearchable
+              isClearable
+              styles={customStyles}
+              className="w-[168px]"
+              classNamePrefix="select"
+            />
           </div>
         </div>
         <div>
@@ -1008,7 +1092,7 @@ const AdvanceReport = () => {
           </div>
         </div>
       </div>
-      <div className='max-w-[1850px] w-full rounded-md ml-4 h-[650px] sm:ml-6 lg:ml-10 px-4 lg:px-10 bg-white p-4'>
+      <div className='max-w-[1850px] rounded-md h-[650px] ml-10 mr-10 px-8 bg-white p-4'>
         <div className='space-x-6 flex justify-end'>
           <button onClick={handleExportPDF} className='text-sm text-[#E4572E] hover:underline font-bold'>Export PDF</button>
           <button onClick={handleExportExcel} className='text-sm text-[#007233] hover:underline font-bold'>Export XL</button>
@@ -1026,7 +1110,7 @@ const AdvanceReport = () => {
             <thead className='bg-[#FAF6ED]'>
               <tr>
                 <th
-                  className="pt-2 pl-3 w-20 font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                  className="py-2 pl-3 w-20 font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
                   onClick={() => requestSort("sno")}
                 >
                   S.No <SortIcon columnKey="sno" />
@@ -1051,7 +1135,7 @@ const AdvanceReport = () => {
                 </th>
                 <th className="px-2 w-[100px] font-bold text-right">Advance</th>
                 <th className="px-2 w-[100px] font-bold text-right">Bill Amount</th>
-                <th className="px-2 w-[100px] font-bold text-right">Refund Amount</th>
+                <th className="px-2 w-[120px] font-bold text-right">Refund Amount</th>
                 <th
                   className="px-2 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
                   onClick={() => requestSort("transfer")}
@@ -1122,23 +1206,43 @@ const AdvanceReport = () => {
           <div className="flex flex-col sm:flex-row justify-between items-center px-5 py-4 bg-white border-t border-gray-200">
             <div className="flex items-center space-x-2">
               <label className="text-sm font-medium text-gray-700">Show:</label>
-              <select
-                value={itemsPerPage}
-                onChange={handleItemsPerPageChange}
-                className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent"
-              >
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-                <option value={200}>200</option>
-                <option value={300}>300</option>
-                <option value={400}>400</option>
-                <option value={500}>500</option>
-                <option value={600}>600</option>
-                <option value={700}>700</option>
-                <option value={800}>800</option>
-                <option value={900}>900</option>
-                <option value={1000}>1000</option>
-              </select>
+              <Select
+                value={{ value: itemsPerPage, label: itemsPerPage.toString() }}
+                onChange={(selectedOption) => {
+                  const newItemsPerPage = selectedOption ? selectedOption.value : 50;
+                  setItemsPerPage(newItemsPerPage);
+                  setCurrentPage(1);
+                }}
+                options={[
+                  { value: 50, label: "50" },
+                  { value: 100, label: "100" },
+                  { value: 200, label: "200" },
+                  { value: 300, label: "300" },
+                  { value: 400, label: "400" },
+                  { value: 500, label: "500" },
+                  { value: 600, label: "600" },
+                  { value: 700, label: "700" },
+                  { value: 800, label: "800" },
+                  { value: 900, label: "900" },
+                  { value: 1000, label: "1000" },
+                ]}
+                isSearchable
+                styles={{
+                  ...customStyles,
+                  control: (provided, state) => ({
+                    ...provided,
+                    borderWidth: '1px',
+                    minHeight: '32px',
+                    height: '32px',
+                    borderRadius: '6px',
+                    borderColor: state.isFocused ? '#BF9853' : '#d1d5db',
+                    boxShadow: state.isFocused ? '0 0 0 2px rgba(191, 152, 83, 0.2)' : 'none',
+                    fontSize: '14px',
+                  }),
+                }}
+                className="w-24"
+                classNamePrefix="select"
+              />
               <span className="text-sm text-gray-700">entries</span>
             </div>
             <div className="text-sm text-gray-700">

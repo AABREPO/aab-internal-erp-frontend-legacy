@@ -429,19 +429,12 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
     control: (provided, state) => ({
       ...provided,
       borderWidth: '2px',
+      lineHeight: '20px',
+      fontSize: '14px',
       height: '45px',
       borderRadius: '8px',
-      borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'rgba(191, 152, 83, 0.2)',
-      boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
-      '&:hover': {
-        borderColor: 'rgba(191, 152, 83, 0.2)',
-      }
-    }),
-    indicatorSeparator: () => ({
-      display: 'none',
-    }),
-    dropdownIndicator: () => ({
-      display: 'none',
+      borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.3)' : 'rgba(191, 152, 83, 0.3)',
+      boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.3)' : 'none',
     }),
     clearIndicator: (provided) => ({
       ...provided,
@@ -1463,34 +1456,34 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
       <div className='overflow-hidden bg-[#FAF6ED] w-full'>
         <div className='px-4 sm:px-6 lg:px-10 overflow-hidden'>
           <div className='flex flex-col xl:flex-row gap-4 xl:gap-10 text-left '>
-            <div className='bg-white w-[1000px] p-4 px-4 sm:px-8 lg:px-12 rounded-md text-left flex  items-center pb-6 gap-[16px] -mt-4'>
-              <div className='space-y-2 flex-1 min-w-[100px]'>
+            <div className='bg-white w-full p-4 px-10 rounded-md text-left xl:flex  items-center pb-6 gap-[16px]'>
+              <div className='space-y-2 flex-1'>
                 <h2 className='font-semibold text-sm sm:text-base'>From Date</h2>
                 <input
                   type='date'
                   value={fromDate}
                   onChange={(e) => setFromDate(e.target.value)}
-                  className='border-2 border-[#BF9853] border-opacity-30 rounded-lg px-2 py-1 w-full min-w-[150px] h-[45px] focus:outline-none text-sm'
+                  className='border-2 border-[#BF9853] border-opacity-30 rounded-lg px-2 py-1 w-full h-[45px] focus:outline-none text-sm'
                 />
               </div>
-              <div className='space-y-2 flex-1 min-w-[100px]'>
+              <div className='space-y-2 flex-1'>
                 <h2 className='font-semibold text-sm sm:text-base'>To Date</h2>
                 <input
                   type='date'
                   value={toDate}
                   onChange={(e) => setToDate(e.target.value)}
-                  className='border-2 border-[#BF9853] border-opacity-30 rounded-lg px-2 py-1 w-full min-w-[150px] h-[45px] focus:outline-none text-sm'
+                  className='border-2 border-[#BF9853] border-opacity-30 rounded-lg px-2 py-1 w-full h-[45px] focus:outline-none text-sm'
                 />
               </div>
-              <div className='space-y-2 flex-1 min-w-[100px]'>
+              <div className='space-y-2 flex-1'>
                 <h2 className='font-semibold text-sm sm:text-base'>Amount Given</h2>
                 <input
                   readOnly
                   value={filteredAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                  className='bg-[#F2F2F2] rounded-lg p-2 w-full min-w-[120px] h-[45px] focus:outline-none text-sm'
+                  className='bg-[#F2F2F2] rounded-lg p-2 w-full h-[45px] focus:outline-none text-sm'
                 />
               </div>
-              <div className='space-y-2 flex-1 min-w-[100px]'>
+              <div className='space-y-2 flex-1'>
                 <h2 className='font-semibold text-sm sm:text-base'>Payment Mode</h2>
                 <Select
                   options={finalPaymentModeOptions}
@@ -1505,7 +1498,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                 />
               </div>
             </div>
-            <div className='flex flex-col sm:flex-row bg-white w-[800px] xl:min-w-[500px] h-auto lg:h-[128px] rounded-md p-4 gap-[16px] px-4 sm:px-8 lg:px-16'>
+            <div className='flex flex-col sm:flex-row bg-white w-full h-auto xl:h-[128px] rounded-md p-4 gap-[16px] px-10 '>
               <div className='space-y-2'>
                 <h2 className='font-semibold text-sm sm:text-base'>Today Amount</h2>
                 <input
@@ -1527,13 +1520,13 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             </div>
           </div>
         </div>
-        <div className='px-4 sm:px-6 lg:px-10 mt-5 overflow-hidden'>
-          <div className='bg-white w-full max-w-[1850px] p-4 lg:p-6 rounded-md shadow-sm'>
-            <div className='flex px-4 sm:px-6 lg:px-8 gap-10'>
-              <div className='flex-1'>
-                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 text-left'>
-                  <div className='space-y-2 flex items-center  '>
-                    <label className='font-semibold text-[#E4572E] text-sm sm:text-base w-40'>Select Type</label>
+        <div className='px-4 sm:px-6 lg:px-10 mt-4'>
+          <div className='bg-white w-full max-w-[1850px] xl:h-[610px] p-4 lg:p-6 rounded-md shadow-sm'>
+            <div className='xl:flex px-4 gap-10'>
+              <div className='xl:flex w-full xl:w-[1100px]'>
+                <div className='grid grid-cols-1 sm:grid-cols-2 gap-3 text-left'>
+                  <div className='space-y-1 flex items-center max-w-[300px]'>
+                    <label className='font-semibold text-[#E4572E] text-sm sm:text-base xl:w-40 w-20'>Select Type</label>
                     <Select
                       options={[
                         { value: 'Advance', label: 'Advance' },
@@ -1552,20 +1545,20 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                       isSearchable
                       isClearable
                       styles={customStyles}
-                      className='w-full rounded-lg focus:outline-none'
+                      className='w-full max-w-[330px] rounded-lg focus:outline-none'
                     />
                   </div>
-                  <div className='space-y-2 flex gap-3 items-center '>
+                  <div className='space-y-1 flex gap-3 items-center'>
                     <label className='font-semibold text-[#E4572E] text-sm sm:text-base'>Date</label>
                     <input
                       type='date'
                       placeholder='dd-mm-yyyy'
                       value={dateValue}
                       onChange={(e) => setDateValue(e.target.value)}
-                      className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
+                      className='w-full max-w-[330px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
                     />
                   </div>
-                  <div className='space-y-2'>
+                  <div className='space-y-1'>
                     <label className='font-semibold block text-sm sm:text-base'>Contractor/Vendor<span className="text-red-500">*</span></label>
                     <Select
                       options={combinedOptions}
@@ -1577,7 +1570,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                       styles={customStyles}
                     />
                   </div>
-                  <div className='space-y-2'>
+                  <div className='space-y-1'>
                     <label className='font-semibold block text-sm sm:text-base'>Overall Advance</label>
                     <input
                       value={overallAdvance.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
@@ -1585,7 +1578,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                       className='w-full h-[45px] px-2 py-1 rounded-lg bg-[#F2F2F2] focus:outline-none text-sm'
                     />
                   </div>
-                  <div className='space-y-2'>
+                  <div className='space-y-1'>
                     <label className='font-semibold block text-sm sm:text-base'>Project Name<span className="text-red-500">*</span></label>
                     <Select
                       options={sortedSiteOptions || []}
@@ -1599,7 +1592,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                     />
                   </div>
                   {selectedType !== 'Bill Settlement' && (
-                    <div className='space-y-2'>
+                    <div className='space-y-1'>
                       <label className='font-semibold block text-sm sm:text-base'>Project Advance</label>
                       <input
                         value={projectAdvance}
@@ -1610,7 +1603,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                     </div>
                   )}
                   {selectedType === 'Bill Settlement' && (
-                    <div className='space-y-2'>
+                    <div className='space-y-1'>
                       <label className='font-semibold block text-sm sm:text-base'>Bill Amount<span className="text-red-500">*</span></label>
                       <input
                         value={billAmount}
@@ -1620,7 +1613,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                     </div>
                   )}
                   {selectedType === 'Bill Settlement' && (
-                    <div className='space-y-2'>
+                    <div className='space-y-1'>
                       <label className='font-semibold block text-sm sm:text-base'>Category<span className="text-red-500">*</span></label>
                       <Select
                         options={categoryOptions}
@@ -1634,7 +1627,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                       />
                     </div>
                   )}
-                  <div className='space-y-2'>
+                  <div className='space-y-1'>
                     <label className='font-semibold block text-sm sm:text-base'>
                       {selectedType === 'Transfer'
                         ? 'Transfer Amount'
@@ -1648,7 +1641,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                       className='w-full h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
                     />
                   </div>
-                  <div className='space-y-2'>
+                  <div className='space-y-1'>
                     {selectedType === 'Transfer' ? (
                       <>
                         <label className='font-semibold block text-sm sm:text-base'>Project Name</label>
@@ -1680,18 +1673,18 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                       </>
                     )}
                   </div>
-                  <div className='col-span-1 sm:col-span-2 space-y-2'>
+                  <div className='col-span-1 sm:col-span-2 space-y-1'>
                     <label className='font-semibold block text-sm sm:text-base'>Description</label>
                     <textarea
                       rows={2}
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       placeholder="Type your text here..."
-                      className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-2 rounded-lg focus:outline-none text-sm'>
+                      className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 font-medium px-2 py-2 rounded-lg focus:outline-none text-sm'>
                     </textarea>
                   </div>
-                  <div className='col-span-1 sm:col-span-2 space-y-4'>
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                  <div className=''>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-2">
                       <div className='flex items-center'>
                         <label htmlFor="fileInput" className="cursor-pointer flex items-center text-orange-600 text-sm">
                           <img className='w-5 h-4 mr-1' alt='' src={Attach}></img>
@@ -1702,7 +1695,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                       {selectedAdvanceFile && <span className="text-gray-600 text-sm">{selectedAdvanceFile.name}</span>}
                     </div>
                     <button
-                      className='bg-[#c7934c] text-white w-full sm:w-[120px] h-[33px] rounded flex items-center justify-center text-sm'
+                      className='bg-[#c7934c] text-white w-full sm:w-[120px] h-[33px] rounded flex items-center justify-center text-sm xl:mb-0 mb-2'
                       onClick={handleSubmit}
                       disabled={isSubmitting}
                     >
@@ -1720,7 +1713,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                   </div>
                 </div>
               </div>
-              <div className='flex-1 xl:min-w-[1000px]'>
+              <div className='w-full'>
                 <div className='flex flex-col sm:flex-row items-start sm:items-center justify-end mb-4 gap-4'>
                   <div className='flex items-center gap-2'>
                     <input
@@ -1735,23 +1728,19 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                     <span className='text-[#BF9853] font-semibold hover:underline cursor-pointer text-sm'>Print</span>
                   </div>
                 </div>
-                <div className='border-l-8 border-l-[#BF9853] rounded-lg'>
-                  <div className=''>
-                    <table className="w-full">
-                      <thead className="bg-[#FAF6ED] text-left">
+                <div className='border-l-8 border-l-[#BF9853] rounded-lg overflow-hidden w-full'>
+                  <div className='overflow-x-auto max-h-[400px] overflow-y-auto thin-scrollbar w-full'>
+                    <table className="w-full min-w-[800px]">
+                      <thead className="bg-[#FAF6ED] text-left sticky top-0 z-10">
                         <tr>
-                          <th className="px-6 py-2 text-xs sm:text-sm w-[130px]">Date</th>
-                          <th className="px-2 py-2 text-xs sm:text-sm w-[150px]">Advance</th>
-                          <th className="px-2 py-2 text-xs sm:text-sm w-[150px]">Bill</th>
-                          <th className="px-2 py-2 text-xs sm:text-sm w-[250px]">Transfer/Refund</th>
-                          <th className="px-2 py-2 text-xs sm:text-sm w-[130px]">Mode</th>
-                          <th className="px-2 py-2 text-xs sm:text-sm w-[130px]">Activity</th>
+                          <th className="px-2 sm:px-4 lg:px-6 py-2 text-xs sm:text-sm whitespace-nowrap">Date</th>
+                          <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap">Advance</th>
+                          <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap">Bill</th>
+                          <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap">Transfer/Refund</th>
+                          <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap">Mode</th>
+                          <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap">Activity</th>
                         </tr>
                       </thead>
-                    </table>
-                  </div>
-                  <div className='overflow-x-auto max-h-[400px] overflow-y-auto'>
-                    <table className="w-full min-w-[950px]">
                       <tbody>
                         {!selectedOption || !selectedSite ? (
                           <tr>
@@ -1831,24 +1820,24 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                                     : `Transfer from ${siteLabel || 'Unknown Site'}`;
                               }
                               return (
-                                <tr key={index} className="border-t">
-                                  <td className="px-2 py-2 text-xs sm:text-sm font-semibold w-[120px]">
+                                <tr key={index} className="border-t hover:bg-gray-50">
+                                  <td className="px-2 sm:px-4 lg:px-6 py-2 text-xs sm:text-sm font-semibold whitespace-nowrap">
                                     {new Date(date).toLocaleDateString('en-GB')}
                                   </td>
-                                  <td className="px-2 py-2 text-xs sm:text-sm text-right pr-20 font-semibold w-[150px]">
+                                  <td className="px-2 py-2 text-xs sm:text-sm text-right font-semibold whitespace-nowrap">
                                     {advanceAmount}
                                   </td>
-                                  <td className="px-2 py-2 text-xs sm:text-sm text-right w-[150px] pr-24 font-semibold">
+                                  <td className="px-2 py-2 text-xs sm:text-sm text-right font-semibold whitespace-nowrap">
                                     {billAmount}
                                   </td>
-                                  <td className="px-2 py-2 text-xs sm:text-sm text-left w-[280px] font-semibold">
+                                  <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold break-words min-w-[120px] sm:min-w-[200px]">
                                     {transferOrRefund}
                                   </td>
-                                  <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold">
+                                  <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold whitespace-nowrap">
                                     {payment_mode || ''}
                                   </td>
-                                  <td className="px-2 py-2 w-[120px]">
-                                    <div className="flex items-center gap-2">
+                                  <td className="px-2 py-2 whitespace-nowrap">
+                                    <div className="flex items-center gap-1 sm:gap-2">
                                       <button className="rounded-full transition duration-200">
                                         <img
                                           src={edit}

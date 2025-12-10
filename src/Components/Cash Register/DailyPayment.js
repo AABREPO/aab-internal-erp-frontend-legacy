@@ -11,7 +11,7 @@ import Change from '../Images/dropdownchange.png'
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { type } from '@testing-library/user-event/dist/type';
-import { e } from 'mathjs';
+import { e, re } from 'mathjs';
 import NotesStart from '../Images/notes _start.png';
 import NotesEnd from '../Images/notes_end.png';
 import Filter from '../Images/filter (3).png';
@@ -797,7 +797,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     };
 
     // Clear Loan Portal entry function
-    const clearLoanPortalEntry = async (loanPortalId, date) => {
+    const clearLoanPortalEntry = async (loanPortalId, date, entry_no) => {
         if (!loanPortalId) return;
         const payload = {
             loanPortalId,
@@ -813,7 +813,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             employee_id: 0,
             project_id: 0,
             transfer_Project_id: 0,
-            entry_no: 0,
+            entry_no,
             description: "",
         };
         const response = await fetch(`https://backendaab.in/aabuildersDash/api/loans/${loanPortalId}?editedBy=${encodeURIComponent(username)}`, {
@@ -826,8 +826,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         }
     };
 
-    // Clear Staff Advance Portal entry function
-    const clearStaffAdvancePortalEntry = async (staffAdvancePortalId, date) => {
+    const clearStaffAdvancePortalEntry = async (staffAdvancePortalId, date, entry_no) => {
         if (!staffAdvancePortalId) return;
         const clearedData = {
             date: date || new Date().toISOString().split("T")[0],
@@ -841,7 +840,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             staff_payment_mode: null,
             file_url: null,
             staff_refund_amount: null,
-            entry_no: null,
+            entry_no,
         };
         const response = await fetch(
             `https://backendaab.in/aabuildersDash/api/staff-advance/${staffAdvancePortalId}?editedBy=${encodeURIComponent(username)}`,
@@ -859,14 +858,11 @@ const DailyPayment = ({ username, userRoles = [] }) => {
 
     const handleRefundSubmit = async () => {
         try {
-            // Check if it's a labour or employee refund
             const isLabourOrEmployeeRefund = (newRefundReceived.labour_id && Number(newRefundReceived.labour_id) > 0) ||
                 (newRefundReceived.employee_id && Number(newRefundReceived.employee_id) > 0);
-            // Check if it's a vendor or contractor refund
             const isVendorOrContractorRefund = (newRefundReceived.vendor_id && Number(newRefundReceived.vendor_id) > 0) ||
                 (newRefundReceived.contractor_id && Number(newRefundReceived.contractor_id) > 0);
             if (isLabourOrEmployeeRefund) {
-                // Only send to staff-advance API for labour/employee refunds
                 const entryNo = await getLastEntryNumber();
                 const staffAdvancePayload = {
                     date: selectedDate,
@@ -884,9 +880,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     staffAdvancePayload,
                     { headers: { "Content-Type": "application/json" } }
                 );
-                // Get the staffAdvancePortalId from the response
                 const staffAdvancePortalId = staffAdvanceResponse.data?.staffAdvancePortalId;
-                // Send to refund_received API with staff_advance_portal_id
                 const refundPayload = {
                     date: selectedDate,
                     labour_id: Number(newRefundReceived.labour_id) || null,
@@ -901,7 +895,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     { headers: { "Content-Type": "application/json" } }
                 );
             } else if (isVendorOrContractorRefund) {
-                // For vendor/contractor refunds - show purpose popup first
                 setPendingRefundData({
                     date: selectedDate,
                     vendor_id: Number(newRefundReceived.vendor_id) || null,
@@ -910,13 +903,12 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     weekly_number: Number(currentWeekNumber)
                 });
                 setShowPurposePopup(true);
-                return; // Don't proceed with submission yet
+                return;
             } else {
                 alert("Please select a labour, employee, vendor, or contractor for the refund.");
                 return;
             }
             window.location.reload();
-            // Reset form after save
             setNewRefundReceived({
                 date: new Date().toISOString().split("T")[0],
                 labour_id: "",
@@ -945,11 +937,10 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             return;
         }
         try {
-            // For vendor/contractor refunds - send to loan portal API as Refund type
             const loanPortalPayload = {
                 type: "Refund",
                 date: pendingRefundData.date,
-                amount: 0, // For refunds, amount is 0 in loan portal
+                amount: 0,
                 loan_payment_mode: "Cash",
                 loan_refund_amount: Number(pendingRefundData.amount),
                 from_purpose_id: selectedPurpose.id,
@@ -966,7 +957,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 loanPortalPayload,
                 { headers: { "Content-Type": "application/json" } }
             );
-            // Also send to refund_received API for tracking
             const refundPayload = {
                 date: pendingRefundData.date,
                 vendor_id: Number(pendingRefundData.vendor_id) || null,
@@ -981,12 +971,10 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 refundPayload,
                 { headers: { "Content-Type": "application/json" } }
             );
-            // Close popup and reset form
             setShowPurposePopup(false);
             setSelectedPurpose(null);
             setPendingRefundData(null);
             window.location.reload();
-            // Reset form after save
             setNewRefundReceived({
                 date: new Date().toISOString().split("T")[0],
                 labour_id: "",
@@ -1034,20 +1022,15 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 file_url: editDailyExpenseData.file_url || null,  // 🔹 send url here
                 staff_advance_portal_id: editDailyExpenseData.staff_advance_portal_id || null,
             };
-
-            // Check if type changed from Staff Advance to another type
             const wasStaffAdvance = row.type === "Staff Advance";
             const isNowStaffAdvance = editDailyExpenseData.type === "Staff Advance";
             const typeChangedFromStaffAdvance = wasStaffAdvance && !isNowStaffAdvance;
             const typeChangedToStaffAdvance = !wasStaffAdvance && isNowStaffAdvance;
             const amountChanged = Number(row.amount) !== Number(editDailyExpenseData.amount);
-
-            // Check if anything actually changed first
             const isChanged = Object.keys(payload).some(
                 (key) => {
                     const payloadValue = payload[key] ?? "";
                     const rowValue = row[key] ?? "";
-                    // Handle numeric comparisons for numeric fields
                     const numericFields = ['labour_id', 'vendor_id', 'contractor_id', 'employee_id', 'project_id', 'quantity', 'amount', 'extra_amount'];
                     if (numericFields.includes(key)) {
                         return Number(payloadValue) !== Number(rowValue);
@@ -1055,10 +1038,8 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     return String(payloadValue) !== String(rowValue);
                 }
             ) || typeChangedFromStaffAdvance || typeChangedToStaffAdvance;
-            // If type changed from Staff Advance to another type, delete staff advance portal record
             if (typeChangedFromStaffAdvance) {
                 payload.staff_advance_portal_id = null;
-                // Delete the staff advance portal record
                 if (row.staff_advance_portal_id) {
                     try {
                         await axios.delete(
@@ -1070,7 +1051,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     }
                 }
             }
-            // If type changed to Staff Advance, create new staff advance portal record
             if (typeChangedToStaffAdvance) {
                 try {
                     const entryNo = await getLastEntryNumber();
@@ -1089,14 +1069,12 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         staffAdvancePayload,
                         { headers: { "Content-Type": "application/json" } }
                     );
-                    // Get the staffAdvancePortalId from the response
                     const staffAdvancePortalId = staffAdvanceResponse.data?.staffAdvancePortalId;
                     payload.staff_advance_portal_id = staffAdvancePortalId;
                 } catch (error) {
                     console.error("Error creating staff advance portal:", error);
                 }
             }
-            // If amount changed and it's still Staff Advance, update staff advance portal
             if (amountChanged && isNowStaffAdvance && row.staff_advance_portal_id) {
                 try {
                     const staffAdvanceUpdatePayload = {
@@ -1120,23 +1098,19 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     console.error("Error updating staff advance portal amount:", error);
                 }
             }
-
-            // If no changes were made, exit edit mode without updating
             if (!isChanged) {
                 setEditingDailyExpenseRowId(null);
                 return;
             }
-
             const response = await axios.put(
                 `https://backendaab.in/aabuildersDash/api/daily-payments/edit/${row.id}?username=${encodeURIComponent(username)}`,
                 payload,
                 { headers: { "Content-Type": "application/json" } }
             );
-            // ✅ Update UI without reload
             setDailyExpenses((prev) =>
                 prev.map((exp) => (exp.id === row.id ? { ...exp, ...payload } : exp))
             );
-            setEditingDailyExpenseRowId(null); // exit edit mode
+            setEditingDailyExpenseRowId(null);
         } catch (error) {
             console.error("Error updating expense:", error);
         }
@@ -1171,9 +1145,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     };
     const saveEditedRefundPayment = async (id) => {
         try {
-            // Find the refund payment data to check for staff_advance_portal_id
             const refundData = refundPayments.find(refund => refund.id === id);
-            // If it has a staff_advance_portal_id, update that record first
             if (refundData && refundData.staff_advance_portal_id) {
                 try {
                     const staffAdvanceUpdatePayload = {
@@ -1204,7 +1176,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 `https://backendaab.in/aabuildersDash/api/refund_received/edit/${id}?username=${encodeURIComponent(username)}`,
                 editRefundPaymentData
             );
-            // Update UI immediately
             setRefundPayments((prev) =>
                 prev.map((row) =>
                     row.id === id ? { ...row, ...editRefundPaymentData } : row
@@ -1273,29 +1244,24 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         if (confirmed) {
             try {
                 const refundData = refundPayments.find(refund => refund.id === id);
-
-                // Clear Staff Advance Portal entry if exists
                 if (refundData && refundData.staff_advance_portal_id) {
                     try {
-                        await clearStaffAdvancePortalEntry(refundData.staff_advance_portal_id, refundData.date);
+                        await clearStaffAdvancePortalEntry(refundData.staff_advance_portal_id, refundData.date, refundData.entry_no);
                     } catch (error) {
                         console.error("Error clearing staff advance portal for refund:", error);
                         alert("Failed to clear the associated Staff Advance Portal entry. Please try again.");
                         return;
                     }
                 }
-
-                // Clear Loan Portal entry if exists
                 if (refundData && refundData.loan_portal_id) {
                     try {
-                        await clearLoanPortalEntry(refundData.loan_portal_id, refundData.date);
+                        await clearLoanPortalEntry(refundData.loan_portal_id, refundData.date, refundData.entry_no);
                     } catch (error) {
                         console.error("Error clearing loan portal for refund:", error);
                         alert("Failed to clear the associated Loan Portal entry. Please try again.");
                         return;
                     }
                 }
-
                 const response = await fetch(`https://backendaab.in/aabuildersDash/api/refund_received/delete/${id}`, {
                     method: 'DELETE',
                 });
@@ -1369,7 +1335,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     vendor_id: null,
                     project_id: siteOptions.find(opt => opt.label === "Daily Wage")?.id || null,
                     type: "Daily",
-                    amount: 0, // 🔹 always 0 → backend will recalc sum
+                    amount: 0,
                     weekly_number: currentWeekNumber,
                     status: false,
                 };
@@ -1404,7 +1370,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     vendor_id: null,
                     project_id: siteOptions.find(opt => opt.label === "Daily Wage")?.id || null,
                     type: "Daily",
-                    amount: 0, // 🔹 always 0 → backend will recalc sum
+                    amount: 0,
                     weekly_number: currentWeekNumber,
                     status: false,
                 };
@@ -1414,7 +1380,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     { headers: { "Content-Type": "application/json" } }
                 );
             }
-            // ✅ Refresh UI
             await handleDateClick(selectedDate);
             window.location.reload();
             setNewDailyExpense({
@@ -1435,14 +1400,14 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     };
     useEffect(() => {
         if (weeks.length > 0) {
-            setSelectedWeek(weeks[weeks.length - 1].number); // default last week
+            setSelectedWeek(weeks[weeks.length - 1].number); 
         }
     }, [weeks]);
     const getCurrentWeekDays = () => {
         const today = new Date();
-        const dayOfWeek = today.getDay() || 7; // make Sunday = 7
+        const dayOfWeek = today.getDay() || 7;
         const monday = new Date(today);
-        monday.setDate(today.getDate() - dayOfWeek + 1); // back to Monday
+        monday.setDate(today.getDate() - dayOfWeek + 1);
         const days = [];
         for (let i = 0; i < 7; i++) {
             const d = new Date(monday);
@@ -1461,7 +1426,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         }
     }
     const currentWeekDays = getCurrentWeekDays();
-    // Auto select today's date ONCE when component mounts
     useEffect(() => {
         if (currentWeekDays.length > 0) {
             const todayStr = new Date().toISOString().split("T")[0];
@@ -1475,14 +1439,12 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             setNewDailyExpense((prev) => ({ ...prev, date: defaultDate }));
         }
     }, []);
-    // format helper
     const formatDate = (date) =>
         date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
     const handleDateClick = async (dateStr) => {
         setSelectedDate(dateStr);
         setNewDailyExpense((prev) => ({ ...prev, date: dateStr }));
         try {
-            // Fetch daily expenses
             const [dailyRes, refundRes] = await Promise.all([
                 axios.get(`https://backendaab.in/aabuildersDash/api/daily-payments/date/${dateStr}`),
                 axios.get(`https://backendaab.in/aabuildersDash/api/refund_received/date/${dateStr}`)
@@ -1514,7 +1476,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         .reduce((sum, p) => sum + Number(p.amount || 0), 0);
     const netBalance = totalAmount - totalRefund;
     const balance = totalPayments - expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-
     const generateExpensesPDF = () => {
         if (!selectedDate || dailyExpenses.length === 0) {
             alert("No data available to generate PDF");
@@ -1542,7 +1503,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         doc.line(14, 15, pageWidth - 14, 15);
         doc.line(14, 30, pageWidth - 14, 30);
         doc.setFont(undefined, 'normal');
-        // Use dailyExpenses directly (unfiltered by UI filters) - only filter by date and type
         const filteredExpenses = dailyExpenses.filter(row => row.date === selectedDate && row.type !== "Staff Advance" && row.type !== "Diwali Bonus");
         const totalAmount = filteredExpenses.reduce(
             (sum, row) => sum + ((row.amount || 0) + (row.extra_amount || 0)),
@@ -1653,7 +1613,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 fillColor: false,
             },
             didParseCell: function (data) {
-                // Make the total row bold
                 if (data.row.index === expensesTableRows.length - 1) {
                     data.cell.styles.fontStyle = 'bold';
                     data.cell.styles.fillColor = [255, 255, 255];
@@ -1663,13 +1622,11 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         });
         const firstTableEndY = doc.lastAutoTable.finalY;
         const spaceBetweenTables = 10;        
-        // Calculate and display NET BALANCE on first page only
         const netBalance = totalAmount - totalRefundAmount;
         doc.setPage(1);
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
-        doc.text(`NET BALANCE: ${netBalance.toLocaleString('en-IN')}`, 155, 38);        
-        // Helper function to add header to new pages
+        doc.text(`NET BALANCE: ${netBalance.toLocaleString('en-IN')}`, 155, 38);      
         const addHeaderToPage = (pageNum) => {
             doc.setPage(pageNum);
             doc.setFontSize(14);
@@ -1683,13 +1640,10 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             doc.line(14, 15, pageWidth - 14, 15);
             doc.line(14, 30, pageWidth - 14, 30);
         };
-        // Add a new page for other tables
         doc.addPage();
         addHeaderToPage(doc.internal.getNumberOfPages());
-        // Calculate start position for second page tables (side by side layout)
         const secondPageStartY = 40;
         const sideBySideStartY = secondPageStartY;
-        // Prepare WAGE REFUND table data
         const refundTableColumn = [
            "SNO", "NAME", "", "BALANCE"
         ];
@@ -1713,7 +1667,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             "TOTAL",
             `${totalRefundAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
         ]);
-        // Render WAGE REFUND heading and table (left side)
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
         doc.text('WAGE REFUND', 14, sideBySideStartY - 2);
@@ -1756,7 +1709,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             }
         });
         const refundTableEndY = doc.lastAutoTable.finalY;
-        // Render WAGE ADVANCE table (right side, same Y position)
         if (advanceExpenses.length > 0) {
             const advanceTableColumn = [
                 "S.NO", "PROJECT NAME", "STAFF NAME", "TOTAL AMOUNT"
@@ -1827,7 +1779,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 }
             });
         }
-        // Arrange DIWALI BONUS - side by side with WAGE REFUND if no WAGE ADVANCE, otherwise below
         if (diwaliBonusExpenses.length > 0) {
             const diwaliBonusTableColumn = [
                 "SNO", "NAME", "AMOUNT"
@@ -1854,16 +1805,14 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 `${totalDiwaliBonusAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
             ]);            
             let diwaliY = sideBySideStartY;
-            let diwaliX = 100; // Right side position            
+            let diwaliX = 100;           
             if (advanceExpenses.length === 0) {
-                // No WAGE ADVANCE, so DIWALI BONUS goes on the right side
                 doc.setFontSize(12);
                 doc.setFont(undefined, 'bold');
                 doc.text('DIWALI BONUS', diwaliX, sideBySideStartY - 2);
             } else {
-                // WAGE ADVANCE exists, so DIWALI BONUS goes below
                 diwaliY = Math.max(refundTableEndY, doc.lastAutoTable.finalY) + 15;
-                diwaliX = 14; // Left side position
+                diwaliX = 14;
                 doc.setFontSize(12);
                 doc.setFont(undefined, 'bold');
                 doc.text('DIWALI BONUS', diwaliX, diwaliY - 2);
@@ -1991,7 +1940,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             })
                 .replace(",", "")
                 .replace(/\s/g, "-");
-
             const formData = new FormData();
             const finalName = `${timestamp}-${siteNo}-${name}`;
             formData.append("file", selectedFileForPopup);

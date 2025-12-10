@@ -49,7 +49,7 @@ const AdvanceHeading = ({ username, userRoles = [] }) => {
         }
     };
     return (
-        <div className="bg-[#FAF6ED] min-h-screen w-full h-auto">
+        <div className="bg-[#FAF6ED] w-full h-auto min-h-screen">
             <div className="topbar-title">
                 <h2
                     className={`link ${activeTab === 'advanceportal' ? 'active' : ''}`}

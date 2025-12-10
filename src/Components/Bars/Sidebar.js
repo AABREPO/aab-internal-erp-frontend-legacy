@@ -407,9 +407,14 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
               <p className="text-sm cursor-pointer"><li>Expense Dashboard</li></p>
             </Link>
             <Link
-              to="/bankreconciliation"
+              to={hasAccessToModel('Bank Reconciliation') ? '/bankreconciliation' : '#'}
               className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Bank Reconciliation' ? 'text-red-500' : ''}`}
-              onClick={() => {
+              onClick={(e) => {
+                if (!hasAccessToModel('Bank Reconciliation')) {
+                  e.preventDefault();
+                  alert("No permissions for this page");
+                  return;
+                }
                 handleSubmenuItemClick('Bank Reconciliation');
                 if (onCloseSidebar) onCloseSidebar();
               }}
@@ -464,12 +469,28 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
               }}>
               <p className="text-sm cursor-pointer"><li>Tools Tracker</li></p>
             </Link>
-            <Link to="/testtoolsTracker" className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Test Tools Tracker' ? 'text-red-500' : ''
-              }`} onClick={() => handleSubmenuItemClick('Test Tools Tracker')}>
+            <Link to={hasAccessToModel('Test Tools Tracker') ? '/testtoolsTracker' : '#'} className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Test Tools Tracker' ? 'text-red-500' : ''
+              }`} onClick={(e) => {
+                if (!hasAccessToModel('Test Tools Tracker')) {
+                  e.preventDefault();
+                  alert("No permissions for this page");
+                  return;
+                }
+                handleSubmenuItemClick('Test Tools Tracker');
+                if (onCloseSidebar) onCloseSidebar();
+              }}>
               <p className="text-sm cursor-pointer"><li>Test Tools Tracker</li></p>
             </Link>
-            <Link to="/testpurchaseorder" className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Test PurchaseOrder' ? 'text-red-500' : ''
-              }`} onClick={() => handleSubmenuItemClick('Test PurchaseOrder')}>
+            <Link to={hasAccessToModel('Test PurchaseOrder') ? '/testpurchaseorder' : '#'} className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Test PurchaseOrder' ? 'text-red-500' : ''
+              }`} onClick={(e) => {
+                if (!hasAccessToModel('Test PurchaseOrder')) {
+                  e.preventDefault();
+                  alert("No permissions for this page");
+                  return;
+                }
+                handleSubmenuItemClick('Test PurchaseOrder');
+                if (onCloseSidebar) onCloseSidebar();
+              }}>
               <p className="text-sm cursor-pointer"><li>Test PurchaseOrder</li></p>
             </Link>
           </div>
@@ -581,22 +602,40 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
         </div>
         {activeMenu === 'hr' && (
           <div className="ml-6">
-            <Link to="billView" className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'onboarding' ? 'text-red-500' : ''}`}
-              onClick={() => {
+            <Link to={hasAccessToModel('Onboarding') ? 'billView' : '#'} className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'onboarding' ? 'text-red-500' : ''}`}
+              onClick={(e) => {
+                if (!hasAccessToModel('Onboarding')) {
+                  e.preventDefault();
+                  alert("No permissions for this page");
+                  return;
+                }
                 handleSubmenuItemClick('onboarding');
                 if (onCloseSidebar) onCloseSidebar();
               }}>
               <p className="text-sm cursor-pointer"><li>Onboarding</li></p>
             </Link>
-            <Link to="/attendance" className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Attendance' ? 'text-red-500' : ''}`}
-              onClick={() => {
+            <Link to={hasAccessToModel('Attendance') ? '/attendance' : '#'} className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Attendance' ? 'text-red-500' : ''}`}
+              onClick={(e) => {
+                if (!hasAccessToModel('Attendance')) {
+                  e.preventDefault();
+                  alert("No permissions for this page");
+                  return;
+                }
                 handleSubmenuItemClick('Attendance');
                 if (onCloseSidebar) onCloseSidebar();
               }}>
               <p className="text-sm cursor-pointer"><li>Attendance</li></p>
             </Link>
-            <Link to="/staffadvance/staffAdvance" className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Staff Advance' ? 'text-red-500' : ''}`}
-              onClick={() => { handleSubmenuItemClick('Staff Advance'); if (onCloseSidebar) onCloseSidebar(); }}
+            <Link to={hasAccessToModel('Staff Advance') ? '/staffadvance/staffAdvance' : '#'} className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Staff Advance' ? 'text-red-500' : ''}`}
+              onClick={(e) => {
+                if (!hasAccessToModel('Staff Advance')) {
+                  e.preventDefault();
+                  alert("No permissions for this page");
+                  return;
+                }
+                handleSubmenuItemClick('Staff Advance');
+                if (onCloseSidebar) onCloseSidebar();
+              }}
             >
               <p className="text-sm cursor-pointer"><li>Staff Advance</li></p>
             </Link>
@@ -624,9 +663,14 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
         {activeMenu === 'utility' && (
           <div className="ml-6">
             <Link
-              to="utility/dashboard"
+              to={hasAccessToModel('Dashboard') ? 'utility/dashboard' : '#'}
               className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Dashboard' ? 'text-red-500' : ''}`}
-              onClick={() => {
+              onClick={(e) => {
+                if (!hasAccessToModel('Dashboard')) {
+                  e.preventDefault();
+                  alert("No permissions for this page");
+                  return;
+                }
                 handleSubmenuItemClick('Dashboard');
                 if (onCloseSidebar) onCloseSidebar();
               }}
@@ -634,9 +678,14 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
               <p className="text-sm cursor-pointer"><li>Dashboard</li></p>
             </Link>
             <Link
-              to="/directory"
+              to={hasAccessToModel('Directory') ? '/directory' : '#'}
               className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Directory' ? 'text-red-500' : ''}`}
-              onClick={() => {
+              onClick={(e) => {
+                if (!hasAccessToModel('Directory')) {
+                  e.preventDefault();
+                  alert("No permissions for this page");
+                  return;
+                }
                 handleSubmenuItemClick('Directory');
                 if (onCloseSidebar) onCloseSidebar();
               }}
@@ -654,9 +703,14 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
         {activeMenu === 'masterdata' && (
           <div className="ml-6">
             <Link
-              to="/master-data"
+              to={hasAccessToModel('Master Data') ? '/master-data' : '#'}
               className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Master Data' ? 'text-red-500' : ''}`}
-              onClick={() => {
+              onClick={(e) => {
+                if (!hasAccessToModel('Master Data')) {
+                  e.preventDefault();
+                  alert("No permissions for this page");
+                  return;
+                }
                 handleSubmenuItemClick('Master Data');
                 if (onCloseSidebar) onCloseSidebar();
               }}

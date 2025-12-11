@@ -68,7 +68,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     { value: 'Cheque', label: 'Cheque' },
     { value: 'Advance Transfer', label: 'Advance Transfer' }
   ], []);
-  
+
   const finalPaymentModeOptions = paymentModeOptions.length > 0 ? paymentModeOptions : defaultPaymentModeOptions;
 
   useEffect(() => {
@@ -652,19 +652,65 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     setCombinedSitePurposeOptions([...siteOptions, ...purposeOptions]);
   }, [siteOptions, purposeOptions]);
   // Memoized custom styles for Select components
-  const customStyles = useMemo(() => ({
+  const customStyles = {
     control: (provided, state) => ({
       ...provided,
-      height: '45px',
       borderWidth: '2px',
+      lineHeight: '20px',
+      fontSize: '14px',
+      height: '45px',
       borderRadius: '8px',
-      borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'rgba(191, 152, 83, 0.2)',
-      boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
-      '&:hover': {
-        borderColor: 'rgba(191, 152, 83, 0.2)',
-      }
+      borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.3)' : 'rgba(191, 152, 83, 0.3)',
+      boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.3)' : 'none',
     }),
-  }), []);
+    clearIndicator: (provided) => ({
+      ...provided,
+      cursor: 'pointer',
+    }),
+    menu: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+      maxHeight: '300px',
+    }),
+    menuPortal: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+    }),
+    menuList: (provided) => ({
+      ...provided,
+      maxHeight: '250px',
+      overflowY: 'auto',
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      fontWeight: '500',
+      backgroundColor: state.isSelected
+        ? 'rgba(191, 152, 83, 0.3)'
+        : state.isFocused
+          ? 'rgba(191, 152, 83, 0.1)'
+          : 'white',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    input: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    placeholder: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: '#999',
+      textAlign: 'left',
+    }),
+  };
   // Function to handle the initial submit button click
   const handleSubmit = async () => {
     // Comprehensive validation for all required fields
@@ -764,12 +810,12 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   // Function to actually submit the loan data
   const submitLoanData = async () => {
     let advancePortalId = null;
-    
+
     // Check if transferring to a project (Site) for Vendor or Contractor
-    if (selectedLoanType === "Transfer" && 
-        transferSelection?.type === "Site" && 
-        (selectedOption?.type === "Vendor" || selectedOption?.type === "Contractor")) {
-      
+    if (selectedLoanType === "Transfer" &&
+      transferSelection?.type === "Site" &&
+      (selectedOption?.type === "Vendor" || selectedOption?.type === "Contractor")) {
+
       // First, create advance portal entry with positive amount
       try {
         // Get entry number for advance portal
@@ -807,7 +853,9 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         }
 
         const advanceResult = await advanceResponse.json();
+        console.log('✅ Advance portal entry created:', advanceResult);
         advancePortalId = advanceResult.id || advanceResult.advancePortalId;
+        console.log('Advance Portal ID to link:', advancePortalId);
       } catch (error) {
         console.error('Error creating advance portal entry:', error);
         toast.error('Failed to create advance portal entry!', {
@@ -818,7 +866,6 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         return; // Stop execution if advance portal entry fails
       }
     }
-
     const payload = {
       type: selectedLoanType,
       date: dateValue,
@@ -829,7 +876,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
             ? transferSelection?.type === "Site" && (selectedOption?.type === "Vendor" || selectedOption?.type === "Contractor")
               ? -Math.abs(parseFloat(transferAmount) || 0) // Negative amount for transfer to project
               : parseFloat(transferAmount) || 0
-            : 0,
+              : 0,
       loan_payment_mode: paymentMode,
       loan_refund_amount: selectedLoanType === "Refund" ? parseFloat(amountGiven) || 0 : 0,
       from_purpose_id: purpose || 0,
@@ -844,6 +891,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       file_url: "",
       advance_portal_id: advancePortalId || null
     };
+    console.log("Submitting loan data with payload:", payload);
     try {
       const response = await fetch("https://backendaab.in/aabuildersDash/api/loans/save", {
         method: "POST",
@@ -856,7 +904,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         throw new Error(`Failed to save loan: ${response.status}`);
       }
       const loanResult = await response.json();
-
+      console.log("✅ Loan saved successfully:", loanResult);
       // If payment mode is GPay, PhonePe, Net Banking, or Cheque, also save to weekly-payment-bills
       if (selectedLoanType === "Loan" && ["GPay", "PhonePe", "Net Banking", "Cheque"].includes(paymentMode)) {
         const weeklyPaymentBillPayload = {
@@ -901,7 +949,6 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
           theme: "colored"
         });
       }
-
       // Reset payment popup data and close modals
       setPaymentPopupData({
         chequeNo: "",
@@ -911,7 +958,6 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       });
       setShowPaymentModal(false);
       setShowReviewModal(false);
-
       // Reset form fields
       setAmountGiven('');
       setTransferAmount('');
@@ -920,7 +966,6 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-
       // Refresh loan data to show the new entry
       setTimeout(async () => {
         try {
@@ -943,7 +988,6 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       });
     }
   };
-
   // Function to handle payment modal submission
   const handlePaymentModalSubmit = async () => {
     // Validate payment details
@@ -963,7 +1007,6 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       });
       return;
     }
-
     await submitLoanData();
   };
   // Function to get the current week number
@@ -1006,7 +1049,6 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     }
     return "";
   }, [purpose, purposeOptions, siteOptions]);
-
   const filteredLoanData = useMemo(() => {
     if (!selectedOption || !purpose) return [];
     const purposeId = parseInt(purpose, 10);
@@ -1094,7 +1136,6 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     }
     e.target.value = '';
   }, []);
-
   // File preview URL effect
   useEffect(() => {
     if (!selectedLoanFile) {
@@ -1105,13 +1146,11 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     setFilePreviewUrl(objectUrl);
     return () => URL.revokeObjectURL(objectUrl);
   }, [selectedLoanFile]);
-
   // Review modal handlers
   const handleReviewConfirm = () => {
     if (isReviewEditMode) {
       return;
     }
-    
     // Re-validate before proceeding
     if (!selectedLoanType || !dateValue || !selectedOption || !purpose) {
       toast.error("Please fill all required fields!", {
@@ -1121,7 +1160,6 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       });
       return;
     }
-
     // Validation based on loan type
     if (selectedLoanType === "Loan") {
       if (!amountGiven || parseFloat(amountGiven) <= 0) {
@@ -1141,7 +1179,6 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         return;
       }
     }
-
     if (selectedLoanType === "Refund") {
       if (!amountGiven || parseFloat(amountGiven) <= 0) {
         toast.error("Please enter a valid refund amount!", {
@@ -1152,7 +1189,6 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         return;
       }
     }
-
     if (selectedLoanType === "Transfer") {
       if (!transferSelection) {
         toast.error("Please select transfer destination!", {
@@ -1171,23 +1207,19 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         return;
       }
     }
-
     // Check if we need to show payment details popup
     if (selectedLoanType === "Loan" && ["GPay", "PhonePe", "Net Banking", "Cheque"].includes(paymentMode)) {
       setShowReviewModal(false);
       setShowPaymentModal(true);
       return;
     }
-
     // Otherwise, proceed with direct submission
     submitLoanData();
   };
-
   const handleReviewClose = () => {
     setShowReviewModal(false);
     setIsReviewEditMode(false);
   };
-
   const handleReviewSave = () => {
     setIsReviewEditMode(false);
   };
@@ -1230,25 +1262,20 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       });
       return;
     }
-
     const doc = new jsPDF();
-
-    const entityType = selectedOption?.type === "Contractor" ? "Contractor" 
+    const entityType = selectedOption?.type === "Contractor" ? "Contractor"
       : selectedOption?.type === "Vendor" ? "Vendor"
-      : selectedOption?.type === "Employee" ? "Employee"
-      : selectedOption?.type === "Labour" ? "Labour"
-      : "Associate";
+        : selectedOption?.type === "Employee" ? "Employee"
+          : selectedOption?.type === "Labour" ? "Labour"
+            : "Associate";
     const entityName = selectedOption?.label || "";
     const purposeName = purposeOptions.find(p => p.id === parseInt(purpose))?.label || "";
-
     doc.setFontSize(12);
     doc.text(`${entityType} - ${entityName}`, 14, 20);
-
     const pageWidth = doc.internal.pageSize.getWidth();
     const purposeText = `Purpose: ${purposeName}`;
     const textWidth = doc.getTextWidth(purposeText);
     doc.text(purposeText, pageWidth - textWidth - 14, 20);
-
     // Filter and sort data
     const filteredData = filteredLoanData
       .sort((a, b) => {
@@ -1256,15 +1283,12 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         const typeOrder = ["Loan", "Refund", "Transfer"];
         const typeIndexA = typeOrder.indexOf((a.type || "").trim());
         const typeIndexB = typeOrder.indexOf((b.type || "").trim());
-
         if (typeIndexA !== typeIndexB) return typeIndexA - typeIndexB;
-
         // Then sort by date (newest first)
         const dateA = new Date(a.date);
         const dateB = new Date(b.date);
         return dateB - dateA;
       });
-
     // Table columns
     const tableColumn = [
       "S.No",
@@ -1275,7 +1299,6 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       "Mode",
       "Description"
     ];
-
     // Table rows
     const tableRows = filteredData.map((entry, index) => {
       const {
@@ -1286,7 +1309,6 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         type,
         description
       } = entry;
-
       // Format loan amount (positive for Loan, negative for Refund shown in Loan column)
       let loanAmount = '';
       if (type === 'Refund') {
@@ -1298,14 +1320,12 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
           ? parseFloat(amount).toLocaleString('en-IN')
           : '';
       }
-
       let transferRefundText = '';
       if (type === 'Refund') {
         transferRefundText = 'Refund';
       } else if (type === 'Transfer') {
         transferRefundText = getTransferDestination(entry) || '';
       }
-
       return [
         index + 1,
         new Date(date).toLocaleDateString('en-GB'),
@@ -1316,7 +1336,6 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         description || ''
       ];
     });
-
     // Generate PDF table
     doc.autoTable({
       startY: 28,
@@ -1334,11 +1353,9 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         2: { halign: 'right' } // Loan
       }
     });
-
     const fileName = `LoanPortal_${selectedOption?.label || 'Report'}_${new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(fileName);
   }, [filteredLoanData, selectedOption, purpose, purposeOptions, getTransferDestination, toast]);
-
   // Export CSV function
   const handleExportCSV = useCallback(() => {
     if (!filteredLoanData || filteredLoanData.length === 0) {
@@ -1349,7 +1366,6 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       });
       return;
     }
-
     const csvHeaders = [
       "S.No",
       "Date",
@@ -1359,7 +1375,6 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       "Mode",
       "Description"
     ];
-
     // Filter and sort data
     const filteredData = filteredLoanData
       .sort((a, b) => {
@@ -1373,10 +1388,8 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         const dateB = new Date(b.date);
         return dateB - dateA;
       });
-
     const csvRows = filteredData.map((entry, index) => {
       const { date, amount, loan_refund_amount, loan_payment_mode, type, description } = entry;
-
       // Format loan amount
       let loanAmount = '';
       if (type === 'Refund') {
@@ -1388,7 +1401,6 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
           ? parseFloat(amount).toLocaleString('en-IN')
           : '';
       }
-
       // Get transfer/refund info
       let transferRefund = '';
       if (type === 'Refund') {
@@ -1396,7 +1408,6 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       } else if (type === 'Transfer') {
         transferRefund = getTransferDestination(entry) || '';
       }
-
       return [
         index + 1,
         formatDateOnly(date),
@@ -1407,7 +1418,6 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         description || ''
       ];
     });
-
     const csvString = [
       csvHeaders.join(","),
       ...csvRows.map(row =>
@@ -1416,7 +1426,6 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
           .join(",")
       )
     ].join("\n");
-
     const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -1426,7 +1435,6 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     link.click();
     document.body.removeChild(link);
   }, [filteredLoanData, selectedOption, getTransferDestination, formatDateOnly, toast]);
-
   // Build review details array
   const reviewDetails = [
     { label: 'Type', value: selectedLoanType || '-' },
@@ -1436,7 +1444,6 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     { label: 'Purpose', value: purposeOptions.find(p => p.id === parseInt(purpose))?.label || '-' },
     { label: 'Purpose ID', value: purpose || '-' },
   ];
-
   if (selectedLoanType === 'Loan') {
     reviewDetails.push(
       { label: 'Amount Given', value: formatWithCommas(amountGiven) || '-' },
@@ -1452,12 +1459,10 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       { label: 'Transfer Amount', value: formatWithCommas(transferAmount) || '-' }
     );
   }
-
   reviewDetails.push(
     { label: 'Description', value: description || '-' },
     { label: 'File Attached', value: selectedLoanFile ? selectedLoanFile.name : 'No file attached' }
   );
-
   const handleEditClick = useCallback((entry) => {
     setEditingId(entry.id);
     setEditFormData({
@@ -1501,82 +1506,90 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     <body>
       <div>
         <div className='mr-10 ml-10'>
-          <div className=' flex gap-10 text-left'>
-            <div className='bg-white w-full max-w-[1210px] p-4 rounded-md h-[128px] flex gap-[16px]'>
-              <div className='space-y-2'>
+          <div className=' xl:flex gap-10 max-w-[95vw] text-left'>
+            <div className='bg-white w-full p-4 px-4 py-2 rounded text-left xl:flex  items-center pb-6 gap-[16px]'>
+              <div className='space-y-2 flex-1'>
                 <h2 className='font-semibold text-sm sm:text-base'>From Date</h2>
                 <input
                   type='date'
                   value={fromDate}
                   onChange={(e) => setFromDate(e.target.value)}
-                  className='border-2 border-[#BF9853] border-opacity-30 rounded-lg px-2 py-1 w-[168px] h-[45px] focus:outline-none text-sm'
+                  className='border-2 border-[#BF9853] border-opacity-30 rounded-lg px-2 py-1 w-full h-[45px] focus:outline-none text-sm'
                 />
               </div>
-              <div className='space-y-2'>
+              <div className='space-y-2 flex-1'>
                 <h2 className='font-semibold text-sm sm:text-base'>To Date</h2>
                 <input
                   type='date'
                   value={toDate}
                   onChange={(e) => setToDate(e.target.value)}
-                  className='border-2 border-[#BF9853] border-opacity-30 rounded-lg px-2 py-1 w-[168px] h-[45px] focus:outline-none text-sm'
+                  className='border-2 border-[#BF9853] border-opacity-30 rounded-lg px-2 py-1 w-full h-[45px] focus:outline-none text-sm'
                 />
               </div>
-              <div className='space-y-2'>
+              <div className='space-y-2 flex-1'>
                 <h2 className='font-semibold text-sm sm:text-base'>Amount Given</h2>
                 <input
                   readOnly
                   value={filteredAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                  className='bg-[#F2F2F2] rounded-lg p-2 w-[107px] h-[45px] focus:outline-none text-sm'
+                  className='bg-[#F2F2F2] rounded-lg p-2 w-full h-[45px] focus:outline-none text-sm'
                 />
               </div>
-              <div className='space-y-2'>
+              <div className='space-y-2 flex-1'>
                 <h2 className='font-semibold text-sm sm:text-base'>Payment Mode</h2>
-                <select
-                  value={filteredPaymentMode}
-                  onChange={(e) => setFilteredPaymentMode(e.target.value)}
-                  className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
-                >
-                  <option value=''>Select</option>
-                  {finalPaymentModeOptions.map(option => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
+                <Select
+                  options={finalPaymentModeOptions}
+                  value={filteredPaymentMode ? { value: filteredPaymentMode, label: filteredPaymentMode } : null}
+                  onChange={(selected) => setFilteredPaymentMode(selected ? selected.value : '')}
+                  placeholder="Select"
+                  isSearchable
+                  isClearable
+                  menuPortalTarget={document.body}
+                  styles={customStyles}
+                  className='w-full rounded-lg focus:outline-none'
+                />
               </div>
             </div>
-            <div className='flex bg-white w-[600px] h-[128px] rounded-md p-4 gap-[16px]'>
+            <div className='flex flex-col xl:flex-row xl:mt-0 mt-4 bg-white w-full xl:max-w-[1100px] h-auto xl:h-[128px] rounded-md p-4 gap-[16px] px-10 '>
               <div className='space-y-2'>
                 <h2 className='font-semibold text-sm sm:text-base'>Today Amount</h2>
                 <input readOnly type='text'
                   value={todayAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                  className='bg-[#F2F2F2] rounded-lg p-2 w-[144px] h-[45px] focus:outline-none text-sm'
+                  className='bg-[#F2F2F2] rounded-lg p-2 w-full h-[45px] focus:outline-none text-sm'
                 />
               </div>
               <div className='space-y-2'>
                 <h2 className='font-semibold text-sm sm:text-base'>Total Outstanding</h2>
                 <input readOnly type='text'
                   value={totalOutstanding.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                  className='bg-[#F2F2F2] p-2 rounded-lg w-[144px] h-[45px] focus:outline-none text-sm'
+                  className='bg-[#F2F2F2] p-2 rounded-lg w-full h-[45px] focus:outline-none text-sm'
                 />
               </div>
             </div>
           </div>
         </div>
-        <div className='mx-auto px-5 sm:px-6 lg:px-10 mt-5'>
-          <div className='bg-white w-full max-w-[1850px] h-[630px] p-4 lg:p-6 rounded-md shadow-sm'>
-            <div className='flex flex-col xl:flex-row gap-6'>
+        <div className='mr-10 ml-10 mt-5'>
+          <div className='bg-white w-full max-w-[95vw] xl:h-[630px] h-auto p-4 lg:p-6 rounded-md shadow-sm'>
+            <div className='flex flex-col xl:flex-row gap-6 '>
               <div className='flex-1 xl:max-w-[600px]'>
                 <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 text-left'>
-                  <div className='space-y-2'>
-                    <label className='font-semibold text-[#E4572E] text-sm sm:text-base'>Select Type</label>
-                    <select value={selectedLoanType} onChange={(e) => setSelectedLoanType(e.target.value)}
-                      className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
-                    >
-                      <option value='Loan'>Loan</option>
-                      <option value='Refund'>Refund</option>
-                      <option value='Transfer'>Transfer</option>
-                    </select>
+                  <div className='space-y-2 flex items-center'>
+                    <label className='font-semibold text-[#E4572E] text-sm sm:text-base w-40'>Select Type</label>
+                    <Select
+                      options={[
+                        { value: 'Loan', label: 'Loan' },
+                        { value: 'Refund', label: 'Refund' },
+                        { value: 'Transfer', label: 'Transfer' }
+                      ]}
+                      value={selectedLoanType ? { value: selectedLoanType, label: selectedLoanType } : null}
+                      onChange={(selected) => setSelectedLoanType(selected ? selected.value : '')}
+                      placeholder="Select Type..."
+                      isSearchable
+                      isClearable
+                      styles={customStyles}
+                      className='w-full rounded-lg focus:outline-none'
+                    />
                   </div>
-                  <div className='space-y-2'>
+                  <div className='space-y-2 flex items-center gap-5'>
                     <label className='font-semibold text-[#E4572E] text-sm sm:text-base'>Date</label>
                     <input
                       type='date'
@@ -1593,6 +1606,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                       onChange={handleChange}
                       className='w-full rounded-lg focus:outline-none'
                       isClearable
+                      isSearchable
                       styles={customStyles}
                     />
                   </div>
@@ -1606,16 +1620,16 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                   </div>
                   <div className='space-y-2'>
                     <label className='font-semibold block text-sm sm:text-base'>Purpose</label>
-                    <select value={purpose} onChange={(e) => setPurpose(e.target.value)}
-                      className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px- py-2 rounded-lg focus:outline-none text-sm'
-                    >
-                      <option value=''>Select Purpose</option>
-                      {purposeOptions.map(option => (
-                        <option key={option.id} value={option.id}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                    <Select
+                      options={purposeOptions}
+                      value={purpose ? purposeOptions.find(opt => opt.id === parseInt(purpose)) : null}
+                      onChange={(selected) => setPurpose(selected ? selected.id : '')}
+                      placeholder="Select Purpose"
+                      isSearchable
+                      isClearable
+                      styles={customStyles}
+                      className='w-full rounded-lg focus:outline-none'
+                    />
                   </div>
                   <div className='space-y-2'>
                     <label className='font-semibold block text-sm sm:text-base'>Loan Amount</label>
@@ -1638,6 +1652,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                         onChange={(selected) => setTransferSelection(selected || null)}
                         className='w-full rounded-lg focus:outline-none'
                         isClearable
+                        isSearchable
                         styles={customStyles}
                         placeholder="Select Transfer To"
                       />
@@ -1662,16 +1677,28 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                         className='w-full h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
                       />
                     ) : (
-                      <select
-                        value={paymentMode}
-                        onChange={handlePaymentModeChange}
-                        className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
-                      >
-                        <option value=''>Select</option>
-                        {finalPaymentModeOptions.map(option => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                      </select>
+                      <Select
+                        options={finalPaymentModeOptions}
+                        value={paymentMode ? { value: paymentMode, label: paymentMode } : null}
+                        onChange={(selected) => {
+                          const newPaymentMode = selected ? selected.value : '';
+                          setPaymentMode(newPaymentMode);
+                          // Reset payment popup data when payment mode changes
+                          if (!["GPay", "PhonePe", "Net Banking", "Cheque"].includes(newPaymentMode)) {
+                            setPaymentPopupData({
+                              chequeNo: "",
+                              chequeDate: "",
+                              transactionNumber: "",
+                              accountNumber: ""
+                            });
+                          }
+                        }}
+                        placeholder="Select"
+                        isSearchable
+                        isClearable
+                        styles={customStyles}
+                        className='w-full rounded-lg focus:outline-none'
+                      />
                     )}
                   </div>
                   <div className='col-span-1 sm:col-span-2 space-y-2'>
@@ -1722,13 +1749,13 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                     />
                   </div>
                   <div className='flex flex-wrap gap-2 sm:gap-4'>
-                    <span 
+                    <span
                       className='text-[#E4572E] font-semibold hover:underline cursor-pointer text-sm'
                       onClick={handleExportPDF}
                     >
                       Export PDF
                     </span>
-                    <span 
+                    <span
                       className='text-[#007233] font-semibold hover:underline cursor-pointer text-sm'
                       onClick={handleExportCSV}
                     >
@@ -1766,7 +1793,6 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                           filteredLoanData.map((entry) => {
                             const { loanPortalId, date, amount, loan_refund_amount, loan_payment_mode, type } = entry;
                             const formattedDate = date ? new Date(date).toLocaleDateString('en-GB') : '';
-
                             // Show refund amount as negative value in Loan column for Refund type, otherwise normal amount
                             const displayAmount =
                               type === 'Refund'
@@ -1836,25 +1862,29 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                 <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4'>
                   <div>
                     <label className="block mb-2 font-semibold text-sm">Payment Mode</label>
-                    <select value={editFormData.mode} onChange={(e) => setEditFormData({ ...editFormData, mode: e.target.value })}
-                      className="border-2 border-[#BF9853] border-opacity-30 w-full h-[45px] rounded-lg focus:outline-none text-sm"
-                    >
-                      <option value="">Select</option>
-                      {finalPaymentModeOptions.map(option => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </select>
+                    <Select
+                      options={finalPaymentModeOptions}
+                      value={editFormData.mode ? { value: editFormData.mode, label: editFormData.mode } : null}
+                      onChange={(selected) => setEditFormData({ ...editFormData, mode: selected ? selected.value : '' })}
+                      placeholder="Select"
+                      isSearchable
+                      isClearable
+                      styles={customStyles}
+                      className="w-full focus:outline-none"
+                    />
                   </div>
                   <div>
                     <label className="block mb-2 font-semibold text-sm">Purpose</label>
-                    <select value={editFormData.purpose} onChange={(e) => setEditFormData({ ...editFormData, purpose: e.target.value })}
-                      className="border-2 border-[#BF9853] border-opacity-30 w-full h-[45px] rounded-lg focus:outline-none text-sm"
-                    >
-                      <option value="">Select Purpose</option>
-                      {purposeOptions.map(option => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </select>
+                    <Select
+                      options={purposeOptions}
+                      value={editFormData.purpose ? purposeOptions.find(opt => opt.id === parseInt(editFormData.purpose) || opt.value === editFormData.purpose) : null}
+                      onChange={(selected) => setEditFormData({ ...editFormData, purpose: selected ? selected.id : '' })}
+                      placeholder="Select Purpose"
+                      isSearchable
+                      isClearable
+                      styles={customStyles}
+                      className="w-full focus:outline-none"
+                    />
                   </div>
                 </div>
                 <div className='mb-4'>
@@ -1955,18 +1985,19 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                             </div>
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-2">Account Number<span className="text-red-500">*</span></label>
-                              <select
-                                value={paymentPopupData.accountNumber}
-                                onChange={(e) => setPaymentPopupData(prev => ({ ...prev, accountNumber: e.target.value }))}
-                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                              >
-                                <option value="">Select Account</option>
-                                {accountDetails.map((account) => (
-                                  <option key={account.id} value={account.account_number}>
-                                    {account.account_number}
-                                  </option>
-                                ))}
-                              </select>
+                              <Select
+                                options={accountDetails.map((account) => ({
+                                  value: account.account_number,
+                                  label: account.account_number
+                                }))}
+                                value={paymentPopupData.accountNumber ? { value: paymentPopupData.accountNumber, label: paymentPopupData.accountNumber } : null}
+                                onChange={(selected) => setPaymentPopupData(prev => ({ ...prev, accountNumber: selected ? selected.value : '' }))}
+                                placeholder="Select Account"
+                                isSearchable
+                                isClearable
+                                styles={customStyles}
+                                className="w-full focus:outline-none"
+                              />
                             </div>
                           </div>
                         </div>
@@ -2027,15 +2058,20 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="text-sm font-semibold mb-1 block">Type</label>
-                          <select
-                            className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
-                            value={selectedLoanType}
-                            onChange={(e) => setSelectedLoanType(e.target.value)}
-                          >
-                            <option value="Loan">Loan</option>
-                            <option value="Refund">Refund</option>
-                            <option value="Transfer">Transfer</option>
-                          </select>
+                          <Select
+                            options={[
+                              { value: 'Loan', label: 'Loan' },
+                              { value: 'Refund', label: 'Refund' },
+                              { value: 'Transfer', label: 'Transfer' }
+                            ]}
+                            value={selectedLoanType ? { value: selectedLoanType, label: selectedLoanType } : null}
+                            onChange={(selected) => setSelectedLoanType(selected ? selected.value : '')}
+                            placeholder="Select Type..."
+                            isSearchable
+                            isClearable
+                            styles={customStyles}
+                            className="custom-select rounded-lg"
+                          />
                         </div>
                         <div>
                           <label className="text-sm font-semibold mb-1 block">Date</label>
@@ -2054,23 +2090,22 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                             onChange={handleChange}
                             styles={customStyles}
                             isClearable
+                            isSearchable
                             className="custom-select rounded-lg"
                           />
                         </div>
                         <div>
                           <label className="text-sm font-semibold mb-1 block">Purpose</label>
-                          <select
-                            value={purpose}
-                            onChange={(e) => setPurpose(e.target.value)}
-                            className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
-                          >
-                            <option value="">Select Purpose</option>
-                            {purposeOptions.map(option => (
-                              <option key={option.id} value={option.id}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
+                          <Select
+                            options={purposeOptions}
+                            value={purpose ? purposeOptions.find(opt => opt.id === parseInt(purpose)) : null}
+                            onChange={(selected) => setPurpose(selected ? selected.id : '')}
+                            placeholder="Select Purpose"
+                            isSearchable
+                            isClearable
+                            styles={customStyles}
+                            className="custom-select rounded-lg"
+                          />
                         </div>
                         {selectedLoanType === 'Loan' && (
                           <>
@@ -2084,16 +2119,28 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                             </div>
                             <div>
                               <label className="text-sm font-semibold mb-1 block">Payment Mode</label>
-                              <select
-                                value={paymentMode}
-                                onChange={handlePaymentModeChange}
-                                className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
-                              >
-                                <option value="">Select</option>
-                                {finalPaymentModeOptions.map(option => (
-                                  <option key={option.value} value={option.value}>{option.label}</option>
-                                ))}
-                              </select>
+                              <Select
+                                options={finalPaymentModeOptions}
+                                value={paymentMode ? { value: paymentMode, label: paymentMode } : null}
+                                onChange={(selected) => {
+                                  const newPaymentMode = selected ? selected.value : '';
+                                  setPaymentMode(newPaymentMode);
+                                  // Reset payment popup data when payment mode changes
+                                  if (!["GPay", "PhonePe", "Net Banking", "Cheque"].includes(newPaymentMode)) {
+                                    setPaymentPopupData({
+                                      chequeNo: "",
+                                      chequeDate: "",
+                                      transactionNumber: "",
+                                      accountNumber: ""
+                                    });
+                                  }
+                                }}
+                                placeholder="Select"
+                                isSearchable
+                                isClearable
+                                styles={customStyles}
+                                className="custom-select rounded-lg"
+                              />
                             </div>
                           </>
                         )}

@@ -12,8 +12,6 @@ import remove from '../Images/Delete.svg';
 const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => {   
   const [vendorOptions, setVendorOptions] = useState([]);
   const [contractorOptions, setContractorOptions] = useState([]);
-  const [employeeOptions, setEmployeeOptions] = useState([]);
-  const [labourOptions, setLabourOptions] = useState([]);
   const [combinedOptions, setCombinedOptions] = useState([]);
   const [siteOptions, setSiteOptions] = useState([]);
   const [clientOptions, setClientOptions] = useState([]);
@@ -172,14 +170,8 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
       const contractorName = entry.contractor_id
         ? contractorOptions.find(c => c.id === entry.contractor_id)?.value || ""
         : "";
-      const employeeName = entry.employee_id
-        ? employeeOptions.find(e => e.id === entry.employee_id)?.value || ""
-        : "";
-      const labourName = entry.labour_id
-        ? labourOptions.find(l => l.id === entry.labour_id)?.value || ""
-        : "";
       
-      const associateName = clientName || vendorName || contractorName || employeeName || labourName || "";
+      const associateName = clientName || vendorName || contractorName || "";
       if (associateName) {
         associateSet.add(associateName);
       }
@@ -192,7 +184,7 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
         value: name,
         label: name
       }));
-  }, [loanData, vendorOptions, contractorOptions, employeeOptions, labourOptions, projectClientNamesById, projectClientNamesByName, siteOptions]);
+  }, [loanData, vendorOptions, contractorOptions, projectClientNamesById, projectClientNamesByName, siteOptions]);
   
   const associateFilterOptions = useMemo(() => (
     uniqueAssociateOptions.length > 0 ? uniqueAssociateOptions : (clientOptions.length ? clientOptions : combinedOptions)
@@ -257,10 +249,6 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     vendorOptions.find(v => v.id === id)?.value || "";
   const getContractorName = (id) =>
     contractorOptions.find(c => c.id === id)?.value || "";
-  const getEmployeeName = (id) =>
-    employeeOptions.find(e => e.id === id)?.value || "";
-  const getLabourName = (id) =>
-    labourOptions.find(l => l.id === id)?.value || "";
   const getSiteName = (id) =>
     siteOptions.find(s => String(s.id) === String(id))?.value || "";
   const getClientNameByProjectId = (projectId) => {
@@ -275,13 +263,7 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     return getClientNameByProjectId(entry.project_id) ||
       (entry.vendor_id
         ? getVendorName(entry.vendor_id)
-        : entry.contractor_id
-          ? getContractorName(entry.contractor_id)
-          : entry.employee_id
-            ? getEmployeeName(entry.employee_id)
-            : entry.labour_id
-              ? getLabourName(entry.labour_id)
-              : "") ||
+        : getContractorName(entry.contractor_id)) ||
       "";
   };
   const totalLoanAmount = loanData
@@ -354,62 +336,8 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     fetchContractorNames();
   }, []);
   useEffect(() => {
-    const fetchEmployeeNames = async () => {
-      try {
-        const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json"
-          }
-        });
-        if (!response.ok) {
-          throw new Error("Network response was not ok: " + response.statusText);
-        }
-        const data = await response.json();
-        const formattedData = data.map(item => ({
-          value: item.employee_name,
-          label: item.employee_name,
-          id: item.id,
-          type: "Employee",
-        }));
-        setEmployeeOptions(formattedData);
-      } catch (error) {
-        console.error("Fetch error: ", error);
-      }
-    };
-    fetchEmployeeNames();
-  }, []);
-  useEffect(() => {
-    const fetchLabourNames = async () => {
-      try {
-        const response = await fetch("https://backendaab.in/aabuildersDash/api/labours-details/getAll", {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json"
-          }
-        });
-        if (!response.ok) {
-          throw new Error("Network response was not ok: " + response.statusText);
-        }
-        const data = await response.json();
-        const formattedData = data.map(item => ({
-          value: item.labour_name,
-          label: item.labour_name,
-          id: item.id,
-          type: "Labour",
-        }));
-        setLabourOptions(formattedData);
-      } catch (error) {
-        console.error("Fetch error: ", error);
-      }
-    };
-    fetchLabourNames();
-  }, []);
-  useEffect(() => {
-    setCombinedOptions([...vendorOptions, ...contractorOptions, ...employeeOptions, ...labourOptions]);
-  }, [vendorOptions, contractorOptions, employeeOptions, labourOptions]);
+    setCombinedOptions([...vendorOptions, ...contractorOptions]);
+  }, [vendorOptions, contractorOptions]);
   useEffect(() => {
     setCombinedSitePurposeOptions([...siteOptions, ...purposeOptions]);
   }, [siteOptions, purposeOptions]);
@@ -586,16 +514,8 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
             bValue = new Date(b.date);
             break;
           case 'vendor':
-            aValue = a.vendor_id ? getVendorName(a.vendor_id) 
-              : a.contractor_id ? getContractorName(a.contractor_id)
-              : a.employee_id ? getEmployeeName(a.employee_id)
-              : a.labour_id ? getLabourName(a.labour_id)
-              : "";
-            bValue = b.vendor_id ? getVendorName(b.vendor_id)
-              : b.contractor_id ? getContractorName(b.contractor_id)
-              : b.employee_id ? getEmployeeName(b.employee_id)
-              : b.labour_id ? getLabourName(b.labour_id)
-              : "";
+            aValue = a.vendor_id ? getVendorName(a.vendor_id) : getContractorName(a.contractor_id);
+            bValue = b.vendor_id ? getVendorName(b.vendor_id) : getContractorName(b.contractor_id);
             break;
           case 'project':
             aValue = getSiteName(a.project_id);
@@ -959,8 +879,6 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
           : 0,
         vendor_id: editSelectedOption?.type === "Vendor" ? editSelectedOption.id : 0,
         contractor_id: editSelectedOption?.type === "Contractor" ? editSelectedOption.id : 0,
-        employee_id: editSelectedOption?.type === "Employee" ? editSelectedOption.id : 0,
-        labour_id: editSelectedOption?.type === "Labour" ? editSelectedOption.id : 0,
         project_id: editFormData.project_id || 0,
         transfer_Project_id: (editSelectedType === "Transfer" && editTransferSelection.type === "Site")
           ? (editTransferSelection?.id || 0)
@@ -1089,8 +1007,11 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
           </div>
         </div>
         <div className='border-l-8 border-l-[#BF9853] rounded-lg mx-5'>
-          <div ref={scrollRef} className='overflow-auto max-h-[500px]'
-            onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
+          <div ref={scrollRef} className='overflow-auto max-h-[500px] thin-scrollbar'
+            onMouseDown={handleMouseDown} 
+            onMouseMove={handleMouseMove} 
+            onMouseUp={handleMouseUp} 
+            onMouseLeave={handleMouseUp}
           >
             <table className="w-full min-w-[1500px] border-collapse">
               <thead className="sticky top-0 z-10 bg-white ">
@@ -1328,11 +1249,7 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                                   ? vendorOptions.find(v => v.id === entry.vendor_id)
                                   : entry.contractor_id
                                     ? contractorOptions.find(c => c.id === entry.contractor_id)
-                                    : entry.employee_id
-                                      ? employeeOptions.find(e => e.id === entry.employee_id)
-                                      : entry.labour_id
-                                        ? labourOptions.find(l => l.id === entry.labour_id)
-                                        : null
+                                    : null
                               );
                               setEditSelectedSite(siteOptions.find(s => s.id === entry.project_id) || null);
                               setEditPurpose(entry.from_purpose_id || '');

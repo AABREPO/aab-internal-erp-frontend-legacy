@@ -49,34 +49,53 @@ const StaffHeading = ({ username, userRoles = [] }) => {
         }
     };
     return (
-        <div className="bg-[#FAF6ED] w-full h-auto min-h-screen">
-            <div className="topbar-title">
-                <h2 className={`link ${activeTab === 'staffAdvance' ? 'active' : ''}`} onClick={() => setActiveTab('staffAdvance')} >
-                    Advance
-                </h2>
-                <h2 className={`link ${activeTab === 'staffTablview' ? 'active' : ''}`} onClick={() => setActiveTab('staffTablview')} >
-                    Table View
-                </h2>
-                {(username === 'Mahalingam M' || username === 'Admin') && (
-                    <h2 className={`link ${activeTab === 'staffDatabase' ? 'active' : ''}`} onClick={() => setActiveTab('staffDatabase')} >
-                        Database
-                    </h2>
-                )}
-                <h2 className={`link ${activeTab === 'staffInput' ? 'active' : ''}`} onClick={() => setActiveTab('staffInput')} >
-                    Add Input
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'staffReport' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('staffReport')}
-                >
-                    Report
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'staffSummary' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('staffSummary')}
-                >
-                    Summary
-                </h2>
+        <div className="bg-[#FAF6ED] w-full h-auto min-h-screen overflow-auto">
+
+            {/* Fixed border wrapper */}
+            <div className="w-full xl:px-0 px-5">
+                {/* Scrolling headings only */}
+                <div className="w-full overflow-x-auto no-scrollbar xl:px-0">
+                    <div className="topbar-title flex flex-nowrap xl:flex-wrap min-w-max xl:min-w-0">
+                        <h2
+                            className={`link ${activeTab === 'staffAdvance' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('staffAdvance')}
+                        >
+                            Advance
+                        </h2>
+                        <h2
+                            className={`link ${activeTab === 'staffTablview' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('staffTablview')}
+                        >
+                            Table View
+                        </h2>
+                        {(username === 'Mahalingam M' || username === 'Admin') && (
+                            <h2
+                                className={`link ${activeTab === 'staffDatabase' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('staffDatabase')}
+                            >
+                                Database
+                            </h2>
+                        )}
+                        <h2
+                            className={`link ${activeTab === 'staffInput' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('staffInput')}
+                        >
+                            Add Input
+                        </h2>
+                        <h2
+                            className={`link ${activeTab === 'staffReport' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('staffReport')}
+                        >
+                            Report
+                        </h2>
+                        <h2
+                            className={`link ${activeTab === 'staffSummary' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('staffSummary')}
+                        >
+                            Summary
+                        </h2>
+                    </div>
+                </div>
             </div>
             <div className="content">
                 {renderContent()}

@@ -140,13 +140,13 @@ const StaffAddInput = ({ username, userRoles = [], paymentModeOptions = [] }) =>
     );
 
     return (
-        <div className="p-4 bg-white ml-6 mr-8">
-            <div className="lg:flex space-x-[2%] lg:w-full md:w-[32rem] w-[20rem] overflow-x-auto">
+        <div className="p-4 bg-white ml-10 mr-5 xl:mr-10">
+            <div className="xl:flex xl:w-full md:w-[32rem] w-[20rem] overflow-x-auto">
                 <div>
-                    <div className="flex items-center mb-2 lg:mt-0 mt-3 ">
+                    <div className="flex items-center mb-2 xl:mt-0 mt-3 ">
                         <input
                             type="text"
-                            className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
+                            className="border-2 border-[#BF9853] border-opacity-30 rounded-lg p-2 flex-1 w-44 h-[45px] focus:outline-none"
                             placeholder="Search Purpose.."
                             value={staffTypeSearch}
                             onChange={(e) => setStaffTypeSearch(e.target.value)}

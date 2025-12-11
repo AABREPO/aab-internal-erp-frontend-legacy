@@ -292,6 +292,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
           throw new Error("Network response was not ok: " + response.statusText);
         }
         const data = await response.json();
+        console.log("Fetched account details:", data);
         setAccountDetails(data);
       } catch (error) {
         console.error("Error fetching account details:", error);

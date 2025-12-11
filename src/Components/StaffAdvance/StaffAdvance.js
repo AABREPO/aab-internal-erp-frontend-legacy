@@ -31,17 +31,12 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
   const [staffAmountGiven, setStaffAdmountGiven] = useState('');
   const [staffTodayAmount, setTodayAmount] = useState('');
   const [staffTotalOutstanding, setStaffTotalOutstanding] = useState('');
-  // Table data state
   const [tableData, setTableData] = useState([]);
-  // Filtered table data state - only shows when both EMP Name and Purpose are selected
   const [filteredTableData, setFilteredTableData] = useState([]);
-  // Loading state
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // Edit modal state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editFormData, setEditFormData] = useState({});
   const [editingId, setEditingId] = useState(null);
-  // Payment popup state
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentPopupData, setPaymentPopupData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -53,19 +48,15 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     accountNumber: ""
   });
   const [pendingFormData, setPendingFormData] = useState(null);
-  // Review modal state
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [isReviewEditMode, setIsReviewEditMode] = useState(false);
   const [filePreviewUrl, setFilePreviewUrl] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const fileInputRef = useRef(null);
-  // Employee options state
   const [employeeOptions, setEmployeeOptions] = useState([]);
   const [laboursList, setLaboursList] = useState([]);
   const [staffAdvanceCombinedOptions, setStaffAdvanceCombinedOptions] = useState([]);
-  // Fetch employee details on component mount
   useEffect(() => {
-    // Fetch employee details
     const fetchEmployeeDetails = async () => {
       try {
         const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
@@ -90,7 +81,6 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
         console.error("Fetch error: ", error);
       }
     };
-    // Call employee fetch function
     fetchEmployeeDetails();
   }, []);
   useEffect(() => {
@@ -118,10 +108,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
       console.log('Error fetching Labour names.');
     }
   };
-
   useEffect(() => { setStaffAdvanceCombinedOptions([...employeeOptions, ...laboursList]); }, [employeeOptions, laboursList]);
-  
-  // File change handler
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -129,8 +116,6 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     }
     e.target.value = '';
   };
-
-  // File preview URL effect
   useEffect(() => {
     if (!selectedFile) {
       setFilePreviewUrl(null);
@@ -140,9 +125,30 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     setFilePreviewUrl(objectUrl);
     return () => URL.revokeObjectURL(objectUrl);
   }, [selectedFile]);
-
   const [purposeOptions, setPurposeOptions] = useState([]);
-  // Fetch purpose options from backend on component mount
+  const [accountDetails, setAccountDetails] = useState([]);
+  // Fetch account details
+    useEffect(() => {
+      const fetchAccountDetails = async () => {
+        try {
+          const response = await fetch("https://backendaab.in/aabuildersDash/api/account-details/getAll", {
+            method: "GET",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json"
+            }
+          });
+          if (!response.ok) {
+            throw new Error("Network response was not ok: " + response.statusText);
+          }
+          const data = await response.json();
+          setAccountDetails(data);
+        } catch (error) {
+          console.error("Error fetching account details:", error);
+        }
+      };
+      fetchAccountDetails();
+    }, []);
   useEffect(() => {
     const fetchPurposeOptions = async () => {
       try {
@@ -156,7 +162,6 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
           return;
         }
         const data = await response.json();
-        // Format for react-select
         const formatted = data.map(item => ({
           value: item.purpose,
           label: item.purpose,
@@ -170,20 +175,65 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     };
     fetchPurposeOptions();
   }, []);
-  // Memoized custom styles to prevent recreation on every render
   const customStyles = useMemo(() => ({
     control: (provided, state) => ({
       ...provided,
       borderWidth: '2px',
+      lineHeight: '20px',
+      fontSize: '14px',
+      height: '45px',
       borderRadius: '8px',
-      borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'rgba(191, 152, 83, 0.2)',
-      boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
-      '&:hover': {
-        borderColor: 'rgba(191, 152, 83, 0.2)',
-      }
+      borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.3)' : 'rgba(191, 152, 83, 0.3)',
+      boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.3)' : 'none',
+    }),
+    clearIndicator: (provided) => ({
+      ...provided,
+      cursor: 'pointer',
+    }),
+    menu: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+      maxHeight: '300px',
+    }),
+    menuPortal: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+    }),
+    menuList: (provided) => ({
+      ...provided,
+      maxHeight: '250px',
+      overflowY: 'auto',
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      fontWeight: '500',
+      backgroundColor: state.isSelected
+        ? 'rgba(191, 152, 83, 0.3)'
+        : state.isFocused
+          ? 'rgba(191, 152, 83, 0.1)'
+          : 'white',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    input: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    placeholder: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: '#999',
+      textAlign: 'left',
     }),
   }), []);
-  // Memoized field configuration to prevent recalculation on every render
   const fieldConfig = useMemo(() => {
     switch (formData.selectedType) {
       case 'Refund':
@@ -209,21 +259,21 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
         };
     }
   }, [formData.selectedType]);
-  // Payment mode options are now passed as prop from StaffHeading
-  // Memoized select type options
   const selectTypeOptions = useMemo(() => [
     { value: 'Advance', label: 'Advance' },
     { value: 'Refund', label: 'Refund' },
     { value: 'Transfer', label: 'Transfer' }
   ], []);
-  // Handle form input changes
+  const accountNumberOptions = accountDetails.map(acc => ({
+  value: acc.account_number,
+  label: acc.account_number
+}));
   const handleInputChange = useCallback((field, value) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
   }, []);
-  // Fetch all records and update table data state
   const fetchRecords = useCallback(async () => {
     try {
       const res = await fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all');
@@ -293,19 +343,10 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     });
 
     const totalAdvance = employeeRecords.reduce((total, record) => {
-      const amount = parseFloat(record.amount) || 0;
-      const refund = parseFloat(record.staff_refund_amount) || 0;
-      
       if (record.type === 'Advance') {
-        // Add amount (if negative, it will subtract automatically)
-        return total + amount;
+        return total + (parseFloat(record.amount) || 0);
       } else if (record.type === 'Refund') {
-        // Subtract refund amount
-        return total - refund;
-      } else if (record.type === 'Transfer') {
-        // For transfer records, the amount field already contains the correct sign
-        // Negative amount means money going out, positive means money coming in
-        return total + amount;
+        return total - (parseFloat(record.staff_refund_amount) || 0);
       }
       return total;
     }, 0);
@@ -395,11 +436,9 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
       );
     }
     // Calculate total amount given (only Advance amounts, no subtraction of refunds)
-    // Negative amounts will subtract automatically
     const totalAmount = filteredRecords.reduce((total, record) => {
       if (record.type === 'Advance') {
-        const amount = parseFloat(record.amount) || 0;
-        return total + amount; // If amount is negative, it will subtract
+        return total + (parseFloat(record.amount) || 0);
       }
       return total;
     }, 0);
@@ -431,8 +470,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     });
     const todayAmount = todayRecords.reduce((total, record) => {
       if (record.type === 'Advance') {
-        const amount = parseFloat(record.amount) || 0;
-        return total + amount; // If amount is negative, it will subtract
+        return total + (parseFloat(record.amount) || 0);
       }
       return total;
     }, 0);
@@ -444,19 +482,10 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
       return 0;
     }
     const totalOutstanding = tableData.reduce((total, record) => {
-      const amount = parseFloat(record.amount) || 0;
-      const refund = parseFloat(record.staff_refund_amount) || 0;
-      
       if (record.type === 'Advance') {
-        // Add amount (if negative, it will subtract automatically)
-        return total + amount;
+        return total + (parseFloat(record.amount) || 0);
       } else if (record.type === 'Refund') {
-        // Subtract refund amount
-        return total - refund;
-      } else if (record.type === 'Transfer') {
-        // For transfer records, the amount field already contains the correct sign
-        // Negative amount means money going out, positive means money coming in
-        return total + amount;
+        return total - (parseFloat(record.staff_refund_amount) || 0);
       }
       return total;
     }, 0);
@@ -673,7 +702,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     // Close the popup and submit with payment details
     setShowPaymentModal(false);
     await submitFormData(pendingFormData, paymentPopupData);
-    
+
     // Reset payment popup data
     setPaymentPopupData({
       date: new Date().toISOString().split('T')[0],
@@ -1035,8 +1064,8 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     }
 
     // Check if payment mode requires popup
-    if ((formData.selectedType === 'Advance' || formData.selectedType === 'Refund') && 
-        ['GPay', 'PhonePe', 'Net Banking', 'Cheque'].includes(formData.paymentMode)) {
+    if ((formData.selectedType === 'Advance' || formData.selectedType === 'Refund') &&
+      ['GPay', 'PhonePe', 'Net Banking', 'Cheque'].includes(formData.paymentMode)) {
       // Store form data and show payment popup
       setPendingFormData({ ...formData });
       setPaymentPopupData(prev => ({
@@ -1178,65 +1207,65 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
   return (
     <div className=" bg-[#FAF6ED]">
       <div className='bg-white max-w-[1850px] text-left shadow-sm rounded ml-10 mr-10'>
-        <div className='flex flex-wrap p-6 gap-4 w-full h-full items-start'>
-          <div className='flex-shrink-0'>
+        <div className='xl:flex flex-wrap p-6 gap-4 xl:max-w-[1200px] h-full items-start'>
+          <div className='flex-1'>
             <h2 className='font-semibold text-sm mb-1'>From Date</h2>
             <input
               type='date'
               value={staffFromDate}
               onChange={(e) => setStaffFromDate(e.target.value)}
-              className='border-2 border-[#BF9853] border-opacity-30 rounded-lg pl-3 w-[168px] h-[45px] focus:outline-none focus:border-[#BF9853] transition-colors'
+              className='border-2 border-[#BF9853] border-opacity-30 rounded-lg px-2 py-1 w-full h-[45px] focus:outline-none focus:border-[#BF9853] transition-colors'
             />
           </div>
-          <div className='flex-shrink-0'>
+          <div className='flex-1'>
             <h2 className='font-semibold text-sm mb-1'>To Date</h2>
             <input
               type='date'
               value={staffToDate}
               onChange={(e) => setStaffToDate(e.target.value)}
-              className='border-2 border-[#BF9853] border-opacity-30 rounded-lg pl-3 w-[168px] h-[45px] focus:outline-none focus:border-[#BF9853] transition-colors'
+              className='border-2 border-[#BF9853] border-opacity-30 rounded-lg px-2 py-1 w-full h-[45px] focus:outline-none focus:border-[#BF9853] transition-colors'
             />
           </div>
-          <div className='flex-shrink-0'>
+          <div className='flex-1'>
             <h2 className='font-semibold text-sm mb-1'>Amount Given</h2>
             <input
               value={staffAmountGiven}
               readOnly
-              className='bg-[#F2F2F2] rounded-lg p-2 w-[107px] h-[45px] focus:outline-none focus:bg-white focus:border-2 focus:border-[#BF9853] transition-all'
+              className='bg-[#F2F2F2] rounded-lg px-2 py-1 w-full h-[45px] focus:outline-none focus:bg-white focus:border-2 focus:border-[#BF9853] transition-all'
               placeholder="0.00"
             />
           </div>
-          <div className='flex-shrink-0 pt-6'>
-            <select
-              value={staffPaymentMode}
-              onChange={(e) => setStaffPaymentMode(e.target.value)}
-              className='w-[133px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors'
-            >
-              <option value=''>Select</option>
-              {paymentModeOptions.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+          <div className='flex-1'>
+            <h2 className='font-semibold text-sm mb-1'>Payment Mode</h2>
+            <Select
+              value={paymentModeOptions.find(option => option.value === staffPaymentMode) || null}
+              onChange={(selected) => setStaffPaymentMode(selected ? selected.value : '')}
+              options={paymentModeOptions}
+              placeholder="Select"
+              isClearable
+              isSearchable
+              menuPortalTarget={document.body}
+              styles={customStyles}
+              className='w-full'
+            />
           </div>
-          <div className='flex-shrink-0'>
+          <div className='flex-1'>
             <h2 className='font-semibold text-sm mb-1'>Today Amount</h2>
             <input
               readOnly
               type='text'
               value={staffTodayAmount}
-              className='bg-[#F2F2F2] rounded-lg p-2 w-[144px] h-[45px] focus:outline-none'
+              className='bg-[#F2F2F2] rounded-lg px-2 py-1 w-full h-[45px] focus:outline-none'
               placeholder="0.00"
             />
           </div>
-          <div className='flex-shrink-0'>
+          <div className='flex-1'>
             <h2 className='font-semibold text-sm mb-1'>Total Outstanding</h2>
             <input
               readOnly
               type='text'
               value={staffTotalOutstanding}
-              className='bg-[#F2F2F2] p-2 rounded-lg w-[144px] h-[45px] focus:outline-none'
+              className='bg-[#F2F2F2] px-2 py-1 rounded-lg w-full h-[45px] focus:outline-none'
               placeholder="0.00"
             />
           </div>
@@ -1246,318 +1275,331 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
         {/* Form */}
         <form onSubmit={handleSubmit} onKeyPress={handleKeyPress} className='bg-white w-full p-6 h-auto rounded shadow-sm'>
           <div className='flex flex-col xl:flex-row '>
-            <div className='grid grid-cols-1 md:grid-cols-2 gap-6 text-left '>
-              {/* Select Type */}
-              <div className=''>
-                <label className='font-semibold text-[#E4572E] block'>
-                  Select Type {isRequired('selectedType') && <span className="text-red-500">*</span>}
-                </label>
-                <select
-                  value={formData.selectedType}
-                  onChange={(e) => handleInputChange('selectedType', e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  className='w-[163px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors'
-                >
-                  <option value=''>Select Type...</option>
-                  {selectTypeOptions.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {/* Date */}
-              <div className=''>
-                <label className='font-semibold text-[#E4572E] block'>
-                  Date {isRequired('date') && <span className="text-red-500">*</span>}
-                </label>
-                <input
-                  type='date'
-                  value={formData.date}
-                  onChange={(e) => handleInputChange('date', e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder='dd-mm-yyyy'
-                  className='w-[144px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors'
-                />
-              </div>
-              {/* EMP Name */}
-              <div className=''>
-                <label className='font-semibold block'>
-                  EMP Name {isRequired('empName') && <span className="text-red-500">*</span>}
-                </label>
-                <Select
-                  value={formData.empName}
-                  onChange={(value) => handleInputChange('empName', value)}
-                  options={staffAdvanceCombinedOptions}
-                  className='w-[263px] h-[45px] rounded-lg focus:outline-none'
-                  isClearable
-                  styles={customStyles}
-                  placeholder="Select employee..."
-                  isSearchable={true}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleSubmit(e);
-                    }
-                  }}
-                />
-              </div>
-              <div className=''>
-                <label className='font-semibold block'>Overall Advance</label>
-                <input
-                  value={formData.overallAdvance}
-                  readOnly
-                  className='w-[263px] h-[45px] px-2 py-1 rounded-lg bg-[#F2F2F2] focus:outline-none cursor-not-allowed'
-                  placeholder="0.00"
-                />
-              </div>
-              {/* Purpose */}
-              <div className=''>
-                <label className='font-semibold block'>{fieldConfig.purposeLabel}</label>
-                <Select
-                  value={formData.purpose}
-                  onChange={(value) => handleInputChange('purpose', value)}
-                  options={purposeOptions}
-                  placeholder="Select a purpose..."
-                  isSearchable={true}
-                  styles={customStyles}
-                  isClearable
-                  className='w-[263px] h-[45px] focus:outline-none'
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleSubmit(e);
-                    }
-                  }}
-                />
-              </div>
-              {/* Advance Amount */}
-              <div className=''>
-                <label className='font-semibold block'>
-                  Advance Amount {isRequired('advanceAmount') && <span className="text-red-500">*</span>}
-                </label>
-                <input
-                  value={formData.advanceAmount}
-                  readOnly
-                  className='w-[263px] h-[45px] px-2 py-1 rounded-lg bg-[#F2F2F2] focus:outline-none cursor-not-allowed'
-                  placeholder="0.00"
-                />
-              </div>
-              {/* Amount Given / Purpose To */}
-              <div className=''>
-                <label className='font-semibold block'>{fieldConfig.amountGivenLabel}</label>
-                {formData.selectedType === 'Transfer' ? (
+            <div className='xl:flex w-full xl:w-[1000px]'>
+              <div className='grid grid-cols-1 md:grid-cols-2 gap-6 text-left '>
+                {/* Select Type */}
+                <div className='flex items-center gap-3'>
+                  <label className='font-semibold text-[#E4572E] w-40'>
+                    Select Type {isRequired('selectedType')}
+                  </label>
                   <Select
-                    value={formData.transferPurpose}
-                    onChange={(value) => handleInputChange('transferPurpose', value)}
-                    options={purposeOptions}
-                    placeholder="Select purpose to..."
-                    styles={customStyles}
-                    className='w-[263px] h-[45px] rounded-lg focus:outline-none'
+                    value={selectTypeOptions.find(option => option.value === formData.selectedType) || null}
+                    onChange={(selected) => handleInputChange('selectedType', selected ? selected.value : '')}
+                    options={selectTypeOptions}
+                    placeholder="Select Type..."
                     isClearable
+                    isSearchable
+                    menuPortalTarget={document.body}
+                    styles={customStyles}
+                    className='w-full'
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSubmit(e);
+                      }
+                    }}
                   />
-                ) : (
-                  <input
-                    value={formData.amountGivenInput}
-                    onChange={(e) => handleInputChange('amountGivenInput', e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    className='w-[263px] h-[45px] px-2 py-1 rounded-lg border-2 border-[#BF9853] border-opacity-30 focus:outline-none focus:border-[#BF9853] transition-colors'
-                    placeholder={`Enter ${fieldConfig.amountGivenLabel.toLowerCase()}`}
-                  />
-                )}
-              </div>
-              {/* Conditional Payment Mode/Transfer Amount */}
-              <div className=''>
-                <label className='font-semibold block'>{fieldConfig.paymentModeLabel}</label>
-                {formData.selectedType === 'Transfer' ? (
-                  <input
-                    value={formData.transferAmount}
-                    onChange={(e) => handleInputChange('transferAmount', e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    className='w-[263px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors'
-                    placeholder="Enter transfer amount"
-                  />
-                ) : (
-                  <select
-                    value={formData.paymentMode}
-                    onChange={(e) => handleInputChange('paymentMode', e.target.value)}
-                    className='w-[263px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors'
-                  >
-                    <option value=''>Select</option>
-                    {paymentModeOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-              {/* Description */}
-              <div className='col-span-1 md:col-span-2 '>
-                <label className='font-semibold block'>Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => handleInputChange('description', e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  className='w-full border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors resize-none'
-                  placeholder="Enter description..."
-                  rows={3}
-                />
-              </div>
-              {/* File Attachment and Submit */}
-              <div className=''>
-                <div className="flex items-center mb-4">
-                  <label htmlFor="fileInput" className="cursor-pointer flex items-center text-orange-600 hover:text-orange-700 transition-colors">
-                    <img className='w-5 h-4 mr-2' alt='' src={Attach} />
-                    Attach file
+                </div>
+                {/* Date */}
+                <div className='flex items-center gap-3'>
+                  <label className='font-semibold text-[#E4572E] w-20'>
+                    Date {isRequired('date') }
                   </label>
                   <input
-                    type="file"
-                    id="fileInput"
-                    ref={fileInputRef}
-                    className="hidden"
-                    onChange={handleFileChange}
+                    type='date'
+                    value={formData.date}
+                    onChange={(e) => handleInputChange('date', e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder='dd-mm-yyyy'
+                    className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors'
                   />
-                  {selectedFile && <span className="text-gray-600 text-sm ml-2">{selectedFile.name}</span>}
                 </div>
-                <div className='flex gap-3'>
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className={`px-6 py-2 rounded-lg flex items-center justify-center transition-all duration-200 ${isSubmitting
-                      ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-[#c7934c] text-white hover:bg-[#b08542] hover:shadow-md'
-                      }`}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Processing...
-                      </>
-                    ) : (
-                      'Pay Advance'
-                    )}
-                  </button>
+                {/* EMP Name */}
+                <div className=''>
+                  <label className='font-semibold block'>
+                    EMP Name {isRequired('empName')}
+                  </label>
+                  <Select
+                    value={formData.empName}
+                    onChange={(value) => handleInputChange('empName', value)}
+                    options={staffAdvanceCombinedOptions}
+                    className='w-full h-[45px] rounded-lg focus:outline-none'
+                    isClearable
+                    styles={customStyles}
+                    placeholder="Select employee..."
+                    isSearchable={true}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSubmit(e);
+                      }
+                    }}
+                  />
                 </div>
-              </div>
-            </div>
-            <div className='flex flex-col xl:ml-8 min-w-0 flex-1'>
-              <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4  p-2  rounded-lg'>
-                <div className="flex items-center gap- text-sm text-gray-600">
-                </div>
-                <div className="flex flex-wrap items-center gap-3">
+                <div className=''>
+                  <label className='font-semibold block'>Overall Advance</label>
                   <input
-                    className='border-2 w-[112px] p-2 border-[#E4572E] text-[#E4572E] font-bold border-opacity-10 rounded h-[33px] bg-transparent focus:outline-none focus:border-[#E4572E] transition-colors'
-                    placeholder=""
+                    value={formData.overallAdvance}
                     readOnly
-                    value={formData.advanceAmount}
+                    className='w-full h-[45px] px-2 py-1 rounded-lg bg-[#F2F2F2] focus:outline-none cursor-not-allowed'
+                    placeholder="0.00"
                   />
-                  <div className="flex gap-2">
+                </div>
+                {/* Purpose */}
+                <div className=''>
+                  <label className='font-semibold block'>{fieldConfig.purposeLabel}</label>
+                  <Select
+                    value={formData.purpose}
+                    onChange={(value) => handleInputChange('purpose', value)}
+                    options={purposeOptions}
+                    placeholder="Select a purpose..."
+                    isSearchable={true}
+                    styles={customStyles}
+                    isClearable
+                    className='w-full h-[45px] focus:outline-none'
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSubmit(e);
+                      }
+                    }}
+                  />
+                </div>
+                {/* Advance Amount */}
+                <div className=''>
+                  <label className='font-semibold block'>
+                    Advance Amount {isRequired('advanceAmount') && <span className="text-red-500">*</span>}
+                  </label>
+                  <input
+                    value={formData.advanceAmount}
+                    readOnly
+                    className='w-full h-[45px] px-2 py-1 rounded-lg bg-[#F2F2F2] focus:outline-none cursor-not-allowed'
+                    placeholder="0.00"
+                  />
+                </div>
+                {/* Amount Given / Purpose To */}
+                <div className=''>
+                  <label className='font-semibold block'>{fieldConfig.amountGivenLabel}</label>
+                  {formData.selectedType === 'Transfer' ? (
+                    <Select
+                      value={formData.transferPurpose}
+                      onChange={(value) => handleInputChange('transferPurpose', value)}
+                      options={purposeOptions}
+                      placeholder="Select purpose to..."
+                      styles={customStyles}
+                      className='w-full h-[45px] rounded-lg focus:outline-none'
+                      isClearable
+                    />
+                  ) : (
+                    <input
+                      value={formData.amountGivenInput}
+                      onChange={(e) => handleInputChange('amountGivenInput', e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      className='w-full h-[45px] px-2 py-1 rounded-lg border-2 border-[#BF9853] border-opacity-30 focus:outline-none focus:border-[#BF9853] transition-colors'
+                      placeholder={`Enter ${fieldConfig.amountGivenLabel.toLowerCase()}`}
+                    />
+                  )}
+                </div>
+                {/* Conditional Payment Mode/Transfer Amount */}
+                <div className=''>
+                  <label className='font-semibold block'>{fieldConfig.paymentModeLabel}</label>
+                  {formData.selectedType === 'Transfer' ? (
+                    <input
+                      value={formData.transferAmount}
+                      onChange={(e) => handleInputChange('transferAmount', e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors'
+                      placeholder="Enter transfer amount"
+                    />
+                  ) : (
+                    <Select
+                      value={paymentModeOptions.find(option => option.value === formData.paymentMode) || null}
+                      onChange={(selected) => handleInputChange('paymentMode', selected ? selected.value : '')}
+                      options={paymentModeOptions}
+                      placeholder="Select"
+                      isClearable
+                      isSearchable
+                      menuPortalTarget={document.body}
+                      styles={customStyles}
+                      className='w-full'
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleSubmit(e);
+                        }
+                      }}
+                    />
+                  )}
+                </div>
+                {/* Description */}
+                <div className='col-span-1 md:col-span-2 '>
+                  <label className='font-semibold block'>Description</label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => handleInputChange('description', e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors resize-none'
+                    placeholder="Enter description..."
+                    rows={3}
+                  />
+                </div>
+                {/* File Attachment and Submit */}
+                <div className=''>
+                  <div className="flex items-center mb-4">
+                    <label htmlFor="fileInput" className="cursor-pointer flex items-center text-orange-600 hover:text-orange-700 transition-colors">
+                      <img className='w-5 h-4 mr-2' alt='' src={Attach} />
+                      Attach file
+                    </label>
+                    <input
+                      type="file"
+                      id="fileInput"
+                      ref={fileInputRef}
+                      className="hidden"
+                      onChange={handleFileChange}
+                    />
+                    {selectedFile && <span className="text-gray-600 text-sm ml-2">{selectedFile.name}</span>}
+                  </div>
+                  <div className='flex gap-3'>
                     <button
-                      type="button"
-                      onClick={exportToPDF}
-                      className='text-[#E4572E] font-semibold hover:underline cursor-pointer transition-colors'
+                      type="submit"
+                      disabled={isSubmitting}
+                      className={`px-6 py-2 rounded-lg flex items-center justify-center transition-all duration-200 ${isSubmitting
+                        ? 'bg-gray-400 cursor-not-allowed'
+                        : 'bg-[#c7934c] text-white hover:bg-[#b08542] hover:shadow-md'
+                        }`}
                     >
-                      Export PDF
-                    </button>
-                    <button
-                      type="button"
-                      onClick={exportToExcel}
-                      className='text-[#007233] font-semibold hover:underline cursor-pointer transition-colors'
-                    >
-                      Export XL
-                    </button>
-                    <button
-                      type="button"
-                      onClick={printData}
-                      className='text-[#BF9853] font-semibold hover:underline cursor-pointer transition-colors'
-                    >
-                      Print
+                      {isSubmitting ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Processing...
+                        </>
+                      ) : (
+                        'Pay Advance'
+                      )}
                     </button>
                   </div>
                 </div>
               </div>
-              <div className='border-l-8 border-l-[#BF9853] rounded-lg h-[450px] overflow-auto shadow-sm bg-white'>
-                <table className="w-full min-w-[800px]">
-                  <thead className="bg-[#FAF6ED] text-left sticky top-0 z-10">
-                    <tr>
-                      <th className="px-4 py-3 font-semibold text-gray-700">Date</th>
-                      <th className="px-4 py-3 font-semibold text-gray-700">Advance</th>
-                      <th className="px-4 py-3 font-semibold text-gray-700">Transfer/Refund</th>
-                      <th className="px-4 py-3 font-semibold text-gray-700">Mode</th>
-                      <th className="px-4 py-3 font-semibold text-gray-700">Activity</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredTableData.length === 0 ? (
+            </div>
+            <div className='w-full'>
+              <div className='flex flex-col xl:ml-8 min-w-0 flex-1'>
+                <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4  p-2  rounded-lg'>
+                  <div className="flex items-center gap- text-sm text-gray-600">
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <input
+                      className='border-2 w-[112px] p-2 border-[#E4572E] text-[#E4572E] font-bold border-opacity-10 rounded h-[33px] bg-transparent focus:outline-none focus:border-[#E4572E] transition-colors'
+                      placeholder=""
+                      readOnly
+                      value={formData.advanceAmount}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={exportToPDF}
+                        className='text-[#E4572E] font-semibold hover:underline cursor-pointer transition-colors'
+                      >
+                        Export PDF
+                      </button>
+                      <button
+                        type="button"
+                        onClick={exportToExcel}
+                        className='text-[#007233] font-semibold hover:underline cursor-pointer transition-colors'
+                      >
+                        Export XL
+                      </button>
+                      <button
+                        type="button"
+                        onClick={printData}
+                        className='text-[#BF9853] font-semibold hover:underline cursor-pointer transition-colors'
+                      >
+                        Print
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className='border-l-8 border-l-[#BF9853] rounded-lg max-h-[450px] overflow-auto shadow-sm bg-white'>
+                  <table className="w-full min-w-[800px]">
+                    <thead className="bg-[#FAF6ED] text-left sticky top-0 z-10">
                       <tr>
-                        <td colSpan="6" className=" py-8 text-center text-gray-500">
-                          <div className="flex flex-col items-center gap-2">
-                            <span>No data available</span>
-                            <span className="text-sm">
-                              {!formData.empName || !formData.purpose
-                                ? "Select both EMP Name and Purpose to view related data"
-                                : "No records found for the selected employee and purpose"
-                              }
-                            </span>
-                          </div>
-                        </td>
+                        <th className="px-4 py-3 font-semibold text-gray-700">Date</th>
+                        <th className="px-4 py-3 font-semibold text-gray-700">Advance</th>
+                        <th className="px-4 py-3 font-semibold text-gray-700">Transfer/Refund</th>
+                        <th className="px-4 py-3 font-semibold text-gray-700">Mode</th>
+                        <th className="px-4 py-3 font-semibold text-gray-700">Activity</th>
                       </tr>
-                    ) : (
-                      filteredTableData.map((record) => (
-                        <tr key={record.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
-                          <td className=" py-3">{record.date}</td>
-                          <td
-                            className=" py-3 font-medium"
-                            style={{ color: record.type === "Refund" ? '#dc2626' : '#059669' }}
-                          >
-                            {record.type === "Refund"
-                              ? -Math.abs(record.staff_refund_amount || 0)
-                              : record.amount}
-                          </td>
-                          <td className=" py-3">
-                            {record.type === "Refund"
-                              ? "Refund"
-                              : record.type === "Transfer"
-                                ? (() => {
-                                  // For transfer records, determine direction based on amount sign
-                                  const amount = parseFloat(record.amount) || 0;
-                                  if (amount < 0) {
-                                    // Negative amount means money going out from this purpose
-                                    // Find the "to" purpose name from the transfer record
-                                    const toPurposeId = record.to_purpose_id;
-                                    const toPurpose = purposeOptions.find(p => p.id === toPurposeId);
-                                    return `Transfer To ${toPurpose?.label || 'Unknown Purpose'}`;
-                                  } else {
-                                    // Positive amount means money coming in to this purpose
-                                    // Find the "from" purpose name from the transfer record
-                                    const fromPurposeId = record.to_purpose_id;
-                                    const fromPurpose = purposeOptions.find(p => p.id === fromPurposeId);
-                                    return `Transfer From ${fromPurpose?.label || 'Unknown Purpose'}`;
-                                  }
-                                })()
-                                : record.staff_refund_amount
-                            }
-                          </td>
-                          <td className=" py-3">{record.staff_payment_mode}</td>
-                          <td className=" py-3">
-                            <button
-                              type="button"
-                              className="rounded-full transition duration-200 ml-2 mr-3"
-                              onClick={() => handleEditClick(record)}
-                            >
-                              <img
-                                src={edit}
-                                alt="Edit"
-                                className=" w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200 cursor-pointer"
-                              />
-                            </button>
+                    </thead>
+                    <tbody>
+                      {filteredTableData.length === 0 ? (
+                        <tr>
+                          <td colSpan="6" className=" py-8 text-center text-gray-500">
+                            <div className="flex flex-col items-center gap-2">
+                              <span>No data available</span>
+                              <span className="text-sm">
+                                {!formData.empName || !formData.purpose
+                                  ? "Select both EMP Name and Purpose to view related data"
+                                  : "No records found for the selected employee and purpose"
+                                }
+                              </span>
+                            </div>
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      ) : (
+                        filteredTableData.map((record) => (
+                          <tr key={record.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
+                            <td className=" py-3">{record.date}</td>
+                            <td
+                              className=" py-3 font-medium"
+                              style={{ color: record.type === "Refund" ? '#dc2626' : '#059669' }}
+                            >
+                              {record.type === "Refund"
+                                ? -Math.abs(record.staff_refund_amount || 0)
+                                : record.amount}
+                            </td>
+                            <td className=" py-3">
+                              {record.type === "Refund"
+                                ? "Refund"
+                                : record.type === "Transfer"
+                                  ? (() => {
+                                    // For transfer records, determine direction based on amount sign
+                                    const amount = parseFloat(record.amount) || 0;
+                                    if (amount < 0) {
+                                      // Negative amount means money going out from this purpose
+                                      // Find the "to" purpose name from the transfer record
+                                      const toPurposeId = record.to_purpose_id;
+                                      const toPurpose = purposeOptions.find(p => p.id === toPurposeId);
+                                      return `Transfer To ${toPurpose?.label || 'Unknown Purpose'}`;
+                                    } else {
+                                      // Positive amount means money coming in to this purpose
+                                      // Find the "from" purpose name from the transfer record
+                                      const fromPurposeId = record.to_purpose_id;
+                                      const fromPurpose = purposeOptions.find(p => p.id === fromPurposeId);
+                                      return `Transfer From ${fromPurpose?.label || 'Unknown Purpose'}`;
+                                    }
+                                  })()
+                                  : record.staff_refund_amount
+                              }
+                            </td>
+                            <td className=" py-3">{record.staff_payment_mode}</td>
+                            <td className=" py-3">
+                              <button
+                                type="button"
+                                className="rounded-full transition duration-200 ml-2 mr-3"
+                                onClick={() => handleEditClick(record)}
+                              >
+                                <img
+                                  src={edit}
+                                  alt="Edit"
+                                  className=" w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200 cursor-pointer"
+                                />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
@@ -1571,29 +1613,25 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
             <h2 className="text-lg font-bold mb-4">Edit Staff Advance Entry</h2>
             <div className='text-left'>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Select Type */}
                 <div className='space-y-2'>
                   <label className='font-semibold text-[#E4572E] block'>
-                    Select Type <span className="text-red-500">*</span>
+                    Select Type
                   </label>
-                  <select
-                    value={editFormData.selectedType}
-                    onChange={(e) => setEditFormData({ ...editFormData, selectedType: e.target.value })}
-                    className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors'
-                  >
-                    <option value=''>Select Type...</option>
-                    {selectTypeOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  <Select
+                    value={selectTypeOptions.find(option => option.value === editFormData.selectedType) || null}
+                    onChange={(selected) => setEditFormData({ ...editFormData, selectedType: selected ? selected.value : '' })}
+                    options={selectTypeOptions}
+                    placeholder="Select Type..."
+                    isClearable
+                    isSearchable
+                    menuPortalTarget={document.body}
+                    styles={customStyles}
+                    className='w-full'
+                  />
                 </div>
-
-                {/* Date */}
                 <div className='space-y-2'>
                   <label className='font-semibold text-[#E4572E] block'>
-                    Date <span className="text-red-500">*</span>
+                    Date
                   </label>
                   <input
                     type='date'
@@ -1602,8 +1640,6 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                     className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors'
                   />
                 </div>
-
-                {/* EMP Name */}
                 <div className='space-y-2'>
                   <label className='font-semibold block'>
                     EMP Name <span className="text-red-500">*</span>
@@ -1619,8 +1655,6 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                     isSearchable={true}
                   />
                 </div>
-
-                {/* Overall Advance */}
                 <div className='space-y-2'>
                   <label className='font-semibold block'>Overall Advance</label>
                   <input
@@ -1630,8 +1664,6 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                     placeholder="0.00"
                   />
                 </div>
-
-                {/* Purpose */}
                 <div className='space-y-2'>
                   <label className='font-semibold block'>Purpose</label>
                   <Select
@@ -1645,8 +1677,6 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                     className='w-full h-[45px] focus:outline-none'
                   />
                 </div>
-
-                {/* Advance Amount */}
                 <div className='space-y-2'>
                   <label className='font-semibold block'>Advance Amount</label>
                   <input
@@ -1656,8 +1686,6 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                     placeholder="0.00"
                   />
                 </div>
-
-                {/* Amount Given / Purpose To */}
                 <div className='space-y-2'>
                   <label className='font-semibold block'>
                     {editFormData.selectedType === 'Transfer' ? 'Purpose To' : 'Amount Given'}
@@ -1681,8 +1709,6 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                     />
                   )}
                 </div>
-
-                {/* Payment Mode/Transfer Amount */}
                 <div className='space-y-2'>
                   <label className='font-semibold block'>
                     {editFormData.selectedType === 'Transfer' ? 'Transfer Amount' : 'Payment Mode'}
@@ -1695,18 +1721,17 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                       placeholder="Enter transfer amount"
                     />
                   ) : (
-                    <select
-                      value={editFormData.paymentMode}
-                      onChange={(e) => setEditFormData({ ...editFormData, paymentMode: e.target.value })}
-                      className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none focus:border-[#BF9853] transition-colors'
-                    >
-                      <option value=''>Select</option>
-                      {paymentModeOptions.map(option => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                    <Select
+                      value={paymentModeOptions.find(option => option.value === editFormData.paymentMode) || null}
+                      onChange={(selected) => setEditFormData({ ...editFormData, paymentMode: selected ? selected.value : '' })}
+                      options={paymentModeOptions}
+                      placeholder="Select"
+                      isClearable
+                      isSearchable
+                      menuPortalTarget={document.body}
+                      styles={customStyles}
+                      className='w-full'
+                    />
                   )}
                 </div>
               </div>
@@ -1728,7 +1753,6 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
           </div>
         </div>
       )}
-      {/* Payment Popup Modal */}
       {showPaymentModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-white text-left rounded-xl p-6 w-[800px] h-[600px] overflow-y-auto flex flex-col">
@@ -1759,22 +1783,20 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>
-                      <select
-                        value={paymentPopupData.paymentMode}
-                        onChange={(e) => setPaymentPopupData({ ...paymentPopupData, paymentMode: e.target.value })}
-                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none bg-gray-100"
-                      >
-                        <option value="">---Select---</option>
-                        {paymentModeOptions && paymentModeOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
+                      <Select
+                        value={paymentModeOptions?.find(option => option.value === paymentPopupData.paymentMode) || null}
+                        onChange={(selected) => setPaymentPopupData({ ...paymentPopupData, paymentMode: selected ? selected.value : '' })}
+                        options={paymentModeOptions || []}
+                        placeholder="---Select---"
+                        isClearable
+                        isSearchable
+                        menuPortalTarget={document.body}
+                        styles={customStyles}
+                        className="w-full"
+                      />
                     </div>
                   </div>
                 </div>
-
                 {(paymentPopupData.paymentMode === "GPay" || paymentPopupData.paymentMode === "PhonePe" ||
                   paymentPopupData.paymentMode === "Net Banking" || paymentPopupData.paymentMode === "Cheque") && (
                     <div className="border-2 border-[#BF9853] border-opacity-25 rounded-lg p-4">
@@ -1815,16 +1837,17 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
-                            <select
-                              value={paymentPopupData.accountNumber}
-                              onChange={(e) => setPaymentPopupData(prev => ({ ...prev, accountNumber: e.target.value }))}
-                              className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                            >
-                              <option value="">Select Account</option>
-                              <option value="2027887700014">2027887700014</option>
-                              <option value="2027887700015">2027887700015</option>
-                              <option value="2027887700016">2027887700016</option>
-                            </select>
+                            <Select
+                              value={accountNumberOptions.find(option => option.value === paymentPopupData.accountNumber) || null}
+                              onChange={(selected) => setPaymentPopupData(prev => ({ ...prev, accountNumber: selected ? selected.value : '' }))}
+                              options={accountNumberOptions}
+                              placeholder="Select Account"
+                              isClearable
+                              isSearchable
+                              menuPortalTarget={document.body}
+                              styles={customStyles}
+                              className="w-full"
+                            />
                           </div>
                         </div>
                       </div>
@@ -1879,8 +1902,6 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
           </div>
         </div>
       )}
-
-      {/* Review Modal */}
       {showReviewModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-white text-left rounded-xl p-6 w-[1400px] h-[680px] overflow-hidden flex flex-col">
@@ -1907,18 +1928,17 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="text-sm font-semibold mb-1 block">Type</label>
-                        <select
-                          className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
-                          value={formData.selectedType}
-                          onChange={(e) => handleInputChange('selectedType', e.target.value)}
-                        >
-                          <option value="">Select Type...</option>
-                          {selectTypeOptions.map(option => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
+                        <Select
+                          value={selectTypeOptions.find(option => option.value === formData.selectedType) || null}
+                          onChange={(selected) => handleInputChange('selectedType', selected ? selected.value : '')}
+                          options={selectTypeOptions}
+                          placeholder="Select Type..."
+                          isClearable
+                          isSearchable
+                          menuPortalTarget={document.body}
+                          styles={customStyles}
+                          className="w-full"
+                        />
                       </div>
                       <div>
                         <label className="text-sm font-semibold mb-1 block">Date</label>
@@ -1992,18 +2012,17 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                           {formData.selectedType === 'Advance' && (
                             <div>
                               <label className="text-sm font-semibold mb-1 block">Payment Mode</label>
-                              <select
-                                value={formData.paymentMode}
-                                onChange={(e) => handleInputChange('paymentMode', e.target.value)}
-                                className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
-                              >
-                                <option value="">Select</option>
-                                {paymentModeOptions.map(option => (
-                                  <option key={option.value} value={option.value}>
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </select>
+                              <Select
+                                value={paymentModeOptions.find(option => option.value === formData.paymentMode) || null}
+                                onChange={(selected) => handleInputChange('paymentMode', selected ? selected.value : '')}
+                                options={paymentModeOptions}
+                                placeholder="Select"
+                                isClearable
+                                isSearchable
+                                menuPortalTarget={document.body}
+                                styles={customStyles}
+                                className="w-full"
+                              />
                             </div>
                           )}
                         </>
@@ -2094,7 +2113,6 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
           </div>
         </div>
       )}
-
       <ToastContainer />
     </div>
   );

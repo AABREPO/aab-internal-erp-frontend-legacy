@@ -858,26 +858,13 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   // Calculate totals from filtered records
   const advanceTotal = filteredRecords
     .filter(r => r.type === 'Advance')
-    .reduce((acc, r) => {
-      const amount = parseFloat(r.amount) || 0;
-      // If amount is negative, it will subtract automatically
-      return acc + amount;
-    }, 0);
+    .reduce((acc, r) => acc + (r.amount || 0), 0);
   const transferTotal = filteredRecords
     .filter(r => r.type === 'Transfer')
-    .reduce((acc, r) => {
-      const amount = parseFloat(r.amount) || 0;
-      // For transfer records, the amount field already contains the correct sign
-      // Negative amount means money going out, positive means money coming in
-      return acc + amount;
-    }, 0);
+    .reduce((acc, r) => acc + (r.amount > 0 ? r.amount : 0), 0);
   const refundTotal = filteredRecords
     .filter(r => r.type === 'Refund')
-    .reduce((acc, r) => {
-      const refund = parseFloat(r.staff_refund_amount) || 0;
-      // Subtract refund amount
-      return acc + refund; // Refund amounts are positive, so we add them (they represent money returned)
-    }, 0);
+    .reduce((acc, r) => acc + (r.staff_refund_amount || 0), 0);
 
   // Sorted data (moved after filteredRecords initialization)
   const sortedData = useMemo(() => {
@@ -1136,7 +1123,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   }
   return (
     <div className="bg-[#faf6ed]">
-      <div className='w-full max-w-[1850px] bg-white text-left lg:flex gap-5 p-5 ml-10 mr-10 shadow-sm rounded'>
+      <div className=' xl:w-[1850px] bg-white text-left lg:flex gap-5 p-5 ml-10 mr-10 shadow-sm rounded'>
         <div className=''>
           <label className='block mb-2 font-semibold'>Advance Amount</label>
           <input
@@ -1168,7 +1155,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
           <p>{error}</p>
         </div>
       )}
-      <div className='w-full max-w-[1850px] bg-white mt-5 pt-5 ml-10'>
+      <div className=' xl:w-[1850px] bg-white mt-5 pt-5 ml-10 mr-10'>
         <div
           className={`text-left flex ${selectDate || selectEmployeeName || selectPurpose || selectTransferTo || selectType || selectMode
             ? 'flex-col sm:flex-row sm:justify-between'

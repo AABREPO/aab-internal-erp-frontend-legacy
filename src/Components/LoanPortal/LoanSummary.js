@@ -1038,20 +1038,59 @@ const LoanSummary = () => {
     control: (provided, state) => ({
       ...provided,
       borderWidth: '2px',
+      lineHeight: '20px',
+      fontSize: '14px',
+      height: '45px',
       borderRadius: '8px',
-      borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'rgba(191, 152, 83, 0.2)',
-      boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
-      '&:hover': {
-        borderColor: 'rgba(191, 152, 83, 0.2)',
-      }
+      borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.3)' : 'rgba(191, 152, 83, 0.3)',
+      boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.3)' : 'none',
+    }),
+    clearIndicator: (provided) => ({
+      ...provided,
+      cursor: 'pointer',
     }),
     menu: (provided) => ({
       ...provided,
       zIndex: 9999,
+      maxHeight: '300px',
     }),
     menuPortal: (provided) => ({
       ...provided,
       zIndex: 9999,
+    }),
+    menuList: (provided) => ({
+      ...provided,
+      maxHeight: '250px',
+      overflowY: 'auto',
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      fontWeight: '500',
+      backgroundColor: state.isSelected 
+        ? 'rgba(191, 152, 83, 0.3)' 
+        : state.isFocused 
+          ? 'rgba(191, 152, 83, 0.1)' 
+          : 'white',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    input: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    placeholder: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: '#999',
+      textAlign: 'left',
     }),
   };
 
@@ -1113,10 +1152,10 @@ const LoanSummary = () => {
 
   return (
     <div className='bg-[#FAF6ED]'>
-      <div className="bg-white rounded-lg w-full max-w-[95vw] h-[780px] p-4 ml-4 sm:ml-6 lg:ml-10 px-4 lg:px-14 mx-auto">
-        <div className="flex flex-col xl:flex-row gap-8">
+      <div className="bg-white rounded-lg xl:w-full xl:max-w-[95vw] xl:h-[780px] p-3 ml-10 mr-10">
+        <div className="xl:flex gap-8">
         {/* Left Panel: Contractor/Vendor Summary */}
-        <div className="flex-1 text-left bg-white p-6">
+        <div className="flex-1 text-left bg-white p-4 sm:p-6 mb-6 xl:mb-0">
           <div className="mb-4">
             <label className="block font-semibold mb-2">
               Contractor/Vendor/Employee/Labour
@@ -1161,8 +1200,8 @@ const LoanSummary = () => {
               Print
             </button>
           </div>
-          <div className="rounded-lg border-l-8 border-l-[#BF9853]">
-            <table className="w-full border-collapse">
+          <div className="rounded-lg border-l-8 border-l-[#BF9853] overflow-x-auto">
+            <table className="w-full min-w-[600px] border-collapse">
               <thead className="bg-[#FAF6ED] sticky top-0 z-10">
                 <tr>
                   <th className="p-3 text-left font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('purposeId')}>
@@ -1233,7 +1272,7 @@ const LoanSummary = () => {
         </div>
 
         {/* Right Panel: To Summary */}
-        <div className="flex-1 bg-white text-left p-6">
+        <div className="flex-1 text-left p-4 sm:p-6">
           <div className="mb-4">
             <label className="block font-semibold mb-2">
               Purpose
@@ -1278,8 +1317,8 @@ const LoanSummary = () => {
               Print
             </button>
           </div>
-          <div className="rounded-lg border-l-8 border-l-[#BF9853]">
-            <table className="w-full border-collapse">
+          <div className="rounded-lg border-l-8 border-l-[#BF9853] overflow-x-auto">
+            <table className="w-full min-w-[600px] border-collapse">
               <thead className="bg-[#FAF6ED] sticky top-0 z-10">
                 <tr>
                   <th className="p-3 text-left font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handlePurposeSort('associateId')}>

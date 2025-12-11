@@ -569,26 +569,13 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) =>
   // Calculate summary totals dynamically for filtered records
   const advanceTotal = filteredRecords
     .filter(r => r.type === 'Advance')
-    .reduce((acc, r) => {
-      const amount = parseFloat(r.amount) || 0;
-      // If amount is negative, it will subtract automatically
-      return acc + amount;
-    }, 0);
+    .reduce((acc, r) => acc + (r.amount || 0), 0);
   const transferTotal = filteredRecords
     .filter(r => r.type === 'Transfer')
-    .reduce((acc, r) => {
-      const amount = parseFloat(r.amount) || 0;
-      // For transfer records, the amount field already contains the correct sign
-      // Negative amount means money going out, positive means money coming in
-      return acc + amount;
-    }, 0);
+    .reduce((acc, r) => acc + (r.amount > 0 ? r.amount : 0), 0);
   const refundTotal = filteredRecords
     .filter(r => r.type === 'Refund')
-    .reduce((acc, r) => {
-      const refund = parseFloat(r.staff_refund_amount) || 0;
-      // Subtract refund amount
-      return acc + refund; // Refund amounts are positive, so we add them (they represent money returned)
-    }, 0);
+    .reduce((acc, r) => acc + (r.staff_refund_amount || 0), 0);
 
   // Export functionality
   const exportPDF = () => {

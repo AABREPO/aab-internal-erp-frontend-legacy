@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import Select from 'react-select';
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import * as XLSX from "xlsx";
@@ -13,13 +14,13 @@ Date.prototype.getWeekNumber = function () {
 const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   const [week, setWeek] = useState("");
   const [year, setYear] = useState(new Date().getFullYear().toString());
-    const [vendorOptions, setVendorOptions] = useState([]);
-    const [contractorOptions, setContractorOptions] = useState([]);
+  const [vendorOptions, setVendorOptions] = useState([]);
+  const [contractorOptions, setContractorOptions] = useState([]);
   const [employeeOptions, setEmployeeOptions] = useState([]);
   const [labourOptions, setLabourOptions] = useState([]);
-    const [siteOptions, setSiteOptions] = useState([]);
+  const [siteOptions, setSiteOptions] = useState([]);
   const [purposeOptions, setPurposeOptions] = useState([]);
-    const [loanData, setLoanData] = useState([]);
+  const [loanData, setLoanData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -122,23 +123,84 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i);
 
 
-    // Use paymentModeOptions from props, fallback to default if not provided
-    const defaultPaymentModeOptions = useMemo(
-        () => [
-            { id: 1, value: "Cash", label: "Cash" },
-            { id: 2, value: "GPay", label: "GPay" },
-            { id: 3, value: "PhonePe", label: "PhonePe" },
-            { id: 4, value: "Net Banking", label: "Net Banking" },
-            { id: 5, value: "Cheque", label: "Cheque" },
-            { id: 6, value: "Advance Transfer", label: "Advance Transfer" },
-        ],
-        []
-    );
-    
-    const finalPaymentModeOptions = paymentModeOptions.length > 0 ? paymentModeOptions : defaultPaymentModeOptions;
+  // Use paymentModeOptions from props, fallback to default if not provided
+  const defaultPaymentModeOptions = useMemo(
+    () => [
+      { id: 1, value: "Cash", label: "Cash" },
+      { id: 2, value: "GPay", label: "GPay" },
+      { id: 3, value: "PhonePe", label: "PhonePe" },
+      { id: 4, value: "Net Banking", label: "Net Banking" },
+      { id: 5, value: "Cheque", label: "Cheque" },
+      { id: 6, value: "Advance Transfer", label: "Advance Transfer" },
+    ],
+    []
+  );
+
+  const finalPaymentModeOptions = paymentModeOptions.length > 0 ? paymentModeOptions : defaultPaymentModeOptions;
+
+  // Custom styles for Select components
+  const customStyles = {
+    control: (provided, state) => ({
+      ...provided,
+      borderWidth: '2px',
+      lineHeight: '20px',
+      fontSize: '14px',
+      height: '45px',
+      borderRadius: '8px',
+      borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.3)' : 'rgba(191, 152, 83, 0.3)',
+      boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.3)' : 'none',
+    }),
+    clearIndicator: (provided) => ({
+      ...provided,
+      cursor: 'pointer',
+    }),
+    menu: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+      maxHeight: '300px',
+    }),
+    menuPortal: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+    }),
+    menuList: (provided) => ({
+      ...provided,
+      maxHeight: '250px',
+      overflowY: 'auto',
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      fontWeight: '500',
+      backgroundColor: state.isSelected
+        ? 'rgba(191, 152, 83, 0.3)'
+        : state.isFocused
+          ? 'rgba(191, 152, 83, 0.1)'
+          : 'white',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    input: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    placeholder: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: '#999',
+      textAlign: 'left',
+    }),
+  };
 
   // Fetch Vendor Names
-    useEffect(() => {
+  useEffect(() => {
     const fetchVendorNames = async () => {
       try {
         setProgress(10);
@@ -147,8 +209,8 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
           credentials: "include",
           headers: { "Content-Type": "application/json" },
         });
-                const data = await res.json();
-                setVendorOptions(
+        const data = await res.json();
+        setVendorOptions(
           data.map((item) => ({ value: item.vendorName, label: item.vendorName, id: item.id }))
         );
         setProgress(20);
@@ -158,10 +220,10 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       }
     };
     fetchVendorNames();
-    }, []);
+  }, []);
 
   // Fetch Contractor Names
-    useEffect(() => {
+  useEffect(() => {
     const fetchContractorNames = async () => {
       try {
         setProgress(30);
@@ -170,8 +232,8 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
           credentials: "include",
           headers: { "Content-Type": "application/json" },
         });
-                const data = await res.json();
-                setContractorOptions(
+        const data = await res.json();
+        setContractorOptions(
           data.map((item) => ({ value: item.contractorName, label: item.contractorName, id: item.id }))
         );
         setProgress(40);
@@ -205,15 +267,15 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         }));
         setEmployeeOptions(formattedData);
         setProgress(55);
-            } catch (error) {
+      } catch (error) {
         console.error("Fetch error: ", error);
-            }
-        };
+      }
+    };
     fetchEmployeeNames();
-    }, []);
+  }, []);
 
   // Fetch Labour Names
-    useEffect(() => {
+  useEffect(() => {
     const fetchLabourNames = async () => {
       try {
         setProgress(60);
@@ -229,7 +291,7 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         const formattedData = data.map(item => ({
           value: item.labour_name,
           label: item.labour_name,
-                        id: item.id,
+          id: item.id,
           type: "Labour",
         }));
         setLabourOptions(formattedData);
@@ -290,23 +352,23 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         }
         const data = await response.json();
         const formattedData = data.map(item => ({
-                        value: item.siteName,
-                        label: item.siteName,
+          value: item.siteName,
+          label: item.siteName,
           id: item.id,
-                        sNo: item.siteNo,
-                        type: "Site",
+          sNo: item.siteNo,
+          type: "Site",
         }));
         setSiteOptions(formattedData);
         setProgress(85);
-            } catch (error) {
+      } catch (error) {
         console.error("Fetch error: ", error);
-            }
-        };
-        fetchSites();
-    }, []);
+      }
+    };
+    fetchSites();
+  }, []);
 
   // Fetch Loan Data
-    useEffect(() => {
+  useEffect(() => {
     const fetchData = async () => {
       try {
         setProgress(90);
@@ -315,8 +377,8 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
           credentials: "include",
           headers: { "Content-Type": "application/json" },
         });
-                const data = await res.json();
-                setLoanData(data);
+        const data = await res.json();
+        setLoanData(data);
         setProgress(100);
         setLoading(false);
       } catch (err) {
@@ -326,14 +388,14 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       }
     };
     fetchData();
-    }, []);
+  }, []);
 
   // Update getPurposeOrSiteName to use fetched purposeOptions
   const getPurposeOrSiteName = (entry) => {
     if (!entry || !purposeOptions || purposeOptions.length === 0) {
       return "";
     }
-    
+
     // Check from_purpose_id first (used for all types including Loan, Refund, Transfer)
     if (entry.from_purpose_id) {
       const purpose = purposeOptions.find((p) => {
@@ -345,7 +407,7 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         return purpose.value;
       }
     }
-    
+
     // Fallback to loan_purpose_id if from_purpose_id is not available
     if (entry.loan_purpose_id) {
       const purpose = purposeOptions.find((p) => {
@@ -357,7 +419,7 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         return purpose.value;
       }
     }
-    
+
     return "";
   };
 
@@ -370,7 +432,7 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Convert to Monday = 0
     const mondayOfWeek = new Date(d);
     mondayOfWeek.setDate(d.getDate() + mondayOffset);
-    
+
     // Get January 1st of the year
     const jan1 = new Date(mondayOfWeek.getFullYear(), 0, 1);
     // Get the Monday of the week containing January 1st
@@ -378,7 +440,7 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     const jan1MondayOffset = jan1DayOfWeek === 0 ? -6 : 1 - jan1DayOfWeek;
     const firstMonday = new Date(jan1);
     firstMonday.setDate(jan1.getDate() + jan1MondayOffset);
-    
+
     // Calculate week number (1-based)
     const diffTime = mondayOfWeek - firstMonday;
     const diffDays = Math.floor(diffTime / (24 * 60 * 60 * 1000));
@@ -468,16 +530,16 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     if (entry.labour_id) return getLabelById(labourOptions, entry.labour_id);
     return "";
   };
-    const getTransferDestination = (entry) => {
-        if (entry.type === "Transfer") {
-            if (entry.to_purpose_id) {
-                return purposeOptions.find((p) => String(p.id) === String(entry.to_purpose_id))?.value || "";
-            } else if (entry.transfer_Project_id) {
+  const getTransferDestination = (entry) => {
+    if (entry.type === "Transfer") {
+      if (entry.to_purpose_id) {
+        return purposeOptions.find((p) => String(p.id) === String(entry.to_purpose_id))?.value || "";
+      } else if (entry.transfer_Project_id) {
         return getLabelById(siteOptions, entry.transfer_Project_id);
-            }
-        }
-        return "";
-    };
+      }
+    }
+    return "";
+  };
   const requestSort = (key) => {
     setSortConfig((prev) => {
       if (prev.key === key) {
@@ -562,11 +624,6 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       setCurrentPage(currentPage - 1);
     }
   };
-  const handleItemsPerPageChange = (e) => {
-    const newItemsPerPage = parseInt(e.target.value);
-    setItemsPerPage(newItemsPerPage);
-    setCurrentPage(1);
-  };
 
   // Popup handlers
   const handleLoanClick = (row) => {
@@ -579,8 +636,8 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       const itemPurposeId = item.loan_purpose_id || item.from_purpose_id;
       const rowPurposeId = row.loan_purpose_id || row.from_purpose_id;
       return String(itemAssociateId) === String(rowAssociateId) &&
-             String(itemPurposeId) === String(rowPurposeId) &&
-             (item.type === "Loan" || item.type === "Transfer");
+        String(itemPurposeId) === String(rowPurposeId) &&
+        (item.type === "Loan" || item.type === "Transfer");
     });
     if (filtered.length > 0) {
       const details = filtered.map(item => ({
@@ -610,8 +667,8 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       const itemPurposeId = item.loan_purpose_id || item.from_purpose_id;
       const rowPurposeId = row.loan_purpose_id || row.from_purpose_id;
       return String(itemAssociateId) === String(rowAssociateId) &&
-             String(itemPurposeId) === String(rowPurposeId) &&
-             item.type === "Refund";
+        String(itemPurposeId) === String(rowPurposeId) &&
+        item.type === "Refund";
     });
     if (filtered.length > 0) {
       const details = filtered.map(item => ({
@@ -688,12 +745,12 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         item.description || "-",
       ]);
     });
-        doc.autoTable({
-            head: [tableColumn],
-            body: tableRows,
+    doc.autoTable({
+      head: [tableColumn],
+      body: tableRows,
       startY: 30,
       theme: 'grid',
-            headStyles: {
+      headStyles: {
         fillColor: [255, 255, 255],
         textColor: 0,
         lineWidth: 0.2,
@@ -704,8 +761,8 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         textColor: 0,
         lineWidth: 0.2,
         lineColor: [100, 100, 100]
-            },
-            columnStyles: {
+      },
+      columnStyles: {
         1: { halign: 'right' }
       }
     });
@@ -845,7 +902,7 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     });
     // Calculate column widths to match header table width exactly
     const mainTableAvailableWidth = availableWidth; // Use same width as header table
-    
+
     // Column width multipliers (proportional)
     const widthMultipliers = {
       sno: 0.4,
@@ -859,16 +916,16 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       mode: 0.7,
       description: 1.5
     };
-    
+
     // Calculate sum of multipliers
     const totalMultiplier = Object.values(widthMultipliers).reduce((sum, val) => sum + val, 0);
-    
+
     // Normalize to fill exact available width
     const normalizedWidths = {};
     Object.keys(widthMultipliers).forEach((key, index) => {
       normalizedWidths[key] = (mainTableAvailableWidth * widthMultipliers[key]) / totalMultiplier;
     });
-    
+
     doc.autoTable({
       startY: doc.lastAutoTable.finalY + 10,
       margin: { left: marginLeft, right: marginRight },
@@ -912,8 +969,8 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   const handleExportExcel = () => {
     if (!filteredData.length) {
       alert("No data to export");
-            return;
-        }
+      return;
+    }
     const normStr = v => (v ?? "").toString().trim().toLowerCase();
     const dateKey = (val) => {
       if (!val) return -Infinity;
@@ -978,55 +1035,50 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       `LoanReport_${fromDate.replace(/\//g, "-")}_to_${toDate.replace(/\//g, "-")}_${timestamp}.xlsx`
     );
   };
-  
-    return (
+
+  return (
     <div className='bg-[#FAF6ED]'>
-      <div className="flex flex-col xl:flex-row items-start justify-between bg-white p-4 ml-4 sm:ml-6 lg:ml-10 px-4 lg:px-14 lg:h-[128px] rounded-md shadow-sm max-w-[95vw] w-full mb-4">
-        <div className="flex flex-wrap space-x-6 text-left">
-          <div>
+      <div className="xl:flex items-start justify-between bg-white p-4 ml-4 sm:ml-6 lg:ml-10 px-5 xl:h-[128px] rounded-md shadow-sm max-w-[95vw] w-full mb-4">
+        <div className="block md:flex md:flex-wrap gap-4 text-left w-full">
+          <div className="xl:px-0">
             <label className="block font-semibold mb-1">Week No</label>
-                        <select
-              value={week}
-              onChange={(e) => {
-                setWeek(e.target.value);
+            <Select
+              options={Array.from({ length: getCurrentWeekNumber() }, (_, i) => ({
+                value: `Week ${String(i + 1).padStart(2, "0")}`,
+                label: `Week ${String(i + 1).padStart(2, "0")}`
+              }))}
+              value={week ? { value: week, label: week } : null}
+              onChange={(selected) => {
+                setWeek(selected ? selected.value : '');
                 setStartDate("");
                 setEndDate("");
               }}
-              className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 focus:outline-none w-[168px] h-[45px]"
-              style={{ 
-                appearance: 'none',
-                WebkitAppearance: 'none',
-                MozAppearance: 'none',
-                backgroundImage: 'none'
-              }}
-            >
-              <option value="">Select</option>
-              {Array.from({ length: getCurrentWeekNumber() }, (_, i) => (
-                <option key={i} value={`Week ${String(i + 1).padStart(2, "0")}`}>
-                  Week {String(i + 1).padStart(2, "0")}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-          <div>
+              placeholder="Select"
+              isSearchable
+              isClearable
+              menuPortalTarget={document.body}
+              styles={customStyles}
+              className=' w-fullrounded-lg focus:outline-none'
+            />
+          </div>
+          <div className="">
             <label className="block font-semibold mb-1">Year</label>
-                        <select
-              value={year}
-              onChange={(e) => setYear(e.target.value)}
-              className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[168px] h-[45px] focus:outline-none"
-              style={{ 
-                appearance: 'none',
-                WebkitAppearance: 'none',
-                MozAppearance: 'none',
-                backgroundImage: 'none'
-              }}
-            >
-              {years.map((y) => (
-                <option key={y} value={y}>{y}</option>
-                            ))}
-                        </select>
-                    </div>
-          <div>
+            <Select
+              options={years.map((y) => ({
+                value: y.toString(),
+                label: y.toString()
+              }))}
+              value={year ? { value: year, label: year } : null}
+              onChange={(selected) => setYear(selected ? selected.value : '')}
+              placeholder="Select Year"
+              isSearchable
+              isClearable
+              menuPortalTarget={document.body}
+              styles={customStyles}
+              className=' w-full rounded-lg focus:outline-none'
+            />
+          </div>
+          <div className="">
             <label className="block font-semibold mb-1">Start Date</label>
             <input
               type="date"
@@ -1035,10 +1087,10 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                 setStartDate(e.target.value);
                 setWeek("");
               }}
-              className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[168px] h-[45px] focus:outline-none"
+              className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-full h-[45px] focus:outline-none"
             />
-                </div>
-          <div>
+          </div>
+          <div className="">
             <label className="block font-semibold mb-1">End Date</label>
             <input
               type="date"
@@ -1047,38 +1099,49 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                 setEndDate(e.target.value);
                 setWeek("");
               }}
-              className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[168px] h-[45px] focus:outline-none"
+              className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-full h-[45px] focus:outline-none"
             />
           </div>
-          <div>
+          <div className="">
             <label className="block font-semibold mb-1">Payment Mode</label>
-            <select
-              value={paymentModeFilter}
-              onChange={(e) => setPaymentModeFilter(e.target.value)}
-              className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[168px] h-[45px] focus:outline-none"
-            >
-              <option value="">All Modes</option>
-              {finalPaymentModeOptions.map((opt) => (
-                <option key={opt.id} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-                    </div>
-          <div>
+            <Select
+              options={[
+                ...finalPaymentModeOptions.map((opt) => ({
+                  value: opt.value,
+                  label: opt.label
+                }))
+              ]}
+              value={paymentModeFilter ? { value: paymentModeFilter, label: finalPaymentModeOptions.find(opt => opt.value === paymentModeFilter)?.label || paymentModeFilter } : null}
+              onChange={(selected) => setPaymentModeFilter(selected ? selected.value : '')}
+              placeholder="Select Modes"
+              isSearchable
+              isClearable
+              menuPortalTarget={document.body}
+              styles={customStyles}
+              className=' w-full rounded-lg focus:outline-none'
+            />
+          </div>
+          <div className="">
             <label className="block font-semibold mb-1">Type</label>
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[168px] h-[45px] focus:outline-none"
-            >
-              <option value="">All Types</option>
-              <option value="Loan">Loan</option>
-              <option value="Refund">Refund</option>
-              <option value="Transfer">Transfer</option>
-            </select>
+            <Select
+              options={[
+                { value: 'Loan', label: 'Loan' },
+                { value: 'Refund', label: 'Refund' },
+                { value: 'Transfer', label: 'Transfer' }
+              ]}
+              value={typeFilter ? { value: typeFilter, label: typeFilter } : null}
+              onChange={(selected) => setTypeFilter(selected ? selected.value : '')}
+              placeholder="Select Types"
+              isSearchable
+              isClearable
+              menuPortalTarget={document.body}
+              styles={customStyles}
+              className=' w-full rounded-lg focus:outline-none'
+            />
           </div>
         </div>
-        <div>
-          <div className="text-sm text-right space-y-1 border-2 border-[#E4572E] border-opacity-15 p-1">
+        <div className="xl:ml-0 max-w-[200px] w-full">
+          <div className="text-sm text-right space-y-1 border-2 border-[#E4572E] border-opacity-15 p-1 xl:mt-0 mt-2">
             <div>
               <span className="font-semibold">From Date</span> :{" "}
               <span className="text-red-500">
@@ -1103,13 +1166,13 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
           </div>
         </div>
       </div>
-      <div className='max-w-[95vw] w-full rounded-md ml-4 h-[630px] sm:ml-6 lg:ml-10 px-4 lg:px-10 bg-white p-4'>
+      <div className='max-w-[95vw] w-full rounded-md ml-4 xl:h-[630px] h-auto sm:ml-6 lg:ml-10 px-5 bg-white p-4'>
         <div className='space-x-6 flex justify-end'>
           <button onClick={handleExportPDF} className='text-sm text-[#E4572E] hover:underline font-bold'>Export PDF</button>
           <button onClick={handleExportExcel} className='text-sm text-[#007233] hover:underline font-bold'>Export XL</button>
           <button className='text-sm text-[#BF9853] hover:underline font-bold'>Print</button>
-                    </div>
-                    <div
+        </div>
+        <div
           ref={scrollRef}
           className=" rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] max-h-[500px] overflow-auto select-none "
           onMouseDown={handleMouseDown}
@@ -1185,7 +1248,7 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                     <td className="text-sm text-left p-3 w-32 font-semibold">{getAssociateName(row)}</td>
                     <td className="text-sm text-left p-3 w-32 font-semibold">{getPurposeOrSiteName(row)}</td>
                     <td className="text-sm text-left p-3 w-32 font-semibold">{getTransferDestination(row)}</td>
-                    <td 
+                    <td
                       className={`text-sm text-right p-3 w-32 font-semibold ${(row.type === "Loan" || row.type === "Transfer") ? "cursor-pointer hover:bg-gray-200" : ""}`}
                       onClick={() => {
                         if (row.type === "Loan" || row.type === "Transfer") {
@@ -1195,7 +1258,7 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                     >
                       {(row.type === "Loan" || row.type === "Transfer") ? (row.amount?.toLocaleString("en-IN") || "0") : "-"}
                     </td>
-                    <td 
+                    <td
                       className={`text-sm text-right p-3 w-32 font-semibold ${row.type === "Refund" ? "cursor-pointer hover:bg-gray-200" : ""}`}
                       onClick={() => {
                         if (row.type === "Refund") {
@@ -1213,35 +1276,52 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
               )}
             </tbody>
           </table>
-                    </div>
+        </div>
         {sortedData.length > 0 && (
           <div className="flex flex-col sm:flex-row justify-between items-center px-5 py-4 bg-white border-t border-gray-200">
             <div className="flex items-center space-x-2">
               <label className="text-sm font-medium text-gray-700">Show:</label>
-              <select
-                value={itemsPerPage}
-                onChange={handleItemsPerPageChange}
-                className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent"
-              >
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-                <option value={200}>200</option>
-                <option value={300}>300</option>
-                <option value={400}>400</option>
-                <option value={500}>500</option>
-                <option value={600}>600</option>
-                <option value={700}>700</option>
-                <option value={800}>800</option>
-                <option value={900}>900</option>
-                <option value={1000}>1000</option>
-              </select>
+              <Select
+                options={[
+                  { value: 50, label: '50' },
+                  { value: 100, label: '100' },
+                  { value: 200, label: '200' },
+                  { value: 300, label: '300' },
+                  { value: 400, label: '400' },
+                  { value: 500, label: '500' },
+                  { value: 600, label: '600' },
+                  { value: 700, label: '700' },
+                  { value: 800, label: '800' },
+                  { value: 900, label: '900' },
+                  { value: 1000, label: '1000' }
+                ]}
+                value={{ value: itemsPerPage, label: itemsPerPage.toString() }}
+                onChange={(selected) => {
+                  const newItemsPerPage = selected ? selected.value : 50;
+                  setItemsPerPage(newItemsPerPage);
+                  setCurrentPage(1);
+                }}
+                isSearchable
+                styles={{
+                  ...customStyles,
+                  control: (provided) => ({
+                    ...provided,
+                    minWidth: '100px',
+                    height: '38px',
+                    borderWidth: '1px',
+                    borderColor: '#d1d5db',
+                    borderRadius: '6px',
+                  }),
+                }}
+                className="text-sm"
+              />
               <span className="text-sm text-gray-700">entries</span>
-                </div>
+            </div>
             <div className="text-sm text-gray-700">
               Showing {startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries
             </div>
             <div className="flex items-center space-x-2">
-                    <button
+              <button
                 onClick={goToPreviousPage}
                 disabled={currentPage === 1}
                 className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === 1
@@ -1313,16 +1393,16 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
               <button
                 onClick={() => exportPopupPDF(sortPopupData(popupData, popupSortConfig), popupTitle, popupContext)}
                 className="flex items-center font-bold hover:underline gap-1 text-[#E4572E]"
-                    >
-                        Export PDF
-                    </button>
-                    <button
+              >
+                Export PDF
+              </button>
+              <button
                 onClick={() => exportPopupCSV(sortPopupData(popupData, popupSortConfig), popupTitle, popupContext)}
                 className="flex items-center font-bold hover:underline gap-1 text-[#007233]"
-                    >
-                        Export XL
-                    </button>
-                </div>
+              >
+                Export XL
+              </button>
+            </div>
             <div className="mt-4 border-l-8 border-l-[#BF9853] rounded-lg overflow-hidden">
               <table className="w-full border-collapse">
                 <thead>
@@ -1357,9 +1437,9 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                         <span className="ml-1">{popupSortConfig.direction === 'asc' ? '↑' : '↓'}</span>
                       )}
                     </th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                  </tr>
+                </thead>
+                <tbody>
                   {popupData &&
                     sortPopupData(popupData, popupSortConfig)
                       .map((entry, index) => (
@@ -1369,7 +1449,7 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                           <td className="p-3 text-left">{entry.type}</td>
                           <td className="p-3 text-left">{entry.mode || "-"}</td>
                           <td className="p-3 text-left">{entry.description || "-"}</td>
-                                    </tr>
+                        </tr>
                       ))}
                 </tbody>
                 <tfoot>
@@ -1380,18 +1460,18 @@ const LoanReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                         popupData
                           .reduce((sum, item) => sum + item.amount, 0)
                           .toLocaleString('en-IN')}
-                                    </td>
+                    </td>
                     <td></td>
                     <td></td>
                     <td></td>
-                                </tr>
+                  </tr>
                 </tfoot>
-                    </table>
-                </div>
+              </table>
             </div>
+          </div>
         </div>
       )}
-        </div>
-    );
+    </div>
+  );
 };
 export default LoanReport;

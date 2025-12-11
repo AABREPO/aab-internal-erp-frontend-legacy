@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import Select from 'react-select';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
@@ -106,10 +107,71 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     return () => cancelMomentum();
   }, []);
 
+  const customStyles = {
+    control: (provided, state) => ({
+      ...provided,
+      borderWidth: '2px',
+      lineHeight: '20px',
+      fontSize: '14px',
+      height: '45px',
+      borderRadius: '8px',
+      borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.3)' : 'rgba(191, 152, 83, 0.3)',
+      boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.3)' : 'none',
+    }),
+    clearIndicator: (provided) => ({
+      ...provided,
+      cursor: 'pointer',
+    }),
+    menu: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+      maxHeight: '300px',
+    }),
+    menuPortal: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+    }),
+    menuList: (provided) => ({
+      ...provided,
+      maxHeight: '250px',
+      overflowY: 'auto',
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      fontWeight: '500',
+      backgroundColor: state.isSelected
+        ? 'rgba(191, 152, 83, 0.3)'
+        : state.isFocused
+          ? 'rgba(191, 152, 83, 0.1)'
+          : 'white',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    input: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: 'black',
+      textAlign: 'left',
+    }),
+    placeholder: (provided) => ({
+      ...provided,
+      fontWeight: '500',
+      color: '#999',
+      textAlign: 'left',
+    }),
+  };
+
   // Generate years dynamically
   const currentYear = new Date().getFullYear();
   const startYear = 2000; // Change if needed
   const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i);
+
   // Fetch Employee Names (for Contractor/Vendor column)
   useEffect(() => {
     const fetchEmployeeNames = async () => {
@@ -155,7 +217,10 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       console.log('Error fetching Labour names.');
     }
   };
+
   useEffect(() => { setStaffAdvanceCombinedOptions([...employees, ...laboursList]); }, [employees, laboursList]);
+
+  // Fetch Purpose Names (for Project Name column)
   useEffect(() => {
     const fetchPurposeNames = async () => {
       try {
@@ -173,6 +238,8 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     };
     fetchPurposeNames();
   }, []);
+
+  // Fetch Staff Advance Data
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -185,35 +252,38 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     };
     fetchData();
   }, []);
+
+  // Helper — ISO-ish week number (keeps original behavior)
   const getWeekNumberFromDate = (date) => {
     const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    const dayOfWeek = d.getDay(); 
-    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; 
-    const mondayOfWeek = new Date(d);
-    mondayOfWeek.setDate(d.getDate() + mondayOffset);    
-    const jan1 = new Date(mondayOfWeek.getFullYear(), 0, 1);
-    const jan1DayOfWeek = jan1.getDay();
-    const jan1MondayOffset = jan1DayOfWeek === 0 ? -6 : 1 - jan1DayOfWeek;
-    const firstMonday = new Date(jan1);
-    firstMonday.setDate(jan1.getDate() + jan1MondayOffset);
-    const diffTime = mondayOfWeek - firstMonday;
-    const diffDays = Math.floor(diffTime / (24 * 60 * 60 * 1000));
-    return Math.floor(diffDays / 7) + 1;
+    const oneJan = new Date(d.getFullYear(), 0, 1);
+    const numberOfDays = Math.floor((d - oneJan) / (24 * 60 * 60 * 1000));
+    return Math.ceil((numberOfDays + oneJan.getDay() + 1) / 7);
   };
+
   const getCurrentWeekNumber = () => {
-    return getWeekNumberFromDate(new Date());
+    const now = new Date();
+    const start = new Date(now.getFullYear(), 0, 1);
+    const days = Math.floor((now - start) / (24 * 60 * 60 * 1000));
+    return Math.ceil((days + start.getDay() + 1) / 7);
   };
+
+  // Default to current week
   useEffect(() => {
     const currentWeek = getCurrentWeekNumber();
     setWeek(`Week ${String(currentWeek).padStart(2, "0")}`);
   }, []);
+
+  // Filter logic — if both startDate and endDate are provided, ignore week filter
   useEffect(() => {
     if (!advanceData.length) return;
+
     let filtered = advanceData;
+
     if (startDate && endDate) {
       const s = new Date(startDate);
       const e = new Date(endDate);
+      // normalize end to end of day
       e.setHours(23, 59, 59, 999);
       filtered = advanceData.filter((item) => {
         const d = new Date(item.date);
@@ -226,16 +296,24 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         return d.getFullYear() === parseInt(year, 10) && getWeekNumberFromDate(item.date) === selectedWeekNum;
       });
     } else {
+      // If neither date-range nor week selected, default to empty
       filtered = [];
     }
+
+    // Apply Payment Mode filter
     if (paymentModeFilter) {
       filtered = filtered.filter((item) => item.staff_payment_mode === paymentModeFilter);
     }
+
+    // Apply Type filter
     if (typeFilter) {
       filtered = filtered.filter((item) => (item.type || "").toString().toLowerCase() === typeFilter.toLowerCase());
     }
+
     setFilteredData(filtered);
   }, [advanceData, startDate, endDate, week, year, paymentModeFilter, typeFilter]);
+
+  // fromDate/toDate/totalAdvance computations
   const fromDate = filteredData.length
     ? new Date(Math.min(...filteredData.map((r) => new Date(r.date)))).toLocaleDateString("en-GB")
     : "-";
@@ -245,31 +323,42 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   const totalAdvance = filteredData
     .filter((r) => r.type === "Advance")
     .reduce((sum, r) => {
-      const amount = parseFloat(r.amount) || 0;
+      const amount = r.amount || 0;
       return sum + amount;
     }, 0)
     .toLocaleString("en-IN");
+
+  // Sorting helpers and memoized sorted rows for rendering
   const normStr = (v) => (v ?? "").toString().trim().toLowerCase();
+
   const dateKey = (val) => {
     if (!val) return -Infinity;
     const s = String(val).trim();
+
+    // Handle DD/MM/YYYY format
     const m1 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
     if (m1) {
       return new Date(+m1[3], +m1[2] - 1, +m1[1]).getTime();
     }
+
+    // Handle ISO date format (YYYY-MM-DD)
     const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (isoMatch) {
       return new Date(+isoMatch[1], +isoMatch[2] - 1, +isoMatch[3]).getTime();
     }
+
+    // Try direct Date parsing for other formats
     const parsedDate = new Date(s);
     if (!isNaN(parsedDate.getTime())) {
+      // Normalize to start of day to avoid time component issues
       return new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate()).getTime();
-    }    
+    }
+
     return -Infinity;
   };
+
   const getLabelById = (options, id) => options.find((o) => String(o.id) === String(id))?.label || "";
-  const getEmployeeName = (id) => employees.find(e => e.id === id)?.label || "";
-  const getLabourName = (id) => laboursList.find(l => l.id === id)?.label || "";
+
   const requestSort = useCallback((key) => {
     setSortConfig((prev) => {
       if (prev.key === key) {
@@ -277,8 +366,9 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       }
       return { key, direction: "asc" };
     });
-    setCurrentPage(1);
+    setCurrentPage(1); // Reset to first page when sorting
   }, []);
+
   const sortedData = useMemo(() => {
     const data = [...filteredData];
     const { key, direction } = sortConfig || {};
@@ -286,11 +376,13 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     if (key === "sno") {
       return direction === "asc" ? data : data.reverse();
     }
+
     const compare = (a, b) => {
       let va = "";
       let vb = "";
       switch (key) {
         case "date":
+          // Use timestamp for proper chronological sorting
           const timestampA = dateKey(a.date);
           const timestampB = dateKey(b.date);
           return timestampA - timestampB;
@@ -327,49 +419,64 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       }
       return va.localeCompare(vb);
     };
+
     data.sort((a, b) => {
       const c = compare(a, b);
       return direction === "asc" ? c : -c;
     });
     return data;
-    }, [filteredData, sortConfig, employees, purposeOptions]);
+  }, [filteredData, sortConfig, employees, purposeOptions]);
+
+  // Pagination logic
   const totalPages = Math.ceil(sortedData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedData = useMemo(() => {
     return sortedData.slice(startIndex, endIndex);
   }, [sortedData, startIndex, endIndex]);
+
+  // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [startDate, endDate, week, year, paymentModeFilter, typeFilter]);
+
+  // Pagination handlers (moved after totalPages calculation)
   const goToPage = useCallback((page) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   }, [totalPages]);
+
   const goToNextPage = useCallback(() => {
     if (currentPage < totalPages) {
       setCurrentPage(currentPage + 1);
     }
   }, [currentPage, totalPages]);
+
   const goToPreviousPage = useCallback(() => {
     if (currentPage > 1) {
       setCurrentPage(currentPage - 1);
     }
   }, [currentPage]);
+
   const handleItemsPerPageChange = useCallback((e) => {
     const newItemsPerPage = parseInt(e.target.value);
     setItemsPerPage(newItemsPerPage);
     setCurrentPage(1);
   }, []);
+
   const SortIcon = ({ columnKey }) => {
     if (sortConfig.key !== columnKey) return null;
     return <span className="ml-1">{sortConfig.direction === "asc" ? "↑" : "↓"}</span>;
   };
+
+  // Export PDF (landscape) of tableRef
   const handleExportPDF = () => {
     if (!filteredData.length) {
       alert("No data to export");
       return;
     }
+
     const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+
     const columns = [
       { header: "S.No", dataKey: "sno" },
       { header: "Date", dataKey: "date" },
@@ -382,57 +489,65 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       { header: "Mode", dataKey: "mode" },
       { header: "Description", dataKey: "description" },
     ];
+
     const normStr = v => (v ?? "").toString().trim().toLowerCase();
+
     function dateKey(val) {
       if (!val) return -Infinity;
       const s = String(val).trim();
+
       // Handle DD/MM/YYYY format
       const m1 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
       if (m1) {
         return new Date(+m1[3], +m1[2] - 1, +m1[1]).getTime();
       }
+
       // Handle ISO date format (YYYY-MM-DD)
       const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
       if (isoMatch) {
         return new Date(+isoMatch[1], +isoMatch[2] - 1, +isoMatch[3]).getTime();
       }
+
       // Try direct Date parsing for other formats
       const parsedDate = new Date(s);
       if (!isNaN(parsedDate.getTime())) {
         // Normalize to start of day to avoid time component issues
         return new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate()).getTime();
       }
+
       return -Infinity;
     }
+
     const sortedData = [...filteredData].sort((a, b) => {
       const typeA = normStr(a.type), typeB = normStr(b.type);
       if (typeA !== typeB) return typeA.localeCompare(typeB);
+
       const modeA = normStr(a.payment_mode), modeB = normStr(b.payment_mode);
       if (modeA !== modeB) return modeA.localeCompare(modeB);
+
       return dateKey(a.date) - dateKey(b.date);
     });
+
     const totalAdvanceCash = sortedData
       .filter(row => normStr(row.type) === "advance" && normStr(row.staff_payment_mode) === "cash")
-      .reduce((sum, row) => {
-        const amount = parseFloat(row.amount) || 0;
-        // If amount is negative, it will subtract automatically
-        return sum + amount;
-      }, 0);
+      .reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
+
     const rows = sortedData.map((row, index) => {
       const d = new Date(dateKey(row.date));
       return {
         sno: index + 1,
         date: isNaN(d) ? "" : d.toLocaleDateString("en-GB"),
-        cv: getEmployeeName(row.employee_id) || getLabourName(row.labour_id) || "",
+        cv: employees.find(v => v.id === row.employee_id)?.label || "",
         project: purposeOptions.find(s => s.id === row.from_purpose_id)?.label || "",
         advance: row.amount?.toLocaleString("en-IN") || "0",
         refund: row.staff_refund_amount?.toLocaleString("en-IN") || "0",
-        transfer: purposeOptions.find(s => s.id === row.to_purpose_id)?.label || "",
+        transfer: siteOptions.find(s => s.id === row.to_purpose_id)?.label || "",
         type: row.type || "",
         mode: row.staff_payment_mode || "",
         description: row.description || "",
       };
     });
+
     // Draw merged header as part of the table
     doc.autoTable({
       startY: 20,
@@ -463,6 +578,7 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         5: { cellWidth: 124 },
       }
     });
+
     // Main data table starts after header
     doc.autoTable({
       startY: doc.lastAutoTable.finalY + 10,
@@ -498,50 +614,59 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         description: { cellWidth: 120 },
       }
     });
+
     doc.save(`StaffReport_${fromDate.replace(/\//g, "-")}_to_${toDate.replace(/\//g, "-")}.pdf`);
   };
+
   // Export Excel using xlsx
   const handleExportExcel = () => {
     if (!filteredData.length) {
       alert("No data to export");
       return;
     }
+
     const normStr = v => (v ?? "").toString().trim().toLowerCase();
+
     const dateKey = (val) => {
       if (!val) return -Infinity;
       const s = String(val).trim();
+
       // Handle DD/MM/YYYY format
       const m1 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
       if (m1) {
         return new Date(+m1[3], +m1[2] - 1, +m1[1]).getTime();
       }
+
       // Handle ISO date format (YYYY-MM-DD)
       const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
       if (isoMatch) {
         return new Date(+isoMatch[1], +isoMatch[2] - 1, +isoMatch[3]).getTime();
       }
+
       // Try direct Date parsing for other formats
       const parsedDate = new Date(s);
       if (!isNaN(parsedDate.getTime())) {
         // Normalize to start of day to avoid time component issues
         return new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate()).getTime();
       }
+
       return -Infinity;
     };
+
     const sortedData = [...filteredData].sort((a, b) => {
       const typeA = normStr(a.type), typeB = normStr(b.type);
       if (typeA !== typeB) return typeA.localeCompare(typeB);
+
       const modeA = normStr(a.payment_mode), modeB = normStr(b.payment_mode);
       if (modeA !== modeB) return modeA.localeCompare(modeB);
+
       return dateKey(a.date) - dateKey(b.date);
     });
+
     const totalAdvanceCash = sortedData
       .filter(row => normStr(row.type) === "advance" && normStr(row.staff_payment_mode) === "cash")
-      .reduce((sum, row) => {
-        const amount = parseFloat(row.amount) || 0;
-        // If amount is negative, it will subtract automatically
-        return sum + amount;
-      }, 0);
+      .reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
+
     const header = [
       "S.No",
       "Date",
@@ -555,75 +680,88 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       "Mode",
       "Description",
     ];
+
     const summaryRow = [
       "", "", "", "",
       `Total Cash Advance: ${totalAdvanceCash.toLocaleString("en-IN")}`,
       "", "", "", "", "", ""
     ];
+
     const rows = sortedData.map((row, idx) => {
-      const employee = getEmployeeName(row.employee_id) || getLabourName(row.labour_id) || "";
-      const purpose = purposeOptions.find((s) => s.id === row.from_purpose_id)?.label || "";
-      const transferPurpose = purposeOptions.find((s) => s.id === row.to_purpose_id)?.label || "";
+      const employee = employees.find((v) => v.id === row.employee_id)?.label;
+      const purpose = purposeOptions.find((s) => s.id === row.from_purpose_id)?.label;
+      const transferPurpose = purposeOptions.find((s) => s.id === row.to_purpose_id)?.label;
+
       return [
         idx + 1,
         new Date(row.date).toLocaleDateString("en-GB"),
-        employee,
-        purpose,
+        employee || "",
+        purpose || "",
         (row.amount ?? 0).toLocaleString("en-IN"),
         (row.staff_bill_amount ?? 0).toLocaleString("en-IN"),
         (row.staff_refund_amount ?? 0).toLocaleString("en-IN"),
-        transferPurpose,
+        transferPurpose || "",
         row.type || "",
         row.staff_payment_mode || "",
         row.description || "",
       ];
     });
+
     const aoa = [header, summaryRow, ...rows];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "StaffReport");
+
     const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+
     saveAs(
       new Blob([wbout], { type: "application/octet-stream" }),
       `StaffReport_${fromDate.replace(/\//g, "-")}_to_${toDate.replace(/\//g, "-")}.xlsx`
     );
   };
+
   return (
-    <div className="w-full max-w-full px-2 sm:px-4 lg:px-6 xl:px-10">
-      <div className="bg-white p-3 sm:p-4 rounded-md shadow-sm mb-4">
+    <div className="w-full max-w-full">
+      {/* Filter Section */}
+      <div className="bg-white p-3 sm:p-4 rounded-md shadow-sm mb-4 ml-10 mr-10">
+        {/* Mobile/Tablet Layout */}
         <div className="block lg:hidden">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
             <div>
               <label className="block font-semibold mb-1 text-sm">Week No</label>
-              <select
-                value={week}
-                onChange={(e) => {
-                  setWeek(e.target.value);
+              <Select
+                value={week ? { label: week, value: week } : null}
+                onChange={(selected) => {
+                  setWeek(selected?.value || "");
                   setStartDate("");
                   setEndDate("");
                 }}
-                className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 focus:outline-none w-full h-[40px] text-sm"
-              >
-                <option value="">Select</option>
-                {Array.from({ length: getCurrentWeekNumber() }, (_, i) => (
-                  <option key={i} value={`Week ${String(i + 1).padStart(2, "0")}`}>
-                    Week {String(i + 1).padStart(2, "0")}
-                  </option>
-                ))}
-              </select>
+                options={Array.from({ length: getCurrentWeekNumber() }, (_, i) => ({
+                  label: `Week ${String(i + 1).padStart(2, "0")}`,
+                  value: `Week ${String(i + 1).padStart(2, "0")}`,
+                }))}
+                isSearchable
+                isClearable
+                placeholder="Select Week"
+                className="w-full text-sm"
+                styles={customStyles}
+              />
             </div>
+
             <div>
               <label className="block font-semibold mb-1 text-sm">Year</label>
-              <select
-                value={year}
-                onChange={(e) => setYear(e.target.value)}
-                className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-full h-[40px] focus:outline-none text-sm"
-              >
-                {years.map((y) => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
+              <Select
+                value={year ? { label: year, value: year } : null}
+                onChange={(selected) => setYear(selected?.value || "")}
+                options={years.map((y) => ({ label: y, value: y }))}
+                isSearchable
+                isClearable
+                placeholder="Select Year"
+                className="w-full text-sm"
+                styles={customStyles}
+              />
             </div>
+
             <div>
               <label className="block font-semibold mb-1 text-sm">Start Date</label>
               <input
@@ -636,6 +774,7 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                 className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-full h-[40px] focus:outline-none text-sm"
               />
             </div>
+
             <div>
               <label className="block font-semibold mb-1 text-sm">End Date</label>
               <input
@@ -648,69 +787,83 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                 className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-full h-[40px] focus:outline-none text-sm"
               />
             </div>
+
             <div>
               <label className="block font-semibold mb-1 text-sm">Payment Mode</label>
-              <select
-                value={paymentModeFilter}
-                onChange={(e) => setPaymentModeFilter(e.target.value)}
-                className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-full h-[40px] focus:outline-none text-sm"
-              >
-                <option value="">All Modes</option>
-                {paymentModeOptions && paymentModeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <Select
+                value={
+                  paymentModeFilter
+                    ? { label: paymentModeFilter, value: paymentModeFilter }
+                    : null
+                }
+                onChange={(selected) => setPaymentModeFilter(selected?.value || "")}
+                options={paymentModeOptions}
+                isSearchable
+                isClearable
+                placeholder="Select Modes"
+                className="w-full text-sm"
+                styles={customStyles}
+              />
             </div>
             <div>
               <label className="block font-semibold mb-1 text-sm">Type</label>
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-full h-[40px] focus:outline-none text-sm"
-              >
-                <option value="">All Types</option>
-                <option value="Advance">Advance</option>
-                <option value="Refund">Refund</option>
-                <option value="Transfer">Transfer</option>
-              </select>
+              <Select
+                value={
+                  typeFilter ? { label: typeFilter, value: typeFilter } : null
+                }
+                onChange={(selected) => setTypeFilter(selected?.value || "")}
+                options={[
+                  { value: "", label: "All Types" },
+                  { value: "Advance", label: "Advance" },
+                  { value: "Refund", label: "Refund" },
+                  { value: "Transfer", label: "Transfer" },
+                ]}
+                isSearchable
+                isClearable
+                placeholder="Select Types"
+                className="w-full text-sm"
+                styles={customStyles}
+              />
             </div>
           </div>
         </div>
+        {/* Desktop Layout */}
         <div className="hidden lg:flex items-start justify-between">
           <div className="flex flex-wrap gap-4 text-left">
             <div>
               <label className="block font-semibold mb-1">Week No</label>
-              <select
-                value={week}
-                onChange={(e) => {
-                  setWeek(e.target.value);
+              <Select
+                value={week ? { label: week, value: week } : null}
+                onChange={(selected) => {
+                  setWeek(selected?.value || "");
                   setStartDate("");
                   setEndDate("");
                 }}
-                className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 focus:outline-none w-[160px] h-[45px]"
-              >
-                <option value="">Select</option>
-                {Array.from({ length: getCurrentWeekNumber() }, (_, i) => (
-                  <option key={i} value={`Week ${String(i + 1).padStart(2, "0")}`}>
-                    Week {String(i + 1).padStart(2, "0")}
-                  </option>
-                ))}
-              </select>
+                options={Array.from({ length: getCurrentWeekNumber() }, (_, i) => ({
+                  label: `Week ${String(i + 1).padStart(2, "0")}`,
+                  value: `Week ${String(i + 1).padStart(2, "0")}`,
+                }))}
+                isSearchable
+                isClearable
+                placeholder="Select Week"
+                className="w-full text-sm"
+                styles={customStyles}
+              />
             </div>
             <div>
               <label className="block font-semibold mb-1">Year</label>
-              <select
-                value={year}
-                onChange={(e) => setYear(e.target.value)}
-                className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[160px] h-[45px] focus:outline-none"
-              >
-                {years.map((y) => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
+              <Select
+                value={year ? { label: year, value: year } : null}
+                onChange={(selected) => setYear(selected?.value || "")}
+                options={years.map((y) => ({ label: y, value: y }))}
+                isSearchable
+                isClearable
+                placeholder="Select Year"
+                className="w-full text-sm"
+                styles={customStyles}
+              />
             </div>
+
             <div>
               <label className="block font-semibold mb-1">Start Date</label>
               <input
@@ -720,9 +873,10 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                   setStartDate(e.target.value);
                   setWeek("");
                 }}
-                className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[160px] h-[45px] focus:outline-none"
+                className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-full h-[45px] focus:outline-none"
               />
             </div>
+
             <div>
               <label className="block font-semibold mb-1">End Date</label>
               <input
@@ -732,38 +886,50 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                   setEndDate(e.target.value);
                   setWeek("");
                 }}
-                className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[160px] h-[45px] focus:outline-none"
+                className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-full h-[45px] focus:outline-none"
               />
             </div>
+
             <div>
               <label className="block font-semibold mb-1">Payment Mode</label>
-              <select
-                value={paymentModeFilter}
-                onChange={(e) => setPaymentModeFilter(e.target.value)}
-                className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[160px] h-[45px] focus:outline-none"
-              >
-                <option value="">All Modes</option>
-                {paymentModeOptions && paymentModeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <Select
+                value={
+                  paymentModeFilter
+                    ? { label: paymentModeFilter, value: paymentModeFilter }
+                    : null
+                }
+                onChange={(selected) => setPaymentModeFilter(selected?.value || "")}
+                options={paymentModeOptions}
+                isSearchable
+                isClearable
+                placeholder="Select Modes"
+                className="w-full text-sm"
+                styles={customStyles}
+              />
             </div>
+
             <div>
               <label className="block font-semibold mb-1">Type</label>
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[160px] h-[45px] focus:outline-none"
-              >
-                <option value="">All Types</option>
-                <option value="Advance">Advance</option>
-                <option value="Refund">Refund</option>
-                <option value="Transfer">Transfer</option>
-              </select>
+              <Select
+                value={
+                  typeFilter ? { label: typeFilter, value: typeFilter } : null
+                }
+                onChange={(selected) => setTypeFilter(selected?.value || "")}
+                  options={[
+                  { value: "Advance", label: "Advance" },
+                  { value: "Refund", label: "Refund" },
+                  { value: "Transfer", label: "Transfer" },
+                ]}
+                isSearchable
+                isClearable
+                placeholder="Select Types"
+                className="w-full text-sm"
+                styles={customStyles}
+              />
             </div>
           </div>
+
+          {/* Summary Section */}
           <div className="flex-shrink-0">
             <div className="text-sm text-right space-y-1 border-2 border-[#E4572E] border-opacity-15 p-2 mb-2">
               <div>
@@ -790,6 +956,8 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
             </div>
           </div>
         </div>
+
+        {/* Mobile Summary Section */}
         <div className="block lg:hidden mt-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="text-sm border-2 border-[#E4572E] border-opacity-15 p-2 rounded">
@@ -818,18 +986,29 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
           </div>
         </div>
       </div>
-      <div className="bg-white rounded-lg shadow-sm">
+
+      {/* Table Section */}
+      <div className="bg-white rounded-lg shadow-sm ml-10 mr-10">
+        {/* Export Buttons */}
         <div className="flex flex-wrap justify-end gap-3 p-4 ">
-          <button onClick={handleExportPDF} className="text-sm text-[#E4572E] hover:underline font-bold px-3 py-1 rounded hover:bg-red-50 transition-colors">
+          <button
+            onClick={handleExportPDF}
+            className="text-sm text-[#E4572E] hover:underline font-bold px-3 py-1 rounded hover:bg-red-50 transition-colors"
+          >
             Export PDF
           </button>
-          <button onClick={handleExportExcel} className="text-sm text-[#007233] hover:underline font-bold px-3 py-1 rounded hover:bg-green-50 transition-colors">
+          <button
+            onClick={handleExportExcel}
+            className="text-sm text-[#007233] hover:underline font-bold px-3 py-1 rounded hover:bg-green-50 transition-colors"
+          >
             Export XL
           </button>
           <button className="text-sm text-[#BF9853] hover:underline font-bold px-3 py-1 rounded hover:bg-yellow-50 transition-colors">
             Print
           </button>
         </div>
+
+        {/* Table Container */}
         <div
           ref={scrollRef}
           className="rounded-lg border border-l-8 border-l-[#BF9853] lg:h-[500px] overflow-auto select-none ml-5 mr-5"
@@ -844,21 +1023,36 @@ const StaffReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                 <th className="pt-2 pl-3 w-16 lg:w-20 font-bold text-left select-none text-xs lg:text-sm">
                   S.No
                 </th>
-                <th className="pt-2 pl-3 w-24 lg:w-36 font-bold text-left cursor-pointer hover:bg-gray-200 select-none text-xs lg:text-sm" onClick={() => requestSort("date")} >
+                <th
+                  className="pt-2 pl-3 w-24 lg:w-36 font-bold text-left cursor-pointer hover:bg-gray-200 select-none text-xs lg:text-sm"
+                  onClick={() => requestSort("date")}
+                >
                   Date <SortIcon columnKey="date" />
                 </th>
-                <th className="px-2 w-[180px] lg:w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none text-xs lg:text-sm" onClick={() => requestSort("cv")} >
+                <th
+                  className="px-2 w-[180px] lg:w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none text-xs lg:text-sm"
+                  onClick={() => requestSort("cv")}
+                >
                   Employee Name <SortIcon columnKey="cv" />
                 </th>
-                <th className="px-2 w-[200px] lg:w-[270px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none text-xs lg:text-sm" onClick={() => requestSort("project")} >
+                <th
+                  className="px-2 w-[200px] lg:w-[270px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none text-xs lg:text-sm"
+                  onClick={() => requestSort("project")}
+                >
                   Purpose <SortIcon columnKey="project" />
                 </th>
                 <th className="px-2 w-[80px] lg:w-[100px] font-bold text-left text-xs lg:text-sm">Advance</th>
                 <th className="px-2 w-[100px] lg:w-[120px] font-bold text-left text-xs lg:text-sm">Refund Amount</th>
-                <th className="px-2 w-[180px] lg:w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none text-xs lg:text-sm" onClick={() => requestSort("transfer")}>
+                <th
+                  className="px-2 w-[180px] lg:w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none text-xs lg:text-sm"
+                  onClick={() => requestSort("transfer")}
+                >
                   Transfer <SortIcon columnKey="transfer" />
                 </th>
-                <th className="px-2 w-[120px] lg:w-[160px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none text-xs lg:text-sm" onClick={() => requestSort("type")}>
+                <th
+                  className="px-2 w-[120px] lg:w-[160px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none text-xs lg:text-sm"
+                  onClick={() => requestSort("type")}
+                >
                   Type <SortIcon columnKey="type" />
                 </th>
                 <th

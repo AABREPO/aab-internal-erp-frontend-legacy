@@ -732,7 +732,7 @@ const BillStatement = ({ username, userRoles = [] }) => {
           </div>
           <div className="overflow-x-auto border-l-8 border-l-[#BF9853] h-[500px] rounded-lg ml-5">
             <table className="w-full border-collapse">
-              <thead className="bg-[#FAF6ED] sticky top-0 z-10">
+              <thead className="bg-[#FAF6ED] sticky top-0 z-90">
                 <tr>
                   <th
                     className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200"

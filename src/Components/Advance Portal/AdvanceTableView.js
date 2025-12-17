@@ -531,7 +531,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
         setLoading(false);
       }
     };
-
     fetchData();
   }, []);
   const formatDateOnly = (dateString) => {
@@ -601,7 +600,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     }
     return true;
   });
-  // Extract unique values from table data for filter options
   const filterOptionsFromData = React.useMemo(() => {
     const uniqueVendors = new Set();
     const uniqueContractors = new Set();
@@ -610,9 +608,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     const uniqueTypes = new Set();
     const uniqueModes = new Set();
     const uniqueEntryNos = new Set();
-
     advanceData.forEach(entry => {
-      // Extract vendors and contractors
       if (entry.vendor_id) {
         const vendorName = getVendorName(entry.vendor_id);
         if (vendorName) uniqueVendors.add(vendorName);
@@ -621,36 +617,24 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
         const contractorName = getContractorName(entry.contractor_id);
         if (contractorName) uniqueContractors.add(contractorName);
       }
-
-      // Extract project IDs
       if (entry.project_id) {
         const projectName = getSiteName(entry.project_id);
         if (projectName) uniqueProjectIds.add(projectName);
       }
-
-      // Extract transfer site IDs
       if (entry.transfer_site_id) {
         const transferName = getSiteName(entry.transfer_site_id);
         if (transferName) uniqueTransferSiteIds.add(transferName);
       }
-
-      // Extract types
       if (entry.type) {
         uniqueTypes.add(entry.type);
       }
-
-      // Extract payment modes
       if (entry.payment_mode) {
         uniqueModes.add(entry.payment_mode);
       }
-
-      // Extract entry numbers
       if (entry.entry_no) {
         uniqueEntryNos.add(entry.entry_no.toString());
       }
     });
-
-    // Create options arrays for Select components
     const vendorContractorOptions = [
       ...Array.from(uniqueVendors).map(name => {
         const vendor = vendorOptions.find(v => v.value === name);
@@ -661,25 +645,21 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
         return contractor || { value: name, label: name, type: 'Contractor' };
       })
     ].sort((a, b) => a.label.localeCompare(b.label));
-
     const projectOptions = Array.from(uniqueProjectIds)
       .map(name => {
         const site = siteOptions.find(s => s.value === name);
         return site || { value: name, label: name, id: null };
       })
       .sort((a, b) => a.label.localeCompare(b.label));
-
     const transferSiteOptions = Array.from(uniqueTransferSiteIds)
       .map(name => {
         const site = siteOptions.find(s => s.value === name);
         return site || { value: name, label: name, id: null };
       })
       .sort((a, b) => a.label.localeCompare(b.label));
-
     const typeOptions = Array.from(uniqueTypes).sort();
     const modeOptions = Array.from(uniqueModes).sort();
     const entryNoOptions = Array.from(uniqueEntryNos).sort((a, b) => Number(a) - Number(b));
-
     return {
       vendorContractorOptions,
       projectOptions,
@@ -689,7 +669,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
       entryNoOptions
     };
   }, [advanceData, vendorOptions, contractorOptions, siteOptions]);
-
   const sortedData = React.useMemo(() => {
     let sortableData = [...filteredData];
     if (sortConfig.key) {
@@ -793,7 +772,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     return sum;
   }, 0);
   const handleEditClick = (entry) => {
-    // Non-admin users must request permission when editing is disabled
     if (!isAdmin && (entry.not_allow_to_edit || entry.allow_to_edit === false)) {
       setRequestingEntry(entry);
       setIsRequestModalOpen(true);
@@ -825,7 +803,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     setSelectedOption(preSelected || null);
     setIsEditModalOpen(true);
   };
-
   const handleSendEditRequest = async () => {
     if (!requestingEntry) return;
     try {
@@ -936,13 +913,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
       if (selectedFile) {
         try {
           const formData = new FormData();
-          const formatDateOnly = (dateString) => {
-            const date = new Date(dateString);
-            const day = String(date.getDate()).padStart(2, '0');
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const year = date.getFullYear();
-            return `${day}-${month}-${year}`;
-          };
           const now = new Date();
           const timestamp = now.toLocaleString("en-GB", {
             day: "2-digit",
@@ -1374,13 +1344,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                   {showFilters && (
                     <tr className="bg-white border-b border-gray-200">
                       <th className="pt-2 pb-2">
-                        <input
-                          type="date"
-                          value={selectDate}
-                          onChange={(e) => setSelectDate(e.target.value)}
-                          className="rounded-md bg-transparent -ml-4 w-32 border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
-                          placeholder="Search Date..."
-                        />
+                        
                       </th>
                       <th className="pt-2 pb-2">
                         <Select
@@ -1958,7 +1922,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                           </>
                         )}
                       </div>
-                      {/* Description */}
                       <div className=' mt-8'>
                         <label className='block font-semibold mb-2'>Description</label>
                         <textarea
@@ -1984,10 +1947,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                   >
                     Cancel
                   </button>
-                  <button
-                    onClick={handleUpdate}
-                    className="px-4 py-2 bg-[#BF9853] w-[100px] h-[45px] text-white rounded"
-                  >
+                  <button onClick={handleUpdate} className="px-4 py-2 bg-[#BF9853] w-[100px] h-[45px] text-white rounded" >
                     Save
                   </button>
                 </div>
@@ -2011,10 +1971,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
                   >
                     Cancel
                   </button>
-                  <button
-                    onClick={handleSendEditRequest}
-                    className="px-4 py-2 bg-[#BF9853] w-[160px] h-[45px] text-white rounded"
-                  >
+                  <button onClick={handleSendEditRequest} className="px-4 py-2 bg-[#BF9853] w-[160px] h-[45px] text-white rounded" >
                     Send Request
                   </button>
                 </div>
@@ -2024,8 +1981,6 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
         </div>
       </div>
     </div>
-
   )
 }
-
 export default AdvanceTableView

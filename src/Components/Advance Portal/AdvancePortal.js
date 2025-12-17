@@ -661,7 +661,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         if (transferSiteIdInt === 11) {
           // First, create loan entry in LoanPortal
           const loanPayload = {
-            type: "Loan",
+            type: "Transfer",
             date: dateValue,
             amount: Math.abs(amountValue),
             loan_payment_mode: "",
@@ -1198,9 +1198,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
       alert("Please select a category for Bill Settlement");
       return;
     }
-
     setIsSubmitting(true);
-
     try {
       // Upload file if exists (for Bill Settlement)
       let fileUrl = '';
@@ -1524,7 +1522,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         <div className='px-4 sm:px-6 lg:px-10 mt-4'>
           <div className='bg-white w-full max-w-[1850px] xl:h-[610px] p-4 lg:p-6 rounded-md shadow-sm'>
             <div className='xl:flex px-4 gap-10'>
-              <div className='xl:flex w-full xl:w-[1100px]'>
+              <div className='xl:flex xl:w-[1100px]'>
                 <div className='grid grid-cols-1 sm:grid-cols-2 gap-3 text-left'>
                   <div className='space-y-1 flex items-center max-w-[300px]'>
                     <label className='font-semibold text-[#E4572E] text-sm sm:text-base xl:w-40 w-20'>Select Type</label>
@@ -1731,7 +1729,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                 </div>
                 <div className='border-l-8 border-l-[#BF9853] rounded-lg overflow-hidden w-full'>
                   <div className='overflow-x-auto max-h-[400px] overflow-y-auto thin-scrollbar w-full'>
-                    <table className="w-full min-w-[800px]">
+                    <table className="w-full">
                       <thead className="bg-[#FAF6ED] text-left sticky top-0 z-10">
                         <tr>
                           <th className="px-2 sm:px-4 lg:px-6 py-2 text-xs sm:text-sm whitespace-nowrap">Date</th>

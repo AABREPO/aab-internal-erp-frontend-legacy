@@ -1479,7 +1479,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                     });
                     const vendorMatchedExpenses = dateMatchedExpenses.filter((expense) => expense.vendor === vendorName);
                     const matchingExpenses = vendorMatchedExpenses.filter((expense) => (
-                        expense.accountType === 'Bill Payments' || expense.accountType === 'Bill Refund'
+                        expense.accountType === 'Bill Payments' || expense.accountType === 'Bill Refund' || expense.accountType === 'Bill Payments + Claim'
                     ));
                     const totalExpenseAmount = matchingExpenses.reduce((sum, expense) => sum + (parseFloat(expense.amount) || 0), 0);
                     const adjustmentAmount = parseFloat(bill.adjustment_amount) || 0;
@@ -1618,7 +1618,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
     // Get vendor name by ID (copied from PendingBill)
     const getVendorNameById = (vendorId) => {
         if (!vendorId) return '-'
-        const vendor = combinedOptions.find(option => option.id === vendorId)
+        const vendor = vendorOptions.find(option => option.id === vendorId)
         return vendor ? vendor.label : `Vendor ID: ${vendorId}`
     }
     // Check if bill is fully finished (Verified + Entered + Paid)
@@ -2018,7 +2018,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                 <div className='border-l-8 overflow-y-auto border-l-[#BF9853] h-[500px] rounded-lg ml-5 mr-5'>
                     <div className="">
                         <table className="w-full border-collapse">
-                            <thead className="bg-[#FAF6ED] sticky top-0 z-10">
+                            <thead className="bg-[#FAF6ED] sticky top-0 z-90">
                                 <tr>
                                     <th className="px-2 py-3 text-left font-semibold">SI.No</th>
                                     <th className="px-2 py-3 text-left font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200"

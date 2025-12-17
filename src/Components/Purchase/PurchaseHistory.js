@@ -375,7 +375,6 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
   const handleHeaderSave = async () => {
     try {
       const payload = {
-        vendor_id: editableHeader.vendorId,
         client_id: editableHeader.clientId,
         date: editableHeader.date,
         eno: editableHeader.eno,

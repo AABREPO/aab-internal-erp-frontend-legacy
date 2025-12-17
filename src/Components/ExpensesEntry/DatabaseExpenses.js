@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 import Modal from 'react-modal';
 import edit from '../Images/Edit.svg';
@@ -241,6 +241,70 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         vendorId: '',
         contractorId: ''
     });
+    const customStyles = useMemo(() => ({
+        control: (provided, state) => ({
+            ...provided,
+            borderWidth: '2px',
+            lineHeight: '20px',
+            fontSize: '12px',
+            height: '45px',
+            borderRadius: '8px',
+            borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.3)' : 'rgba(191, 152, 83, 0.3)',
+            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.3)' : 'none',
+        }),
+        clearIndicator: (provided) => ({
+            ...provided,
+            cursor: 'pointer',
+        }),
+        menu: (provided) => ({
+            ...provided,
+            zIndex: 9999,
+            maxHeight: '300px',
+        }),
+        menuPortal: (provided) => ({
+            ...provided,
+            zIndex: 9999,
+        }),
+        menuList: (provided) => ({
+            ...provided,
+            maxHeight: '250px',
+            overflowY: 'auto',
+        }),
+        singleValue: (provided) => ({
+            ...provided,
+            fontWeight: '400',
+            color: 'black',
+            textAlign: 'left',
+        }),
+        option: (provided, state) => ({
+            ...provided,
+            fontWeight: '300',
+            fontSize: '14px',
+            backgroundColor: state.isSelected
+                ? 'rgba(191, 152, 83, 0.3)'
+                : state.isFocused
+                    ? 'rgba(191, 152, 83, 0.1)'
+                    : 'white',
+            color: 'black',
+            textAlign: 'left',
+        }),
+        input: (provided) => ({
+            ...provided,
+            fontWeight: '300',
+            color: 'black',
+            textAlign: 'left',
+        }),
+        placeholder: (provided) => ({
+            ...provided,
+            fontWeight: '500',
+            color: '#999',
+            textAlign: 'left',
+        }),
+        indicatorSeparator: (provided) => ({
+            ...provided,
+            display: 'none',
+        }),
+    }), []);
     const [modalIsOpen, setModalIsOpen] = useState(false);
     useEffect(() => {
         axios
@@ -265,7 +329,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                 const categoryOption = uniqueCategoryOptions.map(name => ({ value: name, label: name }));
                 // Set the unique dropdown options in state
                 setAccountTypeOptions(uniqueAccountTypes);
-                setMachineToolsOptions(uniqueMachineTools);
+                setMachineToolsOptions(uniqueMachineTools.map(tool => ({ value: tool, label: tool })));
                 setSiteOptions(siteOptions);
                 setVendorOptions(vendorOptions);
                 setContractorOptions(contractorOption);
@@ -1065,13 +1129,13 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                     <div>
                         <div
                             ref={scrollRef}
-                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[440px] overflow-x-auto select-none thin-scrollbar"
+                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[600px] overflow-x-auto select-none thin-scrollbar"
                             onMouseDown={handleMouseDown}
                             onMouseMove={handleMouseMove}
                             onMouseUp={handleMouseUp}
                             onMouseLeave={handleMouseUp}>
                             <table className="table-fixed  min-w-[1765px] w-screen border-collapse">
-                                <thead>
+                                <thead className="sticky top-0 z-9 bg-white ">
                                     <tr className="bg-[#FAF6ED]">
                                         <th className="px-3 w-44 font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('timestamp')}>
                                             Time stamp {sortField === 'timestamp' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -1079,49 +1143,49 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                         <th className="pt-2 w-32 font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('date')}>
                                             Date {sortField === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-2 w-[300px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('siteName')}>
+                                        <th className="px-0.5 w-[300px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('siteName')}>
                                             Project Name {sortField === 'siteName' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('vendor')}>
+                                        <th className="px-0.5 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('vendor')}>
                                             Vendor {sortField === 'vendor' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('contractor')}>
+                                        <th className="px-0.5 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('contractor')}>
                                             Contractor {sortField === 'contractor' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-2 w-[120px] font-bold text-left">Quantity</th>
-                                        <th className="px-2 w-[120px] font-bold text-left">Amount</th>
-                                        <th className="px-2 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('comments')}>
+                                        <th className="px-0.5 w-[120px] font-bold text-left">Quantity</th>
+                                        <th className="px-0.5 w-[120px] font-bold text-left">Amount</th>
+                                        <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('comments')}>
                                             Comments {sortField === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-2 w-[160px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('category')}>
+                                        <th className="px-0.5 w-[160px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('category')}>
                                             Category {sortField === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-2 w-[130px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('accountType')}>
+                                        <th className="px-0.5 w-[130px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('accountType')}>
                                             A/C Type {sortField === 'accountType' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-2 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('machineTools')}>
+                                        <th className="px-0.5 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('machineTools')}>
                                             Machine Tools {sortField === 'machineTools' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-2 w-[150px] font-bold text-left">Source From</th>
-                                        <th className="px-2 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('eno')}>
+                                        <th className="px-0.5 w-[150px] font-bold text-left">Source From</th>
+                                        <th className="px-0.5 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('eno')}>
                                             E.No {sortField === 'eno' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-2 w-[120px] font-bold text-left">Activity</th>
-                                        <th className="px-3 w-[110px] font-bold text-left">Attach file</th>
+                                        <th className="px-0.5 w-[120px] font-bold text-left">Activity</th>
+                                        <th className="px-0.5 w-[50px] font-bold text-left">File</th>
                                     </tr>
                                     {showFilters && (
                                         <tr className="bg-[#FAF6ED]">
                                             <th></th>
-                                            <th className="px-2 py-3">
+                                            <th className=" py-3">
                                                 <input
                                                     type="date"
                                                     value={selectedDate}
                                                     onChange={(e) => setSelectedDate(e.target.value)}
-                                                    className="w-full px-3 py-2 text-sm rounded-lg border-2 border-[#BF9853] bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent transition-all duration-200"
+                                                    className="w-full px-1.5 py-2 text-sm rounded-lg border-2 border-[#BF9853] font-normal border-opacity-30 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent transition-all duration-200"
                                                     placeholder="Search Date..."
                                                 />
                                             </th>
-                                            <th className="px-2 py-3">
+                                            <th className="py-3">
                                                 <Select
                                                     className="w-full"
                                                     options={siteOptions}
@@ -1129,62 +1193,10 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                     onChange={(selectedOption) => setSelectedSiteName(selectedOption ? selectedOption.value : '')}
                                                     placeholder="Site..."
                                                     menuPlacement="bottom"
-                                                    menuPosition="fixed"
-                                                    isClearable
-                                                    styles={{
-                                                        control: (provided, state) => ({
-                                                            ...provided,
-                                                            backgroundColor: 'white',
-                                                            borderWidth: '2px',
-                                                            borderColor: state.isFocused
-                                                                ? '#BF9853'
-                                                                : '#BF9853',
-                                                            borderRadius: '8px',
-                                                            minHeight: '36px',
-                                                            boxShadow: state.isFocused ? '0 0 0 3px rgba(191, 152, 83, 0.1)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                                                            '&:hover': {
-                                                                borderColor: '#BF9853',
-                                                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                                                            },
-                                                        }),
-                                                        placeholder: (provided) => ({
-                                                            ...provided,
-                                                            color: '#6B7280',
-                                                            fontSize: '14px',
-                                                            fontWeight: '400',
-                                                        }),
-                                                        menu: (provided) => ({
-                                                            ...provided,
-                                                            zIndex: 9999,
-                                                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                                                        }),
-                                                        option: (provided, state) => ({
-                                                            ...provided,
-                                                            fontSize: '14px',
-                                                            fontWeight: '400',
-                                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                            color: state.isFocused ? '#BF9853' : '#374151',
-                                                            '&:active': {
-                                                                backgroundColor: 'rgba(191, 152, 83, 0.2)',
-                                                            },
-                                                        }),
-                                                        singleValue: (provided) => ({
-                                                            ...provided,
-                                                            fontSize: '14px',
-                                                            fontWeight: '500',
-                                                            color: '#374151',
-                                                        }),
-                                                        indicatorSeparator: () => ({
-                                                            display: 'none',
-                                                        }),
-                                                        dropdownIndicator: (provided) => ({
-                                                            ...provided,
-                                                            color: '#BF9853',
-                                                        }),
-                                                    }}
+                                                    styles={customStyles}
                                                 />
                                             </th>
-                                            <th className="px-2 py-3">
+                                            <th className="py-3">
                                                 <Select
                                                     className="w-full"
                                                     options={vendorOptions}
@@ -1192,62 +1204,10 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                     onChange={(selectedOption) => setSelectedVendor(selectedOption ? selectedOption.value : '')}
                                                     placeholder="Vendor"
                                                     menuPlacement="bottom"
-                                                    menuPosition="fixed"
-                                                    isClearable
-                                                    styles={{
-                                                        control: (provided, state) => ({
-                                                            ...provided,
-                                                            backgroundColor: 'white',
-                                                            borderWidth: '2px',
-                                                            borderColor: state.isFocused
-                                                                ? '#BF9853'
-                                                                : '#BF9853',
-                                                            borderRadius: '8px',
-                                                            minHeight: '36px',
-                                                            boxShadow: state.isFocused ? '0 0 0 3px rgba(191, 152, 83, 0.1)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                                                            '&:hover': {
-                                                                borderColor: '#BF9853',
-                                                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                                                            },
-                                                        }),
-                                                        placeholder: (provided) => ({
-                                                            ...provided,
-                                                            color: '#6B7280',
-                                                            fontSize: '14px',
-                                                            fontWeight: '400',
-                                                        }),
-                                                        menu: (provided) => ({
-                                                            ...provided,
-                                                            zIndex: 9999,
-                                                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                                                        }),
-                                                        option: (provided, state) => ({
-                                                            ...provided,
-                                                            fontSize: '14px',
-                                                            fontWeight: '400',
-                                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                            color: state.isFocused ? '#BF9853' : '#374151',
-                                                            '&:active': {
-                                                                backgroundColor: 'rgba(191, 152, 83, 0.2)',
-                                                            },
-                                                        }),
-                                                        singleValue: (provided) => ({
-                                                            ...provided,
-                                                            fontSize: '14px',
-                                                            fontWeight: '500',
-                                                            color: '#374151',
-                                                        }),
-                                                        indicatorSeparator: () => ({
-                                                            display: 'none',
-                                                        }),
-                                                        dropdownIndicator: (provided) => ({
-                                                            ...provided,
-                                                            color: '#BF9853',
-                                                        }),
-                                                    }}
+                                                    styles={customStyles}
                                                 />
                                             </th>
-                                            <th className="px-2 py-3">
+                                            <th className="py-3">
                                                 <Select
                                                     className="w-full"
                                                     options={contractorOptions}
@@ -1255,67 +1215,15 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                     onChange={(selectedOption) => setSelectedContractor(selectedOption ? selectedOption.value : '')}
                                                     placeholder="Contractor"
                                                     menuPlacement="bottom"
-                                                    menuPosition="fixed"
-                                                    isClearable
-                                                    styles={{
-                                                        control: (provided, state) => ({
-                                                            ...provided,
-                                                            backgroundColor: 'white',
-                                                            borderWidth: '2px',
-                                                            borderColor: state.isFocused
-                                                                ? '#BF9853'
-                                                                : '#BF9853',
-                                                            borderRadius: '8px',
-                                                            minHeight: '36px',
-                                                            boxShadow: state.isFocused ? '0 0 0 3px rgba(191, 152, 83, 0.1)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                                                            '&:hover': {
-                                                                borderColor: '#BF9853',
-                                                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                                                            },
-                                                        }),
-                                                        placeholder: (provided) => ({
-                                                            ...provided,
-                                                            color: '#6B7280',
-                                                            fontSize: '14px',
-                                                            fontWeight: '400',
-                                                        }),
-                                                        menu: (provided) => ({
-                                                            ...provided,
-                                                            zIndex: 9999,
-                                                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                                                        }),
-                                                        option: (provided, state) => ({
-                                                            ...provided,
-                                                            fontSize: '14px',
-                                                            fontWeight: '400',
-                                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                            color: state.isFocused ? '#BF9853' : '#374151',
-                                                            '&:active': {
-                                                                backgroundColor: 'rgba(191, 152, 83, 0.2)',
-                                                            },
-                                                        }),
-                                                        singleValue: (provided) => ({
-                                                            ...provided,
-                                                            fontSize: '14px',
-                                                            fontWeight: '500',
-                                                            color: '#374151',
-                                                        }),
-                                                        indicatorSeparator: () => ({
-                                                            display: 'none',
-                                                        }),
-                                                        dropdownIndicator: (provided) => ({
-                                                            ...provided,
-                                                            color: '#BF9853',
-                                                        }),
-                                                    }}
+                                                    styles={customStyles}
                                                 />
                                             </th>
                                             <th></th>
-                                            <th className="text-base text-left pl-2 font-bold py-3">
+                                            <th className="text-base text-left font-bold py-3">
                                                 ₹{Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </th>
                                             <th></th>
-                                            <th className="px-2 py-3">
+                                            <th className="py-3">
                                                 <Select
                                                     className="w-full"
                                                     options={categoryOptions}
@@ -1323,62 +1231,10 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                     onChange={(selectedOption) => setSelectedCategory(selectedOption ? selectedOption.value : '')}
                                                     placeholder="Category..."
                                                     menuPlacement="bottom"
-                                                    menuPosition="fixed"
-                                                    isClearable
-                                                    styles={{
-                                                        control: (provided, state) => ({
-                                                            ...provided,
-                                                            backgroundColor: 'white',
-                                                            borderWidth: '2px',
-                                                            borderColor: state.isFocused
-                                                                ? '#BF9853'
-                                                                : '#BF9853',
-                                                            borderRadius: '8px',
-                                                            minHeight: '36px',
-                                                            boxShadow: state.isFocused ? '0 0 0 3px rgba(191, 152, 83, 0.1)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                                                            '&:hover': {
-                                                                borderColor: '#BF9853',
-                                                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                                                            },
-                                                        }),
-                                                        placeholder: (provided) => ({
-                                                            ...provided,
-                                                            color: '#6B7280',
-                                                            fontSize: '14px',
-                                                            fontWeight: '400',
-                                                        }),
-                                                        menu: (provided) => ({
-                                                            ...provided,
-                                                            zIndex: 9999,
-                                                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                                                        }),
-                                                        option: (provided, state) => ({
-                                                            ...provided,
-                                                            fontSize: '14px',
-                                                            fontWeight: '400',
-                                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                            color: state.isFocused ? '#BF9853' : '#374151',
-                                                            '&:active': {
-                                                                backgroundColor: 'rgba(191, 152, 83, 0.2)',
-                                                            },
-                                                        }),
-                                                        singleValue: (provided) => ({
-                                                            ...provided,
-                                                            fontSize: '14px',
-                                                            fontWeight: '500',
-                                                            color: '#374151',
-                                                        }),
-                                                        indicatorSeparator: () => ({
-                                                            display: 'none',
-                                                        }),
-                                                        dropdownIndicator: (provided) => ({
-                                                            ...provided,
-                                                            color: '#BF9853',
-                                                        }),
-                                                    }}
+                                                    styles={customStyles}
                                                 />
                                             </th>
-                                            <th className="px-2 py-3">
+                                            <th className="py-3">
                                                 <Select
                                                     className="w-full"
                                                     options={accountTypeOptions}
@@ -1386,122 +1242,18 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                     onChange={(selectedOption) => setSelectedAccountType(selectedOption ? selectedOption.value : '')}
                                                     placeholder="A/CType"
                                                     menuPlacement="bottom"
-                                                    menuPosition="fixed"
-                                                    isClearable
-                                                    styles={{
-                                                        control: (provided, state) => ({
-                                                            ...provided,
-                                                            backgroundColor: 'white',
-                                                            borderWidth: '2px',
-                                                            borderColor: state.isFocused
-                                                                ? '#BF9853'
-                                                                : '#BF9853',
-                                                            borderRadius: '8px',
-                                                            minHeight: '36px',
-                                                            boxShadow: state.isFocused ? '0 0 0 3px rgba(191, 152, 83, 0.1)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                                                            '&:hover': {
-                                                                borderColor: '#BF9853',
-                                                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                                                            },
-                                                        }),
-                                                        placeholder: (provided) => ({
-                                                            ...provided,
-                                                            color: '#6B7280',
-                                                            fontSize: '14px',
-                                                            fontWeight: '400',
-                                                        }),
-                                                        menu: (provided) => ({
-                                                            ...provided,
-                                                            zIndex: 9999,
-                                                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                                                        }),
-                                                        option: (provided, state) => ({
-                                                            ...provided,
-                                                            fontSize: '14px',
-                                                            fontWeight: '400',
-                                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                            color: state.isFocused ? '#BF9853' : '#374151',
-                                                            '&:active': {
-                                                                backgroundColor: 'rgba(191, 152, 83, 0.2)',
-                                                            },
-                                                        }),
-                                                        singleValue: (provided) => ({
-                                                            ...provided,
-                                                            fontSize: '14px',
-                                                            fontWeight: '500',
-                                                            color: '#374151',
-                                                        }),
-                                                        indicatorSeparator: () => ({
-                                                            display: 'none',
-                                                        }),
-                                                        dropdownIndicator: (provided) => ({
-                                                            ...provided,
-                                                            color: '#BF9853',
-                                                        }),
-                                                    }}
+                                                    styles={customStyles}
                                                 />
                                             </th>
-                                            <th className="px-2 py-3">
+                                            <th className="py-3">
                                                 <Select
                                                     className="w-full"
-                                                    options={machineToolsOptions.map(tool => ({ value: tool, label: tool }))}
-                                                    value={selectedMachineTools ? { value: selectedMachineTools, label: selectedMachineTools } : null}
+                                                    options={machineToolsOptions}
+                                                    value={selectedMachineTools ? machineToolsOptions.find(opt => opt.value === selectedMachineTools) : null}
                                                     onChange={(selectedOption) => setSelectedMachineTools(selectedOption ? selectedOption.value : '')}
                                                     placeholder="Machine..."
                                                     menuPlacement="bottom"
-                                                    menuPosition="fixed"
-                                                    isClearable
-                                                    styles={{
-                                                        control: (provided, state) => ({
-                                                            ...provided,
-                                                            backgroundColor: 'white',
-                                                            borderWidth: '2px',
-                                                            borderColor: state.isFocused
-                                                                ? '#BF9853'
-                                                                : '#BF9853',
-                                                            borderRadius: '8px',
-                                                            minHeight: '36px',
-                                                            boxShadow: state.isFocused ? '0 0 0 3px rgba(191, 152, 83, 0.1)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                                                            '&:hover': {
-                                                                borderColor: '#BF9853',
-                                                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                                                            },
-                                                        }),
-                                                        placeholder: (provided) => ({
-                                                            ...provided,
-                                                            color: '#6B7280',
-                                                            fontSize: '14px',
-                                                            fontWeight: '400',
-                                                        }),
-                                                        menu: (provided) => ({
-                                                            ...provided,
-                                                            zIndex: 9999,
-                                                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                                                        }),
-                                                        option: (provided, state) => ({
-                                                            ...provided,
-                                                            fontSize: '14px',
-                                                            fontWeight: '400',
-                                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                            color: state.isFocused ? '#BF9853' : '#374151',
-                                                            '&:active': {
-                                                                backgroundColor: 'rgba(191, 152, 83, 0.2)',
-                                                            },
-                                                        }),
-                                                        singleValue: (provided) => ({
-                                                            ...provided,
-                                                            fontSize: '14px',
-                                                            fontWeight: '500',
-                                                            color: '#374151',
-                                                        }),
-                                                        indicatorSeparator: () => ({
-                                                            display: 'none',
-                                                        }),
-                                                        dropdownIndicator: (provided) => ({
-                                                            ...provided,
-                                                            color: '#BF9853',
-                                                        }),
-                                                    }}
+                                                    styles={customStyles}
                                                 />
                                             </th>
                                             <th></th>
@@ -1514,16 +1266,16 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                 <tbody>
                                     {currentItems.map((expense, index) => (
                                         <tr key={expense.id} className="odd:bg-white even:bg-[#FAF6ED]">
-                                            <td className="px-3 text-sm text-left py-2">{formatDate(expense.timestamp)}</td>
+                                            <td className="px-3 text-sm text-left ">{formatDate(expense.timestamp)}</td>
                                             <td className=" text-sm text-left w-32 ">{formatDateOnly(expense.date)}</td>
                                             <td className=" text-sm text-left w-60 ">{getDisplaySiteName(expense)}</td>
                                             <td className=" text-sm text-left ">{getDisplayVendorName(expense)}</td>
                                             <td className=" text-sm text-left ">{getDisplayContractorName(expense)}</td>
                                             <td className=" text-sm text-left ">{expense.quantity}</td>
-                                            <td className="text-sm text-left pl-2 ">
+                                            <td className="text-sm text-right pr-5">
                                                 ₹{Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </td>
-                                            <td className=" text-sm text-left ">{expense.comments}</td>
+                                            <td className="text-sm text-left w-[120px] max-w-[120px] break-words overflow-hidden whitespace-normal px-1">{expense.comments || ''}</td>
                                             <td className=" text-sm text-left ">{expense.category}</td>
                                             <td className=" text-sm text-left ">{expense.accountType}</td>                                            
                                             <td className=" text-sm text-left ">{expense.machineTools}</td>
@@ -1552,7 +1304,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                     />
                                                 </button>
                                             </td>
-                                            <td className="px-4 text-sm">
+                                            <td className="px-1 text-sm">
                                                 {expense.billCopy ? (
                                                     <a
                                                         href={expense.billCopy}
@@ -2003,7 +1755,7 @@ const AuditModal = ({ show, onClose, audits }) => {
     ];
     const formatDate = (dateString) => {
         const date = new Date(dateString);
-        date.setMinutes(date.getMinutes() + 330);
+        date.setMinutes(date.getMinutes());
         const day = String(date.getDate()).padStart(2, '0');
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const year = date.getFullYear();

@@ -50,8 +50,6 @@ const TableRow = memo(({ entry, index, onEditClick, getEmployeeName, getLabourNa
     </td>
   </tr>
 ));
-
-// Inline EditModal component with dynamic field changes
 const EditModal = memo(({
   isOpen,
   editFormData,
@@ -79,8 +77,6 @@ const EditModal = memo(({
       }
     }
   }, [editFormData, setEditFormData]);
-
-  // Dynamic field configuration based on type
   const fieldConfig = useMemo(() => {
     switch (editFormData.type) {
       case 'Refund':
@@ -106,9 +102,7 @@ const EditModal = memo(({
         };
     }
   }, [editFormData.type]);
-
   if (!isOpen) return null;
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
       <div className="bg-white p-6 rounded-lg w-[700px] max-h-[90vh] overflow-y-auto">
@@ -315,6 +309,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   const [purposes, setPurposes] = useState([]);
   const [filterType, setFilterType] = useState('');
   const [laboursList, setLaboursList] = useState([]);
+  const [isRequestStaffModalOpen, setIsRequestStaffModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectDate, setSelectDate] = useState('');
@@ -333,6 +328,11 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   const scrollRef = useRef(null);
   const [virtualScroll, setVirtualScroll] = useState(false);
   const [staffAdvanceCombinedOptions, setStaffAdvanceCombinedOptions] = useState([]);
+  const adminUsernames = ['Mahalingam M', 'Admin'];
+  const normalizedUsername = (username || '').trim().toLowerCase();
+  const isAdminUser = adminUsernames.some(name => name.toLowerCase() === normalizedUsername);
+  const isAdmin = isAdminUser;
+  const [requestingStaffEntry, setRequestingStaffEntry] = useState(null);
   const [visibleRange, setVisibleRange] = useState({ start: 0, end: 50 });
   const isDragging = useRef(false);
   const start = useRef({ x: 0, y: 0 });
@@ -340,13 +340,11 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   const velocity = useRef({ x: 0, y: 0 });
   const animationFrame = useRef(null);
   const lastMove = useRef({ time: 0, x: 0, y: 0 });
-  // Optimized data fetching with parallel requests
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        // Parallel API calls for better performance
         const [recRes, empRes, purRes] = await Promise.allSettled([
           fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all'),
           fetch('https://backendaab.in/aabuildersDash/api/employee_details/getAll', {
@@ -354,23 +352,18 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
           }),
           fetch('https://backendaab.in/aabuildersDash/api/purposes/getAll')
         ]);
-        // Process staff advance data
         const recData = recRes.status === 'fulfilled' && recRes.value.ok
           ? await recRes.value.json()
           : [];
-        // Process employee data
         const empData = empRes.status === 'fulfilled' && empRes.value.ok
           ? await empRes.value.json()
           : [];
-        // Process purposes data
         const purData = purRes.status === 'fulfilled' && purRes.value.ok
           ? await purRes.value.json()
           : [];
-        console.log('Records:', recData);
         setRecords(recData);
         setEmployees(empData.map(e => ({ id: e.id, label: e.employee_name, type: "Employee" })));
         setPurposes(purData.map(p => ({ id: p.id, label: p.purpose })));
-        // Set warning if any API failed
         const failedAPIs = [];
         if (recRes.status === 'rejected' || !recRes.value?.ok) failedAPIs.push('Staff Advance');
         if (empRes.status === 'rejected' || !empRes.value?.ok) failedAPIs.push('Employee Details');
@@ -482,12 +475,10 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     };
     animationFrame.current = requestAnimationFrame(step);
   };
-  // Memoized utility functions
   const formatWithCommas = useCallback((value) => {
     if (!value) return "";
     return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   }, []);
-
   const formatDateOnly = useCallback((dateString) => {
     const date = new Date(dateString);
     const day = String(date.getDate()).padStart(2, '0');
@@ -495,12 +486,9 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     const year = date.getFullYear();
     return `${day}-${month}-${year}`;
   }, []);
-
   const getEmployeeName = useCallback((id) => employees.find(e => e.id === id)?.label || id, [employees]);
   const getLabourName = useCallback((id) => laboursList.find(l => l.id === id)?.label || id, [laboursList]);
   const getPurposeName = useCallback((id) => purposes.find(p => p.id === id)?.label || id, [purposes]);
-
-  // Get unique employee names from records for filter dropdown
   const employeeNameOptions = useMemo(() => {
     const uniqueNames = new Set();
     records.forEach((entry) => {
@@ -511,8 +499,6 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     });
     return Array.from(uniqueNames).map(name => ({ value: name, label: name }));
   }, [records, getEmployeeName, getLabourName]);
-
-  // Get unique purpose options from records for filter dropdown
   const purposeOptions = useMemo(() => {
     const uniquePurposes = new Set();
     records.forEach((entry) => {
@@ -523,8 +509,6 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     });
     return Array.from(uniquePurposes).map(purpose => ({ value: purpose, label: purpose, id: records.find(r => getPurposeName(r.from_purpose_id) === purpose)?.from_purpose_id }));
   }, [records, getPurposeName]);
-
-  // Get unique transfer to options from records for filter dropdown
   const transferToOptions = useMemo(() => {
     const uniqueTransferTo = new Set();
     records.forEach((entry) => {
@@ -535,8 +519,6 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     });
     return Array.from(uniqueTransferTo).map(transferTo => ({ value: transferTo, label: transferTo, id: records.find(r => getPurposeName(r.to_purpose_id) === transferTo)?.to_purpose_id }));
   }, [records, getPurposeName]);
-
-  // Get unique type options from records for filter dropdown
   const typeOptions = useMemo(() => {
     const uniqueTypes = new Set();
     records.forEach((entry) => {
@@ -546,8 +528,6 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     });
     return Array.from(uniqueTypes).sort();
   }, [records]);
-
-  // Get unique mode options from records for filter dropdown
   const modeOptions = useMemo(() => {
     const uniqueModes = new Set();
     records.forEach((entry) => {
@@ -557,7 +537,6 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     });
     return Array.from(uniqueModes).sort();
   }, [records]);
-
   const handleSort = useCallback((key) => {
     setSortConfig((prev) => {
       if (prev.key === key) {
@@ -641,91 +620,35 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
           id: item.id,
           sNo: item.siteNo
         }));
-
-        // Add predefined site options with IDs 001, 002, 003, 004
         const predefinedSiteOptions = [
-          {
-            value: "Mason Advance",
-            label: "Mason Advance",
-            id: "1",
-            sNo: "1"
-          },
-          {
-            value: "Material Advance",
-            label: "Material Advance",
-            id: "2",
-            sNo: "2"
-          },
-          {
-            value: "Weekly Advance",
-            label: "Weekly Advance",
-            id: "3",
-            sNo: "3"
-          },
-          {
-            value: "Excess Advance",
-            label: "Excess Advance",
-            id: "4",
-            sNo: "4"
-          },
-          {
-            value: "Material Rent",
-            label: "Material Rent",
-            id: "",
-            sNo: "5"
-          },
-          {
-            value: "Subhash Kumar - Kunnur",
-            label: "Subhash Kumar - Kunnur",
-            id: "6",
-            sNo: "6"
-          }
+          { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
+          { value: "Material Advance", label: "Material Advance", id: 2, sNo: "2" },
+          { value: "Weekly Advance", label: "Weekly Advance", id: 3, sNo: "3" },
+          { value: "Excess Advance", label: "Excess Advance", id: 4, sNo: "4" },
+          { value: "Material Rent", label: "Material Rent", id: 5, sNo: "5" },
+          { value: "Subhash Kumar - Kunnur", label: "Subhash Kumar - Kunnur", id: 6, sNo: "6" },
+          { value: "Summary Bill", label: "Summary Bill", id: 7, sNo: "7" },
+          { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
+          { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
+          { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
+          { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
         ];
-
-        // Combine backend data with predefined options
         const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
         setSiteOptions(combinedSiteOptions);
       } catch (error) {
         console.error("Fetch error: ", error);
-
-        // Fallback: if API fails, still show predefined options
         const predefinedSiteOptions = [
-          {
-            value: "Mason Advance",
-            label: "Mason Advance",
-            id: "1",
-            sNo: "1"
-          },
-          {
-            value: "Material Advance",
-            label: "Material Advance",
-            id: "2",
-            sNo: "2"
-          },
-          {
-            value: "Weekly Advance",
-            label: "Weekly Advance",
-            id: "3",
-            sNo: "3"
-          },
-          {
-            value: "Excess Advance",
-            label: "Excess Advance",
-            id: "4",
-            sNo: "4"
-          },
-          {
-            value: "Material Rent",
-            label: "Material Rent",
-            id: "",
-            sNo: "5"
-          },
-          {
-            value: "Subhash Kumar - Kunnur",
-            label: "Subhash Kumar - Kunnur",
-            id: "6",
-            sNo: "6"
-          }
+          { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
+          { value: "Material Advance", label: "Material Advance", id: 2, sNo: "2" },
+          { value: "Weekly Advance", label: "Weekly Advance", id: 3, sNo: "3" },
+          { value: "Excess Advance", label: "Excess Advance", id: 4, sNo: "4" },
+          { value: "Material Rent", label: "Material Rent", id: 5, sNo: "5" },
+          { value: "Subhash Kumar - Kunnur", label: "Subhash Kumar - Kunnur", id: 6, sNo: "6" },
+          { value: "Summary Bill", label: "Summary Bill", id: 7, sNo: "7" },
+          { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
+          { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
+          { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
+          { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
         ];
         setSiteOptions(predefinedSiteOptions);
       }
@@ -738,6 +661,11 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   }, [selectDate, selectEmployeeName, selectPurpose, selectTransferTo, selectType, selectMode]);
   // Memoized edit handlers
   const handleEditClick = useCallback((entry) => {
+    if (!isAdmin && (entry.not_allow_to_edit || entry.allow_to_edit === false)) {
+      setRequestingStaffEntry(entry);
+      setIsRequestStaffModalOpen(true);
+      return;
+    }
     setEditingId(entry.staffAdvancePortalId || entry.id);
     setEditFormData({
       date: entry.date?.split('T')[0] || '',
@@ -797,8 +725,6 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       alert(error.message || 'Failed to update record. Please try again.');
     }
   }, [editFormData, editingId, username]);
-
-  // Debounced filter handlers for better performance
   const [debouncedFilters, setDebouncedFilters] = useState({
     selectDate: '',
     selectEmployeeName: '',
@@ -807,7 +733,6 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     selectType: '',
     selectMode: ''
   });
-
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedFilters({
@@ -819,11 +744,8 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         selectMode
       });
     }, 300);
-
     return () => clearTimeout(timer);
   }, [selectDate, selectEmployeeName, selectPurpose, selectTransferTo, selectType, selectMode]);
-
-  // Filtered records using debounced filters (moved after debouncedFilters initialization)
   const filteredRecords = useMemo(() => {
     return records.filter((entry) => {
       if (debouncedFilters.selectDate) {
@@ -854,8 +776,6 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       return true;
     });
   }, [records, debouncedFilters, getEmployeeName, getLabourName, getPurposeName]);
-
-  // Calculate totals from filtered records
   const advanceTotal = filteredRecords
     .filter(r => r.type === 'Advance')
     .reduce((acc, r) => acc + (r.amount || 0), 0);
@@ -865,8 +785,6 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   const refundTotal = filteredRecords
     .filter(r => r.type === 'Refund')
     .reduce((acc, r) => acc + (r.staff_refund_amount || 0), 0);
-
-  // Sorted data (moved after filteredRecords initialization)
   const sortedData = useMemo(() => {
     let sortableData = [...filteredRecords];
     if (sortConfig.key) {
@@ -905,15 +823,12 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         return 0;
       });
     } else {
-      // Default sort: newest entries first (by date descending, then by entry_no/id descending)
       sortableData.sort((a, b) => {
         const dateA = new Date(a.date);
         const dateB = new Date(b.date);
-        // First sort by date (newest first)
         if (dateB.getTime() !== dateA.getTime()) {
           return dateB - dateA;
         }
-        // If dates are the same, sort by entry_no or id (newest first)
         const idA = a.staffAdvancePortalId || a.id || a.entry_no || a.entryNo || 0;
         const idB = b.staffAdvancePortalId || b.id || b.entry_no || b.entryNo || 0;
         return idB - idA;
@@ -921,8 +836,6 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     }
     return sortableData;
   }, [filteredRecords, sortConfig, getEmployeeName, getPurposeName]);
-
-  // Memoized export functions (moved after sortedData initialization)
   const exportPDF = useCallback(() => {
     const doc = new jsPDF("l", "pt", "a4");
     const headers = [
@@ -984,7 +897,6 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     });
     doc.save("StaffAdvanceData.pdf");
   }, [sortedData, formatDateOnly, getEmployeeName, getLabourName, getPurposeName]);
-
   const exportCSV = useCallback(() => {
     const csvHeaders = [
       "S.No",
@@ -1023,7 +935,6 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       ...csvRows.map(row =>
         row
           .map(value => {
-            // Convert null/undefined to empty string, then handle quotes
             const stringValue = value == null ? "" : String(value);
             return `"${stringValue.replace(/"/g, '""')}"`;
           })
@@ -1039,70 +950,53 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     document.body.removeChild(link);
   }, [sortedData, formatDateOnly, getEmployeeName, getLabourName, getPurposeName]);
 
-  // Virtual scrolling logic for large datasets (moved after sortedData initialization)
   const totalPages = Math.ceil(sortedData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-
-  // Enable virtual scrolling for datasets larger than 1000 items
   const shouldUseVirtualScroll = sortedData.length > 1000;
-
   const currentData = useMemo(() => {
     if (shouldUseVirtualScroll && virtualScroll) {
       return sortedData.slice(visibleRange.start, visibleRange.end);
     }
     return sortedData.slice(startIndex, endIndex);
   }, [sortedData, startIndex, endIndex, shouldUseVirtualScroll, virtualScroll, visibleRange]);
-
-  // Auto-enable virtual scrolling for large datasets
   useEffect(() => {
     if (sortedData.length > 1000 && !virtualScroll) {
       setVirtualScroll(true);
-      setItemsPerPage(100); // Increase items per page for virtual scrolling
+      setItemsPerPage(100);
     } else if (sortedData.length <= 1000 && virtualScroll) {
       setVirtualScroll(false);
       setItemsPerPage(50);
     }
   }, [sortedData.length, virtualScroll]);
-
-  // Memoized pagination handlers (moved after totalPages calculation)
   const goToPage = useCallback((page) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   }, [totalPages]);
-
   const goToNextPage = useCallback(() => {
     if (currentPage < totalPages) {
       setCurrentPage(currentPage + 1);
     }
   }, [currentPage, totalPages]);
-
   const goToPreviousPage = useCallback(() => {
     if (currentPage > 1) {
       setCurrentPage(currentPage - 1);
     }
   }, [currentPage]);
-
   const handleItemsPerPageChange = useCallback((e) => {
     const newItemsPerPage = parseInt(e.target.value);
     setItemsPerPage(newItemsPerPage);
     setCurrentPage(1);
   }, []);
-
-  // Cleanup effect for memory management
   useEffect(() => {
     return () => {
       cancelMomentum();
-      // Clean up any pending timeouts
       if (animationFrame.current) {
         cancelAnimationFrame(animationFrame.current);
       }
     };
   }, []);
-
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      // Remove any event listeners if they were added
       if (scrollRef.current) {
         scrollRef.current.removeEventListener('mousedown', handleMouseDown);
         scrollRef.current.removeEventListener('mousemove', handleMouseMove);
@@ -1110,8 +1004,8 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         scrollRef.current.removeEventListener('mouseleave', handleMouseUp);
       }
     };
-  }, []);
-  if (isLoading) {
+  },[]);
+  if(isLoading){
     return (
       <div className="p-6 bg-[#faf6ed] min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -1121,6 +1015,36 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       </div>
     );
   }
+  const handleSendStaffEditRequest = async () => {
+    if (!requestingStaffEntry) return;
+    try {
+      const requestData = {
+        module_name: 'Staff Portal',
+        module_name_id: requestingStaffEntry.staffAdvancePortalId,
+        module_name_eno: requestingStaffEntry.entry_no,
+        request_send_by: username,
+        request_approval: false,
+        request_completed: false
+      };
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/edit_requests/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(requestData)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to create edit request');
+      }
+      alert('Edit request sent successfully. Waiting for admin approval.');
+      window.dispatchEvent(new Event('editRequestCreated'));
+      setIsRequestStaffModalOpen(false);
+      setRequestingStaffEntry(null);
+    } catch (error) {
+      console.error('Error creating edit request:', error);
+      alert('Failed to send edit request. Please try again.');
+    }
+  };
   return (
     <div className="bg-[#faf6ed]">
       <div className=' xl:w-[1850px] bg-white text-left lg:flex gap-5 p-5 ml-10 mr-10 shadow-sm rounded'>
@@ -1573,9 +1497,32 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
             formatWithCommas={formatWithCommas}
           />
         )}
+        {isRequestStaffModalOpen && requestingStaffEntry && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+            <div className="bg-white p-6 rounded-lg w-[400px] text-center">
+              <h2 className="text-lg font-bold mb-2 text-[#BF9853]">Request Edit Permission</h2>
+              <p className="text-gray-700 mb-6">
+                You need admin approval to edit this record.
+              </p>
+              <div className="flex justify-center gap-3">
+                <button
+                  onClick={() => {
+                    setIsRequestStaffModalOpen(false);
+                    setRequestingStaffEntry(null);
+                  }}
+                  className="px-4 py-2 border border-[#BF9853] w-[100px] h-[45px] rounded"
+                >
+                  Cancel
+                </button>
+                <button onClick={handleSendStaffEditRequest} className="px-4 py-2 bg-[#BF9853] w-[160px] h-[45px] text-white rounded" >
+                  Send Request
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 };
-// Memoize the main component to prevent unnecessary re-renders
 export default memo(TableView);

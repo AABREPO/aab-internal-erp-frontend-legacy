@@ -70,7 +70,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
       })
       .then((data) => {
         // Filter only items with accountType = 'Claim'
-        const filteredData = data.filter(item => item.accountType === 'Claim');
+        const filteredData = data.filter(item => item.accountType === 'Claim' || item.accountType === 'Bill Payments + Claim');
         setClaimDataList(filteredData);
       })
       .catch((err) => {
@@ -468,6 +468,10 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
         aValue = a.comments || '';
         bValue = b.comments || '';
         break;
+      case 'source':
+        aValue = a.source || '';
+        bValue = b.source || '';
+        break;
       case 'status':
         const aReceived = receivedAmounts[a.id] || 0;
         const bReceived = receivedAmounts[b.id] || 0;
@@ -718,7 +722,13 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                       className="px-2 py-2 w-40 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
                       onClick={() => handleSort('comments')}
                     >
-                      Reason {sortColumn === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      Comments {sortColumn === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th
+                      className="px-2 py-2 w-40 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
+                      onClick={() => handleSort('source')}
+                    >
+                      Source {sortColumn === 'source' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
                       className="px-2 py-2 w-24 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
@@ -844,6 +854,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                       <td className="px-2 py-2 whitespace-nowrap">{formatIndianCurrency(row.amount)}</td>
                       <td className="px-2 py-2 whitespace-nowrap truncate" title={row.category}>{row.category}</td>
                       <td className="px-2 py-2 whitespace-nowrap truncate" title={row.comments}>{row.comments}</td>
+                      <td className="px-2 py-2 whitespace-nowrap truncate" title={row.source}>{row.source}</td>
                       <td
                         className={`px-2 py-2 font-semibold whitespace-nowrap ${((receivedAmounts[row.id] || 0) + (discountAmounts[row.id] || 0)) >= row.amount
                           ? "text-[#007233]"

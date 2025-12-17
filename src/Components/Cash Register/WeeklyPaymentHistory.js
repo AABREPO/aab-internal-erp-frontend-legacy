@@ -48,7 +48,8 @@ const History = ({ username, userRoles = [] }) => {
         client_name: "",
         client_id: "",
     });
-    const [newPayment, setNewPayment] = useState({ date: "", amount: "", type: "Weekly" });
+    const [categoryComments, setCategoryComments] = useState("");
+    const [newPayment, setNewPayment] = useState({ date: "", amount: "", type: "" });
     const [weeks, setWeeks] = useState([]);
     const [vendorOptions, setVendorOptions] = useState([]);
     const [contractorOptions, setContractorOptions] = useState([]);
@@ -80,6 +81,7 @@ const History = ({ username, userRoles = [] }) => {
     const [weeklyPaymentReceivedAudits, setWeeklyPaymentReceivedAudits] = useState([]);
     const [year, setYear] = useState(new Date().getFullYear().toString());
     const [weeklyTypes, setWeeklyTypes] = useState([]);
+    const [weeklyReceivedTypes, setWeeklyReceivedTypes] = useState([]);
     const currentYear = new Date().getFullYear();
     const startYear = 2000;
     const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i);
@@ -274,30 +276,30 @@ const History = ({ username, userRoles = [] }) => {
     };
     const [laboursList, setLaboursList] = useState([]);
     useEffect(() => {
-            fetchLaboursList();
-        }, []);
-        const fetchLaboursList = async () => {
-            try {
-                const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
-                if (response.ok) {
-                    const data = await response.json();
-                    const formattedData = data.map(item => ({
-                        value: item.labour_name,
-                        label: item.labour_name,
-                        id: item.id,
-                        type: "Labour",
-                        salary: item.labour_salary,
-                        extra: item.extra_amount
-                    }));
-                    setLaboursList(formattedData);
-                } else {
-                    console.log('Error fetching Labour names.');
-                }
-            } catch (error) {
-                console.error('Error:', error);
+        fetchLaboursList();
+    }, []);
+    const fetchLaboursList = async () => {
+        try {
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
+            if (response.ok) {
+                const data = await response.json();
+                const formattedData = data.map(item => ({
+                    value: item.labour_name,
+                    label: item.labour_name,
+                    id: item.id,
+                    type: "Labour",
+                    salary: item.labour_salary,
+                    extra: item.extra_amount
+                }));
+                setLaboursList(formattedData);
+            } else {
                 console.log('Error fetching Labour names.');
             }
-        };
+        } catch (error) {
+            console.error('Error:', error);
+            console.log('Error fetching Labour names.');
+        }
+    };
     const getClientName = (entry) => {
         if (!entry) return "";
         if (entry.client_name) return entry.client_name;
@@ -327,6 +329,9 @@ const History = ({ username, userRoles = [] }) => {
         fetchWeeklyType();
     }, []);
     useEffect(() => {
+        fetchWeeklyReceivedType();
+    }, []);
+    useEffect(() => {
         fetchAccountDetails();
     }, []);
     useEffect(() => {
@@ -344,6 +349,19 @@ const History = ({ username, userRoles = [] }) => {
         } catch (error) {
             console.error('Error:', error);
             console.log('Error fetching tile area names.');
+        }
+    };
+    const fetchWeeklyReceivedType = async () => {
+        try {
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/weekly_received_types/getAll');
+            if (response.ok) {
+                const data = await response.json();
+                setWeeklyReceivedTypes(data);
+            } else {
+                console.log('Error fetching Payment Received type.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
         }
     };
     const fetchAccountDetails = async () => {
@@ -3032,10 +3050,7 @@ const History = ({ username, userRoles = [] }) => {
                                                                 }),
                                                             }}
                                                         />
-                                                        <button
-                                                            type="button"
-                                                            onClick={handlePartySourceToggle}
-                                                        >
+                                                        <button type="button" onClick={handlePartySourceToggle} >
                                                             <img
                                                                 src={Change}
                                                                 className={`w-4 h-4 ${isClientToggleActive ? 'opacity-100' : 'opacity-60'}`}
@@ -3281,7 +3296,7 @@ const History = ({ username, userRoles = [] }) => {
                                                         <div className="flex flex-col gap-1">
                                                             <div className="flex items-center gap-2">
                                                                 <span className={row.type === "Claim" && !row.send_to_expenses_entry ? "text-red-500" : ""}>{row.type}</span>
-                                                                {row.type !== "Daily" && Number(row.weekly_number) === Number(lastWeekNumber) && (
+                                                                
                                                                     <button
                                                                         onClick={() => {
                                                                             setCurrentProjectAdvanceRow(row);
@@ -3303,7 +3318,7 @@ const History = ({ username, userRoles = [] }) => {
                                                                     >
                                                                         +
                                                                     </button>
-                                                                )}
+                                                                
                                                             </div>
                                                             {(() => {
                                                                 const payments = getPaymentsByExpenseId(row.id);
@@ -3551,16 +3566,19 @@ const History = ({ username, userRoles = [] }) => {
                                                     {editingPaymentId === (row.id || null) ? (
                                                         <>
                                                             <select
-                                                                value={row.type || "Weekly"}
+                                                                value={row.type || ""}
                                                                 onChange={(e) =>
                                                                     handleEditPayment(index, "type", e.target.value)
                                                                 }
                                                                 className="border-2 border-[#BF9853] border-opacity-25 w-[90px] h-[40px] rounded-lg bg-transparent focus:outline-none"
                                                                 disabled={editingPaymentId !== row.id}
                                                             >
-                                                                <option id='1' value="Weekly">Weekly</option>
-                                                                <option id='2' value="Daily">Daily</option>
-                                                                <option id='3' value="Monthly">Monthly</option>
+                                                                <option value="">Select</option>
+                                                                {weeklyReceivedTypes.map((type, idx) => (
+                                                                    <option key={idx} value={type.received_type}>
+                                                                        {type.received_type}
+                                                                    </option>
+                                                                ))}
                                                             </select>
                                                         </>
                                                     ) : (
@@ -3576,18 +3594,12 @@ const History = ({ username, userRoles = [] }) => {
                                                                 <button
                                                                     className="text-green-600 font-bold text-lg"
                                                                     onClick={() => saveEditedPaymentReceived(row)}
-                                                                    disabled={row.type === "Carry (CF))" || row.type === "Wage Refund" || row.type === "Claim"}
+                                                                    disabled={!weeklyReceivedTypes.some(type => type.received_type === row.type)}
                                                                 >
                                                                     ✓
                                                                 </button>
                                                             ) : (
-                                                                (row.type === "Carry (CF)" || row.type === "Wage Refund" || row.type === "Claim") ? (
-                                                                    <img
-                                                                        className="w-5 h-4 opacity-40 cursor-not-allowed"
-                                                                        src={Edit}
-                                                                        alt="Edit Disabled"
-                                                                    />
-                                                                ) : (
+                                                                weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
                                                                     canEditDelete && (
                                                                         <button onClick={() => {
                                                                             setEditingPaymentId(row.id);
@@ -3596,31 +3608,37 @@ const History = ({ username, userRoles = [] }) => {
                                                                             <img className="w-5 h-4" src={Edit} alt="Edit" />
                                                                         </button>
                                                                     )
+                                                                ) : (
+                                                                    <img
+                                                                        className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                        src={Edit}
+                                                                        alt="Edit Disabled"
+                                                                    />
                                                                 )
                                                             )}
-                                                            {(row.type === "Carry (CF)" || row.type === "Wage Refund" || row.type === "Claim") ? (
-                                                                <img
-                                                                    className="w-5 h-4 opacity-40 cursor-not-allowed"
-                                                                    src={Delete}
-                                                                    alt="Delete Disabled"
-                                                                />
-                                                            ) : (
+                                                            {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
                                                                 canEditDelete && (
                                                                     <button className="" onClick={() => handleWeeklyReceivedDelete(row.id)}>
                                                                         <img src={Delete} className="w-5 h-4" alt="Delete" />
                                                                     </button>
                                                                 )
+                                                            ) : (
+                                                                <img
+                                                                    className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                    src={Delete}
+                                                                    alt="Delete Disabled"
+                                                                />
                                                             )}
-                                                            {(row.type === "Carry (CF)" || row.type === "Wage Refund" || row.type === "Claim") ? (
+                                                            {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
+                                                                <button className="" onClick={() => fetchAuditDetailsForPaymentReceived(row.id)}>
+                                                                    <img src={history} className="w-5 h-4" alt="History" />
+                                                                </button>
+                                                            ) : (
                                                                 <img
                                                                     className="w-5 h-4 opacity-40 cursor-not-allowed"
                                                                     src={history}
                                                                     alt="History Disabled"
                                                                 />
-                                                            ) : (
-                                                                <button className="" onClick={() => fetchAuditDetailsForPaymentReceived(row.id)}>
-                                                                    <img src={history} className="w-5 h-4" alt="History" />
-                                                                </button>
                                                             )}
                                                         </div>
                                                     )}
@@ -3660,9 +3678,12 @@ const History = ({ username, userRoles = [] }) => {
                                                         onChange={handlePaymentChange}
                                                         onKeyDown={handleKeyDown1}
                                                     >
-                                                        <option id='1' value="Weekly">Weekly</option>
-                                                        <option id='2' value="Daily">Daily</option>
-                                                        <option id='3' value="Monthly">Monthly</option>
+                                                        <option value="">Select</option>
+                                                        {weeklyReceivedTypes.map((type, index) => (
+                                                            <option key={index} value={type.received_type}>
+                                                                {type.received_type}
+                                                            </option>
+                                                        ))}
                                                     </select>
                                                 </td>
                                                 <td></td>
@@ -4313,6 +4334,18 @@ const History = ({ username, userRoles = [] }) => {
                                 }}
                             />
                         </div>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Comments
+                            </label>
+                            <textarea
+                                value={categoryComments}
+                                onChange={(e) => setCategoryComments(e.target.value)}
+                                placeholder="Enter comments..."
+                                className="w-full border-2 border-[#BF9853] border-opacity-25 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent resize-none"
+                                rows={3}
+                            />
+                        </div>
                         <div className="flex justify-end gap-3 mt-6">
                             <button
                                 onClick={() => {
@@ -4351,8 +4384,9 @@ const History = ({ username, userRoles = [] }) => {
                                             contractor: contractorOptions.find(opt => opt.id === Number(currentProjectAdvanceRow.contractor_id))?.label || "",
                                             amount: Number(currentProjectAdvanceRow.amount) + previousPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
                                             category: selectedCategory.value,
-                                            comments: `Claim from Weekly Payment `,
+                                            comments: categoryComments || "",
                                             machineTools: "",
+                                            source: "Cash Register",
                                             billCopyUrl: currentProjectAdvanceRow.bill_copy_url
                                         };
                                         const expensesFormResponse = await fetch('https://backendaab.in/aabuilderDash/expenses_form/save', {
@@ -4404,6 +4438,7 @@ const History = ({ username, userRoles = [] }) => {
                                                 setCurrentProjectAdvanceRow(null);
                                                 setSelectedCategory(null);
                                                 setIsConfirmingCategory(false);
+                                                setCategoryComments("");
                                             }, 2000);
                                         } else {
                                             throw new Error('Failed to update expense entry status');

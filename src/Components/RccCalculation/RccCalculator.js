@@ -3386,7 +3386,7 @@ const RccCalculator = () => {
                                                             </div>
                                                         </td>
                                                         <td className="text-center">
-                                                            {!["ROOF SLAB", "SEPTICK TANK", "SUMP TANK", "MAT"].includes(floor.areaName) && (
+                                                            {!["ROOF SLAB", "SEPTICK TANK", "SUMP TANK", "MAT", "LOFT", "SUNSHADE","WAIST SLAB"].includes(floor.areaName) && (
                                                                 <CreatableSelect
                                                                     className="w-[160px] h-[27px] font-medium -mt-2"
                                                                     styles={{
@@ -3438,33 +3438,23 @@ const RccCalculator = () => {
                                                                     onChange={(e) => handleInteriorTileChange(floorIndex, tileIndex, e)}
                                                                     className="px-2 w-[90px] text-base font-medium h-[27px] bg-transparent hover:border focus:outline-none text-center"
                                                                 />
-                                                                {!["ROOF SLAB", "SEPTICK TANK", "SUMP TANK", "MAT"].includes(floor.areaName) && (
-                                                                    <button
-                                                                        className="text-[#E4572E]"
-                                                                        onClick={() => openLengthPopupScreen(floorIndex, tileIndex)}
-                                                                    >
+                                                                {!["ROOF SLAB", "SEPTICK TANK", "SUMP TANK", "MAT","LOFT", "SUNSHADE","WAIST SLAB"].includes(floor.areaName) && (
+                                                                    <button className="text-[#E4572E]" onClick={() => openLengthPopupScreen(floorIndex, tileIndex)}>
                                                                         L
                                                                     </button>
                                                                 )}
-
                                                             </div>
                                                         </td>
-                                                        {!["ROOF SLAB", "SEPTICK TANK", "SUMP TANK", "MAT"].includes(floor.areaName) && lengthPopupState[`${floorIndex}-${tileIndex}`] && (
+                                                        {!["ROOF SLAB", "SEPTICK TANK", "SUMP TANK", "MAT", "LOFT", "SUNSHADE","WAIST SLAB"].includes(floor.areaName) && lengthPopupState[`${floorIndex}-${tileIndex}`] && (
                                                             <div
                                                                 className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50"
                                                                 onClick={() => closelengthPopup(floorIndex, tileIndex)} >
-                                                                <div
-                                                                    className="bg-white rounded-md w-[54rem] py-2 relative z-50"
-                                                                    onClick={(e) => e.stopPropagation()}
-                                                                >
+                                                                <div className="bg-white rounded-md w-[54rem] py-2 relative z-50" onClick={(e) => e.stopPropagation()}>
                                                                     <div className="flex mb-4 mt-2">
                                                                         <label className="text-[#E4572E] text-xl font-bold ml-[14rem] w-96">
                                                                             {floor.areaName} ( {tile.type} ) - Length
                                                                         </label>
-                                                                        <button
-                                                                            className="text-[#E4572E] ml-[14rem] -mt-4"
-                                                                            onClick={() => closelengthPopup(floorIndex, tileIndex)}
-                                                                        >
+                                                                        <button className="text-[#E4572E] ml-[14rem] -mt-4" onClick={() => closelengthPopup(floorIndex, tileIndex)} >
                                                                             <img src={cross} alt="close" className="w-4 h-4" />
                                                                         </button>
                                                                     </div>
@@ -3503,7 +3493,6 @@ const RccCalculator = () => {
                                                                                                     }}
                                                                                                 />
                                                                                             </td>
-
                                                                                             <td className="border border-gray-300 px-4 py-2">
                                                                                                 <input
                                                                                                     type="text"
@@ -3537,7 +3526,6 @@ const RccCalculator = () => {
                                                                                         <td className="border border-gray-300 px-4 py-2">
                                                                                             {calculateTotalOutput(floorIndex, tileIndex)}
                                                                                         </td>
-
                                                                                     </tr>
                                                                                 </tbody>
                                                                             </table>
@@ -3552,7 +3540,7 @@ const RccCalculator = () => {
                                                                 name="breadth"
                                                                 placeholder="B"
                                                                 value={tile.breadth.replace(/"+/g, '"')}
-                                                                readOnly={!["ROOF SLAB", "SEPTICK TANK", "SUMP TANK", "MAT"].includes(floor.areaName)}
+                                                                readOnly={!["ROOF SLAB", "SEPTICK TANK", "SUMP TANK", "MAT","LOFT", "SUNSHADE","WAIST SLAB"].includes(floor.areaName)}
                                                                 onChange={(e) => handleInteriorTileChange(floorIndex, tileIndex, e)}
                                                                 className="px-2 w-16 bg-transparent hover:border focus:outline-none text-center"
                                                             />
@@ -3563,7 +3551,7 @@ const RccCalculator = () => {
                                                                 name="height"
                                                                 placeholder="H"
                                                                 value={tile.height}
-                                                                readOnly={!["ROOF SLAB", "SEPTICK TANK", "SUMP TANK", "MAT"].includes(floor.areaName)}
+                                                                readOnly={!["ROOF SLAB", "SEPTICK TANK", "SUMP TANK", "MAT","LOFT", "SUNSHADE","WAIST SLAB"].includes(floor.areaName)}
                                                                 onChange={(e) => handleInteriorTileChange(floorIndex, tileIndex, e)}
                                                                 className="px-2 w-[90px] text-base font-medium h-[27px] bg-transparent hover:border focus:outline-none text-center"
                                                             />
@@ -3592,10 +3580,7 @@ const RccCalculator = () => {
                                                                 placeholder="Deduction"
                                                                 className="px-2 w-20 bg-transparent hover:border focus:outline-none"
                                                             />
-                                                            <button
-                                                                className="text-[#E4572E]"
-                                                                onClick={() => openDeductionPopup(floorIndex, tileIndex)}
-                                                            >
+                                                            <button className="text-[#E4572E]" onClick={() => openDeductionPopup(floorIndex, tileIndex)}>
                                                                 D
                                                             </button>
                                                         </td>
@@ -3816,21 +3801,12 @@ const RccCalculator = () => {
                                 )}
                             </div>
                             <div>
-                                <button
-                                    className="w-[137px] h-[36px] text-white rounded ml-3 bg-[#E4572E] hover:text-white transition duration-200 ease-in-out"
-                                    onClick={openModals}
-                                >
+                                <button className="w-[137px] h-[36px] text-white rounded ml-3 bg-[#E4572E] hover:text-white transition duration-200 ease-in-out" onClick={openModals} >
                                     Generate Bills
                                 </button>
                                 {isModalOpens && (
-                                    <div
-                                        className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50"
-                                        onClick={closeModals}
-                                    >
-                                        <div
-                                            className="bg-white rounded-lg shadow-lg w-11/12 md:w-3/4 lg:w-2/3 max-h-[90vh] overflow-y-auto p-6"
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
+                                    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50" onClick={closeModals} >
+                                        <div className="bg-white rounded-lg shadow-lg w-11/12 md:w-3/4 lg:w-2/3 max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()} >
                                             <h2 className="text-xl text-center font-bold">Generated Bills</h2>
                                             <div className="mb-4">
                                                 {Object.values(
@@ -3844,7 +3820,6 @@ const RccCalculator = () => {
                                                         acc[floor.floorName].areas.add(floor.areaName);
                                                         return acc;
                                                     }, {})
-
                                                 ).map((floor, floorIndex) => (
                                                     <div key={floorIndex} className="border p-2 mb-2">
                                                         <label className="flex items-center">
@@ -3857,7 +3832,6 @@ const RccCalculator = () => {
                                                             />
                                                             <span className="ml-2 font-bold">{floor.floorName}</span>
                                                         </label>
-
                                                         {selectedFloorss[floor.floorName] && (
                                                             <div className="ml-4">
                                                                 {[...floor.areas].map((areaName, areaIndex) => (
@@ -3885,10 +3859,7 @@ const RccCalculator = () => {
                                                     Date: <span className="ml-2">{new Date().toLocaleDateString()}</span>
                                                 </h1>
                                             </div>
-                                            <div
-                                                className="rounded-lg flex -mt-3 overflow-hidden border"
-                                                id="full-table"
-                                            >
+                                            <div className="rounded-lg flex -mt-3 overflow-hidden border" id="full-table">
                                                 <table className="w-full text-left text-sm">
                                                     <thead className="bg-[#E6E6E6]">
                                                         <tr>
@@ -3922,7 +3893,6 @@ const RccCalculator = () => {
                                                                 const isFirstOccurrence =
                                                                     floorIndex === 0 ||
                                                                     floorArray[floorIndex - 1].floorName !== floor.floorName;
-
                                                                 return (
                                                                     <React.Fragment key={floorIndex}>
                                                                         {isFirstOccurrence && (
@@ -3955,8 +3925,6 @@ const RccCalculator = () => {
                                                                     </React.Fragment>
                                                                 );
                                                             })}
-
-                                                        {/* Add Total Row */}
                                                         <tr className="bg-gray-100 font-bold">
                                                             <td colSpan="11" className="text-right pr-4">Total Amount:</td>
                                                             <td>
@@ -3974,7 +3942,6 @@ const RccCalculator = () => {
                                                     </tbody>
                                                 </table>
                                             </div>
-                                            {/* Generate PDF Button */}
                                             <div className="flex justify-center mt-4">
                                                 <button
                                                     className={`px-6 py-2 text-white font-bold rounded ${Object.keys(selectedAreass).length > 0

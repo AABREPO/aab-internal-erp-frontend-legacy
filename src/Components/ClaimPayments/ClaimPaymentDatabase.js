@@ -33,7 +33,7 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
         return response.json();
       })
       .then((data) => {
-        const filteredData = data.filter(item => item.accountType === 'Claim');
+        const filteredData = data.filter(item => item.accountType === 'Claim'|| item.accountType === 'Bill Payments + Claim');
         setClaimDataList(filteredData);
       })
       .catch((err) => {
@@ -137,6 +137,10 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
       case 'comments':
         aValue = a.comments || '';
         bValue = b.comments || '';
+        break;
+      case 'source':
+        aValue = a.source || '';
+        bValue = b.source || '';
         break;
       case 'eno':
         aValue = a.eno || '';
@@ -344,39 +348,50 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
               <table className="w-full border rounded-lg">
                 <thead className="bg-[#FAF6ED] sticky top-0 z-90">
                   <tr>
-                    <th className="px-4 py-2 sticky top-0 bg-[#FAF6ED] z-20">S.No</th>
-                    <th className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
+                    <th className="px-2 py-2 sticky top-0 bg-[#FAF6ED] z-20">S.No</th>
+                    <th
+                      className="px-2 text-left py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
                       onClick={() => handleSort('date')}
                     >
                       Date {sortColumn === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
+                    <th
+                      className="px-2 py-2 text-left cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
                       onClick={() => handleSort('siteName')}
                     >
                       Project Name {sortColumn === 'siteName' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
+                    <th
+                      className="px-2 py-2 text-left cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
                       onClick={() => handleSort('partyName')}
                     >
                       Party Name {sortColumn === 'partyName' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
+                    <th
+                      className="px-2 py-2 text-left cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
                       onClick={() => handleSort('amount')}
                     >
                       Amount {sortColumn === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
+                    <th
+                      className="px-2 py-2 text-left cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
                       onClick={() => handleSort('category')}
                     >
                       Category {sortColumn === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
+                    <th
+                      className="px-2 py-2 text-left cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
                       onClick={() => handleSort('comments')}
                     >
-                      Reason {sortColumn === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      Comments {sortColumn === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
+                    <th
+                      className="px-2 py-2 text-left cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
+                      onClick={() => handleSort('source')}
+                    >Source {sortColumn === 'source' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                     <th className="px-4 py-2 sticky top-0 bg-[#FAF6ED] z-20">Status</th>
-                    <th className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
+                    <th
+                      className="px-4 py-2 cursor-pointer hover:bg-[#f0e6d2] select-none sticky top-0 bg-[#FAF6ED] z-20"
                       onClick={() => handleSort('eno')}
                     >
                       E.No {sortColumn === 'eno' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -469,6 +484,7 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
                       <th className="pt-2 pb-2"></th>
                       <th className="pt-2 pb-2"></th>
                       <th className="pt-2 pb-2"></th>
+                      <th className="pt-2 pb-2"></th>
                     </tr>
                   )}
                 </thead>
@@ -480,12 +496,13 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
                     return (
                       <tr key={index} className={`even:bg-[#FAF6ED] odd:bg-[#FFFFFF] font-bold text-[14px]`}>
                         <td className="px-4 py-2">{index + 1}</td>
-                        <td className="px-4 py-2">{formatDateOnly(row.date)}</td>
-                        <td className="px-4 py-2">{row.siteName}</td>
-                        <td className="px-4 py-2">{row.vendor || row.contractor}</td>
-                        <td className="px-4 py-2">{formatIndianCurrency(row.amount)}</td>
-                        <td className="px-4 py-2">{row.category}</td>
-                        <td className="px-4 py-2">{row.comments}</td>
+                        <td className="px-2 py-2">{formatDateOnly(row.date)}</td>
+                        <td className="px-2 py-2 text-left">{row.siteName}</td>
+                        <td className="px-2 py-2 text-left">{row.vendor || row.contractor}</td>
+                        <td className="px-2 py-2">{formatIndianCurrency(row.amount)}</td>
+                        <td className="px-2 py-2 text-left">{row.category}</td>
+                        <td className="px-2 py-2 text-left">{row.comments}</td>
+                        <td className="px-2 py-2 text-left">{row.source}</td>
                         <td className={`px-4 py-2 font-semibold ${isClaimed ? 'text-[#007233]' : 'text-[#E4572E]'}`}>
                           {isClaimed ? '✓ Claimed' : 'Not Claimed'}
                         </td>

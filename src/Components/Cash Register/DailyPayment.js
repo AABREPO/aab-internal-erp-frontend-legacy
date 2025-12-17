@@ -1400,7 +1400,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     };
     useEffect(() => {
         if (weeks.length > 0) {
-            setSelectedWeek(weeks[weeks.length - 1].number); 
+            setSelectedWeek(weeks[weeks.length - 1].number);
         }
     }, [weeks]);
     const getCurrentWeekDays = () => {
@@ -1476,7 +1476,120 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         .reduce((sum, p) => sum + Number(p.amount || 0), 0);
     const netBalance = totalAmount - totalRefund;
     const balance = totalPayments - expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-    const generateExpensesPDF = () => {
+    const calculateBalanceForRefundPayments = async (refundPaymentsList) => {
+        try {
+            // Fetch all data once
+            const [staffAdvanceRes, loanRes] = await Promise.all([
+                fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all'),
+                fetch('https://backendaab.in/aabuildersDash/api/loans/all')
+            ]);
+
+            const staffAdvanceData = staffAdvanceRes.ok ? await staffAdvanceRes.json() : [];
+            const loanData = loanRes.ok ? await loanRes.json() : [];
+
+            const selectedDateObj = new Date(selectedDate);
+
+            // Calculate balances for each refund payment
+            return refundPaymentsList.map((refundRow, currentIndex) => {
+                let balance = 0;
+
+                if (refundRow.labour_id) {
+                    // For labour_id: Get balance from staff-advance data
+                    // Filter entries for this labour_id up to selectedDate
+                    const labourEntries = staffAdvanceData.filter(entry => {
+                        if (entry.labour_id !== Number(refundRow.labour_id)) return false;
+                        const entryDate = new Date(entry.date);
+                        if (entryDate > selectedDateObj) return false;
+
+                        // Exclude refunds from staff-advance that match refunds in refundPaymentsList
+                        // to avoid double-counting
+                        if (entry.type === 'Refund') {
+                            const refundAmount = Number(entry.staff_refund_amount || 0);
+                            const refundDate = new Date(entry.date);
+                            // Check if this refund matches any refund in refundPaymentsList
+                            const matchesRefundInList = refundPaymentsList.some(refund => {
+                                if (refund.labour_id !== Number(refundRow.labour_id)) return false;
+                                const refundListDate = new Date(refund.date || selectedDate);
+                                return refundDate.getTime() === refundListDate.getTime() &&
+                                    Math.abs(refundAmount - Number(refund.amount || 0)) < 0.01;
+                            });
+                            if (matchesRefundInList) return false;
+                        }
+                        return true;
+                    });
+
+                    // Calculate base balance: Advance amount - Refund amount from staff-advance data
+                    labourEntries.forEach(entry => {
+                        if (entry.type === 'Advance') {
+                            balance += Number(entry.amount || 0);
+                        } else if (entry.type === 'Refund') {
+                            balance -= Number(entry.staff_refund_amount || 0);
+                        }
+                    });
+
+                    // Subtract all refunds from refundPaymentsList for this labour up to and including current row
+                    for (let i = 0; i <= currentIndex; i++) {
+                        const refund = refundPaymentsList[i];
+                        if (refund.labour_id === refundRow.labour_id) {
+                            balance -= Number(refund.amount || 0);
+                        }
+                    }
+                } else if (refundRow.vendor_id || refundRow.contractor_id) {
+                    // For vendor_id/contractor_id: Get balance from loan data
+                    const loanEntries = loanData.filter(entry => {
+                        const matchesVendor = refundRow.vendor_id && entry.vendor_id === Number(refundRow.vendor_id);
+                        const matchesContractor = refundRow.contractor_id && entry.contractor_id === Number(refundRow.contractor_id);
+                        if (!matchesVendor && !matchesContractor) return false;
+                        const entryDate = new Date(entry.date);
+                        if (entryDate > selectedDateObj) return false;
+
+                        // Exclude refunds from loan data that match refunds in refundPaymentsList
+                        // to avoid double-counting
+                        if (entry.type === 'Refund') {
+                            const refundAmount = Number(entry.loan_refund_amount || 0);
+                            const refundDate = new Date(entry.date);
+                            // Check if this refund matches any refund in refundPaymentsList
+                            const matchesRefundInList = refundPaymentsList.some(refund => {
+                                const matchesVendorRefund = refundRow.vendor_id && refund.vendor_id === refundRow.vendor_id;
+                                const matchesContractorRefund = refundRow.contractor_id && refund.contractor_id === refundRow.contractor_id;
+                                if (!matchesVendorRefund && !matchesContractorRefund) return false;
+                                const refundListDate = new Date(refund.date || selectedDate);
+                                return refundDate.getTime() === refundListDate.getTime() &&
+                                    Math.abs(refundAmount - Number(refund.amount || 0)) < 0.01;
+                            });
+                            if (matchesRefundInList) return false;
+                        }
+                        return true;
+                    });
+
+                    // Calculate base balance: Loan amount - Refund amount from loan data
+                    loanEntries.forEach(entry => {
+                        if (entry.type === 'Loan' || entry.type === 'Transfer') {
+                            balance += Number(entry.amount || 0);
+                        } else if (entry.type === 'Refund') {
+                            balance -= Number(entry.loan_refund_amount || 0);
+                        }
+                    });
+
+                    // Subtract all refunds from refundPaymentsList for this vendor/contractor up to and including current row
+                    for (let i = 0; i <= currentIndex; i++) {
+                        const refund = refundPaymentsList[i];
+                        if ((refundRow.vendor_id && refund.vendor_id === refundRow.vendor_id) ||
+                            (refundRow.contractor_id && refund.contractor_id === refundRow.contractor_id)) {
+                            balance -= Number(refund.amount || 0);
+                        }
+                    }
+                }
+
+                return { ...refundRow, calculatedBalance: balance };
+            });
+        } catch (error) {
+            console.error('Error calculating balances:', error);
+            return refundPaymentsList.map(row => ({ ...row, calculatedBalance: 0 }));
+        }
+    };
+
+    const generateExpensesPDF = async () => {
         if (!selectedDate || dailyExpenses.length === 0) {
             alert("No data available to generate PDF");
             return;
@@ -1621,12 +1734,12 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             }
         });
         const firstTableEndY = doc.lastAutoTable.finalY;
-        const spaceBetweenTables = 10;        
+        const spaceBetweenTables = 10;
         const netBalance = totalAmount - totalRefundAmount;
         doc.setPage(1);
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
-        doc.text(`NET BALANCE: ${netBalance.toLocaleString('en-IN')}`, 155, 38);      
+        doc.text(`NET BALANCE: ${netBalance.toLocaleString('en-IN')}`, 155, 38);
         const addHeaderToPage = (pageNum) => {
             doc.setPage(pageNum);
             doc.setFontSize(14);
@@ -1645,27 +1758,30 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         const secondPageStartY = 40;
         const sideBySideStartY = secondPageStartY;
         const refundTableColumn = [
-           "SNO", "NAME", "", "BALANCE"
+            "SNO", "NAME", "", "BALANCE"
         ];
-        const refundTableRows = refundPayments
-            .reverse()
-            .map((row, index) => {
-                const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
-                const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
-                const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
-                const name = vendor?.label || contractor?.label || labour?.label || "";
-                const amount = Number(row.amount || 0);
-                const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
-                return [
-                    (index + 1).toString(),
-                    name,
-                    formattedAmount
-                ];
-            });
+        // Calculate balances for all refund payments
+        const refundPaymentsWithBalance = await calculateBalanceForRefundPayments(refundPayments.slice().reverse());
+        const refundTableRows = refundPaymentsWithBalance.map((row, index) => {
+            const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
+            const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
+            const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
+            const name = vendor?.label || contractor?.label || labour?.label || "";
+            const amount = Number(row.amount || 0);
+            const formattedAmount = `${amount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
+            const formattedBalance = `${row.calculatedBalance.toLocaleString('en-IN').replace(/\u202F/g, ',')}`;
+            return [
+                (index + 1).toString(),
+                name,
+                formattedAmount,
+                formattedBalance
+            ];
+        });
         refundTableRows.push([
             "",
             "TOTAL",
-            `${totalRefundAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
+            `${totalRefundAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`,
+            ""
         ]);
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
@@ -1702,7 +1818,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 3: { cellWidth: 20, halign: 'right' }
             },
             margin: { left: 14, right: 95 },
-            didDrawPage: function(data) {
+            didDrawPage: function (data) {
                 if (data.pageNumber > 1) {
                     addHeaderToPage(data.pageNumber);
                 }
@@ -1772,7 +1888,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     3: { cellWidth: 20, halign: 'right' }
                 },
                 margin: { left: 100, right: 0 },
-                didDrawPage: function(data) {
+                didDrawPage: function (data) {
                     if (data.pageNumber > 1) {
                         addHeaderToPage(data.pageNumber);
                     }
@@ -1803,9 +1919,9 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 "",
                 "TOTAL",
                 `${totalDiwaliBonusAmount.toLocaleString('en-IN').replace(/\u202F/g, ',')}`
-            ]);            
+            ]);
             let diwaliY = sideBySideStartY;
-            let diwaliX = 100;           
+            let diwaliX = 100;
             if (advanceExpenses.length === 0) {
                 doc.setFontSize(12);
                 doc.setFont(undefined, 'bold');
@@ -1816,7 +1932,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 doc.setFontSize(12);
                 doc.setFont(undefined, 'bold');
                 doc.text('DIWALI BONUS', diwaliX, diwaliY - 2);
-            }            
+            }
             doc.autoTable({
                 startY: diwaliY,
                 head: [diwaliBonusTableColumn],
@@ -1848,7 +1964,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     2: { cellWidth: 20, halign: 'right' }
                 },
                 margin: { left: diwaliX, right: 0 },
-                didDrawPage: function(data) {
+                didDrawPage: function (data) {
                     if (data.pageNumber > 1) {
                         addHeaderToPage(data.pageNumber);
                     }

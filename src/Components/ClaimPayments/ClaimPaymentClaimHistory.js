@@ -34,7 +34,7 @@ const ClaimPaymentClaimHistory = ({ username, userRoles = [] }) => {
       })
       .then((data) => {
         // Filter only items with accountType = 'Claim'
-        const filteredData = data.filter(item => item.accountType === 'Claim');
+        const filteredData = data.filter(item => item.accountType === 'Claim'|| item.accountType === 'Bill Payments + Claim');
         setClaimDataList(filteredData);
       })
       .catch((err) => {

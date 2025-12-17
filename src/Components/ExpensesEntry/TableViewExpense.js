@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 import Modal from 'react-modal';
 import edit from '../Images/Edit.svg';
@@ -8,6 +8,287 @@ import Reload from '../Images/rotate-right.png'
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 Modal.setAppElement('#root');
+
+// Date Range Picker Component
+const DateRangePicker = ({ startDate, endDate, onStartDateChange, onEndDateChange }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [currentMonth, setCurrentMonth] = useState(new Date());
+    const [tempStartDate, setTempStartDate] = useState(null);
+    const [tempEndDate, setTempEndDate] = useState(null);
+    const datePickerRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (datePickerRef.current && !datePickerRef.current.contains(event.target)) {
+                setIsOpen(false);
+            }
+        };
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isOpen]);
+
+    const formatDate = (dateString) => {
+        if (!dateString) return '';
+        // If dateString is already in YYYY-MM-DD format, parse it directly
+        if (dateString.includes('-') && dateString.length === 10) {
+            const [year, month, day] = dateString.split('-');
+            return `${day}-${month}-${year}`;
+        }
+        // Otherwise, parse as Date object
+        const d = new Date(dateString);
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        return `${day}-${month}-${year}`;
+    };
+
+    const getDisplayText = () => {
+        if (startDate && endDate) {
+            return `${formatDate(startDate)} to ${formatDate(endDate)}`;
+        } else if (startDate) {
+            return `${formatDate(startDate)} to ...`;
+        }
+        return 'Select Date';
+    };
+
+    const getDaysInMonth = (date) => {
+        return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    };
+
+    const getFirstDayOfMonth = (date) => {
+        return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+    };
+
+    const formatDateToString = (year, month, day) => {
+        const monthStr = String(month + 1).padStart(2, '0');
+        const dayStr = String(day).padStart(2, '0');
+        return `${year}-${monthStr}-${dayStr}`;
+    };
+
+    const handleDateClick = (day, isCurrentMonth) => {
+        if (!isCurrentMonth) return;
+        
+        const year = currentMonth.getFullYear();
+        const month = currentMonth.getMonth();
+        const dateString = formatDateToString(year, month, day);
+
+        if (!tempStartDate || (tempStartDate && tempEndDate)) {
+            setTempStartDate(dateString);
+            setTempEndDate(null);
+        } else if (tempStartDate && !tempEndDate) {
+            let finalStartDate = tempStartDate;
+            let finalEndDate = dateString;
+            
+            if (dateString < tempStartDate) {
+                finalStartDate = dateString;
+                finalEndDate = tempStartDate;
+            }
+            
+            setTempStartDate(finalStartDate);
+            setTempEndDate(finalEndDate);
+            
+            // Auto-apply when both dates are selected
+            setTimeout(() => {
+                onStartDateChange(finalStartDate);
+                onEndDateChange(finalEndDate);
+                setIsOpen(false);
+            }, 0);
+        }
+    };
+
+    const handleDone = () => {
+        if (tempStartDate) {
+            onStartDateChange(tempStartDate);
+            if (tempEndDate) {
+                onEndDateChange(tempEndDate);
+            } else {
+                onEndDateChange('');
+            }
+        }
+        setIsOpen(false);
+    };
+
+    const handleCancel = () => {
+        setTempStartDate(startDate || null);
+        setTempEndDate(endDate || null);
+        setIsOpen(false);
+    };
+
+    const handleClear = () => {
+        setTempStartDate(null);
+        setTempEndDate(null);
+        onStartDateChange('');
+        onEndDateChange('');
+        setIsOpen(false);
+    };
+
+    const prevMonth = () => {
+        setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+    };
+
+    const nextMonth = () => {
+        setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+    };
+
+    const isDateInRange = (day, isCurrentMonth) => {
+        if (!tempStartDate || !isCurrentMonth) return false;
+        const year = currentMonth.getFullYear();
+        const month = currentMonth.getMonth();
+        const dateString = formatDateToString(year, month, day);
+        
+        if (tempStartDate && tempEndDate) {
+            return dateString >= tempStartDate && dateString <= tempEndDate;
+        } else if (tempStartDate) {
+            return dateString === tempStartDate;
+        }
+        return false;
+    };
+
+    const isStartDate = (day, isCurrentMonth) => {
+        if (!tempStartDate || !isCurrentMonth) return false;
+        const year = currentMonth.getFullYear();
+        const month = currentMonth.getMonth();
+        const dateString = formatDateToString(year, month, day);
+        return dateString === tempStartDate;
+    };
+
+    const isEndDate = (day, isCurrentMonth) => {
+        if (!tempEndDate || !isCurrentMonth) return false;
+        const year = currentMonth.getFullYear();
+        const month = currentMonth.getMonth();
+        const dateString = formatDateToString(year, month, day);
+        return dateString === tempEndDate;
+    };
+
+    const daysInMonth = getDaysInMonth(currentMonth);
+    const firstDay = getFirstDayOfMonth(currentMonth);
+    const days = [];
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+    // Previous month's trailing days
+    const prevMonthDays = getDaysInMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+    for (let i = firstDay - 1; i >= 0; i--) {
+        days.push({ day: prevMonthDays - i, isCurrentMonth: false });
+    }
+
+    // Current month's days
+    for (let i = 1; i <= daysInMonth; i++) {
+        days.push({ day: i, isCurrentMonth: true });
+    }
+
+    // Next month's leading days
+    const totalCells = 42; // 6 rows * 7 days
+    const remainingDays = totalCells - days.length;
+    for (let i = 1; i <= remainingDays; i++) {
+        days.push({ day: i, isCurrentMonth: false });
+    }
+
+    useEffect(() => {
+        if (isOpen) {
+            setTempStartDate(startDate || null);
+            setTempEndDate(endDate || null);
+        }
+    }, [isOpen, startDate, endDate]);
+
+    return (
+        <div className="relative" ref={datePickerRef}>
+            <input
+                type="text"
+                readOnly
+                value={getDisplayText()}
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full px-3 py-2 text-xs bg-transparent focus:outline-none  cursor-pointer"
+                placeholder="Select Date Range"
+            />
+            {isOpen && (
+                <div className="absolute z-50 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 p-4" style={{ minWidth: '320px' }}>
+                    <div className="flex items-center justify-between mb-4">
+                        <button
+                            onClick={prevMonth}
+                            className="p-1 hover:bg-gray-100 rounded"
+                            type="button"
+                        >
+                            <span className="text-lg">‹</span>
+                        </button>
+                        <h3 className="font-semibold text-base">
+                            {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+                        </h3>
+                        <button
+                            onClick={nextMonth}
+                            className="p-1 hover:bg-gray-100 rounded"
+                            type="button"
+                        >
+                            <span className="text-lg">›</span>
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-7 gap-1 mb-2">
+                        {dayNames.map((day, idx) => (
+                            <div key={idx} className="text-center text-xs font-medium text-gray-600 py-1">
+                                {day}
+                            </div>
+                        ))}
+                    </div>
+                    <div className="grid grid-cols-7 gap-1">
+                        {days.map((dateObj, idx) => {
+                            const { day, isCurrentMonth } = dateObj;
+                            const inRange = isDateInRange(day, isCurrentMonth);
+                            const isStart = isStartDate(day, isCurrentMonth);
+                            const isEnd = isEndDate(day, isCurrentMonth);
+                            
+                            return (
+                                <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => handleDateClick(day, isCurrentMonth)}
+                                    disabled={!isCurrentMonth}
+                                    className={`
+                                        py-2 text-sm rounded
+                                        ${!isCurrentMonth ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-100'}
+                                        ${isStart || isEnd ? 'bg-black text-white font-semibold' : ''}
+                                        ${inRange && !isStart && !isEnd ? 'bg-gray-200' : ''}
+                                        ${isCurrentMonth && !inRange && !isStart && !isEnd ? 'text-black' : ''}
+                                    `}
+                                >
+                                    {day}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <div className="flex justify-between mt-4 pt-4 border-t">
+                        <button
+                            onClick={handleClear}
+                            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+                            type="button"
+                        >
+                            Clear
+                        </button>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleCancel}
+                                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+                                type="button"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDone}
+                                className="px-4 py-2 text-sm font-semibold text-black hover:bg-gray-100 rounded"
+                                type="button"
+                            >
+                                Done
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 const TableViewExpense = ({ username, userRoles = [] }) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -41,9 +322,6 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
     const [accountTypeOptions, setAccountTypeOptions] = useState([]);
     const [selectedMachineTools, setSelectedMachineTools] = useState(() => {
         return localStorage.getItem('expenseFilter_machineTools') || '';
-    });
-    const [selectedDate, setSelectedDate] = useState(() => {
-        return localStorage.getItem('expenseFilter_date') || '';
     });
     const [startDate, setStartDate] = useState(() => {
         return localStorage.getItem('expenseFilter_startDate') || '';
@@ -167,9 +445,6 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         localStorage.setItem('expenseFilter_accountType', selectedAccountType);
     }, [selectedAccountType]);
     useEffect(() => {
-        localStorage.setItem('expenseFilter_date', selectedDate);
-    }, [selectedDate]);
-    useEffect(() => {
         localStorage.setItem('expenseFilter_startDate', startDate);
     }, [startDate]);
     useEffect(() => {
@@ -248,7 +523,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                 const categoryOption = uniqueCategoryOptions.map(name => ({ value: name, label: name }));
                 setEnoOptions(uniqueEnos);
                 setAccountTypeOptions(uniqueAccountTypes);
-                setMachineToolsOptions(uniqueMachineTools);
+                setMachineToolsOptions(uniqueMachineTools.map(tool => ({ value: tool, label: tool })));
                 setSiteOptions(siteOptions);
                 setVendorOptions(vendorOptions);
                 setContractorOptions(contractorOption);
@@ -478,17 +753,16 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                 (selectedContractor ? expense.contractor === selectedContractor : true) &&
                 (selectedCategory ? expense.category === selectedCategory : true) &&
                 (selectedMachineTools ? expense.machineTools === selectedMachineTools : true) &&
-                (selectedAccountType ? 
-                    (selectedAccountType === 'Unknown' ? 
-                        (!expense.accountType || expense.accountType === '') : 
+                (selectedAccountType ?
+                    (selectedAccountType === 'Unknown' ?
+                        (!expense.accountType || expense.accountType === '') :
                         expense.accountType === selectedAccountType
                     ) : true) &&
-                (selectedDate ? expense.date === selectedDate : true) &&
                 (selectedEno ? String(expense.eno) === String(selectedEno) : true)
             );
         });
         setFilteredExpenses(filtered);
-        setCurrentPage(1); 
+        setCurrentPage(1);
         const anyFilterApplied = [
             selectedSiteName,
             selectedVendor,
@@ -496,7 +770,8 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
             selectedCategory,
             selectedMachineTools,
             selectedAccountType,
-            selectedDate,
+            startDate,
+            endDate,
             selectedEno
         ].some(Boolean);
         setExportFilteredExpenses(anyFilterApplied ? filtered : []);
@@ -521,7 +796,6 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         selectedCategory,
         selectedMachineTools,
         selectedAccountType,
-        selectedDate,
         startDate,
         endDate,
         selectedEno,
@@ -562,7 +836,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                     hour: "2-digit",
                     minute: "2-digit",
                     hour12: true
-                  })
+                })
                     .replace(",", "")
                     .replace(/\s/g, "-");
                 const finalName = `${timestamp} - ${formData.siteName} - ${formData.vendor || formData.contractor} `;
@@ -615,9 +889,72 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
             setSortField(field);
             setSortDirection('asc');
         }
-        setCurrentPage(1); 
+        setCurrentPage(1);
     };
-
+    const customStyles = useMemo(() => ({
+        control: (provided, state) => ({
+            ...provided,
+            borderWidth: '2px',
+            lineHeight: '20px',
+            fontSize: '12px',
+            height: '45px',
+            borderRadius: '8px',
+            borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.3)' : 'rgba(191, 152, 83, 0.3)',
+            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.3)' : 'none',
+        }),
+        clearIndicator: (provided) => ({
+            ...provided,
+            cursor: 'pointer',
+        }),
+        menu: (provided) => ({
+            ...provided,
+            zIndex: 9999,
+            maxHeight: '300px',
+        }),
+        menuPortal: (provided) => ({
+            ...provided,
+            zIndex: 9999,
+        }),
+        menuList: (provided) => ({
+            ...provided,
+            maxHeight: '250px',
+            overflowY: 'auto',
+        }),
+        singleValue: (provided) => ({
+            ...provided,
+            fontWeight: '400',
+            color: 'black',
+            textAlign: 'left',
+        }),
+        option: (provided, state) => ({
+            ...provided,
+            fontWeight: '300',
+            fontSize: '14px',
+            backgroundColor: state.isSelected
+                ? 'rgba(191, 152, 83, 0.3)'
+                : state.isFocused
+                    ? 'rgba(191, 152, 83, 0.1)'
+                    : 'white',
+            color: 'black',
+            textAlign: 'left',
+        }),
+        input: (provided) => ({
+            ...provided,
+            fontWeight: '300',
+            color: 'black',
+            textAlign: 'left',
+        }),
+        placeholder: (provided) => ({
+            ...provided,
+            fontWeight: '500',
+            color: '#999',
+            textAlign: 'left',
+        }),
+        indicatorSeparator: (provided) => ({
+            ...provided,
+            display: 'none',
+        }),
+    }), []);
     const sortedExpenses = [...filteredExpenses].sort((a, b) => {
         if (!sortField) return 0;
         let aValue = a[sortField];
@@ -720,6 +1057,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         setModalIsOpen(false);
         setSelectedFile(null);
     };
+
     const clearFilters = () => {
         setSelectedSiteName('');
         setSelectedVendor('');
@@ -727,7 +1065,6 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         setSelectedCategory('');
         setSelectedMachineTools('');
         setSelectedAccountType('');
-        setSelectedDate('');
         setStartDate('');
         setEndDate('');
         setSelectedEno('');
@@ -805,85 +1142,9 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                         <span className=' text-[#BF9853] mr-9 font-semibold hover:underline'>Print</span>
                     </div>
                 </div>
-                {Object.keys(accountTypeSummary).length > 0 && (
-                    <div className="w-full max-w-[1860px] mx-auto p-4 bg-white shadow-lg mb-4">
-                        <div className="flex flex-wrap gap-5 items-end">
-                            <div>
-                                <label className="block mb-2 font-semibold text-[#BF9853]">Start Date</label>
-                                <input
-                                    type="date"
-                                    value={startDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
-                                    className="w-[168px] h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2"
-                                />
-                            </div>
-                            <div>
-                                <label className="block mb-2 font-semibold text-[#BF9853]">End Date</label>
-                                <input
-                                    type="date"
-                                    value={endDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
-                                    className="w-[168px] h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2"
-                                />
-                            </div>
-                            
-                            {Object.entries(accountTypeSummary)
-                                .sort(([a], [b]) => {
-                                    if (a === 'Unknown') return 1;
-                                    if (b === 'Unknown') return -1;
-                                    return a.localeCompare(b);
-                                })
-                                .map(([accountType, data]) => (
-                                <div key={accountType} className="cursor-pointer transition-all duration-200 hover:scale-105" onClick={() => setSelectedAccountType(accountType)}>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <label className={`font-semibold transition-colors duration-200 ${selectedAccountType === accountType ? 'text-[#E4572E]' : 'text-[#BF9853] hover:text-[#E4572E]'}`}>
-                                            {accountType}
-                                        </label>
-                                        <span className="text-sm text-red-500 font-medium">
-                                            {data.entryCount}
-                                        </span>
-                                    </div>
-                                    <input
-                                        type="text"
-                                        value={`₹${Number(data.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                                        readOnly
-                                        className={`w-[200px] h-[45px] cursor-pointer rounded-lg border-2 focus:outline-none p-2 text-lg font-bold text-center transition-all duration-200 ${
-                                            selectedAccountType === accountType 
-                                                ? 'border-[#E4572E] bg-[#FEF2F2] text-[#E4572E] shadow-md' 
-                                                : 'border-[#BF9853] border-opacity-25 text-gray-800 hover:border-[#BF9853] hover:border-opacity-75 hover:shadow-sm hover:bg-[#FAF6ED]'
-                                        }`}
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-                {Object.keys(accountTypeSummary).length === 0 && (
-                    <div className="w-full max-w-[1860px] mx-auto p-4 bg-white shadow-lg mb-4">
-                        <div className="flex flex-wrap gap-5 items-end">
-                            <div>
-                                <label className="block mb-2 font-semibold text-[#BF9853]">Start Date</label>
-                                <input
-                                    type="date"
-                                    value={startDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
-                                    className="w-[168px] h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2"
-                                />
-                            </div>
-                            <div>
-                                <label className="block mb-2 font-semibold text-[#BF9853]">End Date</label>
-                                <input
-                                    type="date"
-                                    value={endDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
-                                    className="w-[168px] h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                )}
+
                 <div className="w-full max-w-[1860px] mx-auto p-4 bg-white shadow-lg overflow-x-auto">
-                    <div className={`text-left flex ${selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || startDate || endDate
+                    <div className={`text-left flex ${selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || startDate || endDate
                         ? 'flex-col sm:flex-row sm:justify-between' : 'flex-row justify-between items-center'} mb-3 gap-2`}>
                         <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3">
                             <button className='pl-2' onClick={() => setShowFilters(!showFilters)}>
@@ -893,7 +1154,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                     className="w-7 h-7 border border-[#BF9853] rounded-md"
                                 />
                             </button>
-                            {(selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || startDate || endDate) && (
+                            {(selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || startDate || endDate) && (
                                 <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
                                     {startDate && (
                                         <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
@@ -907,13 +1168,6 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                             <span className="font-normal">End Date: </span>
                                             <span className="font-bold">{endDate}</span>
                                             <button onClick={() => setEndDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
-                                        </span>
-                                    )}
-                                    {selectedDate && (
-                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
-                                            <span className="font-normal">Date: </span>
-                                            <span className="font-bold">{selectedDate}</span>
-                                            <button onClick={() => setSelectedDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
                                         </span>
                                     )}
                                     {selectedSiteName && (
@@ -971,57 +1225,56 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                     </div>
                     <div>
                         <div ref={scrollRef}
-                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[440px] overflow-scroll select-none thin-scrollbar"
+                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[600px] overflow-scroll select-none thin-scrollbar"
                             onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
                         >
                             <table className="table-fixed  min-w-[1765px] w-screen border-collapse">
-                                <thead>
+                                <thead className="sticky top-0 z-9 bg-white ">
                                     <tr className="bg-[#FAF6ED]">
                                         <th className="pt-2 pl-3 w-36 font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('date')}>
                                             Date {sortField === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-2 w-[300px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('siteName')}>
+                                        <th className="px-0.5 w-[300px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('siteName')}>
                                             Project Name {sortField === 'siteName' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('vendor')}>
+                                        <th className="px-0.5 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('vendor')}>
                                             Vendor {sortField === 'vendor' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-2 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('contractor')}>
+                                        <th className="px-0.5 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('contractor')}>
                                             Contractor {sortField === 'contractor' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-2 w-[120px] font-bold text-left">Quantity</th>
-                                        <th className="px-2 w-[120px] font-bold text-left">Amount</th>
-                                        <th className="px-2 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('comments')}>
+                                        <th className="px-0.5 w-[120px] font-bold text-left">Quantity</th>
+                                        <th className="px-0.5 w-[120px] font-bold text-left">Amount</th>
+                                        <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('comments')}>
                                             Comments {sortField === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-2 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('category')}>
+                                        <th className="px-0.5 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('category')}>
                                             Category {sortField === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-2 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('accountType')}>
+                                        <th className="px-0.5 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('accountType')}>
                                             A/C Type {sortField === 'accountType' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-2 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('machineTools')}>
+                                        <th className="px-0.5 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('machineTools')}>
                                             Machine Tools {sortField === 'machineTools' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-2 w-[150px] font-bold text-left">Source From</th>
-                                        <th className="px-2 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('eno')}>
+                                        <th className="px-0.5 w-[150px] font-bold text-left">Source From</th>
+                                        <th className="px-0.5 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('eno')}>
                                             E.No {sortField === 'eno' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-2 w-[60px] font-bold text-left">Edit</th>
-                                        <th className="px-3 w-[110px] font-bold text-left">Attach file</th>
+                                        <th className="px-0.5 w-[60px] font-bold text-left">Edit</th>
+                                        <th className="px-0.5 w-[50px] font-bold text-left">File</th>
                                     </tr>
                                     {showFilters && (
                                         <tr className="bg-[#FAF6ED]">
-                                            <th className="px-2 py-3">
-                                                <input
-                                                    type="date"
-                                                    value={selectedDate}
-                                                    onChange={(e) => setSelectedDate(e.target.value)}
-                                                    className="w-full px-3 py-2 text-sm rounded-lg border-2 border-[#BF9853] bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent transition-all duration-200"
-                                                    placeholder="Search Date..."
+                                            <th className=" py-3">
+                                                <DateRangePicker
+                                                    startDate={startDate}
+                                                    endDate={endDate}
+                                                    onStartDateChange={setStartDate}
+                                                    onEndDateChange={setEndDate}
                                                 />
                                             </th>
-                                            <th className="px-2 py-3">
+                                            <th className=" py-3">
                                                 <Select
                                                     className="w-full"
                                                     options={siteOptions}
@@ -1029,62 +1282,10 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                     onChange={(selectedOption) => setSelectedSiteName(selectedOption ? selectedOption.value : '')}
                                                     placeholder="Search Site..."
                                                     menuPlacement="bottom"
-                                                    menuPosition="fixed"
-                                                    isClearable
-                                                    styles={{
-                                                        control: (provided, state) => ({
-                                                            ...provided,
-                                                            backgroundColor: 'white',
-                                                            borderWidth: '2px',
-                                                            borderColor: state.isFocused
-                                                                ? '#BF9853'
-                                                                : '#BF9853',
-                                                            borderRadius: '8px',
-                                                            minHeight: '36px',
-                                                            boxShadow: state.isFocused ? '0 0 0 3px rgba(191, 152, 83, 0.1)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                                                            '&:hover': {
-                                                                borderColor: '#BF9853',
-                                                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                                                            },
-                                                        }),
-                                                        placeholder: (provided) => ({
-                                                            ...provided,
-                                                            color: '#6B7280',
-                                                            fontSize: '14px',
-                                                            fontWeight: '400',
-                                                        }),
-                                                        menu: (provided) => ({
-                                                            ...provided,
-                                                            zIndex: 9999,
-                                                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                                                        }),
-                                                        option: (provided, state) => ({
-                                                            ...provided,
-                                                            fontSize: '14px',
-                                                            fontWeight: '400',
-                                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                            color: state.isFocused ? '#BF9853' : '#374151',
-                                                            '&:active': {
-                                                                backgroundColor: 'rgba(191, 152, 83, 0.2)',
-                                                            },
-                                                        }),
-                                                        singleValue: (provided) => ({
-                                                            ...provided,
-                                                            fontSize: '14px',
-                                                            fontWeight: '500',
-                                                            color: '#374151',
-                                                        }),
-                                                        indicatorSeparator: () => ({
-                                                            display: 'none',
-                                                        }),
-                                                        dropdownIndicator: (provided) => ({
-                                                            ...provided,
-                                                            color: '#BF9853',
-                                                        }),
-                                                    }}
+                                                    styles={customStyles}
                                                 />
                                             </th>
-                                            <th className="px-2 py-3">
+                                            <th className=" py-3">
                                                 <Select
                                                     className="w-full"
                                                     options={vendorOptions}
@@ -1092,62 +1293,10 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                     onChange={(selectedOption) => setSelectedVendor(selectedOption ? selectedOption.value : '')}
                                                     placeholder="Search Vendor"
                                                     menuPlacement="bottom"
-                                                    menuPosition="fixed"
-                                                    isClearable
-                                                    styles={{
-                                                        control: (provided, state) => ({
-                                                            ...provided,
-                                                            backgroundColor: 'white',
-                                                            borderWidth: '2px',
-                                                            borderColor: state.isFocused
-                                                                ? '#BF9853'
-                                                                : '#BF9853',
-                                                            borderRadius: '8px',
-                                                            minHeight: '36px',
-                                                            boxShadow: state.isFocused ? '0 0 0 3px rgba(191, 152, 83, 0.1)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                                                            '&:hover': {
-                                                                borderColor: '#BF9853',
-                                                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                                                            },
-                                                        }),
-                                                        placeholder: (provided) => ({
-                                                            ...provided,
-                                                            color: '#6B7280',
-                                                            fontSize: '14px',
-                                                            fontWeight: '400',
-                                                        }),
-                                                        menu: (provided) => ({
-                                                            ...provided,
-                                                            zIndex: 9999,
-                                                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                                                        }),
-                                                        option: (provided, state) => ({
-                                                            ...provided,
-                                                            fontSize: '14px',
-                                                            fontWeight: '400',
-                                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                            color: state.isFocused ? '#BF9853' : '#374151',
-                                                            '&:active': {
-                                                                backgroundColor: 'rgba(191, 152, 83, 0.2)',
-                                                            },
-                                                        }),
-                                                        singleValue: (provided) => ({
-                                                            ...provided,
-                                                            fontSize: '14px',
-                                                            fontWeight: '500',
-                                                            color: '#374151',
-                                                        }),
-                                                        indicatorSeparator: () => ({
-                                                            display: 'none',
-                                                        }),
-                                                        dropdownIndicator: (provided) => ({
-                                                            ...provided,
-                                                            color: '#BF9853',
-                                                        }),
-                                                    }}
+                                                    styles={customStyles}
                                                 />
                                             </th>
-                                            <th className="px-2 py-3">
+                                            <th className=" py-3">
                                                 <Select
                                                     className="w-full"
                                                     options={contractorOptions}
@@ -1155,67 +1304,15 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                     onChange={(selectedOption) => setSelectedContractor(selectedOption ? selectedOption.value : '')}
                                                     placeholder="Search Contractor"
                                                     menuPlacement="bottom"
-                                                    menuPosition="fixed"
-                                                    isClearable
-                                                    styles={{
-                                                        control: (provided, state) => ({
-                                                            ...provided,
-                                                            backgroundColor: 'white',
-                                                            borderWidth: '2px',
-                                                            borderColor: state.isFocused
-                                                                ? '#BF9853'
-                                                                : '#BF9853',
-                                                            borderRadius: '8px',
-                                                            minHeight: '36px',
-                                                            boxShadow: state.isFocused ? '0 0 0 3px rgba(191, 152, 83, 0.1)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                                                            '&:hover': {
-                                                                borderColor: '#BF9853',
-                                                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                                                            },
-                                                        }),
-                                                        placeholder: (provided) => ({
-                                                            ...provided,
-                                                            color: '#6B7280',
-                                                            fontSize: '14px',
-                                                            fontWeight: '400',
-                                                        }),
-                                                        menu: (provided) => ({
-                                                            ...provided,
-                                                            zIndex: 9999,
-                                                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                                                        }),
-                                                        option: (provided, state) => ({
-                                                            ...provided,
-                                                            fontSize: '14px',
-                                                            fontWeight: '400',
-                                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                            color: state.isFocused ? '#BF9853' : '#374151',
-                                                            '&:active': {
-                                                                backgroundColor: 'rgba(191, 152, 83, 0.2)',
-                                                            },
-                                                        }),
-                                                        singleValue: (provided) => ({
-                                                            ...provided,
-                                                            fontSize: '14px',
-                                                            fontWeight: '500',
-                                                            color: '#374151',
-                                                        }),
-                                                        indicatorSeparator: () => ({
-                                                            display: 'none',
-                                                        }),
-                                                        dropdownIndicator: (provided) => ({
-                                                            ...provided,
-                                                            color: '#BF9853',
-                                                        }),
-                                                    }}
+                                                    styles={customStyles}
                                                 />
                                             </th>
                                             <th></th>
-                                            <th className="text-base text-left pl-2 font-bold py-3">
+                                            <th className="text-base text-left font-bold py-3">
                                                 ₹{Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </th>
                                             <th></th>
-                                            <th className="px-2 py-3">
+                                            <th className=" py-3">
                                                 <Select
                                                     className="w-full"
                                                     options={categoryOptions}
@@ -1223,62 +1320,10 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                     onChange={(selectedOption) => setSelectedCategory(selectedOption ? selectedOption.value : '')}
                                                     placeholder="Category..."
                                                     menuPlacement="bottom"
-                                                    menuPosition="fixed"
-                                                    isClearable
-                                                    styles={{
-                                                        control: (provided, state) => ({
-                                                            ...provided,
-                                                            backgroundColor: 'white',
-                                                            borderWidth: '2px',
-                                                            borderColor: state.isFocused
-                                                                ? '#BF9853'
-                                                                : '#BF9853',
-                                                            borderRadius: '8px',
-                                                            minHeight: '36px',
-                                                            boxShadow: state.isFocused ? '0 0 0 3px rgba(191, 152, 83, 0.1)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                                                            '&:hover': {
-                                                                borderColor: '#BF9853',
-                                                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                                                            },
-                                                        }),
-                                                        placeholder: (provided) => ({
-                                                            ...provided,
-                                                            color: '#6B7280',
-                                                            fontSize: '14px',
-                                                            fontWeight: '400',
-                                                        }),
-                                                        menu: (provided) => ({
-                                                            ...provided,
-                                                            zIndex: 9999,
-                                                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                                                        }),
-                                                        option: (provided, state) => ({
-                                                            ...provided,
-                                                            fontSize: '14px',
-                                                            fontWeight: '400',
-                                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                            color: state.isFocused ? '#BF9853' : '#374151',
-                                                            '&:active': {
-                                                                backgroundColor: 'rgba(191, 152, 83, 0.2)',
-                                                            },
-                                                        }),
-                                                        singleValue: (provided) => ({
-                                                            ...provided,
-                                                            fontSize: '14px',
-                                                            fontWeight: '500',
-                                                            color: '#374151',
-                                                        }),
-                                                        indicatorSeparator: () => ({
-                                                            display: 'none',
-                                                        }),
-                                                        dropdownIndicator: (provided) => ({
-                                                            ...provided,
-                                                            color: '#BF9853',
-                                                        }),
-                                                    }}
+                                                    styles={customStyles}
                                                 />
                                             </th>
-                                            <th className="px-2 py-3">
+                                            <th className=" py-3">
                                                 <Select
                                                     className="w-full"
                                                     options={accountTypeOptions}
@@ -1286,122 +1331,18 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                     onChange={(selectedOption) => setSelectedAccountType(selectedOption ? selectedOption.value : '')}
                                                     placeholder="A/C Type"
                                                     menuPlacement="bottom"
-                                                    menuPosition="fixed"
-                                                    isClearable
-                                                    styles={{
-                                                        control: (provided, state) => ({
-                                                            ...provided,
-                                                            backgroundColor: 'white',
-                                                            borderWidth: '2px',
-                                                            borderColor: state.isFocused
-                                                                ? '#BF9853'
-                                                                : '#BF9853',
-                                                            borderRadius: '8px',
-                                                            minHeight: '36px',
-                                                            boxShadow: state.isFocused ? '0 0 0 3px rgba(191, 152, 83, 0.1)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                                                            '&:hover': {
-                                                                borderColor: '#BF9853',
-                                                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                                                            },
-                                                        }),
-                                                        placeholder: (provided) => ({
-                                                            ...provided,
-                                                            color: '#6B7280',
-                                                            fontSize: '14px',
-                                                            fontWeight: '400',
-                                                        }),
-                                                        menu: (provided) => ({
-                                                            ...provided,
-                                                            zIndex: 9999,
-                                                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                                                        }),
-                                                        option: (provided, state) => ({
-                                                            ...provided,
-                                                            fontSize: '14px',
-                                                            fontWeight: '400',
-                                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                            color: state.isFocused ? '#BF9853' : '#374151',
-                                                            '&:active': {
-                                                                backgroundColor: 'rgba(191, 152, 83, 0.2)',
-                                                            },
-                                                        }),
-                                                        singleValue: (provided) => ({
-                                                            ...provided,
-                                                            fontSize: '14px',
-                                                            fontWeight: '500',
-                                                            color: '#374151',
-                                                        }),
-                                                        indicatorSeparator: () => ({
-                                                            display: 'none',
-                                                        }),
-                                                        dropdownIndicator: (provided) => ({
-                                                            ...provided,
-                                                            color: '#BF9853',
-                                                        }),
-                                                    }}
+                                                    styles={customStyles}
                                                 />
                                             </th>
-                                            <th className="px-2 py-3">
+                                            <th className=" py-3">
                                                 <Select
                                                     className="w-full"
-                                                    options={machineToolsOptions.map(tool => ({ value: tool, label: tool }))}
-                                                    value={selectedMachineTools ? { value: selectedMachineTools, label: selectedMachineTools } : null}
+                                                    options={machineToolsOptions}
+                                                    value={selectedMachineTools ? machineToolsOptions.find(opt => opt.value === selectedMachineTools) : null}
                                                     onChange={(selectedOption) => setSelectedMachineTools(selectedOption ? selectedOption.value : '')}
                                                     placeholder="Machine..."
                                                     menuPlacement="bottom"
-                                                    menuPosition="fixed"
-                                                    isClearable
-                                                    styles={{
-                                                        control: (provided, state) => ({
-                                                            ...provided,
-                                                            backgroundColor: 'white',
-                                                            borderWidth: '2px',
-                                                            borderColor: state.isFocused
-                                                                ? '#BF9853'
-                                                                : '#BF9853',
-                                                            borderRadius: '8px',
-                                                            minHeight: '36px',
-                                                            boxShadow: state.isFocused ? '0 0 0 3px rgba(191, 152, 83, 0.1)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                                                            '&:hover': {
-                                                                borderColor: '#BF9853',
-                                                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                                                            },
-                                                        }),
-                                                        placeholder: (provided) => ({
-                                                            ...provided,
-                                                            color: '#6B7280',
-                                                            fontSize: '14px',
-                                                            fontWeight: '400',
-                                                        }),
-                                                        menu: (provided) => ({
-                                                            ...provided,
-                                                            zIndex: 9999,
-                                                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                                                        }),
-                                                        option: (provided, state) => ({
-                                                            ...provided,
-                                                            fontSize: '14px',
-                                                            fontWeight: '400',
-                                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                            color: state.isFocused ? '#BF9853' : '#374151',
-                                                            '&:active': {
-                                                                backgroundColor: 'rgba(191, 152, 83, 0.2)',
-                                                            },
-                                                        }),
-                                                        singleValue: (provided) => ({
-                                                            ...provided,
-                                                            fontSize: '14px',
-                                                            fontWeight: '500',
-                                                            color: '#374151',
-                                                        }),
-                                                        indicatorSeparator: () => ({
-                                                            display: 'none',
-                                                        }),
-                                                        dropdownIndicator: (provided) => ({
-                                                            ...provided,
-                                                            color: '#BF9853',
-                                                        }),
-                                                    }}
+                                                    styles={customStyles}
                                                 />
                                             </th>
                                             <th></th>
@@ -1414,21 +1355,21 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                 <tbody>
                                     {currentItems.map((expense, index) => (
                                         <tr key={expense.id} className="odd:bg-white even:bg-[#FAF6ED]">
-                                            <td className=" text-sm text-left pl-3 w-32 py-2">{formatDateOnly(expense.date)}</td>
+                                            <td className=" text-sm text-left pl-3 w-32 ">{formatDateOnly(expense.date)}</td>
                                             <td className=" text-sm text-left w-60 ">{getDisplaySiteName(expense)}</td>
                                             <td className=" text-sm text-left ">{getDisplayVendorName(expense)}</td>
                                             <td className=" text-sm text-left ">{getDisplayContractorName(expense)}</td>
                                             <td className=" text-sm text-left ">{expense.quantity}</td>
-                                            <td className="text-sm text-left pl-2 ">
+                                            <td className="text-sm text-right pr-5 ">
                                                 ₹{Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </td>
-                                            <td className=" text-sm text-left ">{expense.comments}</td>
+                                            <td className="text-sm text-left w-[120px] max-w-[120px] break-words overflow-hidden whitespace-normal px-1">{expense.comments || ''}</td>
                                             <td className=" text-sm text-left ">{expense.category}</td>
                                             <td className=" text-sm text-left ">{expense.accountType}</td>
                                             <td className=" text-sm text-left ">{expense.machineTools}</td>
                                             <td className=" text-sm text-left ">{expense.source}</td>
                                             <td className=" text-sm text-left pl-3 ">{expense.eno}</td>
-                                            <td className=" flex py-2">
+                                            <td className=" py-1.5">
                                                 {userPermissions.includes("Edit") && (
                                                     <button onClick={() => handleEditClick(expense)} className="rounded-full transition duration-200 ml-2 mr-3">
                                                         <img
@@ -1439,7 +1380,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                     </button>
                                                 )}
                                             </td>
-                                            <td className="px-4 text-sm">
+                                            <td className="px-1 text-sm">
                                                 {expense.billCopy ? (
                                                     <a
                                                         href={expense.billCopy}
@@ -1513,8 +1454,8 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                             key={pageNum}
                                             onClick={() => setCurrentPage(pageNum)}
                                             className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${currentPage === pageNum
-                                                    ? 'bg-[#BF9853] text-white border-[#BF9853]'
-                                                    : 'border-gray-300 hover:bg-[#BF9853] hover:text-white'
+                                                ? 'bg-[#BF9853] text-white border-[#BF9853]'
+                                                : 'border-gray-300 hover:bg-[#BF9853] hover:text-white'
                                                 }`}
                                         >
                                             {pageNum}
@@ -1571,8 +1512,8 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                             name="siteName"
                                             value={siteOption.find(option => option.value === formData.siteName)}
                                             onChange={(selectedOption) =>
-                                                setFormData({ 
-                                                    ...formData, 
+                                                setFormData({
+                                                    ...formData,
                                                     siteName: selectedOption?.value || '',
                                                     projectId: selectedOption?.id || ''
                                                 })
@@ -1608,8 +1549,8 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                             options={vendorOption}
                                             value={vendorOption.find(opt => opt.value === formData.vendor)}
                                             onChange={(selectedOption) =>
-                                                setFormData({ 
-                                                    ...formData, 
+                                                setFormData({
+                                                    ...formData,
                                                     vendor: selectedOption?.value || '',
                                                     vendorId: selectedOption?.id || '',
                                                     contractor: selectedOption ? '' : formData.contractor,
@@ -1663,8 +1604,8 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                             options={contractorOption}
                                             value={contractorOption.find(opt => opt.value === formData.contractor)}
                                             onChange={(selectedOption) =>
-                                                setFormData({ 
-                                                    ...formData, 
+                                                setFormData({
+                                                    ...formData,
                                                     contractor: selectedOption?.value || '',
                                                     contractorId: selectedOption?.id || '',
                                                     vendor: selectedOption ? '' : formData.vendor,
@@ -1750,7 +1691,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                     color: 'black',
                                                 }),
                                             }}
-                                            menuPlacement="bottom" 
+                                            menuPlacement="bottom"
                                             menuPosition="absolute"
                                         />
                                     </div>

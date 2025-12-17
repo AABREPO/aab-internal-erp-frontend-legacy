@@ -6,7 +6,7 @@ import Sidebar from './Sidebar';
 import Logout from '../Images/Logout.png'
 import DownloadIcon from '../Images/download.png';
 import EditIcon from '../Images/Edit.svg';
-const Navbar = ({ username, userImage, position, email, onLogout , userRoles = []}) => {
+const Navbar = ({ username, userImage, position, email, onLogout, userRoles = [] }) => {
   const [isSidebarVisible, setIsSidebarVisible] = useState(false);
   const [isProfileDropdownVisible, setIsProfileDropdownVisible] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -17,6 +17,8 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
   const [requestRecordError, setRequestRecordError] = useState('');
   const [vendorLookup, setVendorLookup] = useState({});
   const [contractorLookup, setContractorLookup] = useState({});
+  const [employeeLookup, setEmployeeLookup] = useState({});
+  const [labourLookup, setLabourLookup] = useState({});
   const [siteLookup, setSiteLookup] = useState({});
   const [editRequests, setEditRequests] = useState([]);
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
@@ -32,15 +34,12 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
         const matchedRoles = allRoles.filter(role =>
           userRoleNames.includes(role.userRoles)
         );
-        // Flatten all matched models
         const models = matchedRoles.flatMap(role => role.userModels || []);
         setRoleModels(models);
-
       } catch (error) {
         console.error("Error fetching user roles:", error);
       }
     };
-
     if (userRoles.length > 0) {
       fetchUserRoles();
     }
@@ -51,7 +50,6 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
   const normalizedUsername = username?.trim().toLowerCase();
   const canDownloadExpenses = normalizedUsername === 'admin' || normalizedUsername === 'mahalingam m';
   const canViewEditRequests = normalizedUsername === 'admin' || normalizedUsername === 'mahalingam m';
-
   const handleDownloadExpenses = async () => {
     if (isDownloading || !canDownloadExpenses) return;
     setIsDownloading(true);
@@ -66,7 +64,18 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
         loanPurposesResponse,
         projectClientsResponse,
         rentResponse,
-        tenantLinkResponse
+        tenantLinkResponse,
+        // MasterData API calls
+        categoriesResponse,
+        machineToolsResponse,
+        employeeDetailsResponse,
+        laboursListResponse,
+        accountDetailsResponse,
+        bankAccountTypesResponse,
+        ebServiceLinksResponse,
+        staffAdvanceResponse,
+        purposesResponse,
+        vendorPaymentsTrackerResponse
       ] = await Promise.all([
         axios.get("https://backendaab.in/aabuilderDash/expenses_form/get_form"),
         axios.get("https://backendaab.in/aabuilderDash/api/project_Names/getAll", { withCredentials: true }),
@@ -77,9 +86,19 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
         axios.get("https://backendaab.in/aabuildersDash/api/loan-purposes/getAll", { withCredentials: true }),
         axios.get("https://backendaab.in/aabuilderDash/api/projects/getAll", { withCredentials: true }),
         axios.get("https://backendaab.in/aabuildersDash/api/rental_forms/getAll"),
-        axios.get("https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll")
+        axios.get("https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll"),
+        // MasterData API calls
+        axios.get("https://backendaab.in/aabuilderDash/api/expenses_categories/getAll"),
+        axios.get("https://backendaab.in/aabuilderDash/api/machine_tools/getAll"),
+        axios.get("https://backendaab.in/aabuildersDash/api/employee_details/getAll", { withCredentials: true }),
+        axios.get("https://backendaab.in/aabuildersDash/api/labours-details/getAll", { withCredentials: true }),
+        axios.get("https://backendaab.in/aabuildersDash/api/account-details/getAll"),
+        axios.get("https://backendaab.in/aabuildersDash/api/bank_type/getAll"),
+        axios.get("https://backendaab.in/aabuildersDash/api/eb-service-no/getAll"),
+        axios.get("https://backendaab.in/aabuildersDash/api/staff-advance/all"),
+        axios.get("https://backendaab.in/aabuildersDash/api/purposes/getAll"),
+        axios.get("https://backendaab.in/aabuildersDash/api/vendor-payments/trackers", { withCredentials: true })
       ]);
-
       const buildLookup = (items = [], idKey, labelKey) => {
         if (!Array.isArray(items)) return {};
         return items.reduce((acc, item) => {
@@ -90,12 +109,10 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
           return acc;
         }, {});
       };
-
       const projectLookup = buildLookup(projectsResponse.data, 'id', 'siteName');
       const vendorLookup = buildLookup(vendorsResponse.data, 'id', 'vendorName');
       const contractorLookup = buildLookup(contractorsResponse.data, 'id', 'contractorName');
       const expensesData = Array.isArray(expensesResponse.data) ? expensesResponse.data : [];
-
       const formatDate = (value, options) => {
         if (!value) return '';
         try {
@@ -106,7 +123,6 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
           return value;
         }
       };
-
       const formatDateOnly = (dateString) => {
         if (!dateString) return '';
         try {
@@ -120,7 +136,6 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
           return dateString;
         }
       };
-
       const formatTimestamp = (dateString) => {
         if (!dateString) return '';
         try {
@@ -139,8 +154,6 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
           return dateString;
         }
       };
-
-      // Build site lookup including predefined sites for advance portal
       const predefinedSites = [
         { id: 1, siteName: "Mason Advance" },
         { id: 2, siteName: "Material Advance" },
@@ -150,19 +163,22 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
         { id: 6, siteName: "Subhash Kumar - Kunnur" },
         { id: 7, siteName: "Summary Bill" },
         { id: 8, siteName: "Daily Wage" },
-        { id: 9, siteName: "Rent Management Portal" }
+        { id: 9, siteName: "Rent Management Portal" },
+        { id: 10, siteName: "Multi-Project Batch" },
+        { id: 11, siteName: "Loan Portal" }
       ];
       const allSites = [...predefinedSites, ...(Array.isArray(projectsResponse.data) ? projectsResponse.data : [])];
       const advanceSiteLookup = buildLookup(allSites, 'id', 'siteName');
-
       const getVendorName = (id) => vendorLookup[id] || '';
       const getContractorName = (id) => contractorLookup[id] || '';
       const getSiteName = (id) => {
         if (!id && id !== 0) return '';
         return advanceSiteLookup[id] || '';
       };
-
       const loanPurposeLookup = buildLookup(loanPurposesResponse.data, 'id', 'purpose');
+      const employeeLookup = buildLookup(employeeDetailsResponse.data, 'id', 'employee_name');
+      const labourLookup = buildLookup(laboursListResponse.data, 'id', 'labour_name');
+      const purposeLookup = buildLookup(purposesResponse.data, 'id', 'purpose');
       const buildProjectClientMaps = (projects = []) => {
         const idMap = {};
         const nameMap = {};
@@ -385,17 +401,416 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
           'To Purpose ID': entry.to_purpose_id ?? ''
         };
       });
-      const expensesWorksheet = XLSX.utils.json_to_sheet(worksheetData);
-      const advanceWorksheet = XLSX.utils.json_to_sheet(advanceWorksheetData);
-      const loanWorksheet = XLSX.utils.json_to_sheet(loanWorksheetData);
-      const rentWorksheet = XLSX.utils.json_to_sheet(rentWorksheetData);
+      // Helper function to truncate cell values to Excel's maximum length (32767 characters)
+      const truncateCellValue = (value) => {
+        if (value === null || value === undefined) return '';
+        const str = String(value);
+        const maxLength = 32767;
+        if (str.length > maxLength) {
+          return str.substring(0, maxLength - 3) + '...';
+        }
+        return str;
+      };
+
+      // Helper function to safely process worksheet data and truncate long values
+      const processWorksheetData = (data) => {
+        return data.map(row => {
+          const processedRow = {};
+          for (const key in row) {
+            processedRow[key] = truncateCellValue(row[key]);
+          }
+          return processedRow;
+        });
+      };
+
+      // Process MasterData tables
+      // Process Project Names (already fetched as projectsResponse)
+      const projectNamesData = Array.isArray(projectsResponse.data) ? projectsResponse.data : [];
+      const projectNamesWorksheetData = projectNamesData.map((item, index) => ({
+        'S.No': index + 1,
+        'ID': item.id || '',
+        'Site Name': item.siteName || '',
+        'Site No': item.siteNo || ''
+      }));
+
+      // Process Vendor Names (already fetched as vendorsResponse)
+      const vendorNamesData = Array.isArray(vendorsResponse.data) ? vendorsResponse.data : [];
+      const vendorNamesWorksheetData = vendorNamesData.map((item, index) => ({
+        'S.No': index + 1,
+        'ID': item.id || '',
+        'Vendor Name': item.vendorName || '',
+        'Account Holder Name': item.account_holder_name || '',
+        'Account Number': item.account_number || '',
+        'Bank Name': item.bank_name || '',
+        'Branch': item.branch || '',
+        'IFSC Code': item.ifsc_code || '',
+        'GPay Number': item.gpay_number || '',
+        'UPI ID': item.upi_id || '',
+        'Contact Number': item.contact_number || '',
+        'Contact Email': item.contact_email || '',
+        'QR Image': item.upi_qr_image || ''
+      }));
+
+      // Process Contractor Names (already fetched as contractorsResponse)
+      const contractorNamesData = Array.isArray(contractorsResponse.data) ? contractorsResponse.data : [];
+      const contractorNamesWorksheetData = contractorNamesData.map((item, index) => ({
+        'S.No': index + 1,
+        'ID': item.id || '',
+        'Contractor Name': item.contractorName || '',
+        'Account Holder Name': item.account_holder_name || '',
+        'Account Number': item.account_number || '',
+        'Bank Name': item.bank_name || '',
+        'Branch': item.branch || '',
+        'IFSC Code': item.ifsc_code || '',
+        'GPay Number': item.gpay_number || '',
+        'UPI ID': item.upi_id || '',
+        'Contact Number': item.contact_number || '',
+        'Contact Email': item.contact_email || '',
+        'QR Image': item.upi_qr_image || ''
+      }));
+
+      // Process Categories
+      const categoriesData = Array.isArray(categoriesResponse.data) ? categoriesResponse.data : [];
+      const categoriesWorksheetData = categoriesData.map((item, index) => ({
+        'S.No': index + 1,
+        'ID': item.id || '',
+        'Category': item.category || ''
+      }));
+
+      // Process Machine Tools
+      const machineToolsData = Array.isArray(machineToolsResponse.data) ? machineToolsResponse.data : [];
+      const machineToolsWorksheetData = machineToolsData.map((item, index) => ({
+        'S.No': index + 1,
+        'ID': item.id || '',
+        'Machine Tool': item.machineTool || ''
+      }));
+
+      // Process Employee Details
+      const employeeDetailsData = Array.isArray(employeeDetailsResponse.data) ? employeeDetailsResponse.data : [];
+      const employeeDetailsWorksheetData = employeeDetailsData.map((item, index) => ({
+        'S.No': index + 1,
+        'ID': item.id || '',
+        'Employee Name': item.employee_name || '',
+        'Mobile Number': item.employee_mobile_number || '',
+        'Role': item.role_of_employee || '',
+        'Account Holder Name': item.account_holder_name || '',
+        'Account Number': item.account_number || '',
+        'Bank Name': item.bank_name || '',
+        'IFSC Code': item.ifsc_code || '',
+        'Branch': item.branch || '',
+        'UPI ID': item.upi_id || '',
+        'GPay Number': item.gpay_number || '',
+        'Contact Email': item.contact_email || '',
+        'Employee ID': item.employee_id || '',
+        'Aadhaar PDF': item.aadhaar_pdf || ''
+      }));
+
+      // Process Labours List
+      const laboursListData = Array.isArray(laboursListResponse.data) ? laboursListResponse.data : [];
+      const laboursListWorksheetData = laboursListData.map((item, index) => ({
+        'S.No': index + 1,
+        'ID': item.id || '',
+        'Labour Name': item.labour_name || '',
+        'Salary': item.labourSalary || ''
+      }));
+
+      // Process Account Details
+      const accountDetailsData = Array.isArray(accountDetailsResponse.data) ? accountDetailsResponse.data : [];
+      const accountDetailsWorksheetData = accountDetailsData.map((item, index) => ({
+        'S.No': index + 1,
+        'ID': item.id || '',
+        'Account Holder Name': item.account_holder_name || '',
+        'Account Number': item.account_number || '',
+        'Bank Name': item.bank_name || '',
+        'Branch': item.branch || '',
+        'IFSC Code': item.ifsc_code || '',
+        'UPI ID': item.upi_id || '',
+        'GPay Number': item.gpay_number || '',
+        'Account Type': item.account_type || '',
+        'QR Image': item.upi_qr_image || ''
+      }));
+
+      // Process Bank Account Types
+      const bankAccountTypesData = Array.isArray(bankAccountTypesResponse.data) ? bankAccountTypesResponse.data : [];
+      const bankAccountTypesWorksheetData = bankAccountTypesData.map((item, index) => ({
+        'S.No': index + 1,
+        'ID': item.id || '',
+        'Bank Account Type': item.bank_account_type || ''
+      }));
+
+      // Process EB Service Links
+      const ebServiceLinksData = Array.isArray(ebServiceLinksResponse.data) ? ebServiceLinksResponse.data : [];
+      const ebServiceLinksWorksheetData = ebServiceLinksData.map((item, index) => ({
+        'S.No': index + 1,
+        'ID': item.id || '',
+        'Project ID': item.project_id || '',
+        'Door No': item.door_no || '',
+        'EB Service No': item.eb_service_no || ''
+      }));
+
+      // Process Projects (Project Management) - already fetched as projectClientsResponse
+      const projectsManagementData = Array.isArray(projectClientsResponse.data) ? projectClientsResponse.data : [];
+      const projectsManagementWorksheetData = projectsManagementData.map((project, index) => {
+        const ownerDetails = Array.isArray(project.ownerDetailsList) ? project.ownerDetailsList : [];
+        const propertyDetails = Array.isArray(project.propertyDetailsList) ? project.propertyDetailsList : [];
+        
+        // Flatten owner details
+        const ownerNames = ownerDetails.map(o => o.clientName).filter(Boolean).join('; ');
+        const ownerMobiles = ownerDetails.map(o => o.mobile).filter(Boolean).join('; ');
+        
+        // Flatten property details
+        const shopNos = propertyDetails.map(p => p.shopNo).filter(Boolean).join('; ');
+        const doorNos = propertyDetails.map(p => p.doorNo).filter(Boolean).join('; ');
+        const ebNos = propertyDetails.map(p => p.ebNo).filter(Boolean).join('; ');
+        
+        return {
+          'S.No': index + 1,
+          'ID': project.id || '',
+          'Project Name': project.projectName || '',
+          'Project Address': project.projectAddress || '',
+          'Project ID': project.projectId || '',
+          'Project Category': project.projectCategory || '',
+          'Project Reference Name': project.projectReferenceName || '',
+          'Owner Names': ownerNames,
+          'Owner Mobiles': ownerMobiles,
+          'Shop Nos': shopNos,
+          'Door Nos': doorNos,
+          'EB Nos': ebNos,
+          'Owner Details': truncateCellValue(JSON.stringify(ownerDetails)),
+          'Property Details': truncateCellValue(JSON.stringify(propertyDetails))
+        };
+      });
+
+      // Process Staff Advance
+      const staffAdvanceData = Array.isArray(staffAdvanceResponse.data) ? staffAdvanceResponse.data : [];
+      const getEmployeeOrLabourName = (entry) => {
+        if (entry.employee_id && entry.employee_id !== 0) {
+          return employeeLookup[entry.employee_id] || '';
+        }
+        if (entry.labour_id && entry.labour_id !== 0) {
+          return labourLookup[entry.labour_id] || '';
+        }
+        return '';
+      };
+      const staffAdvanceWorksheetData = staffAdvanceData.map((entry, index) => {
+        const employeeOrLabourName = getEmployeeOrLabourName(entry);
+        const fromPurposeName = purposeLookup[entry.from_purpose_id] || '';
+        const toPurposeName = entry.to_purpose_id ? (purposeLookup[entry.to_purpose_id] || '') : '';
+        const advanceAmount = entry.amount != null && entry.amount !== ""
+          ? Number(entry.amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })
+          : "";
+        const refundAmount = entry.staff_refund_amount != null && entry.staff_refund_amount !== ""
+          ? Number(entry.staff_refund_amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })
+          : "";
+        return {
+          'S.No': index + 1,
+          'Time Stamp': formatTimestamp(entry.timestamp),
+          'Date': formatDateOnly(entry.date),
+          'Employee/Labour Name': employeeOrLabourName,
+          'Purpose From': fromPurposeName,
+          'Purpose To': toPurposeName,
+          'Advance Amount': advanceAmount,
+          'Refund Amount': refundAmount,
+          'Type': entry.type || '',
+          'Payment Mode': entry.staff_payment_mode || '',
+          'Description': entry.description || '',
+          'File URL': entry.file_url || '',
+          'Entry No': entry.entry_no || '',
+          'Week No': entry.week_no || '',
+          'Staff Advance Portal ID': entry.staffAdvancePortalId || '',
+          'Employee ID': entry.employee_id ?? '',
+          'Labour ID': entry.labour_id ?? '',
+          'From Purpose ID': entry.from_purpose_id ?? '',
+          'To Purpose ID': entry.to_purpose_id ?? '',
+          'Loan Portal ID': entry.loan_portal_id ?? '',
+          'Allow To Edit': entry.allow_to_edit ? 'Yes' : 'No'
+        };
+      });
+
+      // Create worksheets with truncated data to prevent Excel cell length errors
+      const expensesWorksheet = XLSX.utils.json_to_sheet(processWorksheetData(worksheetData));
+      const advanceWorksheet = XLSX.utils.json_to_sheet(processWorksheetData(advanceWorksheetData));
+      const loanWorksheet = XLSX.utils.json_to_sheet(processWorksheetData(loanWorksheetData));
+      const rentWorksheet = XLSX.utils.json_to_sheet(processWorksheetData(rentWorksheetData));
+      const projectNamesWorksheet = XLSX.utils.json_to_sheet(processWorksheetData(projectNamesWorksheetData));
+      const vendorNamesWorksheet = XLSX.utils.json_to_sheet(processWorksheetData(vendorNamesWorksheetData));
+      const contractorNamesWorksheet = XLSX.utils.json_to_sheet(processWorksheetData(contractorNamesWorksheetData));
+      const categoriesWorksheet = XLSX.utils.json_to_sheet(processWorksheetData(categoriesWorksheetData));
+      const machineToolsWorksheet = XLSX.utils.json_to_sheet(processWorksheetData(machineToolsWorksheetData));
+      const employeeDetailsWorksheet = XLSX.utils.json_to_sheet(processWorksheetData(employeeDetailsWorksheetData));
+      const laboursListWorksheet = XLSX.utils.json_to_sheet(processWorksheetData(laboursListWorksheetData));
+      const accountDetailsWorksheet = XLSX.utils.json_to_sheet(processWorksheetData(accountDetailsWorksheetData));
+      const bankAccountTypesWorksheet = XLSX.utils.json_to_sheet(processWorksheetData(bankAccountTypesWorksheetData));
+      const ebServiceLinksWorksheet = XLSX.utils.json_to_sheet(processWorksheetData(ebServiceLinksWorksheetData));
+      const projectsManagementWorksheet = XLSX.utils.json_to_sheet(processWorksheetData(projectsManagementWorksheetData));
+      const staffAdvanceWorksheet = XLSX.utils.json_to_sheet(processWorksheetData(staffAdvanceWorksheetData));
+
+      // Create workbook and add all sheets
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, expensesWorksheet, 'Expenses');
       XLSX.utils.book_append_sheet(workbook, advanceWorksheet, 'Advance Portal');
       XLSX.utils.book_append_sheet(workbook, loanWorksheet, 'Loan Portal');
       XLSX.utils.book_append_sheet(workbook, rentWorksheet, 'Rent Management');
+      XLSX.utils.book_append_sheet(workbook, staffAdvanceWorksheet, 'Staff Advance');
+      // MasterData sheets
+      XLSX.utils.book_append_sheet(workbook, projectNamesWorksheet, 'Project Names');
+      XLSX.utils.book_append_sheet(workbook, vendorNamesWorksheet, 'Vendor Names');
+      XLSX.utils.book_append_sheet(workbook, contractorNamesWorksheet, 'Contractor Names');
+      XLSX.utils.book_append_sheet(workbook, categoriesWorksheet, 'Categories');
+      XLSX.utils.book_append_sheet(workbook, machineToolsWorksheet, 'Machine Tools');
+      XLSX.utils.book_append_sheet(workbook, employeeDetailsWorksheet, 'Employee Details');
+      XLSX.utils.book_append_sheet(workbook, laboursListWorksheet, 'Labours List');
+      XLSX.utils.book_append_sheet(workbook, accountDetailsWorksheet, 'Account Details');
+      XLSX.utils.book_append_sheet(workbook, bankAccountTypesWorksheet, 'Bank Account Types');
+      XLSX.utils.book_append_sheet(workbook, ebServiceLinksWorksheet, 'EB Service Links');
+      XLSX.utils.book_append_sheet(workbook, projectsManagementWorksheet, 'Project Management');
+      
       const dateStamp = new Date().toISOString().split('T')[0];
       XLSX.writeFile(workbook, `Expenses_${dateStamp}.xlsx`);
+
+      // Process and download VendorPayments Tracker data as separate file
+      const vendorPaymentsTrackerData = Array.isArray(vendorPaymentsTrackerResponse.data) ? vendorPaymentsTrackerResponse.data : [];
+      const formatTimestampForTracker = (dateString) => {
+        if (!dateString) return '-';
+        try {
+          const date = new Date(dateString);
+          if (Number.isNaN(date.getTime())) return dateString;
+          return date.toLocaleString('en-GB', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+          });
+        } catch {
+          return dateString;
+        }
+      };
+
+      // Fetch all bill entries and payment details for all trackers
+      const fetchBillEntriesForAllTrackers = async () => {
+        const allBillEntries = [];
+        for (const tracker of vendorPaymentsTrackerData) {
+          try {
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/bill-entry/get/${tracker.id}`, {
+              method: "GET",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" }
+            });
+            if (response.ok) {
+              const data = await response.json();
+              if (Array.isArray(data) && data.length > 0) {
+                allBillEntries.push(...data.map(entry => ({
+                  ...entry,
+                  vendor_payments_tracker_id: tracker.id
+                })));
+              }
+            }
+          } catch (error) {
+            console.error(`Error fetching bill entries for tracker ${tracker.id}:`, error);
+          }
+        }
+        return allBillEntries;
+      };
+
+      const fetchPaymentDetailsForAllTrackers = async () => {
+        const allPaymentDetails = [];
+        for (const tracker of vendorPaymentsTrackerData) {
+          try {
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/vendor-bill-tracker/get/${tracker.id}`, {
+              method: 'GET',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' }
+            });
+            if (response.ok) {
+              const data = await response.json();
+              if (Array.isArray(data) && data.length > 0) {
+                allPaymentDetails.push(...data.map(payment => ({
+                  ...payment,
+                  vendor_payments_tracker_id: tracker.id
+                })));
+              }
+            }
+          } catch (error) {
+            console.error(`Error fetching payment details for tracker ${tracker.id}:`, error);
+          }
+        }
+        return allPaymentDetails;
+      };
+
+      // Fetch related data
+      const [allBillEntries, allPaymentDetails] = await Promise.all([
+        fetchBillEntriesForAllTrackers(),
+        fetchPaymentDetailsForAllTrackers()
+      ]);
+
+      // Process VendorPayments Tracker main sheet
+      const vendorPaymentsTrackerWorksheetData = vendorPaymentsTrackerData.map((item, index) => {
+        return {
+          'S.No': index + 1,
+          'ID': item.id || '-',
+          'Time Stamp': formatTimestampForTracker(item.created_at || item.createdAt || item.timestamp),
+          'Bill Arrival Date': item.bill_arrival_date ? formatDateOnly(item.bill_arrival_date) : '-',
+          'Vendor ID': item.vendor_id || item.vendorId || '-',
+          'No of Bills': item.no_of_bills || item.noOfBills || '-',
+          'Total Amount': item.total_amount ? Number(item.total_amount).toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '-',
+          'Adjustment Amount': item.adjustment_amount || item.adjustmentAmount || 0,
+          'Entry Status': item.entry_status || '-',
+          'Over All Payment PDF URL': item.over_all_payment_pdf_url || item.overAllPaymentPdfUrl || '-',
+          'Created At': item.created_at || item.createdAt || item.timestamp || '-',
+          'Updated At': item.updated_at || item.updatedAt || '-'
+        };
+      });
+
+      // Process Bill Entries sheet
+      const billEntriesWorksheetData = allBillEntries.map((entry, index) => {
+        return {
+          'S.No': index + 1,
+          'Bill Entry ID': entry.id || '-',
+          'Vendor Payments Tracker ID': entry.vendor_payments_tracker_id || '-',
+          'Entered By': entry.entered_by || '-',
+          'Entered Date': entry.entered_date ? formatDateOnly(entry.entered_date) : '-',
+          'Created At': entry.created_at || entry.createdAt || entry.timestamp || '-',
+          'Updated At': entry.updated_at || entry.updatedAt || '-'
+        };
+      });
+
+      // Process Payment Details sheet
+      const paymentDetailsWorksheetData = allPaymentDetails.map((payment, index) => {
+        return {
+          'S.No': index + 1,
+          'Payment ID': payment.id || '-',
+          'Vendor Payments Tracker ID': payment.vendor_payments_tracker_id || payment.vendor_payments_tracker_id || '-',
+          'Date': payment.date ? formatDateOnly(payment.date) : '-',
+          'Amount': payment.amount ? Number(payment.amount).toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '-',
+          'Actual Amount': payment.actual_amount ? Number(payment.actual_amount).toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '-',
+          'Discount Amount': payment.discount_amount ? Number(payment.discount_amount).toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '-',
+          'Carry Forward Amount': payment.carry_forward_amount ? Number(payment.carry_forward_amount).toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '-',
+          'Payment Mode': payment.vendor_bill_payment_mode || payment.mode || '-',
+          'Cheque Number': payment.cheque_number || payment.cheque_no || '-',
+          'Cheque Date': payment.cheque_date ? formatDateOnly(payment.cheque_date) : '-',
+          'Transaction Number': payment.transaction_number || payment.transactionNumber || '-',
+          'Account Number': payment.account_number || payment.accountNumber || '-',
+          'Bill URL': payment.bill_url || '-',
+          'Created At': payment.created_at || payment.createdAt || payment.timestamp || '-',
+          'Updated At': payment.updated_at || payment.updatedAt || '-'
+        };
+      });
+
+      // Create worksheets
+      const vendorPaymentsTrackerWorksheet = XLSX.utils.json_to_sheet(processWorksheetData(vendorPaymentsTrackerWorksheetData));
+      const billEntriesWorksheet = XLSX.utils.json_to_sheet(processWorksheetData(billEntriesWorksheetData));
+      const paymentDetailsWorksheet = XLSX.utils.json_to_sheet(processWorksheetData(paymentDetailsWorksheetData));
+      
+      // Create separate workbook for VendorPayments Tracker with multiple sheets
+      const vendorPaymentsTrackerWorkbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(vendorPaymentsTrackerWorkbook, vendorPaymentsTrackerWorksheet, 'Vendor Payments Tracker');
+      XLSX.utils.book_append_sheet(vendorPaymentsTrackerWorkbook, billEntriesWorksheet, 'Bill Entries');
+      XLSX.utils.book_append_sheet(vendorPaymentsTrackerWorkbook, paymentDetailsWorksheet, 'Payment Details');
+      
+      // Download the VendorPayments Tracker file
+      XLSX.writeFile(vendorPaymentsTrackerWorkbook, `VendorPaymentsTracker_${dateStamp}.xlsx`);
     } catch (error) {
       console.error("Error generating expenses report:", error);
       alert("Unable to download expenses report. Please try again.");
@@ -413,7 +828,6 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
       setIsEditRequestsDropdownOpen(false);
     }
   };
-
   const closeSelectedRequestModal = () => {
     setSelectedRequest(null);
     setSelectedRequestRecord(null);
@@ -424,37 +838,30 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  // Fetch edit requests
   useEffect(() => {
     if (!canViewEditRequests) return;
-
     fetchEditRequests();
-    // Poll for new requests every 30 seconds
     const interval = setInterval(fetchEditRequests, 30000);
-
     const handleExternalUpdate = () => {
       fetchEditRequests();
     };
     window.addEventListener('editRequestCreated', handleExternalUpdate);
-
     return () => {
       clearInterval(interval);
       window.removeEventListener('editRequestCreated', handleExternalUpdate);
     };
   }, [canViewEditRequests]);
-
   useEffect(() => {
     if (!canViewEditRequests) return;
-
     const fetchReferenceData = async () => {
       try {
-        const [vendorsRes, contractorsRes, sitesRes] = await Promise.all([
+        const [vendorsRes, contractorsRes, sitesRes, employeesRes, laboursRes] = await Promise.all([
           axios.get("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", { withCredentials: true }),
           axios.get("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", { withCredentials: true }),
           axios.get("https://backendaab.in/aabuilderDash/api/project_Names/getAll", { withCredentials: true }),
+          axios.get("https://backendaab.in/aabuildersDash/api/employee_details/getAll", { withCredentials: true }),
+          axios.get("https://backendaab.in/aabuildersDash/api/labours-details/getAll", { withCredentials: true })
         ]);
-
         const buildLookup = (items = [], idKey, labelKey) =>
           items.reduce((acc, item) => {
             const id = item?.[idKey];
@@ -463,10 +870,10 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
             }
             return acc;
           }, {});
-
         setVendorLookup(buildLookup(vendorsRes.data || [], 'id', 'vendorName'));
         setContractorLookup(buildLookup(contractorsRes.data || [], 'id', 'contractorName'));
-
+        setEmployeeLookup(buildLookup(employeesRes.data || [], 'id', 'employee_name'));
+        setLabourLookup(buildLookup(laboursRes.data || [], 'id', 'labour_name'));
         const predefinedSites = [
           { id: 1, siteName: "Mason Advance" },
           { id: 2, siteName: "Material Advance" },
@@ -476,7 +883,9 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
           { id: 6, siteName: "Subhash Kumar - Kunnur" },
           { id: 7, siteName: "Summary Bill" },
           { id: 8, siteName: "Daily Wage" },
-          { id: 9, siteName: "Rent Management Portal" }
+          { id: 9, siteName: "Rent Management Portal" },
+          { id: 10, siteName: "Multi-Project Batch" },
+          { id: 11, siteName: "Loan Portal" }
         ];
         const allSites = [...predefinedSites, ...(Array.isArray(sitesRes.data) ? sitesRes.data : [])];
         setSiteLookup(allSites.reduce((acc, site) => {
@@ -489,7 +898,6 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
         console.error('Error fetching lookup data:', error);
       }
     };
-
     fetchReferenceData();
   }, [canViewEditRequests]);
 
@@ -499,7 +907,6 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
         withCredentials: true
       });
       const allRequests = response.data || [];
-      // Filter only pending requests (not completed)
       const pending = allRequests.filter(req => !req.request_completed);
       setEditRequests(pending);
       setPendingRequestsCount(pending.length);
@@ -509,19 +916,41 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
   };
 
   const loadRequestRecord = async (request) => {
-    if (!request?.module_name_id || request.module_name !== 'Advance Portal') return;
+    if (!request?.module_name_id) return;
+
     try {
       setRequestRecordLoading(true);
       setRequestRecordError('');
-      const response = await axios.get(`https://backendaab.in/aabuildersDash/api/advance_portal/get/${request.module_name_id}`, {
-        withCredentials: true
-      });
+
+      let response;
+
+      if (request.module_name === 'Advance Portal') {
+        response = await axios.get(
+          `https://backendaab.in/aabuildersDash/api/advance_portal/get/${request.module_name_id}`,
+          { withCredentials: true }
+        );
+      } else if (request.module_name === 'Staff Portal') {
+        response = await axios.get(
+          `https://backendaab.in/aabuildersDash/api/staff-advance/${request.module_name_id}`,
+          { withCredentials: true }
+        );
+      } else if (request.module_name === 'Loan Portal') {
+        response = await axios.get(
+          `https://backendaab.in/aabuildersDash/api/loans/${request.module_name_id}`,
+          { withCredentials: true }
+        );
+      }else {
+        return; // unsupported module
+      }
+
       const record = response.data;
+
       if (record) {
         setSelectedRequestRecord(record);
       } else {
         setRequestRecordError('Unable to locate record details.');
       }
+
     } catch (error) {
       console.error('Error loading request record:', error);
       setRequestRecordError('Failed to load record details.');
@@ -529,7 +958,6 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
       setRequestRecordLoading(false);
     }
   };
-
   const handleRequestCardClick = (request) => {
     setSelectedRequest(request);
     setSelectedRequestRecord(null);
@@ -540,6 +968,8 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
 
   const getVendorNameById = (id) => vendorLookup?.[id] || '';
   const getContractorNameById = (id) => contractorLookup?.[id] || '';
+  const getEmployeeNameById = (id) => employeeLookup?.[id] || '';
+  const getLabourNameById = (id) => labourLookup?.[id] || '';
   const getSiteNameById = (id) => {
     if (id === null || id === undefined) return '';
     return siteLookup?.[id] || '';
@@ -549,6 +979,8 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
     if (!record) return '';
     if (record.vendor_id) return getVendorNameById(record.vendor_id);
     if (record.contractor_id) return getContractorNameById(record.contractor_id);
+    if (record.employee_id) return getEmployeeNameById(record.employee_id);
+    if (record.labour_id) return getLabourNameById(record.labour_id);
     return '';
   };
 
@@ -559,25 +991,37 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
     return num.toLocaleString('en-IN', { maximumFractionDigits: 0 });
   };
 
-  const handleApproveRequest = async (requestId, moduleNameId) => {
+  const handleApproveRequest = async (requestId, moduleName, moduleNameId) => {
     try {
-      // Set allowToEdit to true to allow the user to edit
       if (moduleNameId) {
-        await axios.put(
-          `https://backendaab.in/aabuildersDash/api/advance_portal/allow/${moduleNameId}?allow=true`,
-          {},
-          { withCredentials: true }
-        );
+        if (moduleName === 'Advance Portal') {
+          await axios.put(
+            `https://backendaab.in/aabuildersDash/api/advance_portal/allow/${moduleNameId}?allow=true`,
+            {},
+            { withCredentials: true }
+          );
+        } else if (moduleName === 'Staff Portal') {
+          await axios.put(
+            `https://backendaab.in/aabuildersDash/api/staff-advance/allow/${moduleNameId}?allow=true`,
+            {},
+            { withCredentials: true }
+          );
+        } else if (moduleName === 'Loan Portal') {
+          await axios.put(
+            `https://backendaab.in/aabuildersDash/api/loans/allow/${moduleNameId}?allow=true`,
+            {},
+            { withCredentials: true }
+          );
+        }
       }
-
-      // Update the request to mark as approved and completed
-      await axios.put(`https://backendaab.in/aabuildersDash/api/edit_requests/edit/${requestId}`, {
-        request_approval: true,
-        request_completed: true
-      }, {
-        withCredentials: true
-      });
-
+      await axios.put(
+        `https://backendaab.in/aabuildersDash/api/edit_requests/edit/${requestId}`,
+        {
+          request_approval: true,
+          request_completed: true,
+        },
+        { withCredentials: true }
+      );
       alert('Edit request approved. User can now edit the record.');
       closeSelectedRequestModal();
       setIsEditRequestsDropdownOpen(false);
@@ -596,7 +1040,6 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
       }, {
         withCredentials: true
       });
-
       alert('Edit request rejected.');
       closeSelectedRequestModal();
       setIsEditRequestsDropdownOpen(false);
@@ -655,7 +1098,7 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
             {canDownloadExpenses && (
               <button type="button" onClick={handleDownloadExpenses} disabled={isDownloading}
                 className="flex items-center border border-[#BF9853] rounded-md text-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed"
-                title={isDownloading ? "Preparing download..." : "Download expenses"}
+                title={isDownloading ? "Preparing download..." : "Download expenses and master data"}
               >
                 <img src={DownloadIcon} alt="Download expenses" className="w-5 h-5" />
               </button>
@@ -712,7 +1155,7 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
                                 <p className="text-[8px]">{formatDate(request.timestamp)}</p>
                               </div>
                             </div>
-                            
+
                           </div>
                         ))}
                       </div>
@@ -803,7 +1246,7 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
                       <thead className="bg-[#FAF6ED] text-[11px] uppercase">
                         <tr>
                           <th className="px-3 py-2 text-left">Date</th>
-                          <th className="px-3 py-2 text-left">Contractor/Vendor</th>
+                          <th className="px-3 py-2 text-left">Associate</th>
                           <th className="px-3 py-2 text-left">Project Name</th>
                           <th className="px-3 py-2 text-left">Transfer Site</th>
                           <th className="px-3 py-2 text-right">Advance</th>
@@ -858,7 +1301,7 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
                     Reject
                   </button>
                   <button
-                    onClick={() => handleApproveRequest(selectedRequest.id, selectedRequest.module_name_id)}
+                    onClick={() => handleApproveRequest(selectedRequest.id,selectedRequest.module_name, selectedRequest.module_name_id)}
                     className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm font-semibold"
                   >
                     Approve
@@ -869,7 +1312,7 @@ const Navbar = ({ username, userImage, position, email, onLogout , userRoles = [
           </div>
         </div>
       )}
-      <Sidebar isVisible={isSidebarVisible} sidebarRef={sidebarRef} userRoles={userRoles} onCloseSidebar={() => setIsSidebarVisible(false)}/>
+      <Sidebar isVisible={isSidebarVisible} sidebarRef={sidebarRef} userRoles={userRoles} onCloseSidebar={() => setIsSidebarVisible(false)} />
     </>
   );
 };

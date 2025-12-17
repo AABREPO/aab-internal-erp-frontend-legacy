@@ -937,7 +937,6 @@ const PurchaseInputData = () => {
         setPoBrand(data);
       } else {
         setBrandOptions([]);
-        console.log('Error fetching tile area names.');
       }
     } catch (error) {
       console.error('Error:', error);
@@ -953,7 +952,6 @@ const PurchaseInputData = () => {
       if (response.ok) {
         const data = await response.json();
         setPoType(data);
-        //setTypeColorOptions([]);
       } else {
         console.log('Error fetching tile area names.');
       }
@@ -1165,7 +1163,6 @@ const PurchaseInputData = () => {
       if (!response.ok) {
         throw new Error('Failed to submit data');
       }
-
       const data = await response.json();
       window.location.reload();
       // Optionally show success message or close popup
@@ -1175,7 +1172,6 @@ const PurchaseInputData = () => {
       alert('Failed to submit the form.');
     }
   };
-
   const customSelectStyles = {
     control: (provided, state) => ({
       ...provided,
@@ -1194,7 +1190,6 @@ const PurchaseInputData = () => {
       display: 'none',
     }),
   };
-
   const fetchMappedCategories = async () => {
     try {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/mapped/category/getAll');
@@ -1203,7 +1198,6 @@ const PurchaseInputData = () => {
         const selected = data.map(d => d.mappedCategory);
         setSelectedOptions(selected);
         setOriginalSelectedOptions(selected);
-
         // Map category to its DB id for deletion
         const idMap = {};
         data.forEach(item => {
@@ -1215,7 +1209,6 @@ const PurchaseInputData = () => {
       console.error('Error fetching mapped categories:', error);
     }
   };
-
   const handleSave = async () => {
     // Categories the user just selected
     const toAdd = selectedOptions.filter(opt => !originalSelectedOptions.includes(opt));
@@ -1349,10 +1342,7 @@ const PurchaseInputData = () => {
                               {expandedTables.itemName ? '↑' : '↓'}
                             </span>
                           </button>
-                          <button
-                            onClick={() => { setIsPopupOpen(true) }}
-                            className="text-black font-bold text-xl lg:hidden"
-                          >
+                          <button onClick={() => { setIsPopupOpen(true) }} className="text-black font-bold text-xl lg:hidden" >
                             +
                           </button>
                           <button
@@ -1415,10 +1405,7 @@ const PurchaseInputData = () => {
                           </button>
                         </div>
                         <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
-                          <button
-                            type="button"
-                            onClick={() => { openEditItemName(item) }}
-                          >
+                          <button type="button" onClick={() => { openEditItemName(item) }} >
                             <img src={edit} alt="edit" className="w-4 h-4" />
                           </button>
                           <button >
@@ -1445,10 +1432,7 @@ const PurchaseInputData = () => {
             <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
               <img src={search} alt='search' className=' w-5 h-5' />
             </button>
-            <button
-              onClick={() => setIsPopupOpen1(true)}
-              className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
-            >
+            <button onClick={() => setIsPopupOpen1(true)} className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]">
               + Add
             </button>
           </div>
@@ -1476,46 +1460,28 @@ const PurchaseInputData = () => {
                             onChange={(e) => setPoModelSearch(e.target.value)}
                             autoFocus
                           />
-                          <button 
-                            onClick={() => toggleSearchField('model')}
-                            className="text-gray-500"
-                          >
+                          <button onClick={() => toggleSearchField('model')} className="text-gray-500" >
                             <img src={search} alt='search' className='w-4 h-4' />
                           </button>
-                          <button 
-                            onClick={() => toggleTable('model')} 
-                            className="text-gray-700 lg:hidden"
-                          >
+                          <button onClick={() => toggleTable('model')} className="text-gray-700 lg:hidden">
                             <span className="text-xl font-bold">
                               {expandedTables.model ? '↑' : '↓'}
                             </span>
                           </button>
-                          <button
-                            onClick={() => setIsPopupOpen1(true)}
-                            className="text-black font-bold text-xl lg:hidden"
-                          >
+                          <button onClick={() => setIsPopupOpen1(true)} className="text-black font-bold text-xl lg:hidden" >
                             +
                           </button>
-                          <button
-                            onClick={() => setIsPopupOpen1(true)}
-                            className="text-black font-bold px-1 border-dashed border-b-2 border-[#BF9853] text-sm lg:block hidden"
-                          >
+                          <button onClick={() => setIsPopupOpen1(true)} className="text-black font-bold px-1 border-dashed border-b-2 border-[#BF9853] text-sm lg:block hidden">
                             + Add
                           </button>
                         </div>
                       ) : (
                         <div className="flex items-center justify-between">
-                          <span 
-                            className="cursor-pointer lg:cursor-default"
-                            onClick={() => toggleSearchField('model')}
-                          >
+                          <span className="cursor-pointer lg:cursor-default" onClick={() => toggleSearchField('model')} >
                             Model
                           </span>
                           <div className="flex items-center gap-2 lg:hidden">
-                            <button 
-                              onClick={() => toggleSearchField('model')}
-                              className="text-gray-500"
-                            >
+                            <button onClick={() => toggleSearchField('model')} className="text-gray-500" >
                               <img src={search} alt='search' className='w-4 h-4' />
                             </button>
                             <button onClick={() => toggleTable('model')} className="text-gray-700">
@@ -1523,10 +1489,7 @@ const PurchaseInputData = () => {
                                 {expandedTables.model ? '↑' : '↓'}
                               </span>
                             </button>
-                            <button
-                              onClick={() => setIsPopupOpen1(true)}
-                              className="text-black font-bold text-xl"
-                            >
+                            <button onClick={() => setIsPopupOpen1(true)} className="text-black font-bold text-xl" >
                               +
                             </button>
                           </div>

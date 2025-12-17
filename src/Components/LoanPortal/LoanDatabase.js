@@ -9,7 +9,7 @@ import Reload from '../Images/rotate-right.png'
 import edit from '../Images/Edit.svg';
 import history from '../Images/History.svg';
 import remove from '../Images/Delete.svg';
-const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => {   
+const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   const [vendorOptions, setVendorOptions] = useState([]);
   const [contractorOptions, setContractorOptions] = useState([]);
   const [combinedOptions, setCombinedOptions] = useState([]);
@@ -37,6 +37,8 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
   const [editPaymentMode, setEditPaymentMode] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [combinedSitePurposeOptions, setCombinedSitePurposeOptions] = useState([]);
+  const [laboursList, setLaboursList] = useState([]);
+  const [employeeOptions, setEmployeeOptions] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
@@ -143,13 +145,13 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     { id: 5, value: 'Cheque', label: 'Cheque' },
     { id: 6, value: 'Advance Transfer', label: 'Advance Transfer' }
   ], []);
-  
+
   const finalPaymentModeOptions = paymentModeOptions.length > 0 ? paymentModeOptions : defaultPaymentModeOptions;
-  
+
   // Get unique Associate names from loanData for filter dropdown (only show what exists in table)
   const uniqueAssociateOptions = useMemo(() => {
     const associateSet = new Set();
-    
+
     // Helper function to get client name by project ID
     const getClientNameByProjectId = (projectId) => {
       if (projectId === null || projectId === undefined) return "";
@@ -160,23 +162,23 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
       if (!projectName) return "";
       return projectClientNamesByName[projectName.trim().toLowerCase()] || "";
     };
-    
+
     loanData.forEach(entry => {
       // Get associate name using the same logic as getAssociateName
       const clientName = getClientNameByProjectId(entry.project_id);
-      const vendorName = entry.vendor_id 
+      const vendorName = entry.vendor_id
         ? vendorOptions.find(v => v.id === entry.vendor_id)?.value || ""
         : "";
       const contractorName = entry.contractor_id
         ? contractorOptions.find(c => c.id === entry.contractor_id)?.value || ""
         : "";
-      
+
       const associateName = clientName || vendorName || contractorName || "";
       if (associateName) {
         associateSet.add(associateName);
       }
     });
-    
+
     // Convert to array and format for Select component
     return Array.from(associateSet)
       .sort()
@@ -185,27 +187,27 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
         label: name
       }));
   }, [loanData, vendorOptions, contractorOptions, projectClientNamesById, projectClientNamesByName, siteOptions]);
-  
+
   const associateFilterOptions = useMemo(() => (
     uniqueAssociateOptions.length > 0 ? uniqueAssociateOptions : (clientOptions.length ? clientOptions : combinedOptions)
   ), [uniqueAssociateOptions, clientOptions, combinedOptions]);
-  
+
   // Get unique Type values from loanData for filter dropdown
   const uniqueTypes = useMemo(() => {
     const types = [...new Set(loanData.map(entry => entry.type).filter(Boolean))];
     return types.sort();
   }, [loanData]);
-  
+
   // Get unique Payment Mode values from loanData for filter dropdown
   const uniquePaymentModes = useMemo(() => {
     const modes = [...new Set(loanData.map(entry => entry.loan_payment_mode).filter(Boolean))];
     return modes.sort();
   }, [loanData]);
-  
+
   // Get unique Project/Purpose names from loanData for filter dropdown (only show what exists in table)
   const uniqueProjectPurposeOptions = useMemo(() => {
     const projectPurposeSet = new Set();
-    
+
     loanData.forEach(entry => {
       // Get project name if project_id exists
       if (entry.project_id) {
@@ -215,7 +217,7 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
           projectPurposeSet.add(projectName);
         }
       }
-      
+
       // Get purpose name if from_purpose_id exists
       if (entry.from_purpose_id) {
         const purposeOption = purposeOptions.find(p => p.id === entry.from_purpose_id);
@@ -224,7 +226,7 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
         }
       }
     });
-    
+
     // Convert to array and format for Select component
     return Array.from(projectPurposeSet)
       .sort()
@@ -249,6 +251,10 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     vendorOptions.find(v => v.id === id)?.value || "";
   const getContractorName = (id) =>
     contractorOptions.find(c => c.id === id)?.value || "";
+  const getEmployeeName = (id) =>
+    employeeOptions.find(c => c.id === id)?.value || "";
+  const getLabourName = (id) =>
+    laboursList.find(l => l.id === id)?.value || "";
   const getSiteName = (id) =>
     siteOptions.find(s => String(s.id) === String(id))?.value || "";
   const getClientNameByProjectId = (projectId) => {
@@ -264,6 +270,9 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
       (entry.vendor_id
         ? getVendorName(entry.vendor_id)
         : getContractorName(entry.contractor_id)) ||
+      (entry.employee_id
+        ? getEmployeeName(entry.employee_id)
+        : getLabourName(entry.labour_id)) ||
       "";
   };
   const totalLoanAmount = loanData
@@ -334,6 +343,58 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
       }
     };
     fetchContractorNames();
+  }, []);
+  useEffect(() => {
+    fetchLaboursList();
+  }, []);
+  const fetchLaboursList = async () => {
+    try {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
+      if (response.ok) {
+        const data = await response.json();
+        const formattedData = data.map(item => ({
+          value: item.labour_name,
+          label: item.labour_name,
+          id: item.id,
+          type: "Labour",
+          salary: item.labour_salary,
+          extra: item.extra_amount
+        }));
+        setLaboursList(formattedData);
+      } else {
+        console.log('Error fetching Labour names.');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      console.log('Error fetching Labour names.');
+    }
+  };
+  useEffect(() => {
+    const fetchEmployeeDetails = async () => {
+      try {
+        const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+        if (!response.ok) {
+          throw new Error("Network response was not ok: " + response.statusText);
+        }
+        const data = await response.json();
+        const formattedData = data.map(item => ({
+          value: item.employee_name,
+          label: item.employee_name,
+          id: item.id,
+          type: "Employee",
+        }));
+        setEmployeeOptions(formattedData);
+      } catch (error) {
+        console.error("Fetch error: ", error);
+      }
+    };
+    fetchEmployeeDetails();
   }, []);
   useEffect(() => {
     setCombinedOptions([...vendorOptions, ...contractorOptions]);
@@ -483,8 +544,8 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     if (selectProjectName) {
       const projectName = getSiteName(entry.project_id) || "";
       const purposeName = purposeOptions.find(p => p.id === entry.from_purpose_id)?.value || "";
-      if (projectName.toLowerCase() !== selectProjectName.toLowerCase() && 
-          purposeName.toLowerCase() !== selectProjectName.toLowerCase())
+      if (projectName.toLowerCase() !== selectProjectName.toLowerCase() &&
+        purposeName.toLowerCase() !== selectProjectName.toLowerCase())
         return false;
     }
     if (selectType) {
@@ -541,19 +602,19 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
       sortableData.sort((a, b) => {
         const entryNoA = parseInt(a.entry_no) || 0;
         const entryNoB = parseInt(b.entry_no) || 0;
-        
+
         // Primary sort: entry_no descending (higher entry_no = newer)
         if (entryNoB !== entryNoA) {
           return entryNoB - entryNoA;
         }
-        
+
         // Secondary sort: If entry_no is same, use timestamp if available
         if (a.timestamp && b.timestamp) {
           const timestampA = new Date(a.timestamp);
           const timestampB = new Date(b.timestamp);
           return timestampB - timestampA;
         }
-        
+
         // Tertiary sort: If no timestamp, use date (newest first)
         const dateA = new Date(a.date);
         const dateB = new Date(b.date);
@@ -607,31 +668,31 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     ];
     const rows = sortedData.map((entry, index) => {
       // Get purpose (project_id or from_purpose_id)
-      const purposeValue = getSiteName(entry.project_id) || 
-        purposeOptions.find(p => p.id === entry.from_purpose_id)?.value || 
+      const purposeValue = getSiteName(entry.project_id) ||
+        purposeOptions.find(p => p.id === entry.from_purpose_id)?.value ||
         entry.from_purpose_id || "";
-      
+
       // Get transfer to destination
-      const transferTo = entry.type === "Transfer" 
+      const transferTo = entry.type === "Transfer"
         ? (entry.to_purpose_id
-            ? purposeOptions.find(purpose => purpose.id === entry.to_purpose_id)?.value || ""
-            : siteOptions.find(site => site.id === entry.transfer_Project_id)?.value || "")
+          ? purposeOptions.find(purpose => purpose.id === entry.to_purpose_id)?.value || ""
+          : siteOptions.find(site => site.id === entry.transfer_Project_id)?.value || "")
         : "";
-      
+
       // Get loan amount (only for Loan/Transfer type)
       const loanAmount = (entry.type === "Loan" || entry.type === "Transfer") && entry.amount
         ? Number(entry.amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
         : "";
-      
+
       // Get refund amount (only for Refund type)
       const refundAmount = entry.type === "Refund" && entry.loan_refund_amount
         ? Number(entry.loan_refund_amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
         : "";
-      
+
       // Get payment mode
-      const paymentMode = finalPaymentModeOptions.find(opt => opt.value === entry.loan_payment_mode)?.label || 
+      const paymentMode = finalPaymentModeOptions.find(opt => opt.value === entry.loan_payment_mode)?.label ||
         entry.loan_payment_mode || '';
-      
+
       return [
         index + 1,
         entry.timestamp ? formatDate(entry.timestamp) : "",
@@ -647,7 +708,7 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
         entry.entry_no || ""
       ];
     });
-    
+
     doc.setFontSize(12);
     doc.text("Loan Data Table", 40, 30);
     doc.autoTable({
@@ -696,31 +757,31 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     ];
     const csvRows = sortedData.map((entry, index) => {
       // Get purpose (project_id or from_purpose_id)
-      const purposeValue = getSiteName(entry.project_id) || 
-        purposeOptions.find(p => p.id === entry.from_purpose_id)?.value || 
+      const purposeValue = getSiteName(entry.project_id) ||
+        purposeOptions.find(p => p.id === entry.from_purpose_id)?.value ||
         entry.from_purpose_id || "";
-      
+
       // Get transfer to destination
-      const transferTo = entry.type === "Transfer" 
+      const transferTo = entry.type === "Transfer"
         ? (entry.to_purpose_id
-            ? purposeOptions.find(purpose => purpose.id === entry.to_purpose_id)?.value || ""
-            : siteOptions.find(site => site.id === entry.transfer_Project_id)?.value || "")
+          ? purposeOptions.find(purpose => purpose.id === entry.to_purpose_id)?.value || ""
+          : siteOptions.find(site => site.id === entry.transfer_Project_id)?.value || "")
         : "";
-      
+
       // Get loan amount (only for Loan/Transfer type)
       const loanAmount = (entry.type === "Loan" || entry.type === "Transfer") && entry.amount
         ? Number(entry.amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
         : "";
-      
+
       // Get refund amount (only for Refund type)
       const refundAmount = entry.type === "Refund" && entry.loan_refund_amount
         ? Number(entry.loan_refund_amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
         : "";
-      
+
       // Get payment mode
-      const paymentMode = finalPaymentModeOptions.find(opt => opt.value === entry.loan_payment_mode)?.label || 
+      const paymentMode = finalPaymentModeOptions.find(opt => opt.value === entry.loan_payment_mode)?.label ||
         entry.loan_payment_mode || '';
-      
+
       return [
         index + 1,
         entry.timestamp ? formatDate(entry.timestamp) : "",
@@ -736,7 +797,7 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
         entry.entry_no || ""
       ];
     });
-    
+
     const csvString = [
       csvHeaders.join(","),
       ...csvRows.map(row =>
@@ -1008,9 +1069,9 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
         </div>
         <div className='border-l-8 border-l-[#BF9853] rounded-lg mx-5'>
           <div ref={scrollRef} className='overflow-auto max-h-[500px] thin-scrollbar'
-            onMouseDown={handleMouseDown} 
-            onMouseMove={handleMouseMove} 
-            onMouseUp={handleMouseUp} 
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
           >
             <table className="w-full min-w-[1500px] border-collapse">
@@ -1508,11 +1569,11 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
             </div>
           </div>
         )}
-        <AuditModal 
-          show={showHistoryModal} 
-          onClose={() => setShowHistoryModal(false)} 
-          audits={loanPortalAudits} 
-          vendorOptions={vendorOptions} 
+        <AuditModal
+          show={showHistoryModal}
+          onClose={() => setShowHistoryModal(false)}
+          audits={loanPortalAudits}
+          vendorOptions={vendorOptions}
           contractorOptions={contractorOptions}
           siteOptions={siteOptions}
           purposeOptions={purposeOptions}
@@ -1524,28 +1585,28 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
 }
 export default LoanDatabase
 const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    date.setMinutes(date.getMinutes());
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    let hours = date.getHours();
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12;
-    hours = hours ? String(hours).padStart(2, '0') : '12';
-    return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
-  };
+  const date = new Date(dateString);
+  date.setMinutes(date.getMinutes());
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  let hours = date.getHours();
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? String(hours).padStart(2, '0') : '12';
+  return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+};
 
 const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, siteOptions, purposeOptions }) => {
   if (!show) return null;
-  
+
   const getNameById = (id, options) => {
     if (!id && id !== 0) return "-";
     const found = options.find(opt => String(opt.id) === String(id));
     return found ? found.label : id;
   };
-  
+
   const fields = [
     { oldKey: "old_date", newKey: "new_date", label: "Date", width: "120px" },
     { oldKey: "old_type", newKey: "new_type", label: "Type", width: "100px" },
@@ -1561,7 +1622,7 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
     { oldKey: "old_description", newKey: "new_description", label: "Description", width: "200px" },
     { oldKey: "old_file_url", newKey: "new_file_url", label: "File URL", width: "200px" },
   ];
-  
+
   const formatDateTime = (dateString) => {
     if (!dateString) return "-";
     const date = new Date(dateString);
@@ -1575,7 +1636,7 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
     hours = String(hours).padStart(2, "0");
     return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
   };
-  
+
   const formatDisplayValue = (value, field) => {
     if (
       (field.oldKey?.includes("vendor_id") || field.oldKey?.includes("contractor_id") ||
@@ -1606,7 +1667,7 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
     }
     return value ?? "-";
   };
-  
+
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
       <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1800px] mx-4 p-2">

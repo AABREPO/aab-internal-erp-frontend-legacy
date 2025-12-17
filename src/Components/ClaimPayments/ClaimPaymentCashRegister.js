@@ -20,7 +20,7 @@ const ClaimPaymentCashRegister = () => {
       const allExpenses = expensesResponse.data;
       
       // Filter only claim expenses
-      const claimExpenses = allExpenses.filter(expense => expense.accountType === 'Claim');
+      const claimExpenses = allExpenses.filter(expense => expense.accountType === 'Claim'|| expense.accountType === 'Bill Payments + Claim');
       
       // Create a map of expenses by expenses_claim_id for quick lookup
       const expensesMap = {};

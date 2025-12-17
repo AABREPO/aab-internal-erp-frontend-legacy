@@ -307,7 +307,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                         return expense.vendor === vendorName;
                     });
                     const matchingExpenses = vendorMatchedExpenses.filter((expense) => {
-                        return (expense.accountType === 'Bill Payments' || expense.accountType === 'Bill Refund');
+                        return (expense.accountType === 'Bill Payments' || expense.accountType === 'Bill Refund' || expense.accountType === 'Bill Payments + Claim');
                     });
                     const totalExpenseAmount = matchingExpenses.reduce((sum, expense) => {
                         return sum + (parseFloat(expense.amount) || 0);
@@ -3169,7 +3169,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 <div className='overflow-y-auto border-l-8 border-l-[#BF9853] h-[500px] rounded-lg ml-5 mr-5'>
                     <div className="overflow-x-auto">
                         <table className="w-full border-collapse">
-                            <thead className="bg-[#FAF6ED] sticky top-0 z-10">
+                            <thead className="bg-[#FAF6ED] sticky top-0 z-90">
                                 <tr>
                                     <th className="px-2 py-3 text-left font-semibold align-middle">SI.No</th>
                                     <th className="px-2 py-3 text-left font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200 align-middle"
@@ -3588,8 +3588,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                 </button>
                             </div>
                         </div>
-                        <div className="p-6 flex-1 overflow-hidden">
-                            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4 h-full">
+                        <div className="p-6 flex-1 overflow-y-auto">
+                            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
                                 {renderInputFields()}
                             </div>
                         </div>

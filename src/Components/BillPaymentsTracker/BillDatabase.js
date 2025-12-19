@@ -103,6 +103,9 @@ const BillDatabase = ({ username, userRoles = [] }) => {
     const [receivedAmount, setReceivedAmount] = useState(0)
     const [showPaymentSummaryModal, setShowPaymentSummaryModal] = useState(false)
     const [paymentSummaryData, setPaymentSummaryData] = useState(null)
+    const [carryForwardData, setCarryForwardData] = useState([])
+    const [useCarryForward, setUseCarryForward] = useState(false)
+    const [carryForwardAmount, setCarryForwardAmount] = useState(0)
 
     // Edit modal states
     const [showEditModal, setShowEditModal] = useState(false)
@@ -296,6 +299,39 @@ const BillDatabase = ({ username, userRoles = [] }) => {
         }
     }
 
+    const fetchCarryForwardData = async (vendorId) => {
+        try {
+            const response = await fetch("https://backendaab.in/aabuildersDash/api/vendor_carry_forward/getAll", {
+                method: "GET",
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                // Filter by vendor_id and calculate total carry forward amount
+                const vendorCarryForward = data.filter(item => item.vendor_id === vendorId);
+                setCarryForwardData(vendorCarryForward);
+                const totalCarryForward = vendorCarryForward.reduce((sum, item) => {
+                    const amount = parseFloat(item.amount) || 0;
+                    const billAmount = parseFloat(item.bill_amount) || 0;
+                    const refundAmount = parseFloat(item.refund_amount) || 0;
+                    return sum + amount - billAmount - refundAmount;
+                }, 0);
+                setCarryForwardAmount(Math.max(0, totalCarryForward));
+            } else {
+                console.error("Failed to fetch carry forward data:", response.status);
+                setCarryForwardData([]);
+                setCarryForwardAmount(0);
+            }
+        } catch (error) {
+            console.error("Error fetching carry forward data:", error);
+            setCarryForwardData([]);
+            setCarryForwardAmount(0);
+        }
+    };
+
     const handlePaymentClick = async (item) => {
         setSelectedPaymentBill(item)
         findVendorAccountDetails(item?.vendor_id)
@@ -304,28 +340,43 @@ const BillDatabase = ({ username, userRoles = [] }) => {
         let received = 0
         let totalDiscount = 0
         if (existingPayments && existingPayments.length > 0) {
-            received = existingPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
+            received = existingPayments.reduce((sum, payment) => {
+                const amount = parseFloat(payment.amount) || 0;
+                const carryForwardAmount = parseFloat(payment.carry_forward_amount) || 0;
+                return sum + amount + carryForwardAmount;
+            }, 0);
             totalDiscount = existingPayments.reduce((sum, p) => sum + (parseFloat(p.discount_amount) || 0), 0)
             // Pre-fill entries from existing payments
             const mapped = existingPayments.map((p, idx) => ({
                 id: p.id || idx + 1,
                 date: p.date || '',
                 amount: p.amount || '',
-                mode: p.mode || '',
+                amountDisplay: p.amount ? formatIndianCurrency(parseFloat(p.amount)) : '',
+                mode: p.vendor_bill_payment_mode || p.mode || '',
                 attachedFile: null,
-                chequeNo: p.cheque_no || '',
+                chequeNo: p.cheque_number || p.cheque_no || '',
                 chequeDate: p.cheque_date || '',
                 transactionNumber: p.transaction_number || '',
                 accountNumber: p.account_number || ''
             }))
             setPaymentEntries(mapped)
         } else {
-            setPaymentEntries([{ id: Date.now(), date: '', amount: '', mode: '', attachedFile: null, chequeNo: '', chequeDate: '', transactionNumber: '', accountNumber: '' }])
+            setPaymentEntries([{ id: Date.now(), date: '', amount: '', amountDisplay: '', mode: '', attachedFile: null, chequeNo: '', chequeDate: '', transactionNumber: '', accountNumber: '' }])
         }
         setReceivedAmount(received)
         setDiscount(totalDiscount)
+        setDiscountSubmitted(totalDiscount > 0)
         setActualAmount(billTotal)
         setRemainingAmount(Math.max(0, billTotal - received))
+        setUseCarryForward(false); // Reset checkbox
+        const vendorId = item.vendor_id || item.vendorId
+        if (vendorId) {
+            // Fetch carry forward data for this vendor
+            await fetchCarryForwardData(vendorId);
+        } else {
+            setCarryForwardData([]);
+            setCarryForwardAmount(0);
+        }
         setShowPaymentModal(true)
     }
 
@@ -871,12 +922,69 @@ const BillDatabase = ({ username, userRoles = [] }) => {
     const handlePaymentCancel = () => {
         setShowPaymentModal(false)
         setSelectedPaymentBill(null)
+        setPaymentEntries([
+            {
+                id: 1,
+                date: '',
+                amount: '',
+                amountDisplay: '',
+                mode: '',
+                attachedFile: null,
+                chequeNo: '',
+                chequeDate: '',
+                transactionNumber: '',
+                accountNumber: ''
+            }
+        ])
+        setExistingPaymentDetails(null)
+        setLoadingPaymentDetails(false)
+        setDiscount(0)
+        setDiscountSubmitted(false)
+        setActualAmount(0)
+        setRemainingAmount(0)
+        setOverallPaymentPdfFile(null)
+        setUseCarryForward(false)
+        setCarryForwardData([])
+        setCarryForwardAmount(0)
+        if (overallPdfInputRef.current) {
+            overallPdfInputRef.current.value = '';
+        }
+    }
+
+    const sanitizeAmountInput = (input) => {
+        if (!input) return ''
+        const cleaned = input.replace(/[^\d.]/g, '')
+        if (!cleaned) return ''
+        const parts = cleaned.split('.')
+        const integerPart = parts[0] || ''
+        const decimalPart = parts[1] ? parts[1].slice(0, 2) : ''
+        return decimalPart ? `${integerPart}.${decimalPart}` : integerPart
     }
 
     const handlePaymentEntryChange = (entryId, field, value) => {
-        setPaymentEntries(prev => prev.map(entry =>
-            entry.id === entryId ? { ...entry, [field]: value } : entry
-        ))
+        setPaymentEntries(prev => prev.map(entry => {
+            if (entry.id !== entryId) {
+                return entry
+            }
+            if (field === 'amount') {
+                const sanitized = sanitizeAmountInput(value)
+                if (!sanitized) {
+                    return {
+                        ...entry,
+                        amount: '',
+                        amountDisplay: ''
+                    }
+                }
+                const numericAmount = parseFloat(sanitized)
+                const displayValue = Number.isNaN(numericAmount) ? '' : formatIndianCurrency(numericAmount)
+                return {
+                    ...entry,
+                    amount: sanitized,
+                    amountDisplay: displayValue
+                }
+            }
+            return { ...entry, [field]: value }
+        }))
     }
 
     // Helper function to convert image to PDF
@@ -1181,6 +1289,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             id: Date.now(),
             date: '',
             amount: '',
+            amountDisplay: '',
             mode: '',
             attachedFile: null,
             chequeNo: '',
@@ -1191,35 +1300,105 @@ const BillDatabase = ({ username, userRoles = [] }) => {
         setPaymentEntries(prev => [...prev, newEntry])
     }
 
-    const handlePaymentSubmit = async () => {
-        const hasEmptyFields = paymentEntries.some(entry =>
-            !entry.date || !entry.amount || !entry.mode
-        )
-        if (hasEmptyFields) {
-            alert('Please fill all required fields in payment entries')
-            return
+    // Auto-fill amount when carry forward checkbox is checked
+    useEffect(() => {
+        if (useCarryForward && carryForwardAmount > 0 && paymentEntries.length > 0 && showPaymentModal) {
+            const firstEntry = paymentEntries[0];
+            // Only auto-fill if amount is empty
+            if (!firstEntry.amount || firstEntry.amount === '') {
+                const carryForwardToUse = Math.min(carryForwardAmount, remainingAmount);
+                if (carryForwardToUse > 0) {
+                    const displayValue = formatIndianCurrency(carryForwardToUse);
+                    setPaymentEntries(prev => prev.map((entry, index) => {
+                        if (index === 0) {
+                            return {
+                                ...entry,
+                                amount: carryForwardToUse.toString(),
+                                amountDisplay: displayValue,
+                                mode: entry.mode || 'Carry Forward',
+                                date: entry.date || new Date().toISOString().split('T')[0]
+                            };
+                        }
+                        return entry;
+                    }));
+                }
+            }
+        } else if (!useCarryForward && paymentEntries.length > 0 && showPaymentModal) {
+            // Clear amount when unchecked if it was set by carry forward
+            const firstEntry = paymentEntries[0];
+            if (firstEntry.mode === 'Carry Forward' && firstEntry.amount) {
+                setPaymentEntries(prev => prev.map((entry, index) => {
+                    if (index === 0) {
+                        return {
+                            ...entry,
+                            amount: '',
+                            amountDisplay: '',
+                            mode: ''
+                        };
+                    }
+                    return entry;
+                }));
+            }
         }
-        const hasInvalidModeFields = paymentEntries.some(entry => {
-            if (entry.mode === 'Cheque') {
-                return !entry.chequeNo || !entry.chequeDate
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [useCarryForward, carryForwardAmount, remainingAmount, showPaymentModal])
+
+    const handlePaymentSubmit = async () => {
+        // Check if using carry forward only (no payment entries needed)
+        const isUsingCarryForwardOnly = useCarryForward && carryForwardAmount > 0;
+
+        // If not using carry forward only, validate payment entries
+        if (!isUsingCarryForwardOnly) {
+            const hasEmptyFields = paymentEntries.some(entry =>
+                !entry.date || !entry.amount || !entry.mode
+            )
+            if (hasEmptyFields) {
+                alert('Please fill all required fields in payment entries')
+                return
             }
-            if (entry.mode === 'Net Banking' || entry.mode === 'Gpay' || entry.mode === 'PhonePe') {
-                return !entry.accountNumber
+            const hasInvalidModeFields = paymentEntries.some(entry => {
+                if (entry.mode === 'Cheque') {
+                    return !entry.chequeNo || !entry.chequeDate
+                }
+                if (entry.mode === 'Net Banking' || entry.mode === 'Gpay' || entry.mode === 'PhonePe') {
+                    return !entry.accountNumber
+                }
+                return false
+            })
+            if (hasInvalidModeFields) {
+                alert('Please fill all required fields for the selected payment mode...')
+                return
             }
-            return false
-        })
-        if (hasInvalidModeFields) {
-            alert('Please fill all required fields for the selected payment mode...')
-            return
         }
         try {
-            const totalPaymentAmount = paymentEntries.reduce((sum, entry) => {
+            // Filter out empty payment entries (for carry forward only case)
+            const validPaymentEntries = paymentEntries.filter(entry =>
+                entry.date && entry.amount && entry.mode
+            );
+            // Separate regular payments from carry forward entries
+            const regularPaymentEntries = validPaymentEntries.filter(entry => entry.mode !== 'Carry Forward');
+            const carryForwardEntries = validPaymentEntries.filter(entry => entry.mode === 'Carry Forward');
+            const totalPaymentAmount = regularPaymentEntries.reduce((sum, entry) => {
                 return sum + (parseFloat(entry.amount) || 0)
             }, 0)
             const currentReceivedAmount = actualAmount - remainingAmount;
             const newTotalReceived = currentReceivedAmount + totalPaymentAmount;
-            const newRemainingAmount = Math.max(0, actualAmount - newTotalReceived)
-            const paymentDetailsPromises = paymentEntries.map(async (entry) => {
+            const remainingAfterPayments = Math.max(0, actualAmount - newTotalReceived);
+            // Calculate carry forward to use: either from entries or calculated amount
+            let carryForwardToUse = 0;
+            if (carryForwardEntries.length > 0) {
+                // Sum carry forward amounts from entries
+                carryForwardToUse = carryForwardEntries.reduce((sum, entry) => {
+                    return sum + (parseFloat(entry.amount) || 0)
+                }, 0);
+            } else if (useCarryForward) {
+                // Calculate how much carry forward can be used
+                carryForwardToUse = Math.min(carryForwardAmount, remainingAfterPayments);
+            }
+            const newRemainingAmount = Math.max(0, remainingAfterPayments - carryForwardToUse);
+            // Only process payment entries if there are valid ones
+            const paymentDetailsPromises = validPaymentEntries.length > 0
+                ? validPaymentEntries.map(async (entry, index) => {
                 let billUrl = '';
                 if (entry.attachedFile) {
                     try {
@@ -1256,34 +1435,207 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                         return;
                     }
                 }
-                const paymentData = {
-                    vendor_payments_tracker_id: selectedPaymentBill.id,
-                    date: entry.date,
-                    actual_amount: actualAmount,
-                    amount: parseFloat(entry.amount) || 0,
-                    discount_amount: discount,
-                    carry_forward_amount: 0,
-                    vendor_bill_payment_mode: entry.mode,
-                    cheque_number: entry.chequeNo || '',
-                    cheque_date: entry.chequeDate || '',
-                    transaction_number: entry.transactionNumber || '',
-                    account_number: entry.accountNumber || '',
-                    bill_url: billUrl
-                }
-                const response = await fetch("https://backendaab.in/aabuildersDash/api/vendor-bill-tracker/save", {
-                    method: "POST",
-                    credentials: "include",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify(paymentData)
+                    // If mode is "Carry Forward", save amount in carry_forward_amount field, not amount field
+                    const isCarryForward = entry.mode === 'Carry Forward';
+                    const paymentData = {
+                        vendor_payments_tracker_id: selectedPaymentBill.id,
+                        date: entry.date,
+                        actual_amount: actualAmount,
+                        amount: isCarryForward ? 0 : (parseFloat(entry.amount) || 0),
+                        discount_amount: index === 0 ? discount : 0,
+                        carry_forward_amount: isCarryForward ? (parseFloat(entry.amount) || 0) : 0,
+                        vendor_bill_payment_mode: entry.mode,
+                        cheque_number: entry.chequeNo || '',
+                        cheque_date: entry.chequeDate || '',
+                        transaction_number: entry.transactionNumber || '',
+                        account_number: entry.accountNumber || '',
+                        bill_url: billUrl
+                    }
+                    const response = await fetch("https://backendaab.in/aabuildersDash/api/vendor-bill-tracker/save", {
+                        method: "POST",
+                        credentials: "include",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify(paymentData)
+                    })
+                    if (!response.ok) {
+                        throw new Error(`Failed to save payment details: ${response.statusText}`)
+                    }
+                    return await response.json()
                 })
-                if (!response.ok) {
-                    throw new Error(`Failed to save payment details: ${response.statusText}`)
-                }
-                return await response.json()
-            })
+                : [];
             const savedPaymentDetails = await Promise.all(paymentDetailsPromises)
+
+            // Create separate payment entry for carry forward if checkbox is checked AND not already in entries
+            if (useCarryForward && carryForwardToUse > 0 && carryForwardEntries.length === 0) {
+                try {
+                    const carryForwardPaymentData = {
+                        vendor_payments_tracker_id: selectedPaymentBill.id,
+                        date: validPaymentEntries.length > 0
+                            ? validPaymentEntries[0]?.date
+                            : new Date().toISOString().split('T')[0],
+                        actual_amount: actualAmount,
+                        amount: 0,
+                        discount_amount: 0,
+                        carry_forward_amount: carryForwardToUse,
+                        vendor_bill_payment_mode: "Carry Forward",
+                        cheque_number: '',
+                        cheque_date: '',
+                        transaction_number: '',
+                        account_number: '',
+                        bill_url: ''
+                    };
+                    const carryForwardPaymentResponse = await fetch("https://backendaab.in/aabuildersDash/api/vendor-bill-tracker/save", {
+                        method: "POST",
+                        credentials: "include",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify(carryForwardPaymentData)
+                    });
+                    if (!carryForwardPaymentResponse.ok) {
+                        throw new Error(`Failed to save carry forward payment: ${carryForwardPaymentResponse.statusText}`);
+                    }
+                } catch (error) {
+                    console.error("Error saving carry forward payment:", error);
+                    alert(`Error saving carry forward payment: ${error.message}`);
+                }
+            }
+
+            for (let i = 0; i < validPaymentEntries.length; i++) {
+                const entry = validPaymentEntries[i];
+                const savedPaymentDetail = savedPaymentDetails[i];
+                const billUrl = savedPaymentDetail?.bill_url || '';
+
+                // Only send to weekly-payment-bills/save for Non-Cash payment modes
+                if (entry.mode !== 'Cash' && entry.mode !== 'Carry Forward') {
+                    const weeklyPaymentBillPayload = {
+                        date: entry.date,
+                        created_at: new Date().toISOString(),
+                        contractor_id: null,
+                        vendor_id: selectedPaymentBill.vendor_id,
+                        employee_id: null,
+                        project_id: 10,
+                        type: "Vendor Bill Payment",
+                        bill_payment_mode: entry.mode,
+                        amount: parseFloat(entry.amount) || 0,
+                        status: true,
+                        weekly_number: "",
+                        weekly_payment_expense_id: null,
+                        advance_portal_id: null,
+                        staff_advance_portal_id: null,
+                        claim_payment_id: null,
+                        cheque_number: entry.chequeNo || null,
+                        cheque_date: entry.chequeDate || null,
+                        transaction_number: entry.transactionNumber || null,
+                        account_number: entry.accountNumber || null,
+                        vendor_payment_tracker_id: selectedPaymentBill.id,
+                        tenant_id: null,
+                        tenant_complex_name: null,
+                    };
+                    try {
+                        const weeklyPaymentBillResponse = await fetch(
+                            "https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save",
+                            {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify(weeklyPaymentBillPayload)
+                            }
+                        );
+                        if (!weeklyPaymentBillResponse.ok) {
+                            console.error("❌ Weekly payment bill submission failed for entry:", entry);
+                        } else {
+                            console.log("✅ Weekly payment bill submitted:", weeklyPaymentBillPayload);
+                        }
+                    } catch (error) {
+                        console.error("❌ Error submitting weekly payment bill:", error);
+                    }
+                }
+
+                // Only send to weekly-expenses/save for Cash payment mode
+                if (entry.mode === 'Cash') {
+                    const weeklyExpensePayload = {
+                        date: entry.date,
+                        created_at: new Date().toISOString(),
+                        contractor_id: null,
+                        vendor_id: selectedPaymentBill.vendor_id,
+                        employee_id: null,
+                        project_id: 10,
+                        type: "Vendor Bill Payment",
+                        amount: parseFloat(entry.amount) || 0,
+                        status: true,
+                        weekly_number: "",
+                        period_start_date: null,
+                        period_end_date: null,
+                        advance_portal_id: null,
+                        staff_advance_portal_id: null,
+                        loan_portal_id: null,
+                        rent_management_id: null,
+                        expenses_entry_id: null,
+                        vendor_payment_tracker_id: selectedPaymentBill.id,
+                        send_to_expenses_entry: false,
+                        bill_copy_url: billUrl
+                    };
+                    try {
+                        const weeklyExpenseResponse = await fetch(
+                            "https://backendaab.in/aabuildersDash/api/weekly-expenses/save",
+                            {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify(weeklyExpensePayload)
+                            }
+                        );
+                        if (!weeklyExpenseResponse.ok) {
+                            console.error("❌ Weekly expense submission failed for cash payment:", entry);
+                        } else {
+                            console.log("✅ Weekly expense submitted for cash payment:", weeklyExpensePayload);
+                        }
+                    } catch (error) {
+                        console.error("❌ Error submitting weekly expense for cash payment:", error);
+                    }
+                }
+            }
+            // Handle carry forward if checkbox is checked
+            // Calculate actual carry forward amount used (from payment entries or separate entry)
+            let actualCarryForwardUsed = 0;
+            if (carryForwardEntries.length > 0) {
+                // Sum carry forward amounts from payment entries
+                actualCarryForwardUsed = carryForwardEntries.reduce((sum, entry) => {
+                    return sum + (parseFloat(entry.amount) || 0)
+                }, 0);
+            } else if (useCarryForward && carryForwardToUse > 0) {
+                // Use the separate carry forward entry amount
+                actualCarryForwardUsed = carryForwardToUse;
+            }
+            if (useCarryForward && actualCarryForwardUsed > 0) {
+                try {
+                    // Create a carry forward entry with bill_amount to subtract the used amount
+                    const carryForwardPayload = {
+                        type: "Bill Payment",
+                        date: validPaymentEntries.length > 0
+                            ? validPaymentEntries[0]?.date
+                            : new Date().toISOString().split('T')[0],
+                        vendor_id: selectedPaymentBill.vendor_id,
+                        payment_mode: "Carry Forward",
+                        amount: 0,
+                        bill_amount: actualCarryForwardUsed,
+                        refund_amount: 0
+                    };
+                    const carryForwardResponse = await fetch("https://backendaab.in/aabuildersDash/api/vendor_carry_forward/save", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(carryForwardPayload)
+                    });
+                    if (!carryForwardResponse.ok) {
+                        console.error("Failed to update carry forward amount");
+                    } else {
+                        console.log("Carry forward amount updated successfully");
+                    }
+                } catch (error) {
+                    console.error("Error updating carry forward:", error);
+                }
+            }
 
             setShowPaymentModal(false)
             setPaymentEntries([
@@ -1291,6 +1643,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                     id: 1,
                     date: '',
                     amount: '',
+                    amountDisplay: '',
                     mode: '',
                     attachedFile: null,
                     chequeNo: '',
@@ -1305,6 +1658,9 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             setDiscountSubmitted(false)
             setActualAmount(0)
             setRemainingAmount(0)
+            setUseCarryForward(false)
+            setCarryForwardData([])
+            setCarryForwardAmount(0)
 
             await fetchTrackerData()
             await fetchExpensesData()
@@ -1574,8 +1930,12 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             if (!paymentDetails || paymentDetails.length === 0) {
                 return 'To Pay'
             }
-            const totalPaid = paymentDetails.reduce((sum, payment) => sum + (payment.amount || 0), 0);
-            const totalDiscount = paymentDetails.reduce((sum, payment) => sum + (payment.discount_amount || 0), 0);
+            const totalPaid = paymentDetails.reduce((sum, payment) => {
+                const amount = parseFloat(payment.amount) || 0;
+                const carryForwardAmount = parseFloat(payment.carry_forward_amount) || 0;
+                return sum + amount + carryForwardAmount;
+            }, 0);
+            const totalDiscount = paymentDetails.reduce((sum, payment) => sum + (parseFloat(payment.discount_amount) || 0), 0);
             const actualAmount = parseFloat(item.total_amount) || 0;
             const remainingAmount = Math.max(0, actualAmount - totalPaid - totalDiscount);
             if (remainingAmount === 0) {
@@ -2638,7 +2998,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                                                     <input
                                                                         type="text"
                                                                         placeholder="Enter Amount"
-                                                                        value={entry.amount}
+                                                                        value={entry.amountDisplay || ''}
                                                                         onChange={(e) => handlePaymentEntryChange(entry.id, 'amount', e.target.value)}
                                                                         disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
                                                                         className={`w-[150px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
@@ -2778,7 +3138,12 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                                                         <label className="block font-semibold mb-1 text-sm">Amount</label>
                                                                         <input
                                                                             type="text"
-                                                                            value={payment.amount?.toLocaleString() || ''}
+                                                                            value={(() => {
+                                                                                const amount = parseFloat(payment.amount) || 0;
+                                                                                const carryForwardAmount = parseFloat(payment.carry_forward_amount) || 0;
+                                                                                const totalAmount = amount + carryForwardAmount;
+                                                                                return totalAmount > 0 ? formatIndianCurrency(totalAmount) : '';
+                                                                            })()}
                                                                             readOnly
                                                                             className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm "
                                                                         />
@@ -2895,67 +3260,163 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                 </div>
                                 <div className="w-80 flex flex-col">
                                     <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                                        <div className="text-left">
-                                            <h4 className="text-lg font-semibold mb-2">Summary</h4>
-                                            <div className="space-y-3 shadow-lg rounded-lg p-4">
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-600">Total Payable:</span>
-                                                    <span className="font-semibold">{formatIndianCurrency(actualAmount)}</span>
+                                        {(() => {
+                                            // Calculate draft payment total excluding carry forward entries (carry forward is handled separately)
+                                            const draftPaymentTotal = paymentEntries
+                                                .filter(entry => entry.mode !== 'Carry Forward')
+                                                .reduce((sum, entry) => {
+                                                    const rawAmount = typeof entry.amount === 'string' ? entry.amount.replace(/,/g, '') : entry.amount
+                                                    const numericAmount = parseFloat(rawAmount)
+                                                    if (Number.isNaN(numericAmount)) {
+                                                        return sum
+                                                    }
+                                                    return sum + numericAmount
+                                                }, 0)
+                                            const existingReceivedAmount = Math.max(0, actualAmount - remainingAmount)
+                                            const normalizedDiscount = (() => {
+                                                if (typeof discount === 'string') {
+                                                    const cleaned = discount.replace(/,/g, '')
+                                                    const numeric = parseFloat(cleaned)
+                                                    return Number.isNaN(numeric) ? 0 : numeric
+                                                }
+                                                return Number.isFinite(discount) ? discount : 0
+                                            })()
+                                            // -----------------------------
+                                            // BASIC NORMALIZED VALUES
+                                            // -----------------------------
+                                            const billTotal = actualAmount || 0;
+                                            const existingReceived = existingReceivedAmount || 0;
+                                            const draftPaid = draftPaymentTotal || 0;
+                                            const discountValue = normalizedDiscount || 0;
+                                            const carryForwardAvailable = carryForwardAmount || 0;
+                                            // -----------------------------
+                                            // REMAINING BILL AFTER PREVIOUS PAYMENTS
+                                            // -----------------------------
+                                            const remainingAfterPayments = Math.max(
+                                                0,
+                                                billTotal - existingReceived - draftPaid
+                                            );
+                                            // -----------------------------
+                                            // AMOUNT NEEDED TO SETTLE BILL (AFTER DISCOUNT)
+                                            // -----------------------------
+                                            const amountNeededToPay = Math.max(
+                                                0,
+                                                remainingAfterPayments - discountValue
+                                            );
+                                            // -----------------------------
+                                            // CARRY FORWARD TO USE
+                                            // -----------------------------
+                                            const carryForwardToUse = useCarryForward
+                                                ? Math.min(carryForwardAvailable, amountNeededToPay)
+                                                : 0;
+                                            // -----------------------------
+                                            // FINAL REMAINING BILL AFTER CARRY FORWARD
+                                            // -----------------------------
+                                            const projectedRemainingAmount = Math.max(
+                                                0,
+                                                remainingAfterPayments - carryForwardToUse
+                                            );
+                                            // -----------------------------
+                                            // LIVE RECEIVED AMOUNT (PREVIOUS + CURRENT + CF)
+                                            // -----------------------------
+                                            const liveReceivedAmount = Math.min(
+                                                billTotal,
+                                                existingReceived + draftPaid + carryForwardToUse
+                                            );
+                                            // -----------------------------
+                                            // REMAINING CARRY FORWARD BALANCE
+                                            // -----------------------------
+                                            const remainingCarryForward = useCarryForward
+                                                ? Math.max(0, carryForwardAvailable - carryForwardToUse)
+                                                : carryForwardAvailable;
+                                            // -----------------------------
+                                            // NET PAYABLE (FINAL)
+                                            // -----------------------------
+                                            const excessCarryForward =
+                                                useCarryForward && carryForwardToUse > 0 && carryForwardAvailable > amountNeededToPay
+                                                    ? carryForwardAvailable - amountNeededToPay
+                                                    : 0;
+                                            const projectedNetPayable =
+                                                projectedRemainingAmount > 0
+                                                    ? projectedRemainingAmount
+                                                    : excessCarryForward > 0
+                                                        ? -excessCarryForward
+                                                        : 0;
+                                            return (
+                                                <div className="text-left">
+                                                    <h4 className="text-lg font-semibold mb-2">Summary</h4>
+                                                    <div className="space-y-3 shadow-lg rounded-lg p-4">
+                                                        <div className="flex justify-between">
+                                                            <span className="text-gray-600">Total Payable:</span>
+                                                            <span className="font-semibold">{formatIndianCurrency(actualAmount)}</span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span className="text-gray-600">Received Amount:</span>
+                                                            <span className="font-semibold">{formatIndianCurrency(liveReceivedAmount)}</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-center">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-gray-600">Carry Forward:</span>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={useCarryForward}
+                                                                    onChange={(e) => setUseCarryForward(e.target.checked)}
+                                                                    disabled={carryForwardAmount <= 0 || paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
+                                                                    className="w-4 h-4 cursor-pointer"
+                                                                />
+                                                            </div>
+                                                            <span className={`font-semibold ${useCarryForward ? 'text-green-600' : ''}`}>
+                                                                {formatIndianCurrency(carryForwardAvailable)}
+                                                            </span>
+                                                        </div>
+                                                        <hr className="border-gray-300" />
+                                                        <div className="flex justify-between">
+                                                            <span className="text-gray-600">Total Amount:</span>
+                                                            <span className="font-semibold">{formatIndianCurrency(projectedRemainingAmount)}</span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span className="text-gray-600">Discount:</span>
+                                                            <input
+                                                                type="text"
+                                                                value={
+                                                                    discount === 0
+                                                                        ? ''
+                                                                        : discount.toLocaleString('en-IN')
+                                                                }
+                                                                onChange={(e) => {
+                                                                    if (!discountSubmitted) {
+                                                                        const rawValue = e.target.value.replace(/,/g, '').replace(/\D/g, '');
+                                                                        const newDiscount = Number(rawValue) || 0;
+                                                                        setDiscount(newDiscount);
+                                                                    }
+                                                                }}
+                                                                onKeyDown={(e) => {
+                                                                    if (!discountSubmitted && e.key === 'Backspace' && discount === 0) {
+                                                                        setDiscount('');
+                                                                    }
+                                                                }}
+                                                                disabled={discountSubmitted}
+                                                                className={`w-24 h-6 px-2 no-spinner text-right text-xs border pl-4 border-gray-300 rounded focus:outline-none ${discountSubmitted ? 'bg-gray-100 cursor-not-allowed' : ''
+                                                                    }`}
+                                                                placeholder="0"
+                                                                title={
+                                                                    discountSubmitted
+                                                                        ? 'Discount already applied in previous payment'
+                                                                        : 'Enter discount amount'
+                                                                }
+                                                            />
+                                                        </div>
+                                                        <hr className="border-gray-300" />
+                                                        <div className="flex justify-between">
+                                                            <span className="text-gray-600">Net Payable:</span>
+                                                            <span className={`font-bold ${projectedNetPayable <= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                                {formatIndianCurrency(projectedNetPayable)}
+                                                            </span>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-600">Received Amount:</span>
-                                                    <span className="font-semibold">{formatIndianCurrency(actualAmount - remainingAmount)}</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-600">Carry Forward:</span>
-                                                    <span className="font-semibold">0</span>
-                                                </div>
-                                                <hr className="border-gray-300" />
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-600">Total Amount:</span>
-                                                    <span className="font-semibold">{formatIndianCurrency(remainingAmount)}</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-600">Discount:</span>
-                                                    <input
-                                                        type="text"
-                                                        value={
-                                                            discount === 0
-                                                                ? ''
-                                                                : discount.toLocaleString('en-IN')
-                                                        }
-                                                        onChange={(e) => {
-                                                            if (!discountSubmitted) {
-                                                                const rawValue = e.target.value.replace(/,/g, '').replace(/\D/g, '');
-                                                                const newDiscount = Number(rawValue) || 0;
-                                                                setDiscount(newDiscount);
-                                                            }
-                                                        }}
-                                                        onKeyDown={(e) => {
-                                                            if (!discountSubmitted && e.key === 'Backspace' && discount === 0) {
-                                                                setDiscount('');
-                                                            }
-                                                        }}
-                                                        disabled={discountSubmitted}
-                                                        className={`w-24 h-6 px-2 no-spinner text-right text-xs border pl-4 border-gray-300 rounded focus:outline-none ${discountSubmitted ? 'bg-gray-100 cursor-not-allowed' : ''
-                                                            }`}
-                                                        placeholder="0"
-                                                        title={
-                                                            discountSubmitted
-                                                                ? 'Discount already applied in previous payment'
-                                                                : 'Enter discount amount'
-                                                        }
-                                                    />
-                                                </div>
-                                                <hr className="border-gray-300" />
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-600">Net Payable:</span>
-                                                    <span className={`font-bold ${(remainingAmount - discount) <= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                        {formatIndianCurrency(Math.max(0, remainingAmount - discount))}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
+                                            );
+                                        })()}
                                         <div className="text-left">
                                             <h4 className="text-lg font-semibold mb-2">Vendor Details</h4>
                                             <div className="space-y-3 shadow-lg rounded-lg p-4">

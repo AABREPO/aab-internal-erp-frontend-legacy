@@ -269,11 +269,15 @@ const BillStatement = ({ username, userRoles = [] }) => {
         const rawUrl = payment?.bill_url || payment?.file_url || payment?.document_url || payment?.bill_document_url || payment?.url;
         const isHttpUrl = typeof rawUrl === 'string' && /^(http|https):\/\//i.test(rawUrl);
         const rawDate = payment?.date;
+        // Include carry_forward_amount in the amount calculation
+        const amount = parseFloat(payment?.amount) || 0;
+        const carryForwardAmount = parseFloat(payment?.carry_forward_amount) || 0;
+        const totalAmount = amount + carryForwardAmount;
         return ({
           date: rawDate ? new Date(rawDate).toLocaleDateString('en-GB') : '-',
           rawDate: rawDate || null, // Store raw date for filtering
           mode: payment?.vendor_bill_payment_mode || '-',
-          amount: payment?.amount || payment?.payment_amount || '-',
+          amount: totalAmount > 0 ? totalAmount : (payment?.amount || payment?.payment_amount || '-'),
           billUrl: isHttpUrl ? rawUrl : null
         });
       });

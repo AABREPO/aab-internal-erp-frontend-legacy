@@ -224,6 +224,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
           { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
           { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
           { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
+          { value: "Bill Payment Tracker", label: "Bill Payment Tracker", id: 12, sNo: "12" },
         ];
         // Combine backend data with predefined options
         const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
@@ -242,13 +243,13 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
           { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
           { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
           { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
+          { value: "Bill Payment Tracker", label: "Bill Payment Tracker", id: 12, sNo: "12" },
         ];
         setSiteOptions(predefinedSiteOptions);
       }
     };
     fetchSites();
   }, []);
-
   // Fetch categories for expenses form
   useEffect(() => {
     const fetchCategories = async () => {
@@ -464,10 +465,10 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
     option: (provided, state) => ({
       ...provided,
       fontWeight: '500',
-      backgroundColor: state.isSelected 
-        ? 'rgba(191, 152, 83, 0.3)' 
-        : state.isFocused 
-          ? 'rgba(191, 152, 83, 0.1)' 
+      backgroundColor: state.isSelected
+        ? 'rgba(191, 152, 83, 0.3)'
+        : state.isFocused
+          ? 'rgba(191, 152, 83, 0.1)'
           : 'white',
       color: 'black',
       textAlign: 'left',
@@ -494,7 +495,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
       console.error('Error fetching advance data:', error);
     }
   };
-
   const validateFormFields = () => {
     // --- Common validation based on type ---
     if (selectedType === 'Advance' || selectedType === 'Refund') {
@@ -656,7 +656,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
       if (selectedType === 'Transfer') {
         const amountValue = parseFloat(advanceAmount) || 0;
         const transferSiteIdInt = parseInt(transferSiteId);
-        
         // Check if transferring to Loan Portal (id = 11)
         if (transferSiteIdInt === 11) {
           // First, create loan entry in LoanPortal
@@ -677,27 +676,55 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             description: "Transfer from Advance Portal",
             file_url: ""
           };
-
           // Save to LoanPortal
           const loanResponse = await fetch("https://backendaab.in/aabuildersDash/api/loans/save", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(loanPayload)
           });
-
           if (!loanResponse.ok) {
             throw new Error('Failed to save loan portal data');
           }
-
           const loanResult = await loanResponse.json();
           const loanPortalId = loanResult.id || loanResult.loanPortalId;
-
           // Now save advance portal entry with negative amount and loan_portal_id
-          const advancePayload = createPayload({ 
+          const advancePayload = createPayload({
             amount: -Math.abs(amountValue),
             loan_portal_id: loanPortalId
           });
-
+          await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(advancePayload)
+          });
+        } else if (transferSiteIdInt === 12 && selectedOption?.type === 'Vendor') {
+          // Check if transferring to Bill Payment Tracker (id = 12) and it's a vendor
+          // First, create vendor carry forward entry in Bill Payment Tracker
+          const vendorCarryForwardPayload = {
+            type: "Transfer",
+            date: dateValue,
+            vendor_id: selectedOption.id,
+            payment_mode: paymentMode || "",
+            amount: Math.abs(amountValue),
+            bill_amount: 0,
+            refund_amount: 0
+          };
+          // Save to VendorCarryForwardAmountManagement
+          const vendorCarryForwardResponse = await fetch("https://backendaab.in/aabuildersDash/api/vendor_carry_forward/save", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(vendorCarryForwardPayload)
+          });
+          if (!vendorCarryForwardResponse.ok) {
+            throw new Error('Failed to save vendor carry forward amount management data');
+          }
+          const vendorCarryForwardResult = await vendorCarryForwardResponse.json();
+          const vendorCarryForwardId = vendorCarryForwardResult.id || vendorCarryForwardResult.vendorCarryForwardId;
+          // Now save advance portal entry with negative amount and vendor_carry_forward_id
+          const advancePayload = createPayload({
+            amount: -Math.abs(amountValue),
+            vendor_carry_forward_id: vendorCarryForwardId
+          });
           await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -765,12 +792,10 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             },
             body: JSON.stringify(expensesPayload),
           });
-
           if (!expensesResponse.ok) {
             const errorText = await expensesResponse.text();
             throw new Error(`Expenses form submission failed: ${errorText}`);
           }
-
           // Update ENo for next entry
           setEno(eno + 1);
         }
@@ -804,7 +829,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
       setIsSubmitting(false);
     }
   };
-
   const getWeekNumber = () => {
     const now = new Date();
     const start = new Date(now.getFullYear(), 0, 1);
@@ -863,19 +887,15 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
   // ✅ Export PDF function
   const exportPDF = () => {
     const doc = new jsPDF();
-
     const entityType = selectedOption?.type === "Contractor" ? "Contractor" : "Vendor";
     const entityName = selectedOption?.label || "";
     const projectName = selectedSite?.label || "";
-
     doc.setFontSize(12);
     doc.text(`${entityType} - ${entityName}`, 14, 20);
-
     const pageWidth = doc.internal.pageSize.getWidth();
     const projectText = `Project Name: ${projectName}`;
     const textWidth = doc.getTextWidth(projectText);
     doc.text(projectText, pageWidth - textWidth - 14, 20);
-
     // ✅ Filter data first
     const filteredData = advanceData
       .filter(entry => {
@@ -885,7 +905,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             : selectedOption?.type === 'Contractor'
               ? entry.contractor_id === selectedOption.id
               : false;
-
         const isForCurrentProject = entry.project_id === selectedSite.id;
         return isMatchingVendor && isForCurrentProject;
       })
@@ -894,18 +913,13 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         const typeOrder = ["Advance", "Bill Settlement", "Refund", "Transfer"];
         const typeIndexA = typeOrder.indexOf((a.type || "").trim());
         const typeIndexB = typeOrder.indexOf((b.type || "").trim());
-
         if (typeIndexA !== typeIndexB) return typeIndexA - typeIndexB;
-
         const modeA = (a.payment_mode || "").trim().toLowerCase();
         const modeB = (b.payment_mode || "").trim().toLowerCase();
-
         if (!modeA && modeB) return 1;
         if (modeA && !modeB) return -1;
-
         return modeA.localeCompare(modeB);
       });
-
     // ✅ Table columns (removed Contractor/Vendor and Project Name)
     const tableColumn = [
       "S.No",
@@ -918,7 +932,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
       "Mode",
       "Description"
     ];
-
     // ✅ Table rows
     const tableRows = filteredData.map((entry, index) => {
       const {
@@ -933,20 +946,16 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         project_name,
         description
       } = entry;
-
       const advanceAmount =
         type === 'Refund' ? '' : parseFloat(amount || 0).toLocaleString('en-IN');
-
       const billAmount =
         type === 'Bill Settlement'
           ? parseFloat(bill_amount || 0).toLocaleString('en-IN')
           : '';
-
       const refundAmount =
         type === 'Refund'
           ? parseFloat(refund_amount || 0).toLocaleString('en-IN')
           : '';
-
       let transferText = '';
       if (type === 'Transfer') {
         const siteLabel = siteOptions.find(site => site.id === parseInt(transfer_site_id))?.label;
@@ -955,7 +964,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             ? `Transfer to ${siteLabel || 'Unknown Site'}`
             : `Transfer from ${siteLabel || 'Unknown Site'}`;
       }
-
       return [
         index + 1,
         new Date(date).toLocaleDateString('en-GB'),
@@ -968,7 +976,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         description || ''
       ];
     });
-
     // ✅ Generate PDF table
     doc.autoTable({
       startY: 28,
@@ -987,7 +994,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         4: { halign: 'right' }  // Refund Amount
       }
     });
-
     doc.save("Advance_Report.pdf");
   };
   // ✅ Export CSV function
@@ -995,7 +1001,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
     const entityType = selectedOption?.type === "Contractor" ? "Contractor" : "Vendor";
     const entityName = selectedOption?.label || "";
     const projectName = selectedSite?.label || "";
-
     const filteredData = advanceData.filter(entry => {
       const isMatchingVendor =
         selectedOption?.type === 'Vendor'
@@ -1003,26 +1008,21 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
           : selectedOption?.type === 'Contractor'
             ? entry.contractor_id === selectedOption.id
             : false;
-
       const isForCurrentProject = entry.project_id === selectedSite.id;
       return isMatchingVendor && isForCurrentProject;
     });
-
     const rows = filteredData.map((entry, index) => {
       const { date, amount, bill_amount, type, transfer_site_id, payment_mode, refund_amount } = entry;
-
       const advanceAmount = (() => {
         if (type === 'Refund') {
           return `-${parseFloat(refund_amount || 0).toLocaleString('en-IN')}`;
         }
         return parseFloat(amount || 0).toLocaleString('en-IN');
       })();
-
       const billAmount =
         type === 'Bill Settlement'
           ? parseFloat(bill_amount || 0).toLocaleString('en-IN')
           : '';
-
       let transferOrRefund = '';
       if (type === 'Refund') {
         transferOrRefund = 'Refund';
@@ -1033,7 +1033,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             ? `Transfer to ${siteLabel || 'Unknown Site'}`
             : `Transfer from ${siteLabel || 'Unknown Site'}`;
       }
-
       return {
         "S.No": index + 1,
         "Date": new Date(date).toLocaleDateString('en-GB'),
@@ -1043,13 +1042,11 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         "Mode": payment_mode || ''
       };
     });
-
     let csv = `${entityType}: ${entityName},Project Name: ${projectName}\n\n`;
     csv += Object.keys(rows[0] || {}).join(",") + "\n";
     rows.forEach(row => {
       csv += Object.values(row).map(value => `"${value}"`).join(",") + "\n";
     });
-
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -1069,11 +1066,9 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
       },
       { totalAmount: 0, totalRefund: 0, totalBill: 0 }
     );
-
     const outstanding = totalAmount - totalRefund - totalBill;
     setTotalOutstanding(outstanding);
   }, [advanceData]);
-
   const formatNumber = (num) => {
     if (!num) return '';
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');

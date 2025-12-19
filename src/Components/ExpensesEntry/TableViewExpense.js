@@ -8,7 +8,6 @@ import Reload from '../Images/rotate-right.png'
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 Modal.setAppElement('#root');
-
 // Date Range Picker Component
 const DateRangePicker = ({ startDate, endDate, onStartDateChange, onEndDateChange }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -16,7 +15,6 @@ const DateRangePicker = ({ startDate, endDate, onStartDateChange, onEndDateChang
     const [tempStartDate, setTempStartDate] = useState(null);
     const [tempEndDate, setTempEndDate] = useState(null);
     const datePickerRef = useRef(null);
-
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (datePickerRef.current && !datePickerRef.current.contains(event.target)) {
@@ -30,7 +28,6 @@ const DateRangePicker = ({ startDate, endDate, onStartDateChange, onEndDateChang
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, [isOpen]);
-
     const formatDate = (dateString) => {
         if (!dateString) return '';
         // If dateString is already in YYYY-MM-DD format, parse it directly
@@ -45,7 +42,6 @@ const DateRangePicker = ({ startDate, endDate, onStartDateChange, onEndDateChang
         const year = d.getFullYear();
         return `${day}-${month}-${year}`;
     };
-
     const getDisplayText = () => {
         if (startDate && endDate) {
             return `${formatDate(startDate)} to ${formatDate(endDate)}`;
@@ -54,43 +50,34 @@ const DateRangePicker = ({ startDate, endDate, onStartDateChange, onEndDateChang
         }
         return 'Select Date';
     };
-
     const getDaysInMonth = (date) => {
         return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
     };
-
     const getFirstDayOfMonth = (date) => {
         return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
     };
-
     const formatDateToString = (year, month, day) => {
         const monthStr = String(month + 1).padStart(2, '0');
         const dayStr = String(day).padStart(2, '0');
         return `${year}-${monthStr}-${dayStr}`;
     };
-
     const handleDateClick = (day, isCurrentMonth) => {
         if (!isCurrentMonth) return;
-        
         const year = currentMonth.getFullYear();
         const month = currentMonth.getMonth();
         const dateString = formatDateToString(year, month, day);
-
         if (!tempStartDate || (tempStartDate && tempEndDate)) {
             setTempStartDate(dateString);
             setTempEndDate(null);
         } else if (tempStartDate && !tempEndDate) {
             let finalStartDate = tempStartDate;
             let finalEndDate = dateString;
-            
             if (dateString < tempStartDate) {
                 finalStartDate = dateString;
                 finalEndDate = tempStartDate;
             }
-            
             setTempStartDate(finalStartDate);
-            setTempEndDate(finalEndDate);
-            
+            setTempEndDate(finalEndDate);        
             // Auto-apply when both dates are selected
             setTimeout(() => {
                 onStartDateChange(finalStartDate);
@@ -99,7 +86,6 @@ const DateRangePicker = ({ startDate, endDate, onStartDateChange, onEndDateChang
             }, 0);
         }
     };
-
     const handleDone = () => {
         if (tempStartDate) {
             onStartDateChange(tempStartDate);
@@ -111,13 +97,11 @@ const DateRangePicker = ({ startDate, endDate, onStartDateChange, onEndDateChang
         }
         setIsOpen(false);
     };
-
     const handleCancel = () => {
         setTempStartDate(startDate || null);
         setTempEndDate(endDate || null);
         setIsOpen(false);
     };
-
     const handleClear = () => {
         setTempStartDate(null);
         setTempEndDate(null);
@@ -125,21 +109,17 @@ const DateRangePicker = ({ startDate, endDate, onStartDateChange, onEndDateChang
         onEndDateChange('');
         setIsOpen(false);
     };
-
     const prevMonth = () => {
         setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
     };
-
     const nextMonth = () => {
         setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
     };
-
     const isDateInRange = (day, isCurrentMonth) => {
         if (!tempStartDate || !isCurrentMonth) return false;
         const year = currentMonth.getFullYear();
         const month = currentMonth.getMonth();
-        const dateString = formatDateToString(year, month, day);
-        
+        const dateString = formatDateToString(year, month, day);        
         if (tempStartDate && tempEndDate) {
             return dateString >= tempStartDate && dateString <= tempEndDate;
         } else if (tempStartDate) {
@@ -147,7 +127,6 @@ const DateRangePicker = ({ startDate, endDate, onStartDateChange, onEndDateChang
         }
         return false;
     };
-
     const isStartDate = (day, isCurrentMonth) => {
         if (!tempStartDate || !isCurrentMonth) return false;
         const year = currentMonth.getFullYear();
@@ -155,7 +134,6 @@ const DateRangePicker = ({ startDate, endDate, onStartDateChange, onEndDateChang
         const dateString = formatDateToString(year, month, day);
         return dateString === tempStartDate;
     };
-
     const isEndDate = (day, isCurrentMonth) => {
         if (!tempEndDate || !isCurrentMonth) return false;
         const year = currentMonth.getFullYear();
@@ -163,38 +141,32 @@ const DateRangePicker = ({ startDate, endDate, onStartDateChange, onEndDateChang
         const dateString = formatDateToString(year, month, day);
         return dateString === tempEndDate;
     };
-
     const daysInMonth = getDaysInMonth(currentMonth);
     const firstDay = getFirstDayOfMonth(currentMonth);
     const days = [];
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-
     // Previous month's trailing days
     const prevMonthDays = getDaysInMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
     for (let i = firstDay - 1; i >= 0; i--) {
         days.push({ day: prevMonthDays - i, isCurrentMonth: false });
     }
-
     // Current month's days
     for (let i = 1; i <= daysInMonth; i++) {
         days.push({ day: i, isCurrentMonth: true });
     }
-
     // Next month's leading days
     const totalCells = 42; // 6 rows * 7 days
     const remainingDays = totalCells - days.length;
     for (let i = 1; i <= remainingDays; i++) {
         days.push({ day: i, isCurrentMonth: false });
     }
-
     useEffect(() => {
         if (isOpen) {
             setTempStartDate(startDate || null);
             setTempEndDate(endDate || null);
         }
     }, [isOpen, startDate, endDate]);
-
     return (
         <div className="relative" ref={datePickerRef}>
             <input
@@ -289,7 +261,6 @@ const DateRangePicker = ({ startDate, endDate, onStartDateChange, onEndDateChang
         </div>
     );
 };
-
 const TableViewExpense = ({ username, userRoles = [] }) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [totalAmount, setTotalAmount] = useState(0);
@@ -339,14 +310,6 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
     const [contractorOption, setContractorOption] = useState([]);
     const [categoryOption, setCategoryOption] = useState([]);
     const [machineToolsOption, setMachineToolsOption] = useState([]);
-
-    const [editPaymentMode, setEditPaymentMode] = useState('');
-    const [editUtilityType, setEditUtilityType] = useState('');
-    const [editEbNumberOptions, setEditEbNumberOptions] = useState([]);
-    const [editSelectedEbNumber, setEditSelectedEbNumber] = useState(null);
-    const [editSelectedMonths, setEditSelectedMonths] = useState('');
-    const [editThirdInput, setEditThirdInput] = useState('');
-    const [editProjectData, setEditProjectData] = useState(null);
     const [showFilters, setShowFilters] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(50);
@@ -788,7 +751,6 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         setMachineToolsOptions(getOptions(filtered, "machineTools"));
         setAccountTypeOptions(getOptions(filtered, "accountType"));
         setEnoOptions([...new Set(filtered.map(item => item.eno).filter(Boolean))]);
-
     }, [
         selectedSiteName,
         selectedVendor,
@@ -1057,7 +1019,6 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         setModalIsOpen(false);
         setSelectedFile(null);
     };
-
     const clearFilters = () => {
         setSelectedSiteName('');
         setSelectedVendor('');
@@ -1072,7 +1033,6 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         setCurrentPage(1);
         setSortField('');
         setSortDirection('asc');
-
         localStorage.removeItem('expenseFilter_siteName');
         localStorage.removeItem('expenseFilter_vendor');
         localStorage.removeItem('expenseFilter_contractor');
@@ -1142,7 +1102,6 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                         <span className=' text-[#BF9853] mr-9 font-semibold hover:underline'>Print</span>
                     </div>
                 </div>
-
                 <div className="w-full max-w-[1860px] mx-auto p-4 bg-white shadow-lg overflow-x-auto">
                     <div className={`text-left flex ${selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || startDate || endDate
                         ? 'flex-col sm:flex-row sm:justify-between' : 'flex-row justify-between items-center'} mb-3 gap-2`}>

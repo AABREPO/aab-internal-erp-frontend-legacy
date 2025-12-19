@@ -89,6 +89,10 @@ const PendingBill = ({ username, userRoles = [] }) => {
     const [paidTodayBills, setPaidTodayBills] = useState({})
     const [showEditModal, setShowEditModal] = useState(false)
     const [selectedEditItem, setSelectedEditItem] = useState(null)
+    const [carryForwardData, setCarryForwardData] = useState([])
+    const [useCarryForward, setUseCarryForward] = useState(false)
+    const [carryForwardAmount, setCarryForwardAmount] = useState(0)
+
     const [editFormData, setEditFormData] = useState({
         billArrivalDate: '',
         vendorId: null,
@@ -1951,7 +1955,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
             startY: 30,
             margin: { left: 10, right: 10, top: 30 },
             theme: 'grid',
-            headStyles: { 
+            headStyles: {
                 fillColor: [250, 246, 237],
                 textColor: 0,
                 fontStyle: 'bold',
@@ -1973,7 +1977,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 4: { cellWidth: 28 },
                 5: { cellWidth: 27 },
                 6: { cellWidth: 18 },
-                7: { cellWidth: 26 , halign: 'right' },
+                7: { cellWidth: 26, halign: 'right' },
                 8: { cellWidth: 20 },
                 9: { cellWidth: 30 }
             },
@@ -1986,6 +1990,38 @@ const PendingBill = ({ username, userRoles = [] }) => {
         const fileName = `Matching_Expenses_${vendorName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`
         doc.save(fileName)
     }
+    const fetchCarryForwardData = async (vendorId) => {
+        try {
+            const response = await fetch("https://backendaab.in/aabuildersDash/api/vendor_carry_forward/getAll", {
+                method: "GET",
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                // Filter by vendor_id and calculate total carry forward amount
+                const vendorCarryForward = data.filter(item => item.vendor_id === vendorId);
+                setCarryForwardData(vendorCarryForward);
+                const totalCarryForward = vendorCarryForward.reduce((sum, item) => {
+                    const amount = parseFloat(item.amount) || 0;
+                    const billAmount = parseFloat(item.bill_amount) || 0;
+                    const refundAmount = parseFloat(item.refund_amount) || 0;
+                    return sum + amount - billAmount - refundAmount;
+                }, 0);
+                setCarryForwardAmount(Math.max(0, totalCarryForward));
+            } else {
+                console.error("Failed to fetch carry forward data:", response.status);
+                setCarryForwardData([]);
+                setCarryForwardAmount(0);
+            }
+        } catch (error) {
+            console.error("Error fetching carry forward data:", error);
+            setCarryForwardData([]);
+            setCarryForwardAmount(0);
+        }
+    };
     const handlePaymentClick = async (bill) => {
         setSelectedPaymentBill(bill)
         const billAmount = parseFloat(bill.total_amount) || 0;
@@ -1994,15 +2030,22 @@ const PendingBill = ({ username, userRoles = [] }) => {
         let receivedAmount = 0;
         let totalDiscount = 0;
         if (existingPayments && existingPayments.length > 0) {
-            receivedAmount = existingPayments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+            receivedAmount = existingPayments.reduce((sum, payment) => {
+                const amount = parseFloat(payment.amount) || 0;
+                const carryForwardAmount = parseFloat(payment.carry_forward_amount) || 0;
+                return sum + amount + carryForwardAmount;
+            }, 0);
             totalDiscount = existingPayments.reduce((sum, payment) => sum + (payment.discount_amount || 0), 0);
         }
         const remainingAmount = Math.max(0, billAmount - receivedAmount);
         setRemainingAmount(remainingAmount);
         setDiscount(totalDiscount);
         setDiscountSubmitted(totalDiscount > 0);
+        setUseCarryForward(false); // Reset checkbox
         const vendorId = bill.vendor_id || bill.vendorId
         if (vendorId) {
+            // Fetch carry forward data for this vendor
+            await fetchCarryForwardData(vendorId);
             try {
                 const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
                     method: "GET",
@@ -2025,6 +2068,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
             }
         } else {
             setSelectedVendorAccountDetails(null)
+            setCarryForwardData([]);
+            setCarryForwardAmount(0);
         }
         setShowPaymentModal(true)
     }
@@ -2052,6 +2097,9 @@ const PendingBill = ({ username, userRoles = [] }) => {
         setActualAmount(0)
         setRemainingAmount(0)
         setOverallPaymentPdfFile(null)
+        setUseCarryForward(false)
+        setCarryForwardData([])
+        setCarryForwardAmount(0)
         if (overallPdfInputRef.current) {
             overallPdfInputRef.current.value = '';
         }
@@ -2105,6 +2153,48 @@ const PendingBill = ({ username, userRoles = [] }) => {
             return { ...entry, [field]: value }
         }))
     }
+    // Auto-fill amount when carry forward checkbox is checked
+    useEffect(() => {
+        if (useCarryForward && carryForwardAmount > 0 && paymentEntries.length > 0 && showPaymentModal) {
+            const firstEntry = paymentEntries[0];
+            // Only auto-fill if amount is empty
+            if (!firstEntry.amount || firstEntry.amount === '') {
+                const carryForwardToUse = Math.min(carryForwardAmount, remainingAmount);
+                if (carryForwardToUse > 0) {
+                    const displayValue = formatIndianCurrency(carryForwardToUse);
+                    setPaymentEntries(prev => prev.map((entry, index) => {
+                        if (index === 0) {
+                            return {
+                                ...entry,
+                                amount: carryForwardToUse.toString(),
+                                amountDisplay: displayValue,
+                                mode: entry.mode || 'Carry Forward',
+                                date: entry.date || new Date().toISOString().split('T')[0]
+                            };
+                        }
+                        return entry;
+                    }));
+                }
+            }
+        } else if (!useCarryForward && paymentEntries.length > 0 && showPaymentModal) {
+            // Clear amount when unchecked if it was set by carry forward
+            const firstEntry = paymentEntries[0];
+            if (firstEntry.mode === 'Carry Forward' && firstEntry.amount) {
+                setPaymentEntries(prev => prev.map((entry, index) => {
+                    if (index === 0) {
+                        return {
+                            ...entry,
+                            amount: '',
+                            amountDisplay: '',
+                            mode: ''
+                        };
+                    }
+                    return entry;
+                }));
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [useCarryForward, carryForwardAmount, remainingAmount, showPaymentModal])
     // Helper function to convert image to PDF
     const convertImageToPdf = (file) => {
         return new Promise((resolve, reject) => {
@@ -2128,15 +2218,15 @@ const PendingBill = ({ username, userRoles = [] }) => {
                         const pdfHeight = 297; // A4 height in mm
                         const imgWidth = img.width;
                         const imgHeight = img.height;
-                        
+
                         // Calculate aspect ratio
                         const imgAspectRatio = imgWidth / imgHeight;
                         const pdfAspectRatio = pdfWidth / pdfHeight;
-                        
+
                         // Determine orientation
                         const orientation = imgWidth > imgHeight ? 'landscape' : 'portrait';
                         let finalWidth, finalHeight;
-                        
+
                         if (orientation === 'landscape') {
                             // Use landscape dimensions
                             if (imgAspectRatio > pdfAspectRatio) {
@@ -2160,7 +2250,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                 finalWidth = pdfHeight * imgAspectRatio;
                             }
                         }
-                        
+
                         // Center the image on the page
                         const xOffset = (pdfWidth - finalWidth) / 2;
                         const yOffset = (pdfHeight - finalHeight) / 2;
@@ -2185,7 +2275,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
 
                         // Convert PDF to blob
                         const pdfBlob = pdf.output('blob');
-                        
+
                         // Create a File object from the blob with .pdf extension
                         const pdfFile = new File([pdfBlob], file.name.replace(/\.[^/.]+$/, '') + '.pdf', {
                             type: 'application/pdf',
@@ -2241,7 +2331,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 hour: "2-digit",
                 minute: "2-digit",
                 hour12: true
-              })
+            })
                 .replace(",", "")
                 .replace(/\s/g, "-");
             // Find the payment details to generate a proper filename
@@ -2316,7 +2406,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
             // Convert image to PDF if it's an image
             const processedFile = await convertImageToPdf(file);
             setOverallPaymentPdfFile(processedFile);
-            
+
             // Upload file to Google Drive
             const formData = new FormData();
             const vendorName = getVendorNameById(selectedPaymentBill?.vendor_id);
@@ -2328,7 +2418,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 hour: "2-digit",
                 minute: "2-digit",
                 hour12: true
-              })
+            })
                 .replace(",", "")
                 .replace(/\s/g, "-");
             // Format date as DD-MM-YYYY
@@ -2401,102 +2491,169 @@ const PendingBill = ({ username, userRoles = [] }) => {
         }
     }
     const handlePaymentSubmit = async () => {
-        const hasEmptyFields = paymentEntries.some(entry =>
-            !entry.date || !entry.amount || !entry.mode
-        )
-        if (hasEmptyFields) {
-            alert('Please fill all required fields in payment entries')
-            return
-        }
-        const hasInvalidModeFields = paymentEntries.some(entry => {
-            if (entry.mode === 'Cheque') {
-                return !entry.chequeNo || !entry.chequeDate
+        // Check if using carry forward only (no payment entries needed)
+        const isUsingCarryForwardOnly = useCarryForward && carryForwardAmount > 0;
+
+        // If not using carry forward only, validate payment entries
+        if (!isUsingCarryForwardOnly) {
+            const hasEmptyFields = paymentEntries.some(entry =>
+                !entry.date || !entry.amount || !entry.mode
+            )
+            if (hasEmptyFields) {
+                alert('Please fill all required fields in payment entries')
+                return
             }
-            if (entry.mode === 'Net Banking' || entry.mode === 'Gpay' || entry.mode === 'PhonePe') {
-                return !entry.accountNumber
+            const hasInvalidModeFields = paymentEntries.some(entry => {
+                if (entry.mode === 'Cheque') {
+                    return !entry.chequeNo || !entry.chequeDate
+                }
+                if (entry.mode === 'Net Banking' || entry.mode === 'Gpay' || entry.mode === 'PhonePe') {
+                    return !entry.accountNumber
+                }
+                return false
+            })
+            if (hasInvalidModeFields) {
+                alert('Please fill all required fields for the selected payment mode...')
+                return
             }
-            return false
-        })
-        if (hasInvalidModeFields) {
-            alert('Please fill all required fields for the selected payment mode...')
-            return
         }
         try {
-            const totalPaymentAmount = paymentEntries.reduce((sum, entry) => {
+            // Filter out empty payment entries (for carry forward only case)
+            const validPaymentEntries = paymentEntries.filter(entry =>
+                entry.date && entry.amount && entry.mode
+            );
+            // Separate regular payments from carry forward entries
+            const regularPaymentEntries = validPaymentEntries.filter(entry => entry.mode !== 'Carry Forward');
+            const carryForwardEntries = validPaymentEntries.filter(entry => entry.mode === 'Carry Forward');
+            const totalPaymentAmount = regularPaymentEntries.reduce((sum, entry) => {
                 return sum + (parseFloat(entry.amount) || 0)
             }, 0)
             const currentReceivedAmount = actualAmount - remainingAmount;
             const newTotalReceived = currentReceivedAmount + totalPaymentAmount;
-            const newRemainingAmount = Math.max(0, actualAmount - newTotalReceived)
-            const paymentDetailsPromises = paymentEntries.map(async (entry) => {
-                let billUrl = '';
-                if (entry.attachedFile) {
-                    try {
-                        const formData = new FormData();
-                        const now = new Date();
-                        const timestamp = now.toLocaleString("en-GB", {
-                            day: "2-digit",
-                            month: "2-digit",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            hour12: true
-                        })
-                            .replace(",", "")
-                            .replace(/\s/g, "-");
-                        const finalName = `${timestamp} ${selectedPaymentBill.vendor_name || 'Payment'} ${entry.mode}`;
-                        formData.append('file', entry.attachedFile);
-                        formData.append('file_name', finalName);
-                        const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
-                            method: "POST",
-                            body: formData,
-                        });
-                        if (!uploadResponse.ok) {
-                            throw new Error('File upload failed');
+            const remainingAfterPayments = Math.max(0, actualAmount - newTotalReceived);
+            // Calculate carry forward to use: either from entries or calculated amount
+            let carryForwardToUse = 0;
+            if (carryForwardEntries.length > 0) {
+                // Sum carry forward amounts from entries
+                carryForwardToUse = carryForwardEntries.reduce((sum, entry) => {
+                    return sum + (parseFloat(entry.amount) || 0)
+                }, 0);
+            } else if (useCarryForward) {
+                // Calculate how much carry forward can be used
+                carryForwardToUse = Math.min(carryForwardAmount, remainingAfterPayments);
+            }
+            const newRemainingAmount = Math.max(0, remainingAfterPayments - carryForwardToUse);
+            // Only process payment entries if there are valid ones
+            const paymentDetailsPromises = validPaymentEntries.length > 0
+                ? validPaymentEntries.map(async (entry, index) => {
+                    let billUrl = '';
+                    if (entry.attachedFile) {
+                        try {
+                            const formData = new FormData();
+                            const now = new Date();
+                            const timestamp = now.toLocaleString("en-GB", {
+                                day: "2-digit",
+                                month: "2-digit",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                hour12: true
+                            })
+                                .replace(",", "")
+                                .replace(/\s/g, "-");
+                            const finalName = `${timestamp} ${selectedPaymentBill.vendor_name || 'Payment'} ${entry.mode}`;
+                            formData.append('file', entry.attachedFile);
+                            formData.append('file_name', finalName);
+                            const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+                                method: "POST",
+                                body: formData,
+                            });
+                            if (!uploadResponse.ok) {
+                                throw new Error('File upload failed');
+                            }
+                            const uploadResult = await uploadResponse.json();
+                            billUrl = uploadResult.url;
+                        } catch (error) {
+                            console.error('Error during file upload:', error);
+                            alert('Error during file upload. Please try again.');
+                            return;
                         }
-                        const uploadResult = await uploadResponse.json();
-                        billUrl = uploadResult.url;
-                    } catch (error) {
-                        console.error('Error during file upload:', error);
-                        alert('Error during file upload. Please try again.');
-                        return;
                     }
-                }
-                const paymentData = {
-                    vendor_payments_tracker_id: selectedPaymentBill.id,
-                    date: entry.date,
-                    actual_amount: actualAmount,
-                    amount: parseFloat(entry.amount) || 0,
-                    discount_amount: discount,
-                    carry_forward_amount: 0,
-                    vendor_bill_payment_mode: entry.mode,
-                    cheque_number: entry.chequeNo || '',
-                    cheque_date: entry.chequeDate || '',
-                    transaction_number: entry.transactionNumber || '',
-                    account_number: entry.accountNumber || '',
-                    bill_url: billUrl
-                }
-                const response = await fetch("https://backendaab.in/aabuildersDash/api/vendor-bill-tracker/save", {
-                    method: "POST",
-                    credentials: "include",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify(paymentData)
+                    // If mode is "Carry Forward", save amount in carry_forward_amount field, not amount field
+                    const isCarryForward = entry.mode === 'Carry Forward';
+                    const paymentData = {
+                        vendor_payments_tracker_id: selectedPaymentBill.id,
+                        date: entry.date,
+                        actual_amount: actualAmount,
+                        amount: isCarryForward ? 0 : (parseFloat(entry.amount) || 0),
+                        discount_amount: index === 0 ? discount : 0,
+                        carry_forward_amount: isCarryForward ? (parseFloat(entry.amount) || 0) : 0,
+                        vendor_bill_payment_mode: entry.mode,
+                        cheque_number: entry.chequeNo || '',
+                        cheque_date: entry.chequeDate || '',
+                        transaction_number: entry.transactionNumber || '',
+                        account_number: entry.accountNumber || '',
+                        bill_url: billUrl
+                    }
+                    const response = await fetch("https://backendaab.in/aabuildersDash/api/vendor-bill-tracker/save", {
+                        method: "POST",
+                        credentials: "include",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify(paymentData)
+                    })
+                    if (!response.ok) {
+                        throw new Error(`Failed to save payment details: ${response.statusText}`)
+                    }
+                    return await response.json()
                 })
-                if (!response.ok) {
-                    throw new Error(`Failed to save payment details: ${response.statusText}`)
-                }
-                return await response.json()
-            })
+                : [];
             const savedPaymentDetails = await Promise.all(paymentDetailsPromises)
-            for (let i = 0; i < paymentEntries.length; i++) {
-                const entry = paymentEntries[i];
+
+            // Create separate payment entry for carry forward if checkbox is checked AND not already in entries
+            if (useCarryForward && carryForwardToUse > 0 && carryForwardEntries.length === 0) {
+                try {
+                    const carryForwardPaymentData = {
+                        vendor_payments_tracker_id: selectedPaymentBill.id,
+                        date: validPaymentEntries.length > 0
+                            ? validPaymentEntries[0]?.date
+                            : new Date().toISOString().split('T')[0],
+                        actual_amount: actualAmount,
+                        amount: 0,
+                        discount_amount: 0,
+                        carry_forward_amount: carryForwardToUse,
+                        vendor_bill_payment_mode: "Carry Forward",
+                        cheque_number: '',
+                        cheque_date: '',
+                        transaction_number: '',
+                        account_number: '',
+                        bill_url: ''
+                    };
+                    const carryForwardPaymentResponse = await fetch("https://backendaab.in/aabuildersDash/api/vendor-bill-tracker/save", {
+                        method: "POST",
+                        credentials: "include",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify(carryForwardPaymentData)
+                    });
+                    if (!carryForwardPaymentResponse.ok) {
+                        throw new Error(`Failed to save carry forward payment: ${carryForwardPaymentResponse.statusText}`);
+                    }
+                } catch (error) {
+                    console.error("Error saving carry forward payment:", error);
+                    alert(`Error saving carry forward payment: ${error.message}`);
+                }
+            }
+
+            for (let i = 0; i < validPaymentEntries.length; i++) {
+                const entry = validPaymentEntries[i];
                 const savedPaymentDetail = savedPaymentDetails[i];
                 const billUrl = savedPaymentDetail?.bill_url || '';
-                
+
                 // Only send to weekly-payment-bills/save for Non-Cash payment modes
-                if (entry.mode !== 'Cash') {
+                if (entry.mode !== 'Cash' && entry.mode !== 'Carry Forward') {
                     const weeklyPaymentBillPayload = {
                         date: entry.date,
                         created_at: new Date().toISOString(),
@@ -2539,7 +2696,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                         console.error("❌ Error submitting weekly payment bill:", error);
                     }
                 }
-                
+
                 // Only send to weekly-expenses/save for Cash payment mode
                 if (entry.mode === 'Cash') {
                     const weeklyExpensePayload = {
@@ -2583,6 +2740,46 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     }
                 }
             }
+            // Handle carry forward if checkbox is checked
+            // Calculate actual carry forward amount used (from payment entries or separate entry)
+            let actualCarryForwardUsed = 0;
+            if (carryForwardEntries.length > 0) {
+                // Sum carry forward amounts from payment entries
+                actualCarryForwardUsed = carryForwardEntries.reduce((sum, entry) => {
+                    return sum + (parseFloat(entry.amount) || 0)
+                }, 0);
+            } else if (useCarryForward && carryForwardToUse > 0) {
+                // Use the separate carry forward entry amount
+                actualCarryForwardUsed = carryForwardToUse;
+            }
+            if (useCarryForward && actualCarryForwardUsed > 0) {
+                try {
+                    // Create a carry forward entry with bill_amount to subtract the used amount
+                    const carryForwardPayload = {
+                        type: "Bill Payment",
+                        date: validPaymentEntries.length > 0
+                            ? validPaymentEntries[0]?.date
+                            : new Date().toISOString().split('T')[0],
+                        vendor_id: selectedPaymentBill.vendor_id,
+                        payment_mode: "Carry Forward",
+                        amount: 0,
+                        bill_amount: actualCarryForwardUsed,
+                        refund_amount: 0
+                    };
+                    const carryForwardResponse = await fetch("https://backendaab.in/aabuildersDash/api/vendor_carry_forward/save", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(carryForwardPayload)
+                    });
+                    if (!carryForwardResponse.ok) {
+                        console.error("Failed to update carry forward amount");
+                    } else {
+                        console.log("Carry forward amount updated successfully");
+                    }
+                } catch (error) {
+                    console.error("Error updating carry forward:", error);
+                }
+            }
             setBillData(prev => prev.map(bill =>
                 bill.id === selectedPaymentBill.id
                     ? { ...bill, paymentStatus: newRemainingAmount === 0 ? 'Paid' : 'Partially Paid' }
@@ -2597,12 +2794,21 @@ const PendingBill = ({ username, userRoles = [] }) => {
             }
 
             // Capture latest payment date and other info from entries before clearing
-            const latestEntryDate = paymentEntries
+            const paymentDates = validPaymentEntries
                 .map(e => e.date)
-                .filter(d => d)
-                .sort((a, b) => new Date(b) - new Date(a))[0];
-            const hasCashPayments = paymentEntries.some(entry => entry.mode === 'Cash');
-            const hasFileUploads = paymentEntries.some(entry => entry.attachedFile);
+                .filter(d => d);
+            // If using carry forward, add its date
+            if (useCarryForward && carryForwardToUse > 0) {
+                const carryForwardDate = validPaymentEntries.length > 0
+                    ? validPaymentEntries[0]?.date
+                    : new Date().toISOString().split('T')[0];
+                paymentDates.push(carryForwardDate);
+            }
+            const latestEntryDate = paymentDates.length > 0
+                ? paymentDates.sort((a, b) => new Date(b) - new Date(a))[0]
+                : null;
+            const hasCashPayments = validPaymentEntries.some(entry => entry.mode === 'Cash');
+            const hasFileUploads = validPaymentEntries.some(entry => entry.attachedFile);
 
             setShowPaymentModal(false)
             setPaymentEntries([
@@ -2625,6 +2831,9 @@ const PendingBill = ({ username, userRoles = [] }) => {
             setDiscountSubmitted(false)
             setActualAmount(0)
             setRemainingAmount(0)
+            setUseCarryForward(false)
+            setCarryForwardData([])
+            setCarryForwardAmount(0)
 
             await fetchTrackerData()
             await fetchExpensesData()
@@ -2792,7 +3001,11 @@ const PendingBill = ({ username, userRoles = [] }) => {
             if (!paymentDetails || paymentDetails.length === 0) {
                 return { status: 'To Pay', lastPaymentDate: null, paidToday: false }
             }
-            const totalPaid = paymentDetails.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+            const totalPaid = paymentDetails.reduce((sum, payment) => {
+                const amount = parseFloat(payment.amount) || 0;
+                const carryForwardAmount = parseFloat(payment.carry_forward_amount) || 0;
+                return sum + amount + carryForwardAmount;
+            }, 0);
             const totalDiscount = paymentDetails.reduce((sum, payment) => sum + (payment.discount_amount || 0), 0);
             const actualAmount = parseFloat(item.total_amount) || 0;
             const remainingAmount = Math.max(0, actualAmount - totalPaid - totalDiscount);
@@ -2814,7 +3027,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
             today.setHours(0, 0, 0, 0);
             const todayEnd = new Date(today);
             todayEnd.setHours(23, 59, 59, 999);
-            
+
             let paidToday = false;
             for (const payment of paymentDetails) {
                 // Check timestamp field (if available)
@@ -3048,17 +3261,18 @@ const PendingBill = ({ username, userRoles = [] }) => {
         }),
         singleValue: (provided) => ({ ...provided, textAlign: 'left', color: 'black' }),
     };
-    const draftPaymentTotal = paymentEntries.reduce((sum, entry) => {
-        const rawAmount = typeof entry.amount === 'string' ? entry.amount.replace(/,/g, '') : entry.amount
-        const numericAmount = parseFloat(rawAmount)
-        if (Number.isNaN(numericAmount)) {
-            return sum
-        }
-        return sum + numericAmount
-    }, 0)
+    // Calculate draft payment total excluding carry forward entries (carry forward is handled separately)
+    const draftPaymentTotal = paymentEntries
+        .filter(entry => entry.mode !== 'Carry Forward')
+        .reduce((sum, entry) => {
+            const rawAmount = typeof entry.amount === 'string' ? entry.amount.replace(/,/g, '') : entry.amount
+            const numericAmount = parseFloat(rawAmount)
+            if (Number.isNaN(numericAmount)) {
+                return sum
+            }
+            return sum + numericAmount
+        }, 0)
     const existingReceivedAmount = Math.max(0, actualAmount - remainingAmount)
-    const liveReceivedAmount = Math.max(0, existingReceivedAmount + draftPaymentTotal)
-    const projectedRemainingAmount = Math.max(0, remainingAmount - draftPaymentTotal)
     const normalizedDiscount = (() => {
         if (typeof discount === 'string') {
             const cleaned = discount.replace(/,/g, '')
@@ -3067,7 +3281,77 @@ const PendingBill = ({ username, userRoles = [] }) => {
         }
         return Number.isFinite(discount) ? discount : 0
     })()
-    const projectedNetPayable = Math.max(0, projectedRemainingAmount - normalizedDiscount)
+    // -----------------------------
+    // BASIC NORMALIZED VALUES
+    // -----------------------------
+    const billTotal = actualAmount || 0;
+    const existingReceived = existingReceivedAmount || 0;
+    const draftPaid = draftPaymentTotal || 0;
+    const discountValue = normalizedDiscount || 0;
+    const carryForwardAvailable = carryForwardAmount || 0;
+console.log("carryForwardAvailable", carryForwardAvailable);
+    // -----------------------------
+    // REMAINING BILL AFTER PREVIOUS PAYMENTS
+    // -----------------------------
+    const remainingAfterPayments = Math.max(
+        0,
+        billTotal - existingReceived - draftPaid
+    );
+console.log("remainingAfterPayments", remainingAfterPayments);
+    // -----------------------------
+    // AMOUNT NEEDED TO SETTLE BILL (AFTER DISCOUNT)
+    // -----------------------------
+    const amountNeededToPay = Math.max(
+        0,
+        remainingAfterPayments - discountValue
+    );
+console.log("amountNeededToPay", amountNeededToPay);
+    // -----------------------------
+    // CARRY FORWARD TO USE
+    // -----------------------------
+    const carryForwardToUse = useCarryForward
+        ? Math.min(carryForwardAvailable, amountNeededToPay)
+        : 0;
+console.log("carryForwardToUse", carryForwardToUse);
+    // -----------------------------
+    // FINAL REMAINING BILL AFTER CARRY FORWARD
+    // -----------------------------
+    const projectedRemainingAmount = Math.max(
+        0,
+        remainingAfterPayments - carryForwardToUse
+    );
+console.log("projectedRemainingAmount", projectedRemainingAmount);
+    // -----------------------------
+    // LIVE RECEIVED AMOUNT (PREVIOUS + CURRENT + CF)
+    // -----------------------------
+    const liveReceivedAmount = Math.min(
+        billTotal,
+        existingReceived + draftPaid + carryForwardToUse
+    );
+console.log("liveReceivedAmount", liveReceivedAmount);
+    // -----------------------------
+    // REMAINING CARRY FORWARD BALANCE
+    // -----------------------------
+    const remainingCarryForward = useCarryForward
+        ? Math.max(0, carryForwardAvailable - carryForwardToUse)
+        : carryForwardAvailable;
+console.log("remainingCarryForward", remainingCarryForward);
+    // -----------------------------
+    // NET PAYABLE (FINAL)
+    // -----------------------------
+
+    const excessCarryForward =
+        useCarryForward && carryForwardToUse > 0 && carryForwardAvailable > amountNeededToPay
+            ? carryForwardAvailable - amountNeededToPay
+            : 0;
+    console.log("excessCarryForward", excessCarryForward);
+    const projectedNetPayable =
+        projectedRemainingAmount > 0
+            ? projectedRemainingAmount
+            : excessCarryForward > 0
+                ? -excessCarryForward
+                : 0;
+    console.log("projectedNetPayable", projectedNetPayable);
     const handleSubmitTracker = async () => {
         if (!formData.billArrivalDate) {
             alert('Please select a bill arrival date');
@@ -4044,11 +4328,15 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                         </>
                                     )}
                                     {existingPaymentDetails && existingPaymentDetails.length > 0 && (
-                                        <div className="p-w overflow-auto h-[300px] mb-8">
+                                        <div className={`p-w overflow-auto mb-8 ${
+                                            paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'
+                                                ? 'h-[630px]'
+                                                : 'h-[300px]'
+                                        }`}>
                                             <h4 className="text-sm font-semibold text-gray-700">Previous Payment Details:</h4>
                                             <div className="space-y-4">
                                                 {existingPaymentDetails.map((payment, index) => (
-                                                    <div key={payment.id || index} className="text-left p-4 shadow-lg rounded-lg mb-4">
+                                                    <div key={payment.id || index} className="text-left p-3 shadow-lg rounded-lg mb-4">
                                                         <div className=" border border-[#BF9853] border-opacity-35 rounded-md p-4">
                                                             <div className='grid grid-cols-3 gap-4'>
                                                                 <div>
@@ -4064,7 +4352,12 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                                     <label className="block font-semibold mb-1 text-sm">Amount</label>
                                                                     <input
                                                                         type="text"
-                                                                    value={payment.amount ? formatIndianCurrency(payment.amount) : ''}
+                                                                        value={(() => {
+                                                                            const amount = parseFloat(payment.amount) || 0;
+                                                                            const carryForwardAmount = parseFloat(payment.carry_forward_amount) || 0;
+                                                                            const totalAmount = amount + carryForwardAmount;
+                                                                            return totalAmount > 0 ? formatIndianCurrency(totalAmount) : '';
+                                                                        })()}
                                                                         readOnly
                                                                         className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm "
                                                                     />
@@ -4126,7 +4419,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                                 )}
                                                             </div>
                                                             <div className='mt-2'>
-                                                                <label className="block font-semibold mb-1 text-sm">Attach File</label>
                                                                 <div>
                                                                     {payment.bill_url ? (
                                                                         <button
@@ -4166,7 +4458,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                             </div>
                                         </div>
                                     )}
-                                    <div className="flex justify-end gap-3 bg-white mb-4">
+                                    <div className="flex justify-end gap-3 bg-white mb-2">
                                         <button className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg font-medium" onClick={handlePaymentCancel}>
                                             Cancel
                                         </button>
@@ -4190,9 +4482,20 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                     <span className="text-gray-600">Received Amount:</span>
                                                     <span className="font-semibold">{formatIndianCurrency(liveReceivedAmount)}</span>
                                                 </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-600">Carry Forward:</span>
-                                                    <span className="font-semibold">0</span>
+                                                <div className="flex justify-between items-center">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-gray-600">Carry Forward:</span>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={useCarryForward}
+                                                            onChange={(e) => setUseCarryForward(e.target.checked)}
+                                                            disabled={carryForwardAmount <= 0 || paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
+                                                            className="w-4 h-4 cursor-pointer"
+                                                        />
+                                                    </div>
+                                                    <span className={`font-semibold ${useCarryForward ? 'text-green-600' : ''}`}>
+                                                        {formatIndianCurrency(carryForwardAvailable)}
+                                                    </span>
                                                 </div>
                                                 <hr className="border-gray-300" />
                                                 <div className="flex justify-between">

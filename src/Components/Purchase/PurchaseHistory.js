@@ -822,10 +822,10 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
                       }}>
                       <img src={file} className="w-5 h-5" />
                       <span
-                        title={`${formatDateOnly(order.date)} - ${order.client_id}`}
+                        title={`${order.date} - ${order.client_id}`}
                         className={`font-medium hover:text-[#E4572E] ${selectedOrderId === order.id ? 'text-[#E4572E]' : 'text-black'} ${order.delete_status ? 'line-through text-gray-500' : ''}`}
                       >
-                        {order.eno} - {formatDateOnly(order.date)} - {
+                        {order.eno} - {order.date} - {
                           clientNameOptions.find(opt => opt.id === order.client_id)?.label || order.client_id
                         }
                         {order.po_notes?.po_notes ? ` - ${order.po_notes.po_notes}` : ""}
@@ -976,7 +976,7 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
                     <>
                       <span>
                         <b className='font-medium'>Date:</b>
-                        <b className='font-medium text-[#E4572E]'>{formatDateOnly(selectedOrder.date)}</b>
+                        <b className='font-medium text-[#E4572E]'>{selectedOrder.date}</b>
                       </span>
                       <span>
                         <b className='font-medium'>PO.No:</b>

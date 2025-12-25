@@ -11,7 +11,8 @@ const paymentModeOptions = [
     { value: 'GPay', label: 'GPay' },
     { value: 'PhonePe', label: 'PhonePe' },
     { value: 'Net Banking', label: 'Net Banking' },
-    { value: 'Cheque', label: 'Cheque' }
+    { value: 'Cheque', label: 'Cheque' },
+    { value: 'Direct', label:'Direct'}
 ];
 
 const AdvanceHeading = ({ username, userRoles = [] }) => {

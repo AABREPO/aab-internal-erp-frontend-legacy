@@ -277,7 +277,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
     };
     fetchCategories();
   }, []);
-
   // Fetch account details
   useEffect(() => {
     const fetchAccountDetails = async () => {
@@ -293,7 +292,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
           throw new Error("Network response was not ok: " + response.statusText);
         }
         const data = await response.json();
-        console.log("Fetched account details:", data);
         setAccountDetails(data);
       } catch (error) {
         console.error("Error fetching account details:", error);
@@ -301,7 +299,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
     };
     fetchAccountDetails();
   }, []);
-
   // Fetch latest ENo for expenses form
   const fetchLatestEno = async () => {
     try {
@@ -321,7 +318,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
       console.error('Error fetching latest ENo:', error);
     }
   };
-
   useEffect(() => {
     fetchLatestEno();
   }, []);
@@ -340,7 +336,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
     };
     fetchData();
   }, []);
-
   const handleChange = async (selected) => {
     setSelectedOption(selected);
     if (selected) {
@@ -368,7 +363,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
           const refundAmount = parseFloat(curr.refund_amount) || 0;
           return sum + amount - billAmount - refundAmount;
         }, 0);
-
       setOverallAdvance(total);
     } catch (error) {
       console.error('Error fetching or processing advance data:', error);
@@ -380,12 +374,10 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
       setProjectAdvance('');
       return;
     }
-
     try {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/getAll');
       if (!response.ok) throw new Error('Failed to fetch advance portal data');
       const data = await response.json();
-
       const isVendor = vendorOrContractor.type === 'Vendor';
       const idField = isVendor ? 'vendor_id' : 'contractor_id';
       // Filter for only this vendor/contractor & project
@@ -399,7 +391,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         const refundAmount = parseFloat(entry.refund_amount) || 0;
         return sum + amount - billAmount - refundAmount;
       }, 0);
-
       setProjectAdvance(total.toLocaleString('en-IN', { maximumFractionDigits: 2 }));
     } catch (error) {
       console.error('Error calculating project advance:', error);
@@ -1084,7 +1075,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
   const transferSiteLabel = selectedType === 'Transfer' && transferSiteId
     ? sortedSiteOptions.find(option => option.id === parseInt(transferSiteId))?.label || '-'
     : '-';
-
   const reviewDetails = [
     { label: 'Type', value: selectedType || '-' },
     { label: 'Date', value: formatDateForReview(dateValue) || '-' },
@@ -1093,14 +1083,12 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
     { label: 'Project Name', value: selectedSite?.label || '-' },
     { label: 'Project ID', value: selectedSite?.id || '-' },
   ];
-
   if (selectedType === 'Bill Settlement') {
     reviewDetails.push(
       { label: 'Bill Amount', value: formattedBillAmount },
       { label: 'Category', value: selectedCategory?.label || '-' }
     );
   }
-
   if (selectedType === 'Transfer') {
     reviewDetails.push(
       { label: 'Transfer Amount', value: formattedAdvanceAmount },
@@ -1125,7 +1113,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
       );
     }
   }
-
   reviewDetails.push(
     { label: 'Description', value: description || '-' },
     { label: 'File Attached', value: selectedAdvanceFile ? selectedAdvanceFile.name : 'No file attached' }
@@ -1237,15 +1224,12 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
           return;
         }
       }
-
       // Get entry number
       const res = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/getAll');
       if (!res.ok) throw new Error('Failed to fetch entry numbers');
-
       const allData = await res.json();
       const maxEntryNo = allData.length > 0 ? Math.max(...allData.map(item => item.entry_no || 0)) : 0;
       const nextEntryNo = maxEntryNo + 1;
-
       // Create advance portal payload
       const advancePayload = {
         type: selectedType,
@@ -1266,20 +1250,16 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         description: description,
         file_url: fileUrl,
       };
-
       // Save to advance portal
       const advanceResponse = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(advancePayload)
       });
-
       if (!advanceResponse.ok) {
         throw new Error('Failed to save advance portal data');
       }
-
       const advanceResult = await advanceResponse.json();
-
       // Create weekly payment bills payload
       const weeklyPaymentBillPayload = {
         date: paymentModalData.date,
@@ -1302,18 +1282,15 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         transaction_number: paymentModalData.transactionNumber || null,
         account_number: paymentModalData.accountNumber || null
       };
-
       // Save to weekly payment bills
       const weeklyResponse = await fetch('https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(weeklyPaymentBillPayload)
       });
-
       if (!weeklyResponse.ok) {
         throw new Error('Failed to save weekly payment bills data');
       }
-
       // Also save to expenses form if Bill Settlement
       if (selectedType === 'Bill Settlement') {
         let vendor = '';
@@ -1323,7 +1300,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         } else if (selectedOption?.type === 'Contractor') {
           contractor = selectedOption.label;
         }
-
         const expensesPayload = {
           accountType: 'Bill Settlement',
           eno: eno,
@@ -1341,7 +1317,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
           machineTools: '',
           billCopyUrl: fileUrl || ''
         };
-
         const expensesResponse = await fetch("https://backendaab.in/aabuilderDash/expenses_form/save", {
           method: "POST",
           headers: {
@@ -1349,16 +1324,13 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
           },
           body: JSON.stringify(expensesPayload),
         });
-
         if (!expensesResponse.ok) {
           const errorText = await expensesResponse.text();
           throw new Error(`Expenses form submission failed: ${errorText}`);
         }
-
         // Update ENo for next entry
         setEno(eno + 1);
       }
-
       toast.success('Advance saved successfully and added to Weekly Payment Bills!', {
         position: "top-center",
         autoClose: 3000,

@@ -375,7 +375,6 @@ const BillStatement = ({ username, userRoles = [] }) => {
     setSelectedPaymentMode(null);
     setFilteredData(apiData);
   };
-
   // Handle sort
   const handleSort = (key) => {
     setSortConfig(prevConfig => ({
@@ -383,14 +382,11 @@ const BillStatement = ({ username, userRoles = [] }) => {
       direction: prevConfig.key === key && prevConfig.direction === 'asc' ? 'desc' : 'asc'
     }))
   }
-
   // Apply sorting to filtered data
   const applySorting = (data) => {
     if (!sortConfig.key) return data
-
     return [...data].sort((a, b) => {
       let aValue, bValue
-
       switch (sortConfig.key) {
         case 'si_no':
           // Sort by item ID or index
@@ -440,7 +436,6 @@ const BillStatement = ({ username, userRoles = [] }) => {
         default:
           return 0
       }
-
       if (aValue < bValue) {
         return sortConfig.direction === 'asc' ? -1 : 1
       }
@@ -455,37 +450,30 @@ const BillStatement = ({ username, userRoles = [] }) => {
     if (!amount || amount === '-') return '-';
     const num = parseFloat(amount);
     if (isNaN(num)) return '-';
-
     // Round to 2 decimal places
     const rounded = Math.round(num * 100) / 100;
-
     // Split into integer and decimal parts
     const parts = rounded.toFixed(2).split('.');
     let integerPart = parts[0];
     const decimalPart = parts[1];
-
     // Apply Indian numbering system
     // First 3 digits from right, then groups of 2 from left
     if (integerPart.length <= 3) {
       return integerPart + '.' + decimalPart;
     }
-
     // Last 3 digits
     const lastThree = integerPart.slice(-3);
     // Remaining digits from left
     const remaining = integerPart.slice(0, -3);
-
     // Format remaining: add commas every 2 digits from right to left
     const chunks = [];
     for (let i = remaining.length; i > 0; i -= 2) {
       const start = Math.max(0, i - 2);
       chunks.unshift(remaining.slice(start, i));
     }
-
     const formattedRemaining = chunks.join(',');
     return formattedRemaining + ',' + lastThree + '.' + decimalPart;
   };
-
   // Export to PDF
   const exportToPDF = () => {
     const doc = new jsPDF({
@@ -493,12 +481,10 @@ const BillStatement = ({ username, userRoles = [] }) => {
       unit: 'mm',
       format: 'a4'
     });
-
     // Title
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
     doc.text("Bill Statement Report", 14, 15);
-
     // Add filter information if any filters are applied
     let filterText = [];
     if (selectedVendor) {
@@ -515,7 +501,6 @@ const BillStatement = ({ username, userRoles = [] }) => {
     if (selectedPaymentMode?.label) {
       filterText.push(`Payment Mode: ${selectedPaymentMode.label}`);
     }
-
     let yPosition = 20;
     if (filterText.length > 0) {
       doc.setFontSize(10);
@@ -525,11 +510,9 @@ const BillStatement = ({ username, userRoles = [] }) => {
       });
       yPosition = yPosition + (filterText.length * 5) + 3;
     }
-
     // Generate date for filename
     const today = new Date();
     const dateStr = today.toLocaleDateString('en-GB').replace(/\//g, '-');
-
     // Prepare table data
     const tableColumns = [
       "SI.No",
@@ -545,12 +528,9 @@ const BillStatement = ({ username, userRoles = [] }) => {
       "Bill",
       "Summary Bill"
     ];
-
     const tableRows = [];
-
     filteredData.forEach((item, index) => {
       const payments = paymentInfo[item.id] || [];
-
       if (payments.length === 0) {
         // No payments - single row
         tableRows.push([
@@ -572,7 +552,6 @@ const BillStatement = ({ username, userRoles = [] }) => {
         payments.forEach((pay, pIndex) => {
           const overallPdfUrl = item.over_all_payment_pdf_url || item.overAllPaymentPdfUrl;
           const showOverallPdf = isLastPayment(payments, pIndex) && overallPdfUrl;
-
           tableRows.push([
             String(item.id || index + 1),
             item.bill_arrival_date ? new Date(item.bill_arrival_date).toLocaleDateString('en-GB') : '-',
@@ -590,7 +569,6 @@ const BillStatement = ({ username, userRoles = [] }) => {
         });
       }
     });
-
     // Generate table
     doc.autoTable({
       head: [tableColumns],
@@ -628,7 +606,6 @@ const BillStatement = ({ username, userRoles = [] }) => {
       },
       margin: { top: yPosition, left: 14, right: 14 }
     });
-
     // Save PDF
     const fileName = `Bill_Statement_${dateStr}.pdf`;
     doc.save(fileName);
@@ -738,10 +715,7 @@ const BillStatement = ({ username, userRoles = [] }) => {
             <table className="w-full border-collapse">
               <thead className="bg-[#FAF6ED] sticky top-0 z-90">
                 <tr>
-                  <th
-                    className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200"
-                    onClick={() => handleSort('si_no')}
-                  >
+                  <th className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200" onClick={() => handleSort('si_no')}>
                     <div className="flex items-center gap-1">
                       SI.No
                       {sortConfig.key === 'si_no' && (
@@ -751,10 +725,7 @@ const BillStatement = ({ username, userRoles = [] }) => {
                       )}
                     </div>
                   </th>
-                  <th
-                    className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200"
-                    onClick={() => handleSort('bill_arrival_date')}
-                  >
+                  <th className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200" onClick={() => handleSort('bill_arrival_date')}>
                     <div className="flex items-center gap-1">
                       Bill Arrival Date
                       {sortConfig.key === 'bill_arrival_date' && (
@@ -764,10 +735,7 @@ const BillStatement = ({ username, userRoles = [] }) => {
                       )}
                     </div>
                   </th>
-                  <th
-                    className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200"
-                    onClick={() => handleSort('vendor_name')}
-                  >
+                  <th className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200" onClick={() => handleSort('vendor_name')} >
                     <div className="flex items-center gap-1">
                       Vendor Name
                       {sortConfig.key === 'vendor_name' && (
@@ -777,10 +745,7 @@ const BillStatement = ({ username, userRoles = [] }) => {
                       )}
                     </div>
                   </th>
-                  <th
-                    className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200"
-                    onClick={() => handleSort('no_of_bills')}
-                  >
+                  <th className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200" onClick={() => handleSort('no_of_bills')} >
                     <div className="flex items-center gap-1">
                       No of Bills
                       {sortConfig.key === 'no_of_bills' && (
@@ -790,10 +755,7 @@ const BillStatement = ({ username, userRoles = [] }) => {
                       )}
                     </div>
                   </th>
-                  <th
-                    className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200"
-                    onClick={() => handleSort('total_amount')}
-                  >
+                  <th className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200" onClick={() => handleSort('total_amount')} >
                     <div className="flex items-center gap-1">
                       Total Amount
                       {sortConfig.key === 'total_amount' && (
@@ -803,10 +765,7 @@ const BillStatement = ({ username, userRoles = [] }) => {
                       )}
                     </div>
                   </th>
-                  <th
-                    className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200"
-                    onClick={() => handleSort('bill_verification')}
-                  >
+                  <th className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200" onClick={() => handleSort('bill_verification')} >
                     <div className="flex items-center gap-1">
                       Bill verification
                       {sortConfig.key === 'bill_verification' && (
@@ -816,10 +775,7 @@ const BillStatement = ({ username, userRoles = [] }) => {
                       )}
                     </div>
                   </th>
-                  <th
-                    className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200"
-                    onClick={() => handleSort('entry_date')}
-                  >
+                  <th className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200" onClick={() => handleSort('entry_date')} >
                     <div className="flex items-center gap-1">
                       Entry Date
                       {sortConfig.key === 'entry_date' && (
@@ -829,10 +785,7 @@ const BillStatement = ({ username, userRoles = [] }) => {
                       )}
                     </div>
                   </th>
-                  <th
-                    className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200"
-                    onClick={() => handleSort('payment_date')}
-                  >
+                  <th className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200" onClick={() => handleSort('payment_date')}>
                     <div className="flex items-center gap-1">
                       Payment date
                       {sortConfig.key === 'payment_date' && (
@@ -842,10 +795,7 @@ const BillStatement = ({ username, userRoles = [] }) => {
                       )}
                     </div>
                   </th>
-                  <th
-                    className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200"
-                    onClick={() => handleSort('payment_amount')}
-                  >
+                  <th className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200" onClick={() => handleSort('payment_amount')}>
                     <div className="flex items-center gap-1">
                       Payment Amount
                       {sortConfig.key === 'payment_amount' && (

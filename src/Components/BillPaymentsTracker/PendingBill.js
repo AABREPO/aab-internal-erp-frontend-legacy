@@ -3289,7 +3289,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
     const draftPaid = draftPaymentTotal || 0;
     const discountValue = normalizedDiscount || 0;
     const carryForwardAvailable = carryForwardAmount || 0;
-console.log("carryForwardAvailable", carryForwardAvailable);
     // -----------------------------
     // REMAINING BILL AFTER PREVIOUS PAYMENTS
     // -----------------------------
@@ -3297,7 +3296,6 @@ console.log("carryForwardAvailable", carryForwardAvailable);
         0,
         billTotal - existingReceived - draftPaid
     );
-console.log("remainingAfterPayments", remainingAfterPayments);
     // -----------------------------
     // AMOUNT NEEDED TO SETTLE BILL (AFTER DISCOUNT)
     // -----------------------------
@@ -3305,14 +3303,12 @@ console.log("remainingAfterPayments", remainingAfterPayments);
         0,
         remainingAfterPayments - discountValue
     );
-console.log("amountNeededToPay", amountNeededToPay);
     // -----------------------------
     // CARRY FORWARD TO USE
     // -----------------------------
     const carryForwardToUse = useCarryForward
         ? Math.min(carryForwardAvailable, amountNeededToPay)
         : 0;
-console.log("carryForwardToUse", carryForwardToUse);
     // -----------------------------
     // FINAL REMAINING BILL AFTER CARRY FORWARD
     // -----------------------------
@@ -3320,7 +3316,6 @@ console.log("carryForwardToUse", carryForwardToUse);
         0,
         remainingAfterPayments - carryForwardToUse
     );
-console.log("projectedRemainingAmount", projectedRemainingAmount);
     // -----------------------------
     // LIVE RECEIVED AMOUNT (PREVIOUS + CURRENT + CF)
     // -----------------------------
@@ -3328,14 +3323,12 @@ console.log("projectedRemainingAmount", projectedRemainingAmount);
         billTotal,
         existingReceived + draftPaid + carryForwardToUse
     );
-console.log("liveReceivedAmount", liveReceivedAmount);
     // -----------------------------
     // REMAINING CARRY FORWARD BALANCE
     // -----------------------------
     const remainingCarryForward = useCarryForward
         ? Math.max(0, carryForwardAvailable - carryForwardToUse)
         : carryForwardAvailable;
-console.log("remainingCarryForward", remainingCarryForward);
     // -----------------------------
     // NET PAYABLE (FINAL)
     // -----------------------------
@@ -3344,14 +3337,12 @@ console.log("remainingCarryForward", remainingCarryForward);
         useCarryForward && carryForwardToUse > 0 && carryForwardAvailable > amountNeededToPay
             ? carryForwardAvailable - amountNeededToPay
             : 0;
-    console.log("excessCarryForward", excessCarryForward);
     const projectedNetPayable =
         projectedRemainingAmount > 0
             ? projectedRemainingAmount
             : excessCarryForward > 0
                 ? -excessCarryForward
                 : 0;
-    console.log("projectedNetPayable", projectedNetPayable);
     const handleSubmitTracker = async () => {
         if (!formData.billArrivalDate) {
             alert('Please select a bill arrival date');
@@ -4156,8 +4147,7 @@ console.log("remainingCarryForward", remainingCarryForward);
                                             >
                                                 ✓
                                             </button>
-                                            <button
-                                                className="px-3 py-1.5 w-[100px] h-10 bg-[#BF9853] text-white rounded text-sm font-medium transition-colors duration-200"
+                                            <button className="px-3 py-1.5 w-[100px] h-10 bg-[#BF9853] text-white rounded text-sm font-medium transition-colors duration-200"
                                                 onClick={handleCheck}
                                             >
                                                 Check
@@ -4328,11 +4318,10 @@ console.log("remainingCarryForward", remainingCarryForward);
                                         </>
                                     )}
                                     {existingPaymentDetails && existingPaymentDetails.length > 0 && (
-                                        <div className={`p-w overflow-auto mb-8 ${
-                                            paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'
+                                        <div className={`p-w overflow-auto mb-8 ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'
                                                 ? 'h-[630px]'
                                                 : 'h-[300px]'
-                                        }`}>
+                                            }`}>
                                             <h4 className="text-sm font-semibold text-gray-700">Previous Payment Details:</h4>
                                             <div className="space-y-4">
                                                 {existingPaymentDetails.map((payment, index) => (
@@ -4828,14 +4817,12 @@ console.log("remainingCarryForward", remainingCarryForward);
                             )}
                         </div>
                         <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-between">
-                            <button
-                                className="px-4 py-2 bg-[#BF9853] text-white rounded font-medium hover:bg-[#a67c3a] transition-colors duration-200"
+                            <button className="px-4 py-2 bg-[#BF9853] text-white rounded font-medium hover:bg-[#a67c3a] transition-colors duration-200"
                                 onClick={generateExpensePDF}
                             >
                                 Generate PDF
                             </button>
-                            <button
-                                className="px-4 py-2 bg-white text-[#BF9853] border border-[#BF9853] rounded"
+                            <button className="px-4 py-2 bg-white text-[#BF9853] border border-[#BF9853] rounded"
                                 onClick={() => {
                                     setShowCheckModal(false)
                                     setCheckFilteredExpenses([])

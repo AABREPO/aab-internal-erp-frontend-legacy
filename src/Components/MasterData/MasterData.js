@@ -55,6 +55,14 @@ const MasterData = ({ username, userRoles = [] }) => {
   const [selectedVendorId, setSelectedVendorId] = useState(null);
   const [vendorBulkUploadFile, setVendorBulkUploadFile] = useState(null);
   const [isVendorBulkUploadOpen, setIsVendorBulkUploadOpen] = useState(false);
+  const [supportStaffNameList, setSupportStaffNameList] = useState([]);
+  const [supportStaffSearch, setSupportStaffSearch] = useState('');
+  const [isSupportStaffNameEditOpen, setIsSupportStaffNameEditOpen] = useState(false);
+  const [selectedSupportStaffNameId, setSelectedSupportStaffNameId] = useState(null);
+  const [editSupportStaffName, setEditSupportStaffName] = useState('');
+  const [editSupportStaffMobileNumber, setEditSupportStaffMobileNumber] = useState('');
+  const [supportStaffName, setSupportStaffName] = useState('');
+  const [supportStaffMobileNumber, setSupportStaffMobileNumber] = useState('');
 
   // State for Contractor Names
   const [isContractorNameOpens, setContractorNameOpens] = useState(false);
@@ -203,6 +211,7 @@ const MasterData = ({ username, userRoles = [] }) => {
 
   // State for EB Service Link with Project ID
   const [isEbServiceLinkOpen, setIsEbServiceLinkOpen] = useState(false);
+  const [isSupportStaffNameOpen, setIsSupportStaffNameOpen] = useState(false);
   const [ebServiceLinkSearch, setEbServiceLinkSearch] = useState('');
   const [projectId, setProjectId] = useState('');
   const [selectedProject, setSelectedProject] = useState(null);
@@ -326,7 +335,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     { id: 'labours-list', name: 'Labours List', description: 'Manage labour information' },
     { id: 'Account Details', name: 'Account Details', description: 'Manage account information' },
     { id: 'bank-account-type', name: 'Bank Account Type', description: 'Manage bank account types' },
-    { id: 'eb-service-link', name: 'EB Service Link', description: 'Manage EB service links with project IDs' }
+    { id: 'support-staff-name', name: 'Support Staff Name', description: 'Manage Support Staff Names' }
   ];
   const [vendorQrImageFile, setVendorQrImageFile] = useState(null);
   const [vendorQrImagePreview, setVendorQrImagePreview] = useState(null);
@@ -498,6 +507,8 @@ const MasterData = ({ username, userRoles = [] }) => {
   const closeBankAccountType = () => setIsBankAccountTypeOpen(false);
   const openEbServiceLink = () => setIsEbServiceLinkOpen(true);
   const closeEbServiceLink = () => setIsEbServiceLinkOpen(false);
+  const openSupportStaffName = () => setIsSupportStaffNameOpen(true);
+  const closeSupportStaffName = () => setIsSupportStaffNameOpen(false);
   const openProjectManagement = () => {
     // Generate next project ID
     const generateNextProjectId = () => {
@@ -578,6 +589,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     fetchAccountDetails();
     fetchBankAccountTypes();
     fetchEbServiceLinks();
+    fetchSupportStaffNameList();
     fetchProjects();
   }, []);
 
@@ -592,15 +604,11 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
-
   const fetchVendorNames = async () => {
     try {
-      console.log('Fetching vendor names from:', 'https://backendaab.in/aabuilderDash/api/vendor_Names/getAll');
       const response = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll');
-      console.log('Fetch response status:', response.status);
       if (response.ok) {
         const data = await response.json();
-        console.log('Fetched vendor names:', data);
         setVendorNames(data);
       } else {
         console.error('Failed to fetch vendor names:', response.status);
@@ -621,7 +629,6 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
-
   const fetchCategories = async () => {
     try {
       const response = await fetch('https://backendaab.in/aabuilderDash/api/expenses_categories/getAll');
@@ -633,7 +640,6 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
-
   const fetchMachinTools = async () => {
     try {
       const response = await fetch('https://backendaab.in/aabuilderDash/api/machine_tools/getAll');
@@ -645,7 +651,6 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
-
   const fetchEmployeeList = async () => {
     try {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/employee_details/getAll');
@@ -657,7 +662,6 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
-
   const fetchLaboursList = async () => {
     try {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
@@ -669,7 +673,6 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
-
   const fetchAccountDetails = async () => {
     try {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/getAll');
@@ -681,7 +684,6 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
-
   const fetchBankAccountTypes = async () => {
     try {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/bank_type/getAll');
@@ -693,7 +695,6 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
-
   const fetchEbServiceLinks = async () => {
     try {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/eb-service-no/getAll');
@@ -705,7 +706,17 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
-
+  const fetchSupportStaffNameList = async () => {
+    try {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/support_staff/getAll');
+      if (response.ok) {
+        const data = await response.json();
+        setSupportStaffNameList(data);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
   const fetchProjects = async () => {
     try {
       const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
@@ -1255,6 +1266,28 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
+  const handleSubmitSupportStaffName = async (e) => {
+    e.preventDefault();
+    const newSupportStaffName = {
+      support_staff_name: supportStaffName,
+      mobile_number: supportStaffMobileNumber
+    };
+    try {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/support_staff/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSupportStaffName),
+      });
+      if (response.ok) {
+        setMessage('Support Staff Name saved successfully!');
+        setSupportStaffName('');
+        setSupportStaffMobileNumber('');
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
 
   const handleSubmitProject = async (e) => {
     e.preventDefault();
@@ -1532,6 +1565,12 @@ const MasterData = ({ username, userRoles = [] }) => {
     setSelectedBankAccountTypeId(item.id);
     setEditBankAccountType(item.bank_account_type);
     setIsBankAccountTypeEditOpen(true);
+  };
+  const handleEditSupportStaffName = (item) => {
+    setSelectedSupportStaffNameId(item.id);
+    setEditSupportStaffName(item.support_staff_name);
+    setEditSupportStaffMobileNumber(item.mobile_number || '');
+    setIsSupportStaffNameEditOpen(true);
   };
   const handleEditEbServiceLink = (item) => {
     setSelectedEbServiceLinkId(item.id);
@@ -2056,11 +2095,22 @@ const MasterData = ({ username, userRoles = [] }) => {
       }
     }
   };
+  const handleDeleteSupportStaffName = async (id) => {
+    if (window.confirm('Are you sure you want to delete this support staff name?')) {
+      try {
+        const response = await fetch(`https://backendaab.in/aabuildersDash/api/support_staff/delete/${id}`, {
+          method: 'DELETE',
+        });
+        if (response.ok) {
+          setMessage('Support staff name deleted successfully!');
+          window.location.reload();
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    }
+  };
   // Filter functions
-  const filteredSiteNames = siteNames.filter((item) =>
-    item.siteName.toLowerCase().includes(siteNameSearch.toLowerCase()) ||
-    item.siteNo.toLowerCase().includes(siteNameSearch.toLowerCase())
-  );
   const filteredVendorNames = vendorNames.filter((item) =>
     item.vendorName.toLowerCase().includes(vendorNameSearch.toLowerCase())
   );
@@ -2087,6 +2137,9 @@ const MasterData = ({ username, userRoles = [] }) => {
     (item.project_id?.toString() || '').toLowerCase().includes(ebServiceLinkSearch.toLowerCase()) ||
     (item.door_no || '').toLowerCase().includes(ebServiceLinkSearch.toLowerCase()) ||
     (item.eb_service_no || '').toLowerCase().includes(ebServiceLinkSearch.toLowerCase())
+  );
+  const filteredSupportStaffNameList = supportStaffNameList.filter((item) =>
+    item.support_staff_name.toLowerCase().includes(supportStaffSearch.toLowerCase())
   );
   const filteredAccountDetails = accountDetails.filter((item) =>
     (item.account_holder_name || '').toLowerCase().includes(accountDetailsSearch.toLowerCase()) ||
@@ -3809,43 +3862,36 @@ const MasterData = ({ username, userRoles = [] }) => {
                   </div>
                 </div>
               )}
-              {table.id === 'eb-service-link' && (
+              {table.id === 'support-staff-name' && (
                 <div>
                   <div className="flex items-center mb-2 lg:mt-0 mt-3">
                     <input
                       type="text"
                       className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
                       placeholder="Search EB Service Link.."
-                      value={ebServiceLinkSearch}
-                      onChange={(e) => setEbServiceLinkSearch(e.target.value)}
+                      value={supportStaffSearch}
+                      onChange={(e) => setSupportStaffSearch(e.target.value)}
                     />
                     <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
                       <img src={search} alt='search' className=' w-5 h-5' />
                     </button>
                     <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
-                      onClick={openEbServiceLink}>
+                      onClick={openSupportStaffName}>
                       + Add
                     </button>
                   </div>
-                  <button className="flex items-center text-[#E4572E] font-bold px-1 ml-4 mt-2 mb-6"
-                    onClick={() => document.getElementById('ebServiceLinkFileInput').click()}>
+                  <button className="flex items-center text-[#E4572E] font-bold px-1 ml-4 mt-2 mb-6">
                     <img src={imports} alt='import' className='w-4 h-4 mr-1' />
                     Import File
                   </button>
-                  <input
-                    type="file"
-                    id="ebServiceLinkFileInput"
-                    accept=".sql"
-                    style={{ display: 'none' }}
-                    onChange={(e) => handleBulkUpload(e, 'ebServiceLink')}
-                  />
+                  
                   <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
                     <div className="bg-[#FAF6ED]">
                       <table className="table-auto lg:w-72">
                         <thead className='bg-[#FAF6ED]'>
                           <tr className="border-b">
                             <th className="p-2 text-left lg:w-16 text-xl font-bold">S.No</th>
-                            <th className="p-2 text-left lg:w-72 text-xl font-bold">EB Service No</th>
+                            <th className="p-2 text-left lg:w-72 text-xl font-bold">Support Staff Name</th>
                           </tr>
                         </thead>
                       </table>
@@ -3853,25 +3899,25 @@ const MasterData = ({ username, userRoles = [] }) => {
                     <div className="overflow-y-auto max-h-[550px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                       <table className="table-auto lg:w-full w-full">
                         <tbody>
-                          {filteredEbServiceLinks.map((item, index) => (
+                          {filteredSupportStaffNameList.map((item, index) => (
                             <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
                               <td className="p-2 text-left font-semibold">
-                                {(ebServiceLinks.findIndex(e => e.id === item.id) + 1).toString().padStart(2, '0')}
+                                {(supportStaffNameList.findIndex(e => e.id === item.id) + 1).toString().padStart(2, '0')}
                               </td>
                               <td className="p-2 text-left group flex font-semibold">
                                 <div className="flex flex-grow">
-                                  {item.eb_service_no || ''}
+                                  {item.support_staff_name || ''}
                                 </div>
                                 <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                                   <button
-                                    onClick={() => handleEditEbServiceLink(item)}
+                                    onClick={() => handleEditSupportStaffName(item)}
                                     className="text-blue-600 hover:text-blue-800"
                                     title="Edit"
                                   >
                                     <img src={edit} alt="Edit" className="w-4 h-4" />
                                   </button>
                                   <button
-                                    onClick={() => handleDeleteEbServiceLink(item.id)}
+                                    onClick={() => handleDeleteSupportStaffName(item.id)}
                                     className="text-red-600 hover:text-red-800"
                                     title="Delete"
                                   >
@@ -5867,6 +5913,109 @@ const MasterData = ({ username, userRoles = [] }) => {
           </div>
         )
       }
+      {isSupportStaffNameOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+          <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
+            <div>
+              <button className="text-red-500 ml-[95%]" onClick={closeSupportStaffName}>
+                <img src={cross} alt='cross' className='w-5 h-5' />
+              </button>
+            </div>
+            <form onSubmit={handleSubmitSupportStaffName}>
+              <div className="mb-4">
+                <label className="block text-lg font-medium mb-2 -ml-56">Support Staff Name</label>
+                <input
+                  type="text"
+                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
+                  placeholder="Enter Support Staff Name"
+                  onChange={(e) => setSupportStaffName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-lg font-medium mb-2 -ml-56">Mobile Number</label>
+                <input
+                  type="text"
+                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
+                  placeholder="Enter Mobile Number"
+                  onChange={(e) => setSupportStaffMobileNumber(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="flex justify-end mr-5 space-x-2 mt-4 ">
+                <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
+                  Submit
+                </button>
+                <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={closeSupportStaffName}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )
+      }
+
+      {isSupportStaffNameEditOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+          <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
+            <div>
+              <button className="text-red-500 ml-[95%]" onClick={() => setIsSupportStaffNameEditOpen(false)}>
+                <img src={cross} alt='cross' className='w-5 h-5' />
+              </button>
+            </div>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              try {
+                const response = await fetch(`https://backendaab.in/aabuildersDash/api/support_staff/edit/${selectedSupportStaffNameId}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ support_staff_name: editSupportStaffName, mobile_number: editSupportStaffMobileNumber }),
+                });
+                if (response.ok) {
+                  setMessage('Support Staff Name updated successfully!');
+                  setIsSupportStaffNameEditOpen(false);
+                  window.location.reload();
+                }
+              } catch (error) {
+                console.error('Error:', error);
+              }
+            }}>
+              <div className="mb-4">
+                <label className="block text-lg font-medium mb-2 -ml-56">Support Staff Name</label>
+                <input
+                  type="text"
+                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
+                  placeholder="Enter Support Staff Name"
+                  value={editSupportStaffName}
+                  onChange={(e) => setEditSupportStaffName(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-lg font-medium mb-2 -ml-56">Mobile Number</label>
+                <input
+                  type="text"
+                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
+                  placeholder="Enter Mobile Number"
+                  value={editSupportStaffMobileNumber}
+                  onChange={(e) => setEditSupportStaffMobileNumber(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="flex justify-end mr-5 space-x-2 mt-4 ">
+                <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
+                  Update
+                </button>
+                <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={() => setIsSupportStaffNameEditOpen(false)}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {isProjectManagementOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
           <div className="bg-white rounded-md w-[95rem] h-[40rem] text-left overflow-y-auto pl-20">
@@ -6085,22 +6234,20 @@ const MasterData = ({ username, userRoles = [] }) => {
                           <button
                             type="button"
                             onClick={() => handleNewDetailChange(index, 'ebNoPhase', '1P')}
-                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
-                              (detail.ebNoPhase || '1P') === '1P' 
-                                ? 'bg-[#BF9853] text-white shadow-sm' 
-                                : 'text-gray-600 hover:text-gray-800'
-                            }`}
+                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${(detail.ebNoPhase || '1P') === '1P'
+                              ? 'bg-[#BF9853] text-white shadow-sm'
+                              : 'text-gray-600 hover:text-gray-800'
+                              }`}
                           >
                             1P
                           </button>
                           <button
                             type="button"
                             onClick={() => handleNewDetailChange(index, 'ebNoPhase', '3P')}
-                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
-                              detail.ebNoPhase === '3P' 
-                                ? 'bg-[#BF9853] text-white shadow-sm' 
-                                : 'text-gray-600 hover:text-gray-800'
-                            }`}
+                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${detail.ebNoPhase === '3P'
+                              ? 'bg-[#BF9853] text-white shadow-sm'
+                              : 'text-gray-600 hover:text-gray-800'
+                              }`}
                           >
                             3P
                           </button>
@@ -6396,22 +6543,20 @@ const MasterData = ({ username, userRoles = [] }) => {
                           <button
                             type="button"
                             onClick={() => handleEditDetailChange(index, 'ebNoPhase', '1P')}
-                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
-                              (detail.ebNoPhase || '1P') === '1P' 
-                                ? 'bg-[#BF9853] text-white shadow-sm' 
-                                : 'text-gray-600 hover:text-gray-800'
-                            }`}
+                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${(detail.ebNoPhase || '1P') === '1P'
+                              ? 'bg-[#BF9853] text-white shadow-sm'
+                              : 'text-gray-600 hover:text-gray-800'
+                              }`}
                           >
                             1P
                           </button>
                           <button
                             type="button"
                             onClick={() => handleEditDetailChange(index, 'ebNoPhase', '3P')}
-                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
-                              detail.ebNoPhase === '3P' 
-                                ? 'bg-[#BF9853] text-white shadow-sm' 
-                                : 'text-gray-600 hover:text-gray-800'
-                            }`}
+                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${detail.ebNoPhase === '3P'
+                              ? 'bg-[#BF9853] text-white shadow-sm'
+                              : 'text-gray-600 hover:text-gray-800'
+                              }`}
                           >
                             3P
                           </button>

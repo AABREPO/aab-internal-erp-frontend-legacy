@@ -273,6 +273,8 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
     const [contractorOptions, setContractorOptions] = useState([]);
     const [categoryOptions, setCategoryOptions] = useState([]);
     const [machineToolsOptions, setMachineToolsOptions] = useState([]);
+    const [laboursList, setLaboursList] = useState([]);
+    const [employeeOptions, setEmployeeOptions] = useState([]);
     const [selectedSiteName, setSelectedSiteName] = useState(() => {
         return localStorage.getItem('expenseFilter_siteName') || '';
     });
@@ -654,6 +656,61 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         };
         fetchAccountType();
     }, []);
+    useEffect(() => {
+        const fetchLaboursList = async () => {
+            try {
+                const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
+                if (response.ok) {
+                    const data = await response.json();
+                    const formattedData = data.map(item => ({
+                        value: item.labour_name,
+                        label: item.labour_name,
+                        id: item.id,
+                        type: "Labour",
+                        salary: item.labour_salary,
+                        extra: item.extra_amount
+                    }));
+                    setLaboursList(formattedData);
+                    console.log('Labours loaded:', formattedData.length, 'items');
+                } else {
+                    console.log('Error fetching Labour names.');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                console.log('Error fetching Labour names.');
+            }
+        };
+        fetchLaboursList();
+    }, []);
+    useEffect(() => {
+        const fetchEmployeeDetails = async () => {
+            try {
+                const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
+                    method: "GET",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                });
+                if (!response.ok) {
+                    throw new Error("Network response was not ok: " + response.statusText);
+                }
+                const data = await response.json();
+                const formattedData = data.map(item => ({
+                    value: item.employee_name,
+                    label: item.employee_name,
+                    id: item.id,
+                    type: "Employee",
+                }));
+
+                setEmployeeOptions(formattedData);
+                console.log('Employees loaded:', formattedData.length, 'items');
+            } catch (error) {
+                console.error("Fetch error: ", error);
+            }
+        };
+        fetchEmployeeDetails();
+    }, []);
     const generateFilteredPDF = () => {
         if (exportFilteredExpenses.length === 0) {
             alert("No filtered data to export.");
@@ -982,6 +1039,30 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         });
         return map;
     }, [contractorOption]);
+    const labourIdToName = React.useMemo(() => {
+        const map = {};
+        laboursList.forEach(option => {
+            if (option.id) {
+                // Store as both string and number to handle type mismatches
+                map[option.id] = option.label;
+                map[String(option.id)] = option.label;
+                map[Number(option.id)] = option.label;
+            }
+        });
+        return map;
+    }, [laboursList]);
+    const employeeIdToName = React.useMemo(() => {
+        const map = {};
+        employeeOptions.forEach(option => {
+            if (option.id) {
+                // Store as both string and number to handle type mismatches
+                map[option.id] = option.label;
+                map[String(option.id)] = option.label;
+                map[Number(option.id)] = option.label;
+            }
+        });
+        return map;
+    }, [employeeOptions]);
     const getDisplaySiteName = (expense) => {
         if (expense.projectId && projectIdToName[expense.projectId]) {
             return projectIdToName[expense.projectId];
@@ -999,6 +1080,52 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
             return contractorIdToName[expense.contractorId];
         }
         return expense.contractor || '';
+    };
+    const getDisplayStaffName = (expense) => {
+        // Prioritize labour over employee
+        // Check all possible field name variations
+        const labourId = expense.labourId || expense.labour_id || expense.labourID || expense.labour_ID;
+        const employeeId = expense.employeeId || expense.employee_id || expense.employeeID || expense.employee_ID;
+        
+        // Debug: log first expense with staff data to see what we're working with
+        if ((labourId || employeeId) && !window.staffDebugLogged) {
+            window.staffDebugLogged = true;
+            console.log('Staff Debug - First expense with staff data:', {
+                expenseId: expense.id,
+                labourId,
+                employeeId,
+                labourIdType: typeof labourId,
+                employeeIdType: typeof employeeId,
+                labourIdToNameSample: Object.keys(labourIdToName).slice(0, 3),
+                employeeIdToNameSample: Object.keys(employeeIdToName).slice(0, 3),
+                allExpenseKeys: Object.keys(expense),
+                expenseSample: Object.keys(expense).filter(k => 
+                    k.toLowerCase().includes('labour') || 
+                    k.toLowerCase().includes('employee') || 
+                    k.toLowerCase().includes('staff')
+                )
+            });
+        }
+        
+        if (labourId) {
+            // Try both string and number conversion for ID matching
+            const labourName = labourIdToName[labourId] || 
+                              labourIdToName[String(labourId)] || 
+                              labourIdToName[Number(labourId)];
+            if (labourName) {
+                return labourName;
+            }
+        }
+        if (employeeId) {
+            // Try both string and number conversion for ID matching
+            const employeeName = employeeIdToName[employeeId] || 
+                                employeeIdToName[String(employeeId)] || 
+                                employeeIdToName[Number(employeeId)];
+            if (employeeName) {
+                return employeeName;
+            }
+        }
+        return '';
     };
     const handleEditClick = (expense) => {
         setEditId(expense.id);
@@ -1202,6 +1329,9 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                         <th className="px-0.5 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('contractor')}>
                                             Contractor {sortField === 'contractor' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
+                                        <th className="px-0.5 w-[120px] font-bold text-left">
+                                            Staff
+                                        </th>
                                         <th className="px-0.5 w-[120px] font-bold text-left">Quantity</th>
                                         <th className="px-0.5 w-[120px] font-bold text-left">Amount</th>
                                         <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('comments')}>
@@ -1267,6 +1397,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                 />
                                             </th>
                                             <th></th>
+                                            <th></th>
                                             <th className="text-base text-left font-bold py-3">
                                                 ₹{Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </th>
@@ -1318,6 +1449,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                             <td className=" text-sm text-left w-60 ">{getDisplaySiteName(expense)}</td>
                                             <td className=" text-sm text-left ">{getDisplayVendorName(expense)}</td>
                                             <td className=" text-sm text-left ">{getDisplayContractorName(expense)}</td>
+                                            <td className=" text-sm text-left ">{getDisplayStaffName(expense)}</td>
                                             <td className=" text-sm text-left ">{expense.quantity}</td>
                                             <td className="text-sm text-right pr-5 ">
                                                 ₹{Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

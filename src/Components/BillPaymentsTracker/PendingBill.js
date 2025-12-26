@@ -2858,6 +2858,83 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 ...prev,
                 [selectedPaymentBill.id]: updatedStatusResult.paidToday
             }));
+            // If payment is fully paid, mark purchase orders as payment complete
+            if (updatedStatus === '✓ Paid') {
+                try {
+                    // Fetch updated tracker data to get latest bill verifications
+                    const trackerResponse = await fetch(`https://backendaab.in/aabuildersDash/api/vendor-payments/tracker/${selectedPaymentBill.id}`, {
+                        method: 'GET',
+                        credentials: 'include',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });                    
+                    if (trackerResponse.ok) {
+                        const updatedTracker = await trackerResponse.json();
+                        const vendorId = updatedTracker.vendor_id || updatedTracker.vendorId || selectedPaymentBill.vendor_id || selectedPaymentBill.vendorId;
+                        if (vendorId && updatedTracker.billVerifications && updatedTracker.billVerifications.length > 0) {
+                            // Get all verified PO numbers (ENOs) - exclude NO_PO entries
+                            // Each PO number will be sent individually to the API
+                            const verifiedPONumbers = updatedTracker.billVerifications
+                                .filter(verification => {
+                                    // Only include verified bills
+                                    const isVerified = verification.is_verified === true || verification.status === 'VERIFIED';
+                                    // Exclude NO_PO entries
+                                    const billNumber = verification.bill_number || verification.billNumber || '';
+                                    const isNotNoPO = billNumber !== 'NO_PO' && billNumber.trim() !== '';
+                                    // Must have a valid PO number
+                                    const hasValidPO = billNumber && billNumber.trim() !== '';
+                                    return isVerified && isNotNoPO && hasValidPO;
+                                })
+                                .map(verification => {
+                                    const poNumber = verification.bill_number || verification.billNumber || '';
+                                    return poNumber.trim();
+                                })
+                                .filter(poNumber => poNumber !== '');
+                            // Call complete payment API for each PO number individually
+                            // Each API call sends vendorId and one PO number (eno)
+                            const completePaymentPromises = verifiedPONumbers.map(async (poNumber) => {
+                                try {
+                                    const completeResponse = await fetch(
+                                        `https://backendaab.in/aabuildersDash/api/purchase_orders/payment/complete?vendorId=${vendorId}&eno=${encodeURIComponent(poNumber)}`,
+                                        {
+                                            method: 'PUT',
+                                            credentials: 'include',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                            }
+                                        }
+                                    );                                    
+                                    if (!completeResponse.ok) {
+                                        const errorText = await completeResponse.text();
+                                        console.error(`Failed to mark payment complete for vendorId=${vendorId}, poNumber=${poNumber}:`, errorText);
+                                        return { success: false, poNumber, error: errorText };
+                                    }                                    
+                                    return { success: true, poNumber };
+                                } catch (error) {
+                                    console.error(`Error marking payment complete for vendorId=${vendorId}, poNumber=${poNumber}:`, error);
+                                    return { success: false, poNumber, error: error.message };
+                                }
+                            });
+                            const results = await Promise.all(completePaymentPromises);
+                            const successful = results.filter(r => r.success);
+                            const failed = results.filter(r => !r.success);                            
+                            if (failed.length > 0) {
+                                console.warn(`Some purchase orders could not be marked as payment complete. Failed: ${failed.length}, Successful: ${successful.length}`);
+                                failed.forEach(f => {
+                                    console.warn(`  - PO Number ${f.poNumber}: ${f.error}`);
+                                });
+                            }
+                            if (successful.length > 0) {
+                                console.log(`Successfully marked ${successful.length} purchase order(s) as payment complete for vendorId=${vendorId}`);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error marking purchase orders as payment complete:', error);
+                    // Don't block the success message if this fails
+                }
+            }
             let message = 'Payment details saved successfully and added to Weekly Payment Bills';
             if (hasCashPayments) {
                 message += ' and Weekly Expenses';
@@ -3009,7 +3086,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
             const totalDiscount = paymentDetails.reduce((sum, payment) => sum + (payment.discount_amount || 0), 0);
             const actualAmount = parseFloat(item.total_amount) || 0;
             const remainingAmount = Math.max(0, actualAmount - totalPaid - totalDiscount);
-
             // Get the latest payment date
             let lastPaymentDate = null;
             if (paymentDetails.length > 0) {
@@ -3021,13 +3097,11 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     lastPaymentDate = dates[0];
                 }
             }
-
             // Check if any payment was made today using timestamp or date
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             const todayEnd = new Date(today);
             todayEnd.setHours(23, 59, 59, 999);
-
             let paidToday = false;
             for (const payment of paymentDetails) {
                 // Check timestamp field (if available)
@@ -3048,7 +3122,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     }
                 }
             }
-
             let status;
             if (remainingAmount === 0) {
                 status = '✓ Paid'
@@ -3057,7 +3130,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
             } else {
                 status = 'To Pay'
             }
-
             return { status, lastPaymentDate, paidToday }
         } catch (error) {
             console.error('Error fetching payment status:', error);
@@ -3332,7 +3404,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
     // -----------------------------
     // NET PAYABLE (FINAL)
     // -----------------------------
-
     const excessCarryForward =
         useCarryForward && carryForwardToUse > 0 && carryForwardAvailable > amountNeededToPay
             ? carryForwardAvailable - amountNeededToPay
@@ -3754,15 +3825,13 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                         </td>
                                         <td className="px-2 py-3 text-left text-sm border-b border-gray-100 align-middle">
                                             <div className="flex items-center gap-2">
-                                                <button
-                                                    className="px-2 py-1.5 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-colors duration-200 flex items-center justify-start"
+                                                <button className="px-2 py-1.5 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-colors duration-200 flex items-center justify-start"
                                                     onClick={() => handleEditClick(bill)}
                                                 >
                                                     <img src={edit} alt="edit" className="w-4 h-4" />
                                                 </button>
                                                 {isAdminUser() && (
-                                                    <button
-                                                        className="px-2 py-1.5 bg-red-600 text-white rounded text-sm font-medium hover:bg-red-700 transition-colors duration-200 flex items-center justify-start"
+                                                    <button className="px-2 py-1.5 bg-red-600 text-white rounded text-sm font-medium hover:bg-red-700 transition-colors duration-200 flex items-center justify-start"
                                                         onClick={() => handleDelete(bill.id)}
                                                     >
                                                         <img src={deletes} alt="delete" className="w-4 h-4" />
@@ -3845,11 +3914,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                 />
                                             </div>
                                             <div className="pb-1 flex items-end">
-                                                <button
-                                                    className={`px-4 py-2 rounded text-sm font-medium transition-colors duration-200 ${isRangeFillDisabled() || !rangeStart || !rangeEnd ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#BF9853] text-white hover:bg-[#a67c3a]'}`}
-                                                    onClick={handleFillPoRange}
-                                                    disabled={isRangeFillDisabled() || !rangeStart || !rangeEnd}
-                                                >
+                                                <button className={`px-4 py-2 rounded text-sm font-medium transition-colors duration-200 ${isRangeFillDisabled() || !rangeStart || !rangeEnd ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#BF9853] text-white hover:bg-[#a67c3a]'}`}
+                                                    onClick={handleFillPoRange} disabled={isRangeFillDisabled() || !rangeStart || !rangeEnd}>
                                                     Fill Range
                                                 </button>
                                             </div>
@@ -3857,8 +3923,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                     )}
                                 </div>
                                 <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl"
-                                    onClick={handleCancel}
-                                >
+                                    onClick={handleCancel}>
                                     ×
                                 </button>
                             </div>
@@ -3940,8 +4005,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                 </div>
                                 <div className="flex gap-3">
                                     <button className="px-4 py-2 bg-white text-gray-600 border border-gray-300 rounded font-medium hover:bg-gray-50 transition-colors duration-200"
-                                        onClick={handleCancel}
-                                    >
+                                        onClick={handleCancel}>
                                         Cancel
                                     </button>
                                     {(!selectedBill?.send_request || isAdminUser()) && (
@@ -3968,8 +4032,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                         <div className="flex justify-between items-center p-6 ">
                             <h3 className="text-lg font-bold text-black">Bill Entry Details</h3>
                             <button className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-orange-500 text-lg font-bold"
-                                onClick={handleEntryCancel}
-                            >
+                                onClick={handleEntryCancel}>
                                 ×
                             </button>
                         </div>
@@ -4017,8 +4080,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                                     onChange={(e) => handlePreviousEntryInputChange('date', e.target.value)}
                                                                     className="w-[120px] h-[40px] px-3 py-2 border-2 border-[#BF9853] border-opacity-20 rounded-lg text-sm focus:outline-none"
                                                                 />
-                                                                <button
-                                                                    onClick={() => handlePreviousEntrySave(entry.id)}
+                                                                <button onClick={() => handlePreviousEntrySave(entry.id)}
                                                                     className="px-3 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition-colors duration-200"
                                                                 >
                                                                     Save
@@ -4045,10 +4107,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                                     className="w-[120px] h-[40px] px-3 py-2 border-2 border-gray-300 rounded-lg text-sm bg-gray-50"
                                                                 />
                                                                 {canEditEntry(entry) && (
-                                                                    <button
-                                                                        onClick={() => handleEditPreviousEntry(entry)}
-                                                                        className="px-3 py-2  transition-colors duration-200"
-                                                                    >
+                                                                    <button onClick={() => handleEditPreviousEntry(entry)} className="px-3 py-2  transition-colors duration-200">
                                                                         <img src={edit} alt="edit" className="w-4 h-4" />
                                                                     </button>
                                                                 )}
@@ -4122,8 +4181,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                 >
                                     Confirm
                                 </button>
-                                <button
-                                    className="px-6 py-2 bg-white text-[#BF9853] border border-[#BF9853] rounded font-medium "
+                                <button className="px-6 py-2 bg-white text-[#BF9853] border border-[#BF9853] rounded font-medium "
                                     onClick={handleEntryCancel}
                                 >
                                     Cancel

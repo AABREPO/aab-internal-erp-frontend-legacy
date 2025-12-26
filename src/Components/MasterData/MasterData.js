@@ -234,6 +234,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     projectId: '',
     projectCategory: '',
     projectReferenceName: '',
+    branch: '',
     ownerDetailsList: [{
       clientName: "",
       fatherName: "",
@@ -274,6 +275,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     projectId: '',
     projectCategory: '',
     projectReferenceName: '',
+    branch: '',
     ownerDetailsList: [{
       clientName: "",
       fatherName: "",
@@ -1300,6 +1302,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         projectId: newProject.projectId,
         projectCategory: newProject.projectCategory,
         projectReferenceName: newProject.projectReferenceName,
+        branch: newProject.branch,
         ownerDetails: newProject.ownerDetailsList,      // map to backend
         propertyDetails: newProject.propertyDetailsList // map to backend
       };
@@ -1318,7 +1321,8 @@ const MasterData = ({ username, userRoles = [] }) => {
 
           const siteNamePayload = {
             siteName: newProject.projectName,
-            siteNo: newProject.projectId
+            siteNo: newProject.projectId,
+            branch: newProject.branch
           };
 
           if (existingSiteName) {
@@ -1589,6 +1593,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       projectId: item.projectId || '',
       projectCategory: item.projectCategory || '',
       projectReferenceName: item.projectReferenceName || '',
+      branch: item.branch || '',
       ownerDetailsList: item.ownerDetails && item.ownerDetails.length > 0 ? item.ownerDetails : [{
         clientName: "",
         fatherName: "",
@@ -1667,6 +1672,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         projectId: editProject.projectId,
         projectCategory: editProject.projectCategory,
         projectReferenceName: editProject.projectReferenceName,
+        branch: editProject.branch,
         ownerDetails: editProject.ownerDetailsList,       // mapped for backend
         propertyDetails: sortedPropertyDetails  // mapped for backend - sorted before submit
       };
@@ -1683,7 +1689,8 @@ const MasterData = ({ username, userRoles = [] }) => {
           const existingSiteName = existingSiteNameById || existingSiteNameBySiteNo;
           const siteNamePayload = {
             siteName: editProject.projectName,
-            siteNo: editProject.projectId
+            siteNo: editProject.projectId,
+            branch: editProject.branch
           };
           if (existingSiteName) {
             const siteNameResponse = await fetch(`https://backendaab.in/aabuilderDash/api/project_Names/edit/${existingSiteName.id}`, {
@@ -3868,7 +3875,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                     <input
                       type="text"
                       className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
-                      placeholder="Search EB Service Link.."
+                      placeholder="Search Support Staff.."
                       value={supportStaffSearch}
                       onChange={(e) => setSupportStaffSearch(e.target.value)}
                     />
@@ -5915,7 +5922,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       }
       {isSupportStaffNameOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-          <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
+          <div className="bg-white rounded-md w-[30rem] h-[320px] px-2 py-2">
             <div>
               <button className="text-red-500 ml-[95%]" onClick={closeSupportStaffName}>
                 <img src={cross} alt='cross' className='w-5 h-5' />
@@ -5958,7 +5965,7 @@ const MasterData = ({ username, userRoles = [] }) => {
 
       {isSupportStaffNameEditOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-          <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
+          <div className="bg-white rounded-md w-[30rem] h-[320px] px-2 py-2">
             <div>
               <button className="text-red-500 ml-[95%]" onClick={() => setIsSupportStaffNameEditOpen(false)}>
                 <img src={cross} alt='cross' className='w-5 h-5' />
@@ -6037,14 +6044,14 @@ const MasterData = ({ username, userRoles = [] }) => {
                       onChange={(e) =>
                         setNewProject((prev) => ({ ...prev, projectName: e.target.value }))
                       }
-                      className="w-[35rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                      className="w-[35rem] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none"
                       placeholder="Enter Project Name"
                       required
                     />
                   </div>
                   <div className="mb-4 pl-5">
                     <label className="block text-lg font-medium mb-2">Project ID</label>
-                    <input className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    <input className="w-[25rem] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none"
                       placeholder="Enter Project ID"
                       type="text"
                       value={newProject.projectId}
@@ -6052,11 +6059,25 @@ const MasterData = ({ username, userRoles = [] }) => {
                         setNewProject((prev) => ({ ...prev, projectId: e.target.value }))
                       }></input>
                   </div>
+                  <div className="mb-4 pl-5">
+                    <label className="block text-lg font-medium mb-2">Branch</label>
+                    <select 
+                      className="w-[15rem] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none"
+                      value={newProject.branch}
+                      onChange={(e) =>
+                        setNewProject((prev) => ({ ...prev, branch: e.target.value }))
+                      }
+                    >
+                      <option value="">Select Branch</option>
+                      <option value="Madurai">Madurai</option>
+                      <option value="Srivilliputtur">Srivilliputtur</option>
+                    </select>
+                  </div>
                 </div>
                 <div className="flex gap-4">
                   <div className="mb-4 pl-5">
                     <label className="block text-lg font-medium mb-2">Project Reference Name</label>
-                    <input className="w-[35rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    <input className="w-[35rem] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none"
                       placeholder="Enter Project Reference Name"
                       type="text"
                       value={newProject.projectReferenceName}
@@ -6066,7 +6087,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                   </div>
                   <div className="mb-4 pl-5">
                     <label className="block text-lg font-medium mb-2">Project Category</label>
-                    <select className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    <select className="w-[25rem] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none"
                       value={newProject.projectCategory}
                       onChange={(e) =>
                         setNewProject((prev) => ({ ...prev, projectCategory: e.target.value }))
@@ -6079,7 +6100,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                 </div>
                 <div className="mb-4 pl-5">
                   <label className="block text-lg font-medium mb-2">Project Address</label>
-                  <input className="w-[62rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                  <input className="w-[62rem] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none"
                     placeholder="Enter Project Address"
                     type="text"
                     value={newProject.projectAddress}
@@ -6101,7 +6122,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                             value={owner.clientName}
                             onChange={(e) => handleNewOwnerChange(index, 'clientName', e.target.value)}
                             placeholder="Client Name"
-                            className="w-80 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                            className="w-80 border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                           />
                         </div>
                         <div className="flex flex-col">
@@ -6111,7 +6132,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                             value={owner.fatherName}
                             onChange={(e) => handleNewOwnerChange(index, 'fatherName', e.target.value)}
                             placeholder="Father Name"
-                            className="w-72 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                            className="w-72 border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                           />
                         </div>
                         <div className="flex flex-col">
@@ -6121,7 +6142,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                             value={owner.mobile}
                             onChange={(e) => handleNewOwnerChange(index, 'mobile', e.target.value)}
                             placeholder="Mobile"
-                            className="w-60 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                            className="w-60 border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                           />
                         </div>
                         <div className="flex flex-col">
@@ -6131,7 +6152,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                             value={owner.age}
                             onChange={(e) => handleNewOwnerChange(index, 'age', e.target.value)}
                             placeholder="Age"
-                            className="w-20 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                            className="w-20 border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                           />
                         </div>
                       </div>
@@ -6143,7 +6164,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                         value={owner.clientAddress}
                         onChange={(e) => handleNewOwnerChange(index, 'clientAddress', e.target.value)}
                         placeholder="Client Address"
-                        className="w-[62rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                        className="w-[62rem] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                       />
                       <button
                         type="button"
@@ -6174,7 +6195,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                       <select
                         value={detail.projectType}
                         onChange={(e) => handleNewDetailChange(index, 'projectType', e.target.value)}
-                        className="w-40  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                        className="w-40  border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                       >
                         <option value="">Select Type</option>
                         <option value="Shop">Shop</option>
@@ -6189,7 +6210,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                       <select
                         value={detail.floorName}
                         onChange={(e) => handleNewDetailChange(index, 'floorName', e.target.value)}
-                        className="w-36  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                        className="w-36  border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                       >
                         <option value="">Select Floor</option>
                         <option value="Ground Floor">Ground Floor</option>
@@ -6204,7 +6225,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                         value={detail.shopNo}
                         onChange={(e) => handleNewDetailChange(index, 'shopNo', e.target.value)}
                         placeholder="Shop No"
-                        className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                        className="w-28  border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                       />
                     </div>
                     <div>
@@ -6214,7 +6235,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                         value={detail.doorNo}
                         onChange={(e) => handleNewDetailChange(index, 'doorNo', e.target.value)}
                         placeholder="Door No"
-                        className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                        className="w-28  border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                       />
                     </div>
                     <div>
@@ -6224,7 +6245,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                         value={detail.area}
                         onChange={(e) => handleNewDetailChange(index, 'area', e.target.value)}
                         placeholder="Area"
-                        className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                        className="w-28  border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                       />
                     </div>
                     <div className="relative">
@@ -6259,7 +6280,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                           value={detail.ebNo}
                           onChange={(e) => handleNewDetailChange(index, 'ebNo', e.target.value)}
                           placeholder='EB NO'
-                          className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                          className='w-40 border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none'
                         />
                       </div>
                     </div>
@@ -6271,7 +6292,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                           value={detail.propertyTaxNo}
                           onChange={(e) => handleNewDetailChange(index, 'propertyTaxNo', e.target.value)}
                           placeholder='Property Tax No'
-                          className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                          className='w-40 border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none'
                         />
                       </div>
                     </div>
@@ -6283,7 +6304,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                           value={detail.waterTaxNo}
                           onChange={(e) => handleNewDetailChange(index, 'waterTaxNo', e.target.value)}
                           placeholder='Water Tax No'
-                          className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                          className='w-40 border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none'
                         />
                       </div>
                     </div>
@@ -6346,14 +6367,14 @@ const MasterData = ({ username, userRoles = [] }) => {
                       onChange={(e) =>
                         setEditProject((prev) => ({ ...prev, projectName: e.target.value }))
                       }
-                      className="w-[35rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                      className="w-[35rem] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none"
                       placeholder="Enter Project Name"
                       required
                     />
                   </div>
                   <div className="mb-4 pl-5">
                     <label className="block text-lg font-medium mb-2">Project ID</label>
-                    <input className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    <input className="w-[25rem] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none"
                       placeholder="Enter Project ID"
                       type="text"
                       value={editProject.projectId}
@@ -6361,11 +6382,25 @@ const MasterData = ({ username, userRoles = [] }) => {
                         setEditProject((prev) => ({ ...prev, projectId: e.target.value }))
                       }></input>
                   </div>
+                  <div className="mb-4 pl-5">
+                    <label className="block text-lg font-medium mb-2">Branch</label>
+                    <select 
+                      className="w-[15rem] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none"
+                      value={editProject.branch}
+                      onChange={(e) =>
+                        setEditProject((prev) => ({ ...prev, branch: e.target.value }))
+                      }
+                    >
+                      <option value="">Select Branch</option>
+                      <option value="Madurai">Madurai</option>
+                      <option value="Srivilliputtur">Srivilliputtur</option>
+                    </select>
+                  </div>
                 </div>
                 <div className="flex gap-4">
                   <div className="mb-4 pl-5">
                     <label className="block text-lg font-medium mb-2">Project Reference Name</label>
-                    <input className="w-[35rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    <input className="w-[35rem] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none"
                       placeholder="Enter Project Reference Name"
                       type="text"
                       value={editProject.projectReferenceName}
@@ -6375,7 +6410,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                   </div>
                   <div className="mb-4 pl-5">
                     <label className="block text-lg font-medium mb-2">Project Category</label>
-                    <select className="w-[25rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    <select className="w-[25rem] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none"
                       value={editProject.projectCategory}
                       onChange={(e) =>
                         setEditProject((prev) => ({ ...prev, projectCategory: e.target.value }))
@@ -6388,7 +6423,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                 </div>
                 <div className="mb-4 pl-5">
                   <label className="block text-lg font-medium mb-2">Project Address</label>
-                  <input className="w-[62rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                  <input className="w-[62rem] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none"
                     placeholder="Enter Project Address"
                     type="text"
                     value={editProject.projectAddress}
@@ -6410,7 +6445,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                             value={owner.clientName}
                             onChange={(e) => handleEditOwnerChange(index, 'clientName', e.target.value)}
                             placeholder="Client Name"
-                            className="w-80 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                            className="w-80 border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                           />
                         </div>
                         <div className="flex flex-col">
@@ -6420,7 +6455,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                             value={owner.fatherName}
                             onChange={(e) => handleEditOwnerChange(index, 'fatherName', e.target.value)}
                             placeholder="Father Name"
-                            className="w-72 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                            className="w-72 border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                           />
                         </div>
                         <div className="flex flex-col">
@@ -6430,7 +6465,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                             value={owner.mobile}
                             onChange={(e) => handleEditOwnerChange(index, 'mobile', e.target.value)}
                             placeholder="Mobile"
-                            className="w-60 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                            className="w-60 border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                           />
                         </div>
                         <div className="flex flex-col">
@@ -6440,7 +6475,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                             value={owner.age}
                             onChange={(e) => handleEditOwnerChange(index, 'age', e.target.value)}
                             placeholder="Age"
-                            className="w-20 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                            className="w-20 border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                           />
                         </div>
                       </div>
@@ -6452,7 +6487,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                         value={owner.clientAddress}
                         onChange={(e) => handleEditOwnerChange(index, 'clientAddress', e.target.value)}
                         placeholder="Client Address"
-                        className="w-[62rem] border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14"
+                        className="w-[62rem] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                       />
                       <button
                         type="button"
@@ -6483,7 +6518,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                       <select
                         value={detail.projectType}
                         onChange={(e) => handleEditDetailChange(index, 'projectType', e.target.value)}
-                        className="w-40  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                        className="w-40  border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                       >
                         <option value="">Select Type</option>
                         <option value="Shop">Shop</option>
@@ -6498,7 +6533,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                       <select
                         value={detail.floorName}
                         onChange={(e) => handleEditDetailChange(index, 'floorName', e.target.value)}
-                        className="w-36  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                        className="w-36  border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                       >
                         <option value="">Select Floor</option>
                         <option value="Ground Floor">Ground Floor</option>
@@ -6513,7 +6548,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                         value={detail.shopNo}
                         onChange={(e) => handleEditDetailChange(index, 'shopNo', e.target.value)}
                         placeholder="Shop No"
-                        className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                        className="w-28  border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                       />
                     </div>
                     <div>
@@ -6523,7 +6558,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                         value={detail.doorNo}
                         onChange={(e) => handleEditDetailChange(index, 'doorNo', e.target.value)}
                         placeholder="Door No"
-                        className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                        className="w-28  border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                       />
                     </div>
                     <div>
@@ -6533,7 +6568,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                         value={detail.area}
                         onChange={(e) => handleEditDetailChange(index, 'area', e.target.value)}
                         placeholder="Area"
-                        className="w-28  border-[#FAF6ED] border-[0.25rem] p-2 rounded-lg h-14"
+                        className="w-28  border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                       />
                     </div>
                     <div className="relative">
@@ -6568,7 +6603,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                           value={detail.ebNo}
                           onChange={(e) => handleEditDetailChange(index, 'ebNo', e.target.value)}
                           placeholder='EB NO'
-                          className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                          className='w-40 border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none'
                         />
                       </div>
                     </div>
@@ -6580,7 +6615,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                           value={detail.propertyTaxNo}
                           onChange={(e) => handleEditDetailChange(index, 'propertyTaxNo', e.target.value)}
                           placeholder='Property Tax No'
-                          className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                          className='w-40 border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none'
                         />
                       </div>
                     </div>
@@ -6592,7 +6627,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                           value={detail.waterTaxNo}
                           onChange={(e) => handleEditDetailChange(index, 'waterTaxNo', e.target.value)}
                           placeholder='Water Tax No'
-                          className='w-40 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none'
+                          className='w-40 border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none'
                         />
                       </div>
                     </div>

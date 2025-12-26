@@ -31,6 +31,8 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     const [contractorOption, setContractorOption] = useState([]);
     const [categoryOption, setCategoryOption] = useState([]);
     const [machineToolsOption, setMachineToolsOption] = useState([]);
+    const [laboursList, setLaboursList] = useState([]);
+    const [employeeOptions, setEmployeeOptions] = useState([]);
     // Initialize filter states from localStorage or defaults
     const [selectedSiteName, setSelectedSiteName] = useState(() => {
         return localStorage.getItem('expenseFilter_siteName') || '';
@@ -485,6 +487,59 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         };
         fetchAccountType();
     }, []);
+    useEffect(() => {
+        const fetchLaboursList = async () => {
+            try {
+                const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
+                if (response.ok) {
+                    const data = await response.json();
+                    const formattedData = data.map(item => ({
+                        value: item.labour_name,
+                        label: item.labour_name,
+                        id: item.id,
+                        type: "Labour",
+                        salary: item.labour_salary,
+                        extra: item.extra_amount
+                    }));
+                    setLaboursList(formattedData);
+                } else {
+                    console.log('Error fetching Labour names.');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                console.log('Error fetching Labour names.');
+            }
+        };
+        fetchLaboursList();
+    }, []);
+    useEffect(() => {
+        const fetchEmployeeDetails = async () => {
+            try {
+                const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
+                    method: "GET",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                });
+                if (!response.ok) {
+                    throw new Error("Network response was not ok: " + response.statusText);
+                }
+                const data = await response.json();
+                const formattedData = data.map(item => ({
+                    value: item.employee_name,
+                    label: item.employee_name,
+                    id: item.id,
+                    type: "Employee",
+                }));
+
+                setEmployeeOptions(formattedData);
+            } catch (error) {
+                console.error("Fetch error: ", error);
+            }
+        };
+        fetchEmployeeDetails();
+    }, []);
     const generateTodayPDF = () => {
         const today = new Date().toISOString().slice(0, 10);
         const todayExpenses = expenses.filter(exp => {
@@ -746,6 +801,30 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         });
         return map;
     }, [contractorOption]);
+    const labourIdToName = React.useMemo(() => {
+        const map = {};
+        laboursList.forEach(option => {
+            if (option.id) {
+                // Store as both string and number to handle type mismatches
+                map[option.id] = option.label;
+                map[String(option.id)] = option.label;
+                map[Number(option.id)] = option.label;
+            }
+        });
+        return map;
+    }, [laboursList]);
+    const employeeIdToName = React.useMemo(() => {
+        const map = {};
+        employeeOptions.forEach(option => {
+            if (option.id) {
+                // Store as both string and number to handle type mismatches
+                map[option.id] = option.label;
+                map[String(option.id)] = option.label;
+                map[Number(option.id)] = option.label;
+            }
+        });
+        return map;
+    }, [employeeOptions]);
     // Helper functions to get display names
     const getDisplaySiteName = (expense) => {
         if (expense.projectId && projectIdToName[expense.projectId]) {
@@ -764,6 +843,32 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
             return contractorIdToName[expense.contractorId];
         }
         return expense.contractor || '';
+    };
+    const getDisplayStaffName = (expense) => {
+        // Prioritize labour over employee
+        // Check all possible field name variations
+        const labourId = expense.labourId || expense.labour_id || expense.labourID || expense.labour_ID;
+        const employeeId = expense.employeeId || expense.employee_id || expense.employeeID || expense.employee_ID;
+        
+        if (labourId) {
+            // Try both string and number conversion for ID matching
+            const labourName = labourIdToName[labourId] || 
+                              labourIdToName[String(labourId)] || 
+                              labourIdToName[Number(labourId)];
+            if (labourName) {
+                return labourName;
+            }
+        }
+        if (employeeId) {
+            // Try both string and number conversion for ID matching
+            const employeeName = employeeIdToName[employeeId] || 
+                                employeeIdToName[String(employeeId)] || 
+                                employeeIdToName[Number(employeeId)];
+            if (employeeName) {
+                return employeeName;
+            }
+        }
+        return '';
     };
     const handleEditClick = (expense) => {
         setEditId(expense.id);
@@ -1121,6 +1226,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                         <th className="px-0.5 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('contractor')}>
                                             Contractor {sortField === 'contractor' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
+                                        <th className="px-0.5 w-[120px] font-bold text-left">Staff</th>
                                         <th className="px-0.5 w-[120px] font-bold text-left">Quantity</th>
                                         <th className="px-0.5 w-[120px] font-bold text-left">Amount</th>
                                         <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('comments')}>
@@ -1188,6 +1294,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                 />
                                             </th>
                                             <th></th>
+                                            <th></th>
                                             <th className="text-base text-left font-bold py-3">
                                                 ₹{Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </th>
@@ -1240,6 +1347,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                             <td className=" text-sm text-left w-60 ">{getDisplaySiteName(expense)}</td>
                                             <td className=" text-sm text-left ">{getDisplayVendorName(expense)}</td>
                                             <td className=" text-sm text-left ">{getDisplayContractorName(expense)}</td>
+                                            <td className=" text-sm text-left ">{getDisplayStaffName(expense)}</td>
                                             <td className=" text-sm text-left ">{expense.quantity}</td>
                                             <td className="text-sm text-right pr-5">
                                                 ₹{Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

@@ -737,7 +737,6 @@ const Incoming = ({ username, userRoles = [] }) => {
             if (!response.ok) {
                 throw new Error("Failed to save stocking locations");
             }
-            console.log("Saved successfully!");
             window.location.reload();
             setStockingLocationAddPopup(false);
         } catch (error) {
@@ -1029,9 +1028,7 @@ const Incoming = ({ username, userRoles = [] }) => {
                                 </div>
                             </div>
                             <div className="flex lg:justify-end gap-4 mt-4">
-                                <button
-                                    className="bg-[#BF9853] text-white w-[137px] h-[36px] px-5 rounded"
-                                >
+                                <button className="bg-[#BF9853] text-white w-[137px] h-[36px] px-5 rounded">
                                     Add To Stock
                                 </button>
                             </div>
@@ -1072,8 +1069,7 @@ const Incoming = ({ username, userRoles = [] }) => {
                         <div className="flex justify-end space-x-2">
                             <button
                                 className="px-4 py-2 bg-gray-300 rounded-md text-sm"
-                                onClick={() => setStockingLocationAddPopup(false)}
-                            >
+                                onClick={() => setStockingLocationAddPopup(false)} >
                                 Cancel
                             </button>
                             <button

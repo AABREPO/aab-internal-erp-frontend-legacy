@@ -21,7 +21,7 @@ import PurchaseHeading from './Components/Purchase/PurchaseHeading';
 import TestPurchaseOrder from './Components/Purchase/TestPurchaseOrder';
 import ManageHeading from './Components/ManageUsers/ManageHeading';
 import Attendancelog from './Components/Attendances/Attendancelog';
-import InventoryHeading from './Components/ProcurementInventory/InventoryHeading';
+import InventoryHeading from './Components/Inventory/InventoryHeading';
 import AdvanceHeading from './Components/Advance Portal/AdvanceHeading';
 import ClaimPaymentHeading from './Components/ClaimPayments/ClaimPaymentHeading';
 import StaffHeading from './Components/StaffAdvance/StaffHeading';

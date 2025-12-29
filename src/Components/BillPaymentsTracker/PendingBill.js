@@ -2529,6 +2529,14 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 return sum + (parseFloat(entry.amount) || 0)
             }, 0)
             const currentReceivedAmount = actualAmount - remainingAmount;
+            const normalizedDiscount = (() => {
+                if (typeof discount === 'string') {
+                    const cleaned = discount.replace(/,/g, '')
+                    const numeric = parseFloat(cleaned)
+                    return Number.isNaN(numeric) ? 0 : numeric
+                }
+                return Number.isFinite(discount) ? discount : 0
+            })()
             const newTotalReceived = currentReceivedAmount + totalPaymentAmount;
             const remainingAfterPayments = Math.max(0, actualAmount - newTotalReceived);
             // Calculate carry forward to use: either from entries or calculated amount
@@ -2543,6 +2551,11 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 carryForwardToUse = Math.min(carryForwardAmount, remainingAfterPayments);
             }
             const newRemainingAmount = Math.max(0, remainingAfterPayments - carryForwardToUse);
+            
+            // Calculate excess amount: if payment total exceeds the amount needed to pay
+            const amountNeededToPay = Math.max(0, actualAmount - currentReceivedAmount - normalizedDiscount);
+            const totalPaymentBeingMade = totalPaymentAmount + carryForwardToUse;
+            const excessAmount = Math.max(0, totalPaymentBeingMade - amountNeededToPay);
             // Only process payment entries if there are valid ones
             const paymentDetailsPromises = validPaymentEntries.length > 0
                 ? validPaymentEntries.map(async (entry, index) => {
@@ -2778,6 +2791,34 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     }
                 } catch (error) {
                     console.error("Error updating carry forward:", error);
+                }
+            }
+            // Handle excess amount: if payment total exceeds actual amount needed
+            if (excessAmount > 0) {
+                try {
+                    const excessAmountPayload = {
+                        type: "Extra amount",
+                        date: validPaymentEntries.length > 0
+                            ? validPaymentEntries[0]?.date
+                            : new Date().toISOString().split('T')[0],
+                        vendor_id: selectedPaymentBill.vendor_id,
+                        payment_mode: "",
+                        amount: excessAmount,
+                        bill_amount: 0,
+                        refund_amount: 0
+                    };
+                    const excessAmountResponse = await fetch("https://backendaab.in/aabuildersDash/api/vendor_carry_forward/save", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(excessAmountPayload)
+                    });
+                    if (!excessAmountResponse.ok) {
+                        console.error("Failed to save excess amount to carry forward");
+                    } else {
+                        console.log("Excess amount saved to carry forward successfully:", excessAmount);
+                    }
+                } catch (error) {
+                    console.error("Error saving excess amount to carry forward:", error);
                 }
             }
             setBillData(prev => prev.map(bill =>
@@ -4261,8 +4302,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                                     placeholder="Enter Amount"
                                                                     value={entry.amountDisplay || ''}
                                                                     onChange={(e) => handlePaymentEntryChange(entry.id, 'amount', e.target.value)}
-                                                                    disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
-                                                                    className={`w-[150px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                                                    disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' || (index === 0 && useCarryForward)}
+                                                                    className={`w-[150px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' || (index === 0 && useCarryForward) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                                                                 />
                                                             </div>
                                                             <div className="flex-1">

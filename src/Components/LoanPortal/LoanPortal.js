@@ -647,10 +647,17 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   useEffect(() => {
     calculateLoanAmount();
   }, [calculateLoanAmount]);
-  // Combine site and purpose options
+  // Combine site, purpose, contractor, vendor, employee, and labour options for Transfer To dropdown
   useEffect(() => {
-    setCombinedSitePurposeOptions([...siteOptions, ...purposeOptions]);
-  }, [siteOptions, purposeOptions]);
+    setCombinedSitePurposeOptions([
+      ...siteOptions, 
+      ...purposeOptions,
+      ...vendorOptions,
+      ...contractorOptions,
+      ...employeeOptions,
+      ...labourOptions
+    ]);
+  }, [siteOptions, purposeOptions, vendorOptions, contractorOptions, employeeOptions, labourOptions]);
   // Memoized custom styles for Select components
   const customStyles = {
     control: (provided, state) => ({
@@ -811,6 +818,135 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   const submitLoanData = async () => {
     let advancePortalId = null;
 
+    // Check if transferring between associates (Contractor, Vendor, Employee, or Labour)
+    const isTransferToAssociate = selectedLoanType === "Transfer" && 
+      ["Contractor", "Vendor", "Employee", "Labour"].includes(transferSelection?.type);
+
+    if (isTransferToAssociate) {
+      // Create Transfer entry for sender (subtract amount)
+      const senderName = selectedOption?.label || '';
+      const receiverName = transferSelection?.label || '';
+      const transferAmountValue = parseFloat(transferAmount) || 0;
+      const transferDesc = description 
+        ? `${description} - ${senderName} to ${receiverName} amount transferred`
+        : `${senderName} to ${receiverName} amount transferred`;
+      const senderPayload = {
+        type: "Transfer",
+        date: dateValue,
+        amount: -Math.abs(transferAmountValue), // Negative amount for sender
+        loan_payment_mode: "",
+        loan_refund_amount: 0,
+        from_purpose_id: purpose || 0,
+        transfer_Project_id: 0,
+        to_purpose_id: 0,
+        vendor_id: selectedOption?.type === "Vendor" ? selectedOption.id : 0,
+        contractor_id: selectedOption?.type === "Contractor" ? selectedOption.id : 0,
+        employee_id: selectedOption?.type === "Employee" ? selectedOption.id : 0,
+        labour_id: selectedOption?.type === "Labour" ? selectedOption.id : 0,
+        project_id: 0,
+        description: transferDesc,
+        file_url: "",
+        advance_portal_id: null
+      };
+
+      // Create Loan entry for receiver (add amount)
+      const receiverLoanDesc = description 
+        ? `${description} - ${senderName} to ${receiverName} amount transferred`
+        : `${senderName} to ${receiverName} amount transferred`;
+      
+      const receiverPayload = {
+        type: "Loan",
+        date: dateValue,
+        amount: Math.abs(transferAmountValue), // Positive amount for receiver
+        loan_payment_mode: "",
+        loan_refund_amount: 0,
+        from_purpose_id: purpose || 0,
+        transfer_Project_id: 0,
+        to_purpose_id: 0,
+        vendor_id: transferSelection?.type === "Vendor" ? transferSelection.id : 0,
+        contractor_id: transferSelection?.type === "Contractor" ? transferSelection.id : 0,
+        employee_id: transferSelection?.type === "Employee" ? transferSelection.id : 0,
+        labour_id: transferSelection?.type === "Labour" ? transferSelection.id : 0,
+        project_id: 0,
+        description: receiverLoanDesc,
+        file_url: "",
+        advance_portal_id: null
+      };
+
+      try {
+        // Save sender transfer entry
+        const senderResponse = await fetch("https://backendaab.in/aabuildersDash/api/loans/save", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(senderPayload)
+        });
+
+        if (!senderResponse.ok) {
+          throw new Error(`Failed to save sender transfer: ${senderResponse.status}`);
+        }
+
+        // Save receiver loan entry
+        const receiverResponse = await fetch("https://backendaab.in/aabuildersDash/api/loans/save", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(receiverPayload)
+        });
+
+        if (!receiverResponse.ok) {
+          throw new Error(`Failed to save receiver loan: ${receiverResponse.status}`);
+        }
+
+        toast.success("Transfer completed successfully!", {
+          position: "top-center",
+          autoClose: 3000,
+          theme: "colored"
+        });
+
+        // Reset payment popup data and close modals
+        setPaymentPopupData({
+          chequeNo: "",
+          chequeDate: "",
+          transactionNumber: "",
+          accountNumber: ""
+        });
+        setShowPaymentModal(false);
+        setShowReviewModal(false);
+        // Reset form fields
+        setAmountGiven('');
+        setTransferAmount('');
+        setDescription('');
+        setSelectedLoanFile(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        // Refresh loan data to show the new entries
+        setTimeout(async () => {
+          try {
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/loans/all');
+            if (!response.ok) {
+              throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            const data = await response.json();
+            setLoanData(data);
+          } catch (error) {
+            console.error('Error refreshing loan data:', error);
+          }
+        }, 500);
+        return; // Exit early after handling associate-to-associate transfer
+      } catch (error) {
+        console.error("❌ Error saving transfer:", error);
+        toast.error("Failed to save transfer!", {
+          position: "top-center",
+          autoClose: 3000,
+          theme: "colored"
+        });
+        return;
+      }
+    }
     // Check if transferring to a project (Site) for Vendor or Contractor
     if (selectedLoanType === "Transfer" &&
       transferSelection?.type === "Site" &&

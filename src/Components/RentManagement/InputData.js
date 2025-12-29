@@ -355,6 +355,60 @@ const InputData = ({ username, userRoles = [] }) => {
       return a.shopNo.localeCompare(b.shopNo);
     });
   };
+  const getAllShopNumbersForEdit = () => {
+    const activeLinkedShopNoIds = new Set();
+    if (tenantLinkList && Array.isArray(tenantLinkList)) {
+      tenantLinkList.forEach((tenantLink) => {
+        // Exclude the currently edited tenant link from filtering
+        if (tenantLink.id === selectedTenantLinkId) {
+          return;
+        }
+        if (tenantLink && tenantLink.shopNos && Array.isArray(tenantLink.shopNos)) {
+          tenantLink.shopNos.forEach((shop) => {
+            if (shop && shop.shopNoId != null && shop.active === true) {
+              const shopIdStr = String(shop.shopNoId).trim();
+              activeLinkedShopNoIds.add(shopIdStr);
+            }
+          });
+        }
+      });
+    }
+    const shopMap = new Map();
+    projects.forEach((project) => {
+      if (!project || !project.propertyDetails) return;
+      const propertyDetailsArray = Array.isArray(project.propertyDetails)
+        ? project.propertyDetails
+        : Array.from(project.propertyDetails || []);
+      propertyDetailsArray.forEach((detail) => {
+        if (detail && detail.shopNo && detail.shopNo !== null && detail.shopNo !== undefined && detail.shopNo !== '') {
+          const shopNoStr = String(detail.shopNo).trim();
+          if (shopNoStr !== '') {
+            const shopId = detail.id || detail.shopNo;
+            const shopIdStr = String(shopId).trim();
+            const isActiveLinked = activeLinkedShopNoIds.has(shopIdStr);
+            if (!shopMap.has(shopNoStr) && !isActiveLinked) {
+              shopMap.set(shopNoStr, {
+                value: shopId,
+                label: shopNoStr,
+                shopNo: shopNoStr,
+                id: shopId,
+                projectReferenceName: project.projectReferenceName || '',
+                doorNo: detail.doorNo || ''
+              });
+            }
+          }
+        }
+      });
+    });
+    return Array.from(shopMap.values()).sort((a, b) => {
+      const aNum = parseInt(a.shopNo);
+      const bNum = parseInt(b.shopNo);
+      if (!isNaN(aNum) && !isNaN(bNum)) {
+        return aNum - bNum;
+      }
+      return a.shopNo.localeCompare(b.shopNo);
+    });
+  };
   const getShopDetailsById = (shopNoId) => {
     if (!shopNoId) return null;
     for (const project of projects) {
@@ -377,8 +431,8 @@ const InputData = ({ username, userRoles = [] }) => {
     }
     return null;
   };
-  const getShopsByProjectReferenceName = (projectRefName, useUnfiltered = false) => {
-    const allShops = useUnfiltered ? getAllShopNumbersUnfiltered() : getAllShopNumbers();
+  const getShopsByProjectReferenceName = (projectRefName, useUnfiltered = false, forEdit = false) => {
+    const allShops = useUnfiltered ? getAllShopNumbersUnfiltered() : (forEdit ? getAllShopNumbersForEdit() : getAllShopNumbers());
     if (!projectRefName || projectRefName === '') {
       return allShops;
     }
@@ -3803,12 +3857,12 @@ const InputData = ({ username, userRoles = [] }) => {
                     <>
                       {editTenantLinkFormData.shopNos.map((shop, sIndex) => {
                         const shopDetails = getShopDetailsById(shop.shopNoId);
-                        const filteredShops = getShopsByProjectReferenceName(shop.projectReferenceName, true);
+                        const filteredShops = getShopsByProjectReferenceName(shop.projectReferenceName, false, true);
                         const selectedShopOption = (shop.shopNoId && (shop.shopNoId !== '' && shop.shopNoId !== null))
                           ? (filteredShops.find(option =>
                             option.value === shop.shopNoId || option.id === shop.shopNoId ||
                             String(option.value) === String(shop.shopNoId) || String(option.id) === String(shop.shopNoId)
-                          ) || getAllShopNumbersUnfiltered().find(option =>
+                          ) || getAllShopNumbersForEdit().find(option =>
                             option.value === shop.shopNoId || option.id === shop.shopNoId ||
                             String(option.value) === String(shop.shopNoId) || String(option.id) === String(shop.shopNoId)
                           ))

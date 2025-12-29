@@ -1,9 +1,24 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import PurchaseOrder from './PurchaseOrder';
 import PurchaseHistory from "./PurchaseHistory";
 import PurchaseInputData from "./PurchaseInputData";
+import MobilePurchaseOrder from "../../componentsMobile/PurchaseOrder/PurchaseOrder";
 
 const PurchaseHeading = ({ username, userRoles = [] }) => {
+
+    const [isMobile, setIsMobile] = useState(() => {
+        return window.innerWidth <= 768;
+    });
+
+    useEffect(() => {
+        const handleResize = () => {
+            setIsMobile(window.innerWidth <= 768);
+        };
+        window.addEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+        };
+    }, []);
     const [activeTab, setActiveTab] = useState(() => {
         return localStorage.getItem('activeTab') || 'purchaseorder';
     });
@@ -16,16 +31,25 @@ const PurchaseHeading = ({ username, userRoles = [] }) => {
         }
     }, [activeTab]);
 
+    if (isMobile) {
+        const storedUser = localStorage.getItem('user');
+        const user = storedUser ? JSON.parse(storedUser) : { username, userRoles };
+        return (
+            <div style={{textAlign: 'left'}}>
+                <MobilePurchaseOrder user={user} onLogout={() => { }} />;
+            </div>
+        );
+    }
     const renderContent = () => {
         switch (activeTab) {
             case 'purchaseorder':
-                return <PurchaseOrder username={username} userRoles={userRoles}/>;
+                return <PurchaseOrder username={username} userRoles={userRoles} />;
             case 'purchasehistory':
-                return <PurchaseHistory username={username} userRoles={userRoles}/>;
+                return <PurchaseHistory username={username} userRoles={userRoles} />;
             case 'purchaseinputdata':
-                return <PurchaseInputData username={username} userRoles={userRoles}/>;
+                return <PurchaseInputData username={username} userRoles={userRoles} />;
             default:
-                return <PurchaseOrder username={username} userRoles={userRoles}/>;
+                return <PurchaseOrder username={username} userRoles={userRoles} />;
         }
     };
 
@@ -58,4 +82,4 @@ const PurchaseHeading = ({ username, userRoles = [] }) => {
     );
 }
 
-export default PurchaseHeading
+export default PurchaseHeading;

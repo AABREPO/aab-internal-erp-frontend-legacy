@@ -1,6 +1,6 @@
 import './App.css';
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import Sidebar from './Components/Bars/Sidebar';
 import Navbar from './Components/Bars/Navbar';
 import Home from './Components/Home/HomePage';
@@ -36,74 +36,99 @@ import DirectoryHeading from './Components/Directory/DirectoryHeading';
 import ToolsTrackerHeading from './Components/ToolsTracker/ToolsTrackerHeading';
 import TestToolsTrackerHeading from './Components/TestToolsTracker/TestToolsTrackerHeading';
 
+function AppContent({ user, handleLogout }) {
+  const location = useLocation();
+  const [isMobile, setIsMobile] = useState(() => {
+    return window.innerWidth <= 768;
+  })
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  const isMobileRoute = location.pathname.startsWith('/purchaseorder') || location.pathname.startsWith('/inventory');
+  const shouldHideDesktopBars = isMobile && isMobileRoute;
+
+  return (
+
+    <div>
+      {!shouldHideDesktopBars && (
+        <>
+          <Navbar username={user.username} userImage={user.userImage} position={user.position} email={user.email} userRoles={user?.userRoles || []} onLogout={handleLogout} />
+          <Sidebar userRoles={user?.userRoles || []} />
+        </>
+      )}
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/expense-entry/*" element={<Heading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path="/designtool/*" element={<DHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path="/invoice-bill/*" element={<InHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path="/paints/*" element={<PHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path="/rccal/*" element={<RcHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path="/bath/*" element={<BHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path="/switch/*" element={<SHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path="/weekly-payment/*" element={<WeeklyPaymentHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path="/rent/*" element={<RHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path="/masonary/*" element={<MHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path="/carpentry/*" element={<CHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path="/entrychecklist/*" element={<BillHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path='/purchaseorder/*' element={<PurchaseHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path='/inventory/*' element={<InventoryHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path='/testpurchaseorder' element={<TestPurchaseOrder />} />
+        <Route path='/user_manage/*' element={<ManageHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path='/attendance' element={<Attendancelog username={user.username} />} />
+        <Route path='/portal/*' element={<AdvanceHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path='/Claim/*' element={<ClaimPaymentHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path='/staffadvance/*' element={<StaffHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path='/loan/*' element={<LoanPoratlHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path='/tracker/*' element={<BillPaymentsTrackerHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path='/master-data' element={<MasterData username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path="/bankreconciliation" element={<BankReconciliation username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path="/utility/*" element={<UtilityHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path="/bank-register" element={<BankRegisterHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path="/quotation/*" element={<QuotationHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path="/directory/*" element={<DirectoryHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path="/toolsTracker/*" element={<ToolsTrackerHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path="/testtoolsTracker/*" element={<TestToolsTrackerHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+    </div>
+  );
+}
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      setUser(JSON.parse(storedUser)); // Parse back to object
+      setUser(JSON.parse(storedUser));
       setIsLoggedIn(true);
     }
   }, []);
+
   const handleLogin = (userData) => {
-    setIsLoggedIn(true);
     setUser(userData);
+    setIsLoggedIn(true);
     localStorage.setItem('user', JSON.stringify(userData));
   };
-
   const handleLogout = () => {
+    setUser(null);
     setIsLoggedIn(false);
-    setUser('');
     localStorage.removeItem('user');
-  };
-  
+  }
   return (
     <Router>
       {!user ? (
         <LoginPage onLogin={handleLogin} />
       ) : (
-        <div>
-          <Navbar username={user.username} userImage={user.userImage} position={user.position} email={user.email} userRoles={user?.userRoles || []} onLogout={handleLogout} />
-          <Sidebar userRoles={user?.userRoles || []} />
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/expense-entry/*" element={<Heading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path="/designtool/*" element={<DHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path="/invoice-bill/*" element={<InHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path="/paints/*" element={<PHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path="/rccal/*" element={<RcHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path="/bath/*" element={<BHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path="/switch/*" element={<SHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path="/weekly-payment/*" element={<WeeklyPaymentHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path="/rent/*" element={<RHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path="/masonary/*" element={<MHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path="/carpentry/*" element={<CHeading username={user.username} userRoles={user?.userRoles || []}/>}/>
-            <Route path="/entrychecklist/*" element={<BillHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path='/purchaseorder/*' element={<PurchaseHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path='/inventory/*' element={<InventoryHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path='/testpurchaseorder' element={<TestPurchaseOrder />} />
-            <Route path='/user_manage/*' element={<ManageHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path='/attendance' element={<Attendancelog username={user.username} />}/>
-            <Route path='/portal/*' element={<AdvanceHeading username={user.username} userRoles={user?.userRoles || []} />} />
-            <Route path='/Claim/*' element={<ClaimPaymentHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path='/staffadvance/*' element={<StaffHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path='/loan/*' element={<LoanPoratlHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path='/tracker/*' element={<BillPaymentsTrackerHeading username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path='/master-data' element={<MasterData username={user.username} userRoles={user?.userRoles || []}/>} />
-            <Route path="/bankreconciliation" element={<BankReconciliation username={user.username} userRoles={user?.userRoles || []} />} />
-            <Route path="/utility/*" element={<UtilityHeading username={user.username} userRoles={user?.userRoles || []} />} />
-            <Route path="/bank-register" element={<BankRegisterHeading username={user.username} userRoles={user?.userRoles || []} />} />
-            <Route path="/quotation/*" element={<QuotationHeading username={user.username} userRoles={user?.userRoles || []} />} />
-            <Route path="/directory/*" element={<DirectoryHeading username={user.username} userRoles={user?.userRoles || []} />} />
-            <Route path="/toolsTracker/*" element={<ToolsTrackerHeading username={user.username} userRoles={user?.userRoles || []} />} />
-            <Route path="/testtoolsTracker/*" element={<TestToolsTrackerHeading username={user.username} userRoles={user?.userRoles || []} />} />
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        </div>
+        <AppContent user={user} handleLogout={handleLogout} />
       )}
     </Router>
   );
 }
-
 export default App;

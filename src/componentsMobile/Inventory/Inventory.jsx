@@ -44,9 +44,9 @@ const Inventory = ({ user, onLogout }) => {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'outgoing':
-        return <Outgoing />;
+        return <Outgoing user={user} />;
       case 'incoming':
-        return <Incoming />;
+        return <Incoming user={user} />;
       case 'net-stock':
         return (
           <div className="p-4">

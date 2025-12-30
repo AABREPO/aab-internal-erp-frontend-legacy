@@ -8,7 +8,7 @@ import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 import SearchItemsModal from '../PurchaseOrder/SearchItemsModal';
 import editIcon from '../Images/edit.png';
 
-const Outgoing = () => {
+const Outgoing = ({ user }) => {
   // Helper functions for date
   const getTodayDate = () => {
     const today = new Date();
@@ -449,6 +449,136 @@ const Outgoing = () => {
     setShowDeleteConfirm(false);
   };
 
+  // Save outgoing inventory data (for both dispatch and stock return)
+  const handleSaveOutgoing = async (outgoingType) => {
+    // Validate required fields
+    if (!outgoingData.projectName || !outgoingData.projectIncharge || !outgoingData.stockingLocation) {
+      alert('Please fill in all required fields (Project Name, Project Incharge, and Stocking Location)');
+      return;
+    }
+
+    if (items.length === 0) {
+      alert('Please add at least one item');
+      return;
+    }
+
+    if (!selectedIncharge || !selectedIncharge.id) {
+      alert('Project Incharge ID not found. Please select a valid project incharge.');
+      return;
+    }
+
+    try {
+      // Find stocking location ID from outgoingSiteOptions
+      const stockingLocationSite = outgoingSiteOptions.find(
+        site => site.value === outgoingData.stockingLocation && site.markedAsStockingLocation === true
+      );
+      
+      if (!stockingLocationSite || !stockingLocationSite.id) {
+        alert('Stocking location ID not found. Please select a valid stocking location.');
+        return;
+      }
+
+      const stockingLocationId = stockingLocationSite.id;
+
+      // Find project/client ID from outgoingSiteOptions
+      const projectSite = outgoingSiteOptions.find(
+        site => site.value === outgoingData.projectName
+      );
+      
+      if (!projectSite || !projectSite.id) {
+        alert('Project ID not found. Please select a valid project.');
+        return;
+      }
+
+      const clientId = projectSite.id;
+      const siteInchargeId = selectedIncharge.id;
+      const siteInchargeMobileNumber = outgoingData.contact || selectedIncharge.mobileNumber || '';
+
+      // Get outgoing count for ENO
+      const countResponse = await fetch(
+        `https://backendaab.in/aabuildersDash/api/inventory/outgoingCount?stockingLocationId=${stockingLocationId}`
+      );
+      
+      if (!countResponse.ok) {
+        throw new Error('Failed to fetch outgoing count');
+      }
+      
+      const outgoingCount = await countResponse.json();
+      const eno = String(outgoingCount + 1 || 0);
+
+      // Convert date from DD/MM/YYYY to YYYY-MM-DD format for backend
+      const dateParts = outgoingData.date.split('/');
+      const formattedDate = dateParts.length === 3 
+        ? `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}` 
+        : outgoingData.date;
+
+      // Prepare inventory items
+      // For dispatch: negative quantity (-qty)
+      // For stock return: positive quantity (+qty)
+      const inventoryItems = items.map(item => {
+        const baseQuantity = Math.abs(item.quantity || 0);
+        const quantity = outgoingType === 'dispatch' ? -baseQuantity : baseQuantity;
+        return {
+          item_id: item.itemId || null,
+          category_id: item.categoryId || null,
+          model_id: item.modelId || null,
+          brand_id: item.brandId || null,
+          type_id: item.typeId || null,
+          quantity: quantity,
+          amount: Math.abs((item.price || 0) * baseQuantity)
+        };
+      });
+
+      // Prepare payload
+      const payload = {
+        client_id: clientId,
+        stocking_location_id: stockingLocationId,
+        inventory_type: 'outgoing',
+        outgoing_type: outgoingType,
+        site_incharge_id: siteInchargeId,
+        site_incharge_type: selectedIncharge.type || 'employee',
+        date: formattedDate,
+        site_incharge_mobile_number: siteInchargeMobileNumber,
+        eno: eno,
+        created_by: (user && user.username) || '',
+        inventoryItems: inventoryItems
+      };
+
+      // Save to backend
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/inventory/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to save inventory data');
+      }
+
+      const savedData = await response.json();
+      alert(`Inventory data saved successfully as ${outgoingType === 'dispatch' ? 'Dispatch' : 'Stock Return'}!`);
+      
+      // Reset form
+      setOutgoingData({
+        projectName: '',
+        projectIncharge: '',
+        stockingLocation: '',
+        contact: '',
+        date: getTodayDate()
+      });
+      setSelectedIncharge(null);
+      setItems([]);
+      setHasOpenedAdd(false);
+      setIsEditMode(false);
+    } catch (error) {
+      console.error('Error saving inventory:', error);
+      alert(`Error saving inventory: ${error.message}`);
+    }
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden">
       {/* Date and Actions Row - Only show when not in empty state */}
@@ -465,7 +595,8 @@ const Outgoing = () => {
             <div className="flex items-center gap-4">
               <button
                 type="button"
-                className="flex items-center gap-1 text-[13px] font-medium text-black leading-normal"
+                onClick={() => handleSaveOutgoing('stock return')}
+                className="flex items-center gap-1 text-[13px] font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-3 py-1.5"
               >
                 Stock Return
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -475,7 +606,8 @@ const Outgoing = () => {
               </button>
               <button
                 type="button"
-                className="flex items-center gap-1 text-[13px] font-medium text-black leading-normal"
+                onClick={() => handleSaveOutgoing('dispatch')}
+                className="flex items-center gap-1 text-[13px] font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-3 py-1.5"
               >
                 Dispatch
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -888,6 +1020,12 @@ const Outgoing = () => {
         getAvailableItems={getAvailableItems}
         existingItems={items}
         onRefreshData={fetchPoItemName}
+        stockingLocationId={(() => {
+          const stockingLocationSite = outgoingSiteOptions.find(
+            site => site.value === outgoingData.stockingLocation && site.markedAsStockingLocation === true
+          );
+          return stockingLocationSite?.id || null;
+        })()}
       />
     </div>
   );

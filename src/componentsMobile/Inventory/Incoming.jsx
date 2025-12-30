@@ -8,8 +8,9 @@ import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 import SearchItemsModal from '../PurchaseOrder/SearchItemsModal';
 import SelectPOModal from './SelectPOModal';
 import editIcon from '../Images/edit.png';
+import jsPDF from 'jspdf';
 
-const Incoming = () => {
+const Incoming = ({ user }) => {
   // Helper functions for date
   const getTodayDate = () => {
     const today = new Date();
@@ -325,11 +326,84 @@ const Incoming = () => {
             return;
           }
 
+          // Fetch existing inventory records for this PO number to check already added quantities
+          let inventoryItemQuantities = {}; // Map of item_id to total quantity already added
+          try {
+            const poNumberStr = String(eno).replace('#', '').trim();
+            const inventoryResponse = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll');
+            if (inventoryResponse.ok) {
+              const inventoryRecords = await inventoryResponse.json();
+              
+              // Filter inventory records by purchase_no matching the PO number and exclude deleted records
+              const matchingInventoryRecords = inventoryRecords.filter(record => {
+                // Exclude deleted records
+                const recordDeleteStatus = record.delete_status !== undefined ? record.delete_status : record.deleteStatus;
+                if (recordDeleteStatus) {
+                  return false;
+                }
+                
+                // Match by purchase_no
+                const recordPurchaseNo = record.purchase_no || record.purchaseNo || record.purchase_number || '';
+                const recordPurchaseNoStr = String(recordPurchaseNo).replace('#', '').trim();
+                return recordPurchaseNoStr === poNumberStr;
+              });
+              
+              // Calculate total quantity per item_id from inventory records
+              matchingInventoryRecords.forEach(record => {
+                const inventoryItems = record.inventoryItems || record.inventory_items || [];
+                if (Array.isArray(inventoryItems)) {
+                  inventoryItems.forEach(invItem => {
+                    const itemId = invItem.item_id || invItem.itemId;
+                    const quantity = Math.abs(invItem.quantity || 0); // Use absolute value for incoming
+                    
+                    if (itemId !== null && itemId !== undefined) {
+                      const itemIdStr = String(itemId);
+                      inventoryItemQuantities[itemIdStr] = (inventoryItemQuantities[itemIdStr] || 0) + quantity;
+                    }
+                  });
+                }
+              });
+            }
+          } catch (error) {
+            console.error('Error fetching inventory records:', error);
+            // Continue with PO items even if inventory fetch fails
+          }
+
           // Transform purchaseTable items to the format expected by items
           // Use functional update to get current items and generate IDs correctly
           setItems(prevItems => {
             const maxId = prevItems.length > 0 ? Math.max(...prevItems.map(i => i.id)) : 0;
-            const transformedItems = purchaseTableItems.map((item, index) => {
+            
+            // First, filter and adjust quantities based on inventory
+            const filteredAndAdjustedItems = purchaseTableItems
+              .map((item) => {
+                const poItemId = item.item_id || item.itemId;
+                const poQuantity = item.quantity || 0;
+                
+                // If item_id exists, check inventory quantities
+                if (poItemId !== null && poItemId !== undefined) {
+                  const itemIdStr = String(poItemId);
+                  const alreadyAddedQty = inventoryItemQuantities[itemIdStr] || 0;
+                  
+                  // Calculate balance quantity
+                  const balanceQty = poQuantity - alreadyAddedQty;
+                  
+                  // If balance is 0 or negative, don't include this item
+                  if (balanceQty <= 0) {
+                    return null;
+                  }
+                  
+                  // Use balance quantity instead of PO quantity
+                  return { ...item, quantity: balanceQty };
+                }
+                
+                // If no item_id, include as is
+                return item;
+              })
+              .filter(item => item !== null); // Remove items with 0 or negative balance
+            
+            // Then transform to the expected format
+            const transformedItems = filteredAndAdjustedItems.map((item, index) => {
               // Look up item name - check multiple possible field names
               let itemName = item.itemName || item.name || item.item_name || '';
               
@@ -711,7 +785,59 @@ const Incoming = () => {
     setShowDeleteConfirm(false);
   };
 
-  // Convert file to JPG format
+  // Convert image to PDF format
+  const convertImageToPDF = (file) => {
+    return new Promise((resolve, reject) => {
+      const fileType = file.type;
+      
+      // If already a PDF, return as is
+      if (fileType === 'application/pdf') {
+        resolve(file);
+        return;
+      }
+      
+      // If it's an image, convert to PDF
+      if (fileType.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const pdf = new jsPDF();
+            const imgWidth = img.width;
+            const imgHeight = img.height;
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            
+            // Calculate dimensions to fit the image in PDF
+            const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+            const width = imgWidth * ratio;
+            const height = imgHeight * ratio;
+            const x = (pdfWidth - width) / 2;
+            const y = (pdfHeight - height) / 2;
+            
+            pdf.addImage(e.target.result, 'JPEG', x, y, width, height);
+            
+            // Convert PDF to Blob
+            const pdfBlob = pdf.output('blob');
+            const pdfFile = new File([pdfBlob], file.name.replace(/\.[^/.]+$/, '.pdf'), {
+              type: 'application/pdf',
+              lastModified: Date.now()
+            });
+            resolve(pdfFile);
+          };
+          img.onerror = () => reject(new Error('Failed to load image'));
+          img.src = e.target.result;
+        };
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsDataURL(file);
+      } else {
+        // For other file types, reject
+        reject(new Error('Unsupported file type. Please upload an image or PDF.'));
+      }
+    });
+  };
+
+  // Convert file to JPG format (for preview)
   const convertFileToJPG = (file) => {
     return new Promise((resolve, reject) => {
       const fileType = file.type;
@@ -908,6 +1034,7 @@ const Incoming = () => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
 
+    // Process files sequentially (one at a time) to avoid race conditions
     for (const file of files) {
       // Check file size (5 MB limit)
       if (file.size > 5 * 1024 * 1024) {
@@ -915,8 +1042,8 @@ const Incoming = () => {
         continue;
       }
 
-      // Create file object with upload state
-      const fileId = Date.now() + Math.random();
+      // Create file object with upload state - use a more unique ID
+      const fileId = Date.now() + Math.random() + Math.random() * 1000;
       const newFile = {
         id: fileId,
         originalFile: file,
@@ -925,14 +1052,15 @@ const Incoming = () => {
         progress: 0,
         status: 'uploading', // uploading, completed, error
         timeLeft: null,
-        convertedFile: null
+        convertedFile: null,
+        pdfUrl: null // Store the uploaded PDF URL
       };
 
       setAttachedFiles(prev => [...prev, newFile]);
 
       // Simulate upload progress
       const startTime = Date.now();
-      const totalSize = file.size;
+      let totalSize = file.size;
       let uploadedSize = 0;
       const uploadSpeed = 2 * 1024 * 1024; // 2 MB per second
 
@@ -951,7 +1079,56 @@ const Incoming = () => {
       }, 100);
 
       try {
-        // Convert file to JPG
+        // Convert image to PDF if needed, or use PDF as is
+        const pdfFile = await convertImageToPDF(file);
+        totalSize = pdfFile.size; // Update total size for progress calculation
+        
+        // Get vendor and site info for file naming
+        const selectedSite = siteOptions.find(
+          site => site.value === incomingData.stockingLocation && site.markedAsStockingLocation === true
+        );
+        const vendor = incomingData.vendorName || '';
+        const contractor = vendor; // Using vendor as contractor for naming
+        
+        // Prepare file name with timestamp - include milliseconds and fileId for uniqueness
+        const now = new Date();
+        const timestamp = now.toLocaleString("en-GB", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: true
+        })
+          .replace(",", "")
+          .replace(/\s/g, "-");
+        
+        // Add milliseconds and a unique counter to ensure uniqueness for each file
+        const milliseconds = now.getMilliseconds();
+        // Use fileId converted to a unique string (combine timestamp and random parts)
+        const uniqueId = Math.floor(fileId).toString().replace('.', '').slice(-8); // Use last 8 digits
+        const originalFileName = file.name.replace(/\.[^/.]+$/, '').substring(0, 30); // Limit filename length
+        const finalName = `${timestamp}-${milliseconds}-${uniqueId} ${selectedSite?.sNo || ''} ${vendor || contractor} ${originalFileName}`.trim();
+        
+        // Upload to Google Drive
+        const formData = new FormData();
+        formData.append('file', pdfFile);
+        formData.append('file_name', finalName);
+        
+        const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+          method: "POST",
+          body: formData,
+        });
+        
+        if (!uploadResponse.ok) {
+          throw new Error('File upload failed');
+        }
+        
+        const uploadResult = await uploadResponse.json();
+        const pdfUrl = uploadResult.url;
+        
+        // Convert file to JPG for preview
         const jpgFile = await convertFileToJPG(file);
         
         // Create preview URL for the converted JPG
@@ -966,7 +1143,7 @@ const Incoming = () => {
         clearInterval(progressInterval);
         setAttachedFiles(prev => prev.map(f => 
           f.id === fileId 
-            ? { ...f, progress: 100, status: 'completed', convertedFile: jpgFile, timeLeft: 0 }
+            ? { ...f, progress: 100, status: 'completed', convertedFile: jpgFile, pdfUrl: pdfUrl, timeLeft: 0 }
             : f
         ));
       } catch (error) {
@@ -976,7 +1153,8 @@ const Incoming = () => {
             ? { ...f, status: 'error', progress: 0 }
             : f
         ));
-        console.error('Error converting file:', error);
+        console.error('Error uploading file:', error);
+        alert(`Error uploading file "${file.name}": ${error.message}`);
       }
     }
 
@@ -999,6 +1177,157 @@ const Incoming = () => {
       });
     }
     setAttachedFiles(prev => prev.filter(f => f.id !== fileId));
+  };
+
+  // Save incoming inventory data
+  const handleSaveIncoming = async () => {
+    // Validate required fields
+    if (!incomingData.vendorName || !incomingData.vendorId || !incomingData.stockingLocation) {
+      alert('Please fill in all required fields (Vendor Name and Stocking Location)');
+      return;
+    }
+
+    if (items.length === 0) {
+      alert('Please add at least one item');
+      return;
+    }
+
+    try {
+      // Find stocking location ID from siteOptions
+      const stockingLocationSite = siteOptions.find(
+        site => site.value === incomingData.stockingLocation && site.markedAsStockingLocation === true
+      );
+      
+      if (!stockingLocationSite || !stockingLocationSite.id) {
+        alert('Stocking location ID not found. Please select a valid stocking location.');
+        return;
+      }
+
+      const stockingLocationId = stockingLocationSite.id;
+
+      // Get incoming count for ENO
+      const countResponse = await fetch(
+        `https://backendaab.in/aabuildersDash/api/inventory/incomingCount?stockingLocationId=${stockingLocationId}`
+      );
+      
+      if (!countResponse.ok) {
+        throw new Error('Failed to fetch incoming count');
+      }
+      
+      const incomingCount = await countResponse.json();
+      const eno = String(incomingCount + 1 || 0);
+
+      // Convert date from DD/MM/YYYY to YYYY-MM-DD format for backend
+      const dateParts = incomingData.date.split('/');
+      const formattedDate = dateParts.length === 3 
+        ? `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}` 
+        : incomingData.date;
+
+      // Prepare inventory items - ensure quantities are positive
+      const inventoryItems = items.map(item => ({
+        item_id: item.itemId || null,
+        category_id: item.categoryId || null,
+        model_id: item.modelId || null,
+        brand_id: item.brandId || null,
+        type_id: item.typeId || null,
+        quantity: Math.abs(item.quantity || 0), // Always positive for incoming
+        amount: Math.abs((item.price || 0) * (item.quantity || 0))
+      }));
+
+      // Prepare payload
+      const payload = {
+        vendor_id: incomingData.vendorId,
+        stocking_location_id: stockingLocationId,
+        inventory_type: 'incoming',
+        date: formattedDate,
+        eno: eno,
+        purchase_no: incomingData.poNumber || '',
+        created_by: (user && user.username) || '',
+        inventoryItems: inventoryItems
+      };
+
+      // Save to backend
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/inventory/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to save inventory data');
+      }
+
+      const savedData = await response.json();
+      
+      // Get the inventory management ID from saved data
+      // Try different possible field names for the ID
+      const inventoryManagementId = savedData.id || savedData.inventoryManagementId || savedData.inventory_management_id;
+      
+      if (!inventoryManagementId) {
+        console.warn('Inventory management ID not found in saved data:', savedData);
+      }
+      
+      // Save PDF URLs if there are any uploaded files
+      if (inventoryManagementId && attachedFiles.length > 0) {
+        const filesWithUrls = attachedFiles.filter(f => f.pdfUrl && f.status === 'completed');
+        
+        if (filesWithUrls.length > 0) {
+          try {
+            // Save each PDF URL to the backend
+            const pdfSavePromises = filesWithUrls.map(async (file) => {
+              const pdfPayload = {
+                incoming_pdf: file.pdfUrl,
+                inventory_management_id: inventoryManagementId
+              };
+              
+              const pdfResponse = await fetch('https://backendaab.in/aabuildersDash/api/incoming_pdfs/save', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(pdfPayload)
+              });
+              
+              if (!pdfResponse.ok) {
+                const errorData = await pdfResponse.json().catch(() => ({}));
+                throw new Error(errorData.message || 'Failed to save PDF URL');
+              }
+              
+              return await pdfResponse.json();
+            });
+            
+            await Promise.all(pdfSavePromises);
+          } catch (pdfError) {
+            console.error('Error saving PDF URLs:', pdfError);
+            // Don't fail the entire operation if PDF save fails, just log it
+            alert(`Inventory saved successfully, but there was an error saving PDF attachments: ${pdfError.message}`);
+          }
+        }
+      }
+      
+      alert('Inventory data saved successfully!');
+      
+      // Reset form
+      setIncomingData({
+        poNumber: '',
+        vendorName: '',
+        vendorId: null,
+        stockingLocation: '',
+        date: getTodayDate()
+      });
+      setItems([]);
+      setHasOpenedAdd(false);
+      setIsEditMode(false);
+      setAttachedFiles([]);
+      setFilePreviews({});
+      filePreviewsRef.current = {};
+    } catch (error) {
+      console.error('Error saving inventory:', error);
+      alert(`Error saving inventory: ${error.message}`);
+    }
   };
 
   return (
@@ -1038,7 +1367,8 @@ const Incoming = () => {
               {hasOpenedAdd && items.length > 0 && (
                 <button
                   type="button"
-                  className="text-[13px] font-medium text-black leading-normal rounded-[8px] px-3 py-1.5"
+                  onClick={handleSaveIncoming}
+                  className="text-[13px] font-medium text-black leading-normal rounded-[8px] px-3 py-1.5 hover:bg-gray-100"
                 >
                   Add to Stock
                 </button>
@@ -1412,6 +1742,12 @@ const Incoming = () => {
         getAvailableItems={getAvailableItems}
         existingItems={items}
         onRefreshData={fetchPoItemName}
+        stockingLocationId={(() => {
+          const stockingLocationSite = siteOptions.find(
+            site => site.value === incomingData.stockingLocation && site.markedAsStockingLocation === true
+          );
+          return stockingLocationSite?.id || null;
+        })()}
       />
       <SelectPOModal
         isOpen={showPOModal}

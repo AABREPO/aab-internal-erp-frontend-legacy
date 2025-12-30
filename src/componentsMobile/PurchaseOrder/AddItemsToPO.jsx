@@ -631,34 +631,114 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
       handleFieldSelect(field, value);
     }
   };
-
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!formData.quantity || isNaN(formData.quantity)) {
       setQuantityError('Please Enter Valid Quantity');
       return;
     }
-
-    // Resolve IDs for the selected values
-    const resolvedItemId =
+    // First, try to resolve IDs with current arrays
+    let resolvedItemId =
       initialData.itemId ||
       findIdByLabel(poItemName, formData.itemName, ['itemName', 'poItemName', 'name', 'item_name']);
-    const resolvedModelId =
+    let resolvedModelId =
       initialData.modelId ||
       findIdByLabel(poModel, formData.model, ['model', 'poModel', 'modelName', 'name']);
-    const resolvedBrandId =
+    let resolvedBrandId =
       initialData.brandId ||
       findIdByLabel(poBrand, formData.brand, ['brand', 'poBrand', 'brandName', 'name']);
-    const resolvedTypeId =
+    let resolvedTypeId =
       initialData.typeId ||
       findIdByLabel(poType, formData.type, ['type', 'poType', 'typeName', 'name', 'typeColor']);
-
+    // If any ID is missing, refresh the arrays and try again
+    if ((!resolvedItemId && formData.itemName) ||
+        (!resolvedModelId && formData.model) ||
+        (!resolvedBrandId && formData.brand) ||
+        (!resolvedTypeId && formData.type)) {
+      // Refresh all arrays that need refreshing
+      const refreshPromises = [];
+      if (!resolvedItemId && formData.itemName) {
+        refreshPromises.push(fetchPoItemName());
+        if (onRefreshItemName) {
+          refreshPromises.push(onRefreshItemName());
+        }
+      }
+      if (!resolvedModelId && formData.model) {
+        refreshPromises.push(fetchPoModel());
+        if (onRefreshModel) {
+          refreshPromises.push(onRefreshModel());
+        }
+      }
+      if (!resolvedBrandId && formData.brand) {
+        refreshPromises.push(fetchPoBrand());
+        if (onRefreshBrand) {
+          refreshPromises.push(onRefreshBrand());
+        }
+      }
+      if (!resolvedTypeId && formData.type) {
+        refreshPromises.push(fetchPoType());
+        if (onRefreshType) {
+          refreshPromises.push(onRefreshType());
+        }
+      }
+      // Wait for all refreshes to complete
+      await Promise.all(refreshPromises);
+      // Fetch fresh data directly from API to resolve IDs
+      let freshItemName = poItemName;
+      let freshModel = poModel;
+      let freshBrand = poBrand;
+      let freshType = poType;
+      // If still not resolved, fetch directly
+      if (!resolvedItemId && formData.itemName) {
+        try {
+          const response = await fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/getAll');
+          if (response.ok) {
+            freshItemName = await response.json();
+            resolvedItemId = findIdByLabel(freshItemName, formData.itemName, ['itemName', 'poItemName', 'name', 'item_name']);
+          }
+        } catch (error) {
+          console.error('Error fetching item names:', error);
+        }
+      }
+      if (!resolvedModelId && formData.model) {
+        try {
+          const response = await fetch('https://backendaab.in/aabuildersDash/api/po_model/getAll');
+          if (response.ok) {
+            freshModel = await response.json();
+            resolvedModelId = findIdByLabel(freshModel, formData.model, ['model', 'poModel', 'modelName', 'name']);
+          }
+        } catch (error) {
+          console.error('Error fetching models:', error);
+        }
+      }
+      if (!resolvedBrandId && formData.brand) {
+        try {
+          const response = await fetch('https://backendaab.in/aabuildersDash/api/po_brand/getAll');
+          if (response.ok) {
+            freshBrand = await response.json();
+            resolvedBrandId = findIdByLabel(freshBrand, formData.brand, ['brand', 'poBrand', 'brandName', 'name']);
+          }
+        } catch (error) {
+          console.error('Error fetching brands:', error);
+        }
+      }
+      if (!resolvedTypeId && formData.type) {
+        try {
+          const response = await fetch('https://backendaab.in/aabuildersDash/api/po_type/getAll');
+          if (response.ok) {
+            freshType = await response.json();
+            resolvedTypeId = findIdByLabel(freshType, formData.type, ['type', 'poType', 'typeName', 'name', 'typeColor']);
+          }
+        } catch (error) {
+          console.error('Error fetching types:', error);
+        }
+      }
+    }
     let resolvedCategoryId =
       initialData.categoryId ||
       findIdByLabel(categoryOptions, formData.category, ['label', 'name', 'categoryName', 'category']);
     if (!resolvedCategoryId && categoryOptions.length > 0) {
       resolvedCategoryId = categoryOptions[0].id || null;
     }
-
     onAdd({
       ...formData,
       itemId: resolvedItemId || null,
@@ -680,14 +760,12 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
     setQuantityError('');
     // Don't close the popup - let user close manually or continue adding items
   };
-
   const handleBackdropClick = (e) => {
     // Close modal if clicking on the backdrop (not on the modal content)
     if (e.target === e.currentTarget) {
       onClose();
     }
   };
-
   return (
     <>
       <div
@@ -711,7 +789,6 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
               {(formData.category || selectedCategory) || 'Category'}
             </button>
           </div>
-
           {/* Form fields - All fields are enabled and can be used independently of category selection */}
           <div className="px-6 pb-32">
             {/* Item Name - Can be selected without category */}
@@ -729,7 +806,6 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
                 showAllOptions={true}
               />
             </div>
-
             {/* Model - Can be selected without category */}
             <div className="mb-[10px] relative">
               <p className="text-[13px] font-medium text-black mb-1 leading-normal">
@@ -745,9 +821,7 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
                 showAllOptions={true}
               />
             </div>
-
             {/* Brand - Can be selected without category */}
-
             <div className="w-full mb-[10px] relative">
               <p className="text-[13px] font-medium text-black mb-1 leading-normal">
                 Type<span className="text-[#eb2f8e]">*</span>
@@ -763,7 +837,6 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
                 showAllOptions={true}
               />
             </div>
-
             {/* Type and Quantity row */}
             <div className="flex gap-3 mb-10">
               {/* Type - Can be selected without category */}
@@ -781,7 +854,6 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
                   showAllOptions={true}
                 />
               </div>
-
               {/* Quantity */}
               <div className="w-[100px] relative">
                 <p className="text-[13px] font-medium text-black mb-1 leading-normal">
@@ -820,11 +892,8 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
               </button>
             </div>
           </div>
-
-
         </div>
       </div>
-
       <SelectVendorModal
         isOpen={showCategoryModal}
         onClose={() => setShowCategoryModal(false)}
@@ -840,6 +909,4 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
     </>
   );
 };
-
 export default AddItemsToPO;
-

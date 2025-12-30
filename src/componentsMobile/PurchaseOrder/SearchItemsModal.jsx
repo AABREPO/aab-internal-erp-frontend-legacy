@@ -74,12 +74,87 @@ const highlightText = (text, searchQuery) => {
     return <>{result}</>;
 };
 
-const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingItems = [], onRefreshData }) => {
+// Stock Summary Modal Component
+const StockSummaryModal = ({ isOpen, onClose, item, stockBreakdown, locationNamesMap }) => {
+    if (!isOpen || !item) return null;
+
+    const itemName = item.itemName || '';
+    const breakdown = stockBreakdown || {};
+    
+    // Convert breakdown object to array and sort by location name
+    const breakdownArray = Object.entries(breakdown)
+        .map(([locationId, quantity]) => ({
+            locationId,
+            locationName: locationNamesMap[locationId] || `Location ${locationId}`,
+            quantity: Math.max(0, quantity) // Ensure non-negative
+        }))
+        .filter(entry => entry.quantity > 0) // Only show locations with stock
+        .sort((a, b) => a.locationName.localeCompare(b.locationName));
+
+    // Calculate grand total
+    const grandTotal = breakdownArray.reduce((sum, entry) => sum + entry.quantity, 0);
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-end" onClick={onClose} style={{ fontFamily: "'Manrope', sans-serif" }}>
+            <div
+                className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] flex flex-col max-h-[80vh]"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Header */}
+                <div className="flex justify-between items-center px-6 pt-5 pb-4 border-b border-[#E0E0E0]">
+                    <p className="text-[16px] font-semibold text-black">{itemName} - Stock Summary</p>
+                    <button
+                        onClick={onClose}
+                        className="w-6 h-6 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                    >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 4L4 12M4 4L12 12" stroke="#e4572e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                    </button>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto px-6 py-4">
+                    {breakdownArray.length === 0 ? (
+                        <p className="text-[14px] font-medium text-[#9E9E9E] text-center py-8">
+                            No stock available
+                        </p>
+                    ) : (
+                        <div className="space-y-3">
+                            {breakdownArray.map((entry, index) => (
+                                <div key={entry.locationId} className="flex items-center justify-between py-2 border-b border-[#E0E0E0]">
+                                    <p className="text-[14px] font-medium text-black">{entry.locationName}</p>
+                                    <p className="text-[14px] font-medium text-black">{entry.quantity}</p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Grand Total */}
+                {breakdownArray.length > 0 && (
+                    <div className="px-6 py-4 border-t border-[#E0E0E0] bg-gray-50">
+                        <div className="flex items-center justify-between">
+                            <p className="text-[16px] font-semibold text-black">Grand Total</p>
+                            <p className="text-[16px] font-semibold text-black">{grandTotal} Qty</p>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingItems = [], onRefreshData, stockingLocationId = null }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [itemQuantities, setItemQuantities] = useState({});
     const [focusedInputId, setFocusedInputId] = useState(null); // Track which input is being edited
+    const [stockQuantities, setStockQuantities] = useState({}); // Store available stock quantities (total across all locations)
+    const [stockBreakdown, setStockBreakdown] = useState({}); // Store breakdown by location for each item
+    const [showStockSummary, setShowStockSummary] = useState(false); // Show stock summary modal
+    const [selectedItemForSummary, setSelectedItemForSummary] = useState(null); // Item to show summary for
 
     // Refresh data when modal opens
     useEffect(() => {
@@ -553,10 +628,152 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                 return 'bg-[#E3F2FD] text-[#1976D2]';
         }
     };
-    // Get available quantity (mock data - you can replace with real data)
+    // Fetch inventory data and calculate available stock quantities across ALL locations
+    useEffect(() => {
+        const fetchStockQuantities = async () => {
+            if (!isOpen) {
+                setStockQuantities({});
+                setStockBreakdown({});
+                return;
+            }
+
+            try {
+                // Fetch all inventory records to get complete data
+                const response = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll');
+                if (!response.ok) {
+                    console.error('Failed to fetch inventory data');
+                    setStockQuantities({});
+                    setStockBreakdown({});
+                    return;
+                }
+
+                const inventoryRecords = await response.json();
+                
+                // Filter out deleted records only (don't filter by stocking location - we want ALL locations)
+                const activeRecords = inventoryRecords.filter(record => {
+                    const recordDeleteStatus = record.delete_status !== undefined ? record.delete_status : record.deleteStatus;
+                    return !recordDeleteStatus;
+                });
+
+                // Calculate net stock for each item_id across ALL locations
+                // Also store breakdown by location for each item
+                const stockMap = {}; // Total quantity per item_id
+                const breakdownMap = {}; // Breakdown by location per item_id
+                
+                activeRecords.forEach(record => {
+                    const recordStockingLocationId = record.stocking_location_id || record.stockingLocationId;
+                    const inventoryItems = record.inventoryItems || record.inventory_items || [];
+                    
+                    if (Array.isArray(inventoryItems)) {
+                        inventoryItems.forEach(invItem => {
+                            // Use only item_id to group and sum quantities
+                            const itemId = invItem.item_id || invItem.itemId || null;
+                            
+                            if (itemId !== null && itemId !== undefined) {
+                                // Use item_id as the key (convert to string for consistency)
+                                const itemKey = String(itemId);
+                                
+                                // Initialize if not exists
+                                if (!stockMap[itemKey]) {
+                                    stockMap[itemKey] = 0;
+                                }
+                                if (!breakdownMap[itemKey]) {
+                                    breakdownMap[itemKey] = {};
+                                }
+                                
+                                // Convert quantity to number and sum (incoming is positive, outgoing dispatch is negative, stock return is positive)
+                                const quantity = Number(invItem.quantity) || 0;
+                                stockMap[itemKey] += quantity;
+                                
+                                // Store breakdown by location
+                                const locationKey = String(recordStockingLocationId);
+                                if (!breakdownMap[itemKey][locationKey]) {
+                                    breakdownMap[itemKey][locationKey] = 0;
+                                }
+                                breakdownMap[itemKey][locationKey] += quantity;
+                            }
+                        });
+                    }
+                });
+
+                setStockQuantities(stockMap);
+                setStockBreakdown(breakdownMap);
+            } catch (error) {
+                console.error('Error fetching stock quantities:', error);
+                setStockQuantities({});
+                setStockBreakdown({});
+            }
+        };
+
+        fetchStockQuantities();
+    }, [isOpen]);
+
+    // Get available quantity from calculated stock (based on item_id only) - across ALL locations
     const getAvailableQuantity = (item) => {
-        // This is mock data - replace with actual available quantity from your data source
-        return Math.floor(Math.random() * 100) + 1;
+        // Use only item_id to get the quantity
+        const itemId = item.itemId || item.item_id || null;
+        
+        if (itemId === null || itemId === undefined) {
+            return 0; // Return 0 if item_id is not available
+        }
+
+        // Use item_id as the key (same as in stockMap)
+        const itemKey = String(itemId);
+        
+        const availableQty = stockQuantities[itemKey] || 0;
+        
+        // Return max of 0 (can't have negative stock)
+        return Math.max(0, availableQty);
+    };
+
+    // Get stock breakdown for an item
+    const getStockBreakdown = (item) => {
+        const itemId = item.itemId || item.item_id || null;
+        if (itemId === null || itemId === undefined) {
+            return {};
+        }
+        const itemKey = String(itemId);
+        return stockBreakdown[itemKey] || {};
+    };
+
+    // Fetch location names mapping
+    const [locationNamesMap, setLocationNamesMap] = useState({});
+    useEffect(() => {
+        const fetchLocationNames = async () => {
+            try {
+                const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+                    method: "GET",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    const nameMap = {};
+                    data.forEach(site => {
+                        if (site.id) {
+                            nameMap[String(site.id)] = site.siteName || '';
+                        }
+                    });
+                    setLocationNamesMap(nameMap);
+                }
+            } catch (error) {
+                console.error('Error fetching location names:', error);
+            }
+        };
+        if (isOpen) {
+            fetchLocationNames();
+        }
+    }, [isOpen]);
+
+    // Handle click on quantity to show breakdown
+    const handleQuantityClick = (item) => {
+        const breakdown = getStockBreakdown(item);
+        if (Object.keys(breakdown).length > 0) {
+            setSelectedItemForSummary(item);
+            setShowStockSummary(true);
+        }
     };
     if (!isOpen) return null;
     return (
@@ -670,7 +887,10 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                                                             {highlightText(item.model, debouncedSearchQuery)}
                                                         </p>
                                                     )}
-                                                    <span className="text-[11px] font-medium text-[#777777] mb-1 ml-auto">
+                                                    <span 
+                                                        onClick={() => handleQuantityClick(item)}
+                                                        className="text-[11px] font-medium text-[#777777] mb-1 ml-auto cursor-pointer hover:text-black underline"
+                                                    >
                                                         {availableQty}pcs
                                                     </span>
                                                 </div>
@@ -772,6 +992,18 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                     )}
                 </div>
             </div>
+            
+            {/* Stock Summary Modal */}
+            <StockSummaryModal
+                isOpen={showStockSummary}
+                onClose={() => {
+                    setShowStockSummary(false);
+                    setSelectedItemForSummary(null);
+                }}
+                item={selectedItemForSummary}
+                stockBreakdown={selectedItemForSummary ? getStockBreakdown(selectedItemForSummary) : {}}
+                locationNamesMap={locationNamesMap}
+            />
         </div>
     );
 };

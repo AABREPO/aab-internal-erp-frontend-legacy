@@ -3,12 +3,12 @@ import React, { useRef, useEffect, useState } from 'react';
 const InventoryTabs = ({ activeTab = 'net-stock', onTabChange }) => {
   const tabs = [
     { id: 'outgoing', label: 'Outgoing' },
-    { id: 'incoming', label: 'Incoming' },
+    { id: 'incoming', label: 'Incoming' }, 
+    { id: 'project-usage-report', label: 'Project Usage Report' },
     { id: 'net-stock', label: 'Net Stock' },
     { id: 'history', label: 'History' },
     { id: 'add-input', label: 'Add Input' },
     { id: 'incoming-tracker', label: 'Incoming Tracker' },
-    { id: 'project-usage-report', label: 'Project Usage Report' },
     { id: 'project-usage-history', label: 'Project Usage History' },
     { id: 'non-po-history', label: 'Non PO History' }
   ];
@@ -16,6 +16,9 @@ const InventoryTabs = ({ activeTab = 'net-stock', onTabChange }) => {
   const tabsContainerRef = useRef(null);
   const activeTabRef = useRef(null);
   const [underlineStyle, setUnderlineStyle] = useState({ left: 0, width: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
 
   const updateUnderlinePosition = () => {
     if (activeTabRef.current && tabsContainerRef.current) {
@@ -78,11 +81,37 @@ const InventoryTabs = ({ activeTab = 'net-stock', onTabChange }) => {
 
   return (
     <div className="fixed top-[50px] transform  w-full max-w-[340px] h-[40px] overflow-x-auto bg-white z-40" style={{ fontFamily: "'Manrope', sans-serif" }}>
-      <div className="relative h-full overflow-hidden">
+      <div className="relative h-full overflow-x-auto scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         <div 
           ref={tabsContainerRef}
-          className="flex items-center gap-4 px-4 h-full overflow-x-auto scrollbar-hide"
+          className="flex items-center gap-4 px-4 h-full overflow-x-auto scrollbar-hide cursor-grab active:cursor-grabbing"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          onMouseDown={(e) => {
+            setIsDragging(true);
+            setStartX(e.pageX - tabsContainerRef.current.offsetLeft);
+            setScrollLeft(tabsContainerRef.current.scrollLeft);
+          }}
+          onMouseLeave={() => setIsDragging(false)}
+          onMouseUp={() => setIsDragging(false)}
+          onMouseMove={(e) => {
+            if (!isDragging) return;
+            e.preventDefault();
+            const x = e.pageX - tabsContainerRef.current.offsetLeft;
+            const walk = (x - startX) * 2;
+            tabsContainerRef.current.scrollLeft = scrollLeft - walk;
+          }}
+          onTouchStart={(e) => {
+            setIsDragging(true);
+            setStartX(e.touches[0].pageX - tabsContainerRef.current.offsetLeft);
+            setScrollLeft(tabsContainerRef.current.scrollLeft);
+          }}
+          onTouchEnd={() => setIsDragging(false)}
+          onTouchMove={(e) => {
+            if (!isDragging) return;
+            const x = e.touches[0].pageX - tabsContainerRef.current.offsetLeft;
+            const walk = (x - startX) * 2;
+            tabsContainerRef.current.scrollLeft = scrollLeft - walk;
+          }}
         >
           {tabs.map((tab) => (
             <button
@@ -99,7 +128,7 @@ const InventoryTabs = ({ activeTab = 'net-stock', onTabChange }) => {
         </div>
         
         {/* Three dots menu button */}
-        <button className="absolute right-1 top-1/2 transform -translate-y-1/2 w-[20px] h-[20px] flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity bg-white z-10 pointer-events-auto">
+        <button className="absolute right-0 top-1/2 transform -translate-y-1/2 w-[20px] h-[20px] flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity bg-white z-10 pointer-events-auto">
           <svg width="4" height="16" viewBox="0 0 4 16" fill="none" xmlns="http://www.w3.org/2000/svg">
             <circle cx="2" cy="2" r="1.5" fill="#000"/>
             <circle cx="2" cy="8" r="1.5" fill="#000"/>

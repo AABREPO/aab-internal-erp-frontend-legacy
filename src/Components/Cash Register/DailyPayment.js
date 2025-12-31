@@ -96,7 +96,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching Payment Received type.');
         }
     };
     const fetchPurposeOptions = async () => {
@@ -138,7 +137,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching category.');
         }
     };
     // Sorting state
@@ -425,6 +423,15 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         const days = Math.floor((date - firstJan) / (24 * 60 * 60 * 1000));
         return Math.ceil((days + firstJan.getDay() + 1) / 7);
     };
+
+    // Calculate week number from a specific date (not current date)
+    const getWeekNumberFromDate = (dateString) => {
+        if (!dateString) return getCurrentWeekNumber();
+        const date = new Date(dateString);
+        const firstJan = new Date(date.getFullYear(), 0, 1);
+        const days = Math.floor((date - firstJan) / (24 * 60 * 60 * 1000));
+        return Math.ceil((days + firstJan.getDay() + 1) / 7);
+    };
     const currentWeekNumber = getCurrentWeekNumber();
     const startYear = 2000; // Change if needed
     const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i);
@@ -603,7 +610,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching Labour names.');
         }
     };
     useEffect(() => {
@@ -625,7 +631,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching tile area names.');
         }
     };
     useEffect(() => {
@@ -937,6 +942,8 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             return;
         }
         try {
+            // Calculate week_no from the date to ensure it's correct
+            const weekNo = getWeekNumberFromDate(pendingRefundData.date);
             const loanPortalPayload = {
                 type: "Refund",
                 date: pendingRefundData.date,
@@ -949,6 +956,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 vendor_id: Number(pendingRefundData.vendor_id) || 0,
                 contractor_id: Number(pendingRefundData.contractor_id) || 0,
                 project_id: 0,
+                week_no: Number(weekNo),
                 description: "Refund from Cash Register",
                 file_url: ""
             };
@@ -957,12 +965,14 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 loanPortalPayload,
                 { headers: { "Content-Type": "application/json" } }
             );
+            // Calculate weekly_number from the date in pendingRefundData to ensure it's correct
+            const correctWeeklyNumber = getWeekNumberFromDate(pendingRefundData.date);
             const refundPayload = {
                 date: pendingRefundData.date,
                 vendor_id: Number(pendingRefundData.vendor_id) || null,
                 contractor_id: Number(pendingRefundData.contractor_id) || null,
                 amount: Number(pendingRefundData.amount),
-                weekly_number: Number(pendingRefundData.weekly_number),
+                weekly_number: Number(correctWeeklyNumber),
                 staff_advance_portal_id: null,
                 loan_portal_id: loanPortalResponse.data?.id || loanPortalResponse.data?.loanPortalId
             };
@@ -1688,12 +1698,12 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         ]);
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
-        doc.text('WAGE EXPENSES', 14, 48);
+        doc.text('WAGE EXPENSES', 14, 44);
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
-        doc.text('EXPENDITURE PAYMENTS', 14, 38);
+        doc.text('EXPENDITURE PAYMENTS', 14, 35);
         doc.autoTable({
-            startY: 50,
+            startY: 46,
             head: [expensesTableColumn],
             body: expensesTableRows,
             styles: {
@@ -1739,7 +1749,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         doc.setPage(1);
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
-        doc.text(`NET BALANCE: ${netBalance.toLocaleString('en-IN')}`, 155, 38);
+        doc.text(`NET BALANCE: ${netBalance.toLocaleString('en-IN')}`, 155, 35);
         const addHeaderToPage = (pageNum) => {
             doc.setPage(pageNum);
             doc.setFontSize(14);

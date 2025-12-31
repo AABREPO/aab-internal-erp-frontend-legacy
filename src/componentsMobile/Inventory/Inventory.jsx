@@ -7,6 +7,9 @@ import BottomNav from '../PurchaseOrder/BottomNav';
 import Outgoing from './Outgoing';
 import Incoming from './Incoming';
 import AddInput from './AddInput';
+import History from './History';
+import ProjectUsageReport from './ProjectUsageReport';
+import IncomingTracker from './IncomingTracker';
 
 const Inventory = ({ user, onLogout }) => {
   const navigate = useNavigate();
@@ -55,28 +58,13 @@ const Inventory = ({ user, onLogout }) => {
           </div>
         );
       case 'history':
-        return (
-          <div className="p-4">
-            <h2 className="text-lg font-semibold text-black mb-4">History</h2>
-            <p className="text-gray-500">History content will be displayed here</p>
-          </div>
-        );
+        return <History onTabChange={handleTabChange} />
       case 'add-input':
         return <AddInput />;
       case 'incoming-tracker':
-        return (
-          <div className="p-4">
-            <h2 className="text-lg font-semibold text-black mb-4">Incoming Tracker</h2>
-            <p className="text-gray-500">Incoming Tracker content will be displayed here</p>
-          </div>
-        );
+        return <IncomingTracker />;
       case 'project-usage-report':
-        return (
-          <div className="p-4">
-            <h2 className="text-lg font-semibold text-black mb-4">Project Usage Report</h2>
-            <p className="text-gray-500">Project Usage Report content will be displayed here</p>
-          </div>
-        );
+        return <ProjectUsageReport />;
       case 'project-usage-history':
         return (
           <div className="p-4">

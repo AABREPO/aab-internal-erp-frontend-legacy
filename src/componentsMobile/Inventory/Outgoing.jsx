@@ -46,7 +46,13 @@ const Outgoing = ({ user }) => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [showSearchItemsModal, setShowSearchItemsModal] = useState(false);
   const [poItemName, setPoItemName] = useState([]);
+  const [poBrand, setPoBrand] = useState([]);
+  const [poModel, setPoModel] = useState([]);
+  const [poType, setPoType] = useState([]);
+  const [categoryOptions, setCategoryOptions] = useState([]);
   const expandedItemIdRef = useRef(expandedItemId);
+  // State for edit mode additional fields
+  const [editTransactionId, setEditTransactionId] = useState('');
   
   // Outgoing page options (same as PurchaseOrder but independent)
   const [outgoingSiteOptions, setOutgoingSiteOptions] = useState([]);
@@ -169,11 +175,355 @@ const Outgoing = ({ user }) => {
     }
   }, []);
 
+  // Fetch PO brand from API
+  const fetchPoBrand = useCallback(async () => {
+    try {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_brand/getAll');
+      if (response.ok) {
+        const data = await response.json();
+        setPoBrand(data);
+      }
+    } catch (error) {
+      console.error('Error fetching PO brand:', error);
+    }
+  }, []);
+
+  // Fetch PO model from API
+  const fetchPoModel = useCallback(async () => {
+    try {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_model/getAll');
+      if (response.ok) {
+        const data = await response.json();
+        setPoModel(data);
+      }
+    } catch (error) {
+      console.error('Error fetching PO model:', error);
+    }
+  }, []);
+
+  // Fetch PO type from API
+  const fetchPoType = useCallback(async () => {
+    try {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_type/getAll');
+      if (response.ok) {
+        const data = await response.json();
+        setPoType(data);
+      }
+    } catch (error) {
+      console.error('Error fetching PO type:', error);
+    }
+  }, []);
+
+  // Fetch category options from API
+  const fetchCategoryOptions = useCallback(async () => {
+    try {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
+      if (response.ok) {
+        const data = await response.json();
+        setCategoryOptions(data);
+      }
+    } catch (error) {
+      console.error('Error fetching category options:', error);
+    }
+  }, []);
+
   // Initial fetch on mount
   useEffect(() => {
     fetchPoItemName();
-  }, [fetchPoItemName]);
+    fetchPoBrand();
+    fetchPoModel();
+    fetchPoType();
+    fetchCategoryOptions();
+  }, [fetchPoItemName, fetchPoBrand, fetchPoModel, fetchPoType, fetchCategoryOptions]);
 
+  // Helper functions to resolve IDs to names
+  const findNameById = (array, id, fieldName) => {
+    if (!array || !id || id === 0) return '';
+    const item = array.find(i => {
+      const itemId = i.id || i._id;
+      return String(itemId) === String(id) || Number(itemId) === Number(id);
+    });
+    if (!item) {
+      console.log(`Could not find ${fieldName} for ID ${id} in array of length ${array.length}`);
+      return '';
+    }
+    return item[fieldName] || item.name || item.label || '';
+  };
+
+  const resolveItemName = (itemId) => {
+    if (!itemId) return '';
+    return findNameById(poItemName, itemId, 'itemName') || findNameById(poItemName, itemId, 'name') || '';
+  };
+
+  const resolveBrandName = (brandId) => {
+    if (!brandId) return '';
+    return findNameById(poBrand, brandId, 'brand') || findNameById(poBrand, brandId, 'brandName') || findNameById(poBrand, brandId, 'name') || '';
+  };
+
+  const resolveModelName = (modelId) => {
+    if (!modelId) return '';
+    return findNameById(poModel, modelId, 'model') || findNameById(poModel, modelId, 'modelName') || findNameById(poModel, modelId, 'name') || '';
+  };
+
+  const resolveTypeName = (typeId) => {
+    if (!typeId) return '';
+    return findNameById(poType, typeId, 'typeColor') || findNameById(poType, typeId, 'type') || findNameById(poType, typeId, 'typeName') || findNameById(poType, typeId, 'name') || '';
+  };
+
+  const resolveCategoryName = (categoryId) => {
+    if (!categoryId) return '';
+    return findNameById(categoryOptions, categoryId, 'category') || findNameById(categoryOptions, categoryId, 'name') || findNameById(categoryOptions, categoryId, 'label') || '';
+  };
+
+  // Helper function to resolve category ID
+  const resolveCategoryId = (categoryName) => {
+    if (!categoryName || !categoryOptions.length) return null;
+    const category = categoryOptions.find(cat => {
+      const label = (cat.label || cat.name || cat.categoryName || '').toLowerCase().trim();
+      return label === categoryName.toLowerCase().trim();
+    });
+    return category ? (category.id || category._id || null) : null;
+  };
+
+  // Listen for editInventory event from History component
+  useEffect(() => {
+    const handleEditInventory = async (event) => {
+      const inventoryItem = event.detail;
+      if (!inventoryItem) return;
+
+      // Only wait for essential data (site options and employee list)
+      // Don't wait for item/brand/model/type APIs - resolve names as they become available
+      if (outgoingSiteOptions.length === 0 || outgoingEmployeeList.length === 0) {
+        // Store in localStorage and retry when dependencies are ready
+        localStorage.setItem('editingInventory', JSON.stringify(inventoryItem));
+        return;
+      }
+      // Format date
+      const itemDate = inventoryItem.date || inventoryItem.created_at || inventoryItem.createdAt;
+      const formattedDate = itemDate ? formatDate(itemDate) : getTodayDate();
+      // Get project name from client_id
+      const clientId = inventoryItem.client_id || inventoryItem.clientId;
+      let projectName = '';
+      if (clientId && outgoingSiteOptions.length > 0) {
+        const projectSite = outgoingSiteOptions.find(site => 
+          site.id === clientId || 
+          String(site.id) === String(clientId)
+        );
+        projectName = projectSite ? (projectSite.value || projectSite.label || '') : '';
+      }
+      // Fallback to direct field if client_id mapping fails
+      if (!projectName) {
+        projectName = inventoryItem.project_name || inventoryItem.projectName || '';
+      }
+      // Get contact from site_incharge_mobile_number or contact field
+      const contact = inventoryItem.site_incharge_mobile_number || inventoryItem.siteInchargeMobileNumber || inventoryItem.contact || '';
+      // Get stocking location from stocking_location_id
+      const stockingLocationId = inventoryItem.stocking_location_id || inventoryItem.stockingLocationId;
+      let stockingLocation = '';
+      if (stockingLocationId && outgoingSiteOptions.length > 0) {
+        const stockingLocationSite = outgoingSiteOptions.find(site => 
+          (site.id === stockingLocationId || String(site.id) === String(stockingLocationId)) && 
+          site.markedAsStockingLocation === true
+        );
+        stockingLocation = stockingLocationSite ? (stockingLocationSite.value || stockingLocationSite.label || '') : '';
+      }
+      // Fallback to direct field if ID mapping fails
+      if (!stockingLocation) {
+        stockingLocation = inventoryItem.stocking_location || inventoryItem.stockingLocation || '';
+      }
+      // Find and set selected incharge by ID
+      const inchargeId = inventoryItem.site_incharge_id || inventoryItem.siteInchargeId || null;
+      let projectInchargeName = inventoryItem.project_incharge || inventoryItem.projectIncharge || '';
+      if (inchargeId && outgoingEmployeeList.length > 0) {
+        const employee = outgoingEmployeeList.find(emp => 
+          String(emp.id) === String(inchargeId)
+        );
+        if (employee) {
+          projectInchargeName = employee.employeeName || employee.name || employee.fullName || employee.employee_name || projectInchargeName;
+          setSelectedIncharge({
+            id: employee.id,
+            name: projectInchargeName,
+            mobileNumber: employee.employee_mobile_number || employee.mobileNumber || employee.mobile_number || employee.contact || contact || '',
+            type: 'employee'
+          });
+        }
+      } else if (projectInchargeName && outgoingEmployeeList.length > 0) {
+        // Fallback: find by name if ID not available
+        const employee = outgoingEmployeeList.find(emp => {
+          const empName = emp.employeeName || emp.name || emp.fullName || emp.employee_name || '';
+          return empName === projectInchargeName;
+        });
+        if (employee) {
+          projectInchargeName = employee.employeeName || employee.name || employee.fullName || employee.employee_name || projectInchargeName;
+          setSelectedIncharge({
+            id: employee.id,
+            name: projectInchargeName,
+            mobileNumber: employee.employee_mobile_number || employee.mobileNumber || employee.mobile_number || employee.contact || contact || '',
+            type: 'employee'
+          });
+        }
+      }
+      // Ensure projectInchargeName is set even if employee not found
+      if (!projectInchargeName) {
+        projectInchargeName = inventoryItem.project_incharge || inventoryItem.projectIncharge || '';
+      }
+      // Load inventory items
+      const inventoryItems = inventoryItem.inventoryItems || inventoryItem.inventory_items || [];
+      let formattedItems = [];
+      if (Array.isArray(inventoryItems) && inventoryItems.length > 0) {
+        // Generate IDs starting from 1 (fresh start for edit)
+        formattedItems = inventoryItems.map((invItem, index) => {
+          // Get IDs from the inventory item
+          const itemId = invItem.item_id || invItem.itemId || null;
+          const brandId = invItem.brand_id || invItem.brandId || null;
+          const modelId = invItem.model_id || invItem.modelId || null;
+          const typeId = invItem.type_id || invItem.typeId || null;
+          const categoryId = invItem.category_id || invItem.categoryId || null;
+          // Resolve names from IDs using helper functions
+          let itemName = invItem.itemName || invItem.item_name || '';
+          let brand = invItem.brandName || invItem.brand_name || invItem.brand || '';
+          let model = invItem.modelName || invItem.model_name || invItem.model || '';
+          let type = invItem.typeName || invItem.type_name || invItem.type || '';
+          let category = invItem.categoryName || invItem.category_name || invItem.category || '';
+          // If names are missing, resolve from IDs using API data (if available)
+          // This will work even if APIs are still loading - names will resolve as APIs load
+          if (!itemName && itemId && poItemName.length > 0) {
+            itemName = resolveItemName(itemId);
+          }
+          if (!brand && brandId && brandId !== 0 && poBrand.length > 0) {
+            brand = resolveBrandName(brandId);
+          }
+          if (!model && modelId && poModel.length > 0) {
+            model = resolveModelName(modelId);
+          }
+          if (!type && typeId && typeId !== 0 && poType.length > 0) {
+            type = resolveTypeName(typeId);
+          }
+          if (!category && categoryId && categoryOptions.length > 0) {
+            category = resolveCategoryName(categoryId);
+          }          
+          // If itemName includes category (format: "ItemName, Category")
+          if (itemName && itemName.includes(',')) {
+            const parts = itemName.split(',');
+            itemName = parts[0].trim();
+            category = parts[1] ? parts[1].trim() : category;
+          }
+          const formattedItem = {
+            id: index + 1,
+            name: itemName && category ? `${itemName}, ${category}` : itemName || '',
+            brand: brand || '',
+            model: model || '',
+            type: type || '',
+            category: category || '',
+            quantity: Math.abs(invItem.qty || invItem.quantity || invItem.Qty || invItem.Quantity || 0),
+            price: 0,
+            itemId: itemId,
+            brandId: brandId,
+            modelId: modelId,
+            typeId: typeId,
+            categoryId: categoryId,
+          };
+          return formattedItem;
+        });
+      }
+      // Load inventory data into form
+      setOutgoingData({
+        projectName: projectName,
+        projectIncharge: projectInchargeName,
+        stockingLocation: stockingLocation,
+        contact: contact,
+        date: formattedDate
+      });
+      // Calculate transaction ID (same format as History.jsx)
+      const dateObj = new Date(itemDate);
+      const year = dateObj.getFullYear();
+      const entryNumber = inventoryItem.eno || inventoryItem.ENO || inventoryItem.entry_number || inventoryItem.entryNumber || inventoryItem.entrynumber || inventoryItem.id || '';
+      const outgoingType = inventoryItem.outgoing_type || inventoryItem.outgoingType || '';
+      let transactionId = '';
+      if (outgoingType.toLowerCase() === 'stock return' || outgoingType.toLowerCase() === 'stockreturn') {
+        transactionId = `SR - ${year} - ${entryNumber}`;
+      } else if (outgoingType.toLowerCase() === 'dispatch') {
+        transactionId = `DP - ${year} - ${entryNumber}`;
+      } else {
+        transactionId = `SR - ${year} - ${entryNumber}`;
+      }
+      // Set items
+      setItems(formattedItems);
+      // Set edit mode fields
+      setEditTransactionId(transactionId);
+      // Set edit mode and show items
+      setIsEditMode(true);
+      setHasOpenedAdd(formattedItems.length > 0);
+    };
+    window.addEventListener('editInventory', handleEditInventory);
+    return () => {
+      window.removeEventListener('editInventory', handleEditInventory);
+    };
+  }, [outgoingEmployeeList, outgoingSiteOptions, poItemName, poBrand, poModel, poType, categoryOptions]);
+  // Check localStorage on mount and when essential dependencies are loaded
+  // Items will be shown immediately, names will resolve as APIs load
+  useEffect(() => {
+    const editingInventory = localStorage.getItem('editingInventory');
+    if (editingInventory && outgoingSiteOptions.length > 0 && outgoingEmployeeList.length > 0) {
+      try {
+        const inventoryItem = JSON.parse(editingInventory);
+        // Dispatch event to trigger loadInventoryData
+        window.dispatchEvent(new CustomEvent('editInventory', { detail: inventoryItem }));
+        // Clear from localStorage after loading
+        localStorage.removeItem('editingInventory');
+      } catch (error) {
+        console.error('Error parsing editingInventory from localStorage:', error);
+      }
+    }
+  }, [outgoingEmployeeList, outgoingSiteOptions]);
+  // Re-resolve item names when API data loads (for items already in state)
+  useEffect(() => {
+    if (items.length > 0 && isEditMode && (poItemName.length > 0 || poBrand.length > 0 || poModel.length > 0 || poType.length > 0 || categoryOptions.length > 0)) {
+      const updatedItems = items.map(item => {
+        let itemName = item.name ? item.name.split(',')[0].trim() : '';
+        let category = item.category || (item.name ? item.name.split(',')[1]?.trim() : '') || '';
+        let brand = item.brand || '';
+        let model = item.model || '';
+        let type = item.type || '';
+        // Re-resolve names if we have IDs but missing names
+        if (!itemName && item.itemId && poItemName.length > 0) {
+          itemName = resolveItemName(item.itemId);
+        }
+        if (!brand && item.brandId && item.brandId !== 0 && poBrand.length > 0) {
+          brand = resolveBrandName(item.brandId);
+        }
+        if (!model && item.modelId && poModel.length > 0) {
+          model = resolveModelName(item.modelId);
+        }
+        if (!type && item.typeId && item.typeId !== 0 && poType.length > 0) {
+          type = resolveTypeName(item.typeId);
+        }
+        if (!category && item.categoryId && categoryOptions.length > 0) {
+          category = resolveCategoryName(item.categoryId);
+        }
+        return {
+          ...item,
+          name: itemName && category ? `${itemName}, ${category}` : itemName || '',
+          brand: brand || '',
+          model: model || '',
+          type: type || '',
+          category: category || ''
+        };
+      });
+      // Only update if names actually changed
+      const hasChanges = updatedItems.some((updatedItem, index) => {
+        const original = items[index];
+        return updatedItem.name !== original.name || 
+               updatedItem.brand !== original.brand || 
+               updatedItem.model !== original.model || 
+               updatedItem.type !== original.type ||
+               updatedItem.category !== original.category;
+      });
+      if (hasChanges) {
+        setItems(updatedItems);
+      }
+    }
+  }, [poItemName, poBrand, poModel, poType, categoryOptions, isEditMode]);
   // Get available items function - returns the actual API data structure
   const getAvailableItems = useCallback(() => {
     // Return the actual API data structure with nested otherPOEntityList
@@ -184,25 +534,21 @@ const Outgoing = ({ user }) => {
         useNestedStructure: true
       };
     }
-
     // Fallback to old format if API data not available
     return {
       items: [],
       useNestedStructure: false
     };
   }, [poItemName]);
-
   // Handle search result add with quantity
   const handleSearchAdd = (item, quantity, isIncremental = false) => {
     // Normalize values for comparison
     const normalizeValue = (val) => (val || '').toString().toLowerCase().trim();
-
     const newItemName = normalizeValue(item.itemName);
     const newCategory = normalizeValue(item.category);
     const newModel = normalizeValue(item.model);
     const newBrand = normalizeValue(item.brand);
     const newType = normalizeValue(item.type);
-
     // Check if an item with the same properties (including category) already exists
     const existingItemIndex = items.findIndex(existingItem => {
       const nameParts = existingItem.name ? existingItem.name.split(',') : [];
@@ -343,12 +689,6 @@ const Outgoing = ({ user }) => {
       document.removeEventListener('mouseup', globalMouseUpHandler);
     };
   }, [items]);
-
-  // Helper function to resolve category ID
-  const resolveCategoryId = (categoryName) => {
-    // This would need categoryOptions from API, for now return null
-    return null;
-  };
 
   const handleAddItem = (itemData) => {
     if (editingItem) {
@@ -573,6 +913,8 @@ const Outgoing = ({ user }) => {
       setItems([]);
       setHasOpenedAdd(false);
       setIsEditMode(false);
+      // Clear edit mode fields
+      setEditTransactionId('');
     } catch (error) {
       console.error('Error saving inventory:', error);
       alert(`Error saving inventory: ${error.message}`);
@@ -592,28 +934,20 @@ const Outgoing = ({ user }) => {
             >
               {outgoingData.date}
             </button>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center">
               <button
                 type="button"
                 onClick={() => handleSaveOutgoing('stock return')}
-                className="flex items-center gap-1 text-[13px] font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-3 py-1.5"
+                className="flex items-center text-[13px] font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
               >
                 Stock Return
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M8 3V6L11 3M8 13V10L5 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M3 8C3 5.23858 5.23858 3 8 3C10.7614 3 13 5.23858 13 8C13 10.7614 10.7614 13 8 13C5.23858 13 3 10.7614 3 8Z" stroke="currentColor" strokeWidth="1.5" />
-                </svg>
               </button>
               <button
                 type="button"
                 onClick={() => handleSaveOutgoing('dispatch')}
-                className="flex items-center gap-1 text-[13px] font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-3 py-1.5"
+                className="flex items-center text-[13px] font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
               >
                 Dispatch
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M8 3V6L11 3M8 13V10L5 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M3 8C3 5.23858 5.23858 3 8 3C10.7614 3 13 5.23858 13 8C13 10.7614 10.7614 13 8 13C5.23858 13 3 10.7614 3 8Z" stroke="currentColor" strokeWidth="1.5" />
-                </svg>
               </button>
               {hasOpenedAdd && (
                 <button
@@ -755,8 +1089,8 @@ const Outgoing = ({ user }) => {
         </div>
       )}
 
-      {/* Summary details card - show after first + click */}
-      {hasOpenedAdd && !isEmptyState && (outgoingData.projectName || outgoingData.projectIncharge || outgoingData.stockingLocation) && (
+      {/* Summary details card - show after first + click or in edit mode */}
+      {(hasOpenedAdd || isEditMode) && !isEmptyState && (outgoingData.projectName || outgoingData.projectIncharge || outgoingData.stockingLocation) && (
         <div className="flex-shrink-0 mx-2 mb-1 p-2 bg-white border border-[#aaaaaa] rounded-[8px]">
           <div className="flex flex-col gap-2 px-2">
             {outgoingData.projectName && (
@@ -819,7 +1153,7 @@ const Outgoing = ({ user }) => {
               {items.length > 0 && (
                 <div className="flex-1 overflow-y-auto scrollbar-hide">
                   <div className="space-y-2">
-                    {items.map((item) => {
+                    {items.map((item, index) => {
                       const minSwipeDistance = 50;
                       const handleTouchStart = (e, itemId) => {
                         const touch = e.touches ? e.touches[0] : { clientX: e.clientX };

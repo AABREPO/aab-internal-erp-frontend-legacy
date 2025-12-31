@@ -297,7 +297,6 @@ const History = ({ username, userRoles = [] }) => {
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching Labour names.');
         }
     };
     const getClientName = (entry) => {
@@ -348,7 +347,6 @@ const History = ({ username, userRoles = [] }) => {
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching tile area names.');
         }
     };
     const fetchWeeklyReceivedType = async () => {

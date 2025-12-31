@@ -1493,25 +1493,18 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all'),
                 fetch('https://backendaab.in/aabuildersDash/api/loans/all')
             ]);
-
             const staffAdvanceData = staffAdvanceRes.ok ? await staffAdvanceRes.json() : [];
             const loanData = loanRes.ok ? await loanRes.json() : [];
-
             const selectedDateObj = new Date(selectedDate);
-
             // Calculate balances for each refund payment
             return refundPaymentsList.map((refundRow, currentIndex) => {
                 let balance = 0;
-
                 if (refundRow.labour_id) {
-                    // For labour_id: Get balance from staff-advance data
                     // Filter entries for this labour_id up to selectedDate
                     const labourEntries = staffAdvanceData.filter(entry => {
                         if (entry.labour_id !== Number(refundRow.labour_id)) return false;
                         const entryDate = new Date(entry.date);
                         if (entryDate > selectedDateObj) return false;
-
-                        // Exclude refunds from staff-advance that match refunds in refundPaymentsList
                         // to avoid double-counting
                         if (entry.type === 'Refund') {
                             const refundAmount = Number(entry.staff_refund_amount || 0);
@@ -1527,7 +1520,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         }
                         return true;
                     });
-
                     // Calculate base balance: Advance amount - Refund amount from staff-advance data
                     labourEntries.forEach(entry => {
                         if (entry.type === 'Advance') {
@@ -1536,7 +1528,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                             balance -= Number(entry.staff_refund_amount || 0);
                         }
                     });
-
                     // Subtract all refunds from refundPaymentsList for this labour up to and including current row
                     for (let i = 0; i <= currentIndex; i++) {
                         const refund = refundPaymentsList[i];
@@ -1552,8 +1543,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         if (!matchesVendor && !matchesContractor) return false;
                         const entryDate = new Date(entry.date);
                         if (entryDate > selectedDateObj) return false;
-
-                        // Exclude refunds from loan data that match refunds in refundPaymentsList
                         // to avoid double-counting
                         if (entry.type === 'Refund') {
                             const refundAmount = Number(entry.loan_refund_amount || 0);
@@ -1571,7 +1560,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         }
                         return true;
                     });
-
                     // Calculate base balance: Loan amount - Refund amount from loan data
                     loanEntries.forEach(entry => {
                         if (entry.type === 'Loan' || entry.type === 'Transfer') {
@@ -1580,7 +1568,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                             balance -= Number(entry.loan_refund_amount || 0);
                         }
                     });
-
                     // Subtract all refunds from refundPaymentsList for this vendor/contractor up to and including current row
                     for (let i = 0; i <= currentIndex; i++) {
                         const refund = refundPaymentsList[i];
@@ -1590,7 +1577,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         }
                     }
                 }
-
                 return { ...refundRow, calculatedBalance: balance };
             });
         } catch (error) {
@@ -1598,7 +1584,6 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             return refundPaymentsList.map(row => ({ ...row, calculatedBalance: 0 }));
         }
     };
-
     const generateExpensesPDF = async () => {
         if (!selectedDate || dailyExpenses.length === 0) {
             alert("No data available to generate PDF");

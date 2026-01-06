@@ -7,7 +7,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
     procurement: currentPage === 'purchase-order' || currentPage === 'inventory'
   });
   const [roleModels, setRoleModels] = useState([]);
-
+  const buildTime = process.env.REACT_APP_BUILD_TIME;
   useEffect(() => {
     const fetchUserRoles = async () => {
       try {
@@ -244,7 +244,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
           {/* Footer - Last Updated */}
           <div className="p-4 border-t border-gray-200">
             <p className="text-xs text-gray-600">
-              Last Updated: {new Date().toLocaleDateString('en-GB')} - {new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true })}
+              Last Updated: {buildTime || 'Not available'}
             </p>
           </div>
         </div>

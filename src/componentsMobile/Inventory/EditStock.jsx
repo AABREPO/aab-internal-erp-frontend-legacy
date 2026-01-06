@@ -1,17 +1,14 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
-import Edit from '../Images/edit1.png';
-import Delete from '../Images/delete.png';
 
-const ProjectUsageReport = () => {
+const EditStock = () => {
   // Helper function for date
   const getTodayDate = () => {
     const today = new Date();
     return today.toLocaleDateString('en-GB'); // DD/MM/YYYY
   };
 
-  const [activeTab, setActiveTab] = useState('history'); // 'report' or 'history'
   const [date, setDate] = useState(getTodayDate());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedProject, setSelectedProject] = useState('');
@@ -28,10 +25,6 @@ const ProjectUsageReport = () => {
   const [poTypes, setPoTypes] = useState([]);
   const [poCategories, setPoCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [expandedItemId, setExpandedItemId] = useState(null);
-  const [swipeStates, setSwipeStates] = useState({});
-  const expandedItemIdRef = useRef(expandedItemId);
-  const cardRefs = useRef({});
 
   // Fetch project names from API
   useEffect(() => {
@@ -141,6 +134,11 @@ const ProjectUsageReport = () => {
     return findNameById(poBrands, brandId, 'brand') || findNameById(poBrands, brandId, 'brandName') || findNameById(poBrands, brandId, 'name') || '';
   };
 
+  const resolveModelName = (modelId) => {
+    if (!modelId) return '';
+    return findNameById(poModel, modelId, 'model') || findNameById(poModel, modelId, 'modelName') || findNameById(poModel, modelId, 'name') || '';
+  };
+
   const resolveTypeName = (typeId) => {
     if (!typeId || typeId === 0) return '';
     return findNameById(poTypes, typeId, 'typeColor') || findNameById(poTypes, typeId, 'type') || findNameById(poTypes, typeId, 'typeName') || findNameById(poTypes, typeId, 'name') || '';
@@ -149,11 +147,6 @@ const ProjectUsageReport = () => {
   const resolveCategoryName = (categoryId) => {
     if (!categoryId) return '';
     return findNameById(poCategories, categoryId, 'category') || findNameById(poCategories, categoryId, 'name') || findNameById(poCategories, categoryId, 'label') || '';
-  };
-
-  const resolveModelName = (modelId) => {
-    if (!modelId) return '';
-    return findNameById(poModel, modelId, 'model') || findNameById(poModel, modelId, 'modelName') || findNameById(poModel, modelId, 'name') || '';
   };
 
   // Fetch inventory data
@@ -342,199 +335,6 @@ const ProjectUsageReport = () => {
     }).format(amount);
   };
 
-  // Update ref when expandedItemId changes
-  useEffect(() => {
-    expandedItemIdRef.current = expandedItemId;
-  }, [expandedItemId]);
-
-  // Swipe handlers
-  const minSwipeDistance = 50;
-
-  const handleTouchStart = (e, itemId) => {
-    const touch = e.touches ? e.touches[0] : { clientX: e.clientX };
-    setSwipeStates(prev => ({
-      ...prev,
-      [itemId]: {
-        startX: touch.clientX,
-        currentX: touch.clientX,
-        isSwiping: false
-      }
-    }));
-  };
-
-  const handleTouchMove = (e, itemId) => {
-    const touch = e.touches ? e.touches[0] : { clientX: e.clientX };
-    const state = swipeStates[itemId];
-    if (!state) return;
-    const deltaX = touch.clientX - state.startX;
-    const isExpanded = expandedItemIdRef.current === itemId;
-    // Allow swiping left to reveal buttons, or swiping right to hide if already expanded
-    if (deltaX < 0 || (isExpanded && deltaX > 0)) {
-      if (e.preventDefault) {
-        e.preventDefault();
-      }
-      setSwipeStates(prev => ({
-        ...prev,
-        [itemId]: {
-          ...prev[itemId],
-          currentX: touch.clientX,
-          isSwiping: true
-        }
-      }));
-    }
-  };
-
-  const handleTouchEnd = (itemId) => {
-    const state = swipeStates[itemId];
-    if (!state) return;
-    const deltaX = state.currentX - state.startX;
-    const absDeltaX = Math.abs(deltaX);
-    if (absDeltaX >= minSwipeDistance) {
-      if (deltaX < 0) {
-        // Swiped left (reveal buttons)
-        setExpandedItemId(itemId);
-      } else {
-        // Swiped right (hide buttons)
-        setExpandedItemId(null);
-      }
-    } else {
-      // Small movement - snap back
-      if (expandedItemIdRef.current === itemId) {
-        setExpandedItemId(null);
-      }
-    }
-    // Reset swipe state
-    setSwipeStates(prev => {
-      const newState = { ...prev };
-      delete newState[itemId];
-      return newState;
-    });
-  };
-
-  // Set up non-passive touch event listeners to allow preventDefault
-  useEffect(() => {
-    const cleanupFunctions = [];
-
-    // Set up non-passive touchmove listeners for each card to handle preventDefault
-    Object.keys(cardRefs.current).forEach(itemId => {
-      const cardElement = cardRefs.current[itemId];
-      if (!cardElement) return;
-
-      const touchMoveHandler = (e) => {
-        const state = swipeStates[itemId];
-        if (!state) return;
-        const touch = e.touches[0];
-        const deltaX = touch.clientX - state.startX;
-        const isExpanded = expandedItemIdRef.current === itemId;
-        // Prevent default scrolling when swiping horizontally
-        if (deltaX < 0 || (isExpanded && deltaX > 0)) {
-          e.preventDefault();
-        }
-      };
-
-      // Add non-passive touchmove listener
-      cardElement.addEventListener('touchmove', touchMoveHandler, { passive: false });
-
-      cleanupFunctions.push(() => {
-        cardElement.removeEventListener('touchmove', touchMoveHandler);
-      });
-    });
-
-    return () => {
-      cleanupFunctions.forEach(cleanup => cleanup());
-    };
-  }, [filteredData, swipeStates]);
-
-  // Global mouse handlers for desktop support
-  useEffect(() => {
-    if (filteredData.length === 0) return;
-
-    const globalMouseMoveHandler = (e) => {
-      setSwipeStates(prev => {
-        let hasChanges = false;
-        const newState = { ...prev };
-
-        filteredData.forEach(item => {
-          const itemId = `${item.itemId}-${item.categoryId}-${item.modelId}-${item.brandId}-${item.typeId}-${item.projectId}`;
-          const state = prev[itemId];
-          if (!state) return;
-          const deltaX = e.clientX - state.startX;
-          const isExpanded = expandedItemIdRef.current === itemId;
-          // Only update if dragging horizontally
-          if (deltaX < 0 || (isExpanded && deltaX > 0)) {
-            newState[itemId] = {
-              ...state,
-              currentX: e.clientX,
-              isSwiping: true
-            };
-            hasChanges = true;
-          }
-        });
-
-        return hasChanges ? newState : prev;
-      });
-    };
-
-    const globalMouseUpHandler = () => {
-      setSwipeStates(prev => {
-        let hasChanges = false;
-        const newState = { ...prev };
-
-        filteredData.forEach(item => {
-          const itemId = `${item.itemId}-${item.categoryId}-${item.modelId}-${item.brandId}-${item.typeId}-${item.projectId}`;
-          const state = prev[itemId];
-          if (!state) return;
-          const deltaX = state.currentX - state.startX;
-          const absDeltaX = Math.abs(deltaX);
-          if (absDeltaX >= minSwipeDistance) {
-            if (deltaX < 0) {
-              // Swiped left (reveal buttons)
-              setExpandedItemId(itemId);
-            } else {
-              // Swiped right (hide buttons)
-              setExpandedItemId(null);
-            }
-          } else {
-            // Small movement - snap back
-            if (expandedItemIdRef.current === itemId) {
-              setExpandedItemId(null);
-            }
-          }
-          // Remove swipe state for this card
-          delete newState[itemId];
-          hasChanges = true;
-        });
-
-        return hasChanges ? newState : prev;
-      });
-    };
-
-    // Add global mouse event listeners
-    document.addEventListener('mousemove', globalMouseMoveHandler);
-    document.addEventListener('mouseup', globalMouseUpHandler);
-
-    return () => {
-      document.removeEventListener('mousemove', globalMouseMoveHandler);
-      document.removeEventListener('mouseup', globalMouseUpHandler);
-    };
-  }, [filteredData]);
-
-  // Handle edit
-  const handleEdit = (item) => {
-    // TODO: Implement edit functionality
-    console.log('Edit item:', item);
-    setExpandedItemId(null);
-  };
-
-  // Handle delete
-  const handleDelete = (item) => {
-    // TODO: Implement delete functionality
-    if (window.confirm('Are you sure you want to delete this usage record?')) {
-      console.log('Delete item:', item);
-      setExpandedItemId(null);
-    }
-  };
-
   return (
     <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden">
       {/* Date Row */}
@@ -546,32 +346,6 @@ const ProjectUsageReport = () => {
         >
           {date}
         </button>
-      </div>
-
-      {/* Report/History Tabs */}
-      <div className="flex-shrink-0 px-4 pt-2 pb-2">
-        <div className="flex bg-gray-100 items-center h-9 shadow-sm flex-1 rounded-md">
-          <button
-            type="button"
-            onClick={() => setActiveTab('history')}
-            className={`flex-1 py-1 px-4 ml-1 h-8 rounded text-[14px] font-medium transition-colors ${activeTab === 'history'
-              ?  'bg-white text-black'
-              : 'bg-gray-100 text-gray-600'
-              }`}
-          >
-            History
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('report')}
-            className={`flex-1 py-1 px-4 mr-1 h-8 rounded text-[14px] font-medium transition-colors ${activeTab === 'report'
-              ?  'bg-white text-black'
-              : 'bg-gray-100 text-gray-600'
-              }`}
-          >
-            Report
-          </button>
-        </div>
       </div>
 
       {/* Filters Section */}
@@ -672,170 +446,82 @@ const ProjectUsageReport = () => {
 
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto px-4 pb-4">
-        {activeTab === 'report' ? (
-          // Report Tab Content
-          loading ? (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-[14px] text-gray-500">Loading...</p>
-            </div>
-          ) : filteredData.length === 0 ? (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-[14px] text-gray-500">No usage data found</p>
-            </div>
-          ) : (
-            <div className="space-y-3 pt-2">
-              {filteredData.map((item, index) => {
-                const itemId = `${item.itemId}-${item.categoryId}-${item.modelId}-${item.brandId}-${item.typeId}-${item.projectId}-${index}`;
-                const isExpanded = expandedItemId === itemId;
-                const swipeState = swipeStates[itemId];
+        {loading ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-[14px] text-gray-500">Loading...</p>
+          </div>
+        ) : filteredData.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-[14px] text-gray-500">No data found</p>
+          </div>
+        ) : (
+          <div className="space-y-3 pt-2">
+            {filteredData.map((item, index) => {
+              // Format project/incharge display
+              const projectIncharge = item.projectName || '';
+              // Format details: ID, Brand (matching image format like "190614, Kundan")
+              const detailsParts = [];
+              if (item.itemId) detailsParts.push(item.itemId);
+              if (item.brand) detailsParts.push(item.brand);
+              const details = detailsParts.join(', ');
 
-                // Width of the combined action buttons (2 * 40px + gap)
-                const buttonWidth = 96;
+              return (
+                <div key={`${item.itemId}-${item.categoryId}-${item.modelId}-${item.brandId}-${item.typeId}-${item.projectId}-${index}`} className="bg-white border border-[rgba(0,0,0,0.16)] rounded-[8px] p-2">
+                  <div className="flex items-start justify-between">
+                    {/* Left Side */}
+                    <div className="flex-1 pr-3">
+                      {/* Product Name */}
+                      <p className="text-[14px] font-semibold text-black mb-1">
+                        {item.itemName}
+                      </p>
 
-                // Calculate swipe offset for smooth animation
-                const swipeOffset =
-                  swipeState && swipeState.isSwiping
-                    ? Math.max(-buttonWidth, swipeState.currentX - swipeState.startX)
-                    : isExpanded
-                      ? -buttonWidth
-                      : 0;
+                      {/* Project/Incharge */}
+                      <p className="text-[12px] font-medium text-gray-700 mb-1">
+                        {projectIncharge}
+                      </p>
 
-                // Format project/incharge display
-                const projectIncharge = item.projectName || '';
-                // Format details: ID, Brand, Type (matching image format)
-                const detailsParts = [];
-                if (item.itemId) detailsParts.push(item.itemId);
-                if (item.brand) detailsParts.push(item.brand);
-                if (item.type) detailsParts.push(item.type);
-                const details = detailsParts.join(', ');
+                      {/* Details */}
+                      <p className="text-[12px] font-medium text-gray-600 mb-1">
+                        {details}
+                      </p>
 
-                return (
-                  <div key={itemId} className="relative overflow-hidden">
-                    {/* Card */}
-                    <div
-                      ref={(el) => {
-                        if (el) cardRefs.current[itemId] = el;
-                      }}
-                      className="bg-white border border-[rgba(0,0,0,0.16)] rounded-[8px] p-2 cursor-pointer transition-transform duration-300 ease-out select-none"
-                      style={{
-                        transform: `translateX(${swipeOffset}px)`,
-                        touchAction: 'pan-y',
-                        userSelect: 'none',
-                        WebkitUserSelect: 'none'
-                      }}
-                      onTouchStart={(e) => handleTouchStart(e, itemId)}
-                      onTouchMove={(e) => handleTouchMove(e, itemId)}
-                      onTouchEnd={() => handleTouchEnd(itemId)}
-                      onMouseDown={(e) => {
-                        if (e.button !== 0) return;
-                        const syntheticEvent = {
-                          touches: [{ clientX: e.clientX }],
-                          preventDefault: () => e.preventDefault()
-                        };
-                        handleTouchStart(syntheticEvent, itemId);
-                      }}
-                      onClick={(e) => {
-                        // Don't trigger if clicking on the action buttons
-                        if (e.target.closest('.action-button')) {
-                          return;
-                        }
-                      }}
-                    >
-                      <div className="flex items-start justify-between">
-                        {/* Left Side */}
-                        <div className="flex-1 pr-3">
-                          {/* Product Name */}
-                          <p className="text-[14px] font-semibold text-black mb-1">
-                            {item.itemName}
-                          </p>
+                      {/* Date */}
+                      <p className="text-[12px] font-medium text-gray-600 mb-1">
+                        {item.formattedDate}
+                      </p>
 
-                          {/* Project/Incharge */}
-                          <p className="text-[12px] font-medium text-gray-700 mb-1">
-                            {projectIncharge}
-                          </p>
-
-                          {/* Details */}
-                          <p className="text-[12px] font-medium text-gray-600 mb-1">
-                            {details}
-                          </p>
-
-                          {/* Date */}
-                          <p className="text-[12px] font-medium text-gray-600 mb-1">
-                            {item.formattedDate}
-                          </p>
-                        </div>
-
-                        {/* Right Side */}
-                        <div className="flex flex-col items-end">
-                          {/* Category Tag */}
-                          {item.category && (
-                            <span className={`px-2 py-1 mb-2 rounded-full text-[10px] font-medium ${getCategoryColor(item.category)}`}>
-                              {item.category}
-                            </span>
-                          )}
-                          {/* Dispatch/Return */}
-                          {item.dispatchQty > 0 && (
-                            <p className="text-[12px] font-medium text-[#E4572E] mb-1">
-                              Dispatch {item.dispatchQty}
-                            </p>
-                          )}
-                          {item.returnQty > 0 && (
-                            <p className="text-[12px] font-medium text-[#007233] mb-1">
-                              Return {item.returnQty}
-                            </p>
-                          )}
-
-                          {/* Amount */}
-                          <p className="text-[14px] font-semibold text-black">
-                            {formatAmount(item.totalAmount)}
-                          </p>
-                        </div>
-                      </div>
+                      {/* Dispatch/Return on one line */}
+                      {(item.dispatchQty > 0 || item.returnQty > 0) && (
+                        <p className="text-[12px] font-medium text-gray-600">
+                          {item.dispatchQty > 0 && <span className="text-[#E4572E]">• Dispatch {item.dispatchQty}</span>}
+                          {item.dispatchQty > 0 && item.returnQty > 0 && ' '}
+                          {item.returnQty > 0 && <span className="text-[#007233]">• Return {item.returnQty}</span>}
+                        </p>
+                      )}
                     </div>
 
-                    {/* Action Buttons - Behind the card on the right, revealed on swipe */}
-                    <div
-                      className="absolute right-0 top-0 flex gap-2 flex-shrink-0 z-0"
-                      style={{
-                        opacity:
-                          isExpanded ||
-                            (swipeState && swipeState.isSwiping && swipeOffset < -20)
-                            ? 1
-                            : 0,
-                        transition: 'opacity 0.2s ease-out',
-                        pointerEvents: isExpanded ? 'auto' : 'none'
-                      }}
-                    >
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEdit(item);
-                        }}
-                        className="action-button w-[40px] h-full bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
-                        style={{ minHeight: '100px' }}
-                      >
-                        <img src={Edit} alt="Edit" className="w-[18px] h-[18px]" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(item);
-                        }}
-                        className="action-button w-[40px] h-full bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm"
-                        style={{ minHeight: '100px' }}
-                      >
-                        <img src={Delete} alt="Delete" className="w-[18px] h-[18px]" />
-                      </button>
+                    {/* Right Side */}
+                    <div className="flex flex-col items-end">
+                      {/* Category Tag */}
+                      {item.category && (
+                        <span className={`px-2 py-1 mb-2 rounded-full text-[10px] font-medium ${getCategoryColor(item.category)}`}>
+                          {item.category}
+                        </span>
+                      )}
+                      {/* Usage */}
+                      <p className="text-[12px] font-medium text-[#007233] mb-1">
+                        Usage {item.usage}
+                      </p>
+
+                      {/* Amount */}
+                      <p className="text-[14px] font-semibold text-[#007233]">
+                        {formatAmount(item.totalAmount)}
+                      </p>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )
-        ) : (
-          // History Tab Content - Empty
-          <div className="flex-1 bg-white">
-            {/* Content will be displayed here when history functionality is implemented */}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -873,4 +559,5 @@ const ProjectUsageReport = () => {
   );
 };
 
-export default ProjectUsageReport;
+export default EditStock;
+

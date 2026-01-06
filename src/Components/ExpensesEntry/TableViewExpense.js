@@ -671,13 +671,11 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                         extra: item.extra_amount
                     }));
                     setLaboursList(formattedData);
-                    console.log('Labours loaded:', formattedData.length, 'items');
                 } else {
                     console.log('Error fetching Labour names.');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                console.log('Error fetching Labour names.');
             }
         };
         fetchLaboursList();
@@ -704,7 +702,6 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                 }));
 
                 setEmployeeOptions(formattedData);
-                console.log('Employees loaded:', formattedData.length, 'items');
             } catch (error) {
                 console.error("Fetch error: ", error);
             }
@@ -1105,19 +1102,14 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                     k.toLowerCase().includes('staff')
                 )
             });
-        }
-        
+        }        
         if (labourId) {
-            // Try both string and number conversion for ID matching
-            const labourName = labourIdToName[labourId] || 
-                              labourIdToName[String(labourId)] || 
-                              labourIdToName[Number(labourId)];
+            const labourName = labourIdToName[labourId] || labourIdToName[String(labourId)] || labourIdToName[Number(labourId)];
             if (labourName) {
                 return labourName;
             }
         }
         if (employeeId) {
-            // Try both string and number conversion for ID matching
             const employeeName = employeeIdToName[employeeId] || 
                                 employeeIdToName[String(employeeId)] || 
                                 employeeIdToName[Number(employeeId)];
@@ -1473,12 +1465,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                             </td>
                                             <td className="px-1 text-sm">
                                                 {expense.billCopy ? (
-                                                    <a
-                                                        href={expense.billCopy}
-                                                        className="text-red-500 underline "
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                    >
+                                                    <a href={expense.billCopy} className="text-red-500 underline" target="_blank" rel="noopener noreferrer">
                                                         View
                                                     </a>
                                                 ) : (

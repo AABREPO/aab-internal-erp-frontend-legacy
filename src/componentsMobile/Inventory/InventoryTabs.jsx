@@ -4,13 +4,13 @@ const InventoryTabs = ({ activeTab = 'net-stock', onTabChange }) => {
   const tabs = [
     { id: 'outgoing', label: 'Outgoing' },
     { id: 'incoming', label: 'Incoming' }, 
-    { id: 'project-usage-report', label: 'Project Usage Report' },
+    { id: 'project-usage-report', label: 'Project Usage' },
     { id: 'net-stock', label: 'Net Stock' },
     { id: 'history', label: 'History' },
     { id: 'add-input', label: 'Add Input' },
     { id: 'incoming-tracker', label: 'Incoming Tracker' },
-    { id: 'project-usage-history', label: 'Project Usage History' },
-    { id: 'non-po-history', label: 'Non PO History' }
+    { id: 'non-po-history', label: 'Non PO History' },
+    { id: 'edit-stock', label: 'Edit Stock' }
   ];
 
   const tabsContainerRef = useRef(null);
@@ -80,12 +80,26 @@ const InventoryTabs = ({ activeTab = 'net-stock', onTabChange }) => {
   }, [activeTab]);
 
   return (
-    <div className="fixed top-[50px] transform  w-full max-w-[340px] h-[40px] overflow-x-auto bg-white z-40" style={{ fontFamily: "'Manrope', sans-serif" }}>
-      <div className="relative h-full overflow-x-auto scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-        <div 
-          ref={tabsContainerRef}
-          className="flex items-center gap-4 px-4 h-full overflow-x-auto scrollbar-hide cursor-grab active:cursor-grabbing"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+    <>
+      <style>{`
+        .inventory-tabs-container::-webkit-scrollbar,
+        .inventory-tabs-scroll::-webkit-scrollbar {
+          display: none;
+          width: 0;
+          height: 0;
+        }
+        .inventory-tabs-container,
+        .inventory-tabs-scroll {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
+      <div className="fixed top-[50px] transform w-full max-w-[340px] h-[40px] overflow-x-auto bg-white z-40 inventory-tabs-container" style={{ fontFamily: "'Manrope', sans-serif" }}>
+        <div className="relative h-full overflow-x-auto scrollbar-hide inventory-tabs-scroll" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <div 
+            ref={tabsContainerRef}
+            className="flex items-center gap-4 px-4 h-full overflow-x-auto scrollbar-hide cursor-grab active:cursor-grabbing inventory-tabs-scroll"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           onMouseDown={(e) => {
             setIsDragging(true);
             setStartX(e.pageX - tabsContainerRef.current.offsetLeft);
@@ -126,7 +140,6 @@ const InventoryTabs = ({ activeTab = 'net-stock', onTabChange }) => {
             </button>
           ))}
         </div>
-        
         {/* Three dots menu button */}
         <button className="absolute right-0 top-1/2 transform -translate-y-1/2 w-[20px] h-[20px] flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity bg-white z-10 pointer-events-auto">
           <svg width="4" height="16" viewBox="0 0 4 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -135,8 +148,7 @@ const InventoryTabs = ({ activeTab = 'net-stock', onTabChange }) => {
             <circle cx="2" cy="14" r="1.5" fill="#000"/>
           </svg>
         </button>
-      </div>
-      
+      </div>      
       {/* Base border line in gray */}
       <div className="absolute bottom-0 left-0 w-full h-[1px]" style={{ backgroundColor: '#D9D9D9' }}>
         {/* Active tab underline - positioned exactly below the clicked heading */}
@@ -150,8 +162,8 @@ const InventoryTabs = ({ activeTab = 'net-stock', onTabChange }) => {
         ></div>
       </div>
     </div>
+    </>
   );
 };
 
 export default InventoryTabs;
-

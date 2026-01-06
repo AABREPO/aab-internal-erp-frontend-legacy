@@ -51,6 +51,8 @@ const History = ({ username, userRoles = [] }) => {
     const [categoryComments, setCategoryComments] = useState("");
     const [newPayment, setNewPayment] = useState({ date: "", amount: "", type: "" });
     const [weeks, setWeeks] = useState([]);
+    const [lastWeekWithData, setLastWeekWithData] = useState(null);
+    const [lastEditableWeek, setLastEditableWeek] = useState(null); // { weekNumber, year }
     const [vendorOptions, setVendorOptions] = useState([]);
     const [contractorOptions, setContractorOptions] = useState([]);
     const [siteOptions, setSiteOptions] = useState([]);
@@ -79,7 +81,17 @@ const History = ({ username, userRoles = [] }) => {
     const [weeklyPaymentExpensesAudits, setWeeklyPaymentExpensesAudits] = useState([]);
     const [showWeeklyPaymentReceivedModal, setShowWeeklyPaymentReceivedModal] = useState(false);
     const [weeklyPaymentReceivedAudits, setWeeklyPaymentReceivedAudits] = useState([]);
-    const [year, setYear] = useState(new Date().getFullYear().toString());
+    // Get the current week year (ISO 8601) - may differ from calendar year for weeks spanning year boundaries
+    const getCurrentWeekYear = () => {
+        const d = new Date();
+        d.setHours(0, 0, 0, 0);
+        const dayOfWeek = d.getDay() || 7;
+        const thursday = new Date(d);
+        thursday.setDate(d.getDate() + 4 - dayOfWeek);
+        thursday.setHours(0, 0, 0, 0);
+        return thursday.getFullYear();
+    };
+    const [year, setYear] = useState(getCurrentWeekYear().toString());
     const [weeklyTypes, setWeeklyTypes] = useState([]);
     const [weeklyReceivedTypes, setWeeklyReceivedTypes] = useState([]);
     const currentYear = new Date().getFullYear();
@@ -501,18 +513,42 @@ const History = ({ username, userRoles = [] }) => {
     };
     useEffect(() => {
         const fetchNextWeekDiscount = async () => {
-            if (!selectedWeek) {
+            if (!selectedWeek || !year) {
                 setNextWeekDiscountInfo(null);
                 return;
-            }
-            const nextWeekNumber = Number(selectedWeek) + 1;
+            }            
+            const currentWeekNumber = Number(selectedWeek);
+            const selectedYear = parseInt(year, 10);            
+            // Find the current week's info to determine its year
+            const currentWeek = weeks.find(w => w.number === currentWeekNumber);
+            if (!currentWeek) {
+                setNextWeekDiscountInfo(null);
+                return;
+            }            
+            // Calculate next week - if we're in week 52, next week is week 1 of next year
+            let nextWeekNumber;
+            let nextWeekYear;            
+            // Get the end date of current week
+            const currentWeekEnd = new Date(currentWeek.end);
+            const nextWeekStart = new Date(currentWeekEnd);
+            nextWeekStart.setDate(currentWeekEnd.getDate() + 1); // Next day after current week ends            
+            // Calculate the week year for the next week (ISO 8601)
+            nextWeekYear = getWeekYear(nextWeekStart);
+            nextWeekNumber = getISOWeekNumber(nextWeekStart);
             if (!Number.isFinite(nextWeekNumber)) {
                 setNextWeekDiscountInfo(null);
                 return;
-            }
+            }            
             try {
                 const response = await axios.get(`https://backendaab.in/aabuildersDash/api/payments-received/week/${nextWeekNumber}`);
-                const nextWeekPayments = Array.isArray(response.data) ? response.data : [];
+                const allNextWeekPayments = Array.isArray(response.data) ? response.data : [];
+                // Filter payments by weekly_number field (not by date) to include entries like "Carry (CF)"
+                // that may have dates from previous week but belong to the next week
+                const nextWeekPayments = allNextWeekPayments.filter(payment => {
+                    // Use weekly_number field to determine which week the payment belongs to
+                    const paymentWeekNumber = Number(payment.weekly_number);
+                    return paymentWeekNumber === nextWeekNumber;
+                });
                 const discountSum = nextWeekPayments.reduce((sum, payment) => {
                     const discount = Number(payment.discount_amount) || 0;
                     return discount > 0 ? sum + discount : sum;
@@ -531,7 +567,7 @@ const History = ({ username, userRoles = [] }) => {
             }
         };
         fetchNextWeekDiscount();
-    }, [selectedWeek]);
+    }, [selectedWeek, year, weeks]);
     useEffect(() => {
         fetchWeeklyPaymentBills();
     }, []);
@@ -723,18 +759,98 @@ const History = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchWeeks = async () => {
             try {
-                const response = await axios.get('https://backendaab.in/aabuildersDash/api/payments-received/active_weeks');
-                const currentYear = new Date().getFullYear();
-                const enrichedWeeks = response.data.map((weekNumber) =>
-                    getStartAndEndDateOfWeek(weekNumber, currentYear)
-                );
-                setWeeks(enrichedWeeks);
+                const selectedYear = parseInt(year, 10);
+                const currentWeekNumber = getCurrentISOWeekNumber();
+                const currentWeekYear = getCurrentWeekYear();
+                
+                // Fetch all payments to determine which weeks have data
+                let weeksWithData = new Set();
+                try {
+                    const paymentsResponse = await axios.get('https://backendaab.in/aabuildersDash/api/payments-received/getAll');
+                    paymentsResponse.data.forEach(payment => {
+                        // Only include payments with status === true and period_end_date exists
+                        if (payment.status === true && payment.period_end_date) {
+                            const paymentDate = new Date(payment.period_end_date);
+                            // Validate that the date is valid
+                            if (!isNaN(paymentDate.getTime())) {
+                                const paymentWeekYear = getWeekYear(paymentDate);
+                                if (paymentWeekYear === selectedYear) {
+                                    const weekNumber = getISOWeekNumber(paymentDate);
+                                    weeksWithData.add(weekNumber);
+                                }
+                            }
+                        }
+                    });
+                } catch (error) {
+                    console.error('Error fetching payments for week filtering:', error);
+                }                
+                // Get all possible weeks for the year (1-53)
+                const allWeeks = [];
+                for (let weekNum = 1; weekNum <= 53; weekNum++) {
+                    const weekInfo = getStartAndEndDateOfWeek(weekNum, selectedYear);
+                    const weekStartDate = new Date(weekInfo.start);
+                    const weekEndDate = new Date(weekInfo.end);
+                    const weekYear = getWeekYear(weekStartDate);
+                    const hasData = weeksWithData.has(weekNum);
+                    const isCurrentWeek = (selectedYear === currentWeekYear && weekNum === currentWeekNumber);
+                    const isFutureWeek = weekEndDate > new Date();                    
+                    // Include week if:
+                    // 1. It has data for the selected year (regardless of ISO week year calculation)
+                    // 2. It belongs to the selected year AND (is current week or is future week)
+                    if (hasData || (weekYear === selectedYear && (isCurrentWeek || isFutureWeek))) {
+                        allWeeks.push(weekInfo);
+                    }
+                }
+                
+                // Sort weeks by week number (descending - most recent first)
+                allWeeks.sort((a, b) => b.number - a.number);
+                
+                // Find the last week number that has data with status === true
+                const lastWeekWithDataValue = weeksWithData.size > 0 ? Math.max(...Array.from(weeksWithData)) : null;
+                setLastWeekWithData(lastWeekWithDataValue);
+                
+                setWeeks(allWeeks);
             } catch (error) {
                 console.error('Error fetching active weeks:', error);
             }
         };
         fetchWeeks();
-    }, []);
+    }, [year]);
+    
+    // Find the most recent week (across all years) that has data with status === true
+    useEffect(() => {
+        const findLastEditableWeek = async () => {
+            try {
+                const paymentsResponse = await axios.get('https://backendaab.in/aabuildersDash/api/payments-received/getAll');
+                let mostRecentWeek = null;
+                let mostRecentDate = null;
+                
+                paymentsResponse.data.forEach(payment => {
+                    // Only include payments with status === true and period_end_date exists
+                    if (payment.status === true && payment.period_end_date) {
+                        const paymentDate = new Date(payment.period_end_date);
+                        // Validate that the date is valid
+                        if (!isNaN(paymentDate.getTime())) {
+                            // Check if this is more recent than the current most recent
+                            if (!mostRecentDate || paymentDate > mostRecentDate) {
+                                mostRecentDate = paymentDate;
+                                const weekYear = getWeekYear(paymentDate);
+                                const weekNumber = getISOWeekNumber(paymentDate);
+                                mostRecentWeek = { weekNumber, year: weekYear };
+                            }
+                        }
+                    }
+                });
+                
+                setLastEditableWeek(mostRecentWeek);
+            } catch (error) {
+                console.error('Error finding last editable week:', error);
+            }
+        };
+        
+        findLastEditableWeek();
+    }, []); // Run once on mount
+    
     useEffect(() => {
         const fetchWeekData = async () => {
             if (!selectedWeek) return;
@@ -743,13 +859,42 @@ const History = ({ username, userRoles = [] }) => {
                     axios.get(`https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${selectedWeek}`),
                     axios.get(`https://backendaab.in/aabuildersDash/api/payments-received/week/${selectedWeek}`)
                 ]);
-                setExpenses(expensesRes.data);
-                const filteredPayments = paymentsRes.data.filter(
+                
+                const selectedYear = parseInt(year, 10);
+                
+                // Filter expenses to only include entries that belong to the selected year (ISO 8601)
+                // Only include expenses with status === true and valid period_end_date
+                const filteredExpenses = expensesRes.data.filter(expense => {
+                    // Exclude expenses without period_end_date or with status !== true
+                    if (!expense.period_end_date || expense.status !== true) return false;
+                    const expenseDate = new Date(expense.period_end_date);
+                    // Validate that the date is valid
+                    if (isNaN(expenseDate.getTime())) return false;
+                    const expenseWeekYear = getWeekYear(expenseDate);
+                    return expenseWeekYear === selectedYear;
+                });
+                
+                // Filter payments to only include entries that belong to the selected year (ISO 8601)
+                // Only include payments with status === true and valid period_end_date
+                const filteredPaymentsByYear = paymentsRes.data.filter(payment => {
+                    // Exclude payments without period_end_date or with status !== true
+                    if (!payment.period_end_date || payment.status !== true) return false;
+                    const paymentDate = new Date(payment.period_end_date);
+                    // Validate that the date is valid
+                    if (isNaN(paymentDate.getTime())) return false;
+                    const paymentWeekYear = getWeekYear(paymentDate);
+                    return paymentWeekYear === selectedYear;
+                });
+
+                // Also filter out "Handover" type payments
+                const filteredPayments = filteredPaymentsByYear.filter(
                     (payment) => payment.type !== "Handover"
                 );
+                
+                setExpenses(filteredExpenses);
                 setPayments(filteredPayments);
                 await fetchWeeklyPaymentBills();
-                const projectAdvanceRows = expensesRes.data.filter(row => row.type === "Project Advance" && row.advance_portal_id);
+                const projectAdvanceRows = filteredExpenses.filter(row => row.type === "Project Advance" && row.advance_portal_id);
                 const newDescriptions = { ...portalDescriptions };
                 for (const row of projectAdvanceRows) {
                     try {
@@ -771,7 +916,7 @@ const History = ({ username, userRoles = [] }) => {
             }
         };
         fetchWeekData();
-    }, [selectedWeek]);
+    }, [selectedWeek, year]);
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         if (name === "type") {
@@ -1052,12 +1197,54 @@ const History = ({ username, userRoles = [] }) => {
         }
         return response.json();
     };
+    // ISO 8601 week number calculation with year boundary handling
+    // For weeks spanning two years, use the year the week starts in (Monday's year)
+    // ISO 8601 week number calculation
+    // Week belongs to the year that contains the Thursday of that week
+    // Week 1 is the week with the year's first Thursday
+    const getISOWeekNumber = (date) => {
+        const d = new Date(date);
+        d.setHours(0, 0, 0, 0);
+        
+        // Get Thursday of the week containing the date
+        const dayOfWeek = d.getDay() || 7; // Convert Sunday (0) to 7
+        const thursday = new Date(d);
+        thursday.setDate(d.getDate() + 4 - dayOfWeek); // Thursday is 4 days after Monday
+        thursday.setHours(0, 0, 0, 0);
+        
+        // Use the year that Thursday falls in (ISO 8601 rule)
+        const weekYear = thursday.getFullYear();
+        
+        // Get January 1st of that year
+        const jan1 = new Date(weekYear, 0, 1);
+        jan1.setHours(0, 0, 0, 0);
+        
+        // Get the Thursday of week 1 (first Thursday of the year)
+        const jan1DayOfWeek = jan1.getDay() || 7;
+        const firstThursday = new Date(jan1);
+        firstThursday.setDate(jan1.getDate() + 4 - jan1DayOfWeek);
+        firstThursday.setHours(0, 0, 0, 0);
+        
+        // Calculate week number: difference in days divided by 7, plus 1
+        const daysDiff = Math.floor((thursday - firstThursday) / 86400000);
+        const weekNo = Math.floor(daysDiff / 7) + 1;
+        
+        return weekNo;
+    };
+    
     const getCurrentISOWeekNumber = () => {
-        const now = new Date();
-        const start = new Date(now.getFullYear(), 0, 1);
-        const diff = now - start + (start.getTimezoneOffset() - now.getTimezoneOffset()) * 60000;
-        const oneWeek = 604800000;
-        return Math.floor(diff / oneWeek) + 1;
+        return getISOWeekNumber(new Date());
+    };
+    
+    // Get the year that a week belongs to (ISO 8601 - based on Thursday's year)
+    const getWeekYear = (date) => {
+        const d = new Date(date);
+        d.setHours(0, 0, 0, 0);
+        const dayOfWeek = d.getDay() || 7;
+        const thursday = new Date(d);
+        thursday.setDate(d.getDate() + 4 - dayOfWeek);
+        thursday.setHours(0, 0, 0, 0);
+        return thursday.getFullYear();
     };
     const updateAdvancePortalEntry = async (advancePortalId, { date, amount, vendorId, contractorId, projectId, description, weekNo }) => {
         if (!advancePortalId) return;
@@ -2161,7 +2348,11 @@ const History = ({ username, userRoles = [] }) => {
         newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
         doc.save(`PR ${selectedWeek || ""} - Weekly Payment Report ${formatDateOnly(lastPeriodEndDate)}.pdf`);
     };
-    const lastWeekNumber = Math.max(...weeks.map(week => week.number));
+    const lastWeekNumber = weeks.length > 0 ? Math.max(...weeks.map(week => week.number)) : null;
+    // Allow editing only for the most recent week (across all years) that has data with status === true
+    const canEditSelectedWeek = selectedWeek && lastEditableWeek !== null && 
+        Number(selectedWeek) === Number(lastEditableWeek.weekNumber) && 
+        parseInt(year, 10) === lastEditableWeek.year;
     const getPaymentsByExpenseId = (expenseId) => {
         if (!weeklyPaymentBills || weeklyPaymentBills.length === 0) {
             return [];
@@ -2470,9 +2661,18 @@ const History = ({ username, userRoles = [] }) => {
     };
     useEffect(() => {
         if (weeks.length > 0) {
-            setSelectedWeek(weeks[weeks.length - 1].number);
+            // Check if the currently selected week exists in the filtered weeks
+            const currentSelectedWeek = selectedWeek;
+            const selectedWeekExists = currentSelectedWeek && weeks.some(w => w.number === Number(currentSelectedWeek));
+            if (!selectedWeekExists) {
+                // If selected week doesn't exist in new year, select the last week
+                setSelectedWeek(weeks[weeks.length - 1].number);
+            }
+        } else {
+            // If no weeks available for the selected year, clear the selection
+            setSelectedWeek("");
         }
-    }, [weeks]);
+    }, [weeks, year]);
     const fetchAuditDetailsForExpense = async (expensesId) => {
         try {
             const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly_payment_audit/expenses/${expensesId}`);
@@ -2867,7 +3067,7 @@ const History = ({ username, userRoles = [] }) => {
                                         )}
                                     </thead>
                                     <tbody>
-                                        {Number(selectedWeek) === Number(lastWeekNumber) ? (
+                                        {canEditSelectedWeek ? (
                                             <tr className="">
                                                 <td className="px-4 py-2 font-bold">{filteredExpenses.length + 1}.</td>
                                                 <td className="px-4 py-2">
@@ -3449,7 +3649,7 @@ const History = ({ username, userRoles = [] }) => {
                                                                         alt="Edit Disabled"
                                                                     />
                                                                 ) : (
-                                                                    canEditDelete && (
+                                                                    canEditDelete && canEditSelectedWeek && (
                                                                         <button onClick={() => {
                                                                             setEditingRowId(row.id);
                                                                             setEditingOriginalRow({ ...row });
@@ -3466,7 +3666,7 @@ const History = ({ username, userRoles = [] }) => {
                                                                     alt="Delete Disabled"
                                                                 />
                                                             ) : (
-                                                                canEditDelete && (
+                                                                canEditDelete && canEditSelectedWeek && (
                                                                     <button className="" onClick={() => handleWeeklyExpensesDelete(row.id)}>
                                                                         <img src={Delete} className="w-5 h-4" alt="Delete" />
                                                                     </button>
@@ -3598,7 +3798,7 @@ const History = ({ username, userRoles = [] }) => {
                                                                 </button>
                                                             ) : (
                                                                 weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
-                                                                    canEditDelete && (
+                                                                    canEditDelete && canEditSelectedWeek && (
                                                                         <button onClick={() => {
                                                                             setEditingPaymentId(row.id);
                                                                             setEditingOriginalPayment({ ...row });
@@ -3615,7 +3815,7 @@ const History = ({ username, userRoles = [] }) => {
                                                                 )
                                                             )}
                                                             {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
-                                                                canEditDelete && (
+                                                                canEditDelete && canEditSelectedWeek && (
                                                                     <button className="" onClick={() => handleWeeklyReceivedDelete(row.id)}>
                                                                         <img src={Delete} className="w-5 h-4" alt="Delete" />
                                                                     </button>
@@ -3643,7 +3843,7 @@ const History = ({ username, userRoles = [] }) => {
                                                 </td>
                                             </tr>
                                         ))}
-                                        {Number(selectedWeek) === Number(lastWeekNumber) ? (
+                                        {canEditSelectedWeek ? (
                                             <tr>
                                                 <td className="px-4 py-2">
                                                     <input
@@ -3979,12 +4179,7 @@ const History = ({ username, userRoles = [] }) => {
                                                                 : 0;
                                                         const nextEntryNo = maxEntryNo + 1;
                                                         const getWeekNumber = () => {
-                                                            const now = new Date();
-                                                            const start = new Date(now.getFullYear(), 0, 1);
-                                                            const diff =
-                                                                now - start + (start.getTimezoneOffset() - now.getTimezoneOffset()) * 60000;
-                                                            const oneWeek = 604800000;
-                                                            return Math.floor(diff / oneWeek) + 1;
+                                                            return getISOWeekNumber(new Date());
                                                         };
                                                         const description = portalDescriptions[currentProjectAdvanceRow.advance_portal_id] || "";
                                                         const advanceUpdateData = {
@@ -4033,12 +4228,7 @@ const History = ({ username, userRoles = [] }) => {
                                                                 : 0;
                                                         const nextEntryNo = maxEntryNo + 1;
                                                         const getWeekNumber = () => {
-                                                            const now = new Date();
-                                                            const start = new Date(now.getFullYear(), 0, 1);
-                                                            const diff =
-                                                                now - start + (start.getTimezoneOffset() - now.getTimezoneOffset()) * 60000;
-                                                            const oneWeek = 604800000;
-                                                            return Math.floor(diff / oneWeek) + 1;
+                                                            return getISOWeekNumber(new Date());
                                                         };
                                                         const staffAdvanceSaveData = {
                                                             date: paymentPopupData.date,

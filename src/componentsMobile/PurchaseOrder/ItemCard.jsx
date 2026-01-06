@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import Edit from '../Images/edit1.png'
 import Delete from '../Images/delete.png'
 
@@ -50,11 +50,33 @@ const ItemCard = ({
   onSwipeStart,
   onSwipeMove,
   onSwipeEnd,
-  swipeState
+  swipeState,
+  onAmountChange      // Optional callback when amount changes
 }) => {
+  const [isEditingAmount, setIsEditingAmount] = useState(false);
+  const [amountValue, setAmountValue] = useState(item?.price || 0);
+  const amountInputRef = useRef(null);
   // Ref for the card element to attach non-passive event listeners
   // Must be called before any conditional returns
   const cardRef = useRef(null);
+
+  // Calculate total amount from price and quantity (before early return)
+  const totalAmount = ((item?.price || 0) * (item?.quantity || 1));
+
+  // Update amount value when item changes (must be before early return)
+  useEffect(() => {
+    if (!isEditingAmount && item) {
+      setAmountValue(totalAmount);
+    }
+  }, [totalAmount, isEditingAmount, item]);
+
+  // Focus input when editing starts (must be before early return)
+  useEffect(() => {
+    if (isEditingAmount && amountInputRef.current) {
+      amountInputRef.current.focus();
+      amountInputRef.current.select();
+    }
+  }, [isEditingAmount]);
 
   // Set up non-passive event listeners using refs
   // Must be called before any conditional returns
@@ -133,13 +155,44 @@ const ItemCard = ({
         : 0;
 
   const handleCardClick = (e) => {
-    // Don't trigger if clicking on the action buttons
-    if (e.target.closest('.action-button')) {
+    // Don't trigger if clicking on the action buttons or amount input
+    if (e.target.closest('.action-button') || e.target.closest('.amount-input-container')) {
       return;
     }
     // Optional click-to-toggle if parent provided it
     if (onToggleExpand) {
       onToggleExpand();
+    }
+  };
+
+  const handleAmountClick = (e) => {
+    e.stopPropagation();
+    setIsEditingAmount(true);
+  };
+
+  const handleAmountChange = (e) => {
+    const value = e.target.value.replace(/[^0-9.]/g, '');
+    setAmountValue(value);
+  };
+
+  const handleAmountBlur = () => {
+    setIsEditingAmount(false);
+    const numericValue = parseFloat(amountValue) || 0;
+    setAmountValue(numericValue);
+    // Calculate price per unit from total amount
+    const quantity = item.quantity || 1;
+    const pricePerUnit = quantity > 0 ? numericValue / quantity : 0;
+    if (onAmountChange) {
+      onAmountChange(item.id, pricePerUnit);
+    }
+  };
+
+  const handleAmountKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.target.blur();
+    } else if (e.key === 'Escape') {
+      setAmountValue(totalAmount);
+      setIsEditingAmount(false);
     }
   };
 
@@ -189,9 +242,35 @@ const ItemCard = ({
               <p className="text-[12px] font-semibold text-black leading-snug">
                 {item.quantity} Qty
               </p>
-              <p className="text-[12px] font-semibold text-black leading-snug">
-                ₹{0}
-              </p>
+              <div 
+                className="amount-input-container"
+                onClick={handleAmountClick}
+              >
+                {isEditingAmount ? (
+                  <input
+                    ref={amountInputRef}
+                    type="text"
+                    value={amountValue}
+                    onChange={handleAmountChange}
+                    onBlur={handleAmountBlur}
+                    onKeyDown={handleAmountKeyDown}
+                    className="text-[12px] font-semibold text-black leading-snug bg-transparent outline-none p-0 w-16 text-right border border-gray-400 rounded"
+                    style={{ 
+                      appearance: 'none',
+                      WebkitAppearance: 'none',
+                      MozAppearance: 'textfield',
+                      marginTop: 0,
+                      marginBottom: 0,
+                      height: 'auto',
+                      lineHeight: '1.375rem'
+                    }}
+                  />
+                ) : (
+                  <p className="text-[12px] font-semibold text-black leading-snug cursor-text" style={{ marginTop: 0, marginBottom: 0 }}>
+                    ₹{totalAmount}
+                  </p>
+                )}
+              </div>
             </div>
           )}
         </div>

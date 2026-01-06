@@ -21,7 +21,17 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     const [refundPayments, setRefundPayments] = useState([]);
     const [payments, setPayments] = useState([]);
     const [expenses, setExpenses] = useState([]);
-    const [year, setYear] = useState(new Date().getFullYear().toString());
+    // Get the current week year (ISO 8601) - may differ from calendar year for weeks spanning year boundaries
+    const getCurrentWeekYear = () => {
+        const d = new Date();
+        d.setHours(0, 0, 0, 0);
+        const dayOfWeek = d.getDay() || 7;
+        const thursday = new Date(d);
+        thursday.setDate(d.getDate() + 4 - dayOfWeek);
+        thursday.setHours(0, 0, 0, 0);
+        return thursday.getFullYear();
+    };
+    const [year, setYear] = useState(getCurrentWeekYear().toString());
     const [laboursList, setLaboursList] = useState([]);
     const [siteOptions, setSiteOptions] = useState([]);
     const [vendorOptions, setVendorOptions] = useState([]);
@@ -191,21 +201,46 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             end: ISOWeekEnd.toISOString().split("T")[0],
         };
     }
+    // Get the year that a week belongs to (ISO 8601 - based on Thursday's year)
+    const getWeekYear = (date) => {
+        const d = new Date(date);
+        d.setHours(0, 0, 0, 0);
+        const dayOfWeek = d.getDay() || 7;
+        const thursday = new Date(d);
+        thursday.setDate(d.getDate() + 4 - dayOfWeek);
+        thursday.setHours(0, 0, 0, 0);
+        return thursday.getFullYear();
+    };
     useEffect(() => {
         const fetchWeeks = async () => {
             try {
                 const response = await axios.get('https://backendaab.in/aabuildersDash/api/payments-received/active_weeks');
-                const currentYear = new Date().getFullYear();
-                const enrichedWeeks = response.data.map((weekNumber) =>
-                    getStartAndEndDateOfWeek(weekNumber, currentYear)
-                );
+                const selectedYear = parseInt(year, 10);
+                
+                // Filter and enrich weeks for the selected year
+                const enrichedWeeks = response.data
+                    .map((weekNumber) => {
+                        // Calculate week dates for the selected year
+                        const weekInfo = getStartAndEndDateOfWeek(weekNumber, selectedYear);
+                        // Check if this week actually belongs to the selected year (ISO 8601)
+                        const weekStartDate = new Date(weekInfo.start);
+                        const weekYear = getWeekYear(weekStartDate);
+                        
+                        // Only include weeks that belong to the selected year
+                        if (weekYear === selectedYear) {
+                            return weekInfo;
+                        }
+                        return null;
+                    })
+                    .filter(week => week !== null); // Remove weeks that don't belong to selected year
+                
                 setWeeks(enrichedWeeks);
             } catch (error) {
                 console.error('Error fetching active weeks:', error);
             }
         };
         fetchWeeks();
-    }, []);
+    }, [year]);
     useEffect(() => {
         if (weeks.length > 0) {
             setSelectedWeek(weeks[weeks.length - 1].number);
@@ -1031,12 +1066,12 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         ]);
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
-        doc.text('WAGE EXPENSES', 14, 48);
+        doc.text('WAGE EXPENSES', 14, 44);
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
-        doc.text('EXPENDITURE PAYMENTS', 14, 38);
+        doc.text('EXPENDITURE PAYMENTS', 14, 35);
         doc.autoTable({
-            startY: 50,
+            startY: 46,
             head: [expensesTableColumn],
             body: expensesTableRows,
             styles: {
@@ -1082,7 +1117,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         doc.setPage(1);
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
-        doc.text(`NET BALANCE: ${netBalance.toLocaleString('en-IN')}`, 155, 38);
+        doc.text(`NET BALANCE: ${netBalance.toLocaleString('en-IN')}`, 155, 35);
         const addHeaderToPage = (pageNum) => {
             doc.setPage(pageNum);
             doc.setFontSize(14);
@@ -1780,11 +1815,31 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 console.warn("getAll endpoint not available, using current date's expenses:", error);
                 allDailyPayments = dailyExpenses;
             }
+            const getISOWeekNumber = (date) => {
+                const d = new Date(date);
+                d.setHours(0, 0, 0, 0);                
+                // Get Thursday of the week containing the date
+                const dayOfWeek = d.getDay() || 7; // Convert Sunday (0) to 7
+                const thursday = new Date(d);
+                thursday.setDate(d.getDate() + 4 - dayOfWeek); // Thursday is 4 days after Monday
+                thursday.setHours(0, 0, 0, 0);                
+                // Use the year that Thursday falls in (ISO 8601 rule)
+                const weekYear = thursday.getFullYear();                
+                // Get January 1st of that year
+                const jan1 = new Date(weekYear, 0, 1);
+                jan1.setHours(0, 0, 0, 0);                
+                // Get the Thursday of week 1 (first Thursday of the year)
+                const jan1DayOfWeek = jan1.getDay() || 7;
+                const firstThursday = new Date(jan1);
+                firstThursday.setDate(jan1.getDate() + 4 - jan1DayOfWeek);
+                firstThursday.setHours(0, 0, 0, 0);                
+                // Calculate week number: difference in days divided by 7, plus 1
+                const daysDiff = Math.floor((thursday - firstThursday) / 86400000);
+                const weekNo = Math.floor(daysDiff / 7) + 1;                
+                return weekNo;
+            };            
             const getCurrentWeekNumber = () => {
-                const now = new Date();
-                const startOfYear = new Date(now.getFullYear(), 0, 1);
-                const days = Math.floor((now - startOfYear) / (24 * 60 * 60 * 1000));
-                return Math.ceil((days + startOfYear.getDay() + 1) / 7);
+                return getISOWeekNumber(new Date());
             };
             const actualCurrentWeekNumber = getCurrentWeekNumber();
             const currentYear = new Date().getFullYear();

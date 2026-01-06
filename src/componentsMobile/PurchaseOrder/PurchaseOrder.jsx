@@ -255,7 +255,8 @@ const PurchaseOrder = ({ user, onLogout }) => {
           contact: po.contact || '',
           created_by: po.created_by || (user && user.username) || '',
           paymentStatus: po.paymentStatus || 'Unpaid',
-          originalId: po.id, // Preserve original ID for updating
+          // For clone, don't set originalId so it creates a new PO instead of updating
+          originalId: po.isClone ? undefined : po.id, // Preserve original ID for updating (only if not clone)
           originalCreatedAt: po.createdAt, // Preserve original creation date
           originalClientId: po.client_id || po.clientId || null,
           originalSiteInchargeId: po.site_incharge_id || po.siteInchargeId || null,
@@ -427,8 +428,15 @@ const PurchaseOrder = ({ user, onLogout }) => {
         });
         setItems(itemsWithIds);
         setIsEditMode(true);
-        setIsEditFromHistory(true); // Mark that edit came from History page
-        setHasOpenedAdd(po.items && po.items.length > 0);
+        // Check if this is a clone operation - if so, don't set isEditFromHistory to show "Generate PO" instead of "Update PO"
+        if (po.isClone) {
+          setIsEditFromHistory(false); // Clone should show "Generate PO"
+          setHasOpenedAdd(false);
+        } else {
+          setIsEditFromHistory(true); // Edit should show "Update PO"
+          setHasOpenedAdd(po.items && po.items.length > 0);
+        }
+        
         setIsPdfGenerated(false);
         setPdfBlob(null);
         // Switch to create tab
@@ -481,7 +489,8 @@ const PurchaseOrder = ({ user, onLogout }) => {
           contact: po.contact || '',
           created_by: po.created_by || (user && user.username) || '',
           paymentStatus: po.paymentStatus || 'Unpaid',
-          originalId: po.id,
+          // For clone, don't set originalId so it creates a new PO instead of updating
+          originalId: po.isClone ? undefined : po.id,
           originalCreatedAt: po.createdAt,
           originalClientId: po.client_id || po.clientId || null,
           originalSiteInchargeId: po.site_incharge_id || po.siteInchargeId || null,
@@ -1291,7 +1300,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
         type: item.type,
         category: item.category || '',
         quantity: quantity,
-        price: 40,
+        price: 0,
         itemId: item.itemId || null,
         brandId: item.brandId || null,
         modelId: item.modelId || null,
@@ -1347,11 +1356,13 @@ const PurchaseOrder = ({ user, onLogout }) => {
             model: itemData.model,
             type: itemData.type,
             quantity: parseInt(itemData.quantity),
-            itemId: itemData.itemId || item.itemId || null,
-            brandId: itemData.brandId || item.brandId || null,
-            modelId: itemData.modelId || item.modelId || null,
-            typeId: itemData.typeId || item.typeId || null,
-            categoryId: itemData.categoryId || item.categoryId || resolveCategoryId(itemData.category) || null,
+            // When editing, use the new itemData IDs - don't fall back to old item IDs
+            // This ensures that if user selects a new item, we use the new item's ID, not the old deleted one
+            itemId: itemData.itemId || null,
+            brandId: itemData.brandId || null,
+            modelId: itemData.modelId || null,
+            typeId: itemData.typeId || null,
+            categoryId: itemData.categoryId || resolveCategoryId(itemData.category) || null,
           }
           : item
       );
@@ -1360,14 +1371,12 @@ const PurchaseOrder = ({ user, onLogout }) => {
     } else {
       // Normalize values for comparison
       const normalizeValue = (val) => (val || '').toString().toLowerCase().trim();
-
       const newItemName = normalizeValue(itemData.itemName);
       const newCategory = normalizeValue(itemData.category);
       const newModel = normalizeValue(itemData.model);
       const newBrand = normalizeValue(itemData.brand);
       const newType = normalizeValue(itemData.type);
       const newQuantity = parseInt(itemData.quantity) || 0;
-
       // Check if an item with the same properties exists
       const existingItemIndex = items.findIndex(item => {
         const itemNameParts = item.name ? item.name.split(',') : [];
@@ -1376,7 +1385,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
         const existingModel = normalizeValue(item.model);
         const existingBrand = normalizeValue(item.brand);
         const existingType = normalizeValue(item.type);
-
         // Match if all properties are the same
         return (
           existingItemName === newItemName &&
@@ -1386,7 +1394,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
           existingType === newType
         );
       });
-
       if (existingItemIndex !== -1) {
         // Merge with existing item by adding quantities
         const updatedItems = items.map((item, index) => {
@@ -1409,7 +1416,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
           type: itemData.type,
           category: itemData.category || '',
           quantity: newQuantity,
-          price: 40,
+          price: 0,
           itemId: itemData.itemId || null,
           brandId: itemData.brandId || null,
           modelId: itemData.modelId || null,
@@ -2015,38 +2022,40 @@ const PurchaseOrder = ({ user, onLogout }) => {
                         {isGenerating ? (isEditFromHistory ? 'Updating...' : 'Generating...') : (isEditFromHistory ? 'Update PO' : 'Generate PO')}
                       </button>
                     ) : null}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        // Update UI state immediately for instant response
-                        setIsEditMode(true);
-                        setIsViewOnlyFromHistory(false); // Clear view-only mode when editing
-                        setHasOpenedAdd(false);
-                        setIsPdfGenerated(false);
-                        setPdfBlob(null);
+                    {!isViewOnlyFromHistory && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Update UI state immediately for instant response
+                          setIsEditMode(true);
+                          setIsViewOnlyFromHistory(false); // Clear view-only mode when editing
+                          setHasOpenedAdd(false);
+                          setIsPdfGenerated(false);
+                          setPdfBlob(null);
 
-                        // Preserve isEditFromHistory flag - don't clear it if already editing from History
-                        // Only clear if we're not already editing from History (editing from Create PO page)
-                        if (!isEditFromHistory) {
-                          setIsEditFromHistory(false);
-                          // Update PO number automatically when clicking edit after generating PO
-                          // Do this asynchronously without blocking UI update
-                          if (selectedVendor?.id) {
-                            fetchNextPoNumberForVendor(selectedVendor.id)
-                              .then(nextPoNo => {
-                                setPoData(prev => ({ ...prev, poNumber: `#${nextPoNo}` }));
-                                previousVendorId.current = selectedVendor.id; // Update tracked vendor ID
-                              })
-                              .catch(error => {
-                                console.error('Error fetching PO number:', error);
-                              });
+                          // Preserve isEditFromHistory flag - don't clear it if already editing from History
+                          // Only clear if we're not already editing from History (editing from Create PO page)
+                          if (!isEditFromHistory) {
+                            setIsEditFromHistory(false);
+                            // Update PO number automatically when clicking edit after generating PO
+                            // Do this asynchronously without blocking UI update
+                            if (selectedVendor?.id) {
+                              fetchNextPoNumberForVendor(selectedVendor.id)
+                                .then(nextPoNo => {
+                                  setPoData(prev => ({ ...prev, poNumber: `#${nextPoNo}` }));
+                                  previousVendorId.current = selectedVendor.id; // Update tracked vendor ID
+                                })
+                                .catch(error => {
+                                  console.error('Error fetching PO number:', error);
+                                });
+                            }
                           }
-                        }
-                      }}
-                      className="flex items-center font-semibold justify-center"
-                    >
-                      <img src={editIcon} alt="Edit" className="w-[15px] h-[15px]" />
-                    </button>
+                        }}
+                        className="flex items-center font-semibold justify-center"
+                      >
+                        <img src={editIcon} alt="Edit" className="w-[15px] h-[15px]" />
+                      </button>
+                    )}
 
                   </div>
                 </div>
@@ -2327,6 +2336,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                                   setExpandedItemId(null);
                                   handleDeleteItem(item.id);
                                 }}
+                                hideButtons={isViewOnlyFromHistory}
                               />
                             );
                           })}
@@ -2377,19 +2387,30 @@ const PurchaseOrder = ({ user, onLogout }) => {
           onAdd={handleAddItem}
           selectedCategory={selectedCategory}
           onCategoryChange={setSelectedCategory}
-          initialData={editingItem ? {
-            itemName: editingItem.name ? editingItem.name.split(',')[0].trim() : '',
-            model: editingItem.model || '',
-            brand: editingItem.brand || '',
-            type: editingItem.type || '',
-            quantity: editingItem.quantity ? String(editingItem.quantity) : '',
-            category: editingItem.name ? editingItem.name.split(',')[1]?.trim() || '' : '',
-            itemId: editingItem.itemId || null,
-            brandId: editingItem.brandId || null,
-            modelId: editingItem.modelId || null,
-            typeId: editingItem.typeId || null,
-            categoryId: editingItem.categoryId || null,
-          } : {}}
+          initialData={editingItem ? (() => {
+            // Resolve category: prefer editingItem.category, then extract from name, then resolve from categoryId
+            let resolvedCategory = editingItem.category || '';
+            if (!resolvedCategory && editingItem.name && editingItem.name.includes(',')) {
+              resolvedCategory = editingItem.name.split(',')[1]?.trim() || '';
+            }
+            if (!resolvedCategory && editingItem.categoryId && categoryOptions.length > 0) {
+              const categoryOption = categoryOptions.find(cat => String(cat.id) === String(editingItem.categoryId));
+              resolvedCategory = categoryOption?.label || categoryOption?.value || '';
+            }
+            return {
+              itemName: editingItem.name ? editingItem.name.split(',')[0].trim() : '',
+              model: editingItem.model || '',
+              brand: editingItem.brand || '',
+              type: editingItem.type || '',
+              quantity: editingItem.quantity ? String(editingItem.quantity) : '',
+              category: resolvedCategory,
+              itemId: editingItem.itemId || null,
+              brandId: editingItem.brandId || null,
+              modelId: editingItem.modelId || null,
+              typeId: editingItem.typeId || null,
+              categoryId: editingItem.categoryId || null,
+            };
+          })() : {}}
           onRefreshItemName={fetchPoItemName}
           onRefreshModel={fetchPoModel}
           onRefreshBrand={fetchPoBrand}

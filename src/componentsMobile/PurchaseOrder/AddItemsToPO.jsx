@@ -637,18 +637,73 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
       return;
     }
     // First, try to resolve IDs with current arrays
-    let resolvedItemId =
-      initialData.itemId ||
-      findIdByLabel(poItemName, formData.itemName, ['itemName', 'poItemName', 'name', 'item_name']);
-    let resolvedModelId =
-      initialData.modelId ||
-      findIdByLabel(poModel, formData.model, ['model', 'poModel', 'modelName', 'name']);
-    let resolvedBrandId =
-      initialData.brandId ||
-      findIdByLabel(poBrand, formData.brand, ['brand', 'poBrand', 'brandName', 'name']);
-    let resolvedTypeId =
-      initialData.typeId ||
-      findIdByLabel(poType, formData.type, ['type', 'poType', 'typeName', 'name', 'typeColor']);
+    // Check if we're in editing mode
+    const isEditingMode = initialData && (initialData.itemId !== undefined || initialData.itemName !== undefined);
+    
+    // Check if itemName has changed from initialData
+    // If initialData.itemName is empty/missing but we have formData.itemName, consider it changed
+    // This handles the case where old item was deleted and only had an ID
+    const hasInitialItemName = initialData && initialData.itemName && initialData.itemName.trim() !== '';
+    const hasFormItemName = formData.itemName && formData.itemName.trim() !== '';
+    const itemNameChanged = isEditingMode && (
+      !hasInitialItemName || // If initialData has no itemName but formData does, it changed
+      !hasFormItemName || // If formData has no itemName but initialData does, it changed
+      (hasInitialItemName && hasFormItemName && 
+       initialData.itemName.toLowerCase().trim() !== formData.itemName.toLowerCase().trim()) // Names don't match
+    );
+    
+    // Always try to resolve ID from the current formData.itemName first
+    // This ensures we get the correct ID for newly selected items
+    let resolvedItemId = null;
+    if (formData.itemName) {
+      resolvedItemId = findIdByLabel(poItemName, formData.itemName, ['itemName', 'poItemName', 'name', 'item_name']);
+    }
+    
+    // Only use initialData.itemId as fallback if:
+    // 1. We couldn't resolve from formData.itemName AND
+    // 2. The itemName hasn't changed (meaning user is editing the same item, not selecting a new one)
+    // IMPORTANT: If itemNameChanged is true OR if we're editing and formData.itemName exists, 
+    // we should NEVER use initialData.itemId, even if resolution fails
+    if (!resolvedItemId && !itemNameChanged && initialData && initialData.itemId) {
+      resolvedItemId = initialData.itemId;
+    }
+    
+    // If we're editing and itemName changed but couldn't resolve, log a warning
+    if (isEditingMode && itemNameChanged && !resolvedItemId && formData.itemName) {
+      console.warn('Could not resolve itemId for changed item:', formData.itemName, 'Initial itemName:', initialData.itemName);
+    }
+    // Only use initialData IDs if the corresponding field hasn't changed
+    const modelChanged = isEditingMode && initialData.model && formData.model && 
+      initialData.model.toLowerCase().trim() !== formData.model.toLowerCase().trim();
+    const brandChanged = isEditingMode && initialData.brand && formData.brand && 
+      initialData.brand.toLowerCase().trim() !== formData.brand.toLowerCase().trim();
+    const typeChanged = isEditingMode && initialData.type && formData.type && 
+      initialData.type.toLowerCase().trim() !== formData.type.toLowerCase().trim();
+    
+    // Always try to resolve from current formData first
+    let resolvedModelId = null;
+    if (formData.model) {
+      resolvedModelId = findIdByLabel(poModel, formData.model, ['model', 'poModel', 'modelName', 'name']);
+    }
+    if (!resolvedModelId && !modelChanged && initialData.modelId) {
+      resolvedModelId = initialData.modelId;
+    }
+    
+    let resolvedBrandId = null;
+    if (formData.brand) {
+      resolvedBrandId = findIdByLabel(poBrand, formData.brand, ['brand', 'poBrand', 'brandName', 'name']);
+    }
+    if (!resolvedBrandId && !brandChanged && initialData.brandId) {
+      resolvedBrandId = initialData.brandId;
+    }
+    
+    let resolvedTypeId = null;
+    if (formData.type) {
+      resolvedTypeId = findIdByLabel(poType, formData.type, ['type', 'poType', 'typeName', 'name', 'typeColor']);
+    }
+    if (!resolvedTypeId && !typeChanged && initialData.typeId) {
+      resolvedTypeId = initialData.typeId;
+    }
     // If any ID is missing, refresh the arrays and try again
     if ((!resolvedItemId && formData.itemName) ||
         (!resolvedModelId && formData.model) ||
@@ -693,7 +748,13 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
           const response = await fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/getAll');
           if (response.ok) {
             freshItemName = await response.json();
+            // Update poItemName state with fresh data
+            setPoItemName(freshItemName);
             resolvedItemId = findIdByLabel(freshItemName, formData.itemName, ['itemName', 'poItemName', 'name', 'item_name']);
+            // Debug logging
+            if (!resolvedItemId) {
+              console.warn('Could not find itemId for:', formData.itemName, 'in fresh data. Available items:', freshItemName.slice(0, 5).map(i => i.itemName || i.name));
+            }
           }
         } catch (error) {
           console.error('Error fetching item names:', error);

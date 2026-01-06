@@ -805,49 +805,51 @@ const PurchaseHistory = ({ username, userRoles = [] }) => {
             </div>
             {purchaseOrders.length > 0 ? (
               <ul className="lg:h-[550px] h-[200px] overflow-auto">
-                {purchaseOrders.map((order, index) => (
-                  <li
-                    key={order.id}
-                    className="flex items-center justify-between border-b py-2 cursor-pointer"
-                    onClick={() => {
-                      setSelectedOrder(order);
-                      setSelectedOrderId(order.id);
-                    }}>
-                    <div className="w-[50px] text-right mr-2">{index + 1}.</div>
-                    <div
-                      className="flex items-center gap-2 w-[450px] cursor-pointer"
+                {[...purchaseOrders]
+                  .sort((a, b) => b.id - a.id)
+                  .map((order, index) => (
+                    <li
+                      key={order.id}
+                      className="flex items-center justify-between border-b py-2 cursor-pointer"
                       onClick={() => {
                         setSelectedOrder(order);
                         setSelectedOrderId(order.id);
                       }}>
-                      <img src={file} className="w-5 h-5" />
-                      <span
-                        title={`${order.date} - ${order.client_id}`}
-                        className={`font-medium hover:text-[#E4572E] ${selectedOrderId === order.id ? 'text-[#E4572E]' : 'text-black'} ${order.delete_status ? 'line-through text-gray-500' : ''}`}
-                      >
-                        {order.eno} - {order.date} - {
-                          clientNameOptions.find(opt => opt.id === order.client_id)?.label || order.client_id
-                        }
-                        {order.po_notes?.po_notes ? ` - ${order.po_notes.po_notes}` : ""}
-                      </span>
-                    </div>
-                    <div className="flex gap-3 pr-2 w-[100px] justify-end">
-                      <button onClick={() => generatePDF(order)}>
-                        <img src={download} alt="#" className="w-5 h-5" />
-                      </button>
-                      <button className="rounded-full transition duration-200" onClick={() => handleEditClick(order)}>
-                        <img src={edit} alt="Edit" className="w-4 h-6 transform hover:scale-110" />
-                      </button>
-                      <button onClick={() => toggleDeleteStatus(order)}>
-                        <img
-                          src={order.delete_status ? undo : remove}
-                          alt="Toggle Delete"
-                          className="w-4 h-4 transform hover:scale-110"
-                        />
-                      </button>
-                    </div>
-                  </li>
-                ))}
+                      <div className="w-[50px] text-right mr-2">{index + 1}.</div>
+                      <div
+                        className="flex items-center gap-2 w-[450px] cursor-pointer"
+                        onClick={() => {
+                          setSelectedOrder(order);
+                          setSelectedOrderId(order.id);
+                        }}>
+                        <img src={file} className="w-5 h-5" />
+                        <span
+                          title={`${order.date} - ${order.client_id}`}
+                          className={`font-medium hover:text-[#E4572E] ${selectedOrderId === order.id ? 'text-[#E4572E]' : 'text-black'} ${order.delete_status ? 'line-through text-gray-500' : ''}`}
+                        >
+                          {order.eno} - {order.date} - {
+                            clientNameOptions.find(opt => opt.id === order.client_id)?.label || order.client_id
+                          }
+                          {order.po_notes?.po_notes ? ` - ${order.po_notes.po_notes}` : ""}
+                        </span>
+                      </div>
+                      <div className="flex gap-3 pr-2 w-[100px] justify-end">
+                        <button onClick={() => generatePDF(order)}>
+                          <img src={download} alt="#" className="w-5 h-5" />
+                        </button>
+                        <button className="rounded-full transition duration-200" onClick={() => handleEditClick(order)}>
+                          <img src={edit} alt="Edit" className="w-4 h-6 transform hover:scale-110" />
+                        </button>
+                        <button onClick={() => toggleDeleteStatus(order)}>
+                          <img
+                            src={order.delete_status ? undo : remove}
+                            alt="Toggle Delete"
+                            className="w-4 h-4 transform hover:scale-110"
+                          />
+                        </button>
+                      </div>
+                    </li>
+                  ))}
               </ul>
             ) : (
               <div className="flex flex-col items-center justify-center lg:h-[300px]">

@@ -11,6 +11,7 @@ const History = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [poToDelete, setPoToDelete] = useState(null);
   const [expandedPoId, setExpandedPoId] = useState(null);
+  const [cloneExpandedPoId, setCloneExpandedPoId] = useState(null);
   const [isFirstCardClosed, setIsFirstCardClosed] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -33,12 +34,17 @@ const History = () => {
   
   // Refs to track current state values for event handlers
   const expandedPoIdRef = useRef(expandedPoId);
+  const cloneExpandedPoIdRef = useRef(cloneExpandedPoId);
   const isFirstCardClosedRef = useRef(isFirstCardClosed);
   
   // Keep refs in sync with state
   useEffect(() => {
     expandedPoIdRef.current = expandedPoId;
   }, [expandedPoId]);
+  
+  useEffect(() => {
+    cloneExpandedPoIdRef.current = cloneExpandedPoId;
+  }, [cloneExpandedPoId]);
   
   useEffect(() => {
     isFirstCardClosedRef.current = isFirstCardClosed;
@@ -300,6 +306,20 @@ const History = () => {
     // For now, just store the data - parent component can check for it
     window.dispatchEvent(new CustomEvent('editPO', { detail: po }));
   };
+  const handleClone = (po) => {
+    // Clone PO data - remove ID to create new record
+    const clonedPO = { ...po };
+    delete clonedPO.id;
+    // Mark as clone so Create PO component knows to show "Generate PO" instead of "Update PO"
+    clonedPO.isClone = true;
+    // Store cloned PO data in localStorage to load in create tab
+    localStorage.setItem('editingPO', JSON.stringify(clonedPO));
+    // Switch to create tab immediately
+    localStorage.setItem('activeTab', 'create');
+    // Dispatch custom event for create tab to listen
+    window.dispatchEvent(new CustomEvent('editPO', { detail: clonedPO }));
+    setCloneExpandedPoId(null);
+  };
   const handleDelete = (poId) => {
     setPoToDelete(poId);
     setShowDeleteConfirm(true);
@@ -535,8 +555,9 @@ const History = () => {
     const deltaX = touch.clientX - state.startX;
     const isFirstCard = filteredPOs.length > 0 && filteredPOs[0].id === poId;
     const isExpanded = isFirstCard ? (!isFirstCardClosed || expandedPoId === poId) : expandedPoId === poId;
-    // Allow swiping left to reveal buttons, or swiping right to hide buttons if already expanded
-    if (deltaX < 0 || (isExpanded && deltaX > 0)) {
+    const isCloneExpanded = cloneExpandedPoId === poId;
+    // Allow swiping left to reveal buttons, swiping right to reveal clone, or swiping to hide if already expanded
+    if (deltaX < 0 || (deltaX > 0 && !isExpanded) || (isExpanded && deltaX > 0) || (isCloneExpanded && deltaX < 0)) {
       e.preventDefault();
       setSwipeStates(prev => ({
         ...prev,
@@ -556,26 +577,27 @@ const History = () => {
     const isFirstCard = filteredPOs.length > 0 && filteredPOs[0].id === poId;
     if (absDeltaX >= minSwipeDistance) {
       if (deltaX < 0) {
-        // Swiped left (reveal buttons)
+        // Swiped left (reveal buttons on right)
         if (isFirstCard) {
           setIsFirstCardClosed(false);
         }
         setExpandedPoId(poId);
+        setCloneExpandedPoId(null);
       } else {
-        // Swiped right (hide buttons)
-        if (isFirstCard) {
-          setIsFirstCardClosed(true);
+        // Swiped right (reveal clone button on left)
+        if (expandedPoId === poId) {
+          // Hide right buttons if they were shown
+          if (isFirstCard) {
+            setIsFirstCardClosed(true);
+          }
+          setExpandedPoId(null);
+        } else {
+          // Show clone button on left
+          setCloneExpandedPoId(poId);
         }
-        setExpandedPoId(null);
       }
     } else {
-      // Small movement - snap back
-      if (expandedPoId === poId) {
-        if (isFirstCard) {
-          setIsFirstCardClosed(true);
-        }
-        setExpandedPoId(null);
-      }
+      // Small movement - snap back (no change needed, buttons stay as they are)
     }
     // Reset swipe state
     setSwipeStates(prev => {
@@ -601,12 +623,14 @@ const History = () => {
           // Use refs to get current values
           const currentIsFirstCardClosed = isFirstCardClosedRef.current;
           const currentExpandedPoId = expandedPoIdRef.current;
+          const currentCloneExpandedPoId = cloneExpandedPoIdRef.current;
           // Check if card is expanded
           const isExpanded = isFirstCard 
             ? (!currentIsFirstCardClosed || currentExpandedPoId === po.id) 
             : currentExpandedPoId === po.id;
+          const isCloneExpanded = currentCloneExpandedPoId === po.id;
           // Only update if dragging horizontally
-          if (deltaX < 0 || (isExpanded && deltaX > 0)) {
+          if (deltaX < 0 || (deltaX > 0 && !isExpanded) || (isExpanded && deltaX > 0) || (isCloneExpanded && deltaX < 0)) {
             newState[po.id] = {
               ...state,
               currentX: e.clientX,
@@ -630,27 +654,28 @@ const History = () => {
           const isFirstCard = filteredPOs.length > 0 && filteredPOs[0].id === po.id;
           if (absDeltaX >= minSwipeDistance) {
             if (deltaX < 0) {
-              // Swiped left (reveal buttons)
+              // Swiped left (reveal buttons on right)
               if (isFirstCard) {
                 setIsFirstCardClosed(false);
               }
               setExpandedPoId(po.id);
+              setCloneExpandedPoId(null);
             } else {
-              // Swiped right (hide buttons)
-              if (isFirstCard) {
-                setIsFirstCardClosed(true);
+              // Swiped right (reveal clone button on left)
+              const currentExpandedPoId = expandedPoIdRef.current;
+              if (currentExpandedPoId === po.id) {
+                // Hide right buttons if they were shown
+                if (isFirstCard) {
+                  setIsFirstCardClosed(true);
+                }
+                setExpandedPoId(null);
+              } else {
+                // Show clone button on left
+                setCloneExpandedPoId(po.id);
               }
-              setExpandedPoId(null);
             }
           } else {
-            // Small movement - snap back
-            const currentExpandedPoId = expandedPoIdRef.current;
-            if (currentExpandedPoId === po.id) {
-              if (isFirstCard) {
-                setIsFirstCardClosed(true);
-              }
-              setExpandedPoId(null);
-            }
+            // Small movement - snap back (no change needed, buttons stay as they are)
           }
           // Remove swipe state for this card
           delete newState[po.id];
@@ -690,12 +715,14 @@ const History = () => {
           // Use refs to get current values
           const currentIsFirstCardClosed = isFirstCardClosedRef.current;
           const currentExpandedPoId = expandedPoIdRef.current;
+          const currentCloneExpandedPoId = cloneExpandedPoIdRef.current;
           // Check if card is expanded
           const isExpanded = isFirstCard 
             ? (!currentIsFirstCardClosed || currentExpandedPoId === po.id) 
             : currentExpandedPoId === po.id;
+          const isCloneExpanded = currentCloneExpandedPoId === po.id;
           // Only prevent default and update if swiping horizontally
-          if (deltaX < 0 || (isExpanded && deltaX > 0)) {
+          if (deltaX < 0 || (deltaX > 0 && !isExpanded) || (isExpanded && deltaX > 0) || (isCloneExpanded && deltaX < 0)) {
             e.preventDefault();
             return {
               ...prev,
@@ -718,27 +745,28 @@ const History = () => {
           const isFirstCard = filteredPOs.length > 0 && filteredPOs[0].id === po.id;
           if (absDeltaX >= minSwipeDistance) {
             if (deltaX < 0) {
-              // Swiped left (reveal buttons)
+              // Swiped left (reveal buttons on right)
               if (isFirstCard) {
                 setIsFirstCardClosed(false);
               }
               setExpandedPoId(po.id);
+              setCloneExpandedPoId(null);
             } else {
-              // Swiped right (hide buttons)
-              if (isFirstCard) {
-                setIsFirstCardClosed(true);
+              // Swiped right (reveal clone button on left)
+              const currentExpandedPoId = expandedPoIdRef.current;
+              if (currentExpandedPoId === po.id) {
+                // Hide right buttons if they were shown
+                if (isFirstCard) {
+                  setIsFirstCardClosed(true);
+                }
+                setExpandedPoId(null);
+              } else {
+                // Show clone button on left
+                setCloneExpandedPoId(po.id);
               }
-              setExpandedPoId(null);
             }
           } else {
-            // Small movement - snap back
-            const currentExpandedPoId = expandedPoIdRef.current;
-            if (currentExpandedPoId === po.id) {
-              if (isFirstCard) {
-                setIsFirstCardClosed(true);
-              }
-              setExpandedPoId(null);
-            }
+            // Small movement - snap back (no change needed, buttons stay as they are)
           }
           // Reset swipe state
           const newState = { ...prev };
@@ -773,7 +801,7 @@ const History = () => {
     return () => {
       cleanupFunctions.forEach(cleanup => cleanup());
     };
-  }, [filteredPOs, minSwipeDistance]);
+  }, [filteredPOs, minSwipeDistance, cloneExpandedPoId]);
   // Format date/time for display: "Today • 09:42 AM", "Yesterday • 11:11 AM", or "DD/MM/YYYY • HH:MM AM/PM"
   const formatDateTime = (dateTimeString) => {
     if (!dateTimeString) return '';
@@ -847,7 +875,7 @@ const History = () => {
     )
   ].filter(Boolean))].sort();
   return (
-    <div className="relative w-full h-screen bg-white max-w-[360px] mx-auto flex flex-col overflow-hidden" style={{ fontFamily: "'Manrope', sans-serif" }}>
+    <div className="relative w-full bg-white max-w-[360px] mx-auto flex flex-col scrollbar-none overflow-hidden" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* Header Section - Fixed */}
       <div className="flex-shrink-0 bg-white px-4 pt-4 z-30">
         {/* Search Bar */}
@@ -878,7 +906,6 @@ const History = () => {
                 {/* Top arrows pointing left and right */}
                 <path d="M7 4L9 5L11 4" stroke={hasActiveFilters ? "#26bf94" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
                 <path d="M7 6L9 5L11 6" stroke={hasActiveFilters ? "#26bf94" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-
                 {/* Bottom horizontal line */}
                 <line x1="2" y1="13" x2="16" y2="13" stroke={hasActiveFilters ? "#26bf94" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
                 {/* Bottom vertical line intersecting center */}
@@ -893,11 +920,9 @@ const History = () => {
                 </span>
               )}
             </button>
-
             {/* Active Filter Tags - Next to Filter button */}
-            <div className="flex items-center gap-2 overflow-x-auto  min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-              {/* Show "Filter" text only when no filters are active */}
-              
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scrollbar-none  min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              {/* Show "Filter" text only when no filters are active */}              
               {/* Show filter tags when filters are active */}
               {(filters.vendorName || filters.clientName || filters.siteIncharge || filters.startDate || filters.endDate || filters.branch) && (
                 <div className="flex items-center gap-2 flex-nowrap">
@@ -919,8 +944,7 @@ const History = () => {
                   {filters.vendorName && (
                     <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
                       <span className="text-[11px] font-medium text-black">Vendor</span>
-                      <button
-                        onClick={() => setFilters({ ...filters, vendorName: '' })}
+                      <button onClick={() => setFilters({ ...filters, vendorName: '' })}
                         className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
                       >
                         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -932,8 +956,7 @@ const History = () => {
                   {filters.clientName && (
                     <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
                       <span className="text-[11px] font-medium text-black">Project</span>
-                      <button
-                        onClick={() => setFilters({ ...filters, clientName: '' })}
+                      <button onClick={() => setFilters({ ...filters, clientName: '' })}
                         className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
                       >
                         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -945,8 +968,7 @@ const History = () => {
                   {filters.siteIncharge && (
                     <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
                       <span className="text-[11px] font-medium text-black">Incharge</span>
-                      <button
-                        onClick={() => setFilters({ ...filters, siteIncharge: '' })}
+                      <button onClick={() => setFilters({ ...filters, siteIncharge: '' })}
                         className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
                       >
                         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -960,8 +982,7 @@ const History = () => {
                       <span className="text-[11px] font-medium text-black whitespace-nowrap">
                         Date
                       </span>
-                      <button
-                        onClick={() => setFilters({ ...filters, startDate: '', endDate: '' })}
+                      <button onClick={() => setFilters({ ...filters, startDate: '', endDate: '' })}
                         className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
                       >
                         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -974,23 +995,19 @@ const History = () => {
               )}
             </div>
           </div>
-
           {hasActiveFilters && (
-            <button
-              onClick={handleClear}
-              className="text-[14px] font-medium hover:text-black transition-colors flex-shrink-0 text-[#9E9E9E]"
-            >
+            <button onClick={handleClear} className="text-[14px] font-medium hover:text-black transition-colors flex-shrink-0 text-[#9E9E9E]" >
               x
             </button>
           )}
         </div>
       </div>
-
       {/* Purchase Orders List - Scrollable */}
-      <div
-        className="overflow-y-auto scrollbar-hide px-4 mt-1 pb-4"
-        style={{ height: 'calc(100vh - 180px - 80px)', maxHeight: 'calc(100vh - 180px - 80px)' }}
-        onClick={() => setExpandedPoId(null)}
+      <div className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide px-4 mt-1 " style={{ height: 'calc(100vh - 180px - 80px)', maxHeight: 'calc(100vh - 180px - 80px)' }}
+        onClick={() => {
+          setExpandedPoId(null);
+          setCloneExpandedPoId(null);
+        }}
       >
         {filteredPOs.length === 0 ? (
           <div className="flex flex-col items-center justify-center ">
@@ -1017,19 +1034,43 @@ const History = () => {
                 const amount = item.amount || (item.quantity * item.price) || 0;
                 return sum + Number(amount);
               }, 0) || 0;
-
               const swipeState = swipeStates[po.id];
+              const isCloneExpanded = cloneExpandedPoId === po.id;
               let swipeOffset = 0;
               if (swipeState && swipeState.isSwiping) {
-                swipeOffset = Math.max(-110, Math.min(0, swipeState.currentX - swipeState.startX));
+                swipeOffset = Math.max(-110, Math.min(48, swipeState.currentX - swipeState.startX));
               } else if (isExpanded) {
                 swipeOffset = -110;
+              } else if (isCloneExpanded) {
+                swipeOffset = 48;
               } else {
                 swipeOffset = 0;
               }
-
               return (
                 <div key={po.id} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-gray-50 rounded-[8px] h-[100px]">
+                  {/* Clone Button - Behind the card on the left, revealed on right swipe */}
+                  <div
+                    className="absolute left-0 top-0 flex gap-2 flex-shrink-0 z-0"
+                    style={{
+                      opacity: isCloneExpanded || (swipeState && swipeState.isSwiping && swipeOffset > 20) ? 1 : 0,
+                      transition: 'opacity 0.2s ease-out',
+                      pointerEvents: isCloneExpanded ? 'auto' : 'none'
+                    }}
+                  >
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleClone(po);
+                      }}
+                      className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                      title="Clone"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 6.75V3.75C12 3.33579 11.6642 3 11.25 3H3.75C3.33579 3 3 3.33579 3 3.75V11.25C3 11.6642 3.33579 12 3.75 12H6.75" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M15 6.75H7.5C6.67157 6.75 6 7.42157 6 8.25V14.25C6 15.0784 6.67157 15.75 7.5 15.75H14.25C15.0784 15.75 15.75 15.0784 15.75 14.25V8.25C15.75 7.42157 15.0784 6.75 14.25 6.75H15Z" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                  </div>
                   {/* PO Card */}
                   <div
                     ref={(el) => {
@@ -1045,14 +1086,14 @@ const History = () => {
                       touchAction: 'pan-y'
                     }}
                     onClick={(e) => {
-                      if (!isExpanded) {
+                      if (!isExpanded && !isCloneExpanded) {
                         e.stopPropagation();
                       }
                     }}
                   >
                     <div className="flex items-start justify-between gap-2">
                       {/* Left: PO Details */}
-                      <div className=" min-w-0">
+                      <div className=" min-w-0 mb-1">
                         <div className="flex items-center gap-2 mb-1">
                           <button
                             onClick={(e) => {
@@ -1077,7 +1118,6 @@ const History = () => {
                           </span>
                         )}
                       </div>
-
                       {/* Right: Payment Status Badge and Amount - Always visible */}
                       <div className="flex-shrink-0 flex flex-col items-end gap-1">
                         {po.paymentStatus && (
@@ -1115,7 +1155,6 @@ const History = () => {
                       </div>
                     </div>
                   </div>
-
                   {/* Action Buttons - Behind the card on the right, revealed on swipe */}
                   <div
                     className="absolute right-0 top-0 flex gap-2 flex-shrink-0 z-0"
@@ -1155,7 +1194,6 @@ const History = () => {
           </div>
         )}
       </div>
-
       {/* Filter Modal */}
       {showFilterModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif" }} onClick={() => setShowFilterModal(false)}>
@@ -1174,7 +1212,6 @@ const History = () => {
                 {filters.branch || 'Branch'}
               </button>
             </div>
-
             <div className="px-6 pb-32">
               <div className="space-y-4">
                 {/* Vendor Name Filter */}
@@ -1192,7 +1229,6 @@ const History = () => {
                     showAllOptions={true}
                   />
                 </div>
-
                 {/* Client Name Filter */}
                 <div>
                   <label className="text-[12px] font-semibold text-black mb-1 block">
@@ -1208,7 +1244,6 @@ const History = () => {
                     showAllOptions={true}
                   />
                 </div>
-
                 {/* Site Incharge Filter */}
                 <div>
                   <label className="text-[12px] font-semibold text-black mb-1 block">
@@ -1224,7 +1259,6 @@ const History = () => {
                     showAllOptions={true}
                   />
                 </div>
-
                 <div className="flex gap-2">
                   {/* Date Filter */}
                   <div className="flex-1">
@@ -1250,7 +1284,6 @@ const History = () => {
                       </button>
                     </div>
                   </div>
-
                   {/* PO.No Filter */}
                   <div className="flex-1">
                     <label className="text-[12px] font-semibold text-black mb-1 block">PO.No</label>
@@ -1266,8 +1299,7 @@ const History = () => {
                   </div>
                 </div>
               </div>
-            </div>
-            
+            </div>            
             {/* Action Buttons - Fixed at bottom */}
             <div className="absolute bottom-6 left-0 right-0 px-6 flex gap-4">
               <button
@@ -1286,7 +1318,6 @@ const History = () => {
           </div>
         </div>
       )}
-
       {/* Delete Confirmation Modal */}
       <DeleteConfirmModal
         isOpen={showDeleteConfirm}
@@ -1294,7 +1325,6 @@ const History = () => {
         onCancel={cancelDelete}
         message="Are you sure you want to delete this purchase order?"
       />
-
       {/* Date Range Picker Modal */}
       <DateRangePickerModal
         isOpen={showDatePicker}
@@ -1303,7 +1333,6 @@ const History = () => {
         initialStartDate={filters.startDate ? formatDate(filters.startDate) : ''}
         initialEndDate={filters.endDate ? formatDate(filters.endDate) : ''}
       />
-
       {/* Branch Select Modal */}
       <SelectVendorModal
         isOpen={showBranchModal}
@@ -1321,6 +1350,4 @@ const History = () => {
     </div>
   );
 };
-
 export default History;
-

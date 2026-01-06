@@ -7,6 +7,8 @@ import DeleteConfirmModal from '../PurchaseOrder/DeleteConfirmModal';
 import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 import SearchItemsModal from '../PurchaseOrder/SearchItemsModal';
 import editIcon from '../Images/edit.png';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const Outgoing = ({ user }) => {
   // Helper functions for date
@@ -44,6 +46,7 @@ const Outgoing = ({ user }) => {
   const [itemToDelete, setItemToDelete] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [hideSummaryCard, setHideSummaryCard] = useState(false);
   const [showSearchItemsModal, setShowSearchItemsModal] = useState(false);
   const [poItemName, setPoItemName] = useState([]);
   const [poBrand, setPoBrand] = useState([]);
@@ -53,6 +56,9 @@ const Outgoing = ({ user }) => {
   const expandedItemIdRef = useRef(expandedItemId);
   // State for edit mode additional fields
   const [editTransactionId, setEditTransactionId] = useState('');
+  const [editingInventoryId, setEditingInventoryId] = useState(null);
+  const [pendingItemsFromClone, setPendingItemsFromClone] = useState([]);
+  const [fromHistory, setFromHistory] = useState(false);
   
   // Outgoing page options (same as PurchaseOrder but independent)
   const [outgoingSiteOptions, setOutgoingSiteOptions] = useState([]);
@@ -399,14 +405,22 @@ const Outgoing = ({ user }) => {
           if (!type && typeId && typeId !== 0 && poType.length > 0) {
             type = resolveTypeName(typeId);
           }
-          if (!category && categoryId && categoryOptions.length > 0) {
-            category = resolveCategoryName(categoryId);
-          }          
+          // Always try to resolve category from categoryId if available (even if category is already set)
+          // This ensures category is resolved when categoryOptions loads
+          if (categoryId && categoryOptions.length > 0) {
+            const resolvedCategory = resolveCategoryName(categoryId);
+            if (resolvedCategory) {
+              category = resolvedCategory;
+            }
+          }
           // If itemName includes category (format: "ItemName, Category")
           if (itemName && itemName.includes(',')) {
             const parts = itemName.split(',');
             itemName = parts[0].trim();
-            category = parts[1] ? parts[1].trim() : category;
+            // Only use category from itemName if we don't already have a resolved category
+            if (!category || category === '') {
+              category = parts[1] ? parts[1].trim() : category;
+            }
           }
           const formattedItem = {
             id: index + 1,
@@ -426,19 +440,21 @@ const Outgoing = ({ user }) => {
           return formattedItem;
         });
       }
+      // Get outgoing type before using it
+      const outgoingType = inventoryItem.outgoing_type || inventoryItem.outgoingType || '';
       // Load inventory data into form
       setOutgoingData({
         projectName: projectName,
         projectIncharge: projectInchargeName,
         stockingLocation: stockingLocation,
         contact: contact,
-        date: formattedDate
+        date: formattedDate,
+        outgoingType: outgoingType
       });
       // Calculate transaction ID (same format as History.jsx)
       const dateObj = new Date(itemDate);
       const year = dateObj.getFullYear();
       const entryNumber = inventoryItem.eno || inventoryItem.ENO || inventoryItem.entry_number || inventoryItem.entryNumber || inventoryItem.entrynumber || inventoryItem.id || '';
-      const outgoingType = inventoryItem.outgoing_type || inventoryItem.outgoingType || '';
       let transactionId = '';
       if (outgoingType.toLowerCase() === 'stock return' || outgoingType.toLowerCase() === 'stockreturn') {
         transactionId = `SR - ${year} - ${entryNumber}`;
@@ -447,13 +463,31 @@ const Outgoing = ({ user }) => {
       } else {
         transactionId = `SR - ${year} - ${entryNumber}`;
       }
-      // Set items
-      setItems(formattedItems);
       // Set edit mode fields
       setEditTransactionId(transactionId);
-      // Set edit mode and show items
-      setIsEditMode(true);
+      // Check if this is edit mode (update) or clone mode (create new)
+      // Only set to true if isEditMode is explicitly true (edit button), false otherwise (clone button)
+      const isEditModeFlag = inventoryItem.isEditMode === true;
+      setIsEditMode(isEditModeFlag);
+      // Check if coming from History (view mode)
+      const fromHistoryFlag = inventoryItem.fromHistory === true;
+      setFromHistory(fromHistoryFlag);
+      // Store inventory ID only if in edit mode (for updates)
+      if (isEditModeFlag && inventoryItem.id) {
+        setEditingInventoryId(inventoryItem.id);
+      } else {
+        setEditingInventoryId(null);
+      }
+      // Both edit and clone mode should set items immediately
+      setItems(formattedItems);
       setHasOpenedAdd(formattedItems.length > 0);
+      // When cloning (not edit mode, not from history), show form fields instead of summary card
+      if (!isEditModeFlag && !fromHistoryFlag && formattedItems.length > 0) {
+        setHideSummaryCard(true);
+      } else if (isEditModeFlag && fromHistoryFlag) {
+        // When editing from history, show summary card by default
+        setHideSummaryCard(false);
+      }
     };
     window.addEventListener('editInventory', handleEditInventory);
     return () => {
@@ -478,10 +512,14 @@ const Outgoing = ({ user }) => {
   }, [outgoingEmployeeList, outgoingSiteOptions]);
   // Re-resolve item names when API data loads (for items already in state)
   useEffect(() => {
-    if (items.length > 0 && isEditMode && (poItemName.length > 0 || poBrand.length > 0 || poModel.length > 0 || poType.length > 0 || categoryOptions.length > 0)) {
+    if (items.length > 0 && (poItemName.length > 0 || poBrand.length > 0 || poModel.length > 0 || poType.length > 0 || categoryOptions.length > 0)) {
       const updatedItems = items.map(item => {
         let itemName = item.name ? item.name.split(',')[0].trim() : '';
-        let category = item.category || (item.name ? item.name.split(',')[1]?.trim() : '') || '';
+        // Extract category from item.category first, then from item.name if category is empty
+        let category = item.category || '';
+        if (!category && item.name && item.name.includes(',')) {
+          category = item.name.split(',')[1]?.trim() || '';
+        }
         let brand = item.brand || '';
         let model = item.model || '';
         let type = item.type || '';
@@ -498,8 +536,13 @@ const Outgoing = ({ user }) => {
         if (!type && item.typeId && item.typeId !== 0 && poType.length > 0) {
           type = resolveTypeName(item.typeId);
         }
-        if (!category && item.categoryId && categoryOptions.length > 0) {
-          category = resolveCategoryName(item.categoryId);
+        // Always try to resolve category from categoryId if available (even if category is already set)
+        // This ensures category is resolved when categoryOptions loads
+        if (item.categoryId && categoryOptions.length > 0) {
+          const resolvedCategory = resolveCategoryName(item.categoryId);
+          if (resolvedCategory) {
+            category = resolvedCategory;
+          }
         }
         return {
           ...item,
@@ -541,7 +584,67 @@ const Outgoing = ({ user }) => {
     };
   }, [poItemName]);
   // Handle search result add with quantity
-  const handleSearchAdd = (item, quantity, isIncremental = false) => {
+  const handleSearchAdd = async (item, quantity, isIncremental = false) => {
+    // Check if stocking location is selected
+    if (!outgoingData.stockingLocation) {
+      alert('Please select a Stocking Location first');
+      return;
+    }
+
+    // Get stocking location ID
+    const stockingLocationSite = outgoingSiteOptions.find(
+      site => site.value === outgoingData.stockingLocation && site.markedAsStockingLocation === true
+    );
+    
+    if (!stockingLocationSite || !stockingLocationSite.id) {
+      alert('Stocking location ID not found. Please select a valid stocking location.');
+      return;
+    }
+
+    const stockingLocationId = stockingLocationSite.id;
+    const itemId = item.itemId || item.item_id || null;
+
+    // Check stock availability for this item in the selected stocking location
+    if (itemId !== null && itemId !== undefined) {
+      try {
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll');
+        if (response.ok) {
+          const inventoryRecords = await response.json();
+          
+          // Filter out deleted records and filter by stocking location
+          const activeRecords = inventoryRecords.filter(record => {
+            const recordDeleteStatus = record.delete_status !== undefined ? record.delete_status : record.deleteStatus;
+            const recordStockingLocationId = record.stocking_location_id || record.stockingLocationId;
+            return !recordDeleteStatus && String(recordStockingLocationId) === String(stockingLocationId);
+          });
+
+          // Calculate available stock for this item in this location
+          let availableStock = 0;
+          activeRecords.forEach(record => {
+            const inventoryItems = record.inventoryItems || record.inventory_items || [];
+            if (Array.isArray(inventoryItems)) {
+              inventoryItems.forEach(invItem => {
+                const invItemId = invItem.item_id || invItem.itemId || null;
+                if (String(invItemId) === String(itemId)) {
+                  const qty = Number(invItem.quantity) || 0;
+                  availableStock += qty;
+                }
+              });
+            }
+          });
+
+          // Check if stock is available (must be > 0)
+          if (availableStock <= 0) {
+            alert(`Item "${item.itemName || 'this item'}" is not available in the selected Stocking Location "${outgoingData.stockingLocation}". Available stock: ${availableStock}`);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error checking stock availability:', error);
+        // Continue with adding item if API fails (don't block user)
+      }
+    }
+
     // Normalize values for comparison
     const normalizeValue = (val) => (val || '').toString().toLowerCase().trim();
     const newItemName = normalizeValue(item.itemName);
@@ -789,6 +892,83 @@ const Outgoing = ({ user }) => {
     setShowDeleteConfirm(false);
   };
 
+  // Download PDF function
+  const handleDownloadPDF = () => {
+    if (items.length === 0) {
+      alert('No items to download');
+      return;
+    }
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    let yPos = 20;
+
+    // Title
+    doc.setFontSize(16);
+    doc.text(editTransactionId || 'Outgoing Inventory', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 10;
+
+    // Project Information
+    doc.setFontSize(12);
+    yPos += 5;
+    doc.text(`Project Name: ${outgoingData.projectName || ''}`, 14, yPos);
+    yPos += 7;
+    doc.text(`Project Incharge: ${outgoingData.projectIncharge || ''}`, 14, yPos);
+    yPos += 7;
+    doc.text(`Stocking Location: ${outgoingData.stockingLocation || ''}`, 14, yPos);
+    yPos += 7;
+    doc.text(`Date: ${outgoingData.date || ''}`, 14, yPos);
+    yPos += 10;
+
+    // Items Table
+    const tableData = items.map((item, index) => {
+      const itemNameParts = item.name ? item.name.split(',') : [];
+      const itemName = itemNameParts[0] || '';
+      const category = itemNameParts[1] || item.category || '';
+      return [
+        index + 1,
+        itemName,
+        category,
+        item.model || '',
+        item.brand || '',
+        item.type || '',
+        item.quantity || 0
+      ];
+    });
+
+    doc.autoTable({
+      head: [['S.No', 'Item Name', 'Category', 'Model', 'Brand', 'Type', 'Quantity']],
+      body: tableData,
+      startY: yPos,
+      styles: {
+        fontSize: 9,
+        cellPadding: 3,
+        lineWidth: 0.5,
+        lineColor: [0, 0, 0],
+        textColor: [0, 0, 0]
+      },
+      headStyles: {
+        fillColor: [240, 240, 240],
+        textColor: [0, 0, 0],
+        fontStyle: 'bold',
+        lineWidth: 0.5,
+        lineColor: [0, 0, 0]
+      },
+      margin: { left: 14, right: 14 }
+    });
+
+    // Total Quantity
+    const totalQuantity = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    const finalY = doc.lastAutoTable.finalY + 10;
+    doc.setFontSize(12);
+    doc.text(`Total Quantity: ${totalQuantity}`, 14, finalY);
+
+    // Save PDF
+    const fileName = editTransactionId ? `${editTransactionId}.pdf` : `Outgoing_${outgoingData.date || 'Inventory'}.pdf`;
+    doc.save(fileName);
+  };
+
   // Save outgoing inventory data (for both dispatch and stock return)
   const handleSaveOutgoing = async (outgoingType) => {
     // Validate required fields
@@ -796,10 +976,19 @@ const Outgoing = ({ user }) => {
       alert('Please fill in all required fields (Project Name, Project Incharge, and Stocking Location)');
       return;
     }
-
+    const username = (user && user.username) || '';
     if (items.length === 0) {
       alert('Please add at least one item');
       return;
+    }
+
+    // Validate that all items have a category
+    for (const item of items) {
+      if (!item.categoryId && !item.category) {
+        const itemName = item.name ? item.name.split(',')[0].trim() : 'item';
+        alert(`Please select a category for "${itemName}". Category is required for all items.`);
+        return;
+      }
     }
 
     if (!selectedIncharge || !selectedIncharge.id) {
@@ -820,6 +1009,52 @@ const Outgoing = ({ user }) => {
 
       const stockingLocationId = stockingLocationSite.id;
 
+      // Validate that all items are available in the selected stocking location
+      try {
+        const inventoryResponse = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll');
+        if (inventoryResponse.ok) {
+          const inventoryRecords = await inventoryResponse.json();
+          
+          // Filter records for the selected stocking location and active (not deleted)
+          const locationRecords = inventoryRecords.filter(record => {
+            const recordDeleteStatus = record.delete_status !== undefined ? record.delete_status : record.deleteStatus;
+            const recordStockingLocationId = record.stocking_location_id || record.stockingLocationId;
+            return !recordDeleteStatus && String(recordStockingLocationId) === String(stockingLocationId);
+          });
+
+          // Check each item in the items array
+          for (const item of items) {
+            const itemId = item.itemId || null;
+            if (itemId !== null && itemId !== undefined) {
+              // Calculate available stock for this item in this location
+              let availableStock = 0;
+              locationRecords.forEach(record => {
+                const inventoryItems = record.inventoryItems || record.inventory_items || [];
+                if (Array.isArray(inventoryItems)) {
+                  inventoryItems.forEach(invItem => {
+                    const invItemId = invItem.item_id || invItem.itemId || null;
+                    if (String(invItemId) === String(itemId)) {
+                      const qty = Number(invItem.quantity) || 0;
+                      availableStock += qty;
+                    }
+                  });
+                }
+              });
+
+              // If item is not available (stock <= 0), show alert and prevent save
+              if (availableStock <= 0) {
+                const itemName = item.name ? item.name.split(',')[0].trim() : 'this item';
+                alert(`Item "${itemName}" is not available in the selected Stocking Location "${outgoingData.stockingLocation}". Available stock: ${availableStock}`);
+                return;
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error validating item availability:', error);
+        // Continue with save if validation fails (don't block user)
+      }
+
       // Find project/client ID from outgoingSiteOptions
       const projectSite = outgoingSiteOptions.find(
         site => site.value === outgoingData.projectName
@@ -834,17 +1069,23 @@ const Outgoing = ({ user }) => {
       const siteInchargeId = selectedIncharge.id;
       const siteInchargeMobileNumber = outgoingData.contact || selectedIncharge.mobileNumber || '';
 
-      // Get outgoing count for ENO
-      const countResponse = await fetch(
-        `https://backendaab.in/aabuildersDash/api/inventory/outgoingCount?stockingLocationId=${stockingLocationId}`
-      );
-      
-      if (!countResponse.ok) {
-        throw new Error('Failed to fetch outgoing count');
+      // Check if this is an update (edit mode) or create new (clone mode)
+      const isUpdate = isEditMode && editingInventoryId;
+
+      let eno = '';
+      if (!isUpdate) {
+        // Get outgoing count for ENO only for new records
+        const countResponse = await fetch(
+          `https://backendaab.in/aabuildersDash/api/inventory/outgoingCount?stockingLocationId=${stockingLocationId}`
+        );
+        
+        if (!countResponse.ok) {
+          throw new Error('Failed to fetch outgoing count');
+        }
+        
+        const outgoingCount = await countResponse.json();
+        eno = String(outgoingCount + 1 || 0);
       }
-      
-      const outgoingCount = await countResponse.json();
-      const eno = String(outgoingCount + 1 || 0);
 
       // Convert date from DD/MM/YYYY to YYYY-MM-DD format for backend
       const dateParts = outgoingData.date.split('/');
@@ -858,9 +1099,27 @@ const Outgoing = ({ user }) => {
       const inventoryItems = items.map(item => {
         const baseQuantity = Math.abs(item.quantity || 0);
         const quantity = outgoingType === 'dispatch' ? -baseQuantity : baseQuantity;
+        
+        // Resolve categoryId if not already present
+        let categoryId = item.categoryId || null;
+        if (!categoryId && item.category && categoryOptions.length > 0) {
+          const categoryOption = categoryOptions.find(cat => {
+            const catName = (cat.category || cat.name || cat.label || '').toLowerCase().trim();
+            const itemCategory = item.category.toLowerCase().trim();
+            return catName === itemCategory;
+          });
+          categoryId = categoryOption ? (categoryOption.id || categoryOption._id || null) : null;
+        }
+        
+        // Category is mandatory - throw error if still missing
+        if (!categoryId) {
+          const itemName = item.name ? item.name.split(',')[0].trim() : 'item';
+          throw new Error(`Category is required for "${itemName}". Please select a category.`);
+        }
+        
         return {
           item_id: item.itemId || null,
-          category_id: item.categoryId || null,
+          category_id: categoryId, // Category is now mandatory
           model_id: item.modelId || null,
           brand_id: item.brandId || null,
           type_id: item.typeId || null,
@@ -879,14 +1138,24 @@ const Outgoing = ({ user }) => {
         site_incharge_type: selectedIncharge.type || 'employee',
         date: formattedDate,
         site_incharge_mobile_number: siteInchargeMobileNumber,
-        eno: eno,
         created_by: (user && user.username) || '',
         inventoryItems: inventoryItems
       };
 
-      // Save to backend
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/inventory/save', {
-        method: 'POST',
+      // Add eno only for new records
+      if (!isUpdate) {
+        payload.eno = eno;
+      }
+
+      // Determine API endpoint and method
+      const apiUrl = isUpdate 
+        ? `https://backendaab.in/aabuildersDash/api/inventory/edit_with_history/${editingInventoryId}?changedBy=${encodeURIComponent(username)}`
+        : 'https://backendaab.in/aabuildersDash/api/inventory/save';
+      const method = isUpdate ? 'PUT' : 'POST';
+
+      // Save/Update to backend
+      const response = await fetch(apiUrl, {
+        method: method,
         headers: {
           'Content-Type': 'application/json'
         },
@@ -895,11 +1164,11 @@ const Outgoing = ({ user }) => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to save inventory data');
+        throw new Error(errorData.message || `Failed to ${isUpdate ? 'update' : 'save'} inventory data`);
       }
 
       const savedData = await response.json();
-      alert(`Inventory data saved successfully as ${outgoingType === 'dispatch' ? 'Dispatch' : 'Stock Return'}!`);
+      alert(`Inventory data ${isUpdate ? 'updated' : 'saved'} successfully!`);
       
       // Reset form
       setOutgoingData({
@@ -913,8 +1182,10 @@ const Outgoing = ({ user }) => {
       setItems([]);
       setHasOpenedAdd(false);
       setIsEditMode(false);
+      setFromHistory(false);
       // Clear edit mode fields
       setEditTransactionId('');
+      setEditingInventoryId(null);
     } catch (error) {
       console.error('Error saving inventory:', error);
       alert(`Error saving inventory: ${error.message}`);
@@ -935,26 +1206,67 @@ const Outgoing = ({ user }) => {
               {outgoingData.date}
             </button>
             <div className="flex items-center">
-              <button
-                type="button"
-                onClick={() => handleSaveOutgoing('stock return')}
-                className="flex items-center text-[13px] font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
-              >
-                Stock Return
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSaveOutgoing('dispatch')}
-                className="flex items-center text-[13px] font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
-              >
-                Dispatch
-              </button>
-              {hasOpenedAdd && (
+              {isEditMode && fromHistory ? (
+                <button
+                  type="button"
+                  onClick={() => handleSaveOutgoing(outgoingData.outgoingType || 'stock return')}
+                  className="flex items-center text-[13px] font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
+                >
+                  Update
+                </button>
+              ) : fromHistory && !isEditMode && ((outgoingData.outgoingType || '').toLowerCase() === 'stock return' || (outgoingData.outgoingType || '').toLowerCase() === 'stockreturn') ? (
+                <button
+                  type="button"
+                  onClick={() => handleDownloadPDF()}
+                  className="flex items-center text-[13px] font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
+                >
+                  Download
+                </button>
+              ) : fromHistory && !isEditMode && (outgoingData.outgoingType || '').toLowerCase() === 'dispatch' ? (
+                <button
+                  type="button"
+                  onClick={() => handleDownloadPDF()}
+                  className="flex items-center text-[13px] font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
+                >
+                  Download
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleSaveOutgoing('stock return')}
+                    className="flex items-center text-[13px] font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
+                  >
+                    Stock Return
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSaveOutgoing('dispatch')}
+                    className="flex items-center text-[13px] font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
+                  >
+                    Dispatch
+                  </button>
+                  {hasOpenedAdd && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHideSummaryCard(true);
+                        setIsEditMode(true);
+                      }}
+                      className="flex items-center font-semibold justify-center rounded p-1 ml-1"
+                    >
+                      <img src={editIcon} alt="Edit" className="w-[15px] h-[15px]" />
+                    </button>
+                  )}
+                </>
+              )}
+              {hasOpenedAdd && isEditMode && fromHistory && (
                 <button
                   type="button"
                   onClick={() => {
                     setIsEditMode(true);
                     setHasOpenedAdd(false);
+                    setHideSummaryCard(true);
                   }}
                   className="flex items-center font-semibold justify-center rounded p-1"
                 >
@@ -966,8 +1278,8 @@ const Outgoing = ({ user }) => {
         </div>
       )}
 
-      {/* Form Fields - visible while you are selecting the three fields (before first + click) */}
-      {!showAddItems && !hasOpenedAdd && (
+      {/* Form Fields - visible while you are selecting the three fields (before first + click) or when hideSummaryCard is true */}
+      {(!hasOpenedAdd || hideSummaryCard) && (
         <div className="flex-shrink-0 px-4 pt-4">
           {/* Date in empty state */}
           {isEmptyState && (
@@ -1005,8 +1317,8 @@ const Outgoing = ({ user }) => {
                   e.stopPropagation();
                   setOutgoingData({ ...outgoingData, projectName: '' });
                 }}
-                className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                style={{ right: '32px' }}
+                className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                style={{ right: '24px' }}
               >
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -1041,8 +1353,8 @@ const Outgoing = ({ user }) => {
                   setSelectedIncharge(null);
                   setOutgoingData({ ...outgoingData, projectIncharge: '', contact: '' });
                 }}
-                className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                style={{ right: '32px' }}
+                className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                style={{ right: '24px' }}
               >
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -1076,8 +1388,8 @@ const Outgoing = ({ user }) => {
                   e.stopPropagation();
                   setOutgoingData({ ...outgoingData, stockingLocation: '' });
                 }}
-                className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                style={{ right: '32px' }}
+                className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                style={{ right: '24px' }}
               >
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -1090,7 +1402,7 @@ const Outgoing = ({ user }) => {
       )}
 
       {/* Summary details card - show after first + click or in edit mode */}
-      {(hasOpenedAdd || isEditMode) && !isEmptyState && (outgoingData.projectName || outgoingData.projectIncharge || outgoingData.stockingLocation) && (
+      {(hasOpenedAdd || isEditMode) && !hideSummaryCard && !isEmptyState && (outgoingData.projectName || outgoingData.projectIncharge || outgoingData.stockingLocation) && (
         <div className="flex-shrink-0 mx-2 mb-1 p-2 bg-white border border-[#aaaaaa] rounded-[8px]">
           <div className="flex flex-col gap-2 px-2">
             {outgoingData.projectName && (
@@ -1232,6 +1544,7 @@ const Outgoing = ({ user }) => {
                             setExpandedItemId(null);
                             handleDeleteItem(item.id);
                           }}
+                          hideButtons={fromHistory && !isEditMode}
                         />
                       );
                     })}
@@ -1246,12 +1559,31 @@ const Outgoing = ({ user }) => {
       {/* Add Button - Fixed position (only enabled when all required fields are filled) */}
       <AddButton
         onClick={() => {
-          setHasOpenedAdd(true);
-          setEditingItem(null);
-          setShowAddItems(true);
+          if (fromHistory && !isEditMode) {
+            // Reset to main outgoing page when clicking "+ New"
+            setOutgoingData({
+              projectName: '',
+              projectIncharge: '',
+              stockingLocation: '',
+              contact: '',
+              date: getTodayDate()
+            });
+            setSelectedIncharge(null);
+            setItems([]);
+            setHasOpenedAdd(false);
+            setIsEditMode(false);
+            setFromHistory(false);
+            setEditTransactionId('');
+            setEditingInventoryId(null);
+            setHideSummaryCard(false);
+          } else {
+            setHasOpenedAdd(true);
+            setEditingItem(null);
+            setShowAddItems(true);
+          }
         }}
-        disabled={!areOutgoingFieldsFilled}
-        showNew={false}
+        disabled={fromHistory && !isEditMode ? false : !areOutgoingFieldsFilled}
+        showNew={fromHistory && !isEditMode}
       />
 
       {/* Modals */}
@@ -1325,7 +1657,7 @@ const Outgoing = ({ user }) => {
           brand: editingItem.brand || '',
           type: editingItem.type || '',
           quantity: editingItem.quantity ? String(editingItem.quantity) : '',
-          category: editingItem.name ? editingItem.name.split(',')[1]?.trim() || '' : '',
+          category: editingItem.category || (editingItem.name && editingItem.name.includes(',') ? editingItem.name.split(',')[1]?.trim() || '' : '') || '',
           itemId: editingItem.itemId || null,
           brandId: editingItem.brandId || null,
           modelId: editingItem.modelId || null,

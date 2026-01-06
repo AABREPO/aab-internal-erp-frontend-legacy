@@ -29,6 +29,40 @@ function cleanUrl(url) {
     }
     return cleanedUrl;
 }
+// ISO 8601 week number calculation
+// Week belongs to the year that contains the Thursday of that week
+// Week 1 is the week with the year's first Thursday
+function getISOWeekNumber(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    
+    // Get Thursday of the week containing the date
+    // Monday = 1, Tuesday = 2, ..., Sunday = 0 (convert to 7)
+    const dayOfWeek = d.getDay() || 7; // Convert Sunday (0) to 7
+    const thursday = new Date(d);
+    thursday.setDate(d.getDate() + 4 - dayOfWeek); // Thursday is 4 days after Monday
+    thursday.setHours(0, 0, 0, 0);
+    
+    // Use the year that Thursday falls in (ISO 8601 rule)
+    const weekYear = thursday.getFullYear();
+    
+    // Get January 1st of that year
+    const jan1 = new Date(weekYear, 0, 1);
+    jan1.setHours(0, 0, 0, 0);
+    
+    // Get the Thursday of week 1 (first Thursday of the year)
+    const jan1DayOfWeek = jan1.getDay() || 7;
+    const firstThursday = new Date(jan1);
+    firstThursday.setDate(jan1.getDate() + 4 - jan1DayOfWeek);
+    firstThursday.setHours(0, 0, 0, 0);
+    
+    // Calculate week number: difference in days divided by 7, plus 1
+    const daysDiff = Math.floor((thursday - firstThursday) / 86400000);
+    const weekNo = Math.floor(daysDiff / 7) + 1;
+    
+    return weekNo;
+}
+
 function getStartAndEndDateOfISOWeek(weekNo, year) {
     const simple = new Date(year, 0, 1 + (weekNo - 1) * 7);
     let dayOfWeek = simple.getDay();
@@ -45,6 +79,9 @@ function getStartAndEndDateOfISOWeek(weekNo, year) {
 }
 const WeeklyPayment = ({ username, userRoles = [] }) => {
     const [currentWeekNumber, setCurrentWeekNumber] = useState(null);
+    const [previousWeekHasStatusTrue, setPreviousWeekHasStatusTrue] = useState(false);
+    // Calculate actual current week number using ISO week calculation
+    const actualCurrentWeekNumber = getISOWeekNumber(new Date());
     const [vendorOptions, setVendorOptions] = useState([]);
     const [contractorOptions, setContractorOptions] = useState([]);
     const [siteOptions, setSiteOptions] = useState([]);
@@ -911,53 +948,96 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         }
         setStaffAdvanceDescriptions(newDescriptions);
     }, [staffAdvanceDescriptions]);
-    // Fetch expenses by currentWeekNumber
+    // Fetch expenses by actualCurrentWeekNumber (ISO week)
     const fetchExpenses = useCallback(() => {
-        if (!currentWeekNumber) return;
-        fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${currentWeekNumber}`)
+        if (!actualCurrentWeekNumber) return;
+        fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${actualCurrentWeekNumber}`)
             .then((res) => res.json())
             .then((data) => {
-                setExpenses(data);
+                // Filter out records where status is true
+                const filtered = data.filter((expense) => !expense.status);
+                setExpenses(filtered);
                 // Fetch descriptions for all Project Advance rows
-                fetchPortalDescriptions(data);
+                fetchPortalDescriptions(filtered);
                 // Fetch descriptions for all Staff Advance rows
-                fetchStaffAdvanceDescriptions(data);
+                fetchStaffAdvanceDescriptions(filtered);
             })
             .catch(console.error);
-    }, [currentWeekNumber]);
-    // Fetch payments by currentWeekNumber
+    }, [actualCurrentWeekNumber]);
+    // Fetch payments by actualCurrentWeekNumber (ISO week)
     const fetchPayments = useCallback(() => {
-        if (!currentWeekNumber) return;
-        fetch(`https://backendaab.in/aabuildersDash/api/payments-received/week/${currentWeekNumber}`)
+        if (!actualCurrentWeekNumber) return;
+        fetch(`https://backendaab.in/aabuildersDash/api/payments-received/week/${actualCurrentWeekNumber}`)
             .then((res) => res.json())
             .then((data) => {
-                // Filter out records where type is "Handover"
-                const filtered = data.filter((payment) => payment.type !== "Handover");
+                // Filter out records where type is "Handover" or status is true
+                const filtered = data.filter((payment) => payment.type !== "Handover" && !payment.status);
                 setPayments(filtered);
             })
             .catch(console.error);
-    }, [currentWeekNumber]);
+    }, [actualCurrentWeekNumber]);
     const fetchRefundPayments = useCallback(() => {
-        if (!currentWeekNumber) return;
+        if (!actualCurrentWeekNumber) return;
         fetch(`https://backendaab.in/aabuildersDash/api/refund_received/getAll`)
             .then((res) => res.json())
             .then((data) => {
                 setAllRefundAmount(data);
             })
             .catch(console.error);
-    }, [currentWeekNumber]);
+    }, [actualCurrentWeekNumber]);
+    // Check if previous week has status === true
+    const checkPreviousWeekStatus = useCallback(async () => {
+        // Use actual current week number for calculation
+        if (!actualCurrentWeekNumber) {
+            setPreviousWeekHasStatusTrue(false);
+            return;
+        }
+        let previousWeekNumber;
+        let previousYear;
+        if (actualCurrentWeekNumber === 1) {
+            previousWeekNumber = 52;
+        } else {
+            previousWeekNumber = actualCurrentWeekNumber - 1;
+        }
+        try {
+            const [expensesRes, paymentsRes] = await Promise.all([
+                fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${previousWeekNumber}`),
+                fetch(`https://backendaab.in/aabuildersDash/api/payments-received/week/${previousWeekNumber}`)
+            ]);
+            if (expensesRes.ok && paymentsRes.ok) {
+                const expensesData = await expensesRes.json();
+                const paymentsData = await paymentsRes.json();
+                // Check if any expense or payment has status === true
+                const hasStatusTrue = 
+                    expensesData.some(expense => expense.status === true) ||
+                    paymentsData.some(payment => payment.status === true);
+                setPreviousWeekHasStatusTrue(hasStatusTrue);
+            } else {
+                setPreviousWeekHasStatusTrue(false);
+            }
+        } catch (error) {
+            console.error('Error checking previous week status:', error);
+            setPreviousWeekHasStatusTrue(false);
+        }
+    }, [actualCurrentWeekNumber]);
     // Initial fetch of current week number
     useEffect(() => {
         fetchCurrentWeekNumber();
     }, [fetchCurrentWeekNumber]);
-    // Fetch expenses and payments whenever current week changes
+    // Check previous week status when actualCurrentWeekNumber is available
     useEffect(() => {
-        if (currentWeekNumber) {
+        if (actualCurrentWeekNumber) {
+            checkPreviousWeekStatus();
+        }
+    }, [actualCurrentWeekNumber, checkPreviousWeekStatus]); 
+    // Fetch expenses and payments whenever actual current week is available
+    useEffect(() => {
+        if (actualCurrentWeekNumber) {
             fetchExpenses();
             fetchPayments();
             fetchRefundPayments();
         }
-    }, [currentWeekNumber]);
+    }, [actualCurrentWeekNumber, fetchExpenses, fetchPayments, fetchRefundPayments]);
     useEffect(() => {
         if (!isClientToggleActive) return;
         if (clientProjectOptions.length === 1) {
@@ -1140,7 +1220,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             amount: Number(amount) || 0,
             bill_amount: 0,
             refund_amount: 0,
-            week_no: weekNo || editFormData.weekly_number || currentWeekNumber,
+            week_no: weekNo || editFormData.weekly_number || actualCurrentWeekNumber,
             description: description || "",
             file_url: "",
         };
@@ -1196,7 +1276,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             employee_id: employeeId || null,
             project_id: projectId || null,
             amount: Number(amount) || 0,
-            week_no: weekNo || editFormData.weekly_number || currentWeekNumber,
+            week_no: weekNo || editFormData.weekly_number || actualCurrentWeekNumber,
             staff_payment_mode: "Cash",
             from_purpose_id: 4,
             description: description || "",
@@ -1310,7 +1390,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 project_id: selectedProjectName ? Number(selectedProjectName.id) : null,
                 type: newExpense.type,
                 amount: Number(newExpense.amount),
-                weekly_number: currentWeekNumber,
+                weekly_number: actualCurrentWeekNumber,
                 status: false,
                 created_at: new Date().toISOString(),
                 advance_portal_id: null,
@@ -1339,12 +1419,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                         : 0;
                 const nextEntryNo = maxEntryNo + 1;
                 const getWeekNumber = () => {
-                    const now = new Date();
-                    const start = new Date(now.getFullYear(), 0, 1);
-                    const diff =
-                        now - start + (start.getTimezoneOffset() - now.getTimezoneOffset()) * 60000;
-                    const oneWeek = 604800000;
-                    return Math.floor(diff / oneWeek) + 1;
+                    return getISOWeekNumber(new Date());
                 };
                 const advancePayload = {
                     type: "Advance",
@@ -1398,7 +1473,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     type: "Advance",
                     employee_id: selectedEmployee ? Number(selectedEmployee.id) : null,
                     amount: Number(newExpense.amount),
-                    week_no: currentWeekNumber,
+                    week_no: actualCurrentWeekNumber,
                     staff_payment_mode: "Cash",
                     from_purpose_id: 4,
                     entry_no: nextEntryNo,
@@ -1474,9 +1549,9 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         }
     };
     const validatePaymentDate = (dateStr) => {
-        if (!dateStr || !currentWeekNumber) return;
+        if (!dateStr || !actualCurrentWeekNumber) return;
         const year = new Date().getFullYear();
-        const { startDate, endDate } = getStartAndEndDateOfISOWeek(currentWeekNumber, year);
+        const { startDate, endDate } = getStartAndEndDateOfISOWeek(actualCurrentWeekNumber, year);
         const selectedDate = new Date(dateStr);
         if (selectedDate < startDate || selectedDate > endDate) {
             setPopup({
@@ -1511,7 +1586,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             date: newPayment.date,
             amount: Number(newPayment.amount),
             type: newPayment.type,
-            weekly_number: currentWeekNumber,
+            weekly_number: actualCurrentWeekNumber,
             status: false,
         };
         fetch("https://backendaab.in/aabuildersDash/api/payments-received/save", {
@@ -1541,14 +1616,20 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         try {
             const carryForwardParam = (type === "Carry (CF)" || type === "Handover") ? "true" : "false";
             const carryAmountParam = carryForwardParam === "true" && balance > 0 ? balance : 0;
+            const currentDate = new Date();
+            const nextWeekDate = new Date(currentDate);
+            nextWeekDate.setDate(currentDate.getDate() + 7);
+            const nextWeekNumber = getISOWeekNumber(nextWeekDate);            
             const url = new URL("https://backendaab.in/aabuildersDash/api/payments-received/account-closure");
             url.searchParams.append("closureType", type);
             url.searchParams.append("carryForward", carryForwardParam);
             url.searchParams.append("carryAmount", carryAmountParam - discountAmount);
             url.searchParams.append("discountAmount", discountAmount);
+            url.searchParams.append("currentWeek", actualCurrentWeekNumber);
             const res = await fetch(url.toString(), { method: "POST" });
-            const newWeekNumber = await res.json();
-            setCurrentWeekNumber(newWeekNumber);
+            const backendNextWeekNumber = await res.json();
+            setCurrentWeekNumber(nextWeekNumber);
+            window.location.reload();
             setNewExpense({ date: "", contractor: "", project: "", type: "", amount: "", staff_advance_portal_id: "" });
             setNewPayment({ date: "", amount: "", type: "Weekly" });
         } catch (error) {
@@ -1624,7 +1705,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     contractorId: editFormData.contractor_id ? Number(editFormData.contractor_id) : 0,
                     projectId: editFormData.project_id ? Number(editFormData.project_id) : 0,
                     description: editFormData.description || "",
-                    weekNo: editFormData.weekly_number || currentWeekNumber,
+                    weekNo: editFormData.weekly_number || actualCurrentWeekNumber,
                 };
                 if (row.advance_portal_id) {
                     await updateAdvancePortalEntry(row.advance_portal_id, advancePayload);
@@ -1652,7 +1733,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                         bill_amount: 0,
                         refund_amount: 0,
                         entry_no: nextEntryNo,
-                        week_no: editFormData.weekly_number || currentWeekNumber,
+                        week_no: editFormData.weekly_number || actualCurrentWeekNumber,
                         description: editFormData.description || "",
                         file_url: editFormData.file_url || "",
                     };
@@ -1676,7 +1757,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     employeeId: editFormData.employee_id ? Number(editFormData.employee_id) : 0,
                     projectId: editFormData.project_id ? Number(editFormData.project_id) : 0,
                     description: editFormData.description || "",
-                    weekNo: editFormData.weekly_number || currentWeekNumber,
+                    weekNo: editFormData.weekly_number || actualCurrentWeekNumber,
                 };
                 if (row.staff_advance_portal_id) {
                     await updateStaffAdvancePortalEntry(row.staff_advance_portal_id, staffAdvancePayload);
@@ -1698,7 +1779,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                         employee_id: editFormData.employee_id || null,
                         project_id: editFormData.project_id || null,
                         amount: Number(editFormData.amount) || 0,
-                        week_no: editFormData.weekly_number || currentWeekNumber,
+                        week_no: editFormData.weekly_number || actualCurrentWeekNumber,
                         staff_payment_mode: "Cash",
                         from_purpose_id: 4,
                         entry_no: nextEntryNo,
@@ -2099,7 +2180,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
         const pageWidth = doc.internal.pageSize.getWidth();
         const year = new Date().getFullYear();
-        const weekDates = getStartAndEndDateOfISOWeek(currentWeekNumber, year);
+        const weekDates = getStartAndEndDateOfISOWeek(actualCurrentWeekNumber, year);
         const weekStartDate = weekDates.startDate.toLocaleDateString("en-GB");
         const weekEndDate = weekDates.endDate.toLocaleDateString("en-GB");
         if (!Array.isArray(expenses) || !Array.isArray(payments)) {
@@ -2201,7 +2282,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             doc.rect(20, 24, 810, 40);
             doc.setFont("helvetica", "normal");
             doc.setFontSize(10);
-            doc.text(`PS: ${String(currentWeekNumber || "")}`, 30, 40);
+            const displayWeekNumber = previousWeekHasStatusTrue ? (actualCurrentWeekNumber || "") : "";
+            doc.text(`PS: ${String(displayWeekNumber)}`, 30, 40);
             doc.setFontSize(9);
             doc.text(String(new Date().toLocaleDateString("en-GB") || ""), 30, 55);
             doc.setFontSize(14);
@@ -2723,7 +2805,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             .filter(Boolean)
             .pop();
         newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
-        doc.save(`PR ${currentWeekNumber || ""} - Weekly Payment Report ${formatDateOnly(lastPeriodEndDate)}.pdf`);
+        doc.save(`PR ${actualCurrentWeekNumber || ""} - Weekly Payment Report ${formatDateOnly(lastPeriodEndDate)}.pdf`);
     };
     return (
         <div>
@@ -2757,7 +2839,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 <div className="w-full flex flex-col xl:flex-row gap-6">
                     <div className="flex-[3] min-w-0">
                         <div className="flex justify-between">
-                            <h1 className="font-bold text-xl">PS: {currentWeekNumber ?? "-"}</h1>
+                            <h1 className="font-bold text-xl">PS: {previousWeekHasStatusTrue ? (actualCurrentWeekNumber ?? "-") : "-"}</h1>
                             <h1 className="font-bold text-base">
                                 Expenses: <span style={{ color: "#E4572E" }}>
                                     {Number(totalExpenses).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -4317,12 +4399,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                 : 0;
                                                         const nextEntryNo = maxEntryNo + 1;
                                                         const getWeekNumber = () => {
-                                                            const now = new Date();
-                                                            const start = new Date(now.getFullYear(), 0, 1);
-                                                            const diff =
-                                                                now - start + (start.getTimezoneOffset() - now.getTimezoneOffset()) * 60000;
-                                                            const oneWeek = 604800000; // ms in a week
-                                                            return Math.floor(diff / oneWeek) + 1;
+                                                            return getISOWeekNumber(new Date());
                                                         };
                                                         const description = portalDescriptions[currentProjectAdvanceRow.advance_portal_id] || "";
                                                         const advanceUpdateData = {
@@ -4371,12 +4448,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                 : 0;
                                                         const nextEntryNo = maxEntryNo + 1;
                                                         const getWeekNumber = () => {
-                                                            const now = new Date();
-                                                            const start = new Date(now.getFullYear(), 0, 1);
-                                                            const diff =
-                                                                now - start + (start.getTimezoneOffset() - now.getTimezoneOffset()) * 60000;
-                                                            const oneWeek = 604800000; // ms in a week
-                                                            return Math.floor(diff / oneWeek) + 1;
+                                                            return getISOWeekNumber(new Date());
                                                         };
                                                         const staffAdvanceSaveData = {
                                                             date: paymentPopupData.date,
@@ -4423,7 +4495,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                     bill_payment_mode: paymentPopupData.paymentMode,
                                                     amount: parseFloat(paymentPopupData.amount),
                                                     status: true,
-                                                    weekly_number: currentWeekNumber,
+                                                    weekly_number: actualCurrentWeekNumber,
                                                     weekly_payment_expense_id: currentProjectAdvanceRow.id,
                                                     advance_portal_id: advancePortalId,
                                                     staff_advance_portal_id: staffAdvancePortalId,

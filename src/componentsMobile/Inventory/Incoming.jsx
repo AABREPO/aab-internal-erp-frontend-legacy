@@ -9,19 +9,12 @@ import SearchItemsModal from '../PurchaseOrder/SearchItemsModal';
 import SelectPOModal from './SelectPOModal';
 import editIcon from '../Images/edit.png';
 import jsPDF from 'jspdf';
-
 const Incoming = ({ user }) => {
   // Helper functions for date
   const getTodayDate = () => {
     const today = new Date();
     return today.toLocaleDateString('en-GB'); // DD/MM/YYYY
   };
-
-  const formatDate = (date) => {
-    const d = new Date(date);
-    return d.toLocaleDateString('en-GB'); // DD/MM/YYYY
-  };
-
   // Incoming page state
   const [incomingData, setIncomingData] = useState({
     poNumber: '',
@@ -60,13 +53,11 @@ const Incoming = ({ user }) => {
   const filePreviewsRef = useRef({});
   const [showInvoicePreview, setShowInvoicePreview] = useState(false);
   const [selectedFilePreview, setSelectedFilePreview] = useState(null);
-
   // Incoming page options
   const [vendorNameOptions, setVendorNameOptions] = useState([]);
   const [vendorOptions, setVendorOptions] = useState([]);
   const [stockingLocationOptions, setStockingLocationOptions] = useState([]);
   const [siteOptions, setSiteOptions] = useState([]);
-
   // Fetch vendor names from API
   useEffect(() => {
     const fetchVendorNames = async () => {
@@ -131,7 +122,6 @@ const Incoming = ({ user }) => {
           .filter(site => site.markedAsStockingLocation === true)
           .map(site => site.value || site.label || '')
           .filter(Boolean);
-
         // Remove duplicates
         const uniqueLocations = [...new Set(stockingLocations)];
         setStockingLocationOptions(uniqueLocations);
@@ -140,23 +130,18 @@ const Incoming = ({ user }) => {
         setStockingLocationOptions([]);
       }
     };
-
     if (siteOptions.length > 0) {
       fetchStockingLocations();
     }
   }, [siteOptions]);
-
   // Check if we're in empty state (no fields filled and no items)
   const isEmptyState = !incomingData.vendorName && !incomingData.stockingLocation && items.length === 0 && !isEditMode;
-
   // Check if all required fields are filled (for enabling AddButton)
   const areIncomingFieldsFilled = incomingData.vendorName && incomingData.stockingLocation;
-
   const handleDateConfirm = (date) => {
     setIncomingData({ ...incomingData, date });
     setShowDatePicker(false);
   };
-
   // Fetch PO item names from API
   const fetchPoItemName = useCallback(async () => {
     try {
@@ -169,7 +154,6 @@ const Incoming = ({ user }) => {
       console.error('Error fetching PO item names:', error);
     }
   }, []);
-
   // Fetch PO brand from API
   const fetchPoBrand = useCallback(async () => {
     try {
@@ -182,7 +166,6 @@ const Incoming = ({ user }) => {
       console.error('Error fetching PO brands:', error);
     }
   }, []);
-
   // Fetch PO model from API
   const fetchPoModel = useCallback(async () => {
     try {
@@ -195,7 +178,6 @@ const Incoming = ({ user }) => {
       console.error('Error fetching PO models:', error);
     }
   }, []);
-
   // Fetch PO type from API
   const fetchPoType = useCallback(async () => {
     try {
@@ -208,7 +190,6 @@ const Incoming = ({ user }) => {
       console.error('Error fetching PO types:', error);
     }
   }, []);
-
   // Fetch PO categories from API
   const fetchPoCategory = useCallback(async () => {
     try {
@@ -227,14 +208,12 @@ const Incoming = ({ user }) => {
       setCategoryOptions([]);
     }
   }, []);
-
   // Helper function to find name by ID
   const findNameById = (array, id, fieldName) => {
     if (!array || !id) return '';
     const found = array.find(item => String(item.id || item._id) === String(id));
     return found ? (found[fieldName] || found.name || '') : '';
   };
-
   // Helper function to extract numeric value from eno (same as PurchaseOrder.jsx)
   const getNumericEno = (eno) => {
     if (!eno) return 0;
@@ -246,7 +225,6 @@ const Incoming = ({ user }) => {
     const match = str.match(/\d+/);
     return match ? parseInt(match[0], 10) : 0;
   };
-
   // Fetch all purchase orders and cache them
   const fetchAllPurchaseOrders = useCallback(async () => {
     try {
@@ -261,11 +239,9 @@ const Incoming = ({ user }) => {
     }
     return [];
   }, []);
-
   // Fetch items from selected PO and add to items list
   const fetchPOItems = useCallback(async (eno, cachedPO = null) => {
     if (!eno) return;
-    
     setLoadingPOItems(true);
     try {
       let data = allPurchaseOrders;
@@ -473,7 +449,6 @@ const Incoming = ({ user }) => {
       setLoadingPOItems(false);
     }
   }, [poItemName, poBrand, poModel, poType, categoryOptions, allPurchaseOrders, incomingData.vendorId, fetchAllPurchaseOrders]);
-
   // Initial fetch on mount
   useEffect(() => {
     fetchPoItemName();
@@ -482,7 +457,6 @@ const Incoming = ({ user }) => {
     fetchPoType();
     fetchPoCategory();
   }, [fetchPoItemName, fetchPoBrand, fetchPoModel, fetchPoType, fetchPoCategory]);
-
   // Cleanup preview URLs on unmount
   useEffect(() => {
     return () => {
@@ -491,7 +465,6 @@ const Incoming = ({ user }) => {
       });
     };
   }, []);
-
   // Get available items function - returns the actual API data structure
   const getAvailableItems = useCallback(() => {
     // Return the actual API data structure with nested otherPOEntityList
@@ -502,25 +475,21 @@ const Incoming = ({ user }) => {
         useNestedStructure: true
       };
     }
-
     // Fallback to old format if API data not available
     return {
       items: [],
       useNestedStructure: false
     };
   }, [poItemName]);
-
   // Handle search result add with quantity
   const handleSearchAdd = (item, quantity, isIncremental = false) => {
     // Normalize values for comparison
     const normalizeValue = (val) => (val || '').toString().toLowerCase().trim();
-
     const newItemName = normalizeValue(item.itemName);
     const newCategory = normalizeValue(item.category);
     const newModel = normalizeValue(item.model);
     const newBrand = normalizeValue(item.brand);
     const newType = normalizeValue(item.type);
-
     // Check if an item with the same properties (including category) already exists
     const existingItemIndex = items.findIndex(existingItem => {
       const nameParts = existingItem.name ? existingItem.name.split(',') : [];
@@ -529,7 +498,6 @@ const Incoming = ({ user }) => {
       const existingModel = normalizeValue(existingItem.model);
       const existingBrand = normalizeValue(existingItem.brand);
       const existingType = normalizeValue(existingItem.type);
-
       // Match if all properties including category are the same
       return (
         existingItemName === newItemName &&
@@ -539,7 +507,6 @@ const Incoming = ({ user }) => {
         existingType === newType
       );
     });
-
     if (existingItemIndex !== -1) {
       // Update existing item quantity (merge quantities)
       const updatedItems = [...items];
@@ -559,6 +526,11 @@ const Incoming = ({ user }) => {
     } else if (quantity > 0) {
       // Add new item
       const newItemId = items.length > 0 ? Math.max(...items.map(i => i.id)) + 1 : 1;
+      // Resolve categoryId if not provided
+      let categoryId = item.categoryId || null;
+      if (!categoryId && item.category && categoryOptions.length > 0) {
+        categoryId = resolveCategoryId(item.category);
+      }
       const newItem = {
         id: newItemId,
         name: `${item.itemName}, ${item.category}`,
@@ -572,35 +544,29 @@ const Incoming = ({ user }) => {
         brandId: item.brandId || null,
         modelId: item.modelId || null,
         typeId: item.typeId || null,
-        categoryId: item.categoryId || null,
+        categoryId: categoryId,
       };
       setItems([...items, newItem]);
     }
     setHasOpenedAdd(true);
   };
-
   // Update ref when expandedItemId changes
   useEffect(() => {
     expandedItemIdRef.current = expandedItemId;
   }, [expandedItemId]);
-
   // Global mouse handlers for desktop support (like PurchaseOrder)
   useEffect(() => {
     if (items.length === 0) return;
-
     const minSwipeDistance = 50;
     const globalMouseMoveHandler = (e) => {
       setSwipeStates(prev => {
         let hasChanges = false;
         const newState = { ...prev };
-
         items.forEach(item => {
           const state = prev[item.id];
           if (!state) return;
-
           const deltaX = e.clientX - state.startX;
           const isExpanded = expandedItemIdRef.current === item.id;
-
           // Only update if dragging horizontally
           if (deltaX < 0 || (isExpanded && deltaX > 0)) {
             newState[item.id] = {
@@ -611,23 +577,18 @@ const Incoming = ({ user }) => {
             hasChanges = true;
           }
         });
-
         return hasChanges ? newState : prev;
       });
     };
-
     const globalMouseUpHandler = () => {
       setSwipeStates(prev => {
         let hasChanges = false;
         const newState = { ...prev };
-
         items.forEach(item => {
           const state = prev[item.id];
           if (!state) return;
-
           const deltaX = state.currentX - state.startX;
           const absDeltaX = Math.abs(deltaX);
-
           if (absDeltaX >= minSwipeDistance) {
             if (deltaX < 0) {
               // Swiped left (reveal buttons)
@@ -642,32 +603,30 @@ const Incoming = ({ user }) => {
               setExpandedItemId(null);
             }
           }
-
           // Remove swipe state for this card
           delete newState[item.id];
           hasChanges = true;
         });
-
         return hasChanges ? newState : prev;
       });
     };
-
     // Add global mouse event listeners
     document.addEventListener('mousemove', globalMouseMoveHandler);
     document.addEventListener('mouseup', globalMouseUpHandler);
-
     return () => {
       document.removeEventListener('mousemove', globalMouseMoveHandler);
       document.removeEventListener('mouseup', globalMouseUpHandler);
     };
   }, [items]);
-
   // Helper function to resolve category ID
   const resolveCategoryId = (categoryName) => {
-    // This would need categoryOptions from API, for now return null
-    return null;
+    if (!categoryName || !categoryOptions.length) return null;
+    const category = categoryOptions.find(cat => {
+      const label = (cat.label || cat.value || cat.category || cat.categoryName || cat.name || '').toLowerCase().trim();
+      return label === categoryName.toLowerCase().trim();
+    });
+    return category ? (category.id || category._id || null) : null;
   };
-
   const handleAddItem = (itemData) => {
     if (editingItem) {
       const updatedItems = items.map(item =>
@@ -693,14 +652,12 @@ const Incoming = ({ user }) => {
     } else {
       // Normalize values for comparison
       const normalizeValue = (val) => (val || '').toString().toLowerCase().trim();
-
       const newItemName = normalizeValue(itemData.itemName);
       const newCategory = normalizeValue(itemData.category);
       const newModel = normalizeValue(itemData.model);
       const newBrand = normalizeValue(itemData.brand);
       const newType = normalizeValue(itemData.type);
       const newQuantity = parseInt(itemData.quantity) || 0;
-
       // Check if an item with the same properties exists
       const existingItemIndex = items.findIndex(item => {
         const itemNameParts = item.name ? item.name.split(',') : [];
@@ -709,7 +666,6 @@ const Incoming = ({ user }) => {
         const existingModel = normalizeValue(item.model);
         const existingBrand = normalizeValue(item.brand);
         const existingType = normalizeValue(item.type);
-
         // Match if all properties are the same
         return (
           existingItemName === newItemName &&
@@ -719,7 +675,6 @@ const Incoming = ({ user }) => {
           existingType === newType
         );
       });
-
       if (existingItemIndex !== -1) {
         // Merge with existing item by adding quantities
         const updatedItems = items.map((item, index) => {
@@ -753,12 +708,10 @@ const Incoming = ({ user }) => {
       }
     }
   };
-
   const handleDeleteItem = (itemId) => {
     setItemToDelete(itemId);
     setShowDeleteConfirm(true);
   };
-
   const confirmDelete = () => {
     if (itemToDelete) {
       setItems(items.filter(item => item.id !== itemToDelete));
@@ -766,18 +719,15 @@ const Incoming = ({ user }) => {
     }
     setShowDeleteConfirm(false);
   };
-
   // Convert image to PDF format
   const convertImageToPDF = (file) => {
     return new Promise((resolve, reject) => {
-      const fileType = file.type;
-      
+      const fileType = file.type;  
       // If already a PDF, return as is
       if (fileType === 'application/pdf') {
         resolve(file);
         return;
-      }
-      
+      }      
       // If it's an image, convert to PDF
       if (fileType.startsWith('image/')) {
         const reader = new FileReader();
@@ -788,17 +738,14 @@ const Incoming = ({ user }) => {
             const imgWidth = img.width;
             const imgHeight = img.height;
             const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = pdf.internal.pageSize.getHeight();
-            
+            const pdfHeight = pdf.internal.pageSize.getHeight();      
             // Calculate dimensions to fit the image in PDF
             const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
             const width = imgWidth * ratio;
             const height = imgHeight * ratio;
             const x = (pdfWidth - width) / 2;
-            const y = (pdfHeight - height) / 2;
-            
+            const y = (pdfHeight - height) / 2;            
             pdf.addImage(e.target.result, 'JPEG', x, y, width, height);
-            
             // Convert PDF to Blob
             const pdfBlob = pdf.output('blob');
             const pdfFile = new File([pdfBlob], file.name.replace(/\.[^/.]+$/, '.pdf'), {
@@ -818,12 +765,10 @@ const Incoming = ({ user }) => {
       }
     });
   };
-
   // Convert file to JPG format (for preview)
   const convertFileToJPG = (file) => {
     return new Promise((resolve, reject) => {
-      const fileType = file.type;
-      
+      const fileType = file.type;  
       // If already an image, convert to JPG
       if (fileType.startsWith('image/')) {
         const reader = new FileReader();
@@ -835,7 +780,6 @@ const Incoming = ({ user }) => {
             canvas.height = img.height;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0);
-            
             canvas.toBlob((blob) => {
               const jpgFile = new File([blob], file.name.replace(/\.[^/.]+$/, '.jpg'), {
                 type: 'image/jpeg',
@@ -856,19 +800,16 @@ const Incoming = ({ user }) => {
             if (window.pdfjsLib) {
               pdfResolve();
               return;
-            }
-            
+            }            
             const script = document.createElement('script');
             script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
             script.onload = () => pdfResolve();
             script.onerror = () => pdfReject(new Error('Failed to load PDF.js'));
             document.head.appendChild(script);
           });
-        };
-        
+        };        
         loadPDFJS().then(() => {
           window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-          
           // Read PDF file as ArrayBuffer
           const reader = new FileReader();
           reader.onload = (e) => {
@@ -876,35 +817,29 @@ const Incoming = ({ user }) => {
             window.pdfjsLib.getDocument({ data: arrayBuffer }).promise.then((pdf) => {
               // Render all pages
               const numPages = pdf.numPages;
-              const pagePromises = [];
-              
+              const pagePromises = [];              
               // Get all page viewports first to calculate total height
               for (let pageNum = 1; pageNum <= numPages; pageNum++) {
                 pagePromises.push(pdf.getPage(pageNum));
-              }
-              
+              }              
               Promise.all(pagePromises).then((pages) => {
                 const scale = 2.0;
                 let totalHeight = 0;
-                let maxWidth = 0;
-                
+                let maxWidth = 0;                
                 // Calculate total dimensions
                 pages.forEach((page) => {
                   const viewport = page.getViewport({ scale });
                   totalHeight += viewport.height;
                   maxWidth = Math.max(maxWidth, viewport.width);
-                });
-                
+                });                
                 // Create a single canvas for all pages
                 const canvas = document.createElement('canvas');
                 const context = canvas.getContext('2d');
                 canvas.width = maxWidth;
-                canvas.height = totalHeight;
-                
+                canvas.height = totalHeight;                
                 // Fill white background
                 context.fillStyle = '#ffffff';
                 context.fillRect(0, 0, canvas.width, canvas.height);
-                
                 // Render all pages vertically sequentially
                 let currentY = 0;
                 const renderPage = (pageIndex) => {
@@ -918,21 +853,17 @@ const Incoming = ({ user }) => {
                       resolve(jpgFile);
                     }, 'image/jpeg', 0.9);
                     return;
-                  }
-                  
+                  }                  
                   const page = pages[pageIndex];
                   const viewport = page.getViewport({ scale });
-                  
                   // Save context state
                   context.save();
                   // Translate to position for this page
-                  context.translate(0, currentY);
-                  
+                  context.translate(0, currentY);                  
                   const renderContext = {
                     canvasContext: context,
                     viewport: viewport
-                  };
-                  
+                  };                  
                   page.render(renderContext).promise.then(() => {
                     // Restore context after rendering
                     context.restore();
@@ -945,8 +876,7 @@ const Incoming = ({ user }) => {
                     currentY += viewport.height;
                     renderPage(pageIndex + 1);
                   });
-                };
-                
+                };                
                 // Start rendering from first page
                 renderPage(0);
               }).catch(() => {
@@ -962,8 +892,7 @@ const Incoming = ({ user }) => {
           reader.readAsArrayBuffer(file);
         }).catch(() => {
           createPDFPlaceholder(file, resolve);
-        });
-        
+        });        
         function createPDFPlaceholder(file, resolve) {
           const canvas = document.createElement('canvas');
           canvas.width = 800;
@@ -990,7 +919,6 @@ const Incoming = ({ user }) => {
         canvas.width = 800;
         canvas.height = 600;
         const ctx = canvas.getContext('2d');
-        
         ctx.fillStyle = '#f0f0f0';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = '#000000';
@@ -999,7 +927,6 @@ const Incoming = ({ user }) => {
         ctx.font = '16px Arial';
         ctx.fillText('Type: ' + fileType, 50, 150);
         ctx.fillText('Size: ' + (file.size / 1024 / 1024).toFixed(2) + ' MB', 50, 200);
-        
         canvas.toBlob((blob) => {
           const jpgFile = new File([blob], file.name.replace(/\.[^/.]+$/, '.jpg'), {
             type: 'image/jpeg',
@@ -1010,12 +937,10 @@ const Incoming = ({ user }) => {
       }
     });
   };
-
   // Handle file selection
   const handleFileSelect = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
-
     // Process files sequentially (one at a time) to avoid race conditions
     for (const file of files) {
       // Check file size (5 MB limit)
@@ -1023,7 +948,6 @@ const Incoming = ({ user }) => {
         alert(`File "${file.name}" exceeds 5 MB limit`);
         continue;
       }
-
       // Create file object with upload state - use a more unique ID
       const fileId = Date.now() + Math.random() + Math.random() * 1000;
       const newFile = {
@@ -1037,41 +961,34 @@ const Incoming = ({ user }) => {
         convertedFile: null,
         pdfUrl: null // Store the uploaded PDF URL
       };
-
       setAttachedFiles(prev => [...prev, newFile]);
-
       // Simulate upload progress
       const startTime = Date.now();
       let totalSize = file.size;
       let uploadedSize = 0;
       const uploadSpeed = 2 * 1024 * 1024; // 2 MB per second
-
       const progressInterval = setInterval(() => {
         const elapsed = (Date.now() - startTime) / 1000; // seconds
         uploadedSize = Math.min(elapsed * uploadSpeed, totalSize);
         const progress = (uploadedSize / totalSize) * 100;
         const remaining = totalSize - uploadedSize;
         const timeLeft = Math.ceil(remaining / uploadSpeed);
-
         setAttachedFiles(prev => prev.map(f => 
           f.id === fileId 
             ? { ...f, progress: Math.min(progress, 99), timeLeft }
             : f
         ));
       }, 100);
-
       try {
         // Convert image to PDF if needed, or use PDF as is
         const pdfFile = await convertImageToPDF(file);
         totalSize = pdfFile.size; // Update total size for progress calculation
-        
         // Get vendor and site info for file naming
         const selectedSite = siteOptions.find(
           site => site.value === incomingData.stockingLocation && site.markedAsStockingLocation === true
         );
         const vendor = incomingData.vendorName || '';
-        const contractor = vendor; // Using vendor as contractor for naming
-        
+        const contractor = vendor; // Using vendor as contractor for naming        
         // Prepare file name with timestamp - include milliseconds and fileId for uniqueness
         const now = new Date();
         const timestamp = now.toLocaleString("en-GB", {
@@ -1084,43 +1001,35 @@ const Incoming = ({ user }) => {
           hour12: true
         })
           .replace(",", "")
-          .replace(/\s/g, "-");
-        
+          .replace(/\s/g, "-");        
         // Add milliseconds and a unique counter to ensure uniqueness for each file
         const milliseconds = now.getMilliseconds();
         // Use fileId converted to a unique string (combine timestamp and random parts)
         const uniqueId = Math.floor(fileId).toString().replace('.', '').slice(-8); // Use last 8 digits
         const originalFileName = file.name.replace(/\.[^/.]+$/, '').substring(0, 30); // Limit filename length
         const finalName = `${timestamp}-${milliseconds}-${uniqueId} ${selectedSite?.sNo || ''} ${vendor || contractor} ${originalFileName}`.trim();
-        
         // Upload to Google Drive
         const formData = new FormData();
         formData.append('file', pdfFile);
-        formData.append('file_name', finalName);
-        
+        formData.append('file_name', finalName);        
         const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
           method: "POST",
           body: formData,
-        });
-        
+        });        
         if (!uploadResponse.ok) {
           throw new Error('File upload failed');
-        }
-        
+        }        
         const uploadResult = await uploadResponse.json();
         const pdfUrl = uploadResult.url;
-        
         // Convert file to JPG for preview
         const jpgFile = await convertFileToJPG(file);
-        
         // Create preview URL for the converted JPG
         const previewUrl = URL.createObjectURL(jpgFile);
         setFilePreviews(prev => {
           const newPreviews = { ...prev, [fileId]: previewUrl };
           filePreviewsRef.current = newPreviews;
           return newPreviews;
-        });
-        
+        });        
         // Complete upload
         clearInterval(progressInterval);
         setAttachedFiles(prev => prev.map(f => 
@@ -1139,13 +1048,11 @@ const Incoming = ({ user }) => {
         alert(`Error uploading file "${file.name}": ${error.message}`);
       }
     }
-
     // Reset input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
-
   // Handle file deletion
   const handleDeleteFile = (fileId) => {
     // Clean up preview URL
@@ -1160,7 +1067,6 @@ const Incoming = ({ user }) => {
     }
     setAttachedFiles(prev => prev.filter(f => f.id !== fileId));
   };
-
   // Save incoming inventory data
   const handleSaveIncoming = async () => {
     // Validate required fields
@@ -1168,43 +1074,34 @@ const Incoming = ({ user }) => {
       alert('Please fill in all required fields (Vendor Name and Stocking Location)');
       return;
     }
-
     if (items.length === 0) {
       alert('Please add at least one item');
       return;
     }
-
     try {
       // Find stocking location ID from siteOptions
       const stockingLocationSite = siteOptions.find(
         site => site.value === incomingData.stockingLocation && site.markedAsStockingLocation === true
-      );
-      
+      ); 
       if (!stockingLocationSite || !stockingLocationSite.id) {
         alert('Stocking location ID not found. Please select a valid stocking location.');
         return;
       }
-
       const stockingLocationId = stockingLocationSite.id;
-
       // Get incoming count for ENO
       const countResponse = await fetch(
         `https://backendaab.in/aabuildersDash/api/inventory/incomingCount?stockingLocationId=${stockingLocationId}`
-      );
-      
+      );      
       if (!countResponse.ok) {
         throw new Error('Failed to fetch incoming count');
-      }
-      
+      }      
       const incomingCount = await countResponse.json();
       const eno = String(incomingCount + 1 || 0);
-
       // Convert date from DD/MM/YYYY to YYYY-MM-DD format for backend
       const dateParts = incomingData.date.split('/');
       const formattedDate = dateParts.length === 3 
         ? `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}` 
         : incomingData.date;
-
       // Prepare inventory items - ensure quantities are positive
       const inventoryItems = items.map(item => ({
         item_id: item.itemId || null,
@@ -1215,7 +1112,6 @@ const Incoming = ({ user }) => {
         quantity: Math.abs(item.quantity || 0), // Always positive for incoming
         amount: Math.abs((item.price || 0) * (item.quantity || 0))
       }));
-
       // Prepare payload
       const payload = {
         vendor_id: incomingData.vendorId,
@@ -1223,11 +1119,10 @@ const Incoming = ({ user }) => {
         inventory_type: 'incoming',
         date: formattedDate,
         eno: eno,
-        purchase_no: incomingData.poNumber || '',
+        purchase_no: incomingData.poNumber || 'NO_PO',
         created_by: (user && user.username) || '',
         inventoryItems: inventoryItems
       };
-
       // Save to backend
       const response = await fetch('https://backendaab.in/aabuildersDash/api/inventory/save', {
         method: 'POST',
@@ -1236,35 +1131,24 @@ const Incoming = ({ user }) => {
         },
         body: JSON.stringify(payload)
       });
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.message || 'Failed to save inventory data');
       }
-
       const savedData = await response.json();
-      
-      // Get the inventory management ID from saved data
-      // Try different possible field names for the ID
       const inventoryManagementId = savedData.id || savedData.inventoryManagementId || savedData.inventory_management_id;
-      
       if (!inventoryManagementId) {
         console.warn('Inventory management ID not found in saved data:', savedData);
       }
-      
-      // Save PDF URLs if there are any uploaded files
       if (inventoryManagementId && attachedFiles.length > 0) {
         const filesWithUrls = attachedFiles.filter(f => f.pdfUrl && f.status === 'completed');
-        
         if (filesWithUrls.length > 0) {
           try {
-            // Save each PDF URL to the backend
             const pdfSavePromises = filesWithUrls.map(async (file) => {
               const pdfPayload = {
                 incoming_pdf: file.pdfUrl,
                 inventory_management_id: inventoryManagementId
               };
-              
               const pdfResponse = await fetch('https://backendaab.in/aabuildersDash/api/incoming_pdfs/save', {
                 method: 'POST',
                 headers: {
@@ -1272,26 +1156,20 @@ const Incoming = ({ user }) => {
                 },
                 body: JSON.stringify(pdfPayload)
               });
-              
               if (!pdfResponse.ok) {
                 const errorData = await pdfResponse.json().catch(() => ({}));
                 throw new Error(errorData.message || 'Failed to save PDF URL');
               }
-              
               return await pdfResponse.json();
             });
-            
             await Promise.all(pdfSavePromises);
           } catch (pdfError) {
             console.error('Error saving PDF URLs:', pdfError);
-            // Don't fail the entire operation if PDF save fails, just log it
             alert(`Inventory saved successfully, but there was an error saving PDF attachments: ${pdfError.message}`);
           }
         }
-      }
-      
+      }      
       alert('Inventory data saved successfully!');
-      
       // Reset form
       setIncomingData({
         poNumber: '',
@@ -1311,7 +1189,6 @@ const Incoming = ({ user }) => {
       alert(`Error saving inventory: ${error.message}`);
     }
   };
-
   return (
     <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden">
       {/* PO Number and Date Row - Only show when not in empty state */}
@@ -1371,7 +1248,6 @@ const Incoming = ({ user }) => {
           </div>
         </div>
       )}
-
       {/* Form Fields - visible while you are selecting the fields (before first + click) */}
       {!showAddItems && !hasOpenedAdd && (
         <div className="flex-shrink-0 px-4 pt-4">
@@ -1432,8 +1308,8 @@ const Incoming = ({ user }) => {
                   setIncomingData({ ...incomingData, vendorName: '', vendorId: null, poNumber: '' });
                   setItems([]); // Clear items when vendor is cleared
                 }}
-                className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                style={{ right: '32px' }}
+                className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                style={{ right: '24px' }}
               >
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -1442,7 +1318,6 @@ const Incoming = ({ user }) => {
             )}
           </div>
         </div>
-
         {/* Stocking Location Field */}
         <div className="mb-4 relative">
           <p className="text-[12px] font-semibold text-black leading-normal mb-1">
@@ -1467,8 +1342,8 @@ const Incoming = ({ user }) => {
                   e.stopPropagation();
                   setIncomingData({ ...incomingData, stockingLocation: '', poNumber: '' });
                 }}
-                className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                style={{ right: '32px' }}
+                className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                style={{ right: '24px' }}
               >
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -1479,7 +1354,6 @@ const Incoming = ({ user }) => {
         </div>
         </div>
       )}
-
       {/* Summary details card - show after first + click */}
       {hasOpenedAdd && !isEmptyState && (incomingData.vendorName || incomingData.stockingLocation) && (
         <div className="flex-shrink-0 mx-2 mb-1 p-2 bg-white border border-[#aaaaaa] rounded-[8px]">
@@ -1501,7 +1375,6 @@ const Incoming = ({ user }) => {
           </div>
         </div>
       )}
-
       {/* Filled State extras (items) - Show when fields are filled OR after opening add items OR in edit mode */}
       {(hasOpenedAdd || !isEmptyState || isEditMode) && (
         <>
@@ -1613,6 +1486,12 @@ const Incoming = ({ user }) => {
                             setExpandedItemId(null);
                             handleDeleteItem(item.id);
                           }}
+                          onAmountChange={(itemId, newPrice) => {
+                            const updatedItems = items.map(i =>
+                              i.id === itemId ? { ...i, price: newPrice } : i
+                            );
+                            setItems(updatedItems);
+                          }}
                         />
                       );
                     })}
@@ -1623,7 +1502,6 @@ const Incoming = ({ user }) => {
           )}
         </>
       )}
-
       {/* File Upload Button - Fixed position above + button */}
       {hasOpenedAdd && items.length > 0 && incomingData.vendorName && incomingData.stockingLocation && (
         <div className="fixed bottom-[170px] right-[24px] lg:right-[calc(50%-164px)] z-30">
@@ -1639,7 +1517,6 @@ const Incoming = ({ user }) => {
           </button>
         </div>
       )}
-
       {/* Add Button - Fixed position (only enabled when all required fields are filled) */}
       <AddButton
         onClick={() => {
@@ -1650,7 +1527,6 @@ const Incoming = ({ user }) => {
         disabled={!areIncomingFieldsFilled}
         showNew={false}
       />
-
       {/* Modals */}
       <SelectVendorModal
         isOpen={showVendorModal}
@@ -1730,6 +1606,7 @@ const Incoming = ({ user }) => {
           );
           return stockingLocationSite?.id || null;
         })()}
+        disableAvailabilityCheck={true}
       />
       <SelectPOModal
         isOpen={showPOModal}
@@ -1758,7 +1635,6 @@ const Incoming = ({ user }) => {
         allPurchaseOrders={allPurchaseOrders}
         onFetchPOs={fetchAllPurchaseOrders}
       />
-
       {/* File Upload Modal */}
       {showFileUploadModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -1776,14 +1652,11 @@ const Incoming = ({ user }) => {
                 </svg>
               </button>
             </div>
-
             {/* Modal Content */}
             <div className="p-4">
               <p className="text-[12px] font-medium text-[#616161] mb-4">Attachments will be of this invoice</p>
-
               {/* Upload Area */}
-              <div
-                onClick={() => fileInputRef.current?.click()}
+              <div onClick={() => fileInputRef.current?.click()}
                 className="border-2 border-dashed border-[#FF9800] rounded-[8px] p-8 mb-4 cursor-pointer hover:bg-gray-50 transition-colors"
               >
                 <input
@@ -1802,7 +1675,6 @@ const Incoming = ({ user }) => {
                   <p className="text-[12px] font-medium text-[#9E9E9E]">(Max, File size: 5 MB)</p>
                 </div>
               </div>
-
               {/* File Uploading Section */}
               {attachedFiles.length > 0 && (
                 <div className="mt-4">
@@ -1834,7 +1706,6 @@ const Incoming = ({ user }) => {
                             </svg>
                           )}
                         </div>
-
                         {/* File Info */}
                         <div className="flex-1 min-w-0">
                           <p className="text-[12px] font-medium text-black truncate">{file.name}</p>
@@ -1863,7 +1734,6 @@ const Incoming = ({ user }) => {
                             </p>
                           )}
                         </div>
-
                         {/* Delete Button */}
                         <button
                           type="button"
@@ -1886,7 +1756,6 @@ const Incoming = ({ user }) => {
           </div>
         </div>
       )}
-
       {/* Invoice Preview Modal */}
       {showInvoicePreview && selectedFilePreview && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex flex-col items-center justify-center p-2">
@@ -1919,6 +1788,4 @@ const Incoming = ({ user }) => {
     </div>
   );
 };
-
 export default Incoming;
-

@@ -9,9 +9,11 @@ const History = ({ onTabChange }) => {
   const [loading, setLoading] = useState(true);
   const [clientData, setClientData] = useState([]);
   const [expandedItemId, setExpandedItemId] = useState(null);
+  const [cloneExpandedItemId, setCloneExpandedItemId] = useState(null);
   const [swipeStates, setSwipeStates] = useState({});
   const expandedItemIdRef = useRef(expandedItemId);
   const cardRefs = useRef({});
+  const [activeType, setActiveType] = useState('stack return'); // 'stack return' or 'dispatch'
 
   // Fetch client data
   useEffect(() => {
@@ -57,32 +59,25 @@ const History = ({ onTabChange }) => {
             'Content-Type': 'application/json'
           }
         });
-
         if (!response.ok) {
           throw new Error('Network response was not ok');
         }
-
-        const inventoryData = await response.json();
-        
+        const inventoryData = await response.json();        
         // Filter for outgoing type only
         const outgoingItems = inventoryData.filter(item => 
           item.inventory_type === 'outgoing' || item.inventoryType === 'outgoing'
         );
-
         // Format the outgoing items
         const formattedHistory = outgoingItems.map(item => {
           // Get the date from date column
           const itemDate = item.date || item.created_at || item.createdAt;
           const dateObj = new Date(itemDate);
-          const year = dateObj.getFullYear();
-          
+          const year = dateObj.getFullYear();          
           // Get entry number - use eno as primary source
-          const entryNumber = item.eno || item.ENO || item.entry_number || item.entryNumber || item.entrynumber || item.id || '';
-          
+          const entryNumber = item.eno || item.ENO || item.entry_number || item.entryNumber || item.entrynumber || item.id || '';          
           // Determine transaction ID based on outgoing type
           let transactionId = '';
-          const outgoingType = item.outgoing_type || item.outgoingType || '';
-          
+          const outgoingType = item.outgoing_type || item.outgoingType || '';          
           if (outgoingType.toLowerCase() === 'stock return' || outgoingType.toLowerCase() === 'stockreturn') {
             transactionId = `SR - ${year} - ${entryNumber}`;
           } else if (outgoingType.toLowerCase() === 'dispatch') {
@@ -91,7 +86,6 @@ const History = ({ onTabChange }) => {
             // Default fallback
             transactionId = `SR - ${year} - ${entryNumber}`;
           }
-
           // Get client name from client_id
           const clientId = item.client_id || item.clientId;
           let clientName = '';
@@ -104,11 +98,9 @@ const History = ({ onTabChange }) => {
             );
             clientName = client ? (client.label || client.value || '') : '';
           }
-
           // Calculate numberOfItems from inventoryItems count
           const inventoryItems = item.inventoryItems || item.inventory_items || [];
           const numberOfItems = Array.isArray(inventoryItems) ? inventoryItems.length : 0;
-          
           // Calculate quantity as sum of inventoryItems qty
           const quantity = Array.isArray(inventoryItems) 
             ? inventoryItems.reduce((sum, invItem) => {
@@ -116,14 +108,12 @@ const History = ({ onTabChange }) => {
                 return sum + (parseFloat(qty) || 0);
               }, 0)
             : (item.total_quantity || item.totalQuantity || item.quantity || 0);
-
           // Ensure originalItem includes inventoryItems explicitly
           const originalItemWithItems = {
             ...item,
             inventoryItems: inventoryItems.length > 0 ? inventoryItems : (item.inventoryItems || []),
             inventory_items: inventoryItems.length > 0 ? inventoryItems : (item.inventory_items || [])
           };
-
           return {
             id: item.id,
             transactionId: transactionId,
@@ -140,14 +130,14 @@ const History = ({ onTabChange }) => {
             originalItem: originalItemWithItems
           };
         });
-
-        // Sort by date (newest first)
+        // Sort by created_date_time (latest entry first)
         formattedHistory.sort((a, b) => {
-          const dateA = new Date(a.date);
-          const dateB = new Date(b.date);
-          return dateB - dateA;
+          const dateTimeA = a.createdDateTime || a.created_date_time || a.created_at || a.date;
+          const dateTimeB = b.createdDateTime || b.created_date_time || b.created_at || b.date;
+          const timeA = new Date(dateTimeA).getTime();
+          const timeB = new Date(dateTimeB).getTime();
+          return timeB - timeA; // Latest first (descending order)
         });
-
         setHistoryData(formattedHistory);
         setFilteredData(formattedHistory);
         console.log(formattedHistory);
@@ -159,25 +149,32 @@ const History = ({ onTabChange }) => {
         setLoading(false);
       }
     };
-
     fetchHistory();
   }, [clientData]);
 
-  // Filter data based on search query
+  // Filter data based on search query and active type
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredData(historyData);
-      return;
+    let filtered = historyData;
+
+    // Filter by active type (Stack Return or Dispatch)
+    if (activeType === 'stack return') {
+      filtered = filtered.filter(item => item.type === 'SR');
+    } else if (activeType === 'dispatch') {
+      filtered = filtered.filter(item => item.type === 'DP');
     }
 
-    const query = searchQuery.toLowerCase();
-    const filtered = historyData.filter(item => {
-      const customerLocation = `${item.customerName} - ${item.location}`.toLowerCase();
-      const transactionId = item.transactionId.toLowerCase();
-      return customerLocation.includes(query) || transactionId.includes(query);
-    });
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(item => {
+        const customerLocation = `${item.customerName} - ${item.location}`.toLowerCase();
+        const transactionId = item.transactionId.toLowerCase();
+        return customerLocation.includes(query) || transactionId.includes(query);
+      });
+    }
+
     setFilteredData(filtered);
-  }, [searchQuery, historyData]);
+  }, [searchQuery, historyData, activeType]);
 
   // Format date to show "Today" or actual date
   const formatDate = (dateString) => {
@@ -236,8 +233,9 @@ const History = ({ onTabChange }) => {
     if (!state) return;
     const deltaX = touch.clientX - state.startX;
     const isExpanded = expandedItemIdRef.current === itemId;
-    // Allow swiping left to reveal buttons, or swiping right to hide if already expanded
-    if (deltaX < 0 || (isExpanded && deltaX > 0)) {
+    const isCloneExpanded = cloneExpandedItemId === itemId;
+    // Allow swiping left to reveal buttons, swiping right to reveal clone, or swiping to hide if already expanded
+    if (deltaX < 0 || (deltaX > 0 && !isExpanded) || (isExpanded && deltaX > 0) || (isCloneExpanded && deltaX < 0)) {
       // preventDefault is handled by non-passive listener in useEffect
       setSwipeStates(prev => ({
         ...prev,
@@ -257,17 +255,21 @@ const History = ({ onTabChange }) => {
     const absDeltaX = Math.abs(deltaX);
     if (absDeltaX >= minSwipeDistance) {
       if (deltaX < 0) {
-        // Swiped left (reveal buttons)
+        // Swiped left (reveal buttons on right)
         setExpandedItemId(itemId);
+        setCloneExpandedItemId(null);
       } else {
-        // Swiped right (hide buttons)
-        setExpandedItemId(null);
+        // Swiped right (reveal clone button on left)
+        if (expandedItemIdRef.current === itemId) {
+          // Hide right buttons if they were shown
+          setExpandedItemId(null);
+        } else {
+          // Show clone button on left
+          setCloneExpandedItemId(itemId);
+        }
       }
     } else {
-      // Small movement - snap back
-      if (expandedItemIdRef.current === itemId) {
-        setExpandedItemId(null);
-      }
+      // Small movement - snap back (no change needed, buttons stay as they are)
     }
     // Reset swipe state
     setSwipeStates(prev => {
@@ -292,8 +294,9 @@ const History = ({ onTabChange }) => {
         const touch = e.touches[0];
         const deltaX = touch.clientX - state.startX;
         const isExpanded = expandedItemIdRef.current === itemId;
+        const isCloneExpanded = cloneExpandedItemId === itemId;
         // Prevent default scrolling when swiping horizontally
-        if (deltaX < 0 || (isExpanded && deltaX > 0)) {
+        if (deltaX < 0 || (deltaX > 0 && !isExpanded) || (isExpanded && deltaX > 0) || (isCloneExpanded && deltaX < 0)) {
           e.preventDefault();
         }
       };
@@ -309,7 +312,7 @@ const History = ({ onTabChange }) => {
     return () => {
       cleanupFunctions.forEach(cleanup => cleanup());
     };
-  }, [filteredData, swipeStates]);
+  }, [filteredData, swipeStates, cloneExpandedItemId]);
 
   // Global mouse handlers for desktop support
   useEffect(() => {
@@ -326,7 +329,7 @@ const History = ({ onTabChange }) => {
           const deltaX = e.clientX - state.startX;
           const isExpanded = expandedItemIdRef.current === item.id;
           // Only update if dragging horizontally
-          if (deltaX < 0 || (isExpanded && deltaX > 0)) {
+          if (deltaX < 0 || (deltaX > 0 && !isExpanded) || (isExpanded && deltaX > 0)) {
             newState[item.id] = {
               ...state,
               currentX: e.clientX,
@@ -352,11 +355,18 @@ const History = ({ onTabChange }) => {
           const absDeltaX = Math.abs(deltaX);
           if (absDeltaX >= minSwipeDistance) {
             if (deltaX < 0) {
-              // Swiped left (reveal buttons)
+              // Swiped left (reveal buttons on right)
               setExpandedItemId(item.id);
+              setCloneExpandedItemId(null);
             } else {
-              // Swiped right (hide buttons)
-              setExpandedItemId(null);
+              // Swiped right (reveal clone button on left)
+              if (expandedItemIdRef.current === item.id) {
+                // Hide right buttons if they were shown
+                setExpandedItemId(null);
+              } else {
+                // Show clone button on left
+                setCloneExpandedItemId(item.id);
+              }
             }
           } else {
             // Small movement - snap back
@@ -383,7 +393,90 @@ const History = ({ onTabChange }) => {
     };
   }, [filteredData]);
 
-  // Handle edit
+  // Handle view (for viewing when clicking transaction ID)
+  const handleView = async (item) => {
+    try {
+      // Get the original inventory item data (should already have inventoryItems from originalItem)
+      let inventoryData = item.originalItem || item;
+      
+      // Check if inventoryItems are present in the data
+      const hasInventoryItems = inventoryData?.inventoryItems || inventoryData?.inventory_items;
+      
+      // If inventoryItems are missing, try to fetch them from the backend
+      if (!hasInventoryItems || (Array.isArray(inventoryData?.inventoryItems) && inventoryData.inventoryItems.length === 0) || 
+          (Array.isArray(inventoryData?.inventory_items) && inventoryData.inventory_items.length === 0)) {
+        if (inventoryData?.id) {
+          try {
+            // Try to fetch the inventory record with items by ID
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/inventory/edit_with_history/${inventoryData.id}`, {
+              method: 'GET',
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            if (response.ok) {
+              const detailedData = await response.json();
+              // Merge the detailed data with inventoryItems
+              if (detailedData.inventoryItems || detailedData.inventory_items) {
+                const items = detailedData.inventoryItems || detailedData.inventory_items;
+                inventoryData = {
+                  ...inventoryData,
+                  inventoryItems: items,
+                  inventory_items: items
+                };
+              }
+            }
+          } catch (fetchError) {
+            console.error('Error fetching inventory details:', fetchError);
+            // Continue with existing data even if fetch fails
+          }
+        }
+      }
+      
+      // Ensure inventoryItems are explicitly set (use both field names for compatibility)
+      if (inventoryData?.inventoryItems || inventoryData?.inventory_items) {
+        const items = inventoryData.inventoryItems || inventoryData.inventory_items;
+        inventoryData = {
+          ...inventoryData,
+          inventoryItems: items,
+          inventory_items: items
+        };
+      }
+      
+      // Mark as view mode (not edit mode) - for showing Download button
+      inventoryData.isEditMode = false;
+      // Mark as view mode from History (for showing Download button instead of Stack Return/Dispatch)
+      inventoryData.fromHistory = true;
+      
+      // Store inventory item data in localStorage to load in outgoing tab
+      if (inventoryData) {
+        localStorage.setItem('editingInventory', JSON.stringify(inventoryData));
+      }
+      // Dispatch custom event for outgoing component to listen
+      window.dispatchEvent(new CustomEvent('editInventory', { detail: inventoryData }));
+      // Navigate to outgoing tab for viewing
+      if (onTabChange) {
+        onTabChange('outgoing');
+      }
+      setExpandedItemId(null);
+    } catch (error) {
+      console.error('Error in handleView:', error);
+      // Fallback: still try to pass the data even if there's an error
+      const inventoryData = item.originalItem || item;
+      inventoryData.isEditMode = false;
+      inventoryData.fromHistory = true;
+      localStorage.setItem('editingInventory', JSON.stringify(inventoryData));
+      window.dispatchEvent(new CustomEvent('editInventory', { detail: inventoryData }));
+      if (onTabChange) {
+        onTabChange('outgoing');
+      }
+      setExpandedItemId(null);
+    }
+  };
+
+  // Handle edit (for update)
   const handleEdit = async (item) => {
     try {
       // Get the original inventory item data (should already have inventoryItems from originalItem)
@@ -435,6 +528,11 @@ const History = ({ onTabChange }) => {
         };
       }
       
+      // Mark as edit mode (update, not clone)
+      inventoryData.isEditMode = true;
+      // Mark as view mode from History (for showing Download button instead of Stack Return/Dispatch)
+      inventoryData.fromHistory = true;
+      
       // Store inventory item data in localStorage to load in outgoing tab
       if (inventoryData) {
         localStorage.setItem('editingInventory', JSON.stringify(inventoryData));
@@ -450,12 +548,97 @@ const History = ({ onTabChange }) => {
       console.error('Error in handleEdit:', error);
       // Fallback: still try to pass the data even if there's an error
       const inventoryData = item.originalItem || item;
+      inventoryData.isEditMode = true;
+      inventoryData.fromHistory = true;
       localStorage.setItem('editingInventory', JSON.stringify(inventoryData));
       window.dispatchEvent(new CustomEvent('editInventory', { detail: inventoryData }));
       if (onTabChange) {
         onTabChange('outgoing');
       }
       setExpandedItemId(null);
+    }
+  };
+
+  // Handle clone (for create new)
+  const handleClone = async (item) => {
+    try {
+      // Get the original inventory item data (should already have inventoryItems from originalItem)
+      let inventoryData = item.originalItem || item;
+      
+      // Check if inventoryItems are present in the data
+      const hasInventoryItems = inventoryData?.inventoryItems || inventoryData?.inventory_items;
+      
+      // If inventoryItems are missing, try to fetch them from the backend
+      if (!hasInventoryItems || (Array.isArray(inventoryData?.inventoryItems) && inventoryData.inventoryItems.length === 0) || 
+          (Array.isArray(inventoryData?.inventory_items) && inventoryData.inventory_items.length === 0)) {
+        if (inventoryData?.id) {
+          try {
+            // Try to fetch the inventory record with items by ID
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/inventory/edit_with_history/${inventoryData.id}`, {
+              method: 'GET',
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            if (response.ok) {
+              const detailedData = await response.json();
+              // Merge the detailed data with inventoryItems
+              if (detailedData.inventoryItems || detailedData.inventory_items) {
+                const items = detailedData.inventoryItems || detailedData.inventory_items;
+                inventoryData = {
+                  ...inventoryData,
+                  inventoryItems: items,
+                  inventory_items: items
+                };
+              }
+            }
+          } catch (fetchError) {
+            console.error('Error fetching inventory details:', fetchError);
+            // Continue with existing data even if fetch fails
+          }
+        }
+      }
+      
+      // Ensure inventoryItems are explicitly set (use both field names for compatibility)
+      if (inventoryData?.inventoryItems || inventoryData?.inventory_items) {
+        const items = inventoryData.inventoryItems || inventoryData.inventory_items;
+        inventoryData = {
+          ...inventoryData,
+          inventoryItems: items,
+          inventory_items: items
+        };
+      }
+      
+      // Mark as clone mode (create new, not update) - remove isEditMode or set to false
+      inventoryData.isEditMode = false;
+      // Remove ID to ensure it creates new record
+      delete inventoryData.id;
+      
+      // Store inventory item data in localStorage to load in outgoing tab
+      if (inventoryData) {
+        localStorage.setItem('editingInventory', JSON.stringify(inventoryData));
+      }
+      // Dispatch custom event for outgoing component to listen
+      window.dispatchEvent(new CustomEvent('editInventory', { detail: inventoryData }));
+      // Navigate to outgoing tab for cloning
+      if (onTabChange) {
+        onTabChange('outgoing');
+      }
+      setCloneExpandedItemId(null);
+    } catch (error) {
+      console.error('Error in handleClone:', error);
+      // Fallback: still try to pass the data even if there's an error
+      const inventoryData = item.originalItem || item;
+      inventoryData.isEditMode = false;
+      delete inventoryData.id;
+      localStorage.setItem('editingInventory', JSON.stringify(inventoryData));
+      window.dispatchEvent(new CustomEvent('editInventory', { detail: inventoryData }));
+      if (onTabChange) {
+        onTabChange('outgoing');
+      }
+      setCloneExpandedItemId(null);
     }
   };
 
@@ -468,6 +651,35 @@ const History = ({ onTabChange }) => {
 
   return (
     <div className="flex flex-col h-full bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
+      {/* Stack Return/Dispatch Toggle */}
+      <div className="flex-shrink-0 px-4 pt-3">
+        <div className="flex items-center gap-2">
+          {/* Stack Return/Dispatch Tabs */}
+          <div className="flex bg-gray-100 items-center h-9 shadow-sm flex-1">
+            <button
+              type="button"
+              onClick={() => setActiveType('stack return')}
+              className={`flex-1 py-1 px-4 ml-1 h-8 rounded text-[14px] font-medium transition-colors ${activeType === 'stack return'
+                  ? 'bg-white text-black'
+                  : 'bg-gray-100 text-gray-600'
+                }`}
+            >
+              Stack Return
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveType('dispatch')}
+              className={`flex-1 py-1 px-4 mr-1 h-8 rounded-lg text-[14px] font-medium transition-colors ${activeType === 'dispatch'
+                  ? 'bg-white text-black'
+                  : 'bg-gray-100 text-gray-600'
+                }`}
+            >
+              Dispatch
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Search Bar */}
       <div className="px-4 pt-4 pb-3">
         <div className="relative">
@@ -524,18 +736,49 @@ const History = ({ onTabChange }) => {
               const customerLocation = `${item.customerName}`;
               
               const isExpanded = expandedItemId === item.id;
+              const isCloneExpanded = cloneExpandedItemId === item.id;
               const swipeState = swipeStates[item.id];
               let swipeOffset = 0;
               if (swipeState && swipeState.isSwiping) {
-                swipeOffset = Math.max(-110, Math.min(0, swipeState.currentX - swipeState.startX));
+                const deltaX = swipeState.currentX - swipeState.startX;
+                if (deltaX < 0) {
+                  swipeOffset = Math.max(-160, Math.min(0, deltaX));
+                } else {
+                  swipeOffset = Math.min(48, Math.max(0, deltaX));
+                }
               } else if (isExpanded) {
-                swipeOffset = -110;
+                swipeOffset = -160;
+              } else if (isCloneExpanded) {
+                swipeOffset = 48;
               } else {
                 swipeOffset = 0;
               }
 
               return (
                 <div key={item.id} className="relative overflow-hidden">
+                  {/* Clone Button - Behind the card on the left, revealed on right swipe */}
+                  <div
+                    className="absolute left-0 top-0 flex gap-2 flex-shrink-0 z-0"
+                    style={{
+                      opacity: isCloneExpanded || (swipeState && swipeState.isSwiping && swipeOffset > 20) ? 1 : 0,
+                      transition: 'opacity 0.2s ease-out',
+                      pointerEvents: isCloneExpanded ? 'auto' : 'none'
+                    }}
+                  >
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleClone(item);
+                      }}
+                      className="action-button w-[48px] h-full bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 transition-colors shadow-sm min-h-[80px]"
+                      title="Clone"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 6.75V3.75C12 3.33579 11.6642 3 11.25 3H3.75C3.33579 3 3 3.33579 3 3.75V11.25C3 11.6642 3.33579 12 3.75 12H6.75" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M15 6.75H7.5C6.67157 6.75 6 7.42157 6 8.25V14.25C6 15.0784 6.67157 15.75 7.5 15.75H14.25C15.0784 15.75 15.75 15.0784 15.75 14.25V8.25C15.75 7.42157 15.0784 6.75 14.25 6.75H15Z" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                  </div>
                   {/* History Card */}
                   <div
                     ref={(el) => {
@@ -545,7 +788,7 @@ const History = ({ onTabChange }) => {
                         delete cardRefs.current[item.id];
                       }
                     }}
-                    className="bg-white border border-[rgba(0,0,0,0.16)] rounded-[8px] p-2 cursor-pointer hover:bg-gray-50 transition-all duration-300 ease-out relative z-10"
+                    className="bg-white border border-[rgba(0,0,0,0.16)] rounded-[8px] p-2 hover:bg-gray-50 transition-all duration-300 ease-out relative"
                     style={{
                       transform: `translateX(${swipeOffset}px)`,
                       touchAction: 'pan-y'
@@ -554,18 +797,22 @@ const History = ({ onTabChange }) => {
                     onTouchMove={(e) => handleTouchMove(e, item.id)}
                     onTouchEnd={() => handleTouchEnd(item.id)}
                     onMouseDown={(e) => handleTouchStart(e, item.id)}
-                    onClick={(e) => {
-                      if (!isExpanded) {
-                        e.stopPropagation();
-                      }
-                    }}
                   >
                     <div className="flex items-start justify-between">
                       {/* Left side: Transaction ID, Customer/Location Name, Date and Time */}
                       <div className="flex-1">
                         {/* Transaction ID */}
                         <div className="mb-1">
-                          <p className="text-[14px] font-semibold text-black leading-normal">
+                          <p 
+                            className="text-[14px] font-semibold text-black leading-normal cursor-pointer hover:underline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!isExpanded && !isCloneExpanded) {
+                                // Navigate to outgoing page (view mode from History)
+                                handleView(item);
+                              }
+                            }}
+                          >
                             {item.transactionId}
                           </p>
                         </div>

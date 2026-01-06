@@ -417,20 +417,56 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         }
         return sortableData;
     }, [filteredExpenses, sortConfig, laboursList, siteOptions, isChangeButtonActive, combinedOptions, employeeOptions, vendorOptions, contractorOptions]);
+    // ISO 8601 week number calculation
+    // Week belongs to the year that contains the Thursday of that week
+    // Week 1 is the week with the year's first Thursday
+    const getISOWeekNumber = (date) => {
+        const d = new Date(date);
+        d.setHours(0, 0, 0, 0);
+        
+        // Get Thursday of the week containing the date
+        // Monday = 1, Tuesday = 2, ..., Sunday = 0 (convert to 7)
+        const dayOfWeek = d.getDay() || 7; // Convert Sunday (0) to 7
+        const thursday = new Date(d);
+        thursday.setDate(d.getDate() + 4 - dayOfWeek); // Thursday is 4 days after Monday
+        thursday.setHours(0, 0, 0, 0);
+        
+        // Use the year that Thursday falls in (ISO 8601 rule)
+        const weekYear = thursday.getFullYear();
+        
+        // Get January 1st of that year
+        const jan1 = new Date(weekYear, 0, 1);
+        jan1.setHours(0, 0, 0, 0);
+        
+        // Get the Thursday of week 1 (first Thursday of the year)
+        const jan1DayOfWeek = jan1.getDay() || 7;
+        const firstThursday = new Date(jan1);
+        firstThursday.setDate(jan1.getDate() + 4 - jan1DayOfWeek);
+        firstThursday.setHours(0, 0, 0, 0);
+        
+        // Calculate week number: difference in days divided by 7, plus 1
+        const daysDiff = Math.floor((thursday - firstThursday) / 86400000);
+        const weekNo = Math.floor(daysDiff / 7) + 1;
+        
+        return weekNo;
+    };
+
     const getCurrentWeekNumber = () => {
-        const date = new Date();
-        const firstJan = new Date(date.getFullYear(), 0, 1);
-        const days = Math.floor((date - firstJan) / (24 * 60 * 60 * 1000));
-        return Math.ceil((days + firstJan.getDay() + 1) / 7);
+        return getISOWeekNumber(new Date());
     };
 
     // Calculate week number from a specific date (not current date)
     const getWeekNumberFromDate = (dateString) => {
         if (!dateString) return getCurrentWeekNumber();
         const date = new Date(dateString);
-        const firstJan = new Date(date.getFullYear(), 0, 1);
-        const days = Math.floor((date - firstJan) / (24 * 60 * 60 * 1000));
-        return Math.ceil((days + firstJan.getDay() + 1) / 7);
+        // Handle date strings in DD/MM/YYYY format
+        if (dateString.includes('/')) {
+            const parts = dateString.split('/');
+            if (parts.length === 3) {
+                date.setFullYear(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+            }
+        }
+        return getISOWeekNumber(date);
     };
     const currentWeekNumber = getCurrentWeekNumber();
     const startYear = 2000; // Change if needed
@@ -3339,7 +3375,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         </body >
     )
 }
-export default DailyPayment
+export default DailyPayment;
 const AuditModal = ({ show, onClose, audits, laboursList, siteOptions, vendorOptions, employeeOptions, contractorOptions }) => {
     if (!show) return null;
     const getNameById = (id, options) => {

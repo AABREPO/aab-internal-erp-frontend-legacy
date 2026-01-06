@@ -10,6 +10,9 @@ import AddInput from './AddInput';
 import History from './History';
 import ProjectUsageReport from './ProjectUsageReport';
 import IncomingTracker from './IncomingTracker';
+import NetStock from './NetStock';
+import NonPOHistory from './NonPOHistory';
+import EditStock from './EditStock';
 
 const Inventory = ({ user, onLogout }) => {
   const navigate = useNavigate();
@@ -38,12 +41,10 @@ const Inventory = ({ user, onLogout }) => {
     }
     // Other pages can be handled here when implemented
   };
-
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     localStorage.setItem('inventoryActiveTab', tab);
   };
-
   const renderTabContent = () => {
     switch (activeTab) {
       case 'outgoing':
@@ -51,12 +52,7 @@ const Inventory = ({ user, onLogout }) => {
       case 'incoming':
         return <Incoming user={user} />;
       case 'net-stock':
-        return (
-          <div className="p-4">
-            <h2 className="text-lg font-semibold text-black mb-4">Net Stock</h2>
-            <p className="text-gray-500">Net Stock content will be displayed here</p>
-          </div>
-        );
+        return <NetStock />;
       case 'history':
         return <History onTabChange={handleTabChange} />
       case 'add-input':
@@ -66,24 +62,15 @@ const Inventory = ({ user, onLogout }) => {
       case 'project-usage-report':
         return <ProjectUsageReport />;
       case 'project-usage-history':
-        return (
-          <div className="p-4">
-            <h2 className="text-lg font-semibold text-black mb-4">Project Usage History</h2>
-            <p className="text-gray-500">Project Usage History content will be displayed here</p>
-          </div>
-        );
+        return <ProjectUsageReport />;
       case 'non-po-history':
-        return (
-          <div className="p-4">
-            <h2 className="text-lg font-semibold text-black mb-4">Non PO History</h2>
-            <p className="text-gray-500">Non PO History content will be displayed here</p>
-          </div>
-        );
+        return <NonPOHistory />;
+      case 'edit-stock':
+        return <EditStock />;
       default:
         return null;
     }
   };
-
   return (
     <div className="relative w-full min-h-screen bg-white max-w-[360px] mx-auto pb-[80px]" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* Sidebar */}
@@ -112,6 +99,4 @@ const Inventory = ({ user, onLogout }) => {
     </div>
   );
 };
-
 export default Inventory;
-

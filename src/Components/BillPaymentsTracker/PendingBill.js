@@ -2493,7 +2493,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
     const handlePaymentSubmit = async () => {
         // Check if using carry forward only (no payment entries needed)
         const isUsingCarryForwardOnly = useCarryForward && carryForwardAmount > 0;
-
         // If not using carry forward only, validate payment entries
         if (!isUsingCarryForwardOnly) {
             const hasEmptyFields = paymentEntries.some(entry =>
@@ -2623,7 +2622,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 })
                 : [];
             const savedPaymentDetails = await Promise.all(paymentDetailsPromises)
-
             // Create separate payment entry for carry forward if checkbox is checked AND not already in entries
             if (useCarryForward && carryForwardToUse > 0 && carryForwardEntries.length === 0) {
                 try {
@@ -2709,7 +2707,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                         console.error("❌ Error submitting weekly payment bill:", error);
                     }
                 }
-
                 // Only send to weekly-expenses/save for Cash payment mode
                 if (entry.mode === 'Cash') {
                     const weeklyExpensePayload = {
@@ -2721,7 +2718,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                         project_id: 10,
                         type: "Vendor Bill Payment",
                         amount: parseFloat(entry.amount) || 0,
-                        status: true,
+                        status: false,
                         weekly_number: "",
                         period_start_date: null,
                         period_end_date: null,
@@ -2833,7 +2830,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                         : item
                 ))
             }
-
             // Capture latest payment date and other info from entries before clearing
             const paymentDates = validPaymentEntries
                 .map(e => e.date)
@@ -2850,7 +2846,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 : null;
             const hasCashPayments = validPaymentEntries.some(entry => entry.mode === 'Cash');
             const hasFileUploads = validPaymentEntries.some(entry => entry.attachedFile);
-
             setShowPaymentModal(false)
             setPaymentEntries([
                 {
@@ -2875,16 +2870,13 @@ const PendingBill = ({ username, userRoles = [] }) => {
             setUseCarryForward(false)
             setCarryForwardData([])
             setCarryForwardAmount(0)
-
             await fetchTrackerData()
             await fetchExpensesData()
             await fetchAllBillEntries()
             const updatedStatusResult = await getPaymentStatus(selectedPaymentBill);
             const updatedStatus = updatedStatusResult.status;
-
             // Update last payment date - prefer the latest entry date, otherwise use fetched date
             const finalLastPaymentDate = latestEntryDate || updatedStatusResult.lastPaymentDate;
-
             if (finalLastPaymentDate) {
                 setLastPaymentDates(prev => ({
                     ...prev,

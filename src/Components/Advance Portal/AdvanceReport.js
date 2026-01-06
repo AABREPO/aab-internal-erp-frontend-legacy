@@ -11,6 +11,17 @@ Date.prototype.getWeekNumber = function () {
   return Math.ceil((pastDaysOfYear + firstDay.getDay() + 1) / 7);
 };
 
+// Get the current week year (ISO 8601) - may differ from calendar year for weeks spanning year boundaries
+const getCurrentWeekYear = () => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  const dayOfWeek = d.getDay() || 7;
+  const thursday = new Date(d);
+  thursday.setDate(d.getDate() + 4 - dayOfWeek);
+  thursday.setHours(0, 0, 0, 0);
+  return thursday.getFullYear();
+};
+
 const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   // Use paymentModeOptions from props, fallback to default if not provided
   const defaultPaymentModeOptions = [
@@ -23,7 +34,7 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
   const finalPaymentModeOptions = paymentModeOptions.length > 0 ? paymentModeOptions : defaultPaymentModeOptions;
 
   const [week, setWeek] = useState("");
-  const [year, setYear] = useState(new Date().getFullYear().toString());
+  const [year, setYear] = useState(getCurrentWeekYear().toString());
   const [vendorOptions, setVendorOptions] = useState([]);
   const [contractorOptions, setContractorOptions] = useState([]);
   const [siteOptions, setSiteOptions] = useState([]);
@@ -317,32 +328,57 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
     fetchData();
   }, []);
 
-  // Helper — Week number calculation for Monday-Sunday weeks
-  const getWeekNumberFromDate = (date) => {
+  // ISO 8601 week number calculation
+  // Week belongs to the year that contains the Thursday of that week
+  // Week 1 is the week with the year's first Thursday
+  const getISOWeekNumber = (date) => {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
-    // Get the Monday of the week containing this date
-    const dayOfWeek = d.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Convert to Monday = 0
-    const mondayOfWeek = new Date(d);
-    mondayOfWeek.setDate(d.getDate() + mondayOffset);
     
-    // Get January 1st of the year
-    const jan1 = new Date(mondayOfWeek.getFullYear(), 0, 1);
-    // Get the Monday of the week containing January 1st
-    const jan1DayOfWeek = jan1.getDay();
-    const jan1MondayOffset = jan1DayOfWeek === 0 ? -6 : 1 - jan1DayOfWeek;
-    const firstMonday = new Date(jan1);
-    firstMonday.setDate(jan1.getDate() + jan1MondayOffset);
+    // Get Thursday of the week containing the date
+    // Monday = 1, Tuesday = 2, ..., Sunday = 0 (convert to 7)
+    const dayOfWeek = d.getDay() || 7; // Convert Sunday (0) to 7
+    const thursday = new Date(d);
+    thursday.setDate(d.getDate() + 4 - dayOfWeek); // Thursday is 4 days after Monday
+    thursday.setHours(0, 0, 0, 0);
     
-    // Calculate week number (1-based)
-    const diffTime = mondayOfWeek - firstMonday;
-    const diffDays = Math.floor(diffTime / (24 * 60 * 60 * 1000));
-    return Math.floor(diffDays / 7) + 1;
+    // Use the year that Thursday falls in (ISO 8601 rule)
+    const weekYear = thursday.getFullYear();
+    
+    // Get January 1st of that year
+    const jan1 = new Date(weekYear, 0, 1);
+    jan1.setHours(0, 0, 0, 0);
+    
+    // Get the Thursday of week 1 (first Thursday of the year)
+    const jan1DayOfWeek = jan1.getDay() || 7;
+    const firstThursday = new Date(jan1);
+    firstThursday.setDate(jan1.getDate() + 4 - jan1DayOfWeek);
+    firstThursday.setHours(0, 0, 0, 0);
+    
+    // Calculate week number: difference in days divided by 7, plus 1
+    const daysDiff = Math.floor((thursday - firstThursday) / 86400000);
+    const weekNo = Math.floor(daysDiff / 7) + 1;
+    
+    return weekNo;
+  };
+
+  // Get the year that the week belongs to (ISO 8601)
+  const getWeekYear = (date) => {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    
+    // Get Thursday of the week containing the date
+    const dayOfWeek = d.getDay() || 7;
+    const thursday = new Date(d);
+    thursday.setDate(d.getDate() + 4 - dayOfWeek);
+    thursday.setHours(0, 0, 0, 0);
+    
+    // Return the year that Thursday falls in
+    return thursday.getFullYear();
   };
 
   const getCurrentWeekNumber = () => {
-    return getWeekNumberFromDate(new Date());
+    return getISOWeekNumber(new Date());
   };
 
   // Default to current week
@@ -370,7 +406,9 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
       const selectedWeekNum = parseInt(week.replace("Week ", ""), 10);
       filtered = advanceData.filter((item) => {
         const d = new Date(item.date);
-        return d.getFullYear() === parseInt(year, 10) && getWeekNumberFromDate(item.date) === selectedWeekNum;
+        const itemWeekYear = getWeekYear(item.date);
+        const itemWeekNumber = getISOWeekNumber(item.date);
+        return itemWeekYear === parseInt(year, 10) && itemWeekNumber === selectedWeekNum;
       });
     } else {
       // If neither date-range nor week selected, default to empty
@@ -630,10 +668,10 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
       const selectedYear = parseInt(year, 10);
       const billSettlementData = advanceData.filter((item) => {
         const itemTimestamp = item.timestamp ? new Date(item.timestamp) : new Date(item.date);
-        const itemWeek = getWeekNumberFromDate(itemTimestamp);
-        const itemYear = itemTimestamp.getFullYear();
+        const itemWeek = getISOWeekNumber(itemTimestamp);
+        const itemWeekYear = getWeekYear(itemTimestamp);
         const itemType = normStr(item.type);
-        return itemYear === selectedYear && 
+        return itemWeekYear === selectedYear && 
                itemWeek === selectedWeekNum && 
                itemType === "bill settlement";
       });
@@ -835,10 +873,10 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
       const selectedYear = parseInt(year, 10);
       const billSettlementData = advanceData.filter((item) => {
         const itemTimestamp = item.timestamp ? new Date(item.timestamp) : new Date(item.date);
-        const itemWeek = getWeekNumberFromDate(itemTimestamp);
-        const itemYear = itemTimestamp.getFullYear();
+        const itemWeek = getISOWeekNumber(itemTimestamp);
+        const itemWeekYear = getWeekYear(itemTimestamp);
         const itemType = normStr(item.type);
-        return itemYear === selectedYear && 
+        return itemWeekYear === selectedYear && 
                itemWeek === selectedWeekNum && 
                itemType === "bill settlement";
       });
@@ -979,7 +1017,7 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                 setStartDate("");
                 setEndDate("");
               }}
-              options={Array.from({ length: getCurrentWeekNumber() }, (_, i) => ({
+              options={Array.from({ length: 53 }, (_, i) => ({
                 value: `Week ${String(i + 1).padStart(2, "0")}`,
                 label: `Week ${String(i + 1).padStart(2, "0")}`,
               }))}

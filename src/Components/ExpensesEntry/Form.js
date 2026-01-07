@@ -670,7 +670,7 @@ const Form = ({ username, userRoles = [] }) => {
     };
     const submitExpenseData = async () => {
         if (
-            (selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills') &&
+            (selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills' || selectedAccountType === 'Weekly Payment') &&
             ["GPay", "PhonePe", "Net Banking", "Cheque"].includes(paymentMode)
         ) {
             setPaymentModalData({
@@ -1085,7 +1085,7 @@ const Form = ({ username, userRoles = [] }) => {
                 vendor_id: selectedOption?.type === 'Vendor' ? selectedOption.id : null,
                 employee_id: null,
                 project_id: selectedSite?.id || null,
-                type: selectedAccountType === 'Claim' ? "Claim Payment" : "Utility Payment",
+                type: selectedAccountType === 'Claim' ? "Claim Payment" : selectedAccountType === 'Weekly Payment' ? "Weekly Payment" : "Utility Payment",
                 bill_payment_mode: paymentModalData.paymentMode,
                 amount: parseFloat(paymentModalData.amount),
                 status: true,
@@ -1319,7 +1319,7 @@ const Form = ({ username, userRoles = [] }) => {
                                         className="custom-select rounded-lg w-[290px] h-[45px]"
                                     />
                                 </div>
-                                {(selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills') && (
+                                {(selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills' || selectedAccountType === 'Weekly Payment') && (
                                     <div className='text-left'>
                                         <label className="text-md font-semibold mb-2 block">Payment Mode <span className="text-red-500">*</span></label>
                                         <select
@@ -1328,7 +1328,7 @@ const Form = ({ username, userRoles = [] }) => {
                                             className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[43px] focus:outline-none border-opacity-[0.20]"
                                         >
                                             <option value="">Select Payment Mode</option>
-                                            <option value="Cash">Cash</option>
+                                            {selectedAccountType !== 'Weekly Payment' && <option value="Cash">Cash</option>}
                                             <option value="GPay">GPay</option>
                                             <option value="PhonePe">PhonePe</option>
                                             <option value="Net Banking">Net Banking</option>
@@ -1552,7 +1552,7 @@ const Form = ({ username, userRoles = [] }) => {
                                                     className="custom-select rounded-lg"
                                                 />
                                             </div>
-                                            {(selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills') && (
+                                            {(selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills' || selectedAccountType === 'Weekly Payment') && (
                                                 <div>
                                                     <label className="text-sm font-semibold mb-1 block">Payment Mode</label>
                                                     <select
@@ -1561,7 +1561,7 @@ const Form = ({ username, userRoles = [] }) => {
                                                         className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
                                                     >
                                                         <option value="">Select Payment Mode</option>
-                                                        <option value="Cash">Cash</option>
+                                                        {selectedAccountType !== 'Weekly Payment' && <option value="Cash">Cash</option>}
                                                         <option value="GPay">GPay</option>
                                                         <option value="PhonePe">PhonePe</option>
                                                         <option value="Net Banking">Net Banking</option>

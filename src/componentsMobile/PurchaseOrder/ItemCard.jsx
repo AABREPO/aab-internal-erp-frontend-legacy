@@ -206,7 +206,8 @@ const ItemCard = ({
           transform: `translateX(${swipeOffset}px)`,
           touchAction: 'pan-y',
           userSelect: 'none',
-          WebkitUserSelect: 'none'
+          WebkitUserSelect: 'none',
+          minHeight: '66px'
         }}
         onClick={handleCardClick}
       >
@@ -216,7 +217,7 @@ const ItemCard = ({
             <p className="text-[12px] font-semibold text-black leading-snug truncate">
               {item.name && item.name.includes(',') ? item.name.split(',')[0].trim() : item.name}
             </p>
-            <div className="mt-1 space-y-1">
+            <div className="mt-1 space-y-1 min-h-[32px]">
               {item.model && (
                 <p className="text-[11px] font-medium text-[#777777] leading-snug truncate">
                   {item.model}

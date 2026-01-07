@@ -549,8 +549,8 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
     if (!validateFormFields()) {
       return;
     }
-    // Check if payment mode requires popup details (all modes except Cash)
-    const requiresPaymentDetails = paymentMode && paymentMode !== 'Cash' && finalPaymentModeOptions.some(opt => opt.value === paymentMode);
+    // Check if payment mode requires popup details (all modes except Cash and Direct)
+    const requiresPaymentDetails = paymentMode && paymentMode !== 'Cash' && paymentMode !== 'Direct' && finalPaymentModeOptions.some(opt => opt.value === paymentMode);
     if (requiresPaymentDetails) {
       // Set up payment modal data and show popup
       setPaymentModalData({
@@ -1162,7 +1162,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
     setIsEditModalOpen(true);
   };
   const handlePaymentSubmit = async () => {
-    if (!paymentModalData.accountNumber && paymentModalData.paymentMode !== "Cash") {
+    if (!paymentModalData.accountNumber && paymentModalData.paymentMode !== "Cash" && paymentModalData.paymentMode !== "Direct") {
       alert("Please select account number.");
       return;
     }
@@ -1260,36 +1260,41 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         throw new Error('Failed to save advance portal data');
       }
       const advanceResult = await advanceResponse.json();
-      // Create weekly payment bills payload
-      const weeklyPaymentBillPayload = {
-        date: paymentModalData.date,
-        created_at: new Date().toISOString(),
-        contractor_id: selectedOption?.type === 'Contractor' ? selectedOption.id : null,
-        vendor_id: selectedOption?.type === 'Vendor' ? selectedOption.id : null,
-        employee_id: null,
-        project_id: selectedSite?.id || null,
-        type: selectedType,
-        bill_payment_mode: paymentModalData.paymentMode,
-        amount: parseFloat(paymentModalData.amount),
-        status: true,
-        weekly_number: "",
-        weekly_payment_expense_id: null,
-        advance_portal_id: advanceResult.id || advanceResult.advancePortalId,
-        staff_advance_portal_id: null,
-        claim_payment_id: null,
-        cheque_number: paymentModalData.chequeNo || null,
-        cheque_date: paymentModalData.chequeDate || null,
-        transaction_number: paymentModalData.transactionNumber || null,
-        account_number: paymentModalData.accountNumber || null
-      };
-      // Save to weekly payment bills
-      const weeklyResponse = await fetch('https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(weeklyPaymentBillPayload)
-      });
-      if (!weeklyResponse.ok) {
-        throw new Error('Failed to save weekly payment bills data');
+      // Save to weekly payment bills only if payment mode is not "Direct"
+      let isWeeklyPaymentBillSaved = false;
+      if (paymentModalData.paymentMode !== "Direct") {
+        // Create weekly payment bills payload
+        const weeklyPaymentBillPayload = {
+          date: paymentModalData.date,
+          created_at: new Date().toISOString(),
+          contractor_id: selectedOption?.type === 'Contractor' ? selectedOption.id : null,
+          vendor_id: selectedOption?.type === 'Vendor' ? selectedOption.id : null,
+          employee_id: null,
+          project_id: selectedSite?.id || null,
+          type: selectedType,
+          bill_payment_mode: paymentModalData.paymentMode,
+          amount: parseFloat(paymentModalData.amount),
+          status: true,
+          weekly_number: "",
+          weekly_payment_expense_id: null,
+          advance_portal_id: advanceResult.id || advanceResult.advancePortalId,
+          staff_advance_portal_id: null,
+          claim_payment_id: null,
+          cheque_number: paymentModalData.chequeNo || null,
+          cheque_date: paymentModalData.chequeDate || null,
+          transaction_number: paymentModalData.transactionNumber || null,
+          account_number: paymentModalData.accountNumber || null
+        };
+        // Save to weekly payment bills
+        const weeklyResponse = await fetch('https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(weeklyPaymentBillPayload)
+        });
+        if (!weeklyResponse.ok) {
+          throw new Error('Failed to save weekly payment bills data');
+        }
+        isWeeklyPaymentBillSaved = true;
       }
       // Also save to expenses form if Bill Settlement
       if (selectedType === 'Bill Settlement') {
@@ -1331,7 +1336,10 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         // Update ENo for next entry
         setEno(eno + 1);
       }
-      toast.success('Advance saved successfully and added to Weekly Payment Bills!', {
+      const successMessage = isWeeklyPaymentBillSaved 
+        ? 'Advance saved successfully and added to Weekly Payment Bills!' 
+        : 'Advance saved successfully!';
+      toast.success(successMessage, {
         position: "top-center",
         autoClose: 3000,
         theme: "colored"

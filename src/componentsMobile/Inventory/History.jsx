@@ -656,6 +656,16 @@ const History = ({ onTabChange }) => {
         <div className="flex items-center gap-2">
           {/* Stack Return/Dispatch Tabs */}
           <div className="flex bg-gray-100 items-center h-9 shadow-sm flex-1">
+          <button
+              type="button"
+              onClick={() => setActiveType('dispatch')}
+              className={`flex-1 py-1 px-4 mr-1 h-8 rounded-lg text-[14px] font-medium transition-colors ${activeType === 'dispatch'
+                  ? 'bg-white text-black'
+                  : 'bg-gray-100 text-gray-600'
+                }`}
+            >
+              Dispatch
+            </button>
             <button
               type="button"
               onClick={() => setActiveType('stack return')}
@@ -665,16 +675,6 @@ const History = ({ onTabChange }) => {
                 }`}
             >
               Stack Return
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveType('dispatch')}
-              className={`flex-1 py-1 px-4 mr-1 h-8 rounded-lg text-[14px] font-medium transition-colors ${activeType === 'dispatch'
-                  ? 'bg-white text-black'
-                  : 'bg-gray-100 text-gray-600'
-                }`}
-            >
-              Dispatch
             </button>
           </div>
         </div>
@@ -694,7 +694,7 @@ const History = ({ onTabChange }) => {
             placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-[36px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black bg-white focus:outline-none focus:border-[#BF9853]"
+            className="w-full h-[40px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-full text-[12px] font-medium text-black bg-white focus:outline-none focus:border-[#BF9853]"
           />
         </div>
       </div>
@@ -710,7 +710,7 @@ const History = ({ onTabChange }) => {
       </div>
 
       {/* History List */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4">
+      <div className="flex-1 overflow-y-auto px-4">
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <p className="text-[12px] text-gray-500">Loading...</p>
@@ -720,7 +720,7 @@ const History = ({ onTabChange }) => {
             <p className="text-[12px] text-gray-500">No history found</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="shadow-md border border-gray-200 rounded-lg">
             {filteredData.map((item) => {
               // Get created_date_time and add 5.30 hours
               const createdDateTime = item.created_date_time || item.createdDateTime || item.created_at ;

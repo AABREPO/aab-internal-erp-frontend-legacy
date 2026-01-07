@@ -491,9 +491,9 @@ const NetStock = () => {
         </div>
       </div>
       {/* Filters Section */}
-      <div className="flex-shrink-0 px-4 pt-4 pb-2 space-y-3">
+      <div className="flex-shrink-0 px-4 pt-4 mb-2">
         {/* Category Filter */}
-        <div>
+        <div className="mb-2">
           <p className="text-[12px] font-semibold text-black leading-normal mb-1">
             Category
           </p>
@@ -530,7 +530,7 @@ const NetStock = () => {
           </div>
         </div>
         {/* Stocking Location Filter */}
-        <div>
+        <div className="mb-4">
           <p className="text-[12px] font-semibold text-black leading-normal mb-1">
             Stocking Location
           </p>
@@ -579,12 +579,12 @@ const NetStock = () => {
             placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-10 pr-3 text-[12px] font-medium bg-white"
+            className="w-full h-[40px] border border-[rgba(0,0,0,0.16)] rounded-full pl-10 pr-3 text-[12px] font-medium bg-white"
           />
         </div>
       </div>
       {/* Product List */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4">
+      <div className="flex-1 overflow-y-auto px-3 pb-4 scrollbar-hide no-scrollbar scrollbar-none">
         {loading ? (
           <div className="flex justify-center items-center h-full">
             <p className="text-[14px] text-gray-500">Loading...</p>
@@ -594,7 +594,7 @@ const NetStock = () => {
             <p className="text-[14px] text-gray-500">No items found</p>
           </div>
         ) : (
-          <div className="space-y-3 pt-2">
+          <div className=" shadow-md mt-2">
             {filteredData.map((item) => (
               <div
                 key={item.id}
@@ -630,7 +630,7 @@ const NetStock = () => {
                     {/* Model */}
                     <div className="mb-1">
                       <p className="text-[13px] font-semibold text-black leading-tight">
-                         {item.model ? `- ${item.model}` : ''}
+                         {item.model ? `${item.model}` : ''}
                       </p>
                     </div>
 

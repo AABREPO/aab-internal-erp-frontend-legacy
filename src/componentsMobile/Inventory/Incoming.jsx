@@ -1284,7 +1284,7 @@ const Incoming = ({ user }) => {
             </div>
           )}
         {/* Vendor Name Field */}
-        <div className="mb-4 relative">
+        <div className="mb-2 relative">
           <p className="text-[12px] font-semibold text-black leading-normal mb-1">
             Vendor Name<span className="text-[#eb2f8e]">*</span>
           </p>
@@ -1319,7 +1319,7 @@ const Incoming = ({ user }) => {
           </div>
         </div>
         {/* Stocking Location Field */}
-        <div className="mb-4 relative">
+        <div className="mb-2 relative">
           <p className="text-[12px] font-semibold text-black leading-normal mb-1">
             Stocking Location<span className="text-[#eb2f8e]">*</span>
           </p>

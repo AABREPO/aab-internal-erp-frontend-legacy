@@ -7,6 +7,8 @@ import DeleteConfirmModal from '../PurchaseOrder/DeleteConfirmModal';
 import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 import SearchItemsModal from '../PurchaseOrder/SearchItemsModal';
 import editIcon from '../Images/edit.png';
+import SR from '../Images/SR.png';
+import DP from '../Images/DP.png';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
@@ -604,54 +606,14 @@ const Outgoing = ({ user }) => {
     const stockingLocationId = stockingLocationSite.id;
     const itemId = item.itemId || item.item_id || null;
 
-    // Check stock availability for this item in the selected stocking location
-    if (itemId !== null && itemId !== undefined) {
-      try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll');
-        if (response.ok) {
-          const inventoryRecords = await response.json();
-          
-          // Filter out deleted records and filter by stocking location
-          const activeRecords = inventoryRecords.filter(record => {
-            const recordDeleteStatus = record.delete_status !== undefined ? record.delete_status : record.deleteStatus;
-            const recordStockingLocationId = record.stocking_location_id || record.stockingLocationId;
-            return !recordDeleteStatus && String(recordStockingLocationId) === String(stockingLocationId);
-          });
-
-          // Calculate available stock for this item in this location
-          let availableStock = 0;
-          activeRecords.forEach(record => {
-            const inventoryItems = record.inventoryItems || record.inventory_items || [];
-            if (Array.isArray(inventoryItems)) {
-              inventoryItems.forEach(invItem => {
-                const invItemId = invItem.item_id || invItem.itemId || null;
-                if (String(invItemId) === String(itemId)) {
-                  const qty = Number(invItem.quantity) || 0;
-                  availableStock += qty;
-                }
-              });
-            }
-          });
-
-          // Check if stock is available (must be > 0)
-          if (availableStock <= 0) {
-            alert(`Item "${item.itemName || 'this item'}" is not available in the selected Stocking Location "${outgoingData.stockingLocation}". Available stock: ${availableStock}`);
-            return;
-          }
-        }
-      } catch (error) {
-        console.error('Error checking stock availability:', error);
-        // Continue with adding item if API fails (don't block user)
-      }
-    }
-
-    // Normalize values for comparison
+    // Normalize values for comparison (used for both stock check and item matching)
     const normalizeValue = (val) => (val || '').toString().toLowerCase().trim();
     const newItemName = normalizeValue(item.itemName);
     const newCategory = normalizeValue(item.category);
     const newModel = normalizeValue(item.model);
     const newBrand = normalizeValue(item.brand);
     const newType = normalizeValue(item.type);
+    
     // Check if an item with the same properties (including category) already exists
     const existingItemIndex = items.findIndex(existingItem => {
       const nameParts = existingItem.name ? existingItem.name.split(',') : [];
@@ -671,15 +633,100 @@ const Outgoing = ({ user }) => {
       );
     });
 
+    // Calculate what the final quantity would be (considering merge with existing item)
+    let finalQuantity = quantity;
+    if (existingItemIndex !== -1) {
+      const currentQuantity = items[existingItemIndex].quantity || 0;
+      finalQuantity = isIncremental ? currentQuantity + quantity : quantity;
+    }
+
+    // Check stock availability and get amount for this item in the selected stocking location
+    let itemPrice = 0; // Default price
+    if (itemId !== null && itemId !== undefined) {
+      try {
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll');
+        if (response.ok) {
+          const inventoryRecords = await response.json();
+          
+          // Filter out deleted records and filter by stocking location
+          const activeRecords = inventoryRecords.filter(record => {
+            const recordDeleteStatus = record.delete_status !== undefined ? record.delete_status : record.deleteStatus;
+            const recordStockingLocationId = record.stocking_location_id || record.stockingLocationId;
+            return !recordDeleteStatus && String(recordStockingLocationId) === String(stockingLocationId);
+          });
+
+          // Calculate available stock and find amount for this item in this location
+          let availableStock = 0;
+          const matchingAmounts = []; // Store amounts found for this item
+          
+          activeRecords.forEach(record => {
+            const inventoryItems = record.inventoryItems || record.inventory_items || [];
+            if (Array.isArray(inventoryItems)) {
+              inventoryItems.forEach(invItem => {
+                const invItemId = invItem.item_id || invItem.itemId || null;
+                const invCategoryId = invItem.category_id || invItem.categoryId || null;
+                const invModelId = invItem.model_id || invItem.modelId || null;
+                const invBrandId = invItem.brand_id || invItem.brandId || null;
+                const invTypeId = invItem.type_id || invItem.typeId || null;
+                
+                // Match by composite key: itemId + categoryId + modelId + brandId + typeId
+                const matchesItem = String(invItemId) === String(itemId) &&
+                  String(invCategoryId || 'null') === String(item.categoryId || 'null') &&
+                  String(invModelId || 'null') === String(item.modelId || 'null') &&
+                  String(invBrandId || 'null') === String(item.brandId || 'null') &&
+                  String(invTypeId || 'null') === String(item.typeId || 'null');
+                
+                if (matchesItem) {
+                  const qty = Number(invItem.quantity) || 0;
+                  availableStock += qty;
+                  
+                  // Get amount and calculate price per unit
+                  const amount = Number(invItem.amount) || 0;
+                  if (amount > 0 && qty > 0) {
+                    const pricePerUnit = amount / Math.abs(qty); // Use absolute quantity for price calculation
+                    matchingAmounts.push(pricePerUnit);
+                  }
+                }
+              });
+            }
+          });
+
+          // Check if stock is available (must be > 0)
+          if (availableStock <= 0) {
+            alert(`Item "${item.itemName || 'this item'}" is not available in the selected Stocking Location "${outgoingData.stockingLocation}". Available stock: ${availableStock}`);
+            return;
+          }
+
+          // Check if final quantity exceeds available stock
+          if (finalQuantity > availableStock) {
+            alert(`Item "${item.itemName || 'this item'}" has only ${availableStock} qty available in the selected Stocking Location "${outgoingData.stockingLocation}". You requested ${finalQuantity} qty.`);
+            return;
+          }
+
+          // If multiple amounts exist, use the first one
+          if (matchingAmounts.length > 0) {
+            itemPrice = matchingAmounts[0];
+          }
+        }
+      } catch (error) {
+        console.error('Error checking stock availability:', error);
+        // Continue with adding item if API fails (don't block user)
+      }
+    }
+
     if (existingItemIndex !== -1) {
       // Update existing item quantity (merge quantities)
+      // Update price to the first amount found from inventory
       const updatedItems = [...items];
       const currentQuantity = updatedItems[existingItemIndex].quantity || 0;
       const newQuantity = isIncremental ? currentQuantity + quantity : quantity;
       if (newQuantity > 0) {
+        // Use fetched price if available, otherwise keep existing price
+        const finalPrice = itemPrice > 0 ? itemPrice : (updatedItems[existingItemIndex].price || 0);
         updatedItems[existingItemIndex] = {
           ...updatedItems[existingItemIndex],
-          quantity: newQuantity
+          quantity: newQuantity,
+          price: finalPrice
         };
         setItems(updatedItems);
       } else {
@@ -698,7 +745,7 @@ const Outgoing = ({ user }) => {
         type: item.type,
         category: item.category || '',
         quantity: quantity,
-        price: 0, // Outgoing items don't have a price field in the form, so default to 0
+        price: itemPrice, // Use price fetched from inventory (first amount if multiple exist)
         itemId: item.itemId || null,
         brandId: item.brandId || null,
         modelId: item.modelId || null,
@@ -724,14 +771,11 @@ const Outgoing = ({ user }) => {
       setSwipeStates(prev => {
         let hasChanges = false;
         const newState = { ...prev };
-
         items.forEach(item => {
           const state = prev[item.id];
           if (!state) return;
-
           const deltaX = e.clientX - state.startX;
           const isExpanded = expandedItemIdRef.current === item.id;
-
           // Only update if dragging horizontally
           if (deltaX < 0 || (isExpanded && deltaX > 0)) {
             newState[item.id] = {
@@ -1041,10 +1085,20 @@ const Outgoing = ({ user }) => {
                 }
               });
 
+              // Get requested quantity (use absolute value since quantity can be negative for dispatch)
+              const requestedQuantity = Math.abs(item.quantity || 0);
+
               // If item is not available (stock <= 0), show alert and prevent save
               if (availableStock <= 0) {
                 const itemName = item.name ? item.name.split(',')[0].trim() : 'this item';
                 alert(`Item "${itemName}" is not available in the selected Stocking Location "${outgoingData.stockingLocation}". Available stock: ${availableStock}`);
+                return;
+              }
+
+              // If requested quantity exceeds available stock, show alert and prevent save
+              if (requestedQuantity > availableStock) {
+                const itemName = item.name ? item.name.split(',')[0].trim() : 'this item';
+                alert(`Item "${itemName}" has only ${availableStock} qty available in the selected Stocking Location "${outgoingData.stockingLocation}". You requested ${requestedQuantity} qty.`);
                 return;
               }
             }
@@ -1235,16 +1289,16 @@ const Outgoing = ({ user }) => {
                   <button
                     type="button"
                     onClick={() => handleSaveOutgoing('stock return')}
-                    className="flex items-center text-[13px] font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
+                    className="flex items-center text-[13px] gap-1 font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
                   >
-                    Stock Return
+                    Stock Return <img src={SR} alt="SR" className="w-[13px] h-[13px]" />
                   </button>
                   <button
                     type="button"
                     onClick={() => handleSaveOutgoing('dispatch')}
-                    className="flex items-center text-[13px] font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
+                    className="flex items-center text-[13px] gap-1 font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
                   >
-                    Dispatch
+                    Dispatch <img src={DP} alt="DP" className="w-[13px] h-[13px]" />
                   </button>
                   {hasOpenedAdd && (
                     <button
@@ -1294,7 +1348,7 @@ const Outgoing = ({ user }) => {
             </div>
           )}
         {/* Project Name Field */}
-        <div className="mb-4 relative">
+        <div className="mb-2 relative">
           <p className="text-[12px] font-semibold text-black leading-normal mb-1">
             Project Name<span className="text-[#eb2f8e]">*</span>
           </p>
@@ -1329,7 +1383,7 @@ const Outgoing = ({ user }) => {
         </div>
 
         {/* Project Incharge Field */}
-        <div className="mb-4 relative">
+        <div className="mb-2 relative">
           <p className="text-[12px] font-semibold text-black leading-normal mb-1">
             Project Incharge<span className="text-[#eb2f8e]">*</span>
           </p>
@@ -1365,7 +1419,7 @@ const Outgoing = ({ user }) => {
         </div>
 
         {/* Stocking Location Field */}
-        <div className="mb-4 relative">
+        <div className="mb-2 relative">
           <p className="text-[12px] font-semibold text-black leading-normal mb-1">
             Stocking Location<span className="text-[#eb2f8e]">*</span>
           </p>
@@ -1692,10 +1746,10 @@ const Outgoing = ({ user }) => {
           );
           return stockingLocationSite?.id || null;
         })()}
+        useInventoryData={true}
       />
     </div>
   );
 };
 
 export default Outgoing;
-

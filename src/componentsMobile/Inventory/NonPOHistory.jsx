@@ -179,7 +179,7 @@ const NonPOHistory = () => {
             placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-[40px] pl-10 pr-4 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400"
+            className="w-full h-[40px] pl-10 pr-4 border border-gray-300 rounded-full text-[14px] bg-white focus:outline-none focus:border-gray-400"
           />
           <svg
             className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
@@ -216,11 +216,11 @@ const NonPOHistory = () => {
             <p className="text-gray-500">No non-PO records found</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="">
             {filteredRecords.map((record) => (
               <div
                 key={record.id || record._id}
-                className="bg-white border border-gray-200 rounded-lg p-4"
+                className="bg-white border-2 shadow-md border-gray-200 rounded-lg p-4"
               >
                 <div className="flex justify-between items-start">
                   {/* Left Side */}

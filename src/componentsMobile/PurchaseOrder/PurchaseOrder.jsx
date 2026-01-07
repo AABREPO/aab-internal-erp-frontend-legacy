@@ -2056,7 +2056,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
                         <img src={editIcon} alt="Edit" className="w-[15px] h-[15px]" />
                       </button>
                     )}
-
                   </div>
                 </div>
               </div>
@@ -2256,7 +2255,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                     {/* Items List - Scrollable */}
                     {items.length > 0 && (
                       <div className="flex-1 overflow-y-auto scrollbar-hide">
-                        <div className="space-y-2">
+                        <div className="space-y-2 ">
                           {items.map((item) => {
                             const minSwipeDistance = 50;
                             const handleTouchStart = (e, itemId) => {

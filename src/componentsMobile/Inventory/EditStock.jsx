@@ -439,7 +439,7 @@ const EditStock = () => {
             placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-10 pr-3 text-[12px] font-medium bg-white"
+            className="w-full h-[40px] border border-[rgba(0,0,0,0.16)] rounded-full pl-10 pr-3 text-[12px] font-medium bg-white"
           />
         </div>
       </div>

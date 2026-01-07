@@ -819,36 +819,45 @@ const History = ({ username, userRoles = [] }) => {
     
     // Find the most recent week (across all years) that has data with status === true
     useEffect(() => {
-        const findLastEditableWeek = async () => {
+        const computeEditableWeek = async () => {
             try {
+                const now = new Date();
+                const currentWeekNumber = getISOWeekNumber(now);
+                const currentWeekYear = getWeekYear(now);
                 const paymentsResponse = await axios.get('https://backendaab.in/aabuildersDash/api/payments-received/getAll');
-                let mostRecentWeek = null;
-                let mostRecentDate = null;
-                
-                paymentsResponse.data.forEach(payment => {
-                    // Only include payments with status === true and period_end_date exists
-                    if (payment.status === true && payment.period_end_date) {
-                        const paymentDate = new Date(payment.period_end_date);
-                        // Validate that the date is valid
-                        if (!isNaN(paymentDate.getTime())) {
-                            // Check if this is more recent than the current most recent
-                            if (!mostRecentDate || paymentDate > mostRecentDate) {
-                                mostRecentDate = paymentDate;
-                                const weekYear = getWeekYear(paymentDate);
-                                const weekNumber = getISOWeekNumber(paymentDate);
-                                mostRecentWeek = { weekNumber, year: weekYear };
-                            }
-                        }
-                    }
+                const hasCurrentWeekTrue = Array.isArray(paymentsResponse.data) && paymentsResponse.data.some(payment => {
+                    if (payment?.status !== true || !payment?.period_end_date) return false;
+                    const paymentDate = new Date(payment.period_end_date);
+                    if (isNaN(paymentDate.getTime())) return false;
+                    const weekYear = getWeekYear(paymentDate);
+                    const weekNumber = getISOWeekNumber(paymentDate);
+                    return weekYear === currentWeekYear && weekNumber === currentWeekNumber;
                 });
-                
-                setLastEditableWeek(mostRecentWeek);
+                if (hasCurrentWeekTrue) {
+                    setLastEditableWeek({ weekNumber: currentWeekNumber, year: currentWeekYear });
+                } else {
+                    const { startDate } = getStartAndEndDateOfISOWeek(currentWeekNumber, currentWeekYear);
+                    const prevDate = new Date(startDate);
+                    prevDate.setDate(prevDate.getDate() - 1);
+                    const prevWeekNumber = getISOWeekNumber(prevDate);
+                    const prevWeekYear = getWeekYear(prevDate);
+                    setLastEditableWeek({ weekNumber: prevWeekNumber, year: prevWeekYear });
+                }
             } catch (error) {
-                console.error('Error finding last editable week:', error);
+                console.error('Error computing editable week:', error);
+                // Fallback to previous ISO week if request fails
+                const now = new Date();
+                const currentWeekNumber = getISOWeekNumber(now);
+                const currentWeekYear = getWeekYear(now);
+                const { startDate } = getStartAndEndDateOfISOWeek(currentWeekNumber, currentWeekYear);
+                const prevDate = new Date(startDate);
+                prevDate.setDate(prevDate.getDate() - 1);
+                const prevWeekNumber = getISOWeekNumber(prevDate);
+                const prevWeekYear = getWeekYear(prevDate);
+                setLastEditableWeek({ weekNumber: prevWeekNumber, year: prevWeekYear });
             }
         };
-        
-        findLastEditableWeek();
+        computeEditableWeek();
     }, []); // Run once on mount
     
     useEffect(() => {
@@ -2348,7 +2357,6 @@ const History = ({ username, userRoles = [] }) => {
         newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
         doc.save(`PR ${selectedWeek || ""} - Weekly Payment Report ${formatDateOnly(lastPeriodEndDate)}.pdf`);
     };
-    const lastWeekNumber = weeks.length > 0 ? Math.max(...weeks.map(week => week.number)) : null;
     // Allow editing only for the most recent week (across all years) that has data with status === true
     const canEditSelectedWeek = selectedWeek && lastEditableWeek !== null && 
         Number(selectedWeek) === Number(lastEditableWeek.weekNumber) && 
@@ -3635,7 +3643,7 @@ const History = ({ username, userRoles = [] }) => {
                                                     </div>
                                                 </td>
                                                 <td className="text-sm text-left pl-2 w-[120px] font-semibold">
-                                                    {Number(row.weekly_number) === Number(lastWeekNumber) && (
+                                                    {canEditSelectedWeek && (
                                                         <div className="flex gap-2">
                                                             {editingRowId === row.id ? (
                                                                 <button className="text-green-600 font-bold text-lg relative z-10" onClick={() => saveEditedExpense(row)}>
@@ -3786,7 +3794,7 @@ const History = ({ username, userRoles = [] }) => {
                                                     )}
                                                 </td>
                                                 <td className="px-2 py-2">
-                                                    {Number(row.weekly_number) === Number(lastWeekNumber) && (
+                                                    {canEditSelectedWeek && (
                                                         <div className="flex gap-1">
                                                             {editingPaymentId === row.id ? (
                                                                 <button

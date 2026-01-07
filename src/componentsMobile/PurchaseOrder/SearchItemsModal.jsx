@@ -145,7 +145,7 @@ const StockSummaryModal = ({ isOpen, onClose, item, stockBreakdown, locationName
     );
 };
 
-const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingItems = [], onRefreshData, stockingLocationId = null, disableAvailabilityCheck = false }) => {
+const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingItems = [], onRefreshData, stockingLocationId = null, disableAvailabilityCheck = false, useInventoryData = false }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
@@ -155,6 +155,12 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
     const [stockBreakdown, setStockBreakdown] = useState({}); // Store breakdown by location for each item
     const [showStockSummary, setShowStockSummary] = useState(false); // Show stock summary modal
     const [selectedItemForSummary, setSelectedItemForSummary] = useState(null); // Item to show summary for
+    const [inventoryItems, setInventoryItems] = useState([]); // Store inventory items when useInventoryData is true
+    const [poItemNames, setPoItemNames] = useState([]); // Store PO item names for resolving names
+    const [poBrands, setPoBrands] = useState([]);
+    const [poModels, setPoModels] = useState([]);
+    const [poTypes, setPoTypes] = useState([]);
+    const [poCategories, setPoCategories] = useState([]);
 
     // Refresh data when modal opens
     useEffect(() => {
@@ -280,10 +286,13 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                 const cleaned = {};
                 existingItems.forEach(item => {
                     const itemName = item.name ? item.name.split(',')[0].trim() : '';
+                    const category = (item.category || (item.name && item.name.includes(',') ? item.name.split(',')[1]?.trim() : '') || '').trim();
                     const brand = (item.brand || '').trim();
                     const model = (item.model || '').trim();
                     const type = (item.type || '').trim();
-                    const itemKey = `${itemName}_${brand}_${model}_${type}`;
+                    const itemKey = useInventoryData 
+                        ? `${itemName}_${category}_${brand}_${model}_${type}`
+                        : `${itemName}_${brand}_${model}_${type}`;
                     if (itemName && item.quantity > 0 && prev[itemKey] !== undefined) {
                         cleaned[itemKey] = prev[itemKey];
                     }
@@ -297,7 +306,6 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
         // Clear results at start of search to prevent stale results
         setSearchResults([]);
         
-        const data = getAvailableItems();
         const query = trimmedQuery.toLowerCase();
 
         // Split query into individual words/numbers
@@ -305,6 +313,97 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
 
         const MAX_RESULTS = 100; // Limit results to prevent memory issues
         const results = [];
+
+        // If using inventory data, search from inventoryItems
+        if (useInventoryData && inventoryItems.length > 0) {
+            for (const item of inventoryItems) {
+                if (results.length >= MAX_RESULTS) break;
+
+                const itemName = item.itemName || '';
+                const category = item.category || '';
+                const brand = item.brand || '';
+                const model = item.model || '';
+                const type = item.type || '';
+
+                const itemNameLower = itemName.toLowerCase();
+                const categoryLower = category.toLowerCase();
+                const brandLower = brand.toLowerCase();
+                const modelLower = model.toLowerCase();
+                const typeLower = type.toLowerCase();
+
+                // Check if ALL search terms match across ANY of the fields (itemName, category, brand, model, type)
+                const matches = searchTerms.every(term => {
+                    return (
+                        itemNameLower.includes(term) ||
+                        categoryLower.includes(term) ||
+                        brandLower.includes(term) ||
+                        modelLower.includes(term) ||
+                        typeLower.includes(term)
+                    );
+                });
+
+                if (matches) {
+                    // Check if item has available stock in the selected stocking location
+                    // Only show items that have stock available
+                    const hasStock = checkItemAvailabilityInLocationHelper({
+                        itemName,
+                        category,
+                        brand,
+                        model,
+                        type,
+                        itemId: item.itemId || null,
+                        categoryId: item.categoryId || null,
+                        brandId: item.brandId || null,
+                        modelId: item.modelId || null,
+                        typeId: item.typeId || null,
+                    });
+                    
+                    // Only add to results if item has stock available
+                    if (hasStock) {
+                        results.push({
+                            itemName,
+                            category,
+                            brand,
+                            model,
+                            type,
+                            itemId: item.itemId || null,
+                            categoryId: item.categoryId || null,
+                            brandId: item.brandId || null,
+                            modelId: item.modelId || null,
+                            typeId: item.typeId || null,
+                        });
+                    }
+                }
+            }
+
+            setSearchResults(results);
+            
+            // Clean up itemQuantities for inventory-based results
+            setItemQuantities(prev => {
+                const cleaned = {};
+                const existingItemsMap = {};
+                existingItems.forEach(item => {
+                    const itemKey = getItemKey(item);
+                    if (itemKey && item.quantity > 0) {
+                        existingItemsMap[itemKey] = item.quantity;
+                    }
+                });
+                
+                results.forEach(item => {
+                    const itemId = getItemKey(item);
+                    if (existingItemsMap[itemId] !== undefined) {
+                        cleaned[itemId] = existingItemsMap[itemId];
+                    } else if (prev[itemId] !== undefined && prev[itemId] > 0) {
+                        cleaned[itemId] = prev[itemId];
+                    }
+                });
+                
+                return cleaned;
+            });
+            return;
+        }
+        
+        const data = getAvailableItems();
 
         // Check if using nested structure from API (with otherPOEntityList)
         if (data.useNestedStructure && data.items && Array.isArray(data.items)) {
@@ -566,7 +665,7 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
             
             return cleaned;
         });
-    }, [debouncedSearchQuery, getAvailableItems, existingItems]);
+    }, [debouncedSearchQuery, getAvailableItems, existingItems, useInventoryData, inventoryItems, stockingLocationId, stockBreakdown]);
 
     const handleQuantityChange = (itemId, delta) => {
         setItemQuantities(prev => {
@@ -585,11 +684,25 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
         if (!stockingLocationId) {
             return true; // If no location selected, allow (will be validated in parent)
         }
-        const itemId = item.itemId || item.item_id || null;
-        if (itemId === null || itemId === undefined) {
-            return false;
+        
+        let itemKey;
+        if (useInventoryData) {
+            // For inventory-based search: use composite key
+            const itemName = (item.itemName || '').trim();
+            const category = (item.category || '').trim();
+            const brand = (item.brand || '').trim();
+            const model = (item.model || '').trim();
+            const type = (item.type || '').trim();
+            itemKey = `${itemName}_${category}_${brand}_${model}_${type}`;
+        } else {
+            // Original logic: use item_id
+            const itemId = item.itemId || item.item_id || null;
+            if (itemId === null || itemId === undefined) {
+                return false;
+            }
+            itemKey = String(itemId);
         }
-        const itemKey = String(itemId);
+        
         const breakdown = stockBreakdown[itemKey] || {};
         const locationStock = breakdown[String(stockingLocationId)] || 0;
         return locationStock > 0;
@@ -618,6 +731,27 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                     setItemQuantities(prev => ({ ...prev, [itemId]: currentQuantity }));
                     return;
                 }
+                
+                // For useInventoryData, check if quantity exceeds available stock
+                if (useInventoryData) {
+                    const availableQty = getAvailableQuantity(item);
+                    // Get current quantity from existingItems
+                    const existingItem = existingItems.find(existing => {
+                        const existingKey = getItemKey(existing);
+                        return existingKey === itemId;
+                    });
+                    const currentQuantity = existingItem ? (existingItem.quantity || 0) : 0;
+                    const requestedQuantity = numValue;
+                    
+                    // Check if requested quantity exceeds available stock
+                    if (requestedQuantity > availableQty) {
+                        alert(`Item "${item.itemName || 'this item'}" has only ${availableQty} qty available in the selected Stocking Location. You requested ${requestedQuantity} qty.`);
+                        // Reset to current quantity or available quantity, whichever is lower
+                        const maxAllowed = Math.min(currentQuantity, availableQty);
+                        setItemQuantities(prev => ({ ...prev, [itemId]: maxAllowed }));
+                        return;
+                    }
+                }
             }
             setItemQuantities(prev => ({ ...prev, [itemId]: numValue }));
         }
@@ -642,6 +776,20 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                     setFocusedInputId(null);
                     return;
                 }
+                
+                // For useInventoryData, check if quantity exceeds available stock
+                if (useInventoryData) {
+                    const availableQty = getAvailableQuantity(item);
+                    if (quantity > availableQty) {
+                        alert(`Item "${item.itemName || 'this item'}" has only ${availableQty} qty available in the selected Stocking Location. You requested ${quantity} qty.`);
+                        // Reset to current quantity or available quantity, whichever is lower
+                        const maxAllowed = Math.min(currentQuantity, availableQty);
+                        setItemQuantities(prev => ({ ...prev, [itemId]: maxAllowed }));
+                        setFocusedInputId(null);
+                        return;
+                    }
+                }
+                
                 // Calculate the difference to add/subtract
                 const difference = quantity - currentQuantity;
                 // Update quantity (incremental add/subtract)
@@ -671,12 +819,92 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                 return 'bg-[#E3F2FD] text-[#1976D2]';
         }
     };
+    // Fetch PO data (itemNames, brands, models, types, categories) when useInventoryData is true
+    useEffect(() => {
+        if (!isOpen || !useInventoryData) return;
+
+        const fetchPOData = async () => {
+            try {
+                const [itemNamesRes, brandsRes, modelsRes, typesRes, categoriesRes] = await Promise.all([
+                    fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/getAll'),
+                    fetch('https://backendaab.in/aabuildersDash/api/po_brand/getAll'),
+                    fetch('https://backendaab.in/aabuildersDash/api/po_model/getAll'),
+                    fetch('https://backendaab.in/aabuildersDash/api/po_type/getAll'),
+                    fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll')
+                ]);
+
+                if (itemNamesRes.ok) {
+                    const data = await itemNamesRes.json();
+                    setPoItemNames(data);
+                }
+                if (brandsRes.ok) {
+                    const data = await brandsRes.json();
+                    setPoBrands(data);
+                }
+                if (modelsRes.ok) {
+                    const data = await modelsRes.json();
+                    setPoModels(data);
+                }
+                if (typesRes.ok) {
+                    const data = await typesRes.json();
+                    setPoTypes(data);
+                }
+                if (categoriesRes.ok) {
+                    const data = await categoriesRes.json();
+                    setPoCategories(data);
+                }
+            } catch (error) {
+                console.error('Error fetching PO data:', error);
+            }
+        };
+
+        fetchPOData();
+    }, [isOpen, useInventoryData]);
+
+    // Helper function to resolve IDs to names
+    const findNameById = (array, id, fieldName) => {
+        if (!array || !id || id === 0) return '';
+        const item = array.find(i => {
+            const itemId = i.id || i._id;
+            return String(itemId) === String(id) || Number(itemId) === Number(id);
+        });
+        if (!item) return '';
+        return item[fieldName] || item.name || item.label || '';
+    };
+
+    const resolveItemName = (itemId) => {
+        return findNameById(poItemNames, itemId, 'itemName') || findNameById(poItemNames, itemId, 'name') || '';
+    };
+
+    const resolveBrandName = (brandId) => {
+        if (!brandId || brandId === 0) return '';
+        return findNameById(poBrands, brandId, 'brand') || findNameById(poBrands, brandId, 'brandName') || findNameById(poBrands, brandId, 'name') || '';
+    };
+
+    const resolveModelName = (modelId) => {
+        if (!modelId) return '';
+        return findNameById(poModels, modelId, 'model') || findNameById(poModels, modelId, 'modelName') || findNameById(poModels, modelId, 'name') || '';
+    };
+
+    const resolveTypeName = (typeId) => {
+        if (!typeId || typeId === 0) return '';
+        return findNameById(poTypes, typeId, 'typeColor') || findNameById(poTypes, typeId, 'type') || findNameById(poTypes, typeId, 'typeName') || findNameById(poTypes, typeId, 'name') || '';
+    };
+
+    const resolveCategoryName = (categoryId) => {
+        if (!categoryId) return '';
+        return findNameById(poCategories, categoryId, 'category') || findNameById(poCategories, categoryId, 'name') || findNameById(poCategories, categoryId, 'label') || '';
+    };
+
     // Fetch inventory data and calculate available stock quantities across ALL locations
     useEffect(() => {
         const fetchStockQuantities = async () => {
             if (!isOpen) {
                 setStockQuantities({});
                 setStockBreakdown({});
+                if (useInventoryData) {
+                    setInventoryItems([]);
+                }
                 return;
             }
 
@@ -687,6 +915,9 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                     console.error('Failed to fetch inventory data');
                     setStockQuantities({});
                     setStockBreakdown({});
+                    if (useInventoryData) {
+                        setInventoryItems([]);
+                    }
                     return;
                 }
 
@@ -698,85 +929,239 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                     return !recordDeleteStatus;
                 });
 
-                // Calculate net stock for each item_id across ALL locations
-                // Also store breakdown by location for each item
-                const stockMap = {}; // Total quantity per item_id
-                const breakdownMap = {}; // Breakdown by location per item_id
-                
-                activeRecords.forEach(record => {
-                    const recordStockingLocationId = record.stocking_location_id || record.stockingLocationId;
-                    const inventoryItems = record.inventoryItems || record.inventory_items || [];
+                if (useInventoryData) {
+                    // For inventory-based search: group by itemName + category + model + brand + type combination
+                    const stockMap = {}; // Total quantity per composite key
+                    const breakdownMap = {}; // Breakdown by location per composite key
+                    const itemsMap = {}; // Store unique items with their details
                     
-                    if (Array.isArray(inventoryItems)) {
-                        inventoryItems.forEach(invItem => {
-                            // Use only item_id to group and sum quantities
-                            const itemId = invItem.item_id || invItem.itemId || null;
-                            
-                            if (itemId !== null && itemId !== undefined) {
-                                // Use item_id as the key (convert to string for consistency)
-                                const itemKey = String(itemId);
+                    activeRecords.forEach(record => {
+                        const recordStockingLocationId = record.stocking_location_id || record.stockingLocationId;
+                        const inventoryItems = record.inventoryItems || record.inventory_items || [];
+                        
+                        if (Array.isArray(inventoryItems)) {
+                            inventoryItems.forEach(invItem => {
+                                const itemId = invItem.item_id || invItem.itemId || null;
+                                const categoryId = invItem.category_id || invItem.categoryId || null;
+                                const modelId = invItem.model_id || invItem.modelId || null;
+                                const brandId = invItem.brand_id || invItem.brandId || null;
+                                const typeId = invItem.type_id || invItem.typeId || null;
                                 
-                                // Initialize if not exists
-                                if (!stockMap[itemKey]) {
-                                    stockMap[itemKey] = 0;
+                                if (itemId !== null && itemId !== undefined) {
+                                    // Resolve names from IDs
+                                    const itemName = resolveItemName(itemId);
+                                    const category = resolveCategoryName(categoryId);
+                                    const model = resolveModelName(modelId);
+                                    const brand = resolveBrandName(brandId);
+                                    const type = resolveTypeName(typeId);
+                                    
+                                    // Only process items that have at least one of category/model/brand/type
+                                    const hasOtherData = category || model || brand || type;
+                                    
+                                    if (hasOtherData && itemName) {
+                                        // Create composite key: itemName + category + model + brand + type
+                                        const compositeKey = `${itemName}_${category || ''}_${brand || ''}_${model || ''}_${type || ''}`;
+                                        
+                                        // Initialize if not exists
+                                        if (!stockMap[compositeKey]) {
+                                            stockMap[compositeKey] = 0;
+                                        }
+                                        if (!breakdownMap[compositeKey]) {
+                                            breakdownMap[compositeKey] = {};
+                                        }
+                                        if (!itemsMap[compositeKey]) {
+                                            itemsMap[compositeKey] = {
+                                                itemName,
+                                                category: category || '',
+                                                brand: brand || '',
+                                                model: model || '',
+                                                type: type || '',
+                                                itemId,
+                                                categoryId,
+                                                brandId,
+                                                modelId,
+                                                typeId
+                                            };
+                                        }
+                                        
+                                        // Convert quantity to number and sum
+                                        const quantity = Number(invItem.quantity) || 0;
+                                        stockMap[compositeKey] += quantity;
+                                        
+                                        // Store breakdown by location
+                                        const locationKey = String(recordStockingLocationId);
+                                        if (!breakdownMap[compositeKey][locationKey]) {
+                                            breakdownMap[compositeKey][locationKey] = 0;
+                                        }
+                                        breakdownMap[compositeKey][locationKey] += quantity;
+                                    }
                                 }
-                                if (!breakdownMap[itemKey]) {
-                                    breakdownMap[itemKey] = {};
-                                }
+                            });
+                        }
+                    });
+                    
+                    // Convert itemsMap to array for search results
+                    setInventoryItems(Object.values(itemsMap));
+                    setStockQuantities(stockMap);
+                    setStockBreakdown(breakdownMap);
+                } else {
+                    // Original logic: Calculate net stock for each item_id across ALL locations
+                    const stockMap = {}; // Total quantity per item_id
+                    const breakdownMap = {}; // Breakdown by location per item_id
+                    
+                    activeRecords.forEach(record => {
+                        const recordStockingLocationId = record.stocking_location_id || record.stockingLocationId;
+                        const inventoryItems = record.inventoryItems || record.inventory_items || [];
+                        
+                        if (Array.isArray(inventoryItems)) {
+                            inventoryItems.forEach(invItem => {
+                                // Use only item_id to group and sum quantities
+                                const itemId = invItem.item_id || invItem.itemId || null;
                                 
-                                // Convert quantity to number and sum (incoming is positive, outgoing dispatch is negative, stock return is positive)
-                                const quantity = Number(invItem.quantity) || 0;
-                                stockMap[itemKey] += quantity;
-                                
-                                // Store breakdown by location
-                                const locationKey = String(recordStockingLocationId);
-                                if (!breakdownMap[itemKey][locationKey]) {
-                                    breakdownMap[itemKey][locationKey] = 0;
+                                if (itemId !== null && itemId !== undefined) {
+                                    // Use item_id as the key (convert to string for consistency)
+                                    const itemKey = String(itemId);
+                                    
+                                    // Initialize if not exists
+                                    if (!stockMap[itemKey]) {
+                                        stockMap[itemKey] = 0;
+                                    }
+                                    if (!breakdownMap[itemKey]) {
+                                        breakdownMap[itemKey] = {};
+                                    }
+                                    
+                                    // Convert quantity to number and sum (incoming is positive, outgoing dispatch is negative, stock return is positive)
+                                    const quantity = Number(invItem.quantity) || 0;
+                                    stockMap[itemKey] += quantity;
+                                    
+                                    // Store breakdown by location
+                                    const locationKey = String(recordStockingLocationId);
+                                    if (!breakdownMap[itemKey][locationKey]) {
+                                        breakdownMap[itemKey][locationKey] = 0;
+                                    }
+                                    breakdownMap[itemKey][locationKey] += quantity;
                                 }
-                                breakdownMap[itemKey][locationKey] += quantity;
-                            }
-                        });
-                    }
-                });
+                            });
+                        }
+                    });
 
-                setStockQuantities(stockMap);
-                setStockBreakdown(breakdownMap);
+                    setStockQuantities(stockMap);
+                    setStockBreakdown(breakdownMap);
+                }
             } catch (error) {
                 console.error('Error fetching stock quantities:', error);
                 setStockQuantities({});
                 setStockBreakdown({});
+                if (useInventoryData) {
+                    setInventoryItems([]);
+                }
             }
         };
 
         fetchStockQuantities();
-    }, [isOpen]);
+    }, [isOpen, useInventoryData, poItemNames, poBrands, poModels, poTypes, poCategories]);
 
-    // Get available quantity from calculated stock (based on item_id only) - across ALL locations
-    const getAvailableQuantity = (item) => {
-        // Use only item_id to get the quantity
-        const itemId = item.itemId || item.item_id || null;
-        
-        if (itemId === null || itemId === undefined) {
-            return 0; // Return 0 if item_id is not available
+    // Check if item is available in selected stocking location (helper function for search filtering)
+    const checkItemAvailabilityInLocationHelper = (item) => {
+        // Skip availability check if disabled (e.g., for incoming inventory where we're adding stock)
+        if (disableAvailabilityCheck) {
+            return true;
         }
+        if (!stockingLocationId) {
+            return false; // If no location selected and useInventoryData is true, don't show items
+        }
+        
+        if (useInventoryData) {
+            // For inventory-based search: use composite key
+            const itemName = (item.itemName || '').trim();
+            const category = (item.category || '').trim();
+            const brand = (item.brand || '').trim();
+            const model = (item.model || '').trim();
+            const type = (item.type || '').trim();
+            const compositeKey = `${itemName}_${category}_${brand}_${model}_${type}`;
+            
+            const breakdown = stockBreakdown[compositeKey] || {};
+            const locationStock = breakdown[String(stockingLocationId)] || 0;
+            return locationStock > 0;
+        } else {
+            // Original logic: use item_id
+            const itemId = item.itemId || item.item_id || null;
+            if (itemId === null || itemId === undefined) {
+                return false;
+            }
+            const itemKey = String(itemId);
+            const breakdown = stockBreakdown[itemKey] || {};
+            const locationStock = breakdown[String(stockingLocationId)] || 0;
+            return locationStock > 0;
+        }
+    };
 
-        // Use item_id as the key (same as in stockMap)
-        const itemKey = String(itemId);
-        
-        const availableQty = stockQuantities[itemKey] || 0;
-        
-        // Return max of 0 (can't have negative stock)
-        return Math.max(0, availableQty);
+    // Get available quantity from calculated stock
+    const getAvailableQuantity = (item) => {
+        if (useInventoryData) {
+            // For inventory-based search: use composite key (itemName + category + model + brand + type)
+            const itemName = (item.itemName || '').trim();
+            const category = (item.category || '').trim();
+            const brand = (item.brand || '').trim();
+            const model = (item.model || '').trim();
+            const type = (item.type || '').trim();
+            
+            // Only show quantity if item has at least one of category/model/brand/type
+            const hasOtherData = category || model || brand || type;
+            if (!hasOtherData) {
+                return 0; // Don't show quantity if no other data
+            }
+            
+            const compositeKey = `${itemName}_${category}_${brand}_${model}_${type}`;
+            
+            // If stocking location is selected, return stock for that location only
+            if (stockingLocationId) {
+                const breakdown = stockBreakdown[compositeKey] || {};
+                const locationStock = breakdown[String(stockingLocationId)] || 0;
+                return Math.max(0, locationStock);
+            }
+            
+            // Otherwise return total stock across all locations
+            const availableQty = stockQuantities[compositeKey] || 0;
+            return Math.max(0, availableQty);
+        } else {
+            // Original logic: Use only item_id to get the quantity
+            const itemId = item.itemId || item.item_id || null;
+            
+            if (itemId === null || itemId === undefined) {
+                return 0; // Return 0 if item_id is not available
+            }
+
+            // Use item_id as the key (same as in stockMap)
+            const itemKey = String(itemId);
+            
+            const availableQty = stockQuantities[itemKey] || 0;
+            
+            // Return max of 0 (can't have negative stock)
+            return Math.max(0, availableQty);
+        }
     };
 
     // Get stock breakdown for an item
     const getStockBreakdown = (item) => {
-        const itemId = item.itemId || item.item_id || null;
-        if (itemId === null || itemId === undefined) {
-            return {};
+        if (useInventoryData) {
+            // For inventory-based search: use composite key
+            const itemName = (item.itemName || '').trim();
+            const category = (item.category || '').trim();
+            const brand = (item.brand || '').trim();
+            const model = (item.model || '').trim();
+            const type = (item.type || '').trim();
+            const compositeKey = `${itemName}_${category}_${brand}_${model}_${type}`;
+            return stockBreakdown[compositeKey] || {};
+        } else {
+            // Original logic: use item_id
+            const itemId = item.itemId || item.item_id || null;
+            if (itemId === null || itemId === undefined) {
+                return {};
+            }
+            const itemKey = String(itemId);
+            return stockBreakdown[itemKey] || {};
         }
-        const itemKey = String(itemId);
-        return stockBreakdown[itemKey] || {};
     };
 
     // Fetch location names mapping
@@ -930,12 +1315,14 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                                                             {highlightText(item.model, debouncedSearchQuery)}
                                                         </p>
                                                     )}
-                                                    <span 
-                                                        onClick={() => handleQuantityClick(item)}
-                                                        className="text-[11px] font-medium text-[#777777] mb-1 ml-auto cursor-pointer hover:text-black underline"
-                                                    >
-                                                        {availableQty}pcs
-                                                    </span>
+                                                    {availableQty > 0 && (
+                                                        <span 
+                                                            onClick={() => handleQuantityClick(item)}
+                                                            className="text-[11px] font-medium text-[#777777] mb-1 ml-auto cursor-pointer hover:text-black underline"
+                                                        >
+                                                            {availableQty}pcs
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                             {/* Right Side: Category, Available Quantity, Quantity Selector */}
@@ -1020,7 +1407,15 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                                                                 return existingKey === itemId;
                                                             });
                                                             const current = existingItem ? (existingItem.quantity || 0) : (itemQuantities[itemId] || 0);
-                                                            const newQuantity = current + 1;
+                                                            const newQuantity = current + 1;                                                            
+                                                            // For useInventoryData, check if new quantity exceeds available stock
+                                                            if (useInventoryData) {
+                                                                const availableQty = getAvailableQuantity(item);
+                                                                if (newQuantity > availableQty) {
+                                                                    alert(`Item "${item.itemName || 'this item'}" has only ${availableQty} qty available in the selected Stocking Location.`);
+                                                                    return;
+                                                                }
+                                                            }                                                            
                                                             // Update quantity optimistically for immediate UI feedback
                                                             setItemQuantities(prev => ({ ...prev, [itemId]: newQuantity }));
                                                             // Add 1 item immediately (incremental add) - this updates parent state
@@ -1057,4 +1452,5 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
 };
 
 export default SearchItemsModal;
+
 

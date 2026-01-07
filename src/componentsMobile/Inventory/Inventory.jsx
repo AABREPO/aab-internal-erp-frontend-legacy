@@ -58,7 +58,7 @@ const Inventory = ({ user, onLogout }) => {
       case 'add-input':
         return <AddInput />;
       case 'incoming-tracker':
-        return <IncomingTracker />;
+        return <IncomingTracker user={user} />;
       case 'project-usage-report':
         return <ProjectUsageReport />;
       case 'project-usage-history':

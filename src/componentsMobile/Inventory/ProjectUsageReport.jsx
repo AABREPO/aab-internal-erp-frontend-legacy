@@ -1080,7 +1080,6 @@ const ProjectUsageReport = () => {
           )
         )}
       </div>
-
       {/* Modals */}
       <DatePickerModal
         isOpen={showDatePicker}

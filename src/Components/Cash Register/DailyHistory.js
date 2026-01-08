@@ -1913,57 +1913,46 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 console.warn("getAll endpoint not available, using current date's expenses:", error);
                 allDailyPayments = dailyExpenses;
             }
-            const getISOWeekNumber = (date) => {
-                const d = new Date(date);
-                d.setHours(0, 0, 0, 0);
-                // Get Thursday of the week containing the date
-                const dayOfWeek = d.getDay() || 7; // Convert Sunday (0) to 7
-                const thursday = new Date(d);
-                thursday.setDate(d.getDate() + 4 - dayOfWeek); // Thursday is 4 days after Monday
-                thursday.setHours(0, 0, 0, 0);
-                // Use the year that Thursday falls in (ISO 8601 rule)
-                const weekYear = thursday.getFullYear();
-                // Get January 1st of that year
-                const jan1 = new Date(weekYear, 0, 1);
-                jan1.setHours(0, 0, 0, 0);
-                // Get the Thursday of week 1 (first Thursday of the year)
-                const jan1DayOfWeek = jan1.getDay() || 7;
-                const firstThursday = new Date(jan1);
-                firstThursday.setDate(jan1.getDate() + 4 - jan1DayOfWeek);
-                firstThursday.setHours(0, 0, 0, 0);
-                // Calculate week number: difference in days divided by 7, plus 1
-                const daysDiff = Math.floor((thursday - firstThursday) / 86400000);
-                const weekNo = Math.floor(daysDiff / 7) + 1;
-                return weekNo;
-            };
-            const getCurrentWeekNumber = () => {
-                return getISOWeekNumber(new Date());
-            };
-            const actualCurrentWeekNumber = getCurrentWeekNumber();
-            const currentYear = new Date().getFullYear();
-            const actualCurrentWeek = getStartAndEndDateOfWeek(actualCurrentWeekNumber, currentYear);
-            const lastWeekNumber = weeks.length > 0 ? Math.max(...weeks.map(w => w.number)) : null;
-            const lastWeek = weeks.find(w => w.number === lastWeekNumber);
+            // Get current week number and year using ISO calculation
+            const now = new Date();
+            const actualCurrentWeekNumber = getISOWeekNumber(now);
+            const actualCurrentWeekYear = getWeekYear(now);
+            
+            // Calculate previous week number and year by going back 7 days from current week start
+            // This correctly handles cases where previous week might be week 53 of previous year
+            const { startDate: currentWeekStart } = getStartAndEndDateOfISOWeek(actualCurrentWeekNumber, actualCurrentWeekYear);
+            const previousWeekDate = new Date(currentWeekStart);
+            previousWeekDate.setDate(previousWeekDate.getDate() - 7);
+            previousWeekDate.setHours(0, 0, 0, 0);
+            const previousWeekNumber = getISOWeekNumber(previousWeekDate);
+            const previousWeekYear = getWeekYear(previousWeekDate);
+            
+            // Filter expenses: exclude those from current week or previous week using ISO week calculation
             allDailyPayments = allDailyPayments.filter(expense => {
                 if (!expense.date) return true;
+                
                 const expenseDate = new Date(expense.date);
+                // Check if date is valid
+                if (isNaN(expenseDate.getTime())) {
+                    console.warn('Invalid date for expense:', expense);
+                    return true; // Include invalid dates (let them pass through)
+                }
                 expenseDate.setHours(0, 0, 0, 0);
-                const currentWeekStart = new Date(actualCurrentWeek.start);
-                currentWeekStart.setHours(0, 0, 0, 0);
-                const currentWeekEnd = new Date(actualCurrentWeek.end);
-                currentWeekEnd.setHours(23, 59, 59, 999);
-                if (expenseDate >= currentWeekStart && expenseDate <= currentWeekEnd) {
+                
+                // Calculate ISO week number and year for this expense
+                const expenseWeekNumber = getISOWeekNumber(expenseDate);
+                const expenseWeekYear = getWeekYear(expenseDate);
+                
+                // Exclude if expense is from current week
+                if (expenseWeekNumber === actualCurrentWeekNumber && expenseWeekYear === actualCurrentWeekYear) {
                     return false;
                 }
-                if (lastWeek) {
-                    const lastWeekStart = new Date(lastWeek.start);
-                    lastWeekStart.setHours(0, 0, 0, 0);
-                    const lastWeekEnd = new Date(lastWeek.end);
-                    lastWeekEnd.setHours(23, 59, 59, 999);
-                    if (expenseDate >= lastWeekStart && expenseDate <= lastWeekEnd) {
-                        return false;
-                    }
+                
+                // Exclude if expense is from previous week
+                if (expenseWeekNumber === previousWeekNumber && expenseWeekYear === previousWeekYear) {
+                    return false;
                 }
+                
                 return true;
             });
             let expensesToSend = allDailyPayments.filter(expense =>
@@ -2078,7 +2067,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 ? `\n\nNote: ${combinedCount} group(s) of expenses with same labour, project, and date will be combined into single entries with "Company Labour" as contractor.`
                 : "";
             const confirmed = window.confirm(
-                `Are you sure you want to send ${expensesToSend.length} expense entry/entries (from ${originalExpenseCount} original expense(s)) to Expenses Entry?\n\nNote: Expenses from the actual current week (Week ${actualCurrentWeekNumber}) and last week (Week ${lastWeekNumber}) will be excluded.${combinedMessage}`
+                `Are you sure you want to send ${expensesToSend.length} expense entry/entries (from ${originalExpenseCount} original expense(s)) to Expenses Entry?\n\nNote: Expenses from the actual current week (Week ${actualCurrentWeekNumber} of ${actualCurrentWeekYear}) and previous week (Week ${previousWeekNumber} of ${previousWeekYear}) will be excluded.${combinedMessage}`
             );
             if (!confirmed) {
                 return;

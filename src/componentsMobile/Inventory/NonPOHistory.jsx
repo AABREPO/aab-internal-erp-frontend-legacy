@@ -70,9 +70,9 @@ const NonPOHistory = () => {
           const isDeleted = item.delete_status || item.deleteStatus;
           const purchaseNo = item.purchase_no || item.purchaseNo || item.purchase_number || '';
           // Check if purchase_no is empty/null or equals 'NO_PO' (case-insensitive)
-          const isNonPO = !purchaseNo || 
-                         String(purchaseNo).trim() === '' || 
-                         String(purchaseNo).toUpperCase() === 'NO_PO';
+          const isNonPO = !purchaseNo ||
+            String(purchaseNo).trim() === '' ||
+            String(purchaseNo).toUpperCase() === 'NO_PO';
           return !isDeleted && isNonPO;
         });
 
@@ -199,14 +199,14 @@ const NonPOHistory = () => {
           className="flex items-center gap-2 text-[14px] font-medium text-gray-700"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M2 4H14M4 8H12M6 12H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            <path d="M2 4H14M4 8H12M6 12H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
           Filter
         </button>
       </div>
 
       {/* Records List */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4">
+      <div className="flex-1 overflow-y-auto px-4 pb-4 scrollbar-hide no-scrollbar scrollbar-none">
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <p className="text-gray-500">Loading...</p>
@@ -222,29 +222,39 @@ const NonPOHistory = () => {
                 key={record.id || record._id}
                 className="bg-white border-2 shadow-md border-gray-200 rounded-lg p-4"
               >
-                <div className="flex justify-between items-start">
+                <div className=" justify-between items-start">
                   {/* Left Side */}
-                  <div className="flex-1 pr-4">
-                    <div className="flex items-center gap-1 mb-1">
-                      <span className="text-[14px] font-semibold text-black">
+                  <div className="flex items-center justify-between mb-1">
+                    <div>
+                      <span className="text-[12px] font-semibold text-black">
                         #{record.entryNumber}
                       </span>
-                      <span className="text-[14px] font-semibold text-black">
+                      <span className="text-[12px] font-semibold text-black">
                         , {record.vendorName}
                       </span>
                     </div>
                     <p className="text-[12px] text-gray-600 mb-1">
-                      {record.stockingLocation}
-                    </p>
-                    <p className="text-[12px] text-gray-500">
-                      {record.isToday ? 'Today' : record.formattedDate} • {record.formattedTime}
+                      No. of Items - {record.numberOfItems}
                     </p>
                   </div>
-                  
-                  {/* Right Side */}
-                  <div className="flex flex-col items-end">
+                  <div>
                     <p className="text-[12px] text-gray-600 mb-1">
-                      No. of Items - {record.numberOfItems}
+                      {record.stockingLocation}
+                    </p>
+                  </div>
+                  <div>
+
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[12px] text-gray-500">
+                      {record.created_date_time && new Date(record.created_date_time).toLocaleString('en-GB', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true
+                      })}
                     </p>
                     <p className="text-[12px] font-semibold text-[#BF9853]">
                       Quantity - {record.totalQuantity}

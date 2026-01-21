@@ -2528,7 +2528,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                             {item.total_amount ? `₹${parseInt(item.total_amount).toLocaleString()}` : '-'}
                                         </td>
                                         <td className=" py-3 text-left text-sm font-semibold border-b border-gray-100">
-                                            <div className="relative group">
+                                            <div className="">
                                                 <button className={getButtonClass(getBillVerificationStatus(item))}
                                                     style={getBillVerificationStatus(item) === 'Verified' ? { backgroundColor: '#FFD39E' } : {}}
                                                     onClick={() => handleVerifyClick(item)}
@@ -2538,7 +2538,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                             </div>
                                         </td>
                                         <td className=" py-3 text-sm text-left border-b border-gray-100">
-                                            <div className="relative group">
+                                            <div className="">
                                                 <button className={`${getButtonClass(item.entry_status || 'Entry', item.id)}`}
                                                     onClick={() => handleEntryClick(item)}
                                                 >

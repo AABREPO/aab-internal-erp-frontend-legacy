@@ -1701,7 +1701,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                                                     disabled={rent.formType === 'Shop Closure' || rent.formType === 'Refund'}
                                                     className={`rounded-full transition duration-200 ml-2 mr-3 ${
                                                         rent.formType === 'Shop Closure' || rent.formType === 'Refund' 
-                                                            ? 'opacity-50 cursor-not-allowed' 
+                                                            ? 'cursor-not-allowed' 
                                                             : ''
                                                     }`}
                                                     title={rent.formType === 'Shop Closure' || rent.formType === 'Refund' 
@@ -1714,7 +1714,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                                                         className={`w-4 h-6 transition duration-200 ${
                                                             rent.formType === 'Shop Closure' || rent.formType === 'Refund' 
                                                                 ? '' 
-                                                                : 'transform hover:scale-110 hover:brightness-110'
+                                                                : ''
                                                         }`}
                                                     />
                                                 </button>
@@ -1724,14 +1724,14 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                                                             src={remove}
                                                             alt='delete'
                                                             onClick={() => handleDelete(rent.id, username)}
-                                                            className='  w-4 h-4 transform hover:scale-110 hover:brightness-110 transition duration-200 ' />
+                                                            className='  w-4 h-4 transition duration-200 ' />
                                                     </button>
                                                 )}
                                                 <button onClick={() => fetchAuditDetails(rent.id)} className="rounded-full transition duration-200 -mr-1" >
                                                     <img
                                                         src={history}
                                                         alt="history"
-                                                        className=" w-4 h-5 transform hover:scale-110 hover:brightness-110 transition duration-200 "
+                                                        className=" w-4 h-5 transition duration-200 "
                                                     />
                                                 </button>
                                             </td>

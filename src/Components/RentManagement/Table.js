@@ -1608,7 +1608,7 @@ const Table = () => {
                                                         alt="Edit"
                                                         className={`w-4 h-6 transition duration-200 ${rent.formType === 'Shop Closure' || rent.formType === 'Refund'
                                                                 ? ''
-                                                                : 'transform hover:scale-110 hover:brightness-110'
+                                                                : ''
                                                             }`}
                                                     />
                                                 </button>

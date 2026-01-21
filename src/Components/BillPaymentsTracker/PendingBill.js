@@ -98,7 +98,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
     const [carryForwardData, setCarryForwardData] = useState([])
     const [useCarryForward, setUseCarryForward] = useState(false)
     const [carryForwardAmount, setCarryForwardAmount] = useState(0)
-
     const [editFormData, setEditFormData] = useState({
         billArrivalDate: '',
         vendorId: null,
@@ -302,7 +301,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
             const billEntriesForTracker = groupedBillEntries[trackerId];
             const bill = billMap[trackerId];
             if (!bill) {
-                return; // Skip if no corresponding bill found
+                return;
             }
             const vendorName = getVendorNameById(bill.vendor_id) || bill.vendor_name;
             const billAmount = parseFloat(bill.total_amount) || 0;
@@ -4764,7 +4763,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                             </div>
                                         </div>
                                         <div className="pb-1 flex items-center gap-2">
-                                            <span className="text-sm text-gray-700 font-medium">Last Paid PO</span>
+                                            <span className="text-sm text-gray-700 font-medium">Last PO</span>
                                             <div className="relative">
                                                 <input
                                                     type="text"

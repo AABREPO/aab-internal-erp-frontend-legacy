@@ -1124,6 +1124,7 @@ const DTableView = () => {
       const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/quantity/size');
       const data = await response.json();
       setTileList(data);
+      console.log(data);
     } catch (error) {
       console.error("Error fetching tile data:", error);
     }

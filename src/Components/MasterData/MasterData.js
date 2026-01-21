@@ -185,6 +185,9 @@ const MasterData = ({ username, userRoles = [] }) => {
   const [editEmpContactEmail, setEditEmpContactEmail] = useState('');
   const [editEmpUpiQRImage, setEditEmpUpiQRImage] = useState(null);
   const [editEmpUpiQRImagePreview, setEditEmpUpiQRImagePreview] = useState(null);
+  const [originalEmpUpiQRImageData, setOriginalEmpUpiQRImageData] = useState(null);
+  const [isEmpUpiQRImageModalOpen, setIsEmpUpiQRImageModalOpen] = useState(false);
+  const [empUpiQRImageModalUrl, setEmpUpiQRImageModalUrl] = useState('');
   const [editEmployeeId, setEditEmployeeId] = useState('');
   const [editAadhaarPdfFile, setEditAadhaarPdfFile] = useState(null);
   const [editAadhaarImageUrl, setEditAadhaarImageUrl] = useState('');
@@ -1498,9 +1501,12 @@ const MasterData = ({ username, userRoles = [] }) => {
 
     // Handle QR image from backend byte array (like vendor implementation)
     let qrImagePreview = null;
+    let originalImageData = null;
     if (item.upi_qr_image) {
       let qrImageData = item.upi_qr_image;
       qrImageData = qrImageData.replace(/\s/g, '');
+      // Store original base64 data for preserving image on update
+      originalImageData = qrImageData;
       if (!qrImageData.startsWith('data:')) {
         if (qrImageData.startsWith('/9j/') || qrImageData.startsWith('/9j4')) {
           qrImageData = `data:image/jpeg;base64,${qrImageData}`;
@@ -1515,6 +1521,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     }
     setEditEmpUpiQRImagePreview(qrImagePreview);
     setEditEmpUpiQRImage(null);
+    setOriginalEmpUpiQRImageData(originalImageData);
     setIsEmployeeEditMode(false); // Default to locked mode
     setIsEditEmployeeDataOpen(true);
   };
@@ -6653,17 +6660,10 @@ const MasterData = ({ username, userRoles = [] }) => {
                 <button type="button" className="text-[#E4572E] font-bold px-1 ml-3 border-dashed border-b-2 border-[#BF9853] " onClick={addEditPropertyDetail}>+ Add on</button>
               </div>
               <div className="flex justify-end space-x-2 mt-8 mb-4 mr-5">
-                <button
-                  type="submit"
-                  className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
-                >
+                <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
                   Update
                 </button>
-                <button
-                  type="button"
-                  className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
-                  onClick={() => setIsProjectEditOpen(false)}
-                >
+                <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={() => setIsProjectEditOpen(false)}>
                   Cancel
                 </button>
               </div>
@@ -6718,6 +6718,29 @@ const MasterData = ({ username, userRoles = [] }) => {
                   formData.append('employeeDetails', employeeBlob);
                   if (editEmpUpiQRImage) {
                     formData.append('upi_qr_image', editEmpUpiQRImage);
+                  } else if (originalEmpUpiQRImageData) {
+                    try {
+                      let base64Data = originalEmpUpiQRImageData;
+                      if (base64Data.startsWith('data:')) {
+                        base64Data = base64Data.split(',')[1];
+                      }
+                      let mimeType = 'image/jpeg';
+                      if (originalEmpUpiQRImageData.startsWith('iVBORw0KGgo')) {
+                        mimeType = 'image/png';
+                      } else if (originalEmpUpiQRImageData.startsWith('/9j/') || originalEmpUpiQRImageData.startsWith('/9j4')) {
+                        mimeType = 'image/jpeg';
+                      }
+                      const binaryString = atob(base64Data);
+                      const bytes = new Uint8Array(binaryString.length);
+                      for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                      }
+                      const blob = new Blob([bytes], { type: mimeType });
+                      const file = new File([blob], 'existing_qr_image', { type: mimeType });
+                      formData.append('upi_qr_image', file);
+                    } catch (error) {
+                      console.error('Error converting original image data:', error);
+                    }
                   }
                   try {
                     const response = await fetch(`https://backendaab.in/aabuildersDash/api/employee_details/edit/${selectedEmployeeDataId}`, {
@@ -6961,9 +6984,26 @@ const MasterData = ({ username, userRoles = [] }) => {
                         <div className="mb-4">
                           <div className="w-48 h-48 border-2 border-[#BF9853] border-opacity-35 rounded-lg flex items-center justify-center bg-gray-50">
                             {editEmpUpiQRImagePreview ? (
-                              <img src={editEmpUpiQRImagePreview} alt="QR Preview" className="w-full h-full object-contain rounded-lg" />
+                              <img 
+                                src={editEmpUpiQRImagePreview} 
+                                alt="QR Preview" 
+                                className="w-full h-full object-contain rounded-lg cursor-pointer" 
+                                onClick={() => {
+                                  setEmpUpiQRImageModalUrl(editEmpUpiQRImagePreview);
+                                  setIsEmpUpiQRImageModalOpen(true);
+                                }}
+                              />
                             ) : editEmpUpiQRImage ? (
-                              <img src={URL.createObjectURL(editEmpUpiQRImage)} alt="QR Preview" className="w-full h-full object-contain rounded-lg" />
+                              <img 
+                                src={URL.createObjectURL(editEmpUpiQRImage)} 
+                                alt="QR Preview" 
+                                className="w-full h-full object-contain rounded-lg cursor-pointer" 
+                                onClick={() => {
+                                  const url = URL.createObjectURL(editEmpUpiQRImage);
+                                  setEmpUpiQRImageModalUrl(url);
+                                  setIsEmpUpiQRImageModalOpen(true);
+                                }}
+                              />
                             ) : (
                               <span className="text-gray-400 text-sm">Profile Preview</span>
                             )}
@@ -6980,18 +7020,14 @@ const MasterData = ({ username, userRoles = [] }) => {
                             }}
                             className="hidden"
                           />
-                          <button
-                            type="button"
-                            onClick={() => document.getElementById('editEmployeeQrImageUpload').click()}
+                          <button type="button" onClick={() => document.getElementById('editEmployeeQrImageUpload').click()}
                             className="w-52 bg-[#BF9853] text-white px-4 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
                           >
                             Add Image
                           </button>
                         </div>
                         <div className="mb-4">
-                          <button
-                            type="button"
-                            onClick={() => setIsEmployeeEditMode(!isEmployeeEditMode)}
+                          <button type="button" onClick={() => setIsEmployeeEditMode(!isEmployeeEditMode)}
                             className="w-52 bg-[#BF9853] text-white px-4 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
                           >
                             {isEmployeeEditMode ? 'Disable Edit' : 'Edit Employee Details'}
@@ -7015,17 +7051,13 @@ const MasterData = ({ username, userRoles = [] }) => {
                           className="hidden"
                         />
                         <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => document.getElementById('editAadhaarPdfUpload').click()}
+                          <button type="button" onClick={() => document.getElementById('editAadhaarPdfUpload').click()}
                             className="bg-[#BF9853] text-white px-2 py-2 w-48 -ml-14 rounded-lg hover:bg-yellow-800 font-semibold"
                           >
                             Select Aadhaar PDF
                           </button>
                           {editAadhaarImageUrl && (
-                            <button
-                              type="button"
-                              onClick={() => window.open(editAadhaarImageUrl, '_blank')}
+                            <button type="button" onClick={() => window.open(editAadhaarImageUrl, '_blank')}
                               className="bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 font-semibold"
                               title="View existing Aadhaar PDF"
                             >
@@ -7044,6 +7076,71 @@ const MasterData = ({ username, userRoles = [] }) => {
                   </div>
                 </form>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {isEmpUpiQRImageModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50" onClick={() => setIsEmpUpiQRImageModalOpen(false)}>
+          <div className="bg-white rounded-lg p-6 max-w-4xl max-h-[90vh] flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center w-full mb-4">
+              <h2 className="text-xl font-semibold text-gray-800">Profile Image</h2>
+              <button 
+                className="text-red-500 hover:text-red-700" 
+                onClick={() => setIsEmpUpiQRImageModalOpen(false)}
+              >
+                <img src={cross} alt='close' className='w-5 h-5' />
+              </button>
+            </div>
+            <div className="flex-1 flex items-center justify-center mb-4">
+              <img 
+                src={empUpiQRImageModalUrl} 
+                alt="UPI QR Code" 
+                className="max-w-full max-h-[70vh] object-contain rounded-lg"
+              />
+            </div>
+            <div className="flex gap-4">
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    let downloadUrl = empUpiQRImageModalUrl;
+                    
+                    // If it's a blob URL, fetch it first
+                    if (empUpiQRImageModalUrl.startsWith('blob:')) {
+                      const response = await fetch(empUpiQRImageModalUrl);
+                      const blob = await response.blob();
+                      downloadUrl = URL.createObjectURL(blob);
+                    }
+                    
+                    const link = document.createElement('a');
+                    link.href = downloadUrl;
+                    link.download = `employee_image_${Date.now()}.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    // Clean up blob URL if we created one
+                    if (downloadUrl !== empUpiQRImageModalUrl && downloadUrl.startsWith('blob:')) {
+                      URL.revokeObjectURL(downloadUrl);
+                    }
+                  } catch (error) {
+                    console.error('Error downloading image:', error);
+                    alert('Failed to download image. Please try again.');
+                  }
+                }}
+                className="bg-[#BF9853] text-white px-6 py-2 rounded-lg hover:bg-yellow-800 font-semibold flex items-center gap-2"
+              >
+                <img src={DownloadIcon} alt="Download" className="w-5 h-5" />
+                Download Image
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEmpUpiQRImageModalOpen(false)}
+                className="px-6 py-2 border rounded-lg text-[#BF9853] border-[#BF9853] hover:bg-gray-50 font-semibold"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
@@ -7312,10 +7409,8 @@ const MasterData = ({ username, userRoles = [] }) => {
                             <label className="block text-lg font-medium mb-2">Account Type</label>
                             <div className="relative">
                               {isAccountEditMode ? (
-                                <select
-                                  className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 pr-12 rounded-lg h-14 focus:outline-none"
-                                  value={editAccountType}
-                                  onChange={(e) => setEditAccountType(e.target.value)}
+                                <select className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 pr-12 rounded-lg h-14 focus:outline-none"
+                                  value={editAccountType} onChange={(e) => setEditAccountType(e.target.value)}
                                   required
                                 >
                                   <option value="">Select Account Type</option>
@@ -7362,18 +7457,14 @@ const MasterData = ({ username, userRoles = [] }) => {
                               onChange={handleEditQrImageUpload}
                               className="hidden"
                             />
-                            <button
-                              type="button"
-                              onClick={() => document.getElementById('editQrImageUpload').click()}
+                            <button type="button" onClick={() => document.getElementById('editQrImageUpload').click()}
                               className="w-52 bg-[#BF9853] text-white px-4 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
                             >
                               Add QR
                             </button>
                           </div>
                           <div className="mb-4">
-                            <button
-                              type="button"
-                              onClick={() => setIsAccountEditMode(!isAccountEditMode)}
+                            <button type="button" onClick={() => setIsAccountEditMode(!isAccountEditMode)}
                               className="w-52 bg-[#BF9853] text-white px-4 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
                             >
                               {isAccountEditMode ? 'Disable Edit' : 'Edit Account Details'}
@@ -7392,7 +7483,6 @@ const MasterData = ({ username, userRoles = [] }) => {
                     </div>
                   </form>
                 </div>
-
               </div>
             </div>
           </div>
@@ -7473,10 +7563,8 @@ const MasterData = ({ username, userRoles = [] }) => {
                 </div>
                 {exportDataType === 'project' && (
                   <div className="mb-4">
-                    <select
-                      className="w-full border-2 border-[#BF9853] border-opacity-35 rounded-lg p-3 focus:outline-none focus:border-[#BF9853]"
-                      value={exportProjectCategory}
-                      onChange={(e) => setExportProjectCategory(e.target.value)}
+                    <select className="w-full border-2 border-[#BF9853] border-opacity-35 rounded-lg p-3 focus:outline-none focus:border-[#BF9853]"
+                      value={exportProjectCategory} onChange={(e) => setExportProjectCategory(e.target.value)}
                     >
                       <option value="">All Categories</option>
                       {projectCategoryOptions.map(category => (
@@ -7582,8 +7670,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                             }
                             if (!item) return null;
                             return (
-                              <tr
-                                key={itemId}
+                              <tr key={itemId}
                                 className={`border-b border-gray-200 hover:bg-[#FAF6ED] transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
                                   }`}
                               >
@@ -7600,9 +7687,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                                   }
                                 </td>
                                 <td className="p-3 text-center">
-                                  <button
-                                    onClick={() => handleExportItemToggle(itemId)}
-                                    className="text-red-500 hover:text-red-700 transition-colors"
+                                  <button onClick={() => handleExportItemToggle(itemId)} className="text-red-500 hover:text-red-700 transition-colors"
                                     title="Remove"
                                   >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7621,15 +7706,13 @@ const MasterData = ({ username, userRoles = [] }) => {
               </div>
             </div>
             <div className="flex space-x-3 justify-end mt-6 pt-4 border-t border-gray-200">
-              <button
-                onClick={exportType === 'pdf' ? handleExportToPDF : handleExportToExcel}
+              <button onClick={exportType === 'pdf' ? handleExportToPDF : handleExportToExcel}
                 className="bg-[#BF9853] text-white px-8 py-3 rounded-lg hover:bg-yellow-800 font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={selectedExportItems.length === 0}
               >
                 Export {exportType === 'pdf' ? 'PDF' : 'Excel'} ({selectedExportItems.length} items)
               </button>
-              <button
-                onClick={() => setIsExportSelectionModalOpen(false)}
+              <button onClick={() => setIsExportSelectionModalOpen(false)}
                 className="px-8 py-3 border-2 border-[#BF9853] text-[#BF9853] rounded-lg hover:bg-[#FAF6ED] font-semibold transition-colors"
               >
                 Cancel

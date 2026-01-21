@@ -17,6 +17,13 @@ const IncomingTracker = ({ user }) => {
   const [poType, setPoType] = useState([]);
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [selectedLiveCardId, setSelectedLiveCardId] = useState(null);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [filterVendorName, setFilterVendorName] = useState('');
+  const [filterStockingLocation, setFilterStockingLocation] = useState('');
+  const [filterPONo, setFilterPONo] = useState('');
+  const [showVendorDropdown, setShowVendorDropdown] = useState(false);
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const [showPODropdown, setShowPODropdown] = useState(false);
 
   // Fetch vendor data
   useEffect(() => {
@@ -278,7 +285,7 @@ const IncomingTracker = ({ user }) => {
               const stockingLocationId = record.stocking_location_id || record.stockingLocationId;
               const site = siteData.find(s => s.id === stockingLocationId);
               const stockingLocation = site ? site.siteName : 'Unknown Location';
-              // Calculate total items and quantity
+              // Calculate total items and quantity (include items with 0 quantity)
               const inventoryItems = record.inventoryItems || record.inventory_items || [];
               const numberOfItems = inventoryItems.length;
               const totalQuantity = inventoryItems.reduce((sum, item) => {
@@ -356,7 +363,7 @@ const IncomingTracker = ({ user }) => {
           totalMergedQuantity: record.totalQuantity,
           totalMergedItems: record.numberOfItems,
           totalMergedAmount: record.totalAmount,
-          allInventoryItems: [...inventoryItems],
+          allInventoryItems: [...inventoryItems], // Include all items, even with 0 quantity
           earliestDate: record.date || record.created_at || record.createdAt,
           latestDate: record.date || record.created_at || record.createdAt,
         };
@@ -367,7 +374,7 @@ const IncomingTracker = ({ user }) => {
         merged.totalMergedQuantity += record.totalQuantity;
         merged.totalMergedItems += record.numberOfItems;
         merged.totalMergedAmount += record.totalAmount;
-        // Combine inventory items from all merged entries
+        // Combine inventory items from all merged entries (include items with 0 quantity)
         const inventoryItems = record.inventoryItems || record.inventory_items || [];
         merged.allInventoryItems = [...(merged.allInventoryItems || []), ...inventoryItems];
         const recordDate = new Date(record.date || record.created_at || record.createdAt);
@@ -704,6 +711,25 @@ const IncomingTracker = ({ user }) => {
         );
       });
     }
+    // Filter by vendor name
+    if (filterVendorName.trim()) {
+      filtered = filtered.filter(record => {
+        return record.vendorName?.toLowerCase() === filterVendorName.toLowerCase();
+      });
+    }
+    // Filter by stocking location
+    if (filterStockingLocation.trim()) {
+      filtered = filtered.filter(record => {
+        return record.stockingLocation?.toLowerCase() === filterStockingLocation.toLowerCase();
+      });
+    }
+    // Filter by PO number
+    if (filterPONo.trim()) {
+      filtered = filtered.filter(record => {
+        const poNo = String(record.purchaseNo || record.entryNumber || '').replace('#', '').trim();
+        return poNo === filterPONo.replace('#', '').trim();
+      });
+    }
     // Sort by date (newest first)
     filtered.sort((a, b) => {
       const dateA = new Date(a.latestDate || a.date || a.created_at || a.createdAt);
@@ -711,12 +737,12 @@ const IncomingTracker = ({ user }) => {
       return dateB - dateA;
     });
     setFilteredRecords(filtered);
-  }, [incomingRecords, activeStatus, searchQuery, allPurchaseOrders]);
+  }, [incomingRecords, activeStatus, searchQuery, allPurchaseOrders, filterVendorName, filterStockingLocation, filterPONo]);
   return (
-    <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden bg-white">
+    <div className=" bg-white">
       {/* Back Button - Show when detail view is open */}
       {showDetailView && selectedRecord && (
-        <div className="flex-shrink-0 px-4 pt-2 pb-1">
+        <div className="flex px-4 pt-2 pb-1">
           <button
             type="button"
             onClick={() => {
@@ -734,7 +760,7 @@ const IncomingTracker = ({ user }) => {
       )}
       {/* Date and Category Buttons - Hide when detail view is open */}
       {!showDetailView && (
-        <div className="flex-shrink-0 px-4 pt-1">
+        <div className=" px-4 pt-1">
           <div className="flex items-center justify-between">
             {/* Date Button */}
             <button
@@ -754,7 +780,7 @@ const IncomingTracker = ({ user }) => {
         </div>
       )}
       {/* Live/Closed/History Toggle - Always visible */}
-      <div className="flex-shrink-0 px-4 pt-1 pb-3">
+      <div className="px-4 pt-1 pb-3">
         <div className="flex items-center gap-2">
           {/* Live/Closed/History Tabs */}
           <div className="flex bg-gray-100 items-center h-9 shadow-sm flex-1">
@@ -763,6 +789,12 @@ const IncomingTracker = ({ user }) => {
               onClick={() => {
                 setActiveStatus('live');
                 setSelectedLiveCardId(null);
+                setShowDetailView(false);
+                setSelectedRecord(null);
+                setSearchQuery('');
+                setFilterVendorName('');
+                setFilterStockingLocation('');
+                setFilterPONo('');
               }}
               className={`flex-1 py-1 px-4 ml-1 h-8 rounded text-[14px] font-medium transition-colors ${activeStatus === 'live'
                 ? 'bg-white text-black'
@@ -776,6 +808,12 @@ const IncomingTracker = ({ user }) => {
               onClick={() => {
                 setActiveStatus('closed');
                 setSelectedLiveCardId(null);
+                setShowDetailView(false);
+                setSelectedRecord(null);
+                setSearchQuery('');
+                setFilterVendorName('');
+                setFilterStockingLocation('');
+                setFilterPONo('');
               }}
               className={`flex-1 py-1 px-4 h-8 rounded text-[14px] font-medium transition-colors ${activeStatus === 'closed'
                 ? 'bg-white text-black'
@@ -789,6 +827,12 @@ const IncomingTracker = ({ user }) => {
               onClick={() => {
                 setActiveStatus('history');
                 setSelectedLiveCardId(null);
+                setShowDetailView(false);
+                setSelectedRecord(null);
+                setSearchQuery('');
+                setFilterVendorName('');
+                setFilterStockingLocation('');
+                setFilterPONo('');
               }}
               className={`flex-1 py-1 px-4 mr-1 h-8 rounded text-[14px] font-medium transition-colors ${activeStatus === 'history'
                 ? 'bg-white text-black'
@@ -802,7 +846,7 @@ const IncomingTracker = ({ user }) => {
       </div>
       {/* Search Bar */}
       {!showDetailView && (
-        <div className="flex-shrink-0 px-4 pb-2">
+        <div className=" px-4 pb-2">
           <div className="relative">
             <input
               type="text"
@@ -825,24 +869,80 @@ const IncomingTracker = ({ user }) => {
 
       {/* Filter Button */}
       {!showDetailView && (
-        <div className="flex-shrink-0 px-4 pb-3">
-          <button
-            type="button"
-            className="flex items-center gap-2 text-[14px] font-medium text-gray-700"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M2 4H14M4 8H12M6 12H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-            Filter
-          </button>
+        <div className=" px-4 pb-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setShowFilterModal(true)}
+              className="flex items-center gap-2 text-[14px] font-medium text-gray-700"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2 4H14M4 8H12M6 12H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+              {!(filterVendorName || filterStockingLocation || filterPONo) && (
+                <span className="text-[12px] font-medium text-black">Filter</span>
+              )}
+            </button>
+            {filterVendorName && (
+              <div className="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full">
+                <span className="text-[12px] font-medium text-black">Vendor</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFilterVendorName('');
+                  }}
+                  className="w-4 h-4 flex items-center justify-center hover:bg-gray-200 rounded-full transition-colors"
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M7.5 2.5L2.5 7.5M2.5 2.5L7.5 7.5" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+            )}
+            {filterStockingLocation && (
+              <div className="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full">
+                <span className="text-[12px] font-medium text-black">Stocking Location</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFilterStockingLocation('');
+                  }}
+                  className="w-4 h-4 flex items-center justify-center hover:bg-gray-200 rounded-full transition-colors"
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M7.5 2.5L2.5 7.5M2.5 2.5L7.5 7.5" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+            )}
+            {filterPONo && (
+              <div className="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full">
+                <span className="text-[12px] font-medium text-black">PO. No</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFilterPONo('');
+                  }}
+                  className="w-4 h-4 flex items-center justify-center hover:bg-gray-200 rounded-full transition-colors"
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M7.5 2.5L2.5 7.5M2.5 2.5L7.5 7.5" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
       {/* Records List */}
-      <div className="flex-1 px-4 overflow-hidden flex flex-col">
+      <div className="flex-1 px-4 overflow-hidden  flex flex-col">
         {showDetailView && selectedRecord ? (
           /* Detail View - Inline below search bar */
-          <div className="bg-white flex flex-col flex-1 min-h-0" style={{ fontFamily: "'Manrope', sans-serif" }}>
+          <div className="bg-white flex flex-col flex-1" style={{ fontFamily: "'Manrope', sans-serif" }}>
             {/* Purchase Order Info Card */}
             <div className="flex-shrink-0 p-4 bg-white border border-gray-200 rounded-lg mb-2">
               <div className="space-y-2">
@@ -882,26 +982,146 @@ const IncomingTracker = ({ user }) => {
             </div>
 
             {/* Items List */}
-            <div className=" overflow-y-auto min-h-0 space-y-1 no-scrollbar scrollbar-none scrollbar-hide">
+            <div className=" overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide" style={{ maxHeight: '470px' }}>
               {(() => {
-                // Use allInventoryItems if available (for merged records), otherwise use regular inventoryItems
-                const inventoryItems = selectedRecord.allInventoryItems || selectedRecord.inventoryItems || selectedRecord.inventory_items || [];
-                const getCategoryColor = (category) => {
-                  switch (category) {
-                    case 'Electricals':
-                      return 'bg-[#E3F2FD] text-[#1976D2]';
-                    case 'Paint':
-                      return 'bg-[#E8F5E9] text-[#2E7D32]';
-                    case 'Plumbing':
-                      return 'bg-[#FFF3E0] text-[#F57C00]';
-                    case 'Carpentry':
-                      return 'bg-[#F3E5F5] text-[#7B1FA2]';
-                    default:
-                      return 'bg-[#E3F2FD] text-[#1976D2]';
+                // First, try to use allInventoryItems/inventoryItems for received items
+                const receivedItems = selectedRecord.allInventoryItems || selectedRecord.inventoryItems || selectedRecord.inventory_items || [];
+                
+                // Find the matching PO data
+                let poData = null;
+                if (allPurchaseOrders.length > 0) {
+                  const purchaseNo = selectedRecord.purchaseNo || selectedRecord.purchase_no || '';
+                  const poNumberStr = String(purchaseNo).replace('#', '').trim();
+                  const targetEno = getNumericEno(poNumberStr);
+                  const vendorId = selectedRecord.vendor_id || selectedRecord.vendorId;
+                  const vendorPOs = vendorId
+                    ? allPurchaseOrders.filter(p => String(p.vendor_id || p.vendorId) === String(vendorId))
+                    : allPurchaseOrders;
+                  const matchingPOs = vendorPOs.filter(p => {
+                    const poEno = getNumericEno(p.eno || p.ENO || p.poNumber || p.po_number || '');
+                    return poEno === targetEno && poEno !== 0;
+                  });
+                  if (matchingPOs.length > 0) {
+                    const posWithItems = matchingPOs.filter(p => {
+                      const items = p.purchaseTable || p.purchase_table || p.items || [];
+                      return items.length > 0;
+                    });
+                    if (posWithItems.length > 0) {
+                      poData = posWithItems.reduce((latest, current) => {
+                        const latestId = parseInt(latest.id || latest._id || 0);
+                        const currentId = parseInt(current.id || current._id || 0);
+                        return currentId > latestId ? current : latest;
+                      });
+                    } else if (matchingPOs.length > 0) {
+                      poData = matchingPOs.reduce((latest, current) => {
+                        const latestId = parseInt(latest.id || latest._id || 0);
+                        const currentId = parseInt(current.id || current._id || 0);
+                        return currentId > latestId ? current : latest;
+                      });
+                    }
                   }
+                }
+
+                // Create a map of received items by composite key
+                const receivedMap = {};
+                receivedItems.forEach(item => {
+                  const itemId = item.item_id || item.itemId || null;
+                  const categoryId = item.category_id || item.categoryId || null;
+                  const modelId = item.model_id || item.modelId || null;
+                  const brandId = item.brand_id || item.brandId || null;
+                  const typeId = item.type_id || item.typeId || null;
+                  if (itemId !== null && itemId !== undefined) {
+                    const compositeKey = `${itemId || 'null'}-${categoryId || 'null'}-${modelId || 'null'}-${brandId || 'null'}-${typeId || 'null'}`;
+                    if (!receivedMap[compositeKey]) {
+                      receivedMap[compositeKey] = [];
+                    }
+                    receivedMap[compositeKey].push(item);
+                  }
+                });
+
+                // Get items to display: from PO if available, otherwise from received items
+                const itemsToDisplay = [];
+                if (poData && (poData.purchaseTable || poData.purchase_table || poData.items)) {
+                  const poItems = poData.purchaseTable || poData.purchase_table || poData.items || [];
+                  poItems.forEach((poItem, index) => {
+                    const itemId = poItem.item_id || poItem.itemId || null;
+                    const categoryId = poItem.category_id || poItem.categoryId || null;
+                    const modelId = poItem.model_id || poItem.modelId || null;
+                    const brandId = poItem.brand_id || poItem.brandId || null;
+                    const typeId = poItem.type_id || poItem.typeId || null;
+                    const compositeKey = `${itemId || 'null'}-${categoryId || 'null'}-${modelId || 'null'}-${brandId || 'null'}-${typeId || 'null'}`;
+                    const receivedItemsList = receivedMap[compositeKey] || [];
+                    
+                    // Get received quantity
+                    let receivedQty = 0;
+                    if (receivedItemsList.length > 0) {
+                      receivedQty = receivedItemsList.reduce((sum, item) => sum + Math.abs(item.quantity || 0), 0);
+                    }
+
+                    // Get PO quantity
+                    const poQuantity = Math.abs(poItem.quantity || 0);
+
+                    // Use received item if available
+                    if (receivedItemsList.length > 0) {
+                      receivedItemsList.forEach(item => {
+                        itemsToDisplay.push({
+                          ...item,
+                          poQuantity: poQuantity // Store PO quantity for comparison
+                        });
+                      });
+                    } else if (activeStatus === 'live') {
+                      // Create item display from PO with 0 quantity only in Live tab
+                      itemsToDisplay.push({
+                        ...poItem,
+                        quantity: 0,
+                        amount: 0,
+                        poQuantity: poQuantity, // Store PO quantity
+                        poItem: true // Mark as PO item without receipt
+                      });
+                    }
+                  });
+                } else {
+                  // No PO data, use received items as fallback
+                  itemsToDisplay.push(...receivedItems);
+                }
+
+                const hashString = (str) => {
+                  let hash = 0;
+                  for (let i = 0; i < str.length; i++) {
+                    const char = str.charCodeAt(i);
+                    hash = ((hash << 5) - hash) + char;
+                    hash = hash & hash; // Convert to 32-bit integer
+                  }
+                  return Math.abs(hash);
                 };
 
-                return inventoryItems.map((item, index) => {
+                const getCategoryColor = (category) => {
+                  if (!category) return 'bg-[#E3F2FD] text-[#1976D2]';
+                  
+                  // Define a palette of color combinations
+                  const colorPalette = [
+                    'bg-[#E3F2FD] text-[#1976D2]', // Light blue
+                    'bg-[#E8F5E9] text-[#2E7D32]', // Light green
+                    'bg-[#FFF3E0] text-[#F57C00]', // Light orange
+                    'bg-[#F3E5F5] text-[#7B1FA2]', // Light purple
+                    'bg-[#FCE4EC] text-[#C2185B]', // Light pink
+                    'bg-[#E0F2F1] text-[#00695C]', // Light teal
+                    'bg-[#FFF9C4] text-[#F57F17]', // Light yellow
+                    'bg-[#E1BEE7] text-[#6A1B9A]', // Light lavender
+                    'bg-[#FFE0B2] text-[#E65100]', // Light deep orange
+                    'bg-[#BBDEFB] text-[#0D47A1]', // Light indigo
+                    'bg-[#C8E6C9] text-[#1B5E20]', // Light dark green
+                    'bg-[#FFCCBC] text-[#BF360C]', // Light deep orange red
+                  ];
+                  
+                  // Hash the category name to get a consistent index
+                  const hash = hashString(category.toLowerCase());
+                  const colorIndex = hash % colorPalette.length;
+                  
+                  return colorPalette[colorIndex];
+                };
+
+                return itemsToDisplay.map((item, index) => {
                   const itemId = item.item_id || item.itemId || null;
                   const brandId = item.brand_id || item.brandId || null;
                   const modelId = item.model_id || item.modelId || null;
@@ -934,9 +1154,10 @@ const IncomingTracker = ({ user }) => {
                   const quantity = Math.abs(item.quantity || 0);
                   const amount = Math.abs(item.amount || 0);
                   const unit = item.unit || '';
+                  const poQuantity = item.poQuantity || 0;
 
-                  // Format details: model, brand, type
-                  const details = [model, brand, type].filter(Boolean).join(', ');
+                  // Check if quantity matches PO quantity (different if they don't match)
+                  const isQuantityDifferent = quantity !== poQuantity;
 
                   return (
                     <div key={index} className="bg-white border border-[#E0E0E0] rounded-[8px] p-3">
@@ -960,7 +1181,7 @@ const IncomingTracker = ({ user }) => {
                         </div>
                         <div className="flex items-center justify-between">
 
-                          <p className="text-[12px] font-medium text-[#BF9853]">
+                          <p className={`text-[12px] font-medium ${isQuantityDifferent ? 'text-[#FF6B6B]' : 'text-[#BF9853]'}`}>
                             Quantity {quantity}{unit}
                           </p>
                           <p className="text-[14px] font-semibold text-black">
@@ -1072,7 +1293,14 @@ const IncomingTracker = ({ user }) => {
                       <div className="flex justify-between items-start">
                         {/* Left Side */}
                         <div className="flex-1 pr-2">
-                          <div className="flex items-center gap-1 mb-1">
+                          <div
+                            className="flex items-center gap-1 mb-1 cursor-pointer hover:opacity-80"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedRecord(record);
+                              setShowDetailView(true);
+                            }}
+                          >
                             <span className="text-[12px] font-semibold text-black">
                               #{record.purchaseNo || record.entryNumber}
                             </span>
@@ -1291,6 +1519,267 @@ const IncomingTracker = ({ user }) => {
           >
             Close PO
           </button>
+        </div>
+      )}
+
+      {/* Filter Modal */}
+      {showFilterModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end justify-center"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowFilterModal(false);
+              setShowVendorDropdown(false);
+              setShowLocationDropdown(false);
+              setShowPODropdown(false);
+            }
+          }}
+        >
+          <div
+            className="bg-white w-full max-w-[360px] rounded-t-3xl shadow-lg"
+            style={{ maxHeight: '60vh' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-200">
+              <h2 className="text-[16px] font-semibold text-black">Select Filters</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowFilterModal(false);
+                  setShowVendorDropdown(false);
+                  setShowLocationDropdown(false);
+                  setShowPODropdown(false);
+                }}
+                className="text-red-500 hover:text-red-700"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="px-4 py-4 space-y-4 h-[250px] overflow-visible">
+              {/* Vendor Name */}
+              <div className="relative">
+                <label className="block text-[14px] font-medium text-gray-700 mb-2">Vendor Name</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Select"
+                    value={filterVendorName}
+                    onChange={(e) => {
+                      setFilterVendorName(e.target.value);
+                      setShowVendorDropdown(true);
+                    }}
+                    onFocus={() => setShowVendorDropdown(true)}
+                    className="w-full h-[40px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400"
+                    style={{
+                      paddingRight: filterVendorName ? '60px' : '40px'
+                    }}
+                  />
+                  {filterVendorName && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFilterVendorName('');
+                        setShowVendorDropdown(false);
+                      }}
+                      className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                      style={{ right: '24px' }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowVendorDropdown(!showVendorDropdown)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M4 6L8 10L12 6" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                  {showVendorDropdown && (
+                    <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                      {vendorData.map((vendor) => (
+                        <div
+                          key={vendor.id || vendor._id}
+                          className="px-3 py-2 text-[14px] text-gray-700 hover:bg-gray-100 cursor-pointer"
+                          onClick={() => {
+                            setFilterVendorName(vendor.vendorName || vendor.name || '');
+                            setShowVendorDropdown(false);
+                          }}
+                        >
+                          {vendor.vendorName || vendor.name || ''}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Stocking Location */}
+              <div className="relative flex items-center gap-2">
+                <div>
+                  <label className="text-[14px] font-medium text-gray-700 mb-2">Stocking Location</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Select"
+                      value={filterStockingLocation}
+                      onChange={(e) => {
+                        setFilterStockingLocation(e.target.value);
+                        setShowLocationDropdown(true);
+                      }}
+                      onFocus={() => setShowLocationDropdown(true)}
+                      className="w-full h-[40px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400"
+                      style={{
+                        paddingRight: filterStockingLocation ? '60px' : '40px'
+                      }}
+                    />
+                    {filterStockingLocation && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFilterStockingLocation('');
+                          setShowLocationDropdown(false);
+                        }}
+                        className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                        style={{ right: '24px' }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowLocationDropdown(!showLocationDropdown)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M4 6L8 10L12 6" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                    {showLocationDropdown && (
+                      <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                        {siteData.map((site) => (
+                          <div
+                            key={site.id || site._id}
+                            className="px-3 py-2 text-[14px] text-gray-700 hover:bg-gray-100 cursor-pointer"
+                            onClick={() => {
+                              setFilterStockingLocation(site.siteName || site.name || '');
+                              setShowLocationDropdown(false);
+                            }}
+                          >
+                            {site.siteName || site.name || ''}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {/* PO. No */}
+                <div className="relative">
+                  <label className="block text-[14px] font-medium text-gray-700 mb-2">PO. No</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Enter"
+                      value={filterPONo}
+                      onChange={(e) => {
+                        setFilterPONo(e.target.value);
+                        setShowPODropdown(true);
+                      }}
+                      onFocus={() => setShowPODropdown(true)}
+                      className="w-full max-w-[120px] h-[40px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400"
+                      style={{
+                        paddingRight: filterPONo ? '60px' : '40px'
+                      }}
+                    />
+                    {filterPONo && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFilterPONo('');
+                          setShowPODropdown(false);
+                        }}
+                        className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                        style={{ right: '24px' }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowPODropdown(!showPODropdown)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M4 6L8 10L12 6" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                    {showPODropdown && (
+                      <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-20 overflow-y-auto">
+                        {Array.from(new Set(incomingRecords.map(r => r.purchaseNo || r.entryNumber).filter(Boolean))).map((poNo) => (
+                          <div
+                            key={poNo}
+                            className="px-3 py-2 text-[14px] text-gray-700 hover:bg-gray-100 cursor-pointer"
+                            onClick={() => {
+                              setFilterPONo(String(poNo).replace('#', ''));
+                              setShowPODropdown(false);
+                            }}
+                          >
+                            {String(poNo).replace('#', '')}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 px-4 py-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterVendorName('');
+                  setFilterStockingLocation('');
+                  setFilterPONo('');
+                  setShowFilterModal(false);
+                  setShowVendorDropdown(false);
+                  setShowLocationDropdown(false);
+                  setShowPODropdown(false);
+                }}
+                className="px-6 py-2 border border-black rounded-lg text-[14px] font-medium text-black bg-white hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowFilterModal(false);
+                  setShowVendorDropdown(false);
+                  setShowLocationDropdown(false);
+                  setShowPODropdown(false);
+                }}
+                className="px-6 py-2 bg-black text-white rounded-lg text-[14px] font-medium hover:bg-gray-800"
+              >
+                Save
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

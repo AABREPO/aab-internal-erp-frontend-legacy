@@ -633,7 +633,7 @@ const ProjectUsageReport = () => {
   return (
     <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden">
       {/* Date Row */}
-      <div className="flex-shrink-0 px-4 pt-2 pb-1 border-b border-gray-100">
+      <div className="flex-shrink-0 px-4 pt-1 pb-1.5 border-b border-gray-100">
         <button
           type="button"
           onClick={() => setShowDatePicker(true)}

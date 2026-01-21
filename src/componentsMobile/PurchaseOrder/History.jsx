@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import SearchableDropdown from './SearchableDropdown';
 import DateRangePickerModal from './DateRangePickerModal';
@@ -7,7 +7,17 @@ import Edit from '../Images/edit1.png'
 import Delete from '../Images/delete.png'
 const History = () => {
   const [purchaseOrders, setPurchaseOrders] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  // Cache for fast "get by id" lookups during clone (prevents repeated network calls)
+  const quickFetchCacheRef = useRef(new Map());
+  // Initialize searchQuery from localStorage if available
+  const [searchQuery, setSearchQuery] = useState(() => {
+    try {
+      const saved = localStorage.getItem('purchaseOrderHistorySearchQuery');
+      return saved || '';
+    } catch (error) {
+      return '';
+    }
+  });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [poToDelete, setPoToDelete] = useState(null);
   const [expandedPoId, setExpandedPoId] = useState(null);
@@ -16,14 +26,25 @@ const History = () => {
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showBranchModal, setShowBranchModal] = useState(false);
-  const [filters, setFilters] = useState({
-    vendorName: '',
-    clientName: '',
-    siteIncharge: '',
-    startDate: '',
-    endDate: '',
-    poNumber: '',
-    branch: ''
+  // Initialize filters from localStorage if available
+  const [filters, setFilters] = useState(() => {
+    try {
+      const saved = localStorage.getItem('purchaseOrderHistoryFilters');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (error) {
+      console.error('Error loading filters from localStorage:', error);
+    }
+    return {
+      vendorName: '',
+      clientName: '',
+      siteIncharge: '',
+      startDate: '',
+      endDate: '',
+      poNumber: '',
+      branch: ''
+    };
   });
 
   // Swipe detection state - track per card
@@ -36,6 +57,7 @@ const History = () => {
   const expandedPoIdRef = useRef(expandedPoId);
   const cloneExpandedPoIdRef = useRef(cloneExpandedPoId);
   const isFirstCardClosedRef = useRef(isFirstCardClosed);
+  const isInitialMount = useRef(true);
   
   // Keep refs in sync with state
   useEffect(() => {
@@ -55,6 +77,31 @@ const History = () => {
   const [allProjects, setAllProjects] = useState([]);
   const [allEmployees, setAllEmployees] = useState([]);
   const [allSupportStaff, setAllSupportStaff] = useState([]);
+
+  // Mark initial mount as complete after first render
+  useEffect(() => {
+    isInitialMount.current = false;
+  }, []);
+
+  // Save filters to localStorage whenever they change (skip initial mount)
+  useEffect(() => {
+    if (isInitialMount.current) return;
+    try {
+      localStorage.setItem('purchaseOrderHistoryFilters', JSON.stringify(filters));
+    } catch (error) {
+      console.error('Error saving filters to localStorage:', error);
+    }
+  }, [filters]);
+
+  // Save searchQuery to localStorage whenever it changes (skip initial mount)
+  useEffect(() => {
+    if (isInitialMount.current) return;
+    try {
+      localStorage.setItem('purchaseOrderHistorySearchQuery', searchQuery);
+    } catch (error) {
+      console.error('Error saving searchQuery to localStorage:', error);
+    }
+  }, [searchQuery]);
 
   // Fetch all vendors, projects, employees, and support staff from APIs
   useEffect(() => {
@@ -131,11 +178,38 @@ const History = () => {
   };
 
   // Load purchase orders from API
-  const loadPurchaseOrders = async () => {
+  const loadPurchaseOrders = useCallback(async (skipCache = false) => {
+    // Don't load if vendors/projects aren't ready yet
+    if (allVendors.length === 0 && allProjects.length === 0) {
+      return;
+    }
+    
+    // Check if any filters are active
+    const hasActiveFilters = searchQuery || filters.vendorName || filters.clientName || filters.siteIncharge || filters.startDate || filters.endDate || filters.poNumber || filters.branch;
+    
+    // If filters are active and we have cached data, load from cache first for instant display
+    if (!skipCache && hasActiveFilters) {
+      try {
+        const cachedData = localStorage.getItem('purchaseOrdersHistoryCache');
+        if (cachedData) {
+          const cachedPOs = JSON.parse(cachedData);
+          if (cachedPOs.length > 0) {
+            // Sort cached data
+            const sorted = cachedPOs.sort((a, b) => {
+              const idA = parseInt(a.id) || 0;
+              const idB = parseInt(b.id) || 0;
+              return idB - idA;
+            });
+            setPurchaseOrders(sorted);
+            // Continue to fetch fresh data in background (don't return early)
+          }
+        }
+      } catch (error) {
+        console.error('Error loading from cache:', error);
+      }
+    }
+    
     try {
-      // Check if any filters are active
-      const hasActiveFilters = searchQuery || filters.vendorName || filters.clientName || filters.siteIncharge || filters.startDate || filters.endDate || filters.poNumber || filters.branch;
-      
       // Use /get/latest for faster initial load (last 250 records)
       // Use /getAll only when filters are applied
       const apiUrl = hasActiveFilters 
@@ -158,7 +232,7 @@ const History = () => {
         .map((po) => {
         // Fetch vendor name if we have vendor_id
         let vendorName = '';
-        if (po.vendor_id) {
+        if (po.vendor_id && allVendors.length > 0) {
           const vendorMatch = allVendors.find(v => v.id === po.vendor_id);
           vendorName = vendorMatch?.vendorName || '';
         }
@@ -166,7 +240,7 @@ const History = () => {
         // Fetch project/site name if we have client_id
         let projectName = '';
         let projectBranch = '';
-        if (po.client_id) {
+        if (po.client_id && allProjects.length > 0) {
           const projectMatch = allProjects.find(p => p.id === po.client_id);
           projectName = projectMatch?.siteName || projectMatch?.projectName || '';
           projectBranch = projectMatch?.branch || '';
@@ -177,11 +251,15 @@ const History = () => {
         if (po.site_incharge_id) {
           const inchargeType = po.site_incharge_type || po.siteInchargeType;
           if (inchargeType === 'support staff' || inchargeType === 'support_staff') {
-            const supportStaffMatch = allSupportStaff.find(s => s.id === po.site_incharge_id);
-            projectIncharge = supportStaffMatch?.support_staff_name || supportStaffMatch?.supportStaffName || '';
+            if (allSupportStaff.length > 0) {
+              const supportStaffMatch = allSupportStaff.find(s => s.id === po.site_incharge_id);
+              projectIncharge = supportStaffMatch?.support_staff_name || supportStaffMatch?.supportStaffName || '';
+            }
           } else {
-            const inchargeMatch = allEmployees.find(e => e.id === po.site_incharge_id);
-            projectIncharge = inchargeMatch?.employeeName || inchargeMatch?.name || inchargeMatch?.fullName || inchargeMatch?.employee_name || '';
+            if (allEmployees.length > 0) {
+              const inchargeMatch = allEmployees.find(e => e.id === po.site_incharge_id);
+              projectIncharge = inchargeMatch?.employeeName || inchargeMatch?.name || inchargeMatch?.fullName || inchargeMatch?.employee_name || '';
+            }
           }
         }
 
@@ -258,28 +336,39 @@ const History = () => {
         return idB - idA; // Descending order (highest ID first)
       });
       setPurchaseOrders(sorted);
+      
+      // Cache the transformed data for fast loading next time
+      try {
+        localStorage.setItem('purchaseOrdersHistoryCache', JSON.stringify(sorted));
+      } catch (error) {
+        console.error('Error caching purchase orders:', error);
+      }
     } catch (error) {
       console.error('Error loading purchase orders:', error);
-      // Fallback to localStorage if API fails
-      try {
-        const savedPOs = localStorage.getItem('purchaseOrders');
-        if (savedPOs) {
-          const parsed = JSON.parse(savedPOs);
-          const sorted = parsed.sort((a, b) => {
-            const idA = parseInt(a.id) || 0;
-            const idB = parseInt(b.id) || 0;
-            return idB - idA; // Descending order (highest ID first)
-          });
-          setPurchaseOrders(sorted);
+      // Fallback to localStorage cache if API fails
+      if (!hasActiveFilters) {
+        try {
+          const cachedData = localStorage.getItem('purchaseOrdersHistoryCache');
+          if (cachedData) {
+            const cachedPOs = JSON.parse(cachedData);
+            const sorted = cachedPOs.sort((a, b) => {
+              const idA = parseInt(a.id) || 0;
+              const idB = parseInt(b.id) || 0;
+              return idB - idA;
+            });
+            setPurchaseOrders(sorted);
+          }
+        } catch (localError) {
+          console.error('Error loading from cache:', localError);
         }
-      } catch (localError) {
-        console.error('Error loading from localStorage:', localError);
       }
     }
-  };
+  }, [allVendors, allProjects, allEmployees, allSupportStaff, searchQuery, filters]);
 
   useEffect(() => {
-    loadPurchaseOrders();
+    if (allVendors.length > 0 || allProjects.length > 0) {
+      loadPurchaseOrders();
+    }
     // Also listen for custom event when PO is updated
     const handlePOUpdate = () => {
       loadPurchaseOrders();
@@ -297,21 +386,597 @@ const History = () => {
         clearInterval(interval);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allVendors.length, allProjects.length, allEmployees.length, searchQuery, filters]);
-  const handleEdit = (po) => {
+  }, [allVendors, allProjects, allEmployees, allSupportStaff, searchQuery, filters, loadPurchaseOrders]);
+  const handleEdit = async (po) => {
+    // Fetch the specific PO quickly (ensures purchaseTable/items are present immediately)
+    let payload = po;
+    try {
+      const apiPo = await fetchPurchaseOrderById(po?.id);
+      if (apiPo) {
+        payload = {
+          ...po,
+          vendor_id: apiPo.vendor_id ?? po.vendor_id,
+          client_id: apiPo.client_id ?? po.client_id,
+          site_incharge_id: apiPo.site_incharge_id ?? po.site_incharge_id,
+          site_incharge_type: apiPo.site_incharge_type ?? po.site_incharge_type,
+          site_incharge_mobile_number: apiPo.site_incharge_mobile_number ?? po.site_incharge_mobile_number,
+          items: (apiPo.purchaseTable || []).map((row) => ({
+            name: row.itemName || `${row.item_id || ''}`,
+            itemName: row.itemName || '',
+            item_id: row.item_id,
+            itemId: row.item_id,
+            category_id: row.category_id,
+            categoryId: row.category_id,
+            model_id: row.model_id,
+            modelId: row.model_id,
+            brand_id: row.brand_id,
+            brandId: row.brand_id,
+            type_id: row.type_id,
+            typeId: row.type_id,
+            brand: row.brandName || '',
+            brandName: row.brandName || '',
+            model: row.modelName || '',
+            modelName: row.modelName || '',
+            type: row.typeName || '',
+            typeName: row.typeName || '',
+            quantity: row.quantity || 0,
+            price: row.price || (row.amount / (row.quantity || 1)) || 0,
+            amount: row.amount || 0,
+          })),
+        };
+      }
+
+      // Enrich edit payload using fast get/{id} APIs (same strategy as Clone)
+      const vendorId = payload.vendor_id || payload.vendorId || null;
+      const clientId = payload.client_id || payload.clientId || null;
+      const inchargeId = payload.site_incharge_id || payload.siteInchargeId || null;
+      const inchargeType = payload.site_incharge_type || payload.siteInchargeType || null;
+
+      const [vendorObj, projectObj, inchargeObj] = await Promise.all([
+        vendorId
+          ? quickFetchJson(`https://backendaab.in/aabuilderDash/api/vendor_Names/get/${vendorId}`)
+          : Promise.resolve(null),
+        clientId
+          ? quickFetchJson(`https://backendaab.in/aabuilderDash/api/project_Names/get/${clientId}`)
+          : Promise.resolve(null),
+        inchargeId && (!inchargeType || inchargeType === 'employee')
+          ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/employee_details/get/${inchargeId}`)
+          : Promise.resolve(null),
+      ]);
+
+      if (vendorObj) {
+        payload.vendorName =
+          vendorObj.vendorName || vendorObj.name || vendorObj.vendor_name || payload.vendorName || '';
+      }
+      if (projectObj) {
+        payload.projectName =
+          projectObj.siteName || projectObj.projectName || projectObj.name || payload.projectName || '';
+      }
+      if (inchargeObj) {
+        const resolvedName =
+          inchargeObj.employeeName ||
+          inchargeObj.name ||
+          inchargeObj.fullName ||
+          inchargeObj.employee_name ||
+          '';
+        if (resolvedName) payload.projectIncharge = resolvedName;
+        const resolvedMobile =
+          inchargeObj.employee_mobile_number ||
+          inchargeObj.mobileNumber ||
+          inchargeObj.mobile_number ||
+          inchargeObj.contact ||
+          '';
+        if (resolvedMobile) payload.contact = payload.contact || resolvedMobile;
+        payload.site_incharge_type = 'employee';
+      }
+
+      if (Array.isArray(payload.items) && payload.items.length > 0) {
+        payload.items = await Promise.all(
+          payload.items.map(async (item) => {
+            const next = { ...item };
+            const itemId = next.item_id || next.itemId || null;
+            const modelId = next.model_id || next.modelId || null;
+            const brandId = next.brand_id || next.brandId || null;
+            const typeId = next.type_id || next.typeId || null;
+            const categoryId = next.category_id || next.categoryId || null;
+
+            const [itemObj, modelObj, brandObj, typeObj, categoryObj] = await Promise.all([
+              itemId
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_itemNames/get/${itemId}`)
+                : Promise.resolve(null),
+              modelId
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_model/get/${modelId}`)
+                : Promise.resolve(null),
+              brandId
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_brand/get/${brandId}`)
+                : Promise.resolve(null),
+              typeId
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_type/get/${typeId}`)
+                : Promise.resolve(null),
+              categoryId
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_category/get/${categoryId}`)
+                : Promise.resolve(null),
+            ]);
+
+            if (itemObj) {
+              const resolved =
+                itemObj.itemName || itemObj.poItemName || itemObj.name || itemObj.item_name || '';
+              if (resolved) {
+                next.itemName = next.itemName || resolved;
+                next.name = next.name || resolved;
+              }
+              next.item_id = itemId;
+            }
+            if (modelObj) {
+              const resolved = modelObj.model || modelObj.poModel || modelObj.modelName || modelObj.name || '';
+              if (resolved) {
+                next.model = next.model || resolved;
+                next.modelName = next.modelName || resolved;
+              }
+              next.model_id = modelId;
+            }
+            if (brandObj) {
+              const resolved = brandObj.brand || brandObj.poBrand || brandObj.brandName || brandObj.name || '';
+              if (resolved) {
+                next.brand = next.brand || resolved;
+                next.brandName = next.brandName || resolved;
+              }
+              next.brand_id = brandId;
+            }
+            if (typeObj) {
+              const resolved =
+                typeObj.typeColor || typeObj.type || typeObj.typeName || typeObj.name || '';
+              if (resolved) {
+                next.type = next.type || resolved;
+                next.typeName = next.typeName || resolved;
+                next.typeColor = next.typeColor || resolved;
+              }
+              next.type_id = typeId;
+            }
+            if (categoryObj) {
+              const resolved = categoryObj.category || categoryObj.categoryName || categoryObj.name || '';
+              if (resolved) {
+                next.category = next.category || resolved;
+                next.categoryName = next.categoryName || resolved;
+              }
+              next.category_id = categoryId;
+            }
+            return next;
+          })
+        );
+      }
+    } catch (e) {
+      // best-effort
+    }
     // Store PO data in localStorage to load in create tab
-    localStorage.setItem('editingPO', JSON.stringify(po));
-    // Switch to create tab (this will be handled by parent component)
-    // For now, just store the data - parent component can check for it
-    window.dispatchEvent(new CustomEvent('editPO', { detail: po }));
+    localStorage.setItem('editingPO', JSON.stringify(payload));
+    // Switch to create tab immediately
+    localStorage.setItem('activeTab', 'create');
+    window.dispatchEvent(new CustomEvent('editPO', { detail: payload }));
   };
-  const handleClone = (po) => {
+
+  const handleView = async (po) => {
+    // View-only mode (Download button) with fast PO-by-id fetch
+    let payload = po;
+    try {
+      const apiPo = await fetchPurchaseOrderById(po?.id);
+      if (apiPo) {
+        payload = {
+          ...po,
+          vendor_id: apiPo.vendor_id ?? po.vendor_id,
+          client_id: apiPo.client_id ?? po.client_id,
+          site_incharge_id: apiPo.site_incharge_id ?? po.site_incharge_id,
+          site_incharge_type: apiPo.site_incharge_type ?? po.site_incharge_type,
+          site_incharge_mobile_number: apiPo.site_incharge_mobile_number ?? po.site_incharge_mobile_number,
+          items: (apiPo.purchaseTable || []).map((row) => ({
+            name: row.itemName || `${row.item_id || ''}`,
+            itemName: row.itemName || '',
+            item_id: row.item_id,
+            itemId: row.item_id,
+            category_id: row.category_id,
+            categoryId: row.category_id,
+            model_id: row.model_id,
+            modelId: row.model_id,
+            brand_id: row.brand_id,
+            brandId: row.brand_id,
+            type_id: row.type_id,
+            typeId: row.type_id,
+            brand: row.brandName || '',
+            brandName: row.brandName || '',
+            model: row.modelName || '',
+            modelName: row.modelName || '',
+            type: row.typeName || '',
+            typeName: row.typeName || '',
+            quantity: row.quantity || 0,
+            price: row.price || (row.amount / (row.quantity || 1)) || 0,
+            amount: row.amount || 0,
+          })),
+        };
+      }
+
+      // Enrich view payload using fast get/{id} APIs (same strategy as Clone/Edit)
+      const vendorId = payload.vendor_id || payload.vendorId || null;
+      const clientId = payload.client_id || payload.clientId || null;
+      const inchargeId = payload.site_incharge_id || payload.siteInchargeId || null;
+      const inchargeType = payload.site_incharge_type || payload.siteInchargeType || null;
+
+      const [vendorObj, projectObj, inchargeObj] = await Promise.all([
+        vendorId
+          ? quickFetchJson(`https://backendaab.in/aabuilderDash/api/vendor_Names/get/${vendorId}`)
+          : Promise.resolve(null),
+        clientId
+          ? quickFetchJson(`https://backendaab.in/aabuilderDash/api/project_Names/get/${clientId}`)
+          : Promise.resolve(null),
+        inchargeId && (!inchargeType || inchargeType === 'employee')
+          ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/employee_details/get/${inchargeId}`)
+          : Promise.resolve(null),
+      ]);
+
+      if (vendorObj) {
+        payload.vendorName =
+          vendorObj.vendorName || vendorObj.name || vendorObj.vendor_name || payload.vendorName || '';
+      }
+      if (projectObj) {
+        payload.projectName =
+          projectObj.siteName || projectObj.projectName || projectObj.name || payload.projectName || '';
+      }
+      if (inchargeObj) {
+        const resolvedName =
+          inchargeObj.employeeName ||
+          inchargeObj.name ||
+          inchargeObj.fullName ||
+          inchargeObj.employee_name ||
+          '';
+        if (resolvedName) payload.projectIncharge = resolvedName;
+        const resolvedMobile =
+          inchargeObj.employee_mobile_number ||
+          inchargeObj.mobileNumber ||
+          inchargeObj.mobile_number ||
+          inchargeObj.contact ||
+          '';
+        if (resolvedMobile) payload.contact = payload.contact || resolvedMobile;
+        payload.site_incharge_type = 'employee';
+      }
+
+      if (Array.isArray(payload.items) && payload.items.length > 0) {
+        payload.items = await Promise.all(
+          payload.items.map(async (item) => {
+            const next = { ...item };
+            const itemId = next.item_id || next.itemId || null;
+            const modelId = next.model_id || next.modelId || null;
+            const brandId = next.brand_id || next.brandId || null;
+            const typeId = next.type_id || next.typeId || null;
+            const categoryId = next.category_id || next.categoryId || null;
+
+            const [itemObj, modelObj, brandObj, typeObj, categoryObj] = await Promise.all([
+              itemId
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_itemNames/get/${itemId}`)
+                : Promise.resolve(null),
+              modelId
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_model/get/${modelId}`)
+                : Promise.resolve(null),
+              brandId
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_brand/get/${brandId}`)
+                : Promise.resolve(null),
+              typeId
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_type/get/${typeId}`)
+                : Promise.resolve(null),
+              categoryId
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_category/get/${categoryId}`)
+                : Promise.resolve(null),
+            ]);
+
+            if (itemObj) {
+              const resolved =
+                itemObj.itemName || itemObj.poItemName || itemObj.name || itemObj.item_name || '';
+              if (resolved) {
+                next.itemName = next.itemName || resolved;
+                next.name = next.name || resolved;
+              }
+              next.item_id = itemId;
+            }
+            if (modelObj) {
+              const resolved = modelObj.model || modelObj.poModel || modelObj.modelName || modelObj.name || '';
+              if (resolved) {
+                next.model = next.model || resolved;
+                next.modelName = next.modelName || resolved;
+              }
+              next.model_id = modelId;
+            }
+            if (brandObj) {
+              const resolved = brandObj.brand || brandObj.poBrand || brandObj.brandName || brandObj.name || '';
+              if (resolved) {
+                next.brand = next.brand || resolved;
+                next.brandName = next.brandName || resolved;
+              }
+              next.brand_id = brandId;
+            }
+            if (typeObj) {
+              const resolved =
+                typeObj.typeColor || typeObj.type || typeObj.typeName || typeObj.name || '';
+              if (resolved) {
+                next.type = next.type || resolved;
+                next.typeName = next.typeName || resolved;
+                next.typeColor = next.typeColor || resolved;
+              }
+              next.type_id = typeId;
+            }
+            if (categoryObj) {
+              const resolved = categoryObj.category || categoryObj.categoryName || categoryObj.name || '';
+              if (resolved) {
+                next.category = next.category || resolved;
+                next.categoryName = next.categoryName || resolved;
+              }
+              next.category_id = categoryId;
+            }
+            return next;
+          })
+        );
+      }
+    } catch (e) {
+      // best-effort
+    }
+    // Switch to create tab so details are visible
+    localStorage.setItem('activeTab', 'create');
+    window.dispatchEvent(new CustomEvent('viewPO', { detail: payload }));
+  };
+
+  const quickFetchJson = useCallback(async (url) => {
+    if (!url) return null;
+    const cache = quickFetchCacheRef.current;
+    if (cache.has(url)) return cache.get(url);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        cache.set(url, null);
+        return null;
+      }
+      const data = await res.json();
+      cache.set(url, data);
+      return data;
+    } catch (e) {
+      cache.set(url, null);
+      return null;
+    }
+  }, []);
+
+  const fetchPurchaseOrderById = useCallback(
+    async (poId) => {
+      if (!poId) return null;
+      return await quickFetchJson(`https://backendaab.in/aabuildersDash/api/purchase_orders/get/${poId}`);
+    },
+    [quickFetchJson]
+  );
+
+  const handleClone = async (po) => {
+    // Fetch the specific PO quickly (ensures purchaseTable/items are present immediately)
+    let sourcePO = { ...po };
+    try {
+      const apiPo = await fetchPurchaseOrderById(po?.id);
+      if (apiPo) {
+        sourcePO = {
+          ...sourcePO,
+          vendor_id: apiPo.vendor_id ?? sourcePO.vendor_id,
+          client_id: apiPo.client_id ?? sourcePO.client_id,
+          site_incharge_id: apiPo.site_incharge_id ?? sourcePO.site_incharge_id,
+          site_incharge_type: apiPo.site_incharge_type ?? sourcePO.site_incharge_type,
+          site_incharge_mobile_number:
+            apiPo.site_incharge_mobile_number ?? sourcePO.site_incharge_mobile_number,
+          // Rebuild items from purchaseTable so Create tab always receives item rows
+          items: (apiPo.purchaseTable || []).map((row) => ({
+            name: row.itemName || `${row.item_id || ''}`,
+            itemName: row.itemName || '',
+            item_id: row.item_id,
+            itemId: row.item_id,
+            category_id: row.category_id,
+            categoryId: row.category_id,
+            model_id: row.model_id,
+            modelId: row.model_id,
+            brand_id: row.brand_id,
+            brandId: row.brand_id,
+            type_id: row.type_id,
+            typeId: row.type_id,
+            brand: row.brandName || '',
+            brandName: row.brandName || '',
+            model: row.modelName || '',
+            modelName: row.modelName || '',
+            type: row.typeName || '',
+            typeName: row.typeName || '',
+            quantity: row.quantity || 0,
+            price: row.price || (row.amount / (row.quantity || 1)) || 0,
+            amount: row.amount || 0,
+          })),
+        };
+      }
+    } catch (e) {
+      // best-effort
+    }
+
     // Clone PO data - remove ID to create new record
-    const clonedPO = { ...po };
+    const clonedPO = { ...sourcePO };
     delete clonedPO.id;
     // Mark as clone so Create PO component knows to show "Generate PO" instead of "Update PO"
     clonedPO.isClone = true;
+
+    // Prefetch specific entities by ID so Create tab can render immediately (avoid slow getAll lists)
+    try {
+      const vendorId = clonedPO.vendor_id || clonedPO.vendorId || null;
+      const clientId = clonedPO.client_id || clonedPO.clientId || null;
+      const inchargeId = clonedPO.site_incharge_id || clonedPO.siteInchargeId || null;
+      const inchargeType = clonedPO.site_incharge_type || clonedPO.siteInchargeType || null;
+
+      const [vendorObj, projectObj, inchargeObj] = await Promise.all([
+        vendorId
+          ? quickFetchJson(`https://backendaab.in/aabuilderDash/api/vendor_Names/get/${vendorId}`)
+          : Promise.resolve(null),
+        clientId
+          ? quickFetchJson(`https://backendaab.in/aabuilderDash/api/project_Names/get/${clientId}`)
+          : Promise.resolve(null),
+        // Fast fetch for employee incharge (if it's an employee); support-staff stays best-effort via existing list
+        inchargeId && (!inchargeType || inchargeType === 'employee')
+          ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/employee_details/get/${inchargeId}`)
+          : Promise.resolve(null),
+      ]);
+
+      if (vendorObj) {
+        clonedPO.vendorName =
+          vendorObj.vendorName || vendorObj.name || vendorObj.vendor_name || clonedPO.vendorName || '';
+        // Keep id explicitly for Create page to use without waiting for dropdown options
+        clonedPO.vendor_id = vendorId;
+        
+        // Prefetch next PO number for this vendor in background (non-blocking)
+        // Don't await - let it fetch in background while page opens
+        fetch('https://backendaab.in/aabuildersDash/api/purchase_orders/getAll')
+          .then(response => {
+            if (response.ok) {
+              return response.json();
+            }
+            return null;
+          })
+          .then(data => {
+            if (data) {
+              const normalizedVendorId = String(vendorId);
+              const vendorOrders = data.filter(order => String(order.vendor_id ?? order.vendorId) === normalizedVendorId);
+              const getNumericEno = (order) => {
+                const eno = order.eno || order.ENO || order.poNumber || order.po_number || '';
+                if (typeof eno === 'number') return eno;
+                const str = String(eno);
+                const match = str.match(/\d+/);
+                return match ? parseInt(match[0], 10) : 0;
+              };
+              const latestEno = vendorOrders.reduce((maxValue, order) => {
+                const currentEno = getNumericEno(order);
+                return currentEno > maxValue ? currentEno : maxValue;
+              }, 0);
+              const nextPoNo = latestEno + 1;
+              // Dispatch updated PO number to Create PO page if it's still open
+              const updatedPO = { ...clonedPO, prefetchedPoNumber: `#${nextPoNo}` };
+              window.dispatchEvent(new CustomEvent('poNumberPrefetched', { detail: { vendorId, poNumber: `#${nextPoNo}` } }));
+            }
+          })
+          .catch(e => {
+            // Best-effort: if PO number fetch fails, let Create PO page generate it
+          });
+      }
+
+      if (projectObj) {
+        clonedPO.projectName =
+          projectObj.siteName || projectObj.projectName || projectObj.name || clonedPO.projectName || '';
+        clonedPO.client_id = clientId;
+      }
+
+      if (inchargeObj) {
+        const resolvedName =
+          inchargeObj.employeeName ||
+          inchargeObj.name ||
+          inchargeObj.fullName ||
+          inchargeObj.employee_name ||
+          '';
+        if (resolvedName) {
+          clonedPO.projectIncharge = resolvedName;
+        }
+        // Also try to set contact quickly (if present)
+        const resolvedMobile =
+          inchargeObj.employee_mobile_number ||
+          inchargeObj.mobileNumber ||
+          inchargeObj.mobile_number ||
+          inchargeObj.contact ||
+          '';
+        if (resolvedMobile) {
+          clonedPO.contact = clonedPO.contact || resolvedMobile;
+        }
+        clonedPO.site_incharge_id = inchargeId;
+        clonedPO.site_incharge_type = 'employee';
+      }
+
+      // Enrich items (item/model/brand/type/category) by their IDs
+      if (Array.isArray(clonedPO.items) && clonedPO.items.length > 0) {
+        clonedPO.items = await Promise.all(
+          clonedPO.items.map(async (item) => {
+            const next = { ...item };
+
+            const itemId = next.item_id || next.itemId || null;
+            const modelId = next.model_id || next.modelId || null;
+            const brandId = next.brand_id || next.brandId || null;
+            const typeId = next.type_id || next.typeId || null;
+            const categoryId = next.category_id || next.categoryId || null;
+
+            const [itemObj, modelObj, brandObj, typeObj, categoryObj] = await Promise.all([
+              itemId
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_itemNames/get/${itemId}`)
+                : Promise.resolve(null),
+              modelId
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_model/get/${modelId}`)
+                : Promise.resolve(null),
+              brandId
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_brand/get/${brandId}`)
+                : Promise.resolve(null),
+              typeId
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_type/get/${typeId}`)
+                : Promise.resolve(null),
+              categoryId
+                ? quickFetchJson(`https://backendaab.in/aabuildersDash/api/po_category/get/${categoryId}`)
+                : Promise.resolve(null),
+            ]);
+
+            if (itemObj) {
+              const resolved =
+                itemObj.itemName || itemObj.poItemName || itemObj.name || itemObj.item_name || '';
+              // PurchaseOrder.jsx checks item.name || item.itemName
+              if (resolved) {
+                next.itemName = next.itemName || resolved;
+                next.name = next.name || resolved;
+              }
+              next.item_id = itemId;
+            }
+
+            if (modelObj) {
+              const resolved = modelObj.model || modelObj.poModel || modelObj.modelName || modelObj.name || '';
+              if (resolved) {
+                next.model = next.model || resolved;
+                next.modelName = next.modelName || resolved;
+              }
+              next.model_id = modelId;
+            }
+
+            if (brandObj) {
+              const resolved = brandObj.brand || brandObj.poBrand || brandObj.brandName || brandObj.name || '';
+              if (resolved) {
+                next.brand = next.brand || resolved;
+                next.brandName = next.brandName || resolved;
+              }
+              next.brand_id = brandId;
+            }
+
+            if (typeObj) {
+              const resolved =
+                typeObj.typeColor || typeObj.type || typeObj.typeName || typeObj.name || '';
+              if (resolved) {
+                next.type = next.type || resolved;
+                next.typeName = next.typeName || resolved;
+                next.typeColor = next.typeColor || resolved;
+              }
+              next.type_id = typeId;
+            }
+
+            if (categoryObj) {
+              const resolved = categoryObj.category || categoryObj.categoryName || categoryObj.name || '';
+              if (resolved) {
+                next.category = next.category || resolved;
+                next.categoryName = next.categoryName || resolved;
+              }
+              next.category_id = categoryId;
+            }
+
+            return next;
+          })
+        );
+      }
+    } catch (e) {
+      // Best-effort: if fast lookups fail, still proceed with raw cloned data
+      console.error('Clone quick-prefetch failed:', e);
+    }
+
     // Store cloned PO data in localStorage to load in create tab
     localStorage.setItem('editingPO', JSON.stringify(clonedPO));
     // Switch to create tab immediately
@@ -377,6 +1042,13 @@ const History = () => {
       poNumber: '',
       branch: ''
     });
+    // Clear localStorage
+    try {
+      localStorage.removeItem('purchaseOrderHistoryFilters');
+      localStorage.removeItem('purchaseOrderHistorySearchQuery');
+    } catch (error) {
+      console.error('Error clearing filters from localStorage:', error);
+    }
   };
   const filteredPOs = purchaseOrders.filter(po => {
     // Search query filter
@@ -539,14 +1211,20 @@ const History = () => {
   const minSwipeDistance = 50;
   const handleTouchStart = (e, poId) => {
     const touch = e.touches[0];
-    // Prevent text selection during swipe
-    e.preventDefault();
+    const isFirstCard = filteredPOs.length > 0 && filteredPOs[0].id === poId;
+    const wasExpanded = isFirstCard ? (!isFirstCardClosed || expandedPoId === poId) : expandedPoId === poId;
+    const wasCloneExpanded = cloneExpandedPoId === poId;
+    // Don't prevent default here - wait to see if it's a horizontal swipe
     setSwipeStates(prev => ({
       ...prev,
       [poId]: {
         startX: touch.clientX,
+        startY: touch.clientY,
         currentX: touch.clientX,
-        isSwiping: false
+        currentY: touch.clientY,
+        isSwiping: false,
+        wasExpanded: wasExpanded,
+        wasCloneExpanded: wasCloneExpanded
       }
     }));
   };
@@ -555,6 +1233,22 @@ const History = () => {
     const state = swipeStates[poId];
     if (!state) return;
     const deltaX = touch.clientX - state.startX;
+    const deltaY = touch.clientY - state.startY;
+    const absDeltaX = Math.abs(deltaX);
+    const absDeltaY = Math.abs(deltaY);
+    
+    // Only handle horizontal swipe if horizontal movement is greater than vertical
+    // This allows vertical scrolling to work normally
+    if (absDeltaX <= absDeltaY) {
+      // Vertical scroll - don't interfere, clear swipe state
+      setSwipeStates(prev => {
+        const newState = { ...prev };
+        delete newState[poId];
+        return newState;
+      });
+      return;
+    }
+    
     const isFirstCard = filteredPOs.length > 0 && filteredPOs[0].id === poId;
     const isExpanded = isFirstCard ? (!isFirstCardClosed || expandedPoId === poId) : expandedPoId === poId;
     const isCloneExpanded = cloneExpandedPoId === poId;
@@ -576,7 +1270,10 @@ const History = () => {
         [poId]: {
           ...prev[poId],
           currentX: touch.clientX,
-          isSwiping: true
+          currentY: touch.clientY,
+          isSwiping: true,
+          wasExpanded: prev[poId].wasExpanded,
+          wasCloneExpanded: prev[poId].wasCloneExpanded
         }
       }));
     }
@@ -588,25 +1285,34 @@ const History = () => {
     const absDeltaX = Math.abs(deltaX);
     const isFirstCard = filteredPOs.length > 0 && filteredPOs[0].id === poId;
     const isExpanded = isFirstCard ? (!isFirstCardClosed || expandedPoId === poId) : expandedPoId === poId;
+    const wasCloneExpanded = state.wasCloneExpanded || false;
+    const wasExpanded = state.wasExpanded || false;
+    
     if (absDeltaX >= minSwipeDistance) {
       if (deltaX < 0) {
-        // Swiped left (reveal buttons on right) - close clone button first
-        setCloneExpandedPoId(null);
-        if (isFirstCard) {
-          setIsFirstCardClosed(false);
+        // Swiped left
+        if (wasCloneExpanded) {
+          // If clone was expanded, only close clone button - don't show edit/delete buttons
+          setCloneExpandedPoId(null);
+        } else {
+          // If clone was NOT expanded, reveal edit/delete buttons on right
+          setCloneExpandedPoId(null);
+          if (isFirstCard) {
+            setIsFirstCardClosed(false);
+          }
+          setExpandedPoId(poId);
         }
-        setExpandedPoId(poId);
       } else {
         // Swiped right
-        if (isExpanded) {
-          // If Edit/Delete buttons are visible, just hide them (don't show Clone)
+        if (wasExpanded) {
+          // If Edit/Delete buttons were visible, just hide them (don't show Clone)
           setExpandedPoId(null);
           if (isFirstCard) {
             setIsFirstCardClosed(true);
           }
           setCloneExpandedPoId(null);
         } else {
-          // If Edit/Delete buttons are NOT visible, show Clone button
+          // If Edit/Delete buttons were NOT visible, show Clone button
           setCloneExpandedPoId(poId);
         }
       }
@@ -657,7 +1363,9 @@ const History = () => {
             newState[po.id] = {
               ...state,
               currentX: e.clientX,
-              isSwiping: true
+              isSwiping: true,
+              wasExpanded: state.wasExpanded,
+              wasCloneExpanded: state.wasCloneExpanded
             };
             hasChanges = true;
           }
@@ -680,25 +1388,33 @@ const History = () => {
           const isExpanded = isFirstCard 
             ? (!currentIsFirstCardClosed || currentExpandedPoId === po.id) 
             : currentExpandedPoId === po.id;
+          const wasCloneExpanded = state.wasCloneExpanded || false;
+          const wasExpanded = state.wasExpanded || false;          
           if (absDeltaX >= minSwipeDistance) {
             if (deltaX < 0) {
-              // Swiped left (reveal buttons on right) - close clone button first
-              setCloneExpandedPoId(null);
-              if (isFirstCard) {
-                setIsFirstCardClosed(false);
+              // Swiped left
+              if (wasCloneExpanded) {
+                // If clone was expanded, only close clone button - don't show edit/delete buttons
+                setCloneExpandedPoId(null);
+              } else {
+                // If clone was NOT expanded, reveal edit/delete buttons on right
+                setCloneExpandedPoId(null);
+                if (isFirstCard) {
+                  setIsFirstCardClosed(false);
+                }
+                setExpandedPoId(po.id);
               }
-              setExpandedPoId(po.id);
             } else {
               // Swiped right
-              if (isExpanded) {
-                // If Edit/Delete buttons are visible, just hide them (don't show Clone)
+              if (wasExpanded) {
+                // If Edit/Delete buttons were visible, just hide them (don't show Clone)
                 setExpandedPoId(null);
                 if (isFirstCard) {
                   setIsFirstCardClosed(true);
                 }
                 setCloneExpandedPoId(null);
               } else {
-                // If Edit/Delete buttons are NOT visible, show Clone button
+                // If Edit/Delete buttons were NOT visible, show Clone button
                 setCloneExpandedPoId(po.id);
               }
             }
@@ -724,14 +1440,26 @@ const History = () => {
       if (!element) return;
       const touchStartHandler = (e) => {
         const touch = e.touches[0];
-        // Prevent text selection during swipe
-        e.preventDefault();
+        const isFirstCard = filteredPOs.length > 0 && filteredPOs[0].id === po.id;
+        // Use refs to get current values
+        const currentIsFirstCardClosed = isFirstCardClosedRef.current;
+        const currentExpandedPoId = expandedPoIdRef.current;
+        const currentCloneExpandedPoId = cloneExpandedPoIdRef.current;
+        const wasExpanded = isFirstCard 
+          ? (!currentIsFirstCardClosed || currentExpandedPoId === po.id) 
+          : currentExpandedPoId === po.id;
+        const wasCloneExpanded = currentCloneExpandedPoId === po.id;
+        // Don't prevent default here - wait to see if it's a horizontal swipe
         setSwipeStates(prev => ({
           ...prev,
           [po.id]: {
             startX: touch.clientX,
+            startY: touch.clientY,
             currentX: touch.clientX,
-            isSwiping: false
+            currentY: touch.clientY,
+            isSwiping: false,
+            wasExpanded: wasExpanded,
+            wasCloneExpanded: wasCloneExpanded
           }
         }));
       };
@@ -741,6 +1469,19 @@ const History = () => {
           const state = prev[po.id];
           if (!state) return prev;
           const deltaX = touch.clientX - state.startX;
+          const deltaY = touch.clientY - state.startY;
+          const absDeltaX = Math.abs(deltaX);
+          const absDeltaY = Math.abs(deltaY);
+          
+          // Only handle horizontal swipe if horizontal movement is greater than vertical
+          // This allows vertical scrolling to work normally
+          if (absDeltaX <= absDeltaY) {
+            // Vertical scroll - don't interfere, clear swipe state
+            const newState = { ...prev };
+            delete newState[po.id];
+            return newState;
+          }
+          
           const isFirstCard = filteredPOs.length > 0 && filteredPOs[0].id === po.id;
           // Use refs to get current values
           const currentIsFirstCardClosed = isFirstCardClosedRef.current;
@@ -768,7 +1509,10 @@ const History = () => {
               [po.id]: {
                 ...prev[po.id],
                 currentX: touch.clientX,
-                isSwiping: true
+                currentY: touch.clientY,
+                isSwiping: true,
+                wasExpanded: prev[po.id].wasExpanded,
+                wasCloneExpanded: prev[po.id].wasCloneExpanded
               }
             };
           }
@@ -787,25 +1531,34 @@ const History = () => {
           const isExpanded = isFirstCard 
             ? (!currentIsFirstCardClosed || currentExpandedPoId === po.id) 
             : currentExpandedPoId === po.id;
+          const wasCloneExpanded = state.wasCloneExpanded || false;
+          const wasExpanded = state.wasExpanded || false;
+          
           if (absDeltaX >= minSwipeDistance) {
             if (deltaX < 0) {
-              // Swiped left (reveal buttons on right) - close clone button first
-              setCloneExpandedPoId(null);
-              if (isFirstCard) {
-                setIsFirstCardClosed(false);
+              // Swiped left
+              if (wasCloneExpanded) {
+                // If clone was expanded, only close clone button - don't show edit/delete buttons
+                setCloneExpandedPoId(null);
+              } else {
+                // If clone was NOT expanded, reveal edit/delete buttons on right
+                setCloneExpandedPoId(null);
+                if (isFirstCard) {
+                  setIsFirstCardClosed(false);
+                }
+                setExpandedPoId(po.id);
               }
-              setExpandedPoId(po.id);
             } else {
               // Swiped right
-              if (isExpanded) {
-                // If Edit/Delete buttons are visible, just hide them (don't show Clone)
+              if (wasExpanded) {
+                // If Edit/Delete buttons were visible, just hide them (don't show Clone)
                 setExpandedPoId(null);
                 if (isFirstCard) {
                   setIsFirstCardClosed(true);
                 }
                 setCloneExpandedPoId(null);
               } else {
-                // If Edit/Delete buttons are NOT visible, show Clone button
+                // If Edit/Delete buttons were NOT visible, show Clone button
                 setCloneExpandedPoId(po.id);
               }
             }
@@ -822,12 +1575,23 @@ const History = () => {
       const mouseDownHandler = (e) => {
         // Prevent text selection during swipe
         e.preventDefault();
+        const isFirstCard = filteredPOs.length > 0 && filteredPOs[0].id === po.id;
+        // Use refs to get current values
+        const currentIsFirstCardClosed = isFirstCardClosedRef.current;
+        const currentExpandedPoId = expandedPoIdRef.current;
+        const currentCloneExpandedPoId = cloneExpandedPoIdRef.current;
+        const wasExpanded = isFirstCard 
+          ? (!currentIsFirstCardClosed || currentExpandedPoId === po.id) 
+          : currentExpandedPoId === po.id;
+        const wasCloneExpanded = currentCloneExpandedPoId === po.id;
         setSwipeStates(prev => ({
           ...prev,
           [po.id]: {
             startX: e.clientX,
             currentX: e.clientX,
-            isSwiping: false
+            isSwiping: false,
+            wasExpanded: wasExpanded,
+            wasCloneExpanded: wasCloneExpanded
           }
         }));
       };
@@ -1172,7 +1936,10 @@ const History = () => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              window.dispatchEvent(new CustomEvent('viewPO', { detail: po }));
+                              // Open in view-only mode (Download button)
+                              handleView(po);
+                              setExpandedPoId(null);
+                              setCloneExpandedPoId(null);
                             }}
                             className="text-[12px] font-semibold text-black leading-snug cursor-pointer hover:text-blue-600 hover:underline text-left"
                           >
@@ -1234,7 +2001,10 @@ const History = () => {
                     className="absolute right-0 top-0 flex gap-2 flex-shrink-0 z-0"
                     style={{
                       opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
-                      transition: 'opacity 0.2s ease-out',
+                      transform: swipeOffset < 0 
+                        ? `translateX(${Math.max(0, 110 + swipeOffset)}px)` 
+                        : 'translateX(110px)',
+                        transition: 'opacity 0.2s ease-out',
                       pointerEvents: isExpanded ? 'auto' : 'none'
                     }}
                   >

@@ -93,6 +93,17 @@ const RentDatabase = ({ username, userRoles = [] }) => {
     const [editTenantOptions, setEditTenantOptions] = useState([]);
     const [editShopNoOptions, setEditShopNoOptions] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [paymentModalData, setPaymentModalData] = useState({
+        date: '',
+        amount: '',
+        paymentMode: '',
+        chequeNo: '',
+        chequeDate: '',
+        transactionNumber: '',
+        accountNumber: ""
+    });
+    const [accountDetails, setAccountDetails] = useState([]);
     const [rentFormData, setRentFormData] = useState({
         formType: '',
         shopNo: '',
@@ -271,6 +282,20 @@ const RentDatabase = ({ username, userRoles = [] }) => {
             console.log('Error fetching tile area names.');
         }
     };
+    useEffect(() => {
+        const fetchAccountDetails = async () => {
+            try {
+                const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/getAll');
+                if (response.ok) {
+                    const data = await response.json();
+                    setAccountDetails(data);
+                }
+            } catch (error) {
+                console.error('Error fetching account details:', error);
+            }
+        };
+        fetchAccountDetails();
+    }, []);
     const handleMouseDown = (e) => {
         isDragging.current = true;
         start.current = { x: e.clientX, y: e.clientY };
@@ -730,6 +755,23 @@ const RentDatabase = ({ username, userRoles = [] }) => {
     };
     const handleSubmit = async (e) => {
         e.preventDefault();
+        // Check if payment mode requires bank details
+        if (["GPay", "PhonePe", "Net Banking", "Cheque","Gpay"].includes(rentFormData.paymentMode)) {
+            // Show payment modal if not already shown
+            if (!showPaymentModal) {
+                setPaymentModalData({
+                    date: rentFormData.paidOnDate || new Date().toISOString().split('T')[0],
+                    amount: rentFormData.amount || "",
+                    paymentMode: rentFormData.paymentMode,
+                    chequeNo: "",
+                    chequeDate: "",
+                    transactionNumber: "",
+                    accountNumber: ""
+                });
+                setShowPaymentModal(true);
+            }
+            return;
+        }
         if (rentFormData.shopNoId && rentFormData.tenantNameId) {
             if (!isShopLinkedToTenant(rentFormData.shopNoId, rentFormData.tenantNameId)) {
                 alert('Cannot save: Selected shop is not linked to selected tenant in tenant link data');
@@ -758,6 +800,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
             attachedFile,
             editedBy: username,
         };
+        setIsSubmitting(true);
         try {
             const response = await fetch(`https://backendaab.in/aabuildersDash/api/rental_forms/update/${editId}`, {
                 method: 'PUT',
@@ -776,6 +819,145 @@ const RentDatabase = ({ username, userRoles = [] }) => {
         } catch (error) {
             console.error('Error updating rent form:', error);
             alert('Something went wrong. Please try again.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+    const handlePaymentSubmit = async () => {
+        if (!paymentModalData.accountNumber && paymentModalData.paymentMode !== "Cash") {
+            alert("Please select account number.");
+            return;
+        }
+        if (paymentModalData.paymentMode === "Cheque" && (!paymentModalData.chequeNo || !paymentModalData.chequeDate)) {
+            alert("Please enter cheque number and date.");
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            // Validate that shopNoId is linked to tenantNameId
+            if (rentFormData.shopNoId && rentFormData.tenantNameId) {
+                if (!isShopLinkedToTenant(rentFormData.shopNoId, rentFormData.tenantNameId)) {
+                    alert('Cannot save: Selected shop is not linked to selected tenant in tenant link data');
+                    setIsSubmitting(false);
+                    return;
+                }
+            }
+
+            const {
+                formType, shopNoId, tenantNameId, amount,
+                refundAmount, paidOnDate, forTheMonthOf, attachedFile
+            } = rentFormData;
+
+            // Use date in YYYY-MM-DD format (paymentModalData.date is already in this format from date input)
+            // If not available, use paidOnDate which should also be in YYYY-MM-DD format from date input
+            const dateForWeeklyBills = paymentModalData.date || paidOnDate;
+            
+            // Convert date from YYYY-MM-DD to DD-MM-YYYY format for rental form update
+            const formattedPaidOnDate = paymentModalData.date ? convertYYYYMMDDToDDMMYYYY(paymentModalData.date) : convertYYYYMMDDToDDMMYYYY(paidOnDate);
+
+            // Get shopNo and tenantName from IDs
+            const shopNo = shopNoId && shopNoIdToShopNoMap[shopNoId] ? shopNoIdToShopNoMap[shopNoId] : '';
+            const tenantName = tenantNameId && tenantNameIdToTenantNameMap[tenantNameId] ? tenantNameIdToTenantNameMap[tenantNameId] : '';
+
+            // Find the project ID and projectReferenceName from shopNoId
+            let projectId = null;
+            let projectReferenceName = null;
+            projects.forEach(project => {
+                if (project.propertyDetails) {
+                    const propertyDetailsArray = Array.isArray(project.propertyDetails)
+                        ? project.propertyDetails
+                        : Array.from(project.propertyDetails || []);
+                    const property = propertyDetailsArray.find(p => p.id === shopNoId);
+                    if (property) {
+                        projectId = project.id;
+                        projectReferenceName = project.projectReferenceName || null;
+                    }
+                }
+            });
+
+            const payload = {
+                formType,
+                shopNo: shopNo,
+                shopNoId: shopNoId,
+                tenantName: tenantName,
+                tenantNameId: tenantNameId,
+                amount: paymentModalData.amount || amount,
+                refundAmount,
+                paymentMode: paymentModalData.paymentMode,
+                paidOnDate: formattedPaidOnDate,
+                forTheMonthOf,
+                attachedFile,
+                editedBy: username,
+            };
+
+            // Update rental form first
+            const updateResponse = await fetch(`https://backendaab.in/aabuildersDash/api/rental_forms/update/${editId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            if (!updateResponse.ok) {
+                const errorMsg = await updateResponse.text();
+                throw new Error(`Failed to update rental form: ${errorMsg}`);
+            }
+
+            // Get the updated rental form ID
+            let rentalFormId = editId;
+
+            // Submit to weekly-payment-bills API
+            // Ensure dates are in YYYY-MM-DD format (they're already in this format from date inputs)
+            const chequeDateFormatted = paymentModalData.chequeDate || null;
+            
+            const weeklyPaymentBillPayload = {
+                date: dateForWeeklyBills,
+                created_at: new Date().toISOString(),
+                contractor_id: null,
+                vendor_id: null,
+                employee_id: null,
+                project_id: projectId,
+                type: "Rent Payment",
+                bill_payment_mode: paymentModalData.paymentMode,
+                amount: parseFloat(paymentModalData.amount || amount),
+                status: true,
+                weekly_number: "",
+                rent_management_id: rentalFormId,
+                advance_portal_id: null,
+                staff_advance_portal_id: null,
+                claim_payment_id: null,
+                expenses_entry_id: null,
+                cheque_number: paymentModalData.chequeNo || null,
+                cheque_date: chequeDateFormatted || null,
+                transaction_number: paymentModalData.transactionNumber || null,
+                account_number: paymentModalData.accountNumber || null,
+                tenant_id: tenantNameId || null,
+                tenant_complex_name: projectReferenceName || null
+            };
+
+            const weeklyResponse = await fetch('https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(weeklyPaymentBillPayload)
+            });
+
+            if (!weeklyResponse.ok) {
+                const errorText = await weeklyResponse.text();
+                throw new Error(`Weekly payment bills submission failed: ${errorText}`);
+            }
+
+            alert('Rent form updated successfully and added to Weekly Payment Bills!');
+            setShowPaymentModal(false);
+            handleCancel();
+            window.location.reload();
+        } catch (error) {
+            console.error('Error submitting payment:', error);
+            alert(`Failed to save: ${error.message}`);
+        } finally {
+            setIsSubmitting(false);
         }
     };
     const resetFilters = () => {
@@ -1717,9 +1899,26 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                                         <Select
                                             name="paymentMode"
                                             value={paymentModeOptions.find(option => option.value === rentFormData.paymentMode)}
-                                            onChange={(selectedOption) =>
-                                                setRentFormData({ ...rentFormData, paymentMode: selectedOption?.value || '' })
-                                            }
+                                            onChange={(selectedOption) => {
+                                                const newPaymentMode = selectedOption?.value || '';
+                                                setRentFormData({ ...rentFormData, paymentMode: newPaymentMode });
+                                                // Check if payment mode requires bank details
+                                                if (["GPay", "PhonePe", "Net Banking", "Cheque","Gpay"].includes(newPaymentMode)) {
+                                                    setPaymentModalData({
+                                                        date: rentFormData.paidOnDate || new Date().toISOString().split('T')[0],
+                                                        amount: rentFormData.amount || "",
+                                                        paymentMode: newPaymentMode,
+                                                        chequeNo: "",
+                                                        chequeDate: "",
+                                                        transactionNumber: "",
+                                                        accountNumber: ""
+                                                    });
+                                                    setShowPaymentModal(true);
+                                                } else {
+                                                    // Close modal if switching to a mode that doesn't require bank details
+                                                    setShowPaymentModal(false);
+                                                }
+                                            }}
                                             options={paymentModeOptions}
                                             placeholder="--- Select PaymentMode ---"
                                             styles={{
@@ -1764,6 +1963,116 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                                 </form>
                             </div>
                         </Modal>
+                        {showPaymentModal && (
+                            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                                <div className="bg-white text-left rounded-xl p-6 w-[800px] h-[600px] overflow-y-auto flex flex-col">
+                                    <h3 className="text-lg font-semibold mb-4 text-center">Payment Details</h3>
+                                    <div className="flex-1 overflow-hidden">
+                                        <div className="space-y-4 mb-4">
+                                            <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
+                                                <div className="grid grid-cols-3 gap-4">
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                                                        <input
+                                                            type="date"
+                                                            value={paymentModalData.date}
+                                                            onChange={(e) => setPaymentModalData(prev => ({ ...prev, date: e.target.value }))}
+                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                                                        <input
+                                                            type="number"
+                                                            value={paymentModalData.amount}
+                                                            onChange={(e) => setPaymentModalData(prev => ({ ...prev, amount: e.target.value }))}
+                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>
+                                                        <input
+                                                            type="text"
+                                                            value={paymentModalData.paymentMode}
+                                                            readOnly
+                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {(paymentModalData.paymentMode === "Gpay" || paymentModalData.paymentMode === "PhonePe" || paymentModalData.paymentMode === "GPay" ||
+                                                paymentModalData.paymentMode === "Net Banking" || paymentModalData.paymentMode === "Cheque") && (
+                                                    <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
+                                                        <div className="space-y-4">
+                                                            {paymentModalData.paymentMode === "Cheque" && (
+                                                                <div className="grid grid-cols-2 gap-4">
+                                                                    <div>
+                                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No<span className="text-red-500">*</span></label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={paymentModalData.chequeNo}
+                                                                            onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeNo: e.target.value }))}
+                                                                            placeholder="Enter cheque number"
+                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date<span className="text-red-500">*</span></label>
+                                                                        <input
+                                                                            type="date"
+                                                                            value={paymentModalData.chequeDate}
+                                                                            onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeDate: e.target.value }))}
+                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            <div className="grid grid-cols-2 gap-4">
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={paymentModalData.transactionNumber}
+                                                                        onChange={(e) => setPaymentModalData(prev => ({ ...prev, transactionNumber: e.target.value }))}
+                                                                        placeholder="Enter transaction number (optional)"
+                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Account Number<span className="text-red-500">*</span></label>
+                                                                    <select
+                                                                        value={paymentModalData.accountNumber}
+                                                                        onChange={(e) => setPaymentModalData(prev => ({ ...prev, accountNumber: e.target.value }))}
+                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                                    >
+                                                                        <option value="">Select Account</option>
+                                                                        {accountDetails.map((account) => (
+                                                                            <option key={account.id} value={account.account_number}>
+                                                                                {account.account_number}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-end gap-3 mt-6 p-4 bg-white">
+                                        <button onClick={() => setShowPaymentModal(false)} className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg">
+                                            Cancel
+                                        </button>
+                                        <button onClick={handlePaymentSubmit} disabled={isSubmitting} className="px-4 py-2 bg-[#BF9853] text-white rounded-lg disabled:bg-gray-400">
+                                            {isSubmitting ? 'Saving...' : 'Submit'}
+                                        </button>
+                                    </div>
+                                    <button onClick={() => setShowPaymentModal(false)} className="absolute top-3 right-4 text-xl font-bold text-gray-500 hover:text-black">
+                                        ×
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                         <AuditModal show={showModal} onClose={() => setShowModal(false)} audits={audits} />
                     </div>
                 </div>

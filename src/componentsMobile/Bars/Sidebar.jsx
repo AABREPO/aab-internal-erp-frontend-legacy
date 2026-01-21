@@ -158,7 +158,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
       
       {/* Sidebar */}
       <div 
-        className="fixed h-full w-[280px] bg-white z-[60] shadow-lg overflow-y-auto"
+        className="fixed h-full w-[280px] bg-white z-[60] shadow-lg overflow-y-auto left-0 top-0"
         style={{ fontFamily: "'Manrope', sans-serif" }}
         onClick={(e) => e.stopPropagation()}
       >

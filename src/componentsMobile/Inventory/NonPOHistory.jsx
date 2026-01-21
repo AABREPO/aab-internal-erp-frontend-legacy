@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
 
 const NonPOHistory = () => {
   const [nonPORecords, setNonPORecords] = useState([]);
@@ -7,6 +8,21 @@ const NonPOHistory = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [vendorData, setVendorData] = useState([]);
   const [siteData, setSiteData] = useState([]);
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
+  const [filterData, setFilterData] = useState({
+    projectName: '',
+    stockingLocation: '',
+    date: '',
+    entryNo: '',
+    category: ''
+  });
+  const [projectNameOpen, setProjectNameOpen] = useState(false);
+  const [stockingLocationOpen, setStockingLocationOpen] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [categoryOptions, setCategoryOptions] = useState([]);
+  const [categoryOptionsStrings, setCategoryOptionsStrings] = useState([]);
+  const [projectNameSearch, setProjectNameSearch] = useState('');
+  const [stockingLocationSearch, setStockingLocationSearch] = useState('');
 
   // Fetch vendor data
   useEffect(() => {
@@ -44,6 +60,36 @@ const NonPOHistory = () => {
       }
     };
     fetchSites();
+  }, []);
+
+  // Fetch category options from API
+  useEffect(() => {
+    const fetchPoCategory = async () => {
+      try {
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
+        if (response.ok) {
+          const data = await response.json();
+          const options = (data || []).map(item => ({
+            value: item.category || '',
+            label: item.category || '',
+            id: item.id || null,
+          }));
+          setCategoryOptions(options);
+          // Also set string options for dropdown
+          const categoryStrings = options.map(item => item.label || item.value).filter(Boolean);
+          setCategoryOptionsStrings(categoryStrings);
+        } else {
+          console.log('Error fetching categories, using empty list.');
+          setCategoryOptions([]);
+          setCategoryOptionsStrings([]);
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+        setCategoryOptions([]);
+        setCategoryOptionsStrings([]);
+      }
+    };
+    fetchPoCategory();
   }, []);
 
   // Fetch and process non-PO incoming records
@@ -169,6 +215,90 @@ const NonPOHistory = () => {
     setFilteredRecords(filtered);
   }, [nonPORecords, searchQuery]);
 
+  // Close dropdowns when filter sheet closes
+  useEffect(() => {
+    if (!showFilterSheet) {
+      setProjectNameOpen(false);
+      setStockingLocationOpen(false);
+      setShowCategoryModal(false);
+      setProjectNameSearch('');
+      setStockingLocationSearch('');
+    }
+  }, [showFilterSheet]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!showFilterSheet) return;
+      
+      const target = event.target;
+      const isProjectNameDropdown = target.closest('[data-dropdown="projectName"]');
+      const isStockingLocationDropdown = target.closest('[data-dropdown="stockingLocation"]');
+      
+      if (projectNameOpen && !isProjectNameDropdown) {
+        setProjectNameOpen(false);
+      }
+      if (stockingLocationOpen && !isStockingLocationDropdown) {
+        setStockingLocationOpen(false);
+      }
+    };
+
+    if (showFilterSheet) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [projectNameOpen, stockingLocationOpen, showFilterSheet]);
+
+  // Handler for adding new category
+  const handleAddNewCategory = async (newCategory) => {
+    if (!newCategory || !newCategory.trim()) {
+      return;
+    }
+    try {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ category: newCategory.trim() }),
+      });
+      if (response.ok) {
+        console.log('Category saved successfully!');
+        // Reload categories from API
+        const fetchResponse = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
+        if (fetchResponse.ok) {
+          const data = await fetchResponse.json();
+          const options = (data || []).map(item => ({
+            value: item.category || '',
+            label: item.category || '',
+            id: item.id || null,
+          }));
+          setCategoryOptions(options);
+          const categoryStrings = options.map(item => item.label || item.value).filter(Boolean);
+          setCategoryOptionsStrings(categoryStrings);
+        }
+        if (!categoryOptionsStrings.includes(newCategory.trim())) {
+          setCategoryOptionsStrings([...categoryOptionsStrings, newCategory.trim()]);
+        }
+      } else {
+        console.log('Error saving category.');
+        // Still add to local options for immediate use
+        if (!categoryOptionsStrings.includes(newCategory.trim())) {
+          setCategoryOptionsStrings([...categoryOptionsStrings, newCategory.trim()]);
+        }
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      console.log('Error saving category.');
+      // Still add to local options for immediate use
+      if (!categoryOptionsStrings.includes(newCategory.trim())) {
+        setCategoryOptionsStrings([...categoryOptionsStrings, newCategory.trim()]);
+      }
+    }
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden bg-white">
       {/* Search Bar */}
@@ -195,6 +325,7 @@ const NonPOHistory = () => {
       {/* Filter Button */}
       <div className="flex-shrink-0 px-4 pb-3">
         <button
+          onClick={() => setShowFilterSheet(true)}
           type="button"
           className="flex items-center gap-2 text-[14px] font-medium text-gray-700"
         >
@@ -266,6 +397,259 @@ const NonPOHistory = () => {
           </div>
         )}
       </div>
+
+      {/* Filter Bottom Sheet */}
+      {showFilterSheet && (
+        <>
+          {/* Overlay */}
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 z-40"
+            onClick={() => setShowFilterSheet(false)}
+          />
+
+          {/* Bottom Sheet */}
+          <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-[360px] bg-white rounded-t-[20px] z-50 shadow-lg">
+            {/* Header */}
+            <div className="flex-shrink-0">
+              <div className='flex justify-end mr-4 mt-1'>
+                <button
+                    onClick={() => setShowFilterSheet(false)}
+                    className="text-red-500 hover:text-red-700 text-xl font-bold"
+                  >
+                    ✕
+                  </button>
+              </div>
+              <div className="flex justify-between items-center px-6">
+              <h2 className="text-lg font-semibold text-gray-800">
+                Select Filters
+              </h2>
+
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setShowCategoryModal(true)}
+                  className="text-[16px] font-semibold text-black underline decoration-solid"
+                  style={{ textUnderlinePosition: 'from-font' }}
+                >
+                  {filterData.category || 'Category'}
+                </button>
+              </div>
+              </div>
+            </div>
+            {/* Filter Form */}
+            <div className="px-6 py-4 space-y-5 overflow-y-hidden overflow-x-hidden flex-1" style={{ maxHeight: 'calc(80vh - 140px)' }}>
+              {/* Project Name */}
+              <div className="relative" data-dropdown="projectName">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Project Name
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Select Project"
+                    value={projectNameOpen ? projectNameSearch : (filterData.projectName ? siteData.find(s => s.id === filterData.projectName)?.siteName || '' : '')}
+                    onChange={(e) => {
+                      setProjectNameSearch(e.target.value);
+                      setProjectNameOpen(true);
+                      setStockingLocationOpen(false);
+                    }}
+                    onFocus={() => {
+                      setProjectNameOpen(true);
+                      setStockingLocationOpen(false);
+                      if (!projectNameOpen) {
+                        setProjectNameSearch('');
+                      }
+                    }}
+                    className="w-full h-[40px] px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:border-gray-400 bg-white pr-10"
+                  />
+                  <svg 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setProjectNameOpen(!projectNameOpen);
+                      if (!projectNameOpen) {
+                        setProjectNameSearch('');
+                      }
+                    }}
+                    className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 cursor-pointer transition-transform ${projectNameOpen ? 'rotate-180' : ''}`} 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                  {projectNameOpen && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-hidden">
+                      <div className="overflow-y-auto max-h-48">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFilterData({ ...filterData, projectName: '' });
+                            setProjectNameOpen(false);
+                            setProjectNameSearch('');
+                          }}
+                          className={`w-full h-[40px] px-4 py-2 text-left text-sm hover:bg-gray-100 ${!filterData.projectName ? 'bg-gray-100' : ''}`}
+                        >
+                          Select Project
+                        </button>
+                        {siteData
+                          .filter(site => 
+                            site.siteName?.toLowerCase().includes(projectNameSearch.toLowerCase())
+                          )
+                          .map((site) => (
+                            <button
+                              key={site.id}
+                              type="button"
+                              onClick={() => {
+                                setFilterData({ ...filterData, projectName: site.id });
+                                setProjectNameOpen(false);
+                                setProjectNameSearch('');
+                              }}
+                              className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${filterData.projectName === site.id ? 'bg-gray-100' : ''}`}
+                            >
+                              {site.siteName}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Stocking Location */}
+              <div className="relative" data-dropdown="stockingLocation">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Stocking Location
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="AA Stock Room A"
+                    value={stockingLocationOpen ? stockingLocationSearch : (filterData.stockingLocation ? siteData.find(s => s.id === filterData.stockingLocation)?.siteName || '' : '')}
+                    onChange={(e) => {
+                      setStockingLocationSearch(e.target.value);
+                      setStockingLocationOpen(true);
+                      setProjectNameOpen(false);
+                    }}
+                    onFocus={() => {
+                      setStockingLocationOpen(true);
+                      setProjectNameOpen(false);
+                      if (!stockingLocationOpen) {
+                        setStockingLocationSearch('');
+                      }
+                    }}
+                    className="w-full h-[40px] px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:border-gray-400 bg-white pr-10"
+                  />
+                  <svg 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setStockingLocationOpen(!stockingLocationOpen);
+                      if (!stockingLocationOpen) {
+                        setStockingLocationSearch('');
+                      }
+                    }}
+                    className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 cursor-pointer transition-transform ${stockingLocationOpen ? 'rotate-180' : ''}`} 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                  {stockingLocationOpen && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg overflow-hidden" style={{ maxHeight: '200px', bottom: 'auto', top: '100%' }}>
+                      <div className="overflow-y-auto" style={{ maxHeight: '100px' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFilterData({ ...filterData, stockingLocation: '' });
+                            setStockingLocationOpen(false);
+                            setStockingLocationSearch('');
+                          }}
+                          className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${!filterData.stockingLocation ? 'bg-gray-100' : ''}`}
+                        >
+                          AA Stock Room A
+                        </button>
+                        {siteData
+                          .filter(site => 
+                            site.siteName?.toLowerCase().includes(stockingLocationSearch.toLowerCase())
+                          )
+                          .map((site) => (
+                            <button
+                              key={site.id}
+                              type="button"
+                              onClick={() => {
+                                setFilterData({ ...filterData, stockingLocation: site.id });
+                                setStockingLocationOpen(false);
+                                setStockingLocationSearch('');
+                              }}
+                              className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${filterData.stockingLocation === site.id ? 'bg-gray-100' : ''}`}
+                            >
+                              {site.siteName}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Date and Entry No */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    value={filterData.date}
+                    onChange={(e) => setFilterData({ ...filterData, date: e.target.value })}
+                    className="w-full h-[40px] px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:border-gray-400 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Entry.No
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Enter"
+                    value={filterData.entryNo}
+                    onChange={(e) => setFilterData({ ...filterData, entryNo: e.target.value })}
+                    className="w-full h-[40px] px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:border-gray-400 bg-white"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex-shrink-0 flex gap-3 px-6 py-4 border-t border-gray-200">
+              <button
+                onClick={() => setShowFilterSheet(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => setShowFilterSheet(false)}
+                className="flex-1 px-4 py-2 bg-black text-white rounded-lg font-medium hover:bg-gray-900"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      <SelectVendorModal
+        isOpen={showCategoryModal}
+        onClose={() => setShowCategoryModal(false)}
+        onSelect={(value) => {
+          setFilterData({ ...filterData, category: value });
+          setShowCategoryModal(false);
+        }}
+        selectedValue={filterData.category}
+        options={categoryOptionsStrings}
+        fieldName="Category"
+        onAddNew={handleAddNewCategory}
+      />
     </div>
   );
 };

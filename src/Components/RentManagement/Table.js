@@ -52,6 +52,17 @@ const Table = () => {
         attachedFile: '',
     });
     const [paymentModeOptions, setPaymentModeOptions] = useState([]);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [paymentModalData, setPaymentModalData] = useState({
+        date: new Date().toISOString().split('T')[0],
+        amount: "",
+        paymentMode: "",
+        chequeNo: "",
+        chequeDate: "",
+        transactionNumber: "",
+        accountNumber: ""
+    });
+    const [accountDetails, setAccountDetails] = useState([]);
     useEffect(() => {
         const savedSelectedDate = sessionStorage.getItem('selectedDate');
         const savedShopNo = sessionStorage.getItem('shopNo')
@@ -120,13 +131,11 @@ const Table = () => {
     useEffect(() => {
         fetchProjects();
     }, []);
-    
     useEffect(() => {
         if (projects.length > 0) {
             fetchTenants();
         }
     }, [projects]);
-    
     // Fetch projects for allShops
     const fetchProjects = async () => {
         try {
@@ -145,10 +154,9 @@ const Table = () => {
                     .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
                     .forEach(project => {
                         // Convert Set to Array if needed
-                        const propertyDetailsArray = Array.isArray(project.propertyDetails) 
-                            ? project.propertyDetails 
+                        const propertyDetailsArray = Array.isArray(project.propertyDetails)
+                            ? project.propertyDetails
                             : Array.from(project.propertyDetails || []);
-                        
                         propertyDetailsArray.forEach(shop => {
                             if (shop.shopNo) {
                                 extractedShops.push({
@@ -173,7 +181,6 @@ const Table = () => {
             console.log('Error fetching projects.');
         }
     };
-    
     // Fetch tenant link data
     const fetchTenants = async () => {
         try {
@@ -181,7 +188,6 @@ const Table = () => {
             if (response.ok) {
                 const data = await response.json();
                 setTenantShopData(data);
-                
                 // Build mapping from shopNoId to shopNo from projects (project management)
                 const shopNoIdToShopNoMap = {};
                 projects
@@ -197,7 +203,6 @@ const Table = () => {
                             }
                         });
                     });
-
                 // Create ID-based options for edit popup
                 const shopMap = new Map();
                 data.flatMap(t => (t.shopNos || []).filter(shop => !shop.shopClosureDate))
@@ -207,14 +212,12 @@ const Table = () => {
                             shopMap.set(shop.shopNoId, shopNo);
                         }
                     });
-                
                 const editShopOptions = Array.from(shopMap.entries()).map(([shopNoId, shopNo]) => ({
                     label: shopNo,
                     value: shopNoId, // Use shopNoId as value
                     shopNo: shopNo
                 }));
                 setEditShopNoOptions(editShopOptions);
-                
                 // Create ID-based tenant options for edit popup from tenant link data
                 const editTenantOptions = data.flatMap(t =>
                     (t.shopNos || [])
@@ -244,7 +247,6 @@ const Table = () => {
             console.log('Error fetching tenant link data.');
         }
     };
-    
     // Build mapping from IDs to actual values
     useEffect(() => {
         // Build shopNoId -> shopNo mapping from projects (project management)
@@ -253,10 +255,10 @@ const Table = () => {
             .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
             .forEach(project => {
                 // Convert Set to Array if needed
-                const propertyDetailsArray = Array.isArray(project.propertyDetails) 
-                    ? project.propertyDetails 
+                const propertyDetailsArray = Array.isArray(project.propertyDetails)
+                    ? project.propertyDetails
                     : Array.from(project.propertyDetails || []);
-                
+
                 propertyDetailsArray.forEach(detail => {
                     if (detail.id && detail.shopNo) {
                         shopNoIdMap[detail.id] = detail.shopNo;
@@ -264,7 +266,6 @@ const Table = () => {
                 });
             });
         setShopNoIdToShopNoMap(shopNoIdMap);
-        
         // Build tenantNameId -> tenantName mapping from tenantLinkData
         const tenantNameIdMap = {};
         tenantShopData.forEach(tenant => {
@@ -278,26 +279,22 @@ const Table = () => {
         ? [...currentItems].sort((a, b) => {
             const valA = a[sortField];
             const valB = b[sortField];
-
             // Numeric comparison if both values are numbers
             if (!isNaN(valA) && !isNaN(valB)) {
                 return sortOrder === 'asc' ? valA - valB : valB - valA;
             }
-
             // Sort by "For the Month Of" as date
             if (sortField === 'forTheMonthOf') {
                 const dateA = new Date(valA + '-01');
                 const dateB = new Date(valB + '-01');
                 return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
             }
-
             // ✅ Sort by Paid On Date
             if (sortField === 'paidOnDate') {
                 const dateA = new Date(valA);
                 const dateB = new Date(valB);
                 return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
             }
-
             // Default string comparison
             const strA = valA?.toString().toLowerCase() || '';
             const strB = valB?.toString().toLowerCase() || '';
@@ -332,18 +329,14 @@ const Table = () => {
 
         const dx = e.clientX - start.current.x;
         const dy = e.clientY - start.current.y;
-
         const now = Date.now();
         const dt = now - lastMove.current.time || 16;
-
         velocity.current = {
             x: (e.clientX - lastMove.current.x) / dt,
             y: (e.clientY - lastMove.current.y) / dt,
         };
-
         scrollRef.current.scrollLeft = scroll.current.left - dx;
         scrollRef.current.scrollTop = scroll.current.top - dy;
-
         lastMove.current = {
             time: now,
             x: e.clientX,
@@ -461,15 +454,15 @@ const Table = () => {
             styles: {
                 fontSize: 10,
                 fontStyle: 'normal',
-                textColor: [100, 100, 100], 
+                textColor: [100, 100, 100],
                 lineColor: [100, 100, 100],
-                lineWidth: 0.1,   
+                lineWidth: 0.1,
             },
             headStyles: {
-                fontStyle: 'bold', 
-                fillColor: false, 
-                textColor: [0, 0, 0], 
-                lineColor: [0, 0, 0], 
+                fontStyle: 'bold',
+                fillColor: false,
+                textColor: [0, 0, 0],
+                lineColor: [0, 0, 0],
                 lineWidth: 0.1,
             },
         });
@@ -636,7 +629,7 @@ const Table = () => {
                 const sortedExpenses = response.data.sort((a, b) => {
                     const enoA = parseInt(a.id, 10);
                     const enoB = parseInt(b.id, 10);
-                    return enoB - enoA; 
+                    return enoB - enoA;
                 });
                 setRentForms(sortedExpenses);
                 setFilteredRentForm(sortedExpenses);
@@ -651,10 +644,10 @@ const Table = () => {
                 setTenantNameOption(uniqueTenantName);
                 setPaymentModeOption(uniquePaymentMode);
                 setFormTypeOptions(uniqueFormType);
-                uniqueForTheMonthOf.sort(); 
+                uniqueForTheMonthOf.sort();
                 const formattedMonths = uniqueForTheMonthOf.map(monthStr => {
                     const [year, month] = monthStr.split('-');
-                    const date = new Date(year, parseInt(month) - 1); 
+                    const date = new Date(year, parseInt(month) - 1);
                     return date.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
                 });
                 setMonthOptions(formattedMonths);
@@ -698,7 +691,7 @@ const Table = () => {
         setPaymentModeOption(getUnique('paymentMode'));
         setFormTypeOptions(getUnique('formType'));
         setEnoOption(getUnique('eno'));
-        const uniqueMonths = getUnique('forTheMonthOf').sort(); 
+        const uniqueMonths = getUnique('forTheMonthOf').sort();
         const formattedMonths = uniqueMonths.map(monthStr => {
             const [year, month] = monthStr.split('-');
             const date = new Date(year, parseInt(month) - 1);
@@ -706,7 +699,7 @@ const Table = () => {
         });
         setMonthOptions(formattedMonths);
     }, [shopNo, tenantName, paymentMode, formType, selectedRentMonth, selectedDate, rentForms, selectedENo]);
-    
+
     const formatDateOnly = (dateString) => {
         if (!dateString) return '';
         // If already in DD-MM-YYYY format, just replace - with /
@@ -728,7 +721,7 @@ const Table = () => {
         }
         return dateString;
     };
-    
+
     // Helper function to convert DD-MM-YYYY to YYYY-MM-DD for date input
     const convertDDMMYYYYToYYYYMMDD = (dateString) => {
         if (!dateString) return '';
@@ -772,17 +765,17 @@ const Table = () => {
         }
         return dateString;
     };
-    
+
     // Function to check if shopNoId is linked to tenantNameId in tenant link data
     const isShopLinkedToTenant = (shopNoId, tenantNameId) => {
         if (!shopNoId || !tenantNameId) return false;
-        return tenantShopData.some(tenant => 
-            tenant.id === tenantNameId && 
-            tenant.shopNos && 
+        return tenantShopData.some(tenant =>
+            tenant.id === tenantNameId &&
+            tenant.shopNos &&
             tenant.shopNos.some(shop => shop.shopNoId === shopNoId && !shop.shopClosureDate)
         );
     };
-    
+
     // Fetch payment modes
     useEffect(() => {
         const fetchPaymentModes = async () => {
@@ -802,14 +795,30 @@ const Table = () => {
         };
         fetchPaymentModes();
     }, []);
-    
+
+    // Fetch account details
+    useEffect(() => {
+        const fetchAccountDetails = async () => {
+            try {
+                const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/getAll');
+                if (response.ok) {
+                    const data = await response.json();
+                    setAccountDetails(data);
+                }
+            } catch (error) {
+                console.error('Error fetching account details:', error);
+            }
+        };
+        fetchAccountDetails();
+    }, []);
+
     const handleEditClick = (rent) => {
         // Prevent editing Shop Closure or Refund forms
         if (rent.formType === 'Shop Closure' || rent.formType === 'Refund') {
             alert('Cannot edit Shop Closure or Refund forms');
             return;
         }
-        
+
         // Check if shopNoId is linked to tenantNameId
         if (rent.shopNoId && rent.tenantNameId) {
             if (!isShopLinkedToTenant(rent.shopNoId, rent.tenantNameId)) {
@@ -817,7 +826,7 @@ const Table = () => {
                 return;
             }
         }
-        
+
         setEditId(rent.id);
         // Convert paidOnDate from DD-MM-YYYY to YYYY-MM-DD for date input
         const convertedRent = {
@@ -829,11 +838,11 @@ const Table = () => {
         setRentFormData(convertedRent);
         setModalIsOpen(true);
     };
-    
+
     const handleCancel = () => {
         setModalIsOpen(false);
     };
-    
+
     const handleChange = (e) => {
         const { name, type, value, files } = e.target;
         if (name === "paidOnDate" && value === "") {
@@ -844,10 +853,26 @@ const Table = () => {
             [name]: type === "file" ? files[0] : value
         });
     };
-    
+
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+        // Check if payment mode requires bank details
+        if (["GPay", "PhonePe", "Net Banking", "Cheque","Gpay"].includes(rentFormData.paymentMode)) {
+            // Show payment modal if not already shown
+            if (!showPaymentModal) {
+                setPaymentModalData({
+                    date: rentFormData.paidOnDate || new Date().toISOString().split('T')[0],
+                    amount: rentFormData.amount || "",
+                    paymentMode: rentFormData.paymentMode,
+                    chequeNo: "",
+                    chequeDate: "",
+                    transactionNumber: "",
+                    accountNumber: ""
+                });
+                setShowPaymentModal(true);
+            }
+            return;
+        }
         // Validate that shopNoId is linked to tenantNameId
         if (rentFormData.shopNoId && rentFormData.tenantNameId) {
             if (!isShopLinkedToTenant(rentFormData.shopNoId, rentFormData.tenantNameId)) {
@@ -855,20 +880,16 @@ const Table = () => {
                 return;
             }
         }
-        
         const {
             formType, shopNoId, tenantNameId, amount,
             refundAmount, paymentMode, paidOnDate,
             forTheMonthOf, attachedFile
         } = rentFormData;
-        
-        // Convert paidOnDate from YYYY-MM-DD to DD-MM-YYYY for backend
-        const formattedPaidOnDate = convertYYYYMMDDToDDMMYYYY(paidOnDate);
-        
+        // Backend expects YYYY-MM-DD format, paidOnDate is already in this format from date input
+        const formattedPaidOnDate = paidOnDate;
         // Get shopNo and tenantName from IDs
         const shopNo = shopNoId && shopNoIdToShopNoMap[shopNoId] ? shopNoIdToShopNoMap[shopNoId] : '';
         const tenantName = tenantNameId && tenantNameIdToTenantNameMap[tenantNameId] ? tenantNameIdToTenantNameMap[tenantNameId] : '';
-        
         const payload = {
             formType,
             shopNo: shopNo,
@@ -882,7 +903,6 @@ const Table = () => {
             forTheMonthOf,
             attachedFile,
         };
-        
         setIsSubmitting(true);
         try {
             const response = await fetch(`https://backendaab.in/aabuildersDash/api/rental_forms/update/${editId}`, {
@@ -907,14 +927,144 @@ const Table = () => {
             setIsSubmitting(false);
         }
     };
+    const handlePaymentSubmit = async () => {
+        if (!paymentModalData.accountNumber && paymentModalData.paymentMode !== "Cash") {
+            alert("Please select account number.");
+            return;
+        }
+        if (paymentModalData.paymentMode === "Cheque" && (!paymentModalData.chequeNo || !paymentModalData.chequeDate)) {
+            alert("Please enter cheque number and date.");
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            // Validate that shopNoId is linked to tenantNameId
+            if (rentFormData.shopNoId && rentFormData.tenantNameId) {
+                if (!isShopLinkedToTenant(rentFormData.shopNoId, rentFormData.tenantNameId)) {
+                    alert('Cannot save: Selected shop is not linked to selected tenant in tenant link data');
+                    setIsSubmitting(false);
+                    return;
+                }
+            }
+
+            const {
+                formType, shopNoId, tenantNameId, amount,
+                refundAmount, paidOnDate, forTheMonthOf, attachedFile
+            } = rentFormData;
+
+            // Use date in YYYY-MM-DD format (paymentModalData.date is already in this format from date input)
+            // If not available, use paidOnDate which should also be in YYYY-MM-DD format
+            const formattedPaidOnDate = paymentModalData.date || paidOnDate;
+
+            // Get shopNo and tenantName from IDs
+            const shopNo = shopNoId && shopNoIdToShopNoMap[shopNoId] ? shopNoIdToShopNoMap[shopNoId] : '';
+            const tenantName = tenantNameId && tenantNameIdToTenantNameMap[tenantNameId] ? tenantNameIdToTenantNameMap[tenantNameId] : '';
+
+            // Find the project ID and projectReferenceName from shopNoId
+            let projectId = null;
+            let projectReferenceName = null;
+            projects.forEach(project => {
+                if (project.propertyDetails) {
+                    const propertyDetailsArray = Array.isArray(project.propertyDetails)
+                        ? project.propertyDetails
+                        : Array.from(project.propertyDetails || []);
+                    const property = propertyDetailsArray.find(p => p.id === shopNoId);
+                    if (property) {
+                        projectId = project.id;
+                        projectReferenceName = project.projectReferenceName || null;
+                    }
+                }
+            });
+
+            const payload = {
+                formType,
+                shopNo: shopNo,
+                shopNoId: shopNoId,
+                tenantName: tenantName,
+                tenantNameId: tenantNameId,
+                amount: paymentModalData.amount || amount,
+                refundAmount,
+                paymentMode: paymentModalData.paymentMode,
+                paidOnDate: formattedPaidOnDate,
+                forTheMonthOf,
+                attachedFile,
+            };
+
+            // Update rental form first
+            const updateResponse = await fetch(`https://backendaab.in/aabuildersDash/api/rental_forms/update/${editId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            if (!updateResponse.ok) {
+                const errorMsg = await updateResponse.text();
+                throw new Error(`Failed to update rental form: ${errorMsg}`);
+            }
+
+            // Get the updated rental form ID
+            let rentalFormId = editId;
+
+            // Submit to weekly-payment-bills API
+            // Ensure cheque_date is in YYYY-MM-DD format (it's already in this format from date input)
+            const weeklyPaymentBillPayload = {
+                date: formattedPaidOnDate,
+                created_at: new Date().toISOString(),
+                contractor_id: null,
+                vendor_id: null,
+                employee_id: null,
+                project_id: projectId,
+                type: "Rent Payment",
+                bill_payment_mode: paymentModalData.paymentMode,
+                amount: parseFloat(paymentModalData.amount || amount),
+                status: true,
+                weekly_number: "",
+                rent_management_id: rentalFormId,
+                advance_portal_id: null,
+                staff_advance_portal_id: null,
+                claim_payment_id: null,
+                expenses_entry_id: null,
+                cheque_number: paymentModalData.chequeNo || null,
+                cheque_date: paymentModalData.chequeDate || null, // Already in YYYY-MM-DD format from date input
+                transaction_number: paymentModalData.transactionNumber || null,
+                account_number: paymentModalData.accountNumber || null,
+                tenant_id: tenantNameId || null,
+                tenant_complex_name: projectReferenceName || null
+            };
+
+            const weeklyResponse = await fetch('https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(weeklyPaymentBillPayload)
+            });
+
+            if (!weeklyResponse.ok) {
+                const errorText = await weeklyResponse.text();
+                throw new Error(`Weekly payment bills submission failed: ${errorText}`);
+            }
+
+            alert('Rent form updated successfully and added to Weekly Payment Bills!');
+            setShowPaymentModal(false);
+            handleCancel();
+            window.location.reload();
+        } catch (error) {
+            console.error('Error submitting payment:', error);
+            alert(`Failed to save: ${error.message}`);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
     return (
         <body className="bg-[#FAF6ED] ">
             <div>
                 <div className='md:mt-[-35px] mb-3 text-left max-w-[1850px] md:text-right md:items-center items-start cursor-default flex flex-col sm:flex-row justify-between table-auto  overflow-auto  gap-2 sm:gap-0'>
                     <div></div>
                     <div className='flex gap-2 sm:gap-4'>
-                        <span
-                            className='text-[#E4572E] font-semibold hover:underline cursor-pointer text-sm sm:text-base'
+                        <span className='text-[#E4572E] font-semibold hover:underline cursor-pointer text-sm sm:text-base'
                             onClick={handleExportPDF}
                         >
                             Export pdf
@@ -1410,13 +1560,13 @@ const Table = () => {
                                     {sortedItems.map((rent, index) => (
                                         <tr key={rent.id} className="odd:bg-white even:bg-[#FAF6ED]">
                                             <td className="text-xs sm:text-sm pl-1 sm:pl-2 text-left py-2 font-semibold">
-                                                {rent.shopNoId && shopNoIdToShopNoMap[rent.shopNoId] 
-                                                    ? shopNoIdToShopNoMap[rent.shopNoId] 
+                                                {rent.shopNoId && shopNoIdToShopNoMap[rent.shopNoId]
+                                                    ? shopNoIdToShopNoMap[rent.shopNoId]
                                                     : rent.shopNo}
                                             </td>
                                             <td className="text-xs sm:text-sm text-left px-1 font-semibold">
-                                                {rent.tenantNameId && tenantNameIdToTenantNameMap[rent.tenantNameId] 
-                                                    ? tenantNameIdToTenantNameMap[rent.tenantNameId] 
+                                                {rent.tenantNameId && tenantNameIdToTenantNameMap[rent.tenantNameId]
+                                                    ? tenantNameIdToTenantNameMap[rent.tenantNameId]
                                                     : rent.tenantName}
                                             </td>
                                             <td className={`text-xs sm:text-sm text-left px-2 sm:px-4 font-semibold ${rent.refundAmount ? 'text-red-500' : 'text-black'}`}>
@@ -1445,23 +1595,21 @@ const Table = () => {
                                                 <button
                                                     onClick={() => handleEditClick(rent)}
                                                     disabled={rent.formType === 'Shop Closure' || rent.formType === 'Refund'}
-                                                    className={`rounded-full transition duration-200 ml-2 mr-3 ${
-                                                        rent.formType === 'Shop Closure' || rent.formType === 'Refund' 
-                                                            ? 'opacity-50 cursor-not-allowed' 
+                                                    className={`rounded-full transition duration-200 ml-2 mr-3 ${rent.formType === 'Shop Closure' || rent.formType === 'Refund'
+                                                            ? 'opacity-50 cursor-not-allowed'
                                                             : ''
-                                                    }`}
-                                                    title={rent.formType === 'Shop Closure' || rent.formType === 'Refund' 
-                                                        ? 'Cannot edit Shop Closure or Refund forms' 
+                                                        }`}
+                                                    title={rent.formType === 'Shop Closure' || rent.formType === 'Refund'
+                                                        ? 'Cannot edit Shop Closure or Refund forms'
                                                         : ''}
                                                 >
                                                     <img
                                                         src={edit}
                                                         alt="Edit"
-                                                        className={`w-4 h-6 transition duration-200 ${
-                                                            rent.formType === 'Shop Closure' || rent.formType === 'Refund' 
-                                                                ? '' 
+                                                        className={`w-4 h-6 transition duration-200 ${rent.formType === 'Shop Closure' || rent.formType === 'Refund'
+                                                                ? ''
                                                                 : 'transform hover:scale-110 hover:brightness-110'
-                                                        }`}
+                                                            }`}
                                                     />
                                                 </button>
                                             </td>
@@ -1625,9 +1773,26 @@ const Table = () => {
                                         <Select
                                             name="paymentMode"
                                             value={paymentModeOptions.find(option => option.value === rentFormData.paymentMode)}
-                                            onChange={(selectedOption) =>
-                                                setRentFormData({ ...rentFormData, paymentMode: selectedOption?.value || '' })
-                                            }
+                                            onChange={(selectedOption) => {
+                                                const newPaymentMode = selectedOption?.value || '';
+                                                setRentFormData({ ...rentFormData, paymentMode: newPaymentMode });
+                                                // Check if payment mode requires bank details
+                                                if (["GPay", "PhonePe", "Net Banking", "Cheque","Gpay"].includes(newPaymentMode)) {
+                                                    setPaymentModalData({
+                                                        date: rentFormData.paidOnDate || new Date().toISOString().split('T')[0],
+                                                        amount: rentFormData.amount || "",
+                                                        paymentMode: newPaymentMode,
+                                                        chequeNo: "",
+                                                        chequeDate: "",
+                                                        transactionNumber: "",
+                                                        accountNumber: ""
+                                                    });
+                                                    setShowPaymentModal(true);
+                                                } else {
+                                                    // Close modal if switching to a mode that doesn't require bank details
+                                                    setShowPaymentModal(false);
+                                                }
+                                            }}
                                             options={paymentModeOptions}
                                             placeholder="--- Select PaymentMode ---"
                                             styles={{
@@ -1672,6 +1837,116 @@ const Table = () => {
                                 </form>
                             </div>
                         </Modal>
+                        {showPaymentModal && (
+                            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                                <div className="bg-white text-left rounded-xl p-6 w-[800px] h-[600px] overflow-y-auto flex flex-col">
+                                    <h3 className="text-lg font-semibold mb-4 text-center">Payment Details</h3>
+                                    <div className="flex-1 overflow-hidden">
+                                        <div className="space-y-4 mb-4">
+                                            <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
+                                                <div className="grid grid-cols-3 gap-4">
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                                                        <input
+                                                            type="date"
+                                                            value={paymentModalData.date}
+                                                            onChange={(e) => setPaymentModalData(prev => ({ ...prev, date: e.target.value }))}
+                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                                                        <input
+                                                            type="number"
+                                                            value={paymentModalData.amount}
+                                                            onChange={(e) => setPaymentModalData(prev => ({ ...prev, amount: e.target.value }))}
+                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>
+                                                        <input
+                                                            type="text"
+                                                            value={paymentModalData.paymentMode}
+                                                            readOnly
+                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {(paymentModalData.paymentMode === "Gpay" || paymentModalData.paymentMode === "PhonePe" || paymentModalData.paymentMode === "GPay" ||
+                                                paymentModalData.paymentMode === "Net Banking" || paymentModalData.paymentMode === "Cheque") && (
+                                                    <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
+                                                        <div className="space-y-4">
+                                                            {paymentModalData.paymentMode === "Cheque" && (
+                                                                <div className="grid grid-cols-2 gap-4">
+                                                                    <div>
+                                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No<span className="text-red-500">*</span></label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={paymentModalData.chequeNo}
+                                                                            onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeNo: e.target.value }))}
+                                                                            placeholder="Enter cheque number"
+                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date<span className="text-red-500">*</span></label>
+                                                                        <input
+                                                                            type="date"
+                                                                            value={paymentModalData.chequeDate}
+                                                                            onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeDate: e.target.value }))}
+                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            <div className="grid grid-cols-2 gap-4">
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={paymentModalData.transactionNumber}
+                                                                        onChange={(e) => setPaymentModalData(prev => ({ ...prev, transactionNumber: e.target.value }))}
+                                                                        placeholder="Enter transaction number (optional)"
+                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Account Number<span className="text-red-500">*</span></label>
+                                                                    <select
+                                                                        value={paymentModalData.accountNumber}
+                                                                        onChange={(e) => setPaymentModalData(prev => ({ ...prev, accountNumber: e.target.value }))}
+                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                                    >
+                                                                        <option value="">Select Account</option>
+                                                                        {accountDetails.map((account) => (
+                                                                            <option key={account.id} value={account.account_number}>
+                                                                                {account.account_number}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-end gap-3 mt-6 p-4 bg-white">
+                                        <button onClick={() => setShowPaymentModal(false)} className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg">
+                                            Cancel
+                                        </button>
+                                        <button onClick={handlePaymentSubmit} disabled={isSubmitting} className="px-4 py-2 bg-[#BF9853] text-white rounded-lg disabled:bg-gray-400">
+                                            {isSubmitting ? 'Saving...' : 'Submit'}
+                                        </button>
+                                    </div>
+                                    <button onClick={() => setShowPaymentModal(false)} className="absolute top-3 right-4 text-xl font-bold text-gray-500 hover:text-black">
+                                        ×
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

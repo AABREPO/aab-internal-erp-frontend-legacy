@@ -9,8 +9,10 @@ const PendingBill = ({ username, userRoles = [] }) => {
     const [showModal, setShowModal] = useState(false)
     const [selectedBill, setSelectedBill] = useState(null)
     const [poNumbers, setPoNumbers] = useState([])
+    const [extraPoNumbers, setExtraPoNumbers] = useState([])
     const [rangeStart, setRangeStart] = useState('')
     const [rangeEnd, setRangeEnd] = useState('')
+    const [lastPaidPO, setLastPaidPO] = useState('')
     const [showEntryModal, setShowEntryModal] = useState(false)
     const [selectedEntryBill, setSelectedEntryBill] = useState(null)
     const [vendorId, setVendorId] = useState(null)
@@ -51,11 +53,15 @@ const PendingBill = ({ username, userRoles = [] }) => {
     const [error, setError] = useState(null)
     const [purchaseOrders, setPurchaseOrders] = useState([])
     const [validationResults, setValidationResults] = useState({})
+    const [extraValidationResults, setExtraValidationResults] = useState({})
     const [checkingPO, setCheckingPO] = useState(false)
     const [isEditMode, setIsEditMode] = useState(false)
     const [verifiedBills, setVerifiedBills] = useState({})
+    const [extraVerifiedBills, setExtraVerifiedBills] = useState({})
     const [noPoSelections, setNoPoSelections] = useState({})
+    const [extraNoPoSelections, setExtraNoPoSelections] = useState({})
     const [checkedBills, setCheckedBills] = useState({})
+    const [extraCheckedBills, setExtraCheckedBills] = useState({})
     const [hasBeenSubmitted, setHasBeenSubmitted] = useState(false)
     const [originalData, setOriginalData] = useState(null)
     const [editModeStartData, setEditModeStartData] = useState(null)
@@ -97,6 +103,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
         billArrivalDate: '',
         vendorId: null,
         noOfBills: '',
+        extraBills: '',
         totalAmount: ''
     })
     const [editLoading, setEditLoading] = useState(false)
@@ -578,9 +585,54 @@ const PendingBill = ({ username, userRoles = [] }) => {
             handleAddBill();
         }
     };
+    const getLastBillNumberForVendor = (vendorId) => {
+        if (!vendorId || !apiData || apiData.length === 0) {
+            return null;
+        }
+        // Filter bills for this vendor that have verifications
+        const vendorBills = apiData.filter(bill =>
+            (bill.vendor_id === vendorId || bill.vendorId === vendorId) &&
+            bill.billVerifications &&
+            bill.billVerifications.length > 0
+        );
+
+        if (vendorBills.length === 0) {
+            return null;
+        }
+
+        // Sort bills by date (most recent first), then by ID (most recent first) as fallback
+        vendorBills.sort((a, b) => {
+            const dateA = a.bill_arrival_date || a.billArrivalDate || a.created_at || a.createdAt || '';
+            const dateB = b.bill_arrival_date || b.billArrivalDate || b.created_at || b.createdAt || '';
+            if (dateA && dateB) {
+                return new Date(dateB) - new Date(dateA);
+            }
+            return (b.id || 0) - (a.id || 0);
+        });
+
+        // Get the most recent bill
+        const mostRecentBill = vendorBills[0];
+
+        // Get the last verification from the most recent bill's billVerifications array
+        const verifications = mostRecentBill.billVerifications || [];
+        if (verifications.length === 0) {
+            return null;
+        }
+
+        // Find the last non-empty, non-NO_PO bill number from the verifications
+        for (let i = verifications.length - 1; i >= 0; i--) {
+            const billNumber = verifications[i].bill_number || verifications[i].billNumber;
+            if (billNumber && billNumber !== 'NO_PO' && billNumber.trim() !== '') {
+                return billNumber.trim();
+            }
+        }
+
+        return null;
+    };
     const handleVerifyClick = (bill) => {
         setSelectedBill(bill)
         const numberOfBills = bill.noOfBills || bill.no_of_bills || 1
+        const extraBills = bill.extraBills || bill.extra_bills || 0
         if (bill.billVerifications && bill.billVerifications.length > 0) {
             const existingBillNumbers = bill.billVerifications.map(verification =>
                 verification.bill_number === 'NO_PO' ? '' : (verification.bill_number || '')
@@ -589,12 +641,30 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 existingBillNumbers.push('')
             }
             setPoNumbers(existingBillNumbers.slice(0, numberOfBills))
+
+            // Handle extra bills
+            if (extraBills > 0) {
+                const extraBillNumbers = existingBillNumbers.slice(numberOfBills, numberOfBills + extraBills)
+                while (extraBillNumbers.length < extraBills) {
+                    extraBillNumbers.push('')
+                }
+                setExtraPoNumbers(extraBillNumbers)
+            } else {
+                setExtraPoNumbers([])
+            }
+
             const initialVerified = {}
             const initialNoPo = {}
+            const initialExtraVerified = {}
+            const initialExtraNoPo = {}
             bill.billVerifications.forEach((verification, index) => {
                 if (index < numberOfBills) {
                     initialVerified[index] = verification.is_verified || false
                     initialNoPo[index] = verification.bill_number === 'NO_PO'
+                } else if (index < numberOfBills + extraBills) {
+                    const extraIndex = index - numberOfBills
+                    initialExtraVerified[extraIndex] = verification.is_verified || false
+                    initialExtraNoPo[extraIndex] = verification.bill_number === 'NO_PO'
                 }
             })
             setVerifiedBills(initialVerified)
@@ -609,14 +679,21 @@ const PendingBill = ({ username, userRoles = [] }) => {
             setHasBeenSubmitted(true)
             setOriginalData({
                 poNumbers: existingBillNumbers.slice(0, numberOfBills),
+                extraPoNumbers: extraBills > 0 ? existingBillNumbers.slice(numberOfBills, numberOfBills + extraBills) : [],
                 noPoSelections: initialNoPo,
-                verifiedBills: initialVerified
+                extraNoPoSelections: initialExtraNoPo,
+                verifiedBills: initialVerified,
+                extraVerifiedBills: initialExtraVerified
             })
         } else {
             setPoNumbers(new Array(numberOfBills).fill(''))
+            setExtraPoNumbers(extraBills > 0 ? new Array(extraBills).fill('') : [])
             setVerifiedBills({})
+            setExtraVerifiedBills({})
             setNoPoSelections({})
+            setExtraNoPoSelections({})
             setCheckedBills({})
+            setExtraCheckedBills({})
             setHasBeenSubmitted(false)
             setOriginalData(null)
         }
@@ -625,6 +702,11 @@ const PendingBill = ({ username, userRoles = [] }) => {
         setRangeStart('')
         setRangeEnd('')
         setCheckedBills({}) // Reset checked bills state for new verification
+        setExtraCheckedBills({}) // Reset extra checked bills state for new verification
+        // Fetch and set last paid PO for this vendor
+        const vendorId = bill.vendorId || bill.vendor_id
+        const lastBillNumber = getLastBillNumberForVendor(vendorId)
+        setLastPaidPO(lastBillNumber || '')
         setShowModal(true)
     }
     const handlePoNumberChange = (index, value) => {
@@ -662,6 +744,36 @@ const PendingBill = ({ username, userRoles = [] }) => {
             return newCheckedBills
         })
         setValidationResults(prev => {
+            const newValidationResults = { ...prev }
+            delete newValidationResults[index]
+            return newValidationResults
+        })
+    }
+    const handleExtraPoNumberChange = (index, value) => {
+        const numericValue = value.replace(/[^0-9]/g, '')
+        const newExtraPoNumbers = [...extraPoNumbers]
+        newExtraPoNumbers[index] = numericValue
+        setExtraPoNumbers(newExtraPoNumbers)
+        if (numericValue && isAdminUser()) {
+            setExtraNoPoSelections(prev => ({ ...prev, [index]: false }))
+        }
+        setExtraValidationResults(prev => {
+            const newValidationResults = { ...prev }
+            delete newValidationResults[index]
+            return newValidationResults
+        })
+    }
+    const handleExtraNoPoChange = (index, checked) => {
+        if (!isAdminUser()) {
+            return
+        }
+        setExtraNoPoSelections(prev => ({ ...prev, [index]: checked }))
+        if (checked) {
+            const newExtraPoNumbers = [...extraPoNumbers]
+            newExtraPoNumbers[index] = ''
+            setExtraPoNumbers(newExtraPoNumbers)
+        }
+        setExtraValidationResults(prev => {
             const newValidationResults = { ...prev }
             delete newValidationResults[index]
             return newValidationResults
@@ -780,7 +892,17 @@ const PendingBill = ({ username, userRoles = [] }) => {
             ) || Object.keys(editModeStartData.noPoSelections).some(index =>
                 (noPoSelections[index] || false) !== editModeStartData.noPoSelections[index]
             )
-            return poNumbersChanged || noPoChanged
+            const extraPoNumbersChanged = editModeStartData.extraPoNumbers ? extraPoNumbers.some((current, index) =>
+                current !== (editModeStartData.extraPoNumbers[index] || '')
+            ) : (extraPoNumbers.length > 0)
+            const extraNoPoChanged = editModeStartData.extraNoPoSelections ? (
+                Object.keys(extraNoPoSelections).some(index =>
+                    extraNoPoSelections[index] !== (editModeStartData.extraNoPoSelections[index] || false)
+                ) || Object.keys(editModeStartData.extraNoPoSelections).some(index =>
+                    (extraNoPoSelections[index] || false) !== editModeStartData.extraNoPoSelections[index]
+                )
+            ) : (Object.keys(extraNoPoSelections).length > 0)
+            return poNumbersChanged || noPoChanged || extraPoNumbersChanged || extraNoPoChanged
         }
         const currentPoNumbers = poNumbers.slice(0, originalData.poNumbers.length)
         const poNumbersChanged = currentPoNumbers.some((current, index) =>
@@ -791,17 +913,30 @@ const PendingBill = ({ username, userRoles = [] }) => {
         ) || Object.keys(originalData.noPoSelections).some(index =>
             (noPoSelections[index] || false) !== originalData.noPoSelections[index]
         )
-        return poNumbersChanged || noPoChanged
+        const extraPoNumbersChanged = originalData.extraPoNumbers ? extraPoNumbers.some((current, index) =>
+            current !== (originalData.extraPoNumbers[index] || '')
+        ) : (extraPoNumbers.length > 0)
+        const extraNoPoChanged = originalData.extraNoPoSelections ? (
+            Object.keys(extraNoPoSelections).some(index =>
+                extraNoPoSelections[index] !== (originalData.extraNoPoSelections[index] || false)
+            ) || Object.keys(originalData.extraNoPoSelections).some(index =>
+                (extraNoPoSelections[index] || false) !== originalData.extraNoPoSelections[index]
+            )
+        ) : (Object.keys(extraNoPoSelections).length > 0)
+        return poNumbersChanged || noPoChanged || extraPoNumbersChanged || extraNoPoChanged
     }
     const isSubmitDisabled = () => {
         if (hasBeenSubmitted && !hasDataChanged()) {
             return true
         }
-        if (selectedBill && poNumbers.length > 0) {
+        if (selectedBill && (poNumbers.length > 0 || extraPoNumbers.length > 0)) {
             const maxBills = selectedBill.noOfBills || selectedBill.no_of_bills || 0
+            const extraBills = selectedBill.extraBills || selectedBill.extra_bills || 0
             const currentBillNumbers = poNumbers.filter(num => num.trim() !== '')
+            const currentExtraBillNumbers = extraPoNumbers.filter(num => num.trim() !== '')
+            const allBillNumbers = [...currentBillNumbers, ...currentExtraBillNumbers]
             const duplicateMap = {}
-            currentBillNumbers.forEach((billNumber) => {
+            allBillNumbers.forEach((billNumber) => {
                 if (duplicateMap[billNumber]) {
                     duplicateMap[billNumber]++
                 } else {
@@ -822,6 +957,19 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     }
                 }
             }
+            // Check extra bills
+            if (extraBills > 0) {
+                for (let i = 0; i < extraBills; i++) {
+                    const billNumber = extraPoNumbers[i] || ''
+                    const isNoPo = extraNoPoSelections[i] || false
+                    const validation = extraValidationResults[i]
+                    if (billNumber.trim() && !isNoPo) {
+                        if (!validation || !validation.matched) {
+                            return true
+                        }
+                    }
+                }
+            }
         }
         return false
     }
@@ -831,6 +979,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 return
             }
             const maxBills = selectedBill.noOfBills || selectedBill.no_of_bills || 0
+            const extraBills = selectedBill.extraBills || selectedBill.extra_bills || 0
             if (maxBills === 0) {
                 alert('Invalid number of bills')
                 return
@@ -903,7 +1052,54 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     message: message
                 }
             }
+            // Validate extra bills
+            const extraAutoValidationResults = {}
+            if (extraBills > 0) {
+                for (let i = 0; i < extraBills; i++) {
+                    const billNumber = extraPoNumbers[i] || ''
+                    const isNoPo = extraNoPoSelections[i] || false
+                    let isMatched = false
+                    let message = ''
+                    if (isNoPo) {
+                        isMatched = true
+                        message = 'No PO - Verified'
+                    } else if (billNumber.trim()) {
+                        const currentTrackerId = selectedBill.id
+                        let isAlreadyEntered = false
+                        for (const tracker of apiData) {
+                            if (tracker.id !== currentTrackerId) {
+                                const trackerVendorId = tracker.vendor_id || tracker.vendorId
+                                if (trackerVendorId === vendorId) {
+                                    const verifications = tracker.billVerifications || []
+                                    for (const verification of verifications) {
+                                        const existingBill = verification.bill_number || verification.billNumber
+                                        if (existingBill && existingBill !== 'NO_PO' && String(existingBill).trim() === billNumber.trim()) {
+                                            isAlreadyEntered = true
+                                            break
+                                        }
+                                    }
+                                    if (isAlreadyEntered) break
+                                }
+                            }
+                        }
+                        if (isAlreadyEntered) {
+                            isMatched = false
+                            message = 'Already Entered'
+                        } else {
+                            isMatched = vendorENOs.includes(billNumber.trim())
+                            message = isMatched ? 'Matched' : 'Not Matched'
+                        }
+                    } else {
+                        message = 'No PO Entered'
+                    }
+                    extraAutoValidationResults[i] = {
+                        matched: isMatched,
+                        message: message
+                    }
+                }
+            }
             setValidationResults(autoValidationResults)
+            setExtraValidationResults(extraAutoValidationResults)
             const unmatchedBills = []
             for (let i = 0; i < maxBills; i++) {
                 const billNumber = poNumbers[i] || ''
@@ -915,6 +1111,19 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     }
                 }
             }
+            // Check unmatched extra bills
+            if (extraBills > 0) {
+                for (let i = 0; i < extraBills; i++) {
+                    const billNumber = extraPoNumbers[i] || ''
+                    const isNoPo = extraNoPoSelections[i] || false
+                    const validation = extraAutoValidationResults[i]
+                    if (billNumber.trim() && !isNoPo) {
+                        if (!validation || !validation.matched) {
+                            unmatchedBills.push(`Extra bill ${i + 1} (${billNumber.trim()})`)
+                        }
+                    }
+                }
+            }
             if (unmatchedBills.length > 0) {
                 alert(`Cannot submit: ${unmatchedBills.join(', ')} is/are not matched with purchase orders. Please change these bill numbers or use "Check PO" button first.`)
                 return
@@ -922,6 +1131,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
             const trackerId = selectedBill.id
             const existingBills = selectedBill.billVerifications || []
             const billsData = []
+            // Add regular bills
             for (let i = 0; i < maxBills; i++) {
                 const existingBill = existingBills[i]
                 const billNumber = poNumbers[i] || ''
@@ -955,6 +1165,43 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 }
                 billsData.push(billData)
             }
+            // Add extra bills if extraBills > 0
+            if (extraBills > 0) {
+                for (let i = 0; i < extraBills; i++) {
+                    const existingBillIndex = maxBills + i
+                    const existingBill = existingBills[existingBillIndex]
+                    const billNumber = extraPoNumbers[i] || ''
+                    const isNoPo = extraNoPoSelections[i] || false
+                    const validation = extraAutoValidationResults[i]
+                    let finalStatus = 'NOT_VERIFIED'
+                    let finalIsVerified = false
+                    if (isNoPo) {
+                        finalStatus = 'VERIFIED'
+                        finalIsVerified = true
+                    } else if (billNumber.trim()) {
+                        if (validation && validation.matched) {
+                            finalStatus = 'VERIFIED'
+                            finalIsVerified = true
+                        } else {
+                            finalStatus = 'NOT_VERIFIED'
+                            finalIsVerified = false
+                        }
+                    } else {
+                        finalStatus = 'NOT_VERIFIED'
+                        finalIsVerified = false
+                    }
+                    let billData = {
+                        bill_number: isNoPo ? 'NO_PO' : (billNumber || ''),
+                        status: finalStatus,
+                        is_verified: finalIsVerified,
+                        verified_date: finalIsVerified ? new Date().toISOString() : null
+                    }
+                    if (existingBill) {
+                        billData.id = existingBill.id
+                    }
+                    billsData.push(billData)
+                }
+            }
             const response = await fetch(`https://backendaab.in/aabuildersDash/api/vendor-payments/tracker/${trackerId}/bills`, {
                 method: 'POST',
                 headers: {
@@ -977,8 +1224,11 @@ const PendingBill = ({ username, userRoles = [] }) => {
             setHasBeenSubmitted(true)
             setOriginalData({
                 poNumbers: [...poNumbers],
+                extraPoNumbers: extraBills > 0 ? [...extraPoNumbers] : [],
                 noPoSelections: { ...noPoSelections },
-                verifiedBills: { ...verifiedBills }
+                extraNoPoSelections: extraBills > 0 ? { ...extraNoPoSelections } : {},
+                verifiedBills: { ...verifiedBills },
+                extraVerifiedBills: extraBills > 0 ? { ...extraVerifiedBills } : {}
             })
             await fetchTrackerData()
             await fetchExpensesData()
@@ -986,6 +1236,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
             setShowModal(false)
             setSelectedBill(null)
             setPoNumbers([])
+            setExtraPoNumbers([])
             setRangeStart('')
             setRangeEnd('')
             window.location.reload()
@@ -997,16 +1248,22 @@ const PendingBill = ({ username, userRoles = [] }) => {
         setShowModal(false)
         setSelectedBill(null)
         setPoNumbers([])
+        setExtraPoNumbers([])
         setValidationResults({})
+        setExtraValidationResults({})
         setIsEditMode(false)
         setVerifiedBills({})
+        setExtraVerifiedBills({})
         setNoPoSelections({})
+        setExtraNoPoSelections({})
         setCheckedBills({})
+        setExtraCheckedBills({})
         setHasBeenSubmitted(false)
         setOriginalData(null)
         setEditModeStartData(null)
         setRangeStart('')
         setRangeEnd('')
+        setLastPaidPO('')
     }
     const handleEditClick = (item) => {
         setSelectedEditItem(item)
@@ -1014,6 +1271,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
             billArrivalDate: item.bill_arrival_date ? new Date(item.bill_arrival_date).toISOString().split('T')[0] : '',
             vendorId: item.vendor_id ? { value: item.vendor_id, label: getVendorNameById(item.vendor_id) } : null,
             noOfBills: item.no_of_bills || item.noOfBills || '',
+            extraBills: item.extra_bills || item.extraBills || '0',
             totalAmount: item.total_amount || ''
         }
         setEditFormData(formData)
@@ -1033,18 +1291,27 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 bill_arrival_date: editFormData.billArrivalDate || (selectedEditItem.bill_arrival_date ?
                     new Date(selectedEditItem.bill_arrival_date).toISOString().split('T')[0] : ''),
                 vendor_id: editFormData.vendorId?.id || selectedEditItem.vendor_id,
-                no_of_bills: parseInt(editFormData.noOfBills) || selectedEditItem.no_of_bills || selectedEditItem.noOfBills || 0,
-                total_amount: parseFloat(editFormData.totalAmount) || selectedEditItem.total_amount || 0
+                no_of_bills: editFormData.noOfBills !== '' && editFormData.noOfBills !== null && editFormData.noOfBills !== undefined
+                    ? parseInt(editFormData.noOfBills)
+                    : (selectedEditItem.no_of_bills || selectedEditItem.noOfBills || 0),
+                extra_bills: editFormData.extraBills !== '' && editFormData.extraBills !== null && editFormData.extraBills !== undefined
+                    ? parseInt(editFormData.extraBills)
+                    : (selectedEditItem.extra_bills || selectedEditItem.extraBills || 0),
+                total_amount: editFormData.totalAmount !== '' && editFormData.totalAmount !== null && editFormData.totalAmount !== undefined
+                    ? parseFloat(editFormData.totalAmount)
+                    : (selectedEditItem.total_amount || 0)
             }
             const originalDate = selectedEditItem.bill_arrival_date ?
                 new Date(selectedEditItem.bill_arrival_date).toISOString().split('T')[0] : ''
             const originalVendorId = selectedEditItem.vendor_id
             const originalNoOfBills = selectedEditItem.no_of_bills || selectedEditItem.noOfBills || 0
+            const originalExtraBills = selectedEditItem.extra_bills || selectedEditItem.extraBills || 0
             const originalTotalAmount = selectedEditItem.total_amount || 0
             const hasChanges = (
                 payload.bill_arrival_date !== originalDate ||
                 payload.vendor_id !== originalVendorId ||
                 payload.no_of_bills !== parseInt(originalNoOfBills) ||
+                payload.extra_bills !== parseInt(originalExtraBills) ||
                 payload.total_amount !== parseFloat(originalTotalAmount)
             )
             if (!hasChanges) {
@@ -1062,6 +1329,119 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 }
             )
             if (response.status === 200) {
+                // Handle extra_bills count changes - nullify vendor_payments_tracker_id for removed extra bills
+                const newExtraBills = parseInt(editFormData.extraBills) || 0
+                const originalExtraBills = selectedEditItem.extra_bills || selectedEditItem.extraBills || 0
+
+                // If extra_bills count decreased, nullify the vendor_payments_tracker_id for the removed extra bills
+                if (originalExtraBills > newExtraBills) {
+                    try {
+                        // Fetch current bill verifications
+                        const trackerResponse = await fetch(`https://backendaab.in/aabuildersDash/api/vendor-payments/tracker/${selectedEditItem.id}`, {
+                            method: 'GET',
+                            credentials: 'include',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            }
+                        })
+                        if (trackerResponse.ok) {
+                            const trackerData = await trackerResponse.json()
+                            const allBillVerifications = trackerData.billVerifications || []
+                            const noOfBills = parseInt(editFormData.noOfBills) || selectedEditItem.no_of_bills || selectedEditItem.noOfBills || 0
+
+                            // Calculate which extra bills need to be nullified
+                            // Extra bills start at index noOfBills
+                            // We need to nullify the last (originalExtraBills - newExtraBills) extra bills
+                            const billsToNullifyStart = noOfBills + newExtraBills
+                            const billsToNullifyEnd = noOfBills + originalExtraBills
+                            const billsToNullify = allBillVerifications.slice(billsToNullifyStart, billsToNullifyEnd)
+
+                            // Delete bill verification for each removed extra bill
+                            // The API expects the bill verification ID to delete the bill verification
+                            const deletePromises = []
+
+                            for (const billVerification of billsToNullify) {
+                                // Skip if verification ID doesn't exist
+                                if (!billVerification.id) {
+                                    console.log(`Skipping deletion - no verification ID`)
+                                    continue
+                                }
+
+                                const billNumber = billVerification.bill_number || billVerification.billNumber || 'N/A'
+                                const verificationId = billVerification.id
+
+                                console.log(`Attempting to delete bill verification ID: ${verificationId} (bill number: ${billNumber})`)
+
+                                // Call the delete API with verification ID
+                                const deletePromise = fetch(`https://backendaab.in/aabuildersDash/api/vendor-payments/bill-verification/${verificationId}`, {
+                                    method: 'DELETE',
+                                    credentials: 'include',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                    }
+                                })
+                                    .then(async (response) => {
+                                        if (response.ok) {
+                                            console.log(`Successfully deleted bill verification ID: ${verificationId} (bill number: ${billNumber})`)
+                                            return { success: true, verificationId: verificationId, billNumber: billNumber }
+                                        } else {
+                                            const errorText = await response.text()
+                                            console.error(`Failed to delete bill verification ID ${verificationId} (bill ${billNumber}):`, response.status, errorText)
+                                            return { success: false, verificationId: verificationId, billNumber: billNumber, error: errorText }
+                                        }
+                                    })
+                                    .catch((error) => {
+                                        console.error(`Error deleting bill verification ID ${verificationId} (bill ${billNumber}):`, error)
+                                        return { success: false, verificationId: verificationId, billNumber: billNumber, error: error.message }
+                                    })
+
+                                deletePromises.push(deletePromise)
+                            }
+
+                            // Wait for all delete operations to complete
+                            if (deletePromises.length > 0) {
+                                const results = await Promise.all(deletePromises)
+                                const successCount = results.filter(r => r.success).length
+                                const failCount = results.filter(r => !r.success).length
+
+                                if (failCount > 0) {
+                                    console.warn(`Deletion completed: ${successCount} succeeded, ${failCount} failed`)
+                                    const failedBills = results.filter(r => !r.success).map(r => `ID: ${r.verificationId} (${r.billNumber})`).join(', ')
+                                    console.warn(`Failed bills: ${failedBills}`)
+                                } else {
+                                    console.log(`Successfully deleted ${successCount} extra bill verification(s)`)
+                                }
+                            }
+
+                            // If extra_bills is set to 0, also unlink extra bill verifications
+                            if (newExtraBills === 0) {
+                                // Keep only the first noOfBills verifications
+                                const billsToKeep = allBillVerifications.slice(0, noOfBills)
+                                const billsData = billsToKeep.map(verification => ({
+                                    id: verification.id,
+                                    bill_number: verification.bill_number || '',
+                                    status: verification.status || 'NOT_VERIFIED',
+                                    is_verified: verification.is_verified || false,
+                                    verified_date: verification.verified_date || null
+                                }))
+
+                                // Update bills - this will remove extra bills
+                                const billsResponse = await fetch(`https://backendaab.in/aabuildersDash/api/vendor-payments/tracker/${selectedEditItem.id}/bills`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify(billsData)
+                                })
+                                if (!billsResponse.ok) {
+                                    console.error('Failed to unlink extra bills:', billsResponse.statusText)
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error handling extra bills nullification:', error)
+                    }
+                }
                 alert('Tracker details updated successfully!')
                 setShowEditModal(false)
                 setSelectedEditItem(null)
@@ -1069,6 +1449,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     billArrivalDate: '',
                     vendorId: null,
                     noOfBills: '',
+                    extraBills: '',
                     totalAmount: ''
                 })
                 window.location.reload()
@@ -1087,6 +1468,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
             billArrivalDate: '',
             vendorId: null,
             noOfBills: '',
+            extraBills: '',
             totalAmount: ''
         })
     }
@@ -1143,7 +1525,10 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 po.eno || po.po_number || po.purchase_order_number
             ).filter(eno => eno)
             const newValidationResults = {}
+            const newExtraValidationResults = {}
             const duplicateNumbers = []
+
+            // Check for duplicates in regular bills
             const currentBillNumbers = poNumbers.filter(num => num.trim() !== '')
             const duplicateMap = {}
             currentBillNumbers.forEach((billNumber, index) => {
@@ -1153,16 +1538,31 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     duplicateMap[billNumber] = [index]
                 }
             })
+
+            // Check for duplicates in extra bills
+            const currentExtraBillNumbers = extraPoNumbers.filter(num => num.trim() !== '')
+            currentExtraBillNumbers.forEach((billNumber, index) => {
+                if (duplicateMap[billNumber]) {
+                    duplicateMap[billNumber].push(`extra-${index}`)
+                } else {
+                    duplicateMap[billNumber] = [`extra-${index}`]
+                }
+            })
+
+            // Check for duplicates across all bills (regular + extra)
             Object.keys(duplicateMap).forEach(billNumber => {
                 if (duplicateMap[billNumber].length > 1) {
                     duplicateNumbers.push(billNumber)
                 }
             })
+
             if (duplicateNumbers.length > 0) {
                 alert(` Duplicate bill found within the same bill number: ${duplicateNumbers.join(', ')}. Please enter unique bill numbers.`)
                 setCheckingPO(false)
                 return
             }
+
+            // Validate regular bills
             poNumbers.forEach((billNumber, index) => {
                 const isNoPo = noPoSelections[index]
                 let isMatched = false
@@ -1205,7 +1605,56 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     message: message
                 }
             })
+
+            // Validate extra bills
+            const extraBills = selectedBill.extraBills || selectedBill.extra_bills || 0
+            if (extraBills > 0) {
+                extraPoNumbers.forEach((billNumber, index) => {
+                    const isNoPo = extraNoPoSelections[index]
+                    let isMatched = false
+                    let message = ''
+                    if (isNoPo) {
+                        isMatched = true
+                        message = 'No PO - Verified'
+                    } else if (billNumber.trim()) {
+                        const currentTrackerId = selectedBill.id
+                        let isAlreadyEntered = false
+                        for (const tracker of apiData) {
+                            if (tracker.id !== currentTrackerId) {
+                                const trackerVendorId = tracker.vendor_id || tracker.vendorId
+                                if (trackerVendorId === vendorId) {
+                                    const verifications = tracker.billVerifications || []
+                                    for (const verification of verifications) {
+                                        const existingBill = verification.bill_number || verification.billNumber
+                                        if (existingBill && existingBill !== 'NO_PO' && String(existingBill).trim() === billNumber.trim()) {
+                                            isAlreadyEntered = true
+                                            break
+                                        }
+                                    }
+                                    if (isAlreadyEntered) break
+                                }
+                            }
+                        }
+                        if (isAlreadyEntered) {
+                            isMatched = false
+                            message = 'Already Entered'
+                        } else {
+                            isMatched = vendorENOs.includes(billNumber.trim())
+                            message = isMatched ? 'Matched' : 'Not Matched'
+                        }
+                    } else {
+                        message = 'No PO Entered'
+                    }
+                    newExtraValidationResults[index] = {
+                        matched: isMatched,
+                        message: message
+                    }
+                })
+            }
+
             setValidationResults(newValidationResults)
+            setExtraValidationResults(newExtraValidationResults)
+
             const newCheckedBills = {}
             poNumbers.forEach((billNumber, index) => {
                 const isNoPo = noPoSelections[index]
@@ -1214,7 +1663,21 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     newCheckedBills[index] = true
                 }
             })
+
+            // Check extra bills
+            const newExtraCheckedBills = {}
+            if (extraBills > 0) {
+                extraPoNumbers.forEach((billNumber, index) => {
+                    const isNoPo = extraNoPoSelections[index]
+                    const validation = newExtraValidationResults[index]
+                    if ((isNoPo && isAdminUser()) || (billNumber.trim() && validation && validation.matched)) {
+                        newExtraCheckedBills[index] = true
+                    }
+                })
+            }
+
             setCheckedBills(prev => ({ ...prev, ...newCheckedBills }))
+            setExtraCheckedBills(prev => ({ ...prev, ...newExtraCheckedBills }))
         } catch (error) {
             alert('Error checking PO numbers')
         } finally {
@@ -1230,12 +1693,17 @@ const PendingBill = ({ username, userRoles = [] }) => {
             }
             const isFirstTimeEntry = !selectedBill.billVerifications || selectedBill.billVerifications.length === 0
             const maxBills = selectedBill.noOfBills || selectedBill.no_of_bills || 0
+            const extraBillsCount = selectedBill.extraBills || selectedBill.extra_bills || 0
             if (isAdminUser()) {
                 const validBillNumbers = poNumbers
                     .filter(billNumber => billNumber.trim() !== '')
                     .slice(0, maxBills)
+                const validExtraBillNumbers = extraBillsCount > 0 ? extraPoNumbers
+                    .filter(billNumber => billNumber.trim() !== '')
+                    .slice(0, extraBillsCount) : []
                 const hasNoPoSelections = Object.values(noPoSelections).some(isNoPo => isNoPo)
-                if (validBillNumbers.length === 0 && !hasNoPoSelections) {
+                const hasExtraNoPoSelections = extraBillsCount > 0 ? Object.values(extraNoPoSelections).some(isNoPo => isNoPo) : false
+                if (validBillNumbers.length === 0 && validExtraBillNumbers.length === 0 && !hasNoPoSelections && !hasExtraNoPoSelections) {
                     alert('Please enter at least one bill number or select "No PO" before sending request')
                     return
                 }
@@ -1246,6 +1714,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
             }
             const existingBills = selectedBill.billVerifications || []
             const billsData = []
+
+            // Add regular bills
             for (let i = 0; i < maxBills; i++) {
                 const existingBill = existingBills[i]
                 const billNumber = poNumbers[i] || ''
@@ -1279,6 +1749,44 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 }
                 billsData.push(billData)
             }
+
+            // Add extra bills if extraBillsCount > 0
+            if (extraBillsCount > 0) {
+                for (let i = 0; i < extraBillsCount; i++) {
+                    const existingBillIndex = maxBills + i
+                    const existingBill = existingBills[existingBillIndex]
+                    const billNumber = extraPoNumbers[i] || ''
+                    const isNoPo = extraNoPoSelections[i] || false
+                    const validation = extraValidationResults[i]
+                    let finalStatus = 'NOT_VERIFIED'
+                    let finalIsVerified = false
+                    if (isNoPo) {
+                        finalStatus = 'VERIFIED'
+                        finalIsVerified = true
+                    } else if (billNumber.trim()) {
+                        if (validation && validation.matched) {
+                            finalStatus = 'VERIFIED'
+                            finalIsVerified = true
+                        } else {
+                            finalStatus = 'NOT_VERIFIED'
+                            finalIsVerified = false
+                        }
+                    } else {
+                        finalStatus = 'NOT_VERIFIED'
+                        finalIsVerified = false
+                    }
+                    let billData = {
+                        bill_number: isNoPo ? 'NO_PO' : (billNumber || ''),
+                        status: finalStatus,
+                        is_verified: finalIsVerified,
+                        verified_date: finalIsVerified ? new Date().toISOString() : null
+                    }
+                    if (existingBill) {
+                        billData.id = existingBill.id
+                    }
+                    billsData.push(billData)
+                }
+            }
             const billResponse = await fetch(`https://backendaab.in/aabuildersDash/api/vendor-payments/tracker/${trackerId}/bills`, {
                 method: 'POST',
                 headers: {
@@ -1303,13 +1811,18 @@ const PendingBill = ({ username, userRoles = [] }) => {
             setShowModal(false)
             setSelectedBill(null)
             setPoNumbers([])
+            setExtraPoNumbers([])
             setRangeStart('')
             setRangeEnd('')
             setValidationResults({})
+            setExtraValidationResults({})
             setIsEditMode(false)
             setVerifiedBills({})
+            setExtraVerifiedBills({})
             setNoPoSelections({})
+            setExtraNoPoSelections({})
             setCheckedBills({})
+            setExtraCheckedBills({})
             window.location.reload()
         } catch (error) {
             alert(`Error sending request: ${error.message}`)
@@ -1374,7 +1887,11 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 po.eno || po.po_number || po.purchase_order_number
             ).filter(eno => eno)
             const maxBills = selectedBill.noOfBills || selectedBill.no_of_bills || 0
+            const extraBills = selectedBill.extraBills || selectedBill.extra_bills || 0
             const autoValidationResults = {}
+            const extraAutoValidationResults = {}
+
+            // Validate regular bills
             for (let i = 0; i < maxBills; i++) {
                 const billNumber = poNumbers[i] || ''
                 const isNoPo = noPoSelections[i] || false
@@ -1417,7 +1934,56 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     message: message
                 }
             }
+
+            // Validate extra bills
+            if (extraBills > 0) {
+                for (let i = 0; i < extraBills; i++) {
+                    const billNumber = extraPoNumbers[i] || ''
+                    const isNoPo = extraNoPoSelections[i] || false
+                    let isMatched = false
+                    let message = ''
+                    if (isNoPo) {
+                        isMatched = true
+                        message = 'No PO - Verified'
+                    } else if (billNumber.trim()) {
+                        const currentTrackerId = selectedBill.id
+                        let isAlreadyEntered = false
+                        for (const tracker of apiData) {
+                            if (tracker.id !== currentTrackerId) {
+                                const trackerVendorId = tracker.vendor_id || tracker.vendorId
+                                if (trackerVendorId === vendorId) {
+                                    const verifications = tracker.billVerifications || []
+                                    for (const verification of verifications) {
+                                        const existingBill = verification.bill_number || verification.billNumber
+                                        if (existingBill && existingBill !== 'NO_PO' && String(existingBill).trim() === billNumber.trim()) {
+                                            isAlreadyEntered = true
+                                            break
+                                        }
+                                    }
+                                    if (isAlreadyEntered) break
+                                }
+                            }
+                        }
+                        if (isAlreadyEntered) {
+                            isMatched = false
+                            message = 'Already Entered'
+                        } else {
+                            isMatched = vendorENOs.includes(billNumber.trim())
+                            message = isMatched ? 'Matched' : 'Not Matched'
+                        }
+                    } else {
+                        message = 'No PO Entered'
+                    }
+                    extraAutoValidationResults[i] = {
+                        matched: isMatched,
+                        message: message
+                    }
+                }
+            }
+
             setValidationResults(autoValidationResults)
+            setExtraValidationResults(extraAutoValidationResults)
+
             const unmatchedBills = []
             for (let i = 0; i < maxBills; i++) {
                 const billNumber = poNumbers[i] || ''
@@ -1426,6 +1992,19 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 if (billNumber.trim() && !isNoPo) {
                     if (!validation || !validation.matched) {
                         unmatchedBills.push(`Bill number ${i + 1} (${billNumber.trim()})`)
+                    }
+                }
+            }
+            // Check unmatched extra bills
+            if (extraBills > 0) {
+                for (let i = 0; i < extraBills; i++) {
+                    const billNumber = extraPoNumbers[i] || ''
+                    const isNoPo = extraNoPoSelections[i] || false
+                    const validation = extraAutoValidationResults[i]
+                    if (billNumber.trim() && !isNoPo) {
+                        if (!validation || !validation.matched) {
+                            unmatchedBills.push(`Extra bill ${i + 1} (${billNumber.trim()})`)
+                        }
                     }
                 }
             }
@@ -1441,6 +2020,16 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 const isNoPo = noPoSelections[i] || false
                 if (billNumber.trim() && !isNoPo) {
                     currentBillNumbers.push(billNumber.trim())
+                }
+            }
+            // Add extra bills to duplicate check
+            if (extraBills > 0) {
+                for (let i = 0; i < extraBills; i++) {
+                    const billNumber = extraPoNumbers[i] || ''
+                    const isNoPo = extraNoPoSelections[i] || false
+                    if (billNumber.trim() && !isNoPo) {
+                        currentBillNumbers.push(billNumber.trim())
+                    }
                 }
             }
             for (const billNumber of currentBillNumbers) {
@@ -1466,6 +2055,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
             }
             const existingBills = selectedBill.billVerifications || []
             const billsData = []
+
+            // Add regular bills
             for (let i = 0; i < maxBills; i++) {
                 const existingBill = existingBills[i]
                 const billNumber = poNumbers[i] || ''
@@ -1502,6 +2093,48 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     billData.id = existingBill.id
                 }
                 billsData.push(billData)
+            }
+
+            // Add extra bills if extraBills > 0
+            if (extraBills > 0) {
+                for (let i = 0; i < extraBills; i++) {
+                    const existingBillIndex = maxBills + i
+                    const existingBill = existingBills[existingBillIndex]
+                    const billNumber = extraPoNumbers[i] || ''
+                    const isNoPo = extraNoPoSelections[i] || false
+                    const validation = extraValidationResults[i]
+                    let finalBillNumber = ''
+                    let finalStatus = 'NOT_VERIFIED'
+                    let finalIsVerified = false
+                    if (isNoPo) {
+                        finalBillNumber = 'NO_PO'
+                        finalStatus = 'VERIFIED'
+                        finalIsVerified = true
+                    } else if (billNumber.trim()) {
+                        finalBillNumber = billNumber.trim()
+                        if (validation && validation.matched) {
+                            finalStatus = 'VERIFIED'
+                            finalIsVerified = true
+                        } else {
+                            finalStatus = 'VERIFIED'
+                            finalIsVerified = true
+                        }
+                    } else {
+                        finalBillNumber = 'NO_PO'
+                        finalStatus = 'VERIFIED'
+                        finalIsVerified = true
+                    }
+                    let billData = {
+                        bill_number: finalBillNumber,
+                        status: finalStatus,
+                        is_verified: finalIsVerified,
+                        verified_date: finalIsVerified ? new Date().toISOString() : null
+                    }
+                    if (existingBill) {
+                        billData.id = existingBill.id
+                    }
+                    billsData.push(billData)
+                }
             }
             const billResponse = await fetch(`https://backendaab.in/aabuildersDash/api/vendor-payments/tracker/${trackerId}/bills`, {
                 method: 'POST',
@@ -1588,8 +2221,11 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 })) : prev.billVerifications || []
             } : prev)
             setVerifiedBills({})
+            setExtraVerifiedBills({})
             setCheckedBills({})
+            setExtraCheckedBills({})
             setValidationResults({})
+            setExtraValidationResults({})
             setHasBeenSubmitted(false)
             setOriginalData(null)
         } catch (error) {
@@ -1622,8 +2258,11 @@ const PendingBill = ({ username, userRoles = [] }) => {
             setValidationResults({})
             setIsEditMode(false)
             setVerifiedBills({})
+            setExtraVerifiedBills({})
             setNoPoSelections({})
+            setExtraNoPoSelections({})
             setCheckedBills({})
+            setExtraCheckedBills({})
             window.location.reload()
         } catch (error) {
             alert(`Error rejecting request: ${error.message}`)
@@ -1631,6 +2270,9 @@ const PendingBill = ({ username, userRoles = [] }) => {
     }
     const hasUnverifiedBillNumbers = () => {
         const maxBills = selectedBill?.noOfBills || selectedBill?.no_of_bills || 0
+        const extraBills = selectedBill?.extraBills || selectedBill?.extra_bills || 0
+
+        // Check regular bills
         for (let i = 0; i < maxBills; i++) {
             const billNumber = poNumbers[i] || ''
             const isNoPo = noPoSelections[i] || false
@@ -1641,6 +2283,21 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 }
             }
         }
+
+        // Check extra bills
+        if (extraBills > 0) {
+            for (let i = 0; i < extraBills; i++) {
+                const billNumber = extraPoNumbers[i] || ''
+                const isNoPo = extraNoPoSelections[i] || false
+                const validation = extraValidationResults[i]
+                if (billNumber.trim() && !isNoPo) {
+                    if (!validation || !validation.matched) {
+                        return true
+                    }
+                }
+            }
+        }
+
         return false
     }
     const isSendRequestDisabled = () => {
@@ -2490,6 +3147,41 @@ const PendingBill = ({ username, userRoles = [] }) => {
             }
         }
     }
+
+    // ISO 8601 week number calculation
+    // Week belongs to the year that contains the Thursday of that week
+    // Week 1 is the week with the year's first Thursday
+    const getISOWeekNumber = (date) => {
+        const d = new Date(date);
+        d.setHours(0, 0, 0, 0);
+
+        // Get Thursday of the week containing the date
+        // Monday = 1, Tuesday = 2, ..., Sunday = 0 (convert to 7)
+        const dayOfWeek = d.getDay() || 7; // Convert Sunday (0) to 7
+        const thursday = new Date(d);
+        thursday.setDate(d.getDate() + 4 - dayOfWeek); // Thursday is 4 days after Monday
+        thursday.setHours(0, 0, 0, 0);
+
+        // Use the year that Thursday falls in (ISO 8601 rule)
+        const weekYear = thursday.getFullYear();
+
+        // Get January 1st of that year
+        const jan1 = new Date(weekYear, 0, 1);
+        jan1.setHours(0, 0, 0, 0);
+
+        // Get the Thursday of week 1 (first Thursday of the year)
+        const jan1DayOfWeek = jan1.getDay() || 7;
+        const firstThursday = new Date(jan1);
+        firstThursday.setDate(jan1.getDate() + 4 - jan1DayOfWeek);
+        firstThursday.setHours(0, 0, 0, 0);
+
+        // Calculate week number: difference in days divided by 7, plus 1
+        const daysDiff = Math.floor((thursday - firstThursday) / 86400000);
+        const weekNo = Math.floor(daysDiff / 7) + 1;
+
+        return weekNo;
+    };
+
     const handlePaymentSubmit = async () => {
         // Check if using carry forward only (no payment entries needed)
         const isUsingCarryForwardOnly = useCarryForward && carryForwardAmount > 0;
@@ -2550,7 +3242,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 carryForwardToUse = Math.min(carryForwardAmount, remainingAfterPayments);
             }
             const newRemainingAmount = Math.max(0, remainingAfterPayments - carryForwardToUse);
-            
+
             // Calculate excess amount: if payment total exceeds the amount needed to pay
             const amountNeededToPay = Math.max(0, actualAmount - currentReceivedAmount - normalizedDiscount);
             const totalPaymentBeingMade = totalPaymentAmount + carryForwardToUse;
@@ -2719,7 +3411,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                         type: "Vendor Bill Payment",
                         amount: parseFloat(entry.amount) || 0,
                         status: false,
-                        weekly_number: "",
+                        weekly_number: entry.date ? getISOWeekNumber(entry.date) : "",
                         period_start_date: null,
                         period_end_date: null,
                         advance_portal_id: null,
@@ -2901,7 +3593,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                         headers: {
                             'Content-Type': 'application/json',
                         }
-                    });                    
+                    });
                     if (trackerResponse.ok) {
                         const updatedTracker = await trackerResponse.json();
                         const vendorId = updatedTracker.vendor_id || updatedTracker.vendorId || selectedPaymentBill.vendor_id || selectedPaymentBill.vendorId;
@@ -2937,12 +3629,12 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                 'Content-Type': 'application/json',
                                             }
                                         }
-                                    );                                    
+                                    );
                                     if (!completeResponse.ok) {
                                         const errorText = await completeResponse.text();
                                         console.error(`Failed to mark payment complete for vendorId=${vendorId}, poNumber=${poNumber}:`, errorText);
                                         return { success: false, poNumber, error: errorText };
-                                    }                                    
+                                    }
                                     return { success: true, poNumber };
                                 } catch (error) {
                                     console.error(`Error marking payment complete for vendorId=${vendorId}, poNumber=${poNumber}:`, error);
@@ -2951,7 +3643,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                             });
                             const results = await Promise.all(completePaymentPromises);
                             const successful = results.filter(r => r.success);
-                            const failed = results.filter(r => !r.success);                            
+                            const failed = results.filter(r => !r.success);
                             if (failed.length > 0) {
                                 console.warn(`Some purchase orders could not be marked as payment complete. Failed: ${failed.length}, Successful: ${successful.length}`);
                                 failed.forEach(f => {
@@ -3231,8 +3923,10 @@ const PendingBill = ({ username, userRoles = [] }) => {
     const renderInputFields = () => {
         const fields = []
         const noOfBills = selectedBill?.noOfBills || selectedBill?.no_of_bills || 0
+        const extraBills = selectedBill?.extraBills || selectedBill?.extra_bills || 0
         const hasExistingBills = selectedBill?.billVerifications && selectedBill.billVerifications.length > 0
         const vendorIdForSelected = selectedBill?.vendorId || selectedBill?.vendor_id || null
+        // Render regular bills
         for (let i = 0; i < noOfBills; i++) {
             const validation = validationResults[i]
             const hasValidation = validation !== undefined
@@ -3327,6 +4021,105 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
             )
+        }
+        // Render extra bills if extraBills > 0
+        if (extraBills > 0) {
+            for (let i = 0; i < extraBills; i++) {
+                const validation = extraValidationResults[i]
+                const hasValidation = validation !== undefined
+                const isValid = validation?.matched
+                const poNumber = extraPoNumbers[i] || ''
+                const isVerified = extraVerifiedBills[i] || false
+                const isNoPo = extraNoPoSelections[i] || false
+                let borderClass = 'border-gray-300'
+                let bgClass = isEditMode ? 'bg-white' : 'bg-[#F2F2F2]'
+                let tooltipText = null
+                const persistedVerificationIndex = noOfBills + i
+                const persistedVerification = selectedBill?.billVerifications && selectedBill.billVerifications[persistedVerificationIndex]
+                if (hasValidation) {
+                    const validationMessage = validation.message
+                    if (isValid) {
+                        const paidPreviously = !isNoPo && poNumber.trim() ? isBillAlreadyPaid(vendorIdForSelected, poNumber.trim()) : false
+                        if (paidPreviously) {
+                            borderClass = 'border-yellow-500'
+                            tooltipText = 'Paid'
+                        } else {
+                            borderClass = 'border-green-500'
+                            tooltipText = 'Matched'
+                        }
+                    } else if (validationMessage === 'Already Entered') {
+                        borderClass = 'border-orange-500'
+                        tooltipText = 'Already Entered'
+                    } else {
+                        borderClass = 'border-red-500'
+                        tooltipText = 'Not Matched'
+                    }
+                } else if (persistedVerification) {
+                    const persistedBillNumber = persistedVerification.bill_number || persistedVerification.billNumber || ''
+                    const persistedIsVerified = persistedVerification.is_verified === true || persistedVerification.status === 'VERIFIED'
+                    const persistedIsPaid = persistedVerification.is_paid === true || persistedVerification.status === 'PAID'
+                    if (persistedIsVerified) {
+                        const billToCheck = persistedBillNumber && persistedBillNumber !== 'NO_PO' ? String(persistedBillNumber).trim() : (poNumber && poNumber !== 'NO_PO' ? String(poNumber).trim() : '')
+                        const paidPreviously = billToCheck ? (persistedIsPaid || isBillAlreadyPaid(vendorIdForSelected, billToCheck)) : false
+                        if (paidPreviously) {
+                            borderClass = 'border-yellow-500'
+                            tooltipText = 'Paid'
+                        } else {
+                            borderClass = 'border-green-500'
+                            tooltipText = 'Matched'
+                        }
+                    } else {
+                        borderClass = 'border-red-500'
+                        tooltipText = 'Not Matched'
+                    }
+                }
+                const showInput = isEditMode || !hasExistingBills
+                fields.push(
+                    <div key={`extra-${i}`} className="flex flex-col items-center gap-2 p-3 rounded-lg bg-white border-2 border-white">
+                        <div className="relative group">
+                            {showInput ? (
+                                <div className="flex flex-col gap-2 items-center">
+                                    <input
+                                        type="text"
+                                        value={poNumber}
+                                        onChange={(e) => handleExtraPoNumberChange(i, e.target.value)}
+                                        placeholder="Enter PO"
+                                        className={`w-20 h-8 px-2 py-1 rounded text-sm text-center ${bgClass} focus:outline-none focus:bg-white transition-colors duration-200 placeholder-gray-400 border ${borderClass}`}
+                                        disabled={isNoPo}
+                                    />
+                                    {isAdminUser() && (
+                                        <div className="flex items-center gap-1">
+                                            <input
+                                                type="checkbox"
+                                                id={`extra-no-po-${i}`}
+                                                checked={isNoPo}
+                                                onChange={(e) => handleExtraNoPoChange(i, e.target.checked)}
+                                                className="w-3 h-3"
+                                            />
+                                            <label htmlFor={`extra-no-po-${i}`} className="text-xs text-gray-600 cursor-pointer">
+                                                No PO
+                                            </label>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center gap-1">
+                                    <div className={`w-20 h-8 px-2 py-1 rounded text-sm text-center bg-gray-50 border ${borderClass} flex items-center justify-center`}>
+                                        <span className={isNoPo ? 'text-gray-500' : 'text-gray-700'}>
+                                            {isNoPo ? 'No PO' : (poNumber || '-')}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                            {(tooltipText) && (
+                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                                    {tooltipText}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )
+            }
         }
         return fields
     }
@@ -3711,7 +4504,14 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                             {getVendorNameById(item.vendor_id)}
                                         </td>
                                         <td className="px-2 py-3 text-left text-sm font-semibold border-b border-gray-100 align-middle">
-                                            {item.no_of_bills || item.noOfBills || '-'}
+                                            {(() => {
+                                                const noOfBills = item.no_of_bills || item.noOfBills || 0;
+                                                const extraBills = item.extra_bills || item.extraBills || 0;
+                                                if (extraBills > 0) {
+                                                    return `${noOfBills} & ${extraBills}`;
+                                                }
+                                                return noOfBills || '-';
+                                            })()}
                                         </td>
                                         <td className="px-2 py-3 text-center text-sm font-semibold border-b border-gray-100 align-middle">
                                             {item.total_amount ? formatIndianCurrency(parseInt(item.total_amount)) : '-'}
@@ -3883,49 +4683,59 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg w-full max-w-5xl max-h-[90vh] shadow-lg flex flex-col">
                         <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
-                            <div className="flex justify-between items-center">
-                                <div>
-                                    <p className="text-gray-700 text-sm">
-                                        {selectedBill?.request_approved ? (
-                                            <>
-                                                Request has been approved. You can proceed with the bills.
-                                                <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                                                    Approved
-                                                </span>
-                                            </>
-                                        ) : areAllBillsVerifiedAndNotPaid() ? (
-                                            <>
-                                                All bills have been verified successfully. No need to send request.
-                                                <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                                                    All Verified
-                                                </span>
-                                            </>
-                                        ) : selectedBill?.send_request ? (
-                                            isAdminUser() ? (
+                            <div className=" items-center">
+                                <div className="flex justify-between">
+                                    <div className='flex '>
+                                        <p className="text-gray-700 text-sm">
+                                            {selectedBill?.request_approved ? (
                                                 <>
-                                                    Request has been sent. Admin can approve or reject the request.
+                                                    Request has been approved. You can proceed with the bills.
+                                                    <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                                                        Approved
+                                                    </span>
                                                 </>
+                                            ) : areAllBillsVerifiedAndNotPaid() ? (
+                                                <>
+                                                    All bills have been verified successfully. No need to send request.
+                                                    <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                                                        All Verified
+                                                    </span>
+                                                </>
+                                            ) : selectedBill?.send_request ? (
+                                                isAdminUser() ? (
+                                                    <>
+                                                        Request has been sent. Admin can approve or reject the request.
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        Request has been sent. You can only view the bills now.
+                                                        <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                                                            Request Sent
+                                                        </span>
+                                                    </>
+                                                )
                                             ) : (
                                                 <>
-                                                    Request has been sent. You can only view the bills now.
-                                                    <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                                                        Request Sent
-                                                    </span>
+                                                    Enter PO numbers or select "No PO" (Max: {selectedBill?.noOfBills || selectedBill?.no_of_bills || 0})
+                                                    {isSendRequestDisabled() && !hasUnverifiedBillNumbers() && (
+                                                        <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
+                                                            Enter bill numbers to enable Send Request
+                                                        </span>
+                                                    )}
                                                 </>
-                                            )
-                                        ) : (
-                                            <>
-                                                Enter PO numbers or select "No PO" (Max: {selectedBill?.noOfBills || selectedBill?.no_of_bills || 0})
-                                                {isSendRequestDisabled() && !hasUnverifiedBillNumbers() && (
-                                                    <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
-                                                        Enter bill numbers to enable Send Request
-                                                    </span>
-                                                )}
-                                            </>
-                                        )}
-                                    </p>
-                                    {selectedBill && (
-                                        <div className="mt-3 flex flex-wrap items-end gap-3">
+                                            )}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <button className="w-8 h-8 flex items-center justify-end transition-colors duration-200 text-gray-500 text-xl"
+                                            onClick={handleCancel}>
+                                            ×
+                                        </button>
+                                    </div>
+                                </div>
+                                {selectedBill && (
+                                    <div className="mt-3 flex justify-between">
+                                        <div className="flex flex-wrap items-end gap-3">
                                             <div>
                                                 <input
                                                     type="text"
@@ -3953,12 +4763,19 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                 </button>
                                             </div>
                                         </div>
-                                    )}
-                                </div>
-                                <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl"
-                                    onClick={handleCancel}>
-                                    ×
-                                </button>
+                                        <div className="pb-1 flex items-center gap-2">
+                                            <span className="text-sm text-gray-700 font-medium">Last Paid PO</span>
+                                            <div className="relative">
+                                                <input
+                                                    type="text"
+                                                    value={lastPaidPO}
+                                                    readOnly
+                                                    className="w-24 h-10 px-3 py-2 border-2 border-red-500 rounded-md text-sm focus:outline-none bg-white text-gray-700"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                         <div className="p-6 flex-1 overflow-y-auto">
@@ -4410,8 +5227,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                     )}
                                     {existingPaymentDetails && existingPaymentDetails.length > 0 && (
                                         <div className={`p-w overflow-auto mb-8 ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'
-                                                ? 'h-[630px]'
-                                                : 'h-[300px]'
+                                            ? 'h-[630px]'
+                                            : 'h-[300px]'
                                             }`}>
                                             <h4 className="text-sm font-semibold text-gray-700">Previous Payment Details:</h4>
                                             <div className="space-y-4">
@@ -4776,19 +5593,34 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                         }}
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Number of Bills *
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        value={editFormData.noOfBills}
-                                        onChange={(e) => handleEditInputChange('noOfBills', e.target.value)}
-                                        className="w-full h-[45px] px-3 py-2 border-2 border-[#BF9853] border-opacity-30 rounded-lg text-sm focus:outline-none focus:border-[#BF9853] focus:border-opacity-60"
-                                        placeholder="Enter number of bills"
-                                        required
-                                    />
+                                <div className="flex gap-4">
+                                    <div className="flex-1">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Number of Bills *
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={editFormData.noOfBills}
+                                            onChange={(e) => handleEditInputChange('noOfBills', e.target.value)}
+                                            className="w-full h-[45px] px-3 py-2 border-2 border-[#BF9853] border-opacity-30 rounded-lg text-sm focus:outline-none focus:border-[#BF9853] focus:border-opacity-60"
+                                            placeholder="Enter number of bills"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Extra Bills
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={editFormData.extraBills}
+                                            onChange={(e) => handleEditInputChange('extraBills', e.target.value)}
+                                            className="w-full h-[45px] px-3 py-2 border-2 border-[#BF9853] border-opacity-30 rounded-lg text-sm focus:outline-none focus:border-[#BF9853] focus:border-opacity-60"
+                                            placeholder="Enter extra bills (default: 0)"
+                                        />
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">

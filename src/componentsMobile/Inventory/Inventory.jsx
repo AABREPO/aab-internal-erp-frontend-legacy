@@ -72,7 +72,7 @@ const Inventory = ({ user, onLogout }) => {
     }
   };
   return (
-    <div className="relative w-full min-h-screen bg-white max-w-[360px] mx-auto pb-[80px]" style={{ fontFamily: "'Manrope', sans-serif" }}>
+    <div className="relative w-full  bg-white max-w-[360px] mx-auto" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
@@ -91,7 +91,7 @@ const Inventory = ({ user, onLogout }) => {
       {/* Tabs - Fixed */}
       <InventoryTabs activeTab={activeTab} onTabChange={handleTabChange} />
       {/* Content Area */}
-      <div className="pt-[90px]">
+      <div className="mt-[90px]">
         {renderTabContent()}
       </div>
       {/* Bottom Navigation */}

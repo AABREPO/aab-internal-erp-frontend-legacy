@@ -14,6 +14,16 @@ const History = ({ onTabChange }) => {
   const expandedItemIdRef = useRef(expandedItemId);
   const cardRefs = useRef({});
   const [activeType, setActiveType] = useState('stack return'); // 'stack return' or 'dispatch'
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [filterProjectName, setFilterProjectName] = useState('');
+  const [filterProjectIncharge, setFilterProjectIncharge] = useState('');
+  const [filterStockingLocation, setFilterStockingLocation] = useState('');
+  const [filterSRNumber, setFilterSRNumber] = useState('');
+  const [filterDate, setFilterDate] = useState('');
+  const [employeeData, setEmployeeData] = useState([]);
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [showInchargeDropdown, setShowInchargeDropdown] = useState(false);
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
 
   // Fetch client data
   useEffect(() => {
@@ -46,6 +56,25 @@ const History = ({ onTabChange }) => {
     fetchClients();
   }, []);
 
+  // Fetch employee data for Project Incharge
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/employee_details/getAll');
+        if (response.ok) {
+          const data = await response.json();
+          const siteEngineers = data.filter(
+            (emp) => emp.role_of_employee === 'Site Engineer'
+          );
+          setEmployeeData(siteEngineers);
+        }
+      } catch (error) {
+        console.error('Error fetching employees:', error);
+      }
+    };
+    fetchEmployees();
+  }, []);
+
   // Fetch inventory history data
   useEffect(() => {
     const fetchHistory = async () => {
@@ -62,9 +91,9 @@ const History = ({ onTabChange }) => {
         if (!response.ok) {
           throw new Error('Network response was not ok');
         }
-        const inventoryData = await response.json();        
+        const inventoryData = await response.json();
         // Filter for outgoing type only
-        const outgoingItems = inventoryData.filter(item => 
+        const outgoingItems = inventoryData.filter(item =>
           item.inventory_type === 'outgoing' || item.inventoryType === 'outgoing'
         );
         // Format the outgoing items
@@ -72,12 +101,12 @@ const History = ({ onTabChange }) => {
           // Get the date from date column
           const itemDate = item.date || item.created_at || item.createdAt;
           const dateObj = new Date(itemDate);
-          const year = dateObj.getFullYear();          
+          const year = dateObj.getFullYear();
           // Get entry number - use eno as primary source
-          const entryNumber = item.eno || item.ENO || item.entry_number || item.entryNumber || item.entrynumber || item.id || '';          
+          const entryNumber = item.eno || item.ENO || item.entry_number || item.entryNumber || item.entrynumber || item.id || '';
           // Determine transaction ID based on outgoing type
           let transactionId = '';
-          const outgoingType = item.outgoing_type || item.outgoingType || '';          
+          const outgoingType = item.outgoing_type || item.outgoingType || '';
           if (outgoingType.toLowerCase() === 'stock return' || outgoingType.toLowerCase() === 'stockreturn') {
             transactionId = `SR - ${year} - ${entryNumber}`;
           } else if (outgoingType.toLowerCase() === 'dispatch') {
@@ -90,9 +119,9 @@ const History = ({ onTabChange }) => {
           const clientId = item.client_id || item.clientId;
           let clientName = '';
           if (clientId && clientData.length > 0) {
-            const client = clientData.find(c => 
-              c.id === clientId || 
-              c.client_id === clientId || 
+            const client = clientData.find(c =>
+              c.id === clientId ||
+              c.client_id === clientId ||
               String(c.id) === String(clientId) ||
               String(c.client_id) === String(clientId)
             );
@@ -102,11 +131,11 @@ const History = ({ onTabChange }) => {
           const inventoryItems = item.inventoryItems || item.inventory_items || [];
           const numberOfItems = Array.isArray(inventoryItems) ? inventoryItems.length : 0;
           // Calculate quantity as sum of inventoryItems qty
-          const quantity = Array.isArray(inventoryItems) 
+          const quantity = Array.isArray(inventoryItems)
             ? inventoryItems.reduce((sum, invItem) => {
-                const qty = invItem.qty || invItem.quantity || invItem.Qty || invItem.Quantity || 0;
-                return sum + (parseFloat(qty) || 0);
-              }, 0)
+              const qty = invItem.qty || invItem.quantity || invItem.Qty || invItem.Quantity || 0;
+              return sum + (parseFloat(qty) || 0);
+            }, 0)
             : (item.total_quantity || item.totalQuantity || item.quantity || 0);
           // Ensure originalItem includes inventoryItems explicitly
           const originalItemWithItems = {
@@ -120,7 +149,7 @@ const History = ({ onTabChange }) => {
             customerName: clientName || item.project_name || item.projectName || item.project_incharge || item.projectIncharge || '',
             location: item.stocking_location || item.stockingLocation || '',
             date: itemDate,
-            createdDateTime: item.created_date_time || item.createdDateTime || item.created_at ,
+            createdDateTime: item.created_date_time || item.createdDateTime || item.created_at,
             time: item.time || (itemDate ? new Date(itemDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : ''),
             numberOfItems: numberOfItems,
             quantity: quantity,
@@ -173,8 +202,57 @@ const History = ({ onTabChange }) => {
       });
     }
 
+    // Filter by Project Name
+    if (filterProjectName.trim()) {
+      filtered = filtered.filter(item => {
+        const customerName = item.customerName || '';
+        return customerName.toLowerCase() === filterProjectName.toLowerCase();
+      });
+    }
+
+    // Filter by Project Incharge
+    if (filterProjectIncharge.trim()) {
+      filtered = filtered.filter(item => {
+        const incharge = item.originalItem?.project_incharge || item.originalItem?.projectIncharge || '';
+        return incharge.toLowerCase() === filterProjectIncharge.toLowerCase();
+      });
+    }
+
+    // Filter by Stocking Location
+    if (filterStockingLocation.trim()) {
+      filtered = filtered.filter(item => {
+        const location = item.location || '';
+        return location.toLowerCase() === filterStockingLocation.toLowerCase();
+      });
+    }
+
+    // Filter by SR Number
+    if (filterSRNumber.trim()) {
+      filtered = filtered.filter(item => {
+        const srNumber = filterSRNumber.replace('#', '').trim();
+        const transactionId = item.transactionId || '';
+        // Extract number from transaction ID (e.g., "SR - 2026 - 2" -> "2")
+        const match = transactionId.match(/- (\d+)$/);
+        if (match) {
+          return match[1] === srNumber;
+        }
+        return transactionId.includes(srNumber);
+      });
+    }
+
+    // Filter by Date
+    if (filterDate.trim()) {
+      filtered = filtered.filter(item => {
+        const itemDate = item.date || item.created_at || item.createdAt;
+        if (!itemDate) return false;
+        const dateObj = new Date(itemDate);
+        const filterDateObj = new Date(filterDate);
+        return dateObj.toDateString() === filterDateObj.toDateString();
+      });
+    }
+
     setFilteredData(filtered);
-  }, [searchQuery, historyData, activeType]);
+  }, [searchQuery, historyData, activeType, filterProjectName, filterProjectIncharge, filterStockingLocation, filterSRNumber, filterDate]);
 
   // Format date to show "Today" or actual date
   const formatDate = (dateString) => {
@@ -182,7 +260,7 @@ const History = ({ onTabChange }) => {
     const date = new Date(dateString);
     const today = new Date();
     const isToday = date.toDateString() === today.toDateString();
-    
+
     if (isToday) {
       return 'Today';
     } else {
@@ -214,7 +292,7 @@ const History = ({ onTabChange }) => {
 
   // Swipe handlers
   const minSwipeDistance = 50;
-  
+
   const handleTouchStart = (e, itemId) => {
     const touch = e.touches ? e.touches[0] : { clientX: e.clientX };
     setSwipeStates(prev => ({
@@ -282,7 +360,7 @@ const History = ({ onTabChange }) => {
   // Set up non-passive touch event listeners to allow preventDefault
   useEffect(() => {
     const cleanupFunctions = [];
-    
+
     // Set up non-passive touchmove listeners for each card to handle preventDefault
     Object.keys(cardRefs.current).forEach(itemId => {
       const cardElement = cardRefs.current[itemId];
@@ -398,13 +476,13 @@ const History = ({ onTabChange }) => {
     try {
       // Get the original inventory item data (should already have inventoryItems from originalItem)
       let inventoryData = item.originalItem || item;
-      
+
       // Check if inventoryItems are present in the data
       const hasInventoryItems = inventoryData?.inventoryItems || inventoryData?.inventory_items;
-      
+
       // If inventoryItems are missing, try to fetch them from the backend
-      if (!hasInventoryItems || (Array.isArray(inventoryData?.inventoryItems) && inventoryData.inventoryItems.length === 0) || 
-          (Array.isArray(inventoryData?.inventory_items) && inventoryData.inventory_items.length === 0)) {
+      if (!hasInventoryItems || (Array.isArray(inventoryData?.inventoryItems) && inventoryData.inventoryItems.length === 0) ||
+        (Array.isArray(inventoryData?.inventory_items) && inventoryData.inventory_items.length === 0)) {
         if (inventoryData?.id) {
           try {
             // Try to fetch the inventory record with items by ID
@@ -415,7 +493,7 @@ const History = ({ onTabChange }) => {
                 'Content-Type': 'application/json'
               }
             });
-            
+
             if (response.ok) {
               const detailedData = await response.json();
               // Merge the detailed data with inventoryItems
@@ -434,7 +512,7 @@ const History = ({ onTabChange }) => {
           }
         }
       }
-      
+
       // Ensure inventoryItems are explicitly set (use both field names for compatibility)
       if (inventoryData?.inventoryItems || inventoryData?.inventory_items) {
         const items = inventoryData.inventoryItems || inventoryData.inventory_items;
@@ -444,12 +522,12 @@ const History = ({ onTabChange }) => {
           inventory_items: items
         };
       }
-      
+
       // Mark as view mode (not edit mode) - for showing Download button
       inventoryData.isEditMode = false;
       // Mark as view mode from History (for showing Download button instead of Stack Return/Dispatch)
       inventoryData.fromHistory = true;
-      
+
       // Store inventory item data in localStorage to load in outgoing tab
       if (inventoryData) {
         localStorage.setItem('editingInventory', JSON.stringify(inventoryData));
@@ -481,13 +559,13 @@ const History = ({ onTabChange }) => {
     try {
       // Get the original inventory item data (should already have inventoryItems from originalItem)
       let inventoryData = item.originalItem || item;
-      
+
       // Check if inventoryItems are present in the data
       const hasInventoryItems = inventoryData?.inventoryItems || inventoryData?.inventory_items;
-      
+
       // If inventoryItems are missing, try to fetch them from the backend
-      if (!hasInventoryItems || (Array.isArray(inventoryData?.inventoryItems) && inventoryData.inventoryItems.length === 0) || 
-          (Array.isArray(inventoryData?.inventory_items) && inventoryData.inventory_items.length === 0)) {
+      if (!hasInventoryItems || (Array.isArray(inventoryData?.inventoryItems) && inventoryData.inventoryItems.length === 0) ||
+        (Array.isArray(inventoryData?.inventory_items) && inventoryData.inventory_items.length === 0)) {
         if (inventoryData?.id) {
           try {
             // Try to fetch the inventory record with items by ID
@@ -498,7 +576,7 @@ const History = ({ onTabChange }) => {
                 'Content-Type': 'application/json'
               }
             });
-            
+
             if (response.ok) {
               const detailedData = await response.json();
               // Merge the detailed data with inventoryItems
@@ -517,7 +595,7 @@ const History = ({ onTabChange }) => {
           }
         }
       }
-      
+
       // Ensure inventoryItems are explicitly set (use both field names for compatibility)
       if (inventoryData?.inventoryItems || inventoryData?.inventory_items) {
         const items = inventoryData.inventoryItems || inventoryData.inventory_items;
@@ -527,12 +605,12 @@ const History = ({ onTabChange }) => {
           inventory_items: items
         };
       }
-      
+
       // Mark as edit mode (update, not clone)
       inventoryData.isEditMode = true;
       // Mark as view mode from History (for showing Download button instead of Stack Return/Dispatch)
       inventoryData.fromHistory = true;
-      
+
       // Store inventory item data in localStorage to load in outgoing tab
       if (inventoryData) {
         localStorage.setItem('editingInventory', JSON.stringify(inventoryData));
@@ -564,13 +642,13 @@ const History = ({ onTabChange }) => {
     try {
       // Get the original inventory item data (should already have inventoryItems from originalItem)
       let inventoryData = item.originalItem || item;
-      
+
       // Check if inventoryItems are present in the data
       const hasInventoryItems = inventoryData?.inventoryItems || inventoryData?.inventory_items;
-      
+
       // If inventoryItems are missing, try to fetch them from the backend
-      if (!hasInventoryItems || (Array.isArray(inventoryData?.inventoryItems) && inventoryData.inventoryItems.length === 0) || 
-          (Array.isArray(inventoryData?.inventory_items) && inventoryData.inventory_items.length === 0)) {
+      if (!hasInventoryItems || (Array.isArray(inventoryData?.inventoryItems) && inventoryData.inventoryItems.length === 0) ||
+        (Array.isArray(inventoryData?.inventory_items) && inventoryData.inventory_items.length === 0)) {
         if (inventoryData?.id) {
           try {
             // Try to fetch the inventory record with items by ID
@@ -581,7 +659,7 @@ const History = ({ onTabChange }) => {
                 'Content-Type': 'application/json'
               }
             });
-            
+
             if (response.ok) {
               const detailedData = await response.json();
               // Merge the detailed data with inventoryItems
@@ -600,7 +678,7 @@ const History = ({ onTabChange }) => {
           }
         }
       }
-      
+
       // Ensure inventoryItems are explicitly set (use both field names for compatibility)
       if (inventoryData?.inventoryItems || inventoryData?.inventory_items) {
         const items = inventoryData.inventoryItems || inventoryData.inventory_items;
@@ -610,12 +688,12 @@ const History = ({ onTabChange }) => {
           inventory_items: items
         };
       }
-      
+
       // Mark as clone mode (create new, not update) - remove isEditMode or set to false
       inventoryData.isEditMode = false;
       // Remove ID to ensure it creates new record
       delete inventoryData.id;
-      
+
       // Store inventory item data in localStorage to load in outgoing tab
       if (inventoryData) {
         localStorage.setItem('editingInventory', JSON.stringify(inventoryData));
@@ -649,32 +727,48 @@ const History = ({ onTabChange }) => {
     setExpandedItemId(null);
   };
 
+  const getTodayDate = () => {
+    const today = new Date();
+    return today.toLocaleDateString('en-GB'); // DD/MM/YYYY
+  };
+
   return (
     <div className="flex flex-col h-full bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
+      {/* Date and Category Section */}
+      <div className="flex-shrink-0 px-4 pt-2">
+        <div className="flex items-center justify-between flex-1">
+          <p className="text-[12px] font-medium text-black leading-normal">
+            {getTodayDate()}
+          </p>
+          <p className="text-[12px] font-medium text-black leading-normal">
+            Category
+          </p>
+        </div>
+      </div>
       {/* Stack Return/Dispatch Toggle */}
       <div className="flex-shrink-0 px-4 pt-3">
         <div className="flex items-center gap-2">
           {/* Stack Return/Dispatch Tabs */}
           <div className="flex bg-gray-100 items-center h-9 shadow-sm flex-1">
-          <button
-              type="button"
-              onClick={() => setActiveType('dispatch')}
-              className={`flex-1 py-1 px-4 mr-1 h-8 rounded-lg text-[14px] font-medium transition-colors ${activeType === 'dispatch'
-                  ? 'bg-white text-black'
-                  : 'bg-gray-100 text-gray-600'
-                }`}
-            >
-              Dispatch
-            </button>
             <button
               type="button"
               onClick={() => setActiveType('stack return')}
               className={`flex-1 py-1 px-4 ml-1 h-8 rounded text-[14px] font-medium transition-colors ${activeType === 'stack return'
-                  ? 'bg-white text-black'
-                  : 'bg-gray-100 text-gray-600'
+                ? 'bg-white text-black'
+                : 'bg-gray-100 text-gray-600'
                 }`}
             >
-              Stack Return
+              Stock Return
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveType('dispatch')}
+              className={`flex-1 py-1 px-4 mr-1 h-8 rounded-lg text-[14px] font-medium transition-colors ${activeType === 'dispatch'
+                ? 'bg-white text-black'
+                : 'bg-gray-100 text-gray-600'
+                }`}
+            >
+              Dispatch
             </button>
           </div>
         </div>
@@ -701,11 +795,104 @@ const History = ({ onTabChange }) => {
 
       {/* Filter */}
       <div className="px-4 pb-3">
-        <div className="flex items-center gap-2 cursor-pointer">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M2 4H14M4 8H12M6 12H10" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          <span className="text-[12px] font-medium text-black">Filter</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setShowFilterModal(true)}
+            className="flex items-center gap-2 cursor-pointer"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M2 4H14M4 8H12M6 12H10" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            {!(filterProjectName || filterProjectIncharge || filterStockingLocation || filterSRNumber || filterDate) && (
+              <span className="text-[12px] font-medium text-black">Filter</span>
+            )}
+          </button>
+          {filterProjectName && (
+            <div className="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full">
+              <span className="text-[12px] font-medium text-black">Project Name</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFilterProjectName('');
+                }}
+                className="w-4 h-4 flex items-center justify-center hover:bg-gray-200 rounded-full transition-colors"
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M7.5 2.5L2.5 7.5M2.5 2.5L7.5 7.5" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+          )}
+          {filterProjectIncharge && (
+            <div className="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full">
+              <span className="text-[12px] font-medium text-black">Project Incharge</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFilterProjectIncharge('');
+                }}
+                className="w-4 h-4 flex items-center justify-center hover:bg-gray-200 rounded-full transition-colors"
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M7.5 2.5L2.5 7.5M2.5 2.5L7.5 7.5" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+          )}
+          {filterStockingLocation && (
+            <div className="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full">
+              <span className="text-[12px] font-medium text-black">Stocking Location</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFilterStockingLocation('');
+                }}
+                className="w-4 h-4 flex items-center justify-center hover:bg-gray-200 rounded-full transition-colors"
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M7.5 2.5L2.5 7.5M2.5 2.5L7.5 7.5" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+          )}
+          {filterSRNumber && (
+            <div className="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full">
+              <span className="text-[12px] font-medium text-black">{activeType === 'dispatch' ? 'DP Number' : 'SR Number'}</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFilterSRNumber('');
+                }}
+                className="w-4 h-4 flex items-center justify-center hover:bg-gray-200 rounded-full transition-colors"
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M7.5 2.5L2.5 7.5M2.5 2.5L7.5 7.5" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+          )}
+          {filterDate && (
+            <div className="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full">
+              <span className="text-[12px] font-medium text-black">Date</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFilterDate('');
+                }}
+                className="w-4 h-4 flex items-center justify-center hover:bg-gray-200 rounded-full transition-colors"
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M7.5 2.5L2.5 7.5M2.5 2.5L7.5 7.5" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -723,18 +910,18 @@ const History = ({ onTabChange }) => {
           <div className="shadow-md border border-gray-200 rounded-lg">
             {filteredData.map((item) => {
               // Get created_date_time and add 5.30 hours
-              const createdDateTime = item.created_date_time || item.createdDateTime || item.created_at ;
+              const createdDateTime = item.created_date_time || item.createdDateTime || item.created_at;
               let adjustedDate = null;
               if (createdDateTime) {
                 adjustedDate = new Date(createdDateTime);
                 // Add 5 hours and 30 minutes (5.30 hours = 5.5 hours = 19800000 milliseconds)
-                adjustedDate.setTime(adjustedDate.getTime() );
+                adjustedDate.setTime(adjustedDate.getTime());
               }
-              
+
               const displayDate = adjustedDate ? formatDate(adjustedDate.toISOString()) : formatDate(item.date);
               const displayTime = adjustedDate ? formatTime(adjustedDate.toISOString(), null) : formatTime(item.date, item.time);
               const customerLocation = `${item.customerName}`;
-              
+
               const isExpanded = expandedItemId === item.id;
               const isCloneExpanded = cloneExpandedItemId === item.id;
               const swipeState = swipeStates[item.id];
@@ -774,8 +961,8 @@ const History = ({ onTabChange }) => {
                       title="Clone"
                     >
                       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 6.75V3.75C12 3.33579 11.6642 3 11.25 3H3.75C3.33579 3 3 3.33579 3 3.75V11.25C3 11.6642 3.33579 12 3.75 12H6.75" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M15 6.75H7.5C6.67157 6.75 6 7.42157 6 8.25V14.25C6 15.0784 6.67157 15.75 7.5 15.75H14.25C15.0784 15.75 15.75 15.0784 15.75 14.25V8.25C15.75 7.42157 15.0784 6.75 14.25 6.75H15Z" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M12 6.75V3.75C12 3.33579 11.6642 3 11.25 3H3.75C3.33579 3 3 3.33579 3 3.75V11.25C3 11.6642 3.33579 12 3.75 12H6.75" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M15 6.75H7.5C6.67157 6.75 6 7.42157 6 8.25V14.25C6 15.0784 6.67157 15.75 7.5 15.75H14.25C15.0784 15.75 15.75 15.0784 15.75 14.25V8.25C15.75 7.42157 15.0784 6.75 14.25 6.75H15Z" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     </button>
                   </div>
@@ -803,7 +990,7 @@ const History = ({ onTabChange }) => {
                       <div className="flex-1">
                         {/* Transaction ID */}
                         <div className="mb-1">
-                          <p 
+                          <p
                             className="text-[14px] font-semibold text-black leading-normal cursor-pointer hover:underline"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -883,6 +1070,293 @@ const History = ({ onTabChange }) => {
           </div>
         )}
       </div>
+
+      {/* Filter Modal */}
+      {showFilterModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end justify-center"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowFilterModal(false);
+              setShowProjectDropdown(false);
+              setShowInchargeDropdown(false);
+              setShowLocationDropdown(false);
+            }
+          }}
+        >
+          <div
+            className="bg-white w-full max-w-[360px] h-[450px] rounded-t-3xl shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-200">
+              <h2 className="text-[16px] font-semibold text-black">Select Filters</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowFilterModal(false);
+                  setShowProjectDropdown(false);
+                  setShowInchargeDropdown(false);
+                  setShowLocationDropdown(false);
+                }}
+                className="text-red-500 hover:text-red-700"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="px-4 py-4 space-y-2 h-[250px] overflow-visible">
+              {/* Project Name */}
+              <div className="relative">
+                <label className="block text-[14px] font-medium text-gray-700 mb-2">Project Name</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Select"
+                    value={filterProjectName}
+                    onChange={(e) => {
+                      setFilterProjectName(e.target.value);
+                      setShowProjectDropdown(true);
+                    }}
+                    onFocus={() => setShowProjectDropdown(true)}
+                    className="w-full h-[40px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400"
+                    style={{
+                      paddingRight: filterProjectName ? '60px' : '40px'
+                    }}
+                  />
+                  {filterProjectName && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFilterProjectName('');
+                        setShowProjectDropdown(false);
+                      }}
+                      className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                      style={{ right: '24px' }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowProjectDropdown(!showProjectDropdown)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M4 6L8 10L12 6" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                  {showProjectDropdown && (
+                    <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                      {clientData.map((client) => (
+                        <div
+                          key={client.id || client._id}
+                          className="px-3 py-2 text-[14px] text-gray-700 hover:bg-gray-100 cursor-pointer"
+                          onClick={() => {
+                            setFilterProjectName(client.value || client.label || client.siteName || '');
+                            setShowProjectDropdown(false);
+                          }}
+                        >
+                          {client.value || client.label || client.siteName || ''}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              {/* Project Incharge */}
+              <div className="relative">
+                <label className="block text-[14px] font-medium text-gray-700 mb-2">Project Incharge</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Select"
+                    value={filterProjectIncharge}
+                    onChange={(e) => {
+                      setFilterProjectIncharge(e.target.value);
+                      setShowInchargeDropdown(true);
+                    }}
+                    onFocus={() => setShowInchargeDropdown(true)}
+                    className="w-full h-[40px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400"
+                    style={{
+                      paddingRight: filterProjectIncharge ? '60px' : '40px'
+                    }}
+                  />
+                  {filterProjectIncharge && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFilterProjectIncharge('');
+                        setShowInchargeDropdown(false);
+                      }}
+                      className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                      style={{ right: '24px' }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowInchargeDropdown(!showInchargeDropdown)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M4 6L8 10L12 6" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                  {showInchargeDropdown && (
+                    <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                      {employeeData.map((employee) => (
+                        <div
+                          key={employee.id || employee._id}
+                          className="px-3 py-2 text-[14px] text-gray-700 hover:bg-gray-100 cursor-pointer"
+                          onClick={() => {
+                            const empName = employee.employeeName || employee.name || employee.fullName || employee.employee_name || '';
+                            setFilterProjectIncharge(empName);
+                            setShowInchargeDropdown(false);
+                          }}
+                        >
+                          {employee.employeeName || employee.name || employee.fullName || employee.employee_name || ''}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              {/* Stocking Location */}
+
+              <div className="flex-1">
+                <label className="block text-[14px] font-medium text-gray-700 mb-2">Stocking Location</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Select"
+                    value={filterStockingLocation}
+                    onChange={(e) => {
+                      setFilterStockingLocation(e.target.value);
+                      setShowLocationDropdown(true);
+                    }}
+                    onFocus={() => setShowLocationDropdown(true)}
+                    className="w-full h-[40px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400"
+                    style={{
+                      paddingRight: filterStockingLocation ? '60px' : '40px'
+                    }}
+                  />
+                  {filterStockingLocation && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFilterStockingLocation('');
+                        setShowLocationDropdown(false);
+                      }}
+                      className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                      style={{ right: '24px' }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowLocationDropdown(!showLocationDropdown)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M4 6L8 10L12 6" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                  {showLocationDropdown && (
+                    <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                      {clientData
+                        .filter(client => client.markedAsStockingLocation === true)
+                        .map((client) => (
+                          <div
+                            key={client.id || client._id}
+                            className="px-3 py-2 text-[14px] text-gray-700 hover:bg-gray-100 cursor-pointer"
+                            onClick={() => {
+                              setFilterStockingLocation(client.value || client.label || client.siteName || '');
+                              setShowLocationDropdown(false);
+                            }}
+                          >
+                            {client.value || client.label || client.siteName || ''}
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+
+              <div className=" flex items-center gap-2">
+                {/* Date */}
+                <div className="flex-1">
+                  <label className="block text-[14px] font-medium text-gray-700 mb-2">Date</label>
+                  <input
+                    type="date"
+                    value={filterDate}
+                    onChange={(e) => setFilterDate(e.target.value)}
+                    className="w-full h-[40px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400"
+                  />
+                </div>
+                {/* Entry Number */}
+                <div className="flex-1">
+                  <label className="block text-[14px] font-medium text-gray-700 mb-2">Entry Number</label>
+                  <input
+                    type="text"
+                    placeholder="Enter"
+                    value={filterSRNumber}
+                    onChange={(e) => setFilterSRNumber(e.target.value)}
+                    className="w-full h-[40px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400"
+                  />
+                </div>
+              </div>
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterProjectName('');
+                    setFilterProjectIncharge('');
+                    setFilterStockingLocation('');
+                    setFilterSRNumber('');
+                    setFilterDate('');
+                    setShowFilterModal(false);
+                    setShowProjectDropdown(false);
+                    setShowInchargeDropdown(false);
+                    setShowLocationDropdown(false);
+                  }}
+                  className="px-6 py-2 border border-black rounded-lg text-[14px] font-medium text-black bg-white hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowFilterModal(false);
+                    setShowProjectDropdown(false);
+                    setShowInchargeDropdown(false);
+                    setShowLocationDropdown(false);
+                  }}
+                  className="px-6 py-2 bg-black text-white rounded-lg text-[14px] font-medium hover:bg-gray-800"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

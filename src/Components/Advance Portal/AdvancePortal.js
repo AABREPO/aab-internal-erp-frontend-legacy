@@ -600,7 +600,18 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             const year = date.getFullYear();
             return `${day}-${month}-${year}`;
           };
-          const finalName = `${formatDateOnly(dateValue)} ${selectedSite.sNo} ${selectedOption.label}`;
+          const now = new Date();
+          const timestamp = now.toLocaleString("en-GB", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true
+          })
+            .replace(",", "")
+            .replace(/\s/g, "-");
+          const finalName = `${timestamp} ${selectedSite.sNo} ${selectedOption.label}`;
           formData.append('file', selectedAdvanceFile);
           formData.append('file_name', finalName);
           const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
@@ -1668,10 +1679,8 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                       </div>
                       {selectedAdvanceFile && <span className="text-gray-600 text-sm">{selectedAdvanceFile.name}</span>}
                     </div>
-                    <button
-                      className='bg-[#c7934c] text-white w-full sm:w-[120px] h-[33px] rounded flex items-center justify-center text-sm xl:mb-0 mb-2'
-                      onClick={handleSubmit}
-                      disabled={isSubmitting}
+                    <button className='bg-[#c7934c] text-white w-full sm:w-[120px] h-[33px] rounded flex items-center justify-center text-sm xl:mb-0 mb-2'
+                      onClick={handleSubmit} disabled={isSubmitting}
                     >
                       {isSubmitting ? 'Saving...' : getButtonLabel()}
                     </button>
@@ -1952,16 +1961,10 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                 </div>
               </div>
               <div className="flex justify-center sm:justify-end gap-3 mt-4">
-                <button
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="w-[100px] h-[45px] border border-[#BF9853] rounded text-sm"
-                >
+                <button onClick={() => setIsEditModalOpen(false)} className="w-[100px] h-[45px] border border-[#BF9853] rounded text-sm">
                   Cancel
                 </button>
-                <button
-                  onClick={handleUpdate}
-                  className="w-[100px] h-[45px] bg-[#BF9853] text-white rounded text-sm"
-                >
+                <button onClick={handleUpdate} className="w-[100px] h-[45px] bg-[#BF9853] text-white rounded text-sm">
                   Save
                 </button>
               </div>
@@ -1970,7 +1973,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         )}
         {showPaymentModal && (
           <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-            <div className="bg-white text-left rounded-xl p-6 w-[800px] max-h-[90vh] overflow-y-auto flex flex-col">
+            <div className="bg-white text-left rounded-xl p-8 w-[800px] max-h-[100vh] overflow-y-auto flex flex-col">
               <h3 className="text-lg font-semibold mb-4 text-center">Payment Details</h3>
               <div className="flex-1 overflow-hidden">
                 <div className="space-y-4 mb-4">
@@ -2006,7 +2009,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                       </div>
                     </div>
                   </div>
-
                   {(paymentModalData.paymentMode === "GPay" || paymentModalData.paymentMode === "PhonePe" ||
                     paymentModalData.paymentMode === "Net Banking" || paymentModalData.paymentMode === "Cheque") && (
                       <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
@@ -2058,6 +2060,8 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                                 isSearchable
                                 isClearable
                                 styles={customStyles}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
                                 className="w-full focus:outline-none"
                               />
                             </div>
@@ -2068,17 +2072,10 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                 </div>
               </div>
               <div className="flex justify-end gap-3 mt-4">
-                <button
-                  onClick={() => setShowPaymentModal(false)}
-                  className="w-[100px] h-[45px] border border-[#BF9853] rounded"
-                >
+                <button onClick={() => setShowPaymentModal(false)} className="w-[100px] h-[45px] border border-[#BF9853] rounded">
                   Cancel
                 </button>
-                <button
-                  onClick={handlePaymentSubmit}
-                  disabled={isSubmitting}
-                  className="w-[100px] h-[45px] bg-[#BF9853] text-white rounded"
-                >
+                <button onClick={handlePaymentSubmit} disabled={isSubmitting} className="w-[100px] h-[45px] bg-[#BF9853] text-white rounded">
                   {isSubmitting ? 'Saving...' : 'Submit'}
                 </button>
               </div>
@@ -2098,9 +2095,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                 <div className="flex-[0.40] flex flex-col">
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="text-base font-semibold text-gray-700">Advance Details</h4>
-                    <button
-                      type="button"
-                      onClick={() => setIsReviewEditMode((prev) => !prev)}
+                    <button type="button" onClick={() => setIsReviewEditMode((prev) => !prev)}
                       className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg hover:bg-[#FFF8EE]"
                     >
                       {isReviewEditMode ? 'Cancel Edit' : 'Edit'}
@@ -2256,18 +2251,10 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                   </div>
                   {isReviewEditMode && (
                     <div className="flex justify-end gap-3 mt-4">
-                      <button
-                        type="button"
-                        onClick={() => setIsReviewEditMode(false)}
-                        className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg"
-                      >
+                      <button type="button" onClick={() => setIsReviewEditMode(false)} className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg">
                         Discard
                       </button>
-                      <button
-                        type="button"
-                        onClick={handleReviewSave}
-                        className="px-4 py-2 bg-[#BF9853] text-white rounded-lg"
-                      >
+                      <button type="button" onClick={handleReviewSave} className="px-4 py-2 bg-[#BF9853] text-white rounded-lg">
                         Save Changes
                       </button>
                     </div>
@@ -2294,27 +2281,16 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                   {selectedAdvanceFile && (
                     <p className="text-xs text-gray-500 mt-2 break-words">{selectedAdvanceFile.name}</p>
                   )}
-                  <button
-                    type="button"
-                    onClick={handleChangeAttachment}
-                    className="mt-4 px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg hover:bg-[#FFF8EE]"
-                  >
+                  <button type="button" onClick={handleChangeAttachment} className="mt-4 px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg hover:bg-[#FFF8EE]">
                     Change Attachfile
                   </button>
                 </div>
               </div>
               <div className="flex justify-end gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={handleReviewClose}
-                  className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg"
-                >
+                <button type="button" onClick={handleReviewClose} className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg">
                   Close
                 </button>
-                <button
-                  type="button"
-                  onClick={handleReviewConfirm}
-                  disabled={isSubmitting || isReviewEditMode}
+                <button type="button" onClick={handleReviewConfirm} disabled={isSubmitting || isReviewEditMode}
                   className={`px-4 py-2 rounded-lg text-white ${isSubmitting || isReviewEditMode ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#BF9853]'}`}
                 >
                   {isSubmitting ? 'Submitting...' : 'Confirm & Submit'}

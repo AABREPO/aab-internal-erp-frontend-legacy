@@ -20,6 +20,10 @@ import SearchItemsModal from './SearchItemsModal';
 import Summary from './Summary';
 import editIcon from '../Images/edit.png';
 
+// Module-level cache that persists across component remounts
+const siteEngineersCache = { data: null };
+const supportStaffCache = { data: null };
+
 const PurchaseOrder = ({ user, onLogout }) => {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -75,6 +79,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
   const expandedItemIdRef = useRef(expandedItemId); // ref to track current expandedItemId for event handlers
   const previousVendorName = useRef(poData.vendorName); // Track previous vendor name
   const previousVendorId = useRef(null); // Track previous vendor ID to detect actual changes
+  const hasLoadedNetStockItems = useRef(false); // Track if NetStock items have been loaded
   const [isPdfGenerated, setIsPdfGenerated] = useState(false); // track if PDF has been generated
   const [pdfBlob, setPdfBlob] = useState(null); // store generated PDF blob
   const [isGenerating, setIsGenerating] = useState(false); // track if PO is being generated
@@ -85,16 +90,25 @@ const PurchaseOrder = ({ user, onLogout }) => {
   // State for project name options from API
   const [siteOptions, setSiteOptions] = useState([]);
 
-  // State for employee list options from API
-  const [employeeList, setEmployeeList] = useState([]);
-  const [supportStaffList, setSupportStaffList] = useState([]);
-
+  // Cache for quick employee lookups by ID (prevents repeated network calls when opening multiple POs)
+  const quickEmployeeCacheRef = useRef(new Map());
+  
+  // State for employee list options from API - initialize from module-level cache immediately
+  const [employeeList, setEmployeeList] = useState(() => {
+    return siteEngineersCache.data || [];
+  });
+  const [supportStaffList, setSupportStaffList] = useState(() => {
+    return supportStaffCache.data || [];
+  });
   // State for PO item options from API (with IDs for lookup)
   const [poItemName, setPoItemName] = useState([]);
   const [poModel, setPoModel] = useState([]);
   const [poBrand, setPoBrand] = useState([]);
   const [poType, setPoType] = useState([]);
   const [categoryOptions, setCategoryOptions] = useState([]);
+  // State for tile data (for TILE category with category_id = 10)
+  const [tileData, setTileData] = useState([]);
+  const [tileSizeData, setTileSizeData] = useState([]);
 
   // Check if we're in empty/home state
   const isEmptyState = !poData.vendorName && !poData.projectName && !poData.projectIncharge && items.length === 0 && !isEditMode;
@@ -218,36 +232,88 @@ const PurchaseOrder = ({ user, onLogout }) => {
     return found ? (found.id || found._id || null) : null;
   };
 
+  // Ref to track if we're currently loading from editPO event (prevents clearing items when effect re-runs)
+  const isLoadingFromEventRef = useRef(false);
+  
   // Listen for editPO event from History component
   useEffect(() => {
     const handleEditPO = (event) => {
       const po = event.detail;
       if (po) {
-        // Find vendor by name to set selectedVendor
-        const vendorOption = vendorNameOptions.find(opt => opt.value === po.vendorName);
-        if (vendorOption) {
-          // Set previous vendor ID BEFORE setting selectedVendor to preserve PO number
-          // This ensures the useEffect doesn't update PO number when loading from History
-          previousVendorId.current = vendorOption.id;
-          setSelectedVendor({ id: vendorOption.id, name: po.vendorName });
-        }
-
-        // Extract eno and display as #eno format (this event only fires when editing from History)
-        let displayPoNumber = po.poNumber || '';
-        if (po.eno) {
-          // Use eno directly to show as #eno format
-          displayPoNumber = `#${po.eno}`;
-        } else if (po.poNumber && po.poNumber.includes(' - ')) {
-          // Extract eno from "PO - YYYY - eno" format
-          const parts = po.poNumber.split(' - ');
-          if (parts.length >= 3) {
-            displayPoNumber = `#${parts[2]}`;
+        isLoadingFromEventRef.current = true;
+        // Reset state first to ensure clean slate for subsequent clones
+        setItems([]);
+        setSelectedSite(null);
+        setSelectedIncharge(null);
+        setHasOpenedAdd(false);
+        setIsPdfGenerated(false);
+        setPdfBlob(null);
+        
+        // Restore selected vendor quickly (prefer ID from history/clone; avoids waiting for vendorNameOptions getAll)
+        const vendorId = po.vendor_id || po.vendorId || null;
+        if (vendorId) {
+          // For clone mode, reset previousVendorId to null so useEffect will detect change and generate new PO number
+          // For edit mode, set it before to preserve existing PO number
+          if (po.isClone) {
+            previousVendorId.current = null; // Reset to ensure PO number generation triggers
+          } else {
+            previousVendorId.current = vendorId;
+          }
+          setSelectedVendor({ id: vendorId, name: po.vendorName || '' });
+          // For clone, set previousVendorId AFTER useEffect runs to prevent future unnecessary triggers
+          if (po.isClone) {
+            // Use setTimeout to ensure useEffect runs first, then update previousVendorId
+            setTimeout(() => {
+              previousVendorId.current = vendorId;
+            }, 200);
+          }
+        } else {
+          // Fallback: find vendor by name from loaded options
+          const vendorOption = vendorNameOptions.find(opt => opt.value === po.vendorName);
+          if (vendorOption) {
+            // For clone mode, reset previousVendorId to null so useEffect will detect change and generate new PO number
+            // For edit mode, set it before to preserve existing PO number
+            if (po.isClone) {
+              previousVendorId.current = null; // Reset to ensure PO number generation triggers
+            } else {
+              previousVendorId.current = vendorOption.id;
+            }
+            setSelectedVendor({ id: vendorOption.id, name: po.vendorName });
+            // For clone, set previousVendorId AFTER useEffect runs to prevent future unnecessary triggers
+            if (po.isClone) {
+              // Use setTimeout to ensure useEffect runs first, then update previousVendorId
+              setTimeout(() => {
+                previousVendorId.current = vendorOption.id;
+              }, 200);
+            }
+          } else {
+            setSelectedVendor(null);
           }
         }
-
+        // Extract eno and display as #eno format (this event only fires when editing from History)
+        // For clone, use prefetched PO number if available, otherwise it will be generated based on vendor
+        let displayPoNumber = '';
+        if (po.isClone && po.prefetchedPoNumber) {
+          // Use prefetched PO number from History.jsx handleClone (faster than waiting for useEffect)
+          displayPoNumber = po.prefetchedPoNumber;
+        } else if (!po.isClone) {
+          // Only extract PO number for edit mode (not clone)
+          displayPoNumber = po.poNumber || '';
+          if (po.eno) {
+            // Use eno directly to show as #eno format
+            displayPoNumber = `#${po.eno}`;
+          } else if (po.poNumber && po.poNumber.includes(' - ')) {
+            // Extract eno from "PO - YYYY - eno" format
+            const parts = po.poNumber.split(' - ');
+            if (parts.length >= 3) {
+              displayPoNumber = `#${parts[2]}`;
+            }
+          }
+        }
         // Load PO data into form, preserving original ID and creation date
+        // For clone with prefetched PO number, use it immediately (faster than waiting for useEffect)
         setPoData({
-          poNumber: displayPoNumber,
+          poNumber: displayPoNumber || (po.isClone && po.prefetchedPoNumber ? po.prefetchedPoNumber : ''),
           date: po.date || '10/11/2025',
           vendorName: po.vendorName || '',
           projectName: po.projectName || '',
@@ -264,12 +330,15 @@ const PurchaseOrder = ({ user, onLogout }) => {
           originalSiteInchargeType: po.site_incharge_type || po.siteInchargeType || null,
         });
 
-        // Restore selected site (client) if we have its ID
+        // Restore selected site (client) quickly (prefer ID from history/clone; avoids waiting for siteOptions getAll)
         const clientId = po.client_id || po.clientId || null;
-        if (clientId && siteOptions && siteOptions.length > 0) {
-          const siteOpt = siteOptions.find(s => String(s.id) === String(clientId));
-          if (siteOpt) {
-            setSelectedSite({ id: siteOpt.id, name: siteOpt.value });
+        if (clientId) {
+          setSelectedSite({ id: clientId, name: po.projectName || '' });
+        } else if (po.projectName && siteOptions && siteOptions.length > 0) {
+          // Fallback: try to find site by name if ID not available
+          const siteByName = siteOptions.find(s => s.value === po.projectName);
+          if (siteByName) {
+            setSelectedSite({ id: siteByName.id, name: siteByName.value });
           }
         }
 
@@ -278,6 +347,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
         const inchargeType = po.site_incharge_type || po.siteInchargeType || null;
 
         if (inchargeId) {
+          let inchargeFound = false;
           if (inchargeType === 'support staff' || inchargeType === 'support_staff') {
             // Look for support staff
             if (supportStaffList && supportStaffList.length > 0) {
@@ -289,6 +359,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                   mobileNumber: staff.mobile_number || staff.mobileNumber || '',
                   type: 'support staff'
                 });
+                inchargeFound = true;
               }
             }
           } else {
@@ -302,6 +373,75 @@ const PurchaseOrder = ({ user, onLogout }) => {
                   mobileNumber: emp.employee_mobile_number || emp.mobileNumber || emp.mobile_number || emp.contact || '',
                   type: 'employee'
                 });
+                inchargeFound = true;
+              }
+            }
+          }
+
+          // If not found yet (because lists haven't loaded), fetch quickly by ID (employee)
+          if (!inchargeFound && (!inchargeType || inchargeType === 'employee')) {
+            (async () => {
+              try {
+                const cache = quickEmployeeCacheRef.current;
+                const cacheKey = String(inchargeId);
+                let empObj = cache.get(cacheKey);
+                if (empObj === undefined) {
+                  const res = await fetch(`https://backendaab.in/aabuildersDash/api/employee_details/get/${inchargeId}`);
+                  empObj = res.ok ? await res.json() : null;
+                  cache.set(cacheKey, empObj);
+                }
+                if (empObj) {
+                  const resolvedName =
+                    empObj.employeeName || empObj.name || empObj.fullName || empObj.employee_name || '';
+                  const resolvedMobile =
+                    empObj.employee_mobile_number || empObj.mobileNumber || empObj.mobile_number || empObj.contact || '';
+                  setSelectedIncharge({
+                    id: empObj.id || inchargeId,
+                    name: resolvedName,
+                    mobileNumber: resolvedMobile,
+                    type: 'employee'
+                  });
+                  // Also patch displayed PO data immediately (so Items section can render consistently)
+                  setPoData(prev => ({
+                    ...prev,
+                    projectIncharge: prev.projectIncharge || resolvedName,
+                    contact: prev.contact || resolvedMobile,
+                  }));
+                }
+              } catch (e) {
+                // best-effort
+              }
+            })();
+          }
+          // If incharge not found by ID, try to find by name
+          if (!inchargeFound && po.projectIncharge) {
+            if (employeeList && employeeList.length > 0) {
+              const empByName = employeeList.find(e => {
+                const name = e.employeeName || e.name || e.fullName || e.employee_name || '';
+                return name === po.projectIncharge;
+              });
+              if (empByName) {
+                setSelectedIncharge({
+                  id: empByName.id,
+                  name: empByName.employeeName || empByName.name || empByName.fullName || empByName.employee_name || '',
+                  mobileNumber: empByName.employee_mobile_number || empByName.mobileNumber || empByName.mobile_number || empByName.contact || '',
+                  type: 'employee'
+                });
+                inchargeFound = true;
+              }
+            }
+            if (!inchargeFound && supportStaffList && supportStaffList.length > 0) {
+              const staffByName = supportStaffList.find(s => {
+                const name = s.support_staff_name || s.supportStaffName || '';
+                return name === po.projectIncharge;
+              });
+              if (staffByName) {
+                setSelectedIncharge({
+                  id: staffByName.id,
+                  name: staffByName.support_staff_name || staffByName.supportStaffName || '',
+                  mobileNumber: staffByName.mobile_number || staffByName.mobileNumber || '',
+                  type: 'support staff'
+                });
               }
             }
           }
@@ -311,46 +451,90 @@ const PurchaseOrder = ({ user, onLogout }) => {
         const itemsWithIds = (po.items || []).map((item, index) => {
           console.log('Processing item from history:', item);
 
-          // Extract item name - check if it already includes category (format: "ItemName, Category")
+          // Extract item name - PREFER prefetched itemName over name field (which might be just ID)
           // Prefer explicit item_id / itemId over generic id (which might be purchaseTable row id)
-          const rawItemId = item.itemId || item.item_id || item.itemId || null;
+          const rawItemId = item.itemId || item.item_id || null;
           let itemId = rawItemId || item.id || null;
-          let itemName = item.name || item.itemName || '';
-          let category = '';
-          const existingCategoryId = item.categoryId || item.category_id || null;
-
-          // If backend sent name as just the numeric ID (e.g. "12"), treat it as missing
-          if (itemName && rawItemId && normalize(itemName) === String(rawItemId)) {
-            itemName = '';
+          
+          // Prefer prefetched itemName first (from clone operation), then fall back to name
+          let itemName = item.itemName || '';
+          // If itemName is empty, check name field, but validate it's not just the ID
+          if (!itemName && item.name) {
+            const nameStr = String(item.name).trim();
+            // If name is just the numeric ID, treat it as missing (will look up below)
+            if (rawItemId && normalize(nameStr) === String(rawItemId)) {
+              itemName = '';
+            } else {
+              itemName = nameStr;
+            }
           }
+          
+          let category = item.categoryName || item.category || '';
+          const existingCategoryId = item.categoryId || item.category_id || null;
 
           // If name includes comma, split it (format: "ItemName, Category")
           if (itemName && itemName.includes(',')) {
             const parts = itemName.split(',');
             itemName = parts[0].trim();
-            category = parts[1] ? parts[1].trim() : '';
+            // Only use comma-separated category if we don't already have categoryName
+            if (!category && parts[1]) {
+              category = parts[1].trim();
+            }
           }
 
-          // If name is empty but we have itemId, look it up from poItemName API data
-          if (!itemName && rawItemId && poItemName && poItemName.length > 0) {
-            itemName = findNameById(poItemName, rawItemId, 'itemName') ||
-              findNameById(poItemName, rawItemId, 'name') || '';
+          // Check if this is TILE category (category_id = 10)
+          const isTileCategory = existingCategoryId === 10 || String(existingCategoryId) === '10';
+          
+          // If name is still empty but we have itemId, look it up from appropriate API data
+          // Only do this if arrays are loaded (don't block on empty arrays)
+          if (!itemName && rawItemId) {
+            if (isTileCategory && tileData && tileData.length > 0) {
+              // For TILE category, look up from tileData
+              itemName = findNameById(tileData, rawItemId, 'label') ||
+                findNameById(tileData, rawItemId, 'tileName') ||
+                findNameById(tileData, rawItemId, 'name') || '';
+            } else if (poItemName && poItemName.length > 0) {
+              // For other categories, look up from poItemName
+              itemName = findNameById(poItemName, rawItemId, 'itemName') ||
+                findNameById(poItemName, rawItemId, 'name') || '';
+            }
           }
-          if (!itemId && itemName && poItemName && poItemName.length > 0) {
-            const foundItem = poItemName.find(i => {
-              const label = (i.itemName || i.name || '').toLowerCase().trim();
-              return label === itemName.toLowerCase().trim();
-            });
-            itemId = foundItem ? (foundItem.id || foundItem._id) : null;
+          
+          // Ensure itemId is set from rawItemId if available
+          if (!itemId && rawItemId) {
+            itemId = rawItemId;
+          }
+          
+          // Only try to find ID from name if we don't have itemId yet AND arrays are loaded
+          if (!itemId && itemName) {
+            if (isTileCategory && tileData && tileData.length > 0) {
+              // For TILE category, find ID from tileData
+              const foundItem = tileData.find(i => {
+                const label = (i.label || i.tileName || i.name || '').toLowerCase().trim();
+                return label === itemName.toLowerCase().trim();
+              });
+              itemId = foundItem ? (foundItem.id || foundItem._id) : null;
+            } else if (poItemName && poItemName.length > 0) {
+              // For other categories, find ID from poItemName
+              const foundItem = poItemName.find(i => {
+                const label = (i.itemName || i.name || '').toLowerCase().trim();
+                return label === itemName.toLowerCase().trim();
+              });
+              itemId = foundItem ? (foundItem.id || foundItem._id) : null;
+            }
           }
 
-          // Look up category from categoryId if not already extracted
+          // Look up category from categoryId if not already extracted (prefer prefetched categoryName)
           let resolvedCategoryId = existingCategoryId;
           if (!category && existingCategoryId && categoryOptions && categoryOptions.length > 0) {
             const categoryOption = categoryOptions.find(cat => String(cat.id) === String(existingCategoryId));
             category = categoryOption ? categoryOption.label : '';
           }
-          // Fallback category
+          // Fallback: if still no category but we have categoryName from prefetch, use it
+          if (!category && item.categoryName) {
+            category = item.categoryName;
+          }
+          // Final fallback
           if (!category) {
             category = '';
           }
@@ -361,43 +545,64 @@ const PurchaseOrder = ({ user, onLogout }) => {
             });
             resolvedCategoryId = foundCategory ? (foundCategory.id || foundCategory._id) : null;
           }
+          // Ensure resolvedCategoryId is set if we have existingCategoryId
+          if (!resolvedCategoryId && existingCategoryId) {
+            resolvedCategoryId = existingCategoryId;
+          }
 
           // Reconstruct name with category (format: "ItemName, Category")
           const fullName = itemName ? `${itemName}, ${category}` : '';
 
-          // Handle brand - check multiple possible fields and look up from API if needed
-          let brand = item.brand || item.brandName || '';
+          // Handle brand - PREFER prefetched brandName/brand fields first
+          let brand = item.brandName || item.brand || '';
           let brandId = item.brandId || item.brand_id || null;
-          if (!brand && item.brandId && poBrand && poBrand.length > 0) {
-            brand = findNameById(poBrand, item.brandId, 'brand') ||
-              findNameById(poBrand, item.brandId, 'brandName') ||
-              findNameById(poBrand, item.brandId, 'name') || '';
+          // Only look up from API if brand is missing AND arrays are loaded
+          if (!brand && brandId && poBrand && poBrand.length > 0) {
+            brand = findNameById(poBrand, brandId, 'brand') ||
+              findNameById(poBrand, brandId, 'brandName') ||
+              findNameById(poBrand, brandId, 'name') || '';
           }
 
-          // Handle model - check multiple possible fields and look up from API if needed
-          let model = item.model || item.modelName || '';
+          // Handle model - PREFER prefetched modelName/model fields first
+          let model = item.modelName || item.model || '';
           let modelId = item.modelId || item.model_id || null;
-          if (!model && item.modelId && poModel && poModel.length > 0) {
-            model = findNameById(poModel, item.modelId, 'model') ||
-              findNameById(poModel, item.modelId, 'modelName') ||
-              findNameById(poModel, item.modelId, 'name') || '';
+          // Only look up from API if model is missing AND arrays are loaded
+          if (!model && modelId) {
+            if (isTileCategory && tileSizeData && tileSizeData.length > 0) {
+              // For TILE category, look up size from tileSizeData
+              model = findNameById(tileSizeData, modelId, 'size') ||
+                findNameById(tileSizeData, modelId, 'tileSize') ||
+                findNameById(tileSizeData, modelId, 'label') ||
+                findNameById(tileSizeData, modelId, 'name') || '';
+            } else if (poModel && poModel.length > 0) {
+              // For other categories, look up from poModel
+              model = findNameById(poModel, modelId, 'model') ||
+                findNameById(poModel, modelId, 'modelName') ||
+                findNameById(poModel, modelId, 'name') || '';
+            }
           }
 
-          // Handle type - check multiple possible fields and look up from API if needed
-          let type = item.type || item.typeName || item.typeColor || '';
+          // Handle type - PREFER prefetched typeName/typeColor/type fields first
+          let type = item.typeName || item.typeColor || item.type || '';
           let typeId = item.typeId || item.type_id || null;
-          if (!type && item.typeId && poType && poType.length > 0) {
-            type = findNameById(poType, item.typeId, 'typeColor') ||
-              findNameById(poType, item.typeId, 'type') ||
-              findNameById(poType, item.typeId, 'typeName') ||
-              findNameById(poType, item.typeId, 'name') || '';
+          // Only look up from API if type is missing AND arrays are loaded
+          if (!type && typeId && poType && poType.length > 0) {
+            type = findNameById(poType, typeId, 'typeColor') ||
+              findNameById(poType, typeId, 'type') ||
+              findNameById(poType, typeId, 'typeName') ||
+              findNameById(poType, typeId, 'name') || '';
           }
+          // Only try to find typeId from type name if we don't have it yet AND arrays are loaded
           if (!typeId && type && poType && poType.length > 0) {
             const foundType = poType.find(t => {
               const label = (t.typeColor || t.type || t.typeName || t.name || '').toLowerCase().trim();
               return label === type.toLowerCase().trim();
             });
             typeId = foundType ? (foundType.id || foundType._id) : null;
+          }
+          // Ensure typeId is set if we have it from the item
+          if (!typeId && (item.typeId || item.type_id)) {
+            typeId = item.typeId || item.type_id;
           }
 
           // Handle price - calculate from amount if needed
@@ -426,21 +631,44 @@ const PurchaseOrder = ({ user, onLogout }) => {
           };
           return transformedItem;
         });
-        setItems(itemsWithIds);
+        // Set items immediately - don't wait for arrays to load
+        console.log('Setting items from editPO:', itemsWithIds.length, 'items', itemsWithIds);
+        // Ensure we have valid items before setting
+        if (itemsWithIds && itemsWithIds.length > 0) {
+          setItems(itemsWithIds);
+        } else {
+          console.warn('No items to set from editPO event:', po.items);
+          setItems([]);
+        }
         setIsEditMode(true);
+        // IMPORTANT: Clear view-only mode when editing/cloning (fixes issue where Edit/Clone after View shows Download button)
+        setIsViewOnlyFromHistory(false);
+        // IMPORTANT: Reset previousVendorId for clone to ensure PO number generation triggers
+        if (po.isClone) {
+          previousVendorId.current = null;
+        }
+        
         // Check if this is a clone operation - if so, don't set isEditFromHistory to show "Generate PO" instead of "Update PO"
         if (po.isClone) {
           setIsEditFromHistory(false); // Clone should show "Generate PO"
+          // For clone, start with hasOpenedAdd = false so summary card shows initially (before + click)
           setHasOpenedAdd(false);
+          // For clone, PO number is already empty (from displayPoNumber logic above) - it will be auto-generated based on vendor
         } else {
           setIsEditFromHistory(true); // Edit should show "Update PO"
-          setHasOpenedAdd(po.items && po.items.length > 0);
+          // For edit, start with hasOpenedAdd = false so summary card shows initially (before + click)
+          setHasOpenedAdd(false);
         }
-        
+
         setIsPdfGenerated(false);
         setPdfBlob(null);
         // Switch to create tab
         setActiveTab('create');
+        
+        // Reset flag after a short delay to allow state updates to complete
+        setTimeout(() => {
+          isLoadingFromEventRef.current = false;
+        }, 100);
       }
     };
 
@@ -448,26 +676,32 @@ const PurchaseOrder = ({ user, onLogout }) => {
     return () => {
       window.removeEventListener('editPO', handleEditPO);
     };
-  }, [user, vendorNameOptions, siteOptions, employeeList, supportStaffList, poItemName, poBrand, poModel, poType, categoryOptions]);
+  }, [user, vendorNameOptions, siteOptions, employeeList, supportStaffList, poItemName, poBrand, poModel, poType, categoryOptions, tileData, tileSizeData]);
 
   // Listen for viewPO event from History component (view mode with PDF generation)
   useEffect(() => {
     const handleViewPO = (event) => {
       const po = event.detail;
       if (po) {
+        // Treat view the same as edit/clone for data hydration, but keep view-only UI (Download)
+        isLoadingFromEventRef.current = true;
+
         // Reset PDF state first to prevent showing wrong PDF data when switching between POs
         setIsPdfGenerated(false);
         setPdfBlob(null);
 
-        // Find vendor by name to set selectedVendor
-        const vendorOption = vendorNameOptions.find(opt => opt.value === po.vendorName);
-        if (vendorOption) {
-          // Set previous vendor ID BEFORE setting selectedVendor to preserve PO number
-          // This ensures the useEffect doesn't update PO number when loading from History
-          previousVendorId.current = vendorOption.id;
-          setSelectedVendor({ id: vendorOption.id, name: po.vendorName });
+        // Restore selected vendor quickly (prefer ID from payload; avoids waiting for vendorNameOptions getAll)
+        const vendorId = po.vendor_id || po.vendorId || null;
+        if (vendorId) {
+          previousVendorId.current = vendorId;
+          setSelectedVendor({ id: vendorId, name: po.vendorName || '' });
+        } else {
+          const vendorOption = vendorNameOptions.find(opt => opt.value === po.vendorName);
+          if (vendorOption) {
+            previousVendorId.current = vendorOption.id;
+            setSelectedVendor({ id: vendorOption.id, name: po.vendorName });
+          }
         }
-
         // Extract eno and display as #eno format
         let displayPoNumber = po.poNumber || '';
         if (po.eno) {
@@ -498,20 +732,21 @@ const PurchaseOrder = ({ user, onLogout }) => {
           originalSiteInchargeType: po.site_incharge_type || po.siteInchargeType || null,
         });
 
-        // Restore selected site (client) if we have its ID
+        // Restore selected site (client) quickly (prefer ID from payload)
         const clientId = po.client_id || po.clientId || null;
-        if (clientId && siteOptions && siteOptions.length > 0) {
-          const siteOpt = siteOptions.find(s => String(s.id) === String(clientId));
-          if (siteOpt) {
-            setSelectedSite({ id: siteOpt.id, name: siteOpt.value });
-          }
+        if (clientId) {
+          setSelectedSite({ id: clientId, name: po.projectName || '' });
+        } else if (siteOptions && siteOptions.length > 0 && po.projectName) {
+          const siteByName = siteOptions.find(s => s.value === po.projectName);
+          if (siteByName) setSelectedSite({ id: siteByName.id, name: siteByName.value });
         }
 
-        // Restore selected incharge if we have its ID - check both employee and support staff
+        // Restore selected incharge quickly (prefer ID; fallback to quick fetch)
         const inchargeId = po.site_incharge_id || po.siteInchargeId || null;
         const inchargeType = po.site_incharge_type || po.siteInchargeType || null;
 
         if (inchargeId) {
+          let inchargeFound = false;
           if (inchargeType === 'support staff' || inchargeType === 'support_staff') {
             // Look for support staff
             if (supportStaffList && supportStaffList.length > 0) {
@@ -523,6 +758,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                   mobileNumber: staff.mobile_number || staff.mobileNumber || '',
                   type: 'support staff'
                 });
+                inchargeFound = true;
               }
             }
           } else {
@@ -536,11 +772,46 @@ const PurchaseOrder = ({ user, onLogout }) => {
                   mobileNumber: emp.employee_mobile_number || emp.mobileNumber || emp.mobile_number || emp.contact || '',
                   type: 'employee'
                 });
+                inchargeFound = true;
               }
             }
           }
-        }
 
+          // If not found yet (lists not loaded), fetch quickly by ID (employee)
+          if (!inchargeFound && (!inchargeType || inchargeType === 'employee')) {
+            (async () => {
+              try {
+                const cache = quickEmployeeCacheRef.current;
+                const cacheKey = String(inchargeId);
+                let empObj = cache.get(cacheKey);
+                if (empObj === undefined) {
+                  const res = await fetch(`https://backendaab.in/aabuildersDash/api/employee_details/get/${inchargeId}`);
+                  empObj = res.ok ? await res.json() : null;
+                  cache.set(cacheKey, empObj);
+                }
+                if (empObj) {
+                  const resolvedName =
+                    empObj.employeeName || empObj.name || empObj.fullName || empObj.employee_name || '';
+                  const resolvedMobile =
+                    empObj.employee_mobile_number || empObj.mobileNumber || empObj.mobile_number || empObj.contact || '';
+                  setSelectedIncharge({
+                    id: empObj.id || inchargeId,
+                    name: resolvedName,
+                    mobileNumber: resolvedMobile,
+                    type: 'employee'
+                  });
+                  setPoData(prev => ({
+                    ...prev,
+                    projectIncharge: prev.projectIncharge || resolvedName,
+                    contact: prev.contact || resolvedMobile,
+                  }));
+                }
+              } catch (e) {
+                // best-effort
+              }
+            })();
+          }
+        }
         // Process items similar to editPO handler
         const itemsWithIds = (po.items || []).map((item, index) => {
           const rawItemId = item.itemId || item.item_id || item.itemId || null;
@@ -548,27 +819,45 @@ const PurchaseOrder = ({ user, onLogout }) => {
           let itemName = item.name || item.itemName || '';
           let category = '';
           const existingCategoryId = item.categoryId || item.category_id || null;
-
           if (itemName && rawItemId && normalize(itemName) === String(rawItemId)) {
             itemName = '';
           }
-
           if (itemName && itemName.includes(',')) {
             const parts = itemName.split(',');
             itemName = parts[0].trim();
             category = parts[1] ? parts[1].trim() : '';
           }
-
-          if (!itemName && rawItemId && poItemName && poItemName.length > 0) {
-            itemName = findNameById(poItemName, rawItemId, 'itemName') ||
-              findNameById(poItemName, rawItemId, 'name') || '';
+          // Check if this is TILE category (category_id = 10)
+          const isTileCategory = existingCategoryId === 10 || String(existingCategoryId) === '10';
+          
+          if (!itemName && rawItemId) {
+            if (isTileCategory && tileData && tileData.length > 0) {
+              // For TILE category, look up from tileData
+              itemName = findNameById(tileData, rawItemId, 'label') ||
+                findNameById(tileData, rawItemId, 'tileName') ||
+                findNameById(tileData, rawItemId, 'name') || '';
+            } else if (poItemName && poItemName.length > 0) {
+              // For other categories, look up from poItemName
+              itemName = findNameById(poItemName, rawItemId, 'itemName') ||
+                findNameById(poItemName, rawItemId, 'name') || '';
+            }
           }
-          if (!itemId && itemName && poItemName && poItemName.length > 0) {
-            const foundItem = poItemName.find(i => {
-              const label = (i.itemName || i.name || '').toLowerCase().trim();
-              return label === itemName.toLowerCase().trim();
-            });
-            itemId = foundItem ? (foundItem.id || foundItem._id) : null;
+          if (!itemId && itemName) {
+            if (isTileCategory && tileData && tileData.length > 0) {
+              // For TILE category, find ID from tileData
+              const foundItem = tileData.find(i => {
+                const label = (i.label || i.tileName || i.name || '').toLowerCase().trim();
+                return label === itemName.toLowerCase().trim();
+              });
+              itemId = foundItem ? (foundItem.id || foundItem._id) : null;
+            } else if (poItemName && poItemName.length > 0) {
+              // For other categories, find ID from poItemName
+              const foundItem = poItemName.find(i => {
+                const label = (i.itemName || i.name || '').toLowerCase().trim();
+                return label === itemName.toLowerCase().trim();
+              });
+              itemId = foundItem ? (foundItem.id || foundItem._id) : null;
+            }
           }
 
           let resolvedCategoryId = existingCategoryId;
@@ -599,10 +888,19 @@ const PurchaseOrder = ({ user, onLogout }) => {
 
           let model = item.model || item.modelName || '';
           let modelId = item.modelId || item.model_id || null;
-          if (!model && item.modelId && poModel && poModel.length > 0) {
-            model = findNameById(poModel, item.modelId, 'model') ||
-              findNameById(poModel, item.modelId, 'modelName') ||
-              findNameById(poModel, item.modelId, 'name') || '';
+          if (!model && item.modelId) {
+            if (isTileCategory && tileSizeData && tileSizeData.length > 0) {
+              // For TILE category, look up size from tileSizeData
+              model = findNameById(tileSizeData, item.modelId, 'size') ||
+                findNameById(tileSizeData, item.modelId, 'tileSize') ||
+                findNameById(tileSizeData, item.modelId, 'label') ||
+                findNameById(tileSizeData, item.modelId, 'name') || '';
+            } else if (poModel && poModel.length > 0) {
+              // For other categories, look up from poModel
+              model = findNameById(poModel, item.modelId, 'model') ||
+                findNameById(poModel, item.modelId, 'modelName') ||
+                findNameById(poModel, item.modelId, 'name') || '';
+            }
           }
 
           let type = item.type || item.typeName || item.typeColor || '';
@@ -648,9 +946,14 @@ const PurchaseOrder = ({ user, onLogout }) => {
         setIsViewOnlyFromHistory(true); // Mark as view-only mode
         setIsEditMode(false);
         setIsEditFromHistory(false);
-        setHasOpenedAdd(po.items && po.items.length > 0);
+        setHasOpenedAdd(itemsWithIds.length > 0);
         // Switch to create tab
         setActiveTab('create');
+
+        // Reset flag after a short delay to avoid other effects clearing state mid-load
+        setTimeout(() => {
+          isLoadingFromEventRef.current = false;
+        }, 100);
       }
     };
 
@@ -658,7 +961,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
     return () => {
       window.removeEventListener('viewPO', handleViewPO);
     };
-  }, [user, vendorNameOptions, siteOptions, employeeList, supportStaffList, poItemName, poBrand, poModel, poType, categoryOptions]);
+  }, [user, vendorNameOptions, siteOptions, employeeList, supportStaffList, poItemName, poBrand, poModel, poType, categoryOptions, tileData, tileSizeData]);
 
   // Auto-generate PDF when in view-only mode and all required data is available
   useEffect(() => {
@@ -756,6 +1059,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
     setExpandedItemId(null);
     setSwipeStates({});
     previousVendorId.current = null; // Reset previous vendor ID tracking
+    hasLoadedNetStockItems.current = false; // Reset to allow loading NetStock items
   }, []);
 
   // Get available items function - returns the actual API data structure
@@ -858,56 +1162,71 @@ const PurchaseOrder = ({ user, onLogout }) => {
     setProjectOptions(siteOptions.map(option => option.value));
   }, [siteOptions]);
 
-  // Fetch employee list from API
+  // Fetch employee list and support staff list from API in parallel
+  // Cached data is shown instantly (from useState initialization), fresh data fetched in background
   useEffect(() => {
-    const fetchEmployeeList = async () => {
+    const fetchBothLists = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/employee_details/getAll');
-        if (response.ok) {
-          const data = await response.json();
-          const siteEngineers = data.filter(
-            (emp) => emp.role_of_employee === 'Site Engineer'
-          );
-          setEmployeeList(siteEngineers);
-        }
-      } catch (error) {
-        console.error('Error:', error);
-      }
-    };
-    fetchEmployeeList();
-  }, []);
+        // Fetch both APIs in parallel - no waiting, fire immediately
+        const [employeeResponse, supportStaffResponse] = await Promise.all([
+          fetch('https://backendaab.in/aabuildersDash/api/employee_details/site_engineers', {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }),
+          fetch('https://backendaab.in/aabuildersDash/api/support_staff/getAll', {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          })
+        ]);
 
-  // Fetch support staff list from API
-  useEffect(() => {
-    const fetchSupportStaffList = async () => {
-      try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/support_staff/getAll');
-        if (response.ok) {
-          const data = await response.json();
-          setSupportStaffList(data);
+        // Process responses immediately without waiting
+        if (employeeResponse.ok) {
+          const employeeData = await employeeResponse.json();
+          const employees = Array.isArray(employeeData) ? employeeData : [];
+          siteEngineersCache.data = employees;
+          setEmployeeList(employees);
+        }
+
+        if (supportStaffResponse.ok) {
+          const supportStaffData = await supportStaffResponse.json();
+          const staff = Array.isArray(supportStaffData) ? supportStaffData : [];
+          supportStaffCache.data = staff;
+          setSupportStaffList(staff);
         }
       } catch (error) {
-        console.error('Error fetching support staff:', error);
+        // Silent fail - use cache if available (already set from useState init)
       }
     };
-    fetchSupportStaffList();
+    // Don't await - fire and forget, let it update in background
+    fetchBothLists();
   }, []);
 
   // Extract employee and support staff names as strings for the dropdown - merge both lists
-  const [inchargeOptions, setInchargeOptions] = useState([]);
-  useEffect(() => {
+  // Use useMemo for immediate computation (no render delay like useEffect)
+  const [customInchargeOptions, setCustomInchargeOptions] = useState([]);
+  const inchargeOptions = useMemo(() => {
+    // Extract employee names - check all possible field names
     const employeeNames = employeeList.map(employee => {
-      return employee.employeeName || employee.name || employee.fullName || employee.employee_name || '';
-    }).filter(name => name !== '');
+      const name = employee.employeeName || employee.name || employee.fullName || employee.employee_name || employee.employee_name || '';
+      return name;
+    }).filter(name => name !== '' && name.trim() !== '');
 
+    // Extract support staff names
     const supportStaffNames = supportStaffList.map(staff => {
-      return staff.support_staff_name || staff.supportStaffName || '';
-    }).filter(name => name !== '');
+      const name = staff.support_staff_name || staff.supportStaffName || staff.name || '';
+      return name;
+    }).filter(name => name !== '' && name.trim() !== '');
 
-    // Merge and remove duplicates
-    const merged = [...new Set([...employeeNames, ...supportStaffNames])].sort();
-    setInchargeOptions(merged);
-  }, [employeeList, supportStaffList]);
+    // Merge and remove duplicates, including custom options
+    const merged = [...new Set([...employeeNames, ...supportStaffNames, ...customInchargeOptions])].sort();
+    return merged;
+  }, [employeeList, supportStaffList, customInchargeOptions]);
 
   // Create siteInchargeOptions with IDs for lookup in PDF - includes both employees and support staff
   const siteInchargeOptions = [
@@ -1016,6 +1335,40 @@ const PurchaseOrder = ({ user, onLogout }) => {
     fetchPoCategory();
   }, []);
 
+  // Fetch tiles data (for TILE category)
+  const fetchTiles = useCallback(async () => {
+    try {
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/tiles/all/data');
+      if (response.ok) {
+        const data = await response.json();
+        setTileData(data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching tiles:', error);
+      setTileData([]);
+    }
+  }, []);
+
+  // Fetch tile sizes data (for TILE category)
+  const fetchTileSizes = useCallback(async () => {
+    try {
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/quantity/size');
+      if (response.ok) {
+        const data = await response.json();
+        setTileSizeData(data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching tile sizes:', error);
+      setTileSizeData([]);
+    }
+  }, []);
+
+  // Initial fetch for tiles and tile sizes
+  useEffect(() => {
+    fetchTiles();
+    fetchTileSizes();
+  }, [fetchTiles, fetchTileSizes]);
+
   // Helper function to extract numeric value from eno
   const getNumericEno = (order) => {
     const eno = order.eno || order.ENO || order.poNumber || order.po_number || '';
@@ -1108,7 +1461,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
   };
   const handleAddNewIncharge = (newIncharge) => {
     if (!inchargeOptions.includes(newIncharge)) {
-      setInchargeOptions([...inchargeOptions, newIncharge]);
+      setCustomInchargeOptions(prev => [...prev, newIncharge]);
     }
   };
   // Search functionality (legacy - may not be used anymore)
@@ -1290,8 +1643,13 @@ const PurchaseOrder = ({ user, onLogout }) => {
         setItems(updatedItems);
       }
     } else if (quantity > 0) {
-      // Add new item
-      const newItemId = items.length > 0 ? Math.max(...items.map(i => i.id)) + 1 : 1;
+      // Add new item - ensure ID is a number and doesn't conflict with existing IDs
+      const existingIds = items.map(i => {
+        const id = Number(i.id);
+        return isNaN(id) ? 0 : id;
+      }).filter(id => id > 0);
+      const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 0;
+      const newItemId = maxId + 1;
       const newItem = {
         id: newItemId,
         name: `${item.itemName}, ${item.category}`,
@@ -1310,10 +1668,26 @@ const PurchaseOrder = ({ user, onLogout }) => {
       setItems([...items, newItem]);
     }
     if (items.length === 0 && !poData.poNumber) {
-      setPoData({ ...poData, poNumber: '#312' });
+      setPoData({ ...poData, poNumber: '#' });
     }
     setHasOpenedAdd(true);
   };
+  // Listen for prefetched PO number from History.jsx clone operation
+  useEffect(() => {
+    const handlePoNumberPrefetched = (event) => {
+      const { vendorId, poNumber } = event.detail;
+      // Only use prefetched PO number if it matches current vendor and we're in clone mode
+      if (isEditMode && selectedVendor?.id === vendorId && poNumber && !poData.poNumber) {
+        setPoData(prev => ({ ...prev, poNumber }));
+        previousVendorId.current = vendorId;
+      }
+    };
+    window.addEventListener('poNumberPrefetched', handlePoNumberPrefetched);
+    return () => {
+      window.removeEventListener('poNumberPrefetched', handlePoNumberPrefetched);
+    };
+  }, [isEditMode, selectedVendor, poData.poNumber]);
+
   useEffect(() => {
     const fetchPoNumber = async () => {
       if (isViewOnlyFromHistory) {
@@ -1339,12 +1713,125 @@ const PurchaseOrder = ({ user, onLogout }) => {
     fetchPoNumber();
   }, [selectedVendor, isEditMode, isEditFromHistory, isViewOnlyFromHistory]);
   useEffect(() => {
+    // When loading from History (edit/clone), vendorName may be set in multiple steps (selectedVendor + poData),
+    // so this effect can accidentally clear items right after we set them. Skip clearing while handling an event load.
+    if (isLoadingFromEventRef.current) {
+      previousVendorName.current = poData.vendorName;
+      return;
+    }
     if (isEditMode && previousVendorName.current !== '' &&
       previousVendorName.current !== poData.vendorName) {
       setItems([]);
     }
     previousVendorName.current = poData.vendorName;
   }, [poData.vendorName, isEditMode]);
+
+  // Load selected items from NetStock page
+  useEffect(() => {
+    if (hasLoadedNetStockItems.current) return; // Only run once
+
+    const netStockItems = localStorage.getItem('netStockSelectedItems');
+    if (netStockItems && items.length === 0 && !isEditMode && !isViewOnlyFromHistory) {
+      try {
+        const selectedItems = JSON.parse(netStockItems);
+        if (Array.isArray(selectedItems) && selectedItems.length > 0) {
+          // Normalize function for comparison
+          const normalizeValue = (val) => (val || '').toString().toLowerCase().trim();
+
+          // Process each item and add to items array
+          const newItems = [];
+          selectedItems.forEach((itemData) => {
+            const newItemName = normalizeValue(itemData.itemName);
+            const newCategory = normalizeValue(itemData.category);
+            const newModel = normalizeValue(itemData.model);
+            const newBrand = normalizeValue(itemData.brand);
+            const newType = normalizeValue(itemData.type);
+            // Ensure quantity is a number
+            const newQuantity = Number(itemData.quantity) || 1;
+
+            // Check if item already exists in newItems array
+            const existingItemIndex = newItems.findIndex(item => {
+              const itemNameParts = item.name ? item.name.split(',') : [];
+              const existingItemName = normalizeValue(itemNameParts[0]);
+              const existingCategory = normalizeValue(itemNameParts[1] || item.category || '');
+              const existingModel = normalizeValue(item.model);
+              const existingBrand = normalizeValue(item.brand);
+              const existingType = normalizeValue(item.type);
+              return (
+                existingItemName === newItemName &&
+                existingCategory === newCategory &&
+                existingModel === newModel &&
+                existingBrand === newBrand &&
+                existingType === newType
+              );
+            });
+
+            if (existingItemIndex !== -1) {
+              // Merge with existing item - preserve IDs and add quantities
+              const existingItem = newItems[existingItemIndex];
+              newItems[existingItemIndex] = {
+                ...existingItem,
+                quantity: existingItem.quantity + newQuantity,
+                // Preserve IDs from the new item if existing item doesn't have them
+                itemId: existingItem.itemId || itemData.itemId || null,
+                brandId: existingItem.brandId || itemData.brandId || null,
+                modelId: existingItem.modelId || itemData.modelId || null,
+                typeId: existingItem.typeId || itemData.typeId || null,
+                categoryId: existingItem.categoryId || itemData.categoryId || resolveCategoryId(itemData.category) || null,
+              };
+            } else {
+              // Add new item with all required IDs for PO generation
+              // Ensure ID is a number and doesn't conflict with existing IDs
+              const existingIds = newItems.map(i => {
+                const id = Number(i.id);
+                return isNaN(id) ? 0 : id;
+              }).filter(id => id > 0);
+              const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 0;
+              const newItemId = maxId + 1;
+              newItems.push({
+                id: newItemId,
+                name: `${itemData.itemName}, ${itemData.category}`,
+                brand: itemData.brand || '',
+                model: itemData.model || '',
+                type: itemData.type || '',
+                category: itemData.category || '',
+                quantity: newQuantity,
+                // Ensure all IDs are properly set for PO generation
+                itemId: itemData.itemId || null,
+                brandId: itemData.brandId || null,
+                modelId: itemData.modelId || null,
+                typeId: itemData.typeId || null,
+                categoryId: itemData.categoryId || resolveCategoryId(itemData.category) || null,
+              });
+            }
+          });
+
+          if (newItems.length > 0) {
+            setItems(newItems);
+            if (!poData.poNumber) {
+              setPoData({ ...poData, poNumber: '#' });
+            }
+            setHasOpenedAdd(true);
+            // Ensure we're on the create tab to show the items
+            setActiveTab('create');
+            localStorage.setItem('activeTab', 'create');
+          }
+
+          // Clear the stored items after adding
+          localStorage.removeItem('netStockSelectedItems');
+          hasLoadedNetStockItems.current = true;
+        }
+      } catch (error) {
+        console.error('Error loading NetStock items:', error);
+        localStorage.removeItem('netStockSelectedItems');
+        hasLoadedNetStockItems.current = true;
+      }
+    } else if (!netStockItems) {
+      // If no NetStock items, mark as loaded to prevent future checks
+      hasLoadedNetStockItems.current = true;
+    }
+  }, [items.length, isEditMode, isViewOnlyFromHistory]); // Run when items array is empty
+
   const handleAddItem = (itemData) => {
     if (editingItem) {
       const updatedItems = items.map(item =>
@@ -1407,9 +1894,14 @@ const PurchaseOrder = ({ user, onLogout }) => {
         });
         setItems(updatedItems);
       } else {
-        // Add as new item
+        // Add as new item - ensure ID is a number and doesn't conflict with existing IDs
+        const existingIds = items.map(i => {
+          const id = Number(i.id);
+          return isNaN(id) ? 0 : id;
+        }).filter(id => id > 0);
+        const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 0;
         const newItem = {
-          id: items.length > 0 ? Math.max(...items.map(i => i.id)) + 1 : 1,
+          id: maxId + 1,
           name: `${itemData.itemName}, ${itemData.category}`,
           brand: itemData.brand,
           model: itemData.model,
@@ -1427,7 +1919,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
       }
     }
     if (items.length === 0 && !poData.poNumber) {
-      setPoData({ ...poData, poNumber: '#312' });
+      setPoData({ ...poData, poNumber: '#' });
     }
   };
   const handleDeleteItem = (itemId) => {
@@ -1591,9 +2083,32 @@ const PurchaseOrder = ({ user, onLogout }) => {
       return match[key] || match.label || match.name || '';
     };
     const vendorName = findNameById(vendorNameOptions, payload.vendor_id, "label");
-    const clientName = findNameById(siteOptions, payload.client_id, "label");
-    const siteInchargeName = findNameById(siteInchargeOptions, payload.site_incharge_id, "label");
+    const clientName = findNameById(siteOptions, payload.client_id, "label");    
+    // Find site incharge name based on site_incharge_type
+    let siteInchargeName = '';
+    const siteInchargeType = payload.site_incharge_type || payload.siteInchargeType;
+    const siteInchargeId = payload.site_incharge_id;    
+    if (siteInchargeId) {
+      if (siteInchargeType === 'support staff' || siteInchargeType === 'support_staff') {
+        // Look up from supportStaffList
+        if (supportStaffList && supportStaffList.length > 0) {
+          const staff = supportStaffList.find(s => String(s.id) === String(siteInchargeId));
+          if (staff) {
+            siteInchargeName = staff.support_staff_name || staff.supportStaffName || '';
+          }
+        }
+      } else if (siteInchargeType === 'employee' || !siteInchargeType) {
+        // Look up from employeeList (default to employee if type is not specified)
+        if (employeeList && employeeList.length > 0) {
+          const emp = employeeList.find(e => String(e.id) === String(siteInchargeId));
+          if (emp) {
+            siteInchargeName = emp.employeeName || emp.name || emp.fullName || emp.employee_name || '';
+          }
+        }
+      }
+    }
     const isRajaganapathyVendor = vendorName === "Rajaganapathy Plywoods";
+    const isVATradersVendor = vendorName === "VA Traders";
     doc.setDrawColor(0);
     doc.setLineWidth(0.5);
     doc.rect(10, 10, 190, 41.8);
@@ -1662,8 +2177,20 @@ const PurchaseOrder = ({ user, onLogout }) => {
       let model = '';
       let brand = '';
       let type = '';
+      
+      // Check if this is TILE category (category_id = 10)
+      const isTileCategory = item.category_id === 10 || String(item.category_id) === '10';
+      
       if (item.item_id) {
-        itemName = findNameById(poItemName, item.item_id, "itemName") || findNameById(poItemName, item.item_id, "name") || '';
+        if (isTileCategory && tileData && tileData.length > 0) {
+          // For TILE category, look up from tileData
+          itemName = findNameById(tileData, item.item_id, "label") ||
+            findNameById(tileData, item.item_id, "tileName") ||
+            findNameById(tileData, item.item_id, "name") || '';
+        } else {
+          // For other categories, look up from poItemName
+          itemName = findNameById(poItemName, item.item_id, "itemName") || findNameById(poItemName, item.item_id, "name") || '';
+        }
       }
       if (!itemName && item._itemName) {
         itemName = item._itemName;
@@ -1675,7 +2202,16 @@ const PurchaseOrder = ({ user, onLogout }) => {
         category = item._category;
       }
       if (item.model_id) {
-        model = findNameById(poModel, item.model_id, "model") || findNameById(poModel, item.model_id, "name") || '';
+        if (isTileCategory && tileSizeData && tileSizeData.length > 0) {
+          // For TILE category, look up size from tileSizeData
+          model = findNameById(tileSizeData, item.model_id, "size") ||
+            findNameById(tileSizeData, item.model_id, "tileSize") ||
+            findNameById(tileSizeData, item.model_id, "label") ||
+            findNameById(tileSizeData, item.model_id, "name") || '';
+        } else {
+          // For other categories, look up from poModel
+          model = findNameById(poModel, item.model_id, "model") || findNameById(poModel, item.model_id, "name") || '';
+        }
       }
       if (!model && item._model) {
         model = item._model;
@@ -1703,7 +2239,20 @@ const PurchaseOrder = ({ user, onLogout }) => {
           item.quantity || "",
           item.amount || ""
         ];
-      } else {
+      } if (isVATradersVendor) {
+        // For VA Traders: SNO, BRAND, ITEM NAME, TYPE, QTY, WEIGHT, RATE, AMOUNT (no CATEGORY, MODEL)
+        return [
+          index + 1,
+          brand,
+          itemName,
+          type,
+          item.quantity || "",
+          item.weight || "",
+          item.rate || "",
+          item.amount || "",
+        ];
+      }
+      else {
         // Original order: SNO, ITEM NAME, CATEGORY, MODEL, BRAND, TYPE, QTY, PRICE
         return [
           index + 1,
@@ -1720,7 +2269,10 @@ const PurchaseOrder = ({ user, onLogout }) => {
     while (tableBody.length < 24) {
       if (isRajaganapathyVendor) {
         tableBody.push(["", "", "", "", "", "", ""]);
-      } else {
+      } else if (isVATradersVendor) {
+        tableBody.push(["", "", "", "", "", "", "", ""]);
+      } 
+      else {
         tableBody.push(["", "", "", "", "", "", "", ""]);
       }
     }
@@ -1728,12 +2280,21 @@ const PurchaseOrder = ({ user, onLogout }) => {
     const totalAmount = purchaseTableData.reduce((sum, item) => sum + Number(item.amount || 0), 0);
     if (isRajaganapathyVendor) {
       tableBody.push([
-        "", "", "", "",
+        "", "", "", 
         { content: `TOTAL`, styles: { fontStyle: "bold", halign: "center" } },
         { content: `${totalQty}`, styles: { fontStyle: "bold", halign: "center" } },
         { content: `${totalAmount}`, styles: { fontStyle: "bold", halign: "center" } }
       ]);
-    } else {
+    }if (isVATradersVendor) {
+      tableBody.push([
+        "", "", "",
+        { content: `TOTAL`, styles: { fontStyle: "bold", halign: "center" } },
+        { content: `${totalQty}`, styles: { fontStyle: "bold", halign: "center" } },
+        "", "",
+        { content: `${totalAmount}`, styles: { fontStyle: "bold", halign: "center" } }
+      ]);
+    } 
+    else {
       tableBody.push([
         "", "", "", "", "",
         { content: `TOTAL`, styles: { fontStyle: "bold", halign: "center" } },
@@ -1741,31 +2302,42 @@ const PurchaseOrder = ({ user, onLogout }) => {
         { content: `${totalAmount}`, styles: { fontStyle: "bold", halign: "center" } }
       ]);
     }
-    const tableHeaders = isRajaganapathyVendor 
+    const tableHeaders = isRajaganapathyVendor
       ? [["SNO", "BRAND", "ITEM NAME", "MODEL", "TYPE", "QTY", "PRICE"]]
+      : isVATradersVendor
+        ? [["SNO", "BRAND", "ITEM NAME", "TYPE", "QTY", "WEIGHT", "RATE", "AMOUNT"]]
       : [["SNO", "ITEM NAME", "CATEGORY", "MODEL", "BRAND", "TYPE", "QTY", "PRICE"]];
-    
     const columnStylesConfig = isRajaganapathyVendor
       ? {
+        0: { cellWidth: 12 }, // SNO
+        1: { cellWidth: 25 }, // BRAND
+        2: { cellWidth: 75 }, // ITEM NAME
+        3: { cellWidth: 28 }, // MODEL
+        4: { cellWidth: 20 }, // TYPE
+        5: { cellWidth: 13 }, // QTY
+        6: { cellWidth: 17 }  // PRICE
+      }
+      : isVATradersVendor
+        ? {
           0: { cellWidth: 12 }, // SNO
-          1: { cellWidth: 25 }, // BRAND
-          2: { cellWidth: 75 }, // ITEM NAME
-          3: { cellWidth: 28 }, // MODEL
-          4: { cellWidth: 20 }, // TYPE
-          5: { cellWidth: 13 }, // QTY
-          6: { cellWidth: 17 }  // PRICE
+          1: { cellWidth: 23 }, // BRAND
+          2: { cellWidth: 65 }, // ITEM NAME
+          3: { cellWidth: 20 }, // TYPE
+          4: { cellWidth: 13 }, // QTY
+          5: { cellWidth: 19 }, // WEIGHT
+          6: { cellWidth: 17 }, // RATE
+          7: { cellWidth: 21 }  // AMOUNT
         }
       : {
-          0: { cellWidth: 12 }, // SNO
-          1: { cellWidth: 50 }, // ITEM NAME
-          2: { cellWidth: 30 }, // CATEGORY
-          3: { cellWidth: 28 }, // MODEL
-          4: { cellWidth: 20 }, // BRAND
-          5: { cellWidth: 20 }, // TYPE
-          6: { cellWidth: 13 }, // QTY
-          7: { cellWidth: 17 }  // PRICE
-        };
-
+        0: { cellWidth: 12 }, // SNO
+        1: { cellWidth: 50 }, // ITEM NAME
+        2: { cellWidth: 30 }, // CATEGORY
+        3: { cellWidth: 28 }, // MODEL
+        4: { cellWidth: 20 }, // BRAND
+        5: { cellWidth: 20 }, // TYPE
+        6: { cellWidth: 13 }, // QTY
+        7: { cellWidth: 17 }  // PRICE
+      };
     autoTable(doc, {
       startY: 52,
       margin: { left: 10, right: 10 },
@@ -1901,6 +2473,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
     setSwipeStates({});
     setSelectedCategory('');
     previousVendorId.current = null;
+    hasLoadedNetStockItems.current = false; // Reset to allow loading NetStock items again
   };
   const shareViaWhatsApp = () => {
     if (pdfBlob) {
@@ -1992,9 +2565,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                     {poData.poNumber && (
                       <p className="text-[12px] font-medium text-black leading-normal">{poData.poNumber}</p>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => setShowDatePicker(true)}
+                    <button type="button" onClick={() => setShowDatePicker(true)}
                       className="text-[12px] font-medium text-[#616161] leading-normal underline-offset-2 hover:underline"
                     >
                       {poData.date}
@@ -2003,11 +2574,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                   <div className="flex items-center gap-4">
                     {isPdfGenerated ? (
                       <>
-                        <button
-                          type="button"
-                          onClick={downloadPDF}
-                          className="text-[13px] font-medium text-black leading-normal"
-                        >
+                        <button type="button" onClick={downloadPDF} className="text-[13px] font-medium text-black leading-normal" >
                           Download
                         </button>
 
@@ -2032,7 +2599,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
                           setHasOpenedAdd(false);
                           setIsPdfGenerated(false);
                           setPdfBlob(null);
-
                           // Preserve isEditFromHistory flag - don't clear it if already editing from History
                           // Only clear if we're not already editing from History (editing from Create PO page)
                           if (!isEditFromHistory) {
@@ -2060,26 +2626,11 @@ const PurchaseOrder = ({ user, onLogout }) => {
                 </div>
               </div>
             )}
-            {/* Input Fields - visible while you are selecting the three fields (before first + click) */}
-            {!showAddItems && !hasOpenedAdd && (
+            {/* Input Fields - Show dropdowns BEFORE clicking + button (when !hasOpenedAdd) for edit/clone mode */}
+            {/* For edit/clone mode: show dropdowns before clicking + */}
+            {/* For regular flow: show dropdowns before clicking + (when selecting fields) */}
+            {(!hasOpenedAdd && isEditMode) || ((!showAddItems && !hasOpenedAdd) && !isEditMode) || (items.length > 0 && hasOpenedAdd && (!poData.vendorName || !poData.projectName || !poData.projectIncharge)) ? (
               <div className="flex-shrink-0 px-4 pt-4">
-                {/* Date and PO Number in empty state (matches design) */}
-                {isEmptyState && (
-                  <div className="mb-4 border-b border-gray-200 pb-2">
-                    <div className="flex items-center gap-2">
-                      {poData.poNumber && (
-                        <p className="text-[12px] font-medium text-black leading-normal">{poData.poNumber}</p>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setShowDatePicker(true)}
-                        className="text-[12px] font-medium text-[#616161] leading-normal underline-offset-2 hover:underline"
-                      >
-                        {poData.date}
-                      </button>
-                    </div>
-                  </div>
-                )}
                 {/* Vendor Name Field */}
                 <div className="mb-4 relative">
                   <p className="text-[12px] font-semibold text-black leading-normal mb-1">
@@ -2088,7 +2639,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                   <div className="relative">
                     <div
                       onClick={() => {
-                        // Prevent editing vendor name when editing from History page
+                        // Prevent editing vendor name when editing (not cloning) from History page
                         if (!isEditFromHistory) {
                           setShowVendorModal(true);
                         }
@@ -2129,8 +2680,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                     Project Name<span className="text-[#eb2f8e]">*</span>
                   </p>
                   <div className="relative">
-                    <div
-                      onClick={() => setShowProjectModal(true)}
+                    <div onClick={() => setShowProjectModal(true)}
                       className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                       style={{
                         paddingRight: poData.projectName ? '40px' : '12px',
@@ -2141,8 +2691,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                       {poData.projectName || 'Select Name'}
                     </div>
                     {poData.projectName && (
-                      <button
-                        type="button"
+                      <button type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setPoData({ ...poData, projectName: '' });
@@ -2163,8 +2712,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                     Project Incharge<span className="text-[#eb2f8e]">*</span>
                   </p>
                   <div className="relative">
-                    <div
-                      onClick={() => setShowInchargeModal(true)}
+                    <div onClick={() => setShowInchargeModal(true)}
                       className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                       style={{
                         paddingRight: poData.projectIncharge ? '40px' : '12px',
@@ -2175,8 +2723,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                       {poData.projectIncharge || 'Select Name'}
                     </div>
                     {poData.projectIncharge && (
-                      <button
-                        type="button"
+                      <button type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setPoData({ ...poData, projectIncharge: '' });
@@ -2192,9 +2739,12 @@ const PurchaseOrder = ({ user, onLogout }) => {
                   </div>
                 </div>
               </div>
-            )}
-            {/* Summary details card - show after first + click (both under popup and after closing it) */}
-            {hasOpenedAdd && !isEmptyState && (poData.vendorName || poData.projectName || poData.projectIncharge) && (
+            ) : null}
+            {/* Summary details card - Show AFTER clicking + button (when hasOpenedAdd is true) for edit/clone mode */}
+            {/* For regular flow: show summary card AFTER clicking + button */}
+            {/* These two views are mutually exclusive - never show both at the same time */}
+            {((hasOpenedAdd && isEditMode && (poData.vendorName || poData.projectName || poData.projectIncharge)) || 
+              (hasOpenedAdd && !isEmptyState && (poData.vendorName || poData.projectName || poData.projectIncharge) && !isEditMode)) && (
               <div className="flex-shrink-0 mx-2 mb-1 p-2 bg-white border border-[#aaaaaa] rounded-[8px]">
                 <div className="flex flex-col gap-2 px-2">
                   {poData.vendorName && (
@@ -2233,8 +2783,9 @@ const PurchaseOrder = ({ user, onLogout }) => {
             {/* Filled State extras (items) - Show when fields are filled OR after opening add items OR in edit mode */}
             {(hasOpenedAdd || !isEmptyState || isEditMode) && (
               <>
-                {/* Items Section - Show only when all three fields are filled */}
-                {(!isEmptyState || isEditMode) && poData.vendorName && poData.projectName && poData.projectIncharge && (
+                {/* Items Section - Show when items exist (from NetStock) or when all three fields are filled */}
+                {/* For edit/clone mode, always show items if they exist, regardless of hasOpenedAdd */}
+                {((items.length > 0 && (hasOpenedAdd || isEditMode)) || ((!isEmptyState || isEditMode) && poData.vendorName && poData.projectName && poData.projectIncharge)) && (
                   <div className="flex flex-col flex-1 min-h-0 mx-4 mb-4">
                     {/* Items Header - Fixed */}
                     <div className="flex-shrink-0 flex items-center gap-2 mb-2 border-b border-[#E0E0E0] pb-2">
@@ -2257,24 +2808,30 @@ const PurchaseOrder = ({ user, onLogout }) => {
                       <div className="flex-1 overflow-y-auto scrollbar-hide">
                         <div className="space-y-2 ">
                           {items.map((item) => {
+                            // Use item.id as-is (can be string or number) for consistent swipe state lookup
+                            if (!item || !item.id) return null;
+                            const itemId = item.id; // Use ID as-is, don't force to number
+                            
                             const minSwipeDistance = 50;
-                            const handleTouchStart = (e, itemId) => {
+                            const handleTouchStart = (e, id) => {
+                              if (!id) return;
                               const touch = e.touches ? e.touches[0] : { clientX: e.clientX };
                               setSwipeStates(prev => ({
                                 ...prev,
-                                [itemId]: {
+                                [id]: {
                                   startX: touch.clientX,
                                   currentX: touch.clientX,
                                   isSwiping: false
                                 }
                               }));
                             };
-                            const handleTouchMove = (e, itemId) => {
+                            const handleTouchMove = (e, id) => {
+                              if (!id) return;
                               const touch = e.touches ? e.touches[0] : { clientX: e.clientX };
-                              const state = swipeStates[itemId];
+                              const state = swipeStates[id];
                               if (!state) return;
                               const deltaX = touch.clientX - state.startX;
-                              const isExpanded = expandedItemId === itemId;
+                              const isExpanded = expandedItemId === id;
                               // Allow swiping left to reveal buttons, or swiping right to hide if already expanded
                               if (deltaX < 0 || (isExpanded && deltaX > 0)) {
                                 if (e.preventDefault) {
@@ -2282,46 +2839,47 @@ const PurchaseOrder = ({ user, onLogout }) => {
                                 }
                                 setSwipeStates(prev => ({
                                   ...prev,
-                                  [itemId]: {
-                                    ...prev[itemId],
+                                  [id]: {
+                                    ...prev[id],
                                     currentX: touch.clientX,
                                     isSwiping: true
                                   }
                                 }));
                               }
                             };
-                            const handleTouchEnd = (itemId) => {
-                              const state = swipeStates[itemId];
+                            const handleTouchEnd = (id) => {
+                              if (!id) return;
+                              const state = swipeStates[id];
                               if (!state) return;
                               const deltaX = state.currentX - state.startX;
                               const absDeltaX = Math.abs(deltaX);
                               if (absDeltaX >= minSwipeDistance) {
                                 if (deltaX < 0) {
                                   // Swiped left (reveal buttons) - only expand this card
-                                  setExpandedItemId(itemId);
+                                  setExpandedItemId(id);
                                 } else {
                                   // Swiped right (hide buttons)
                                   setExpandedItemId(null);
                                 }
                               } else {
                                 // Small movement - snap back or close if already expanded
-                                if (expandedItemId === itemId) {
+                                if (expandedItemId === id) {
                                   setExpandedItemId(null);
                                 }
                               }
                               // Reset swipe state
                               setSwipeStates(prev => {
                                 const newState = { ...prev };
-                                delete newState[itemId];
+                                delete newState[id];
                                 return newState;
                               });
                             };
                             return (
                               <ItemCard
-                                key={item.id}
+                                key={itemId}
                                 item={item}
-                                isExpanded={expandedItemId === item.id}
-                                swipeState={swipeStates[item.id]}
+                                isExpanded={expandedItemId === itemId}
+                                swipeState={swipeStates[itemId]}
                                 onSwipeStart={handleTouchStart}
                                 onSwipeMove={handleTouchMove}
                                 onSwipeEnd={handleTouchEnd}
@@ -2363,9 +2921,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
         )}
         {/* Floating WhatsApp Button - Show after PDF generation (only on create tab) */}
         {activeTab === 'create' && isPdfGenerated && (
-          <button
-            type="button"
-            onClick={shareViaWhatsApp}
+          <button type="button" onClick={shareViaWhatsApp}
             className="fixed bottom-[180px] right-[24px] lg:right-[calc(50%-164px)] w-[48px] h-[48px] rounded-full bg-[#25D366] flex items-center justify-center shadow-lg z-40 hover:bg-[#20BA5A] transition-colors"
             style={{ fontFamily: "'Manrope', sans-serif" }}
           >
@@ -2470,13 +3026,11 @@ const PurchaseOrder = ({ user, onLogout }) => {
               const empName = emp.employeeName || emp.name || emp.fullName || emp.employee_name || '';
               return empName === value;
             });
-
             // If not an employee, check if it's support staff
             const selectedSupportStaff = !selectedEmployee ? supportStaffList.find(staff => {
               const staffName = staff.support_staff_name || staff.supportStaffName || '';
               return staffName === value;
             }) : null;
-
             if (selectedEmployee) {
               setSelectedIncharge({
                 id: selectedEmployee.id,

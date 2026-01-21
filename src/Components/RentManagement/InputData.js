@@ -422,6 +422,7 @@ const InputData = ({ username, userRoles = [] }) => {
       );
       if (detail) {
         return {
+          shopNo: detail.shopNo || '',
           projectReferenceName: project.projectReferenceName || '',
           doorNo: detail.doorNo || '',
           projectType: detail.projectType || '',
@@ -2046,26 +2047,37 @@ const InputData = ({ username, userRoles = [] }) => {
             <div className="overflow-y-auto max-h-[600px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
               <table className="table-auto w-96">
                 <tbody>
-                  {filteredTenantLink.map((item, index) => (
-                    <tr key={item.id} className="border-b bg-white hover:bg-gray-50 cursor-pointer" >
-                      <td className="p-2 align-top">{index + 1}</td>
-                      <td className="py-2 pl-9 font-semibold group flex text-left ">
-                        <div className="flex flex-grow">
-                          {item.tenantName || 'N/A'}
-                        </div>
-                        <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
-                          <button type="button" onClick={() => openEditTenantLink(item)}>
-                            <img src={edit} alt="add" className="w-4 h-4" type="button" />
-                          </button>
-                          {userPermissions.includes("Delete") && (
-                            <button >
-                              <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleTenantLinkDelete(item.id)} />
+                  {filteredTenantLink.map((item, index) => {
+                    // Check if tenant has any vacated shops (similar to Dashboard.js logic)
+                    // A shop is vacated if it has a shopClosureDate (active = !shopClosureDate in Dashboard.js)
+                    const hasVacatedShops = item.shopNos?.some(shop => 
+                      shop.shopClosureDate && shop.shopClosureDate.trim() !== ''
+                    ) || false;
+                    const displayTenantName = hasVacatedShops 
+                      ? `${item.tenantName || 'N/A'} (Vacated)`
+                      : (item.tenantName || 'N/A');
+                    
+                    return (
+                      <tr key={item.id} className="border-b bg-white hover:bg-gray-50 cursor-pointer">
+                        <td className="p-2 align-top">{index + 1}</td>
+                        <td className="py-2 pl-9 font-semibold group flex text-left ">
+                          <div className="flex flex-grow">
+                            {displayTenantName}
+                          </div>
+                          <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
+                            <button type="button" onClick={() => openEditTenantLink(item)}>
+                              <img src={edit} alt="add" className="w-4 h-4" type="button" />
                             </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                            {userPermissions.includes("Delete") && (
+                              <button >
+                                <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleTenantLinkDelete(item.id)} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -3867,8 +3879,32 @@ const InputData = ({ username, userRoles = [] }) => {
                             String(option.value) === String(shop.shopNoId) || String(option.id) === String(shop.shopNoId)
                           ))
                           : null;
+                        const isVacated = shop.shopClosureDate && shop.shopClosureDate.trim() !== '';
+                        // Create a display option for the shop dropdown that shows the shop number
+                        // Always show shop number if shopNoId exists, even if not found in filtered shops
+                        let shopDisplayOption = null;
+                        if (shop.shopNoId && shop.shopNoId !== '' && shop.shopNoId !== null) {
+                          const shopNo = shopDetails?.shopNo;
+                          if (selectedShopOption) {
+                            // Use selectedShopOption but override label with shop number
+                            shopDisplayOption = {
+                              ...selectedShopOption,
+                              label: shopNo || selectedShopOption.label || selectedShopOption.shopNo || 'Shop No'
+                            };
+                          } else if (shopNo) {
+                            // Create option from shop details if not found in filtered shops
+                            shopDisplayOption = {
+                              value: shop.shopNoId,
+                              id: shop.shopNoId,
+                              label: shopNo,
+                              shopNo: shopNo,
+                              projectReferenceName: shopDetails?.projectReferenceName || shop.projectReferenceName || ''
+                            };
+                          }
+                        }
+                        
                         return (
-                          <div key={sIndex} className="bg-gray-50 p-2 rounded-lg shadow-md mb-6 text-left w-[1250px]">
+                          <div key={sIndex} className="p-2 rounded-lg shadow-md mb-6 text-left w-[1250px] bg-gray-50">
                             <div className="flex gap-1 mb-2 ">
                               <Select
                                 name="projectReferenceName"
@@ -3903,6 +3939,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                 placeholder="Property Name"
                                 isSearchable
                                 isClearable
+                                isDisabled={isVacated}
                                 className="w-60 text-sm"
                                 classNamePrefix="select"
                                 menuPortalTarget={document.body}
@@ -3921,6 +3958,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                     '&:hover': {
                                       borderColor: 'rgba(191, 152, 83, 0.4)',
                                     },
+                                    cursor: isVacated ? 'not-allowed' : 'pointer',
                                   }),
                                   menuPortal: (base) => ({
                                     ...base,
@@ -3953,9 +3991,11 @@ const InputData = ({ username, userRoles = [] }) => {
                               <Select
                                 name="shopNo"
                                 options={filteredShops}
-                                value={selectedShopOption}
+                                value={shopDisplayOption}
                                 menuPlacement="auto"
+                                isDisabled={isVacated}
                                 onMenuOpen={() => {
+                                  if (isVacated) return;
                                   setTimeout(() => {
                                     const menu = document.querySelector('.select__menu');
                                     if (menu && selectedShopOption) {
@@ -3973,6 +4013,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                   }, 50);
                                 }}
                                 onChange={(selectedOption) => {
+                                  if (isVacated) return;
                                   if (selectedOption) {
                                     const shopDetails = getShopDetailsById(selectedOption.value || selectedOption.id);
                                     handleEditTenantLinkShopChange(sIndex, {
@@ -4000,7 +4041,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                 }}
                                 placeholder="Shop No"
                                 isSearchable
-                                isClearable
+                                isClearable={!isVacated}
                                 className="w-44 text-sm"
                                 classNamePrefix="select"
                                 menuPortalTarget={document.body}
@@ -4019,6 +4060,7 @@ const InputData = ({ username, userRoles = [] }) => {
                                     '&:hover': {
                                       borderColor: 'rgba(191, 152, 83, 0.4)',
                                     },
+                                    cursor: isVacated ? 'not-allowed' : 'pointer',
                                   }),
                                   menuPortal: (base) => ({
                                     ...base,

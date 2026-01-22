@@ -761,12 +761,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
         })
     }
     const handleDuplicateChange = async (index, checked) => {
-        if (!isAdminUser() || !selectedBill) {
-            return
-        }
         // Update local state immediately for better UX
         setDuplicateSelections(prev => ({ ...prev, [index]: checked }))
-
         // Find the bill verification ID for this index
         if (selectedBill.billVerifications && selectedBill.billVerifications[index]) {
             const billVerification = selectedBill.billVerifications[index]
@@ -802,20 +798,14 @@ const PendingBill = ({ username, userRoles = [] }) => {
         }
     }
     const handleExtraDuplicateChange = async (index, checked) => {
-        if (!isAdminUser() || !selectedBill) {
-            return
-        }
         const noOfBills = selectedBill?.noOfBills || selectedBill?.no_of_bills || 0
         const actualIndex = noOfBills + index
-
         // Update local state immediately for better UX
         setExtraDuplicateSelections(prev => ({ ...prev, [index]: checked }))
-
         // Find the bill verification ID for this index
         if (selectedBill.billVerifications && selectedBill.billVerifications[actualIndex]) {
             const billVerification = selectedBill.billVerifications[actualIndex]
             const billId = billVerification.id
-
             try {
                 const response = await axios.put(
                     `https://backendaab.in/aabuildersDash/api/vendor-payments/bill/${billId}/duplicate`,
@@ -4097,37 +4087,35 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                     className={`w-20 h-8 px-2 py-1 rounded text-sm text-center ${bgClass} focus:outline-none focus:bg-white transition-colors duration-200 placeholder-gray-400 border ${borderClass}`}
                                     disabled={isNoPo}
                                 />
-                                {isAdminUser() && (
-                                    <div className="flex items-center gap-1">
-                                        {isDuplicateMode ? (
-                                            <>
-                                                <input
-                                                    type="checkbox"
-                                                    id={`duplicate-${i}`}
-                                                    checked={duplicateSelections[i] || false}
-                                                    onChange={(e) => handleDuplicateChange(i, e.target.checked)}
-                                                    className="w-3 h-3"
-                                                />
-                                                <label htmlFor={`duplicate-${i}`} className="text-xs text-gray-600 cursor-pointer">
-                                                    Duplicate
-                                                </label>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <input
-                                                    type="checkbox"
-                                                    id={`no-po-${i}`}
-                                                    checked={isNoPo}
-                                                    onChange={(e) => handleNoPoChange(i, e.target.checked)}
-                                                    className="w-3 h-3"
-                                                />
-                                                <label htmlFor={`no-po-${i}`} className="text-xs text-gray-600 cursor-pointer">
-                                                    No PO
-                                                </label>
-                                            </>
-                                        )}
-                                    </div>
-                                )}
+                                <div className="flex items-center gap-1">
+                                    {isDuplicateMode ? (
+                                        <>
+                                            <input
+                                                type="checkbox"
+                                                id={`duplicate-${i}`}
+                                                checked={duplicateSelections[i] || false}
+                                                onChange={(e) => handleDuplicateChange(i, e.target.checked)}
+                                                className="w-3 h-3"
+                                            />
+                                            <label htmlFor={`duplicate-${i}`} className="text-xs text-gray-600 cursor-pointer">
+                                                Duplicate
+                                            </label>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <input
+                                                type="checkbox"
+                                                id={`no-po-${i}`}
+                                                checked={isNoPo}
+                                                onChange={(e) => handleNoPoChange(i, e.target.checked)}
+                                                className="w-3 h-3"
+                                            />
+                                            <label htmlFor={`no-po-${i}`} className="text-xs text-gray-600 cursor-pointer">
+                                                No PO
+                                            </label>
+                                        </>
+                                    )}
+                                </div>
                             </div>
                         ) : (
                             <div className="flex flex-col items-center gap-1">
@@ -4184,7 +4172,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     const persistedIsVerified = persistedVerification.is_verified === true || persistedVerification.status === 'VERIFIED'
                     const persistedIsPaid = persistedVerification.is_paid === true || persistedVerification.status === 'PAID'
                     const persistedIsDuplicate = persistedVerification.is_duplicate === true
-
                     // Check if bill is duplicate and verified - show different border color
                     if (persistedIsDuplicate && persistedIsVerified) {
                         borderClass = 'border-purple-600'
@@ -4218,37 +4205,35 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                         className={`w-20 h-8 px-2 py-1 rounded text-sm text-center ${bgClass} focus:outline-none focus:bg-white transition-colors duration-200 placeholder-gray-400 border ${borderClass}`}
                                         disabled={isNoPo}
                                     />
-                                    {isAdminUser() && (
-                                        <div className="flex items-center gap-1">
-                                            {isDuplicateMode ? (
-                                                <>
-                                                    <input
-                                                        type="checkbox"
-                                                        id={`extra-duplicate-${i}`}
-                                                        checked={extraDuplicateSelections[i] || false}
-                                                        onChange={(e) => handleExtraDuplicateChange(i, e.target.checked)}
-                                                        className="w-3 h-3"
-                                                    />
-                                                    <label htmlFor={`extra-duplicate-${i}`} className="text-xs text-gray-600 cursor-pointer">
-                                                        Duplicate
-                                                    </label>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <input
-                                                        type="checkbox"
-                                                        id={`extra-no-po-${i}`}
-                                                        checked={isNoPo}
-                                                        onChange={(e) => handleExtraNoPoChange(i, e.target.checked)}
-                                                        className="w-3 h-3 "
-                                                    />
-                                                    <label htmlFor={`extra-no-po-${i}`} className="text-xs text-gray-600 cursor-pointer">
-                                                        No PO
-                                                    </label>
-                                                </>
-                                            )}
-                                        </div>
-                                    )}
+                                    <div className="flex items-center gap-1">
+                                        {isDuplicateMode ? (
+                                            <>
+                                                <input
+                                                    type="checkbox"
+                                                    id={`extra-duplicate-${i}`}
+                                                    checked={extraDuplicateSelections[i] || false}
+                                                    onChange={(e) => handleExtraDuplicateChange(i, e.target.checked)}
+                                                    className="w-3 h-3"
+                                                />
+                                                <label htmlFor={`extra-duplicate-${i}`} className="text-xs text-gray-600 cursor-pointer">
+                                                    Duplicate
+                                                </label>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <input
+                                                    type="checkbox"
+                                                    id={`extra-no-po-${i}`}
+                                                    checked={isNoPo}
+                                                    onChange={(e) => handleExtraNoPoChange(i, e.target.checked)}
+                                                    className="w-3 h-3 "
+                                                />
+                                                <label htmlFor={`extra-no-po-${i}`} className="text-xs text-gray-600 cursor-pointer">
+                                                    No PO
+                                                </label>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center gap-1">
@@ -4944,17 +4929,15 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                             >
                                                 {checkingPO ? 'Checking...' : 'Check PO'}
                                             </button>
-                                            {isAdminUser() && (
-                                                <button
-                                                    className={`px-4 py-2 rounded font-medium transition-colors duration-200 ${isDuplicateMode
-                                                        ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                                        : 'bg-white text-blue-600 border border-blue-600 hover:bg-blue-50'
-                                                        }`}
-                                                    onClick={toggleDuplicateMode}
-                                                >
-                                                    {isDuplicateMode ? 'Duplicate Mode' : 'Duplicate'}
-                                                </button>
-                                            )}
+                                            <button
+                                                className={`px-4 py-2 rounded font-medium transition-colors duration-200 ${isDuplicateMode
+                                                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                                    : 'bg-white text-blue-600 border border-blue-600 hover:bg-blue-50'
+                                                    }`}
+                                                onClick={toggleDuplicateMode}
+                                            >
+                                                {isDuplicateMode ? 'Duplicate Mode' : 'Duplicate'}
+                                            </button>
                                             {selectedBill?.send_request && !selectedBill?.request_approved && isAdminUser() ? (
                                                 <>
                                                     <button className="px-4 py-2 bg-green-600 text-white rounded font-medium hover:bg-green-700 transition-colors duration-200"
@@ -4972,11 +4955,9 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                 !selectedBill?.request_approved && !areAllBillsVerifiedAndNotPaid() && !isAdminUser() && (
                                                     <button
                                                         className={`px-4 py-2 rounded font-medium transition-colors duration-200 ${isSendRequestDisabled()
-                                                            ? 'bg-gray-400 text-white cursor-not-allowed'
-                                                            : 'bg-gray-600 text-white hover:bg-gray-700'
+                                                            ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-gray-600 text-white hover:bg-gray-700'
                                                             }`}
-                                                        onClick={handleSendRequest}
-                                                        disabled={isSendRequestDisabled()}
+                                                        onClick={handleSendRequest} disabled={isSendRequestDisabled()}
                                                     >
                                                         Send Request
                                                     </button>
@@ -5007,8 +4988,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                         </div>
                                     )}
                                     {selectedBill?.request_approved && isAdminUser() && (
-                                        <button
-                                            className="px-4 py-2 bg-red-600 text-white rounded font-medium hover:bg-red-700 transition-colors duration-200"
+                                        <button className="px-4 py-2 bg-red-600 text-white rounded font-medium hover:bg-red-700 transition-colors duration-200"
                                             onClick={handleRevokeApproval}
                                         >
                                             Revoke Approval

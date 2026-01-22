@@ -11,6 +11,7 @@ import AddItemsToPO from './AddItemsToPO';
 import ItemCard from './ItemCard';
 import DatePickerModal from './DatePickerModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
+import DuplicatePOConfirmModal from './DuplicatePOConfirmModal';
 import SearchResults from './SearchResults';
 import SearchableDropdown from './SearchableDropdown';
 import History from './History';
@@ -38,6 +39,8 @@ const PurchaseOrder = ({ user, onLogout }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
+  const [showDuplicatePOConfirm, setShowDuplicatePOConfirm] = useState(false);
+  const [duplicatePONumber, setDuplicatePONumber] = useState(null);
   const [showVendorModal, setShowVendorModal] = useState(false);
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showInchargeModal, setShowInchargeModal] = useState(false);
@@ -1948,11 +1951,91 @@ const PurchaseOrder = ({ user, onLogout }) => {
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
   };
-  const generatePO = async () => {
-    if (!selectedVendor?.id) {
-      alert("Please select a Vendor before generating a PO.");
-      return;
+
+  // Function to fetch the previous PO for the same vendor and project
+  const fetchPreviousPO = async (vendorId, clientId) => {
+    if (!vendorId || !clientId) {
+      return null;
     }
+    try {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/purchase_orders/getAll');
+      if (!response.ok) {
+        throw new Error('Failed to fetch purchase orders');
+      }
+      const data = await response.json();
+      const normalizedVendorId = String(vendorId);
+      const normalizedClientId = String(clientId);
+      
+      // Filter POs for the same vendor and project, sorted by eno descending (most recent first)
+      const matchingPOs = data
+        .filter(order => 
+          String(order.vendor_id ?? order.vendorId) === normalizedVendorId &&
+          String(order.client_id ?? order.clientId) === normalizedClientId
+        )
+        .sort((a, b) => {
+          const enoA = getNumericEno(a);
+          const enoB = getNumericEno(b);
+          return enoB - enoA; // Descending order
+        });
+      
+      // Return the most recent PO (first in sorted array)
+      return matchingPOs.length > 0 ? matchingPOs[0] : null;
+    } catch (error) {
+      console.error('Failed to fetch previous PO:', error);
+      return null;
+    }
+  };
+
+  // Function to compare items (ignoring quantity) - check if the set of items is exactly the same
+  const areItemsSame = (items1, items2) => {
+    if (!items1 || !items2 || items1.length !== items2.length) {
+      return false;
+    }
+    
+    // Create normalized item sets (ignoring quantity)
+    const normalizeItem = (item) => {
+      return {
+        item_id: item.item_id || null,
+        category_id: item.category_id || null,
+        model_id: item.model_id || null,
+        brand_id: item.brand_id || null,
+        type_id: item.type_id || null,
+      };
+    };
+    
+    const normalizedItems1 = items1.map(normalizeItem).sort((a, b) => {
+      // Sort by item_id, then category_id, etc. for consistent comparison
+      const keyA = `${a.item_id || ''}-${a.category_id || ''}-${a.model_id || ''}-${a.brand_id || ''}-${a.type_id || ''}`;
+      const keyB = `${b.item_id || ''}-${b.category_id || ''}-${b.model_id || ''}-${b.brand_id || ''}-${b.type_id || ''}`;
+      return keyA.localeCompare(keyB);
+    });
+    
+    const normalizedItems2 = items2.map(normalizeItem).sort((a, b) => {
+      const keyA = `${a.item_id || ''}-${a.category_id || ''}-${a.model_id || ''}-${a.brand_id || ''}-${a.type_id || ''}`;
+      const keyB = `${b.item_id || ''}-${b.category_id || ''}-${b.model_id || ''}-${b.brand_id || ''}-${b.type_id || ''}`;
+      return keyA.localeCompare(keyB);
+    });
+    
+    // Compare each item
+    for (let i = 0; i < normalizedItems1.length; i++) {
+      const item1 = normalizedItems1[i];
+      const item2 = normalizedItems2[i];
+      
+      if (
+        item1.item_id !== item2.item_id ||
+        item1.category_id !== item2.category_id ||
+        item1.model_id !== item2.model_id ||
+        item1.brand_id !== item2.brand_id ||
+        item1.type_id !== item2.type_id
+      ) {
+        return false;
+      }
+    }
+    
+    return true;
+  };
+
+  const proceedWithPOGeneration = async () => {
     setIsGenerating(true);
     try {
       const username = (user && user.username) || poData.created_by || '';
@@ -2074,6 +2157,87 @@ const PurchaseOrder = ({ user, onLogout }) => {
       setIsGenerating(false);
     }
   };
+
+  const generatePO = async () => {
+    if (!selectedVendor?.id) {
+      alert("Please select a Vendor before generating a PO.");
+      return;
+    }
+    
+    // Check for duplicate PO only when creating new PO (not editing)
+    if (!isEditMode || !poData.originalId) {
+      const clientIdForCheck = selectedSite?.id ?? poData.originalClientId ?? null;
+      
+      if (clientIdForCheck && items.length > 0) {
+        // Fetch previous PO for same vendor and project
+        const previousPO = await fetchPreviousPO(selectedVendor.id, clientIdForCheck);
+        
+        if (previousPO && previousPO.purchaseTable && previousPO.purchaseTable.length > 0) {
+          // Prepare current items for comparison (same structure as payload.purchaseTable)
+          const currentItemsForComparison = items.map(item => {
+            const nameParts = item.name ? item.name.split(',') : [];
+            const itemNameOnly = nameParts[0] ? nameParts[0].trim() : '';
+            const categoryName = item.category || (nameParts[1] ? nameParts[1].trim() : '');
+            let itemId = item.itemId;
+            let brandId = item.brandId;
+            let modelId = item.modelId;
+            let typeId = item.typeId;
+            let categoryId = item.categoryId;
+            
+            if (!itemId && itemNameOnly && poItemName && poItemName.length > 0) {
+              const foundItem = poItemName.find(i =>
+                (i.itemName || i.name || '').toLowerCase() === itemNameOnly.toLowerCase()
+              );
+              itemId = foundItem ? (foundItem.id || foundItem._id) : null;
+            }
+            if (!brandId && item.brand && poBrand && poBrand.length > 0) {
+              const foundBrand = poBrand.find(b =>
+                (b.brand || b.brandName || b.name || '').toLowerCase() === item.brand.toLowerCase()
+              );
+              brandId = foundBrand ? (foundBrand.id || foundBrand._id) : null;
+            }
+            if (!modelId && item.model && poModel && poModel.length > 0) {
+              const foundModel = poModel.find(m =>
+                (m.model || m.modelName || m.name || '').toLowerCase() === item.model.toLowerCase()
+              );
+              modelId = foundModel ? (foundModel.id || foundModel._id) : null;
+            }
+            if (!typeId && item.type && poType && poType.length > 0) {
+              const foundType = poType.find(t =>
+                (t.typeColor || t.type || t.typeName || t.name || '').toLowerCase() === item.type.toLowerCase()
+              );
+              typeId = foundType ? (foundType.id || foundType._id) : null;
+            }
+            if (!categoryId && categoryName && categoryOptions && categoryOptions.length > 0) {
+              categoryId = resolveCategoryId(categoryName);
+            }
+            
+            return {
+              item_id: itemId || null,
+              category_id: categoryId || null,
+              model_id: modelId || null,
+              brand_id: brandId || null,
+              type_id: typeId || null,
+            };
+          });
+          
+          // Compare items (ignoring quantity)
+          if (areItemsSame(currentItemsForComparison, previousPO.purchaseTable)) {
+            // Items are the same - show custom confirmation modal
+            const previousPONumber = previousPO.eno || previousPO.poNumber || 'N/A';
+            setDuplicatePONumber(previousPONumber);
+            setShowDuplicatePOConfirm(true);
+            return; // Exit early, will proceed when user confirms
+          }
+          // Items are different - proceed without asking
+        }
+      }
+    }
+    
+    // No duplicate detected or editing mode - proceed directly
+    proceedWithPOGeneration();
+  };
+
   const generatePDF = (payload, skipSaveAndDownload = false) => {
     const doc = new jsPDF();
     const findNameById = (options, id, key) => {
@@ -3071,6 +3235,20 @@ const PurchaseOrder = ({ user, onLogout }) => {
           getAvailableItems={getAvailableItems}
           existingItems={items}
           onRefreshData={fetchPoItemName}
+        />
+        <DuplicatePOConfirmModal
+          isOpen={showDuplicatePOConfirm}
+          onCancel={() => {
+            setShowDuplicatePOConfirm(false);
+            setDuplicatePONumber(null);
+          }}
+          onConfirm={() => {
+            setShowDuplicatePOConfirm(false);
+            setDuplicatePONumber(null);
+            // Continue with PO generation
+            proceedWithPOGeneration();
+          }}
+          previousPONumber={duplicatePONumber}
         />
       </div>
     </div>

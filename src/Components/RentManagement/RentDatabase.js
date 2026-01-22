@@ -1736,10 +1736,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                                                 </button>
                                             </td>
                                             <td className="text-sm text-left px-2 font-semibold">
-                                                <button
-                                                    className="text-blue-600 underline"
-                                                    onClick={() => handlePrint(rent)}
-                                                >
+                                                <button className="text-blue-600 underline" onClick={() => handlePrint(rent)}>
                                                     Print
                                                 </button>
                                             </td>

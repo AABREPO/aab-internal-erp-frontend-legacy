@@ -62,6 +62,9 @@ const PendingBill = ({ username, userRoles = [] }) => {
     const [extraNoPoSelections, setExtraNoPoSelections] = useState({})
     const [checkedBills, setCheckedBills] = useState({})
     const [extraCheckedBills, setExtraCheckedBills] = useState({})
+    const [isDuplicateMode, setIsDuplicateMode] = useState(false)
+    const [duplicateSelections, setDuplicateSelections] = useState({})
+    const [extraDuplicateSelections, setExtraDuplicateSelections] = useState({})
     const [hasBeenSubmitted, setHasBeenSubmitted] = useState(false)
     const [originalData, setOriginalData] = useState(null)
     const [editModeStartData, setEditModeStartData] = useState(null)
@@ -656,18 +659,24 @@ const PendingBill = ({ username, userRoles = [] }) => {
             const initialNoPo = {}
             const initialExtraVerified = {}
             const initialExtraNoPo = {}
+            const initialDuplicate = {}
+            const initialExtraDuplicate = {}
             bill.billVerifications.forEach((verification, index) => {
                 if (index < numberOfBills) {
                     initialVerified[index] = verification.is_verified || false
                     initialNoPo[index] = verification.bill_number === 'NO_PO'
+                    initialDuplicate[index] = verification.is_duplicate || false
                 } else if (index < numberOfBills + extraBills) {
                     const extraIndex = index - numberOfBills
                     initialExtraVerified[extraIndex] = verification.is_verified || false
                     initialExtraNoPo[extraIndex] = verification.bill_number === 'NO_PO'
+                    initialExtraDuplicate[extraIndex] = verification.is_duplicate || false
                 }
             })
             setVerifiedBills(initialVerified)
             setNoPoSelections(initialNoPo)
+            setDuplicateSelections(initialDuplicate)
+            setExtraDuplicateSelections(initialExtraDuplicate)
             const initialChecked = {}
             bill.billVerifications.forEach((verification, index) => {
                 if (index < numberOfBills) {
@@ -693,10 +702,13 @@ const PendingBill = ({ username, userRoles = [] }) => {
             setExtraNoPoSelections({})
             setCheckedBills({})
             setExtraCheckedBills({})
+            setDuplicateSelections({})
+            setExtraDuplicateSelections({})
             setHasBeenSubmitted(false)
             setOriginalData(null)
         }
         setIsEditMode(false)
+        setIsDuplicateMode(false)
         setValidationResults({})
         setRangeStart('')
         setRangeEnd('')
@@ -747,6 +759,99 @@ const PendingBill = ({ username, userRoles = [] }) => {
             delete newValidationResults[index]
             return newValidationResults
         })
+    }
+    const handleDuplicateChange = async (index, checked) => {
+        if (!isAdminUser() || !selectedBill) {
+            return
+        }
+        // Update local state immediately for better UX
+        setDuplicateSelections(prev => ({ ...prev, [index]: checked }))
+
+        // Find the bill verification ID for this index
+        if (selectedBill.billVerifications && selectedBill.billVerifications[index]) {
+            const billVerification = selectedBill.billVerifications[index]
+            const billId = billVerification.id
+
+            try {
+                const response = await axios.put(
+                    `https://backendaab.in/aabuildersDash/api/vendor-payments/bill/${billId}/duplicate`,
+                    null,
+                    {
+                        params: { duplicate: checked }
+                    }
+                )
+                if (response.status === 200) {
+                    // Update the local bill data
+                    const updatedBillVerifications = [...selectedBill.billVerifications]
+                    updatedBillVerifications[index] = { ...updatedBillVerifications[index], is_duplicate: checked }
+                    setSelectedBill({ ...selectedBill, billVerifications: updatedBillVerifications })
+
+                    // Refresh the API data
+                    fetchTrackerData()
+                }
+            } catch (error) {
+                console.error('Error updating duplicate status:', error)
+                alert(`Error updating duplicate status: ${error.message}`)
+                // Revert local state on error
+                setDuplicateSelections(prev => ({ ...prev, [index]: !checked }))
+            }
+        } else {
+            // If bill verification doesn't exist yet, we need to create it first
+            // This would happen if the bill hasn't been submitted yet
+            // For now, just keep the local state - it will be saved when the bill is submitted
+        }
+    }
+    const handleExtraDuplicateChange = async (index, checked) => {
+        if (!isAdminUser() || !selectedBill) {
+            return
+        }
+        const noOfBills = selectedBill?.noOfBills || selectedBill?.no_of_bills || 0
+        const actualIndex = noOfBills + index
+
+        // Update local state immediately for better UX
+        setExtraDuplicateSelections(prev => ({ ...prev, [index]: checked }))
+
+        // Find the bill verification ID for this index
+        if (selectedBill.billVerifications && selectedBill.billVerifications[actualIndex]) {
+            const billVerification = selectedBill.billVerifications[actualIndex]
+            const billId = billVerification.id
+
+            try {
+                const response = await axios.put(
+                    `https://backendaab.in/aabuildersDash/api/vendor-payments/bill/${billId}/duplicate`,
+                    null,
+                    {
+                        params: { duplicate: checked }
+                    }
+                )
+                if (response.status === 200) {
+                    // Update the local bill data
+                    const updatedBillVerifications = [...selectedBill.billVerifications]
+                    updatedBillVerifications[actualIndex] = { ...updatedBillVerifications[actualIndex], is_duplicate: checked }
+                    setSelectedBill({ ...selectedBill, billVerifications: updatedBillVerifications })
+
+                    // Refresh the API data
+                    fetchTrackerData()
+                }
+            } catch (error) {
+                console.error('Error updating duplicate status:', error)
+                alert(`Error updating duplicate status: ${error.message}`)
+                // Revert local state on error
+                setExtraDuplicateSelections(prev => ({ ...prev, [index]: !checked }))
+            }
+        } else {
+            // If bill verification doesn't exist yet, we need to create it first
+            // This would happen if the bill hasn't been submitted yet
+            // For now, just keep the local state - it will be saved when the bill is submitted
+        }
+    }
+    const toggleDuplicateMode = () => {
+        setIsDuplicateMode(prev => !prev)
+        // Clear duplicate selections when switching modes
+        if (isDuplicateMode) {
+            setDuplicateSelections({})
+            setExtraDuplicateSelections({})
+        }
     }
     const handleExtraPoNumberChange = (index, value) => {
         const numericValue = value.replace(/[^0-9]/g, '')
@@ -2554,12 +2659,10 @@ const PendingBill = ({ username, userRoles = [] }) => {
         }
         const billId = selectedEntryBill.id
         const matchDetails = expenseMatchDetails[billId]
-
         if (!matchDetails || !matchDetails.matchingExpenses || matchDetails.matchingExpenses.length === 0) {
             alert('No matching expenses found for this bill')
             return
         }
-
         setCheckFilteredExpenses(matchDetails.matchingExpenses)
         setShowCheckModal(true)
     }
@@ -3959,7 +4062,13 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 const persistedBillNumber = persistedVerification.bill_number || persistedVerification.billNumber || ''
                 const persistedIsVerified = persistedVerification.is_verified === true || persistedVerification.status === 'VERIFIED'
                 const persistedIsPaid = persistedVerification.is_paid === true || persistedVerification.status === 'PAID'
-                if (persistedIsVerified) {
+                const persistedIsDuplicate = persistedVerification.is_duplicate === true
+
+                // Check if bill is duplicate and verified - show different border color
+                if (persistedIsDuplicate && persistedIsVerified) {
+                    borderClass = 'border-purple-500'
+                    tooltipText = 'Duplicate & Verified'
+                } else if (persistedIsVerified) {
                     const billToCheck = persistedBillNumber && persistedBillNumber !== 'NO_PO' ? String(persistedBillNumber).trim() : (poNumber && poNumber !== 'NO_PO' ? String(poNumber).trim() : '')
                     const paidPreviously = billToCheck ? (persistedIsPaid || isBillAlreadyPaid(vendorIdForSelected, billToCheck)) : false
                     if (paidPreviously) {
@@ -3990,16 +4099,33 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                 />
                                 {isAdminUser() && (
                                     <div className="flex items-center gap-1">
-                                        <input
-                                            type="checkbox"
-                                            id={`no-po-${i}`}
-                                            checked={isNoPo}
-                                            onChange={(e) => handleNoPoChange(i, e.target.checked)}
-                                            className="w-3 h-3"
-                                        />
-                                        <label htmlFor={`no-po-${i}`} className="text-xs text-gray-600 cursor-pointer">
-                                            No PO
-                                        </label>
+                                        {isDuplicateMode ? (
+                                            <>
+                                                <input
+                                                    type="checkbox"
+                                                    id={`duplicate-${i}`}
+                                                    checked={duplicateSelections[i] || false}
+                                                    onChange={(e) => handleDuplicateChange(i, e.target.checked)}
+                                                    className="w-3 h-3"
+                                                />
+                                                <label htmlFor={`duplicate-${i}`} className="text-xs text-gray-600 cursor-pointer">
+                                                    Duplicate
+                                                </label>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <input
+                                                    type="checkbox"
+                                                    id={`no-po-${i}`}
+                                                    checked={isNoPo}
+                                                    onChange={(e) => handleNoPoChange(i, e.target.checked)}
+                                                    className="w-3 h-3"
+                                                />
+                                                <label htmlFor={`no-po-${i}`} className="text-xs text-gray-600 cursor-pointer">
+                                                    No PO
+                                                </label>
+                                            </>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -4030,7 +4156,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 const poNumber = extraPoNumbers[i] || ''
                 const isVerified = extraVerifiedBills[i] || false
                 const isNoPo = extraNoPoSelections[i] || false
-                let borderClass = 'border-gray-300'
+                let borderClass = 'border-gray-600'
                 let bgClass = isEditMode ? 'bg-white' : 'bg-[#F2F2F2]'
                 let tooltipText = null
                 const persistedVerificationIndex = noOfBills + i
@@ -4040,35 +4166,41 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     if (isValid) {
                         const paidPreviously = !isNoPo && poNumber.trim() ? isBillAlreadyPaid(vendorIdForSelected, poNumber.trim()) : false
                         if (paidPreviously) {
-                            borderClass = 'border-yellow-500'
+                            borderClass = 'border-yellow-600'
                             tooltipText = 'Paid'
                         } else {
-                            borderClass = 'border-green-500'
+                            borderClass = 'border-green-600'
                             tooltipText = 'Matched'
                         }
                     } else if (validationMessage === 'Already Entered') {
-                        borderClass = 'border-orange-500'
+                        borderClass = 'border-orange-600'
                         tooltipText = 'Already Entered'
                     } else {
-                        borderClass = 'border-red-500'
+                        borderClass = 'border-red-600'
                         tooltipText = 'Not Matched'
                     }
                 } else if (persistedVerification) {
                     const persistedBillNumber = persistedVerification.bill_number || persistedVerification.billNumber || ''
                     const persistedIsVerified = persistedVerification.is_verified === true || persistedVerification.status === 'VERIFIED'
                     const persistedIsPaid = persistedVerification.is_paid === true || persistedVerification.status === 'PAID'
-                    if (persistedIsVerified) {
+                    const persistedIsDuplicate = persistedVerification.is_duplicate === true
+
+                    // Check if bill is duplicate and verified - show different border color
+                    if (persistedIsDuplicate && persistedIsVerified) {
+                        borderClass = 'border-purple-600'
+                        tooltipText = 'Duplicate & Verified'
+                    } else if (persistedIsVerified) {
                         const billToCheck = persistedBillNumber && persistedBillNumber !== 'NO_PO' ? String(persistedBillNumber).trim() : (poNumber && poNumber !== 'NO_PO' ? String(poNumber).trim() : '')
                         const paidPreviously = billToCheck ? (persistedIsPaid || isBillAlreadyPaid(vendorIdForSelected, billToCheck)) : false
                         if (paidPreviously) {
-                            borderClass = 'border-yellow-500'
+                            borderClass = 'border-yellow-600'
                             tooltipText = 'Paid'
                         } else {
-                            borderClass = 'border-green-500'
+                            borderClass = 'border-green-600'
                             tooltipText = 'Matched'
                         }
                     } else {
-                        borderClass = 'border-red-500'
+                        borderClass = 'border-red-600'
                         tooltipText = 'Not Matched'
                     }
                 }
@@ -4088,16 +4220,33 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                     />
                                     {isAdminUser() && (
                                         <div className="flex items-center gap-1">
-                                            <input
-                                                type="checkbox"
-                                                id={`extra-no-po-${i}`}
-                                                checked={isNoPo}
-                                                onChange={(e) => handleExtraNoPoChange(i, e.target.checked)}
-                                                className="w-3 h-3"
-                                            />
-                                            <label htmlFor={`extra-no-po-${i}`} className="text-xs text-gray-600 cursor-pointer">
-                                                No PO
-                                            </label>
+                                            {isDuplicateMode ? (
+                                                <>
+                                                    <input
+                                                        type="checkbox"
+                                                        id={`extra-duplicate-${i}`}
+                                                        checked={extraDuplicateSelections[i] || false}
+                                                        onChange={(e) => handleExtraDuplicateChange(i, e.target.checked)}
+                                                        className="w-3 h-3"
+                                                    />
+                                                    <label htmlFor={`extra-duplicate-${i}`} className="text-xs text-gray-600 cursor-pointer">
+                                                        Duplicate
+                                                    </label>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <input
+                                                        type="checkbox"
+                                                        id={`extra-no-po-${i}`}
+                                                        checked={isNoPo}
+                                                        onChange={(e) => handleExtraNoPoChange(i, e.target.checked)}
+                                                        className="w-3 h-3 "
+                                                    />
+                                                    <label htmlFor={`extra-no-po-${i}`} className="text-xs text-gray-600 cursor-pointer">
+                                                        No PO
+                                                    </label>
+                                                </>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -4680,7 +4829,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
             </div>
             {showModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg w-full max-w-5xl max-h-[90vh] shadow-lg flex flex-col">
+                    <div className="bg-white rounded-lg w-full max-w-[1050px] max-h-[90vh] shadow-lg flex flex-col">
                         <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
                             <div className=" items-center">
                                 <div className="flex justify-between">
@@ -4715,7 +4864,10 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                 )
                                             ) : (
                                                 <>
-                                                    Enter PO numbers or select "No PO" (Max: {selectedBill?.noOfBills || selectedBill?.no_of_bills || 0})
+                                                    {isDuplicateMode
+                                                        ? `Enter PO numbers or mark as "Duplicate" (Max: ${selectedBill?.noOfBills || selectedBill?.no_of_bills || 0})`
+                                                        : `Enter PO numbers or select "No PO" (Max: ${selectedBill?.noOfBills || selectedBill?.no_of_bills || 0})`
+                                                    }
                                                     {isSendRequestDisabled() && !hasUnverifiedBillNumbers() && (
                                                         <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
                                                             Enter bill numbers to enable Send Request
@@ -4769,7 +4921,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                     type="text"
                                                     value={lastPaidPO}
                                                     readOnly
-                                                    className="w-24 h-10 px-3 py-2 border-2 border-red-500 rounded-md text-sm focus:outline-none bg-white text-gray-700"
+                                                    className="w-24 h-10 px-3 py-2 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm focus:outline-none bg-white text-gray-700"
                                                 />
                                             </div>
                                         </div>
@@ -4792,6 +4944,17 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                             >
                                                 {checkingPO ? 'Checking...' : 'Check PO'}
                                             </button>
+                                            {isAdminUser() && (
+                                                <button
+                                                    className={`px-4 py-2 rounded font-medium transition-colors duration-200 ${isDuplicateMode
+                                                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                                        : 'bg-white text-blue-600 border border-blue-600 hover:bg-blue-50'
+                                                        }`}
+                                                    onClick={toggleDuplicateMode}
+                                                >
+                                                    {isDuplicateMode ? 'Duplicate Mode' : 'Duplicate'}
+                                                </button>
+                                            )}
                                             {selectedBill?.send_request && !selectedBill?.request_approved && isAdminUser() ? (
                                                 <>
                                                     <button className="px-4 py-2 bg-green-600 text-white rounded font-medium hover:bg-green-700 transition-colors duration-200"
@@ -5055,8 +5218,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                 ✓
                                             </button>
                                             <button className="px-3 py-1.5 w-[100px] h-10 bg-[#BF9853] text-white rounded text-sm font-medium transition-colors duration-200"
-                                                onClick={handleCheck}
-                                            >
+                                                onClick={handleCheck}>
                                                 Check
                                             </button>
                                         </div>
@@ -5609,7 +5771,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                     </div>
                                     <div className="flex-1">
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Extra Bills
+                                            Extra Bills (PO)
                                         </label>
                                         <input
                                             type="number"

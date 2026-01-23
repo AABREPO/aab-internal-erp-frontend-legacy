@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
+import Edit from '../Images/edit1.png';
+import Delete from '../Images/delete.png';
 
-const NonPOHistory = () => {
+const NonPOHistory = ({ onTabChange }) => {
   const [nonPORecords, setNonPORecords] = useState([]);
   const [filteredRecords, setFilteredRecords] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,6 +25,10 @@ const NonPOHistory = () => {
   const [categoryOptionsStrings, setCategoryOptionsStrings] = useState([]);
   const [projectNameSearch, setProjectNameSearch] = useState('');
   const [stockingLocationSearch, setStockingLocationSearch] = useState('');
+  const [expandedItemId, setExpandedItemId] = useState(null);
+  const [swipeStates, setSwipeStates] = useState({});
+  const expandedItemIdRef = useRef(expandedItemId);
+  const cardRefs = useRef({});
 
   // Fetch vendor data
   useEffect(() => {
@@ -251,6 +257,266 @@ const NonPOHistory = () => {
     }
   }, [projectNameOpen, stockingLocationOpen, showFilterSheet]);
 
+  // Update ref when expandedItemId changes
+  useEffect(() => {
+    expandedItemIdRef.current = expandedItemId;
+  }, [expandedItemId]);
+
+  // Swipe handlers
+  const minSwipeDistance = 50;
+
+  const handleTouchStart = (e, itemId) => {
+    const touch = e.touches ? e.touches[0] : { clientX: e.clientX };
+    setSwipeStates(prev => ({
+      ...prev,
+      [itemId]: {
+        startX: touch.clientX,
+        currentX: touch.clientX,
+        isSwiping: false
+      }
+    }));
+  };
+
+  const handleTouchMove = (e, itemId) => {
+    const touch = e.touches ? e.touches[0] : { clientX: e.clientX };
+    const state = swipeStates[itemId];
+    if (!state) return;
+    const deltaX = touch.clientX - state.startX;
+    const isExpanded = expandedItemIdRef.current === itemId;
+    if (deltaX < 0 || (isExpanded && deltaX > 0)) {
+      setSwipeStates(prev => ({
+        ...prev,
+        [itemId]: {
+          ...prev[itemId],
+          currentX: touch.clientX,
+          isSwiping: true
+        }
+      }));
+    }
+  };
+
+  const handleTouchEnd = (itemId) => {
+    const state = swipeStates[itemId];
+    if (!state) return;
+    const deltaX = state.currentX - state.startX;
+    const absDeltaX = Math.abs(deltaX);
+    if (absDeltaX >= minSwipeDistance) {
+      if (deltaX < 0) {
+        setExpandedItemId(itemId);
+      } else {
+        setExpandedItemId(null);
+      }
+    }
+    setSwipeStates(prev => {
+      const newState = { ...prev };
+      delete newState[itemId];
+      return newState;
+    });
+  };
+
+  // Set up non-passive touch event listeners
+  useEffect(() => {
+    const cleanupFunctions = [];
+
+    Object.keys(cardRefs.current).forEach(itemId => {
+      const cardElement = cardRefs.current[itemId];
+      if (!cardElement) return;
+
+      const touchMoveHandler = (e) => {
+        const state = swipeStates[itemId];
+        if (!state) return;
+        const touch = e.touches[0];
+        const deltaX = touch.clientX - state.startX;
+        const isExpanded = expandedItemIdRef.current === itemId;
+        if (deltaX < 0 || (isExpanded && deltaX > 0)) {
+          e.preventDefault();
+        }
+      };
+
+      cardElement.addEventListener('touchmove', touchMoveHandler, { passive: false });
+
+      cleanupFunctions.push(() => {
+        cardElement.removeEventListener('touchmove', touchMoveHandler);
+      });
+    });
+
+    return () => {
+      cleanupFunctions.forEach(cleanup => cleanup());
+    };
+  }, [filteredRecords, swipeStates]);
+
+  // Global mouse handlers for desktop support
+  useEffect(() => {
+    if (filteredRecords.length === 0) return;
+
+    const globalMouseMoveHandler = (e) => {
+      setSwipeStates(prev => {
+        let hasChanges = false;
+        const newState = { ...prev };
+
+        filteredRecords.forEach(record => {
+          const state = prev[record.id || record._id];
+          if (!state) return;
+          const deltaX = e.clientX - state.startX;
+          const isExpanded = expandedItemIdRef.current === (record.id || record._id);
+          if (deltaX < 0 || (isExpanded && deltaX > 0)) {
+            newState[record.id || record._id] = {
+              ...state,
+              currentX: e.clientX,
+              isSwiping: true
+            };
+            hasChanges = true;
+          }
+        });
+
+        return hasChanges ? newState : prev;
+      });
+    };
+
+    const globalMouseUpHandler = () => {
+      setSwipeStates(prev => {
+        let hasChanges = false;
+        const newState = { ...prev };
+
+        filteredRecords.forEach(record => {
+          const state = prev[record.id || record._id];
+          if (!state) return;
+          const deltaX = state.currentX - state.startX;
+          const absDeltaX = Math.abs(deltaX);
+          if (absDeltaX >= minSwipeDistance) {
+            if (deltaX < 0) {
+              setExpandedItemId(record.id || record._id);
+            } else {
+              setExpandedItemId(null);
+            }
+          } else {
+            if (expandedItemIdRef.current === (record.id || record._id)) {
+              setExpandedItemId(null);
+            }
+          }
+          delete newState[record.id || record._id];
+          hasChanges = true;
+        });
+
+        return hasChanges ? newState : prev;
+      });
+    };
+
+    document.addEventListener('mousemove', globalMouseMoveHandler);
+    document.addEventListener('mouseup', globalMouseUpHandler);
+
+    return () => {
+      document.removeEventListener('mousemove', globalMouseMoveHandler);
+      document.removeEventListener('mouseup', globalMouseUpHandler);
+    };
+  }, [filteredRecords]);
+
+  // Handle edit
+  const handleEdit = async (record) => {
+    try {
+      let inventoryData = record;
+
+      // Check if inventoryItems are present
+      const hasInventoryItems = inventoryData?.inventoryItems || inventoryData?.inventory_items;
+
+      // If inventoryItems are missing, try to fetch them from the backend
+      if (!hasInventoryItems || (Array.isArray(inventoryData?.inventoryItems) && inventoryData.inventoryItems.length === 0) ||
+        (Array.isArray(inventoryData?.inventory_items) && inventoryData.inventory_items.length === 0)) {
+        if (inventoryData?.id) {
+          try {
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/inventory/edit_with_history/${inventoryData.id}`, {
+              method: 'GET',
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            });
+
+            if (response.ok) {
+              const detailedData = await response.json();
+              if (detailedData.inventoryItems || detailedData.inventory_items) {
+                const items = detailedData.inventoryItems || detailedData.inventory_items;
+                inventoryData = {
+                  ...inventoryData,
+                  inventoryItems: items,
+                  inventory_items: items
+                };
+              }
+            }
+          } catch (fetchError) {
+            console.error('Error fetching inventory details:', fetchError);
+          }
+        }
+      }
+
+      // Ensure inventoryItems are explicitly set
+      if (inventoryData?.inventoryItems || inventoryData?.inventory_items) {
+        const items = inventoryData.inventoryItems || inventoryData.inventory_items;
+        inventoryData = {
+          ...inventoryData,
+          inventoryItems: items,
+          inventory_items: items
+        };
+      }
+
+      // Mark as edit mode
+      inventoryData.isEditMode = true;
+
+      // Store inventory item data in localStorage
+      if (inventoryData) {
+        localStorage.setItem('editingInventory', JSON.stringify(inventoryData));
+      }
+      // Dispatch custom event for incoming component to listen
+      window.dispatchEvent(new CustomEvent('editInventory', { detail: inventoryData }));
+      // Navigate to incoming tab for editing
+      if (onTabChange) {
+        onTabChange('incoming');
+      }
+      setExpandedItemId(null);
+    } catch (error) {
+      console.error('Error in handleEdit:', error);
+      const inventoryData = record;
+      inventoryData.isEditMode = true;
+      localStorage.setItem('editingInventory', JSON.stringify(inventoryData));
+      window.dispatchEvent(new CustomEvent('editInventory', { detail: inventoryData }));
+      if (onTabChange) {
+        onTabChange('incoming');
+      }
+      setExpandedItemId(null);
+    }
+  };
+
+  // Handle delete
+  const handleDelete = async (recordId) => {
+    if (!window.confirm('Are you sure you want to delete this record?')) {
+      setExpandedItemId(null);
+      return;
+    }
+
+    try {
+      const response = await fetch(`https://backendaab.in/aabuildersDash/api/inventory/delete/${recordId}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        // Remove from local state
+        setNonPORecords(prev => prev.filter(record => (record.id || record._id) !== recordId));
+        alert('Record deleted successfully');
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to delete record');
+      }
+    } catch (error) {
+      console.error('Error deleting record:', error);
+      alert(`Error deleting record: ${error.message}`);
+    }
+    setExpandedItemId(null);
+  };
+
   // Handler for adding new category
   const handleAddNewCategory = async (newCategory) => {
     if (!newCategory || !newCategory.trim()) {
@@ -348,52 +614,116 @@ const NonPOHistory = () => {
           </div>
         ) : (
           <div className="">
-            {filteredRecords.map((record) => (
-              <div
-                key={record.id || record._id}
-                className="bg-white border-2 shadow-md border-gray-200 rounded-lg p-4"
-              >
-                <div className=" justify-between items-start">
-                  {/* Left Side */}
-                  <div className="flex items-center justify-between mb-1">
-                    <div>
-                      <span className="text-[12px] font-semibold text-black">
-                        #{record.entryNumber}
-                      </span>
-                      <span className="text-[12px] font-semibold text-black">
-                        , {record.vendorName}
-                      </span>
-                    </div>
-                    <p className="text-[12px] text-gray-600 mb-1">
-                      No. of Items - {record.numberOfItems}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[12px] text-gray-600 mb-1">
-                      {record.stockingLocation}
-                    </p>
-                  </div>
-                  <div>
+            {filteredRecords.map((record) => {
+              const recordId = record.id || record._id;
+              const isExpanded = expandedItemId === recordId;
+              const swipeState = swipeStates[recordId];
+              let swipeOffset = 0;
+              if (swipeState && swipeState.isSwiping) {
+                const deltaX = swipeState.currentX - swipeState.startX;
+                if (deltaX < 0) {
+                  swipeOffset = Math.max(-160, Math.min(0, deltaX));
+                } else {
+                  swipeOffset = Math.min(0, Math.max(0, deltaX));
+                }
+              } else if (isExpanded) {
+                swipeOffset = -160;
+              } else {
+                swipeOffset = 0;
+              }
 
+              return (
+                <div key={recordId} className="relative overflow-hidden mb-2">
+                  {/* History Card */}
+                  <div
+                    ref={(el) => {
+                      if (el) {
+                        cardRefs.current[recordId] = el;
+                      } else {
+                        delete cardRefs.current[recordId];
+                      }
+                    }}
+                    className="bg-white border-2 shadow-md border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-all duration-300 ease-out relative"
+                    style={{
+                      transform: `translateX(${swipeOffset}px)`,
+                      touchAction: 'pan-y'
+                    }}
+                    onTouchStart={(e) => handleTouchStart(e, recordId)}
+                    onTouchMove={(e) => handleTouchMove(e, recordId)}
+                    onTouchEnd={() => handleTouchEnd(recordId)}
+                    onMouseDown={(e) => handleTouchStart(e, recordId)}
+                  >
+                    <div className=" justify-between items-start">
+                      {/* Left Side */}
+                      <div className="flex items-center justify-between mb-1">
+                        <div>
+                          <span className="text-[12px] font-semibold text-black">
+                            #{record.entryNumber}
+                          </span>
+                          <span className="text-[12px] font-semibold text-black">
+                            , {record.vendorName}
+                          </span>
+                        </div>
+                        <p className="text-[12px] text-gray-600 mb-1">
+                          No. of Items - {record.numberOfItems}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[12px] text-gray-600 mb-1">
+                          {record.stockingLocation}
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <p className="text-[12px] text-gray-500">
+                          {record.created_date_time && new Date(record.created_date_time).toLocaleString('en-GB', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: true
+                          })}
+                        </p>
+                        <p className="text-[12px] font-semibold text-[#BF9853]">
+                          Quantity - {record.totalQuantity}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <p className="text-[12px] text-gray-500">
-                      {record.created_date_time && new Date(record.created_date_time).toLocaleString('en-GB', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: true
-                      })}
-                    </p>
-                    <p className="text-[12px] font-semibold text-[#BF9853]">
-                      Quantity - {record.totalQuantity}
-                    </p>
+
+                  {/* Action Buttons - Behind the card on the right, revealed on swipe */}
+                  <div
+                    className="absolute right-0 top-0 flex gap-2 flex-shrink-0 z-0"
+                    style={{
+                      opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
+                      transition: 'opacity 0.2s ease-out',
+                      pointerEvents: isExpanded ? 'auto' : 'none'
+                    }}
+                  >
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEdit(record);
+                      }}
+                      className="action-button w-[48px] h-full bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 transition-colors shadow-sm min-h-[80px]"
+                      title="Edit"
+                    >
+                      <img src={Edit} alt="Edit" className="w-[18px] h-[18px]" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(recordId);
+                      }}
+                      className="action-button w-[48px] h-full bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm min-h-[80px]"
+                      title="Delete"
+                    >
+                      <img src={Delete} alt="Delete" className="w-[18px] h-[18px]" />
+                    </button>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

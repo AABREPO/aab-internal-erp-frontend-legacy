@@ -1426,7 +1426,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 // Handle extra_bills count changes - nullify vendor_payments_tracker_id for removed extra bills
                 const newExtraBills = parseInt(editFormData.extraBills) || 0
                 const originalExtraBills = selectedEditItem.extra_bills || selectedEditItem.extraBills || 0
-
                 // If extra_bills count decreased, nullify the vendor_payments_tracker_id for the removed extra bills
                 if (originalExtraBills > newExtraBills) {
                     try {
@@ -1442,30 +1441,22 @@ const PendingBill = ({ username, userRoles = [] }) => {
                             const trackerData = await trackerResponse.json()
                             const allBillVerifications = trackerData.billVerifications || []
                             const noOfBills = parseInt(editFormData.noOfBills) || selectedEditItem.no_of_bills || selectedEditItem.noOfBills || 0
-
                             // Calculate which extra bills need to be nullified
                             // Extra bills start at index noOfBills
                             // We need to nullify the last (originalExtraBills - newExtraBills) extra bills
                             const billsToNullifyStart = noOfBills + newExtraBills
                             const billsToNullifyEnd = noOfBills + originalExtraBills
                             const billsToNullify = allBillVerifications.slice(billsToNullifyStart, billsToNullifyEnd)
-
                             // Delete bill verification for each removed extra bill
                             // The API expects the bill verification ID to delete the bill verification
                             const deletePromises = []
-
                             for (const billVerification of billsToNullify) {
                                 // Skip if verification ID doesn't exist
                                 if (!billVerification.id) {
-                                    console.log(`Skipping deletion - no verification ID`)
                                     continue
                                 }
-
                                 const billNumber = billVerification.bill_number || billVerification.billNumber || 'N/A'
                                 const verificationId = billVerification.id
-
-                                console.log(`Attempting to delete bill verification ID: ${verificationId} (bill number: ${billNumber})`)
-
                                 // Call the delete API with verification ID
                                 const deletePromise = fetch(`https://backendaab.in/aabuildersDash/api/vendor-payments/bill-verification/${verificationId}`, {
                                     method: 'DELETE',
@@ -1491,13 +1482,11 @@ const PendingBill = ({ username, userRoles = [] }) => {
 
                                 deletePromises.push(deletePromise)
                             }
-
                             // Wait for all delete operations to complete
                             if (deletePromises.length > 0) {
                                 const results = await Promise.all(deletePromises)
                                 const successCount = results.filter(r => r.success).length
                                 const failCount = results.filter(r => !r.success).length
-
                                 if (failCount > 0) {
                                     console.warn(`Deletion completed: ${successCount} succeeded, ${failCount} failed`)
                                     const failedBills = results.filter(r => !r.success).map(r => `ID: ${r.verificationId} (${r.billNumber})`).join(', ')
@@ -1506,7 +1495,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                     console.log(`Successfully deleted ${successCount} extra bill verification(s)`)
                                 }
                             }
-
                             // If extra_bills is set to 0, also unlink extra bill verifications
                             if (newExtraBills === 0) {
                                 // Keep only the first noOfBills verifications
@@ -1518,7 +1506,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                     is_verified: verification.is_verified || false,
                                     verified_date: verification.verified_date || null
                                 }))
-
                                 // Update bills - this will remove extra bills
                                 const billsResponse = await fetch(`https://backendaab.in/aabuildersDash/api/vendor-payments/tracker/${selectedEditItem.id}/bills`, {
                                     method: 'POST',
@@ -1621,7 +1608,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
             const newValidationResults = {}
             const newExtraValidationResults = {}
             const duplicateNumbers = []
-
             // Check for duplicates in regular bills
             const currentBillNumbers = poNumbers.filter(num => num.trim() !== '')
             const duplicateMap = {}
@@ -1632,7 +1618,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     duplicateMap[billNumber] = [index]
                 }
             })
-
             // Check for duplicates in extra bills
             const currentExtraBillNumbers = extraPoNumbers.filter(num => num.trim() !== '')
             currentExtraBillNumbers.forEach((billNumber, index) => {
@@ -1642,20 +1627,17 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     duplicateMap[billNumber] = [`extra-${index}`]
                 }
             })
-
             // Check for duplicates across all bills (regular + extra)
             Object.keys(duplicateMap).forEach(billNumber => {
                 if (duplicateMap[billNumber].length > 1) {
                     duplicateNumbers.push(billNumber)
                 }
             })
-
             if (duplicateNumbers.length > 0) {
                 alert(` Duplicate bill found within the same bill number: ${duplicateNumbers.join(', ')}. Please enter unique bill numbers.`)
                 setCheckingPO(false)
                 return
             }
-
             // Validate regular bills
             poNumbers.forEach((billNumber, index) => {
                 const isNoPo = noPoSelections[index]
@@ -1699,7 +1681,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     message: message
                 }
             })
-
             // Validate extra bills
             const extraBills = selectedBill.extraBills || selectedBill.extra_bills || 0
             if (extraBills > 0) {
@@ -1745,10 +1726,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     }
                 })
             }
-
             setValidationResults(newValidationResults)
             setExtraValidationResults(newExtraValidationResults)
-
             const newCheckedBills = {}
             poNumbers.forEach((billNumber, index) => {
                 const isNoPo = noPoSelections[index]
@@ -1757,7 +1736,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     newCheckedBills[index] = true
                 }
             })
-
             // Check extra bills
             const newExtraCheckedBills = {}
             if (extraBills > 0) {
@@ -1769,7 +1747,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     }
                 })
             }
-
             setCheckedBills(prev => ({ ...prev, ...newCheckedBills }))
             setExtraCheckedBills(prev => ({ ...prev, ...newExtraCheckedBills }))
         } catch (error) {
@@ -1808,7 +1785,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
             }
             const existingBills = selectedBill.billVerifications || []
             const billsData = []
-
             // Add regular bills
             for (let i = 0; i < maxBills; i++) {
                 const existingBill = existingBills[i]
@@ -1843,7 +1819,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 }
                 billsData.push(billData)
             }
-
             // Add extra bills if extraBillsCount > 0
             if (extraBillsCount > 0) {
                 for (let i = 0; i < extraBillsCount; i++) {
@@ -1984,7 +1959,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
             const extraBills = selectedBill.extraBills || selectedBill.extra_bills || 0
             const autoValidationResults = {}
             const extraAutoValidationResults = {}
-
             // Validate regular bills
             for (let i = 0; i < maxBills; i++) {
                 const billNumber = poNumbers[i] || ''
@@ -2028,7 +2002,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     message: message
                 }
             }
-
             // Validate extra bills
             if (extraBills > 0) {
                 for (let i = 0; i < extraBills; i++) {
@@ -2074,10 +2047,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     }
                 }
             }
-
             setValidationResults(autoValidationResults)
             setExtraValidationResults(extraAutoValidationResults)
-
             const unmatchedBills = []
             for (let i = 0; i < maxBills; i++) {
                 const billNumber = poNumbers[i] || ''
@@ -2149,7 +2120,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
             }
             const existingBills = selectedBill.billVerifications || []
             const billsData = []
-
             // Add regular bills
             for (let i = 0; i < maxBills; i++) {
                 const existingBill = existingBills[i]
@@ -2188,7 +2158,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 }
                 billsData.push(billData)
             }
-
             // Add extra bills if extraBills > 0
             if (extraBills > 0) {
                 for (let i = 0; i < extraBills; i++) {
@@ -2365,7 +2334,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
     const hasUnverifiedBillNumbers = () => {
         const maxBills = selectedBill?.noOfBills || selectedBill?.no_of_bills || 0
         const extraBills = selectedBill?.extraBills || selectedBill?.extra_bills || 0
-
         // Check regular bills
         for (let i = 0; i < maxBills; i++) {
             const billNumber = poNumbers[i] || ''
@@ -2377,7 +2345,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 }
             }
         }
-
         // Check extra bills
         if (extraBills > 0) {
             for (let i = 0; i < extraBills; i++) {
@@ -2391,7 +2358,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 }
             }
         }
-
         return false
     }
     const isSendRequestDisabled = () => {
@@ -2414,7 +2380,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
         const hasNoPoSelections = Object.values(noPoSelections).some(isNoPo => isNoPo)
         return validBillNumbers.length === 0 && !hasNoPoSelections
     }
-
     const handleEntryClick = async (bill) => {
         setSelectedEntryBill(bill)
         setShowEntryModal(true)
@@ -2954,11 +2919,9 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 resolve(file);
                 return;
             }
-
             // Create an image element to load the file
             const img = new Image();
             const reader = new FileReader();
-
             reader.onload = (e) => {
                 img.onload = () => {
                     try {
@@ -2967,15 +2930,12 @@ const PendingBill = ({ username, userRoles = [] }) => {
                         const pdfHeight = 297; // A4 height in mm
                         const imgWidth = img.width;
                         const imgHeight = img.height;
-
                         // Calculate aspect ratio
                         const imgAspectRatio = imgWidth / imgHeight;
                         const pdfAspectRatio = pdfWidth / pdfHeight;
-
                         // Determine orientation
                         const orientation = imgWidth > imgHeight ? 'landscape' : 'portrait';
                         let finalWidth, finalHeight;
-
                         if (orientation === 'landscape') {
                             // Use landscape dimensions
                             if (imgAspectRatio > pdfAspectRatio) {
@@ -2999,18 +2959,15 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                 finalWidth = pdfHeight * imgAspectRatio;
                             }
                         }
-
                         // Center the image on the page
                         const xOffset = (pdfWidth - finalWidth) / 2;
                         const yOffset = (pdfHeight - finalHeight) / 2;
-
                         // Create a new PDF document
                         const pdf = new jsPDF({
                             orientation: orientation,
                             unit: 'mm',
                             format: 'a4'
                         });
-
                         // Determine image format for PDF
                         let imgFormat = 'JPEG';
                         if (file.type === 'image/png') {
@@ -3018,41 +2975,32 @@ const PendingBill = ({ username, userRoles = [] }) => {
                         } else if (file.type === 'image/gif') {
                             imgFormat = 'GIF';
                         }
-
                         // Add the image to PDF
                         pdf.addImage(img, imgFormat, xOffset, yOffset, finalWidth, finalHeight);
-
                         // Convert PDF to blob
                         const pdfBlob = pdf.output('blob');
-
                         // Create a File object from the blob with .pdf extension
                         const pdfFile = new File([pdfBlob], file.name.replace(/\.[^/.]+$/, '') + '.pdf', {
                             type: 'application/pdf',
                             lastModified: Date.now()
                         });
-
                         resolve(pdfFile);
                     } catch (error) {
                         console.error('Error converting image to PDF:', error);
                         reject(error);
                     }
                 };
-
                 img.onerror = () => {
                     reject(new Error('Failed to load image'));
                 };
-
                 img.src = e.target.result;
             };
-
             reader.onerror = () => {
                 reject(new Error('Failed to read file'));
             };
-
             reader.readAsDataURL(file);
         });
     };
-
     const handleFileAttachment = async (entryId, file) => {
         if (!file) return;
         try {
@@ -3068,7 +3016,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
     }
     const handleExistingPaymentFileUpload = async (paymentId, file) => {
         if (!file) return;
-
         try {
             // Convert image to PDF if it's an image
             const processedFile = await convertImageToPdf(file);
@@ -3100,10 +3047,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
             if (!uploadResponse.ok) {
                 throw new Error('File upload failed');
             }
-
             const uploadResult = await uploadResponse.json();
             const billUrl = uploadResult.url;
-
             // Update the payment with bill_url using the update API
             const updateResponse = await fetch(`https://backendaab.in/aabuildersDash/api/vendor-bill-tracker/update/${paymentId}`, {
                 method: "PUT",
@@ -3113,16 +3058,13 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 },
                 body: JSON.stringify({ bill_url: billUrl })
             });
-
             if (!updateResponse.ok) {
                 throw new Error(`Failed to update bill URL: ${updateResponse.statusText}`);
             }
-
             // Update local state
             setExistingPaymentDetails(prev => prev.map(payment =>
                 payment.id === paymentId ? { ...payment, bill_url: billUrl } : payment
             ));
-
             // Also update in apiData if present
             setApiData(prev => prev.map(bill => {
                 if (bill.id === selectedPaymentBill?.id) {
@@ -3133,7 +3075,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 }
                 return bill;
             }));
-
             alert('File uploaded and payment updated successfully!');
         } catch (error) {
             console.error('Error uploading file for existing payment:', error);
@@ -3143,19 +3084,15 @@ const PendingBill = ({ username, userRoles = [] }) => {
     const handleOverallPaymentPdfChange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
         if (!selectedPaymentBill || !selectedPaymentBill.id) {
             alert('Please select a payment bill first');
             return;
         }
-
         setUploadingOverallPdf(true);
-
         try {
             // Convert image to PDF if it's an image
             const processedFile = await convertImageToPdf(file);
             setOverallPaymentPdfFile(processedFile);
-
             // Upload file to Google Drive
             const formData = new FormData();
             const vendorName = getVendorNameById(selectedPaymentBill?.vendor_id);
@@ -3178,19 +3115,15 @@ const PendingBill = ({ username, userRoles = [] }) => {
             const fileName = `${timestamp} ${displayVendorName} - summary bill.pdf`;
             formData.append('file', processedFile);
             formData.append('file_name', fileName);
-
             const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
                 method: "POST",
                 body: formData,
             });
-
             if (!uploadResponse.ok) {
                 throw new Error('File upload failed');
             }
-
             const uploadResult = await uploadResponse.json();
             const pdfUrl = uploadResult.url;
-
             // Update the overall payment PDF URL via API
             const billId = selectedPaymentBill.id; // This is the tracker ID
             const response = await fetch(
@@ -3203,20 +3136,16 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     }
                 }
             );
-
             if (!response.ok) {
                 throw new Error(`Failed to update PDF URL: ${response.statusText}`);
             }
-
             const updatedTracker = await response.json();
-
             // Update the local state with the new PDF URL
             setSelectedPaymentBill(prev => ({
                 ...prev,
                 over_all_payment_pdf_url: pdfUrl,
                 overAllPaymentPdfUrl: pdfUrl // Also set camelCase version for consistency
             }));
-
             // Also update in apiData if present
             setApiData(prev => prev.map(bill =>
                 bill.id === billId ? {
@@ -3225,7 +3154,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     overAllPaymentPdfUrl: pdfUrl
                 } : bill
             ));
-
             alert('PDF uploaded successfully!');
         } catch (error) {
             console.error('Error uploading overall payment PDF:', error);
@@ -3239,38 +3167,31 @@ const PendingBill = ({ username, userRoles = [] }) => {
             }
         }
     }
-
     // ISO 8601 week number calculation
     // Week belongs to the year that contains the Thursday of that week
     // Week 1 is the week with the year's first Thursday
     const getISOWeekNumber = (date) => {
         const d = new Date(date);
         d.setHours(0, 0, 0, 0);
-
         // Get Thursday of the week containing the date
         // Monday = 1, Tuesday = 2, ..., Sunday = 0 (convert to 7)
         const dayOfWeek = d.getDay() || 7; // Convert Sunday (0) to 7
         const thursday = new Date(d);
         thursday.setDate(d.getDate() + 4 - dayOfWeek); // Thursday is 4 days after Monday
         thursday.setHours(0, 0, 0, 0);
-
         // Use the year that Thursday falls in (ISO 8601 rule)
         const weekYear = thursday.getFullYear();
-
         // Get January 1st of that year
         const jan1 = new Date(weekYear, 0, 1);
         jan1.setHours(0, 0, 0, 0);
-
         // Get the Thursday of week 1 (first Thursday of the year)
         const jan1DayOfWeek = jan1.getDay() || 7;
         const firstThursday = new Date(jan1);
         firstThursday.setDate(jan1.getDate() + 4 - jan1DayOfWeek);
         firstThursday.setHours(0, 0, 0, 0);
-
         // Calculate week number: difference in days divided by 7, plus 1
         const daysDiff = Math.floor((thursday - firstThursday) / 86400000);
         const weekNo = Math.floor(daysDiff / 7) + 1;
-
         return weekNo;
     };
 

@@ -9,14 +9,12 @@ const Header = ({ title = "Purchase Order", showBack = true, showNotification = 
       setShowProfileModal(true);
     }
   };
-
   const handleLogout = () => {
     setShowProfileModal(false);
     if (onLogout) {
       onLogout();
     }
   };
-
   return (
     <>
       <div className="fixed top-0 left-1/2 transform -translate-x-1/2 w-full max-w-[360px] h-[50px] bg-white z-40" style={{ fontFamily: "'Manrope', sans-serif" }}>

@@ -50,12 +50,9 @@ function AppContent({ user, handleLogout }) {
       window.removeEventListener('resize', handleResize);
     };
   }, []);
-
-  const isMobileRoute = location.pathname.startsWith('/purchaseorder') || location.pathname.startsWith('/inventory');
+  const isMobileRoute = location.pathname.startsWith('/purchaseorder') || location.pathname.startsWith('/inventory') || location.pathname.startsWith('/toolsTracker');
   const shouldHideDesktopBars = isMobile && isMobileRoute;
-
   return (
-
     <div>
       {!shouldHideDesktopBars && (
         <>
@@ -110,7 +107,6 @@ function App() {
       setIsLoggedIn(true);
     }
   }, []);
-
   const handleLogin = (userData) => {
     setUser(userData);
     setIsLoggedIn(true);

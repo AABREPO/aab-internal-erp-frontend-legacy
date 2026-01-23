@@ -4,7 +4,7 @@ import logo from '../Images/AABBlack.png'
 
 const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) => {
   const [expandedItems, setExpandedItems] = useState({
-    procurement: currentPage === 'purchase-order' || currentPage === 'inventory'
+    procurement: currentPage === 'purchase-order' || currentPage === 'inventory' || currentPage === 'tools-tracker'
   });
   const [roleModels, setRoleModels] = useState([]);
   const buildTime = process.env.REACT_APP_BUILD_TIME;
@@ -68,7 +68,8 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
       icon: 'cart',
       subItems: [
         { id: 'purchase-order', label: 'Purchase Order', modelName: 'Purchase Order' },
-        { id: 'inventory', label: 'Inventory', modelName: 'Inventory' }
+        { id: 'inventory', label: 'Inventory', modelName: 'Inventory' },
+        { id: 'tools-tracker', label: 'Tools Tracker', modelName: 'Tools Tracker' }
       ]
     },
     { id: 'design-tools', label: 'Design Tools', icon: 'tools' },

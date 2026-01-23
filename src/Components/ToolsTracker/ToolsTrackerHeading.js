@@ -7,8 +7,23 @@ import ToolTrackerAddInput from './ToolsTrackerAddInput';
 import ToolTrackerNetStock from './ToolsTrackerNetStock';
 import ToolTrackerToolHistory from './ToolsTrackerToolsHistory';
 import ToolTrackerServiceHistory from './ToolsTrackerServiceHistory';
+import MobileToolsTracker from "../../componentsMobile/ToolsTracker/ToolsTracker";
 
 const ToolsTrackerHeading = ({ username, userRoles = [] }) => {
+  const [isMobile, setIsMobile] = useState(() => {
+    return window.innerWidth <= 768;
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
   const [activeTab, setActiveTab] = useState(
     localStorage.getItem('activePaintTab') || 'toolstrackerentry'
   );
@@ -17,6 +32,16 @@ const ToolsTrackerHeading = ({ username, userRoles = [] }) => {
     // Save the active tab to localStorage whenever it changes
     localStorage.setItem('activePaintTab', activeTab);
   }, [activeTab]);
+
+  if (isMobile) {
+    const storedUser = localStorage.getItem('user');
+    const user = storedUser ? JSON.parse(storedUser) : { username, userRoles };
+    return (
+      <div style={{textAlign: 'left'}}>
+        <MobileToolsTracker user={user} onLogout={() => { }} />
+      </div>
+    );
+  }
 
   const renderContent = () => {
     switch (activeTab) {

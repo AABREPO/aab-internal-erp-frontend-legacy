@@ -1057,7 +1057,8 @@ const Outgoing = ({ user }) => {
       const clientId = projectSite.id;
 
       // Validate that all items are available in the selected stocking location (only for 'dispatch')
-      if ((outgoingType || '').toLowerCase() === 'dispatch') {
+      // Skip validation if in edit mode (updating existing record)
+      if ((outgoingType || '').toLowerCase() === 'dispatch' && !isEditMode) {
         try {
           const inventoryResponse = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll');
           if (inventoryResponse.ok) {

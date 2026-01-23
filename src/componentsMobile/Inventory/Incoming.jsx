@@ -21,7 +21,8 @@ const Incoming = ({ user }) => {
     vendorName: '',
     vendorId: null,
     stockingLocation: '',
-    date: getTodayDate()
+    date: getTodayDate(),
+    inventoryId: null // For edit mode
   });
   const [showVendorModal, setShowVendorModal] = useState(false);
   const [showStockingLocationModal, setShowStockingLocationModal] = useState(false);
@@ -213,6 +214,32 @@ const Incoming = ({ user }) => {
     if (!array || !id) return '';
     const found = array.find(item => String(item.id || item._id) === String(id));
     return found ? (found[fieldName] || found.name || '') : '';
+  };
+
+  // Helper functions to resolve names from IDs (similar to Outgoing.jsx)
+  const resolveItemName = (itemId) => {
+    if (!itemId) return '';
+    return findNameById(poItemName, itemId, 'itemName') || findNameById(poItemName, itemId, 'name') || '';
+  };
+
+  const resolveBrandName = (brandId) => {
+    if (!brandId) return '';
+    return findNameById(poBrand, brandId, 'brand') || findNameById(poBrand, brandId, 'brandName') || findNameById(poBrand, brandId, 'name') || '';
+  };
+
+  const resolveModelName = (modelId) => {
+    if (!modelId) return '';
+    return findNameById(poModel, modelId, 'model') || findNameById(poModel, modelId, 'modelName') || findNameById(poModel, modelId, 'name') || '';
+  };
+
+  const resolveTypeName = (typeId) => {
+    if (!typeId) return '';
+    return findNameById(poType, typeId, 'typeColor') || findNameById(poType, typeId, 'type') || findNameById(poType, typeId, 'typeName') || findNameById(poType, typeId, 'name') || '';
+  };
+
+  const resolveCategoryName = (categoryId) => {
+    if (!categoryId) return '';
+    return findNameById(categoryOptions, categoryId, 'category') || findNameById(categoryOptions, categoryId, 'name') || findNameById(categoryOptions, categoryId, 'label') || '';
   };
   // Helper function to extract numeric value from eno (same as PurchaseOrder.jsx)
   const getNumericEno = (eno) => {
@@ -457,6 +484,234 @@ const Incoming = ({ user }) => {
     fetchPoType();
     fetchPoCategory();
   }, [fetchPoItemName, fetchPoBrand, fetchPoModel, fetchPoType, fetchPoCategory]);
+
+  // Listen for editInventory event from NonPOHistory component
+  useEffect(() => {
+    const handleEditInventory = async (event) => {
+      const inventoryItem = event.detail;
+      if (!inventoryItem) return;
+
+      // Only wait for essential data (vendor options and site options)
+      if (vendorNameOptions.length === 0 || siteOptions.length === 0) {
+        // Store in localStorage and retry when dependencies are ready
+        localStorage.setItem('editingInventory', JSON.stringify(inventoryItem));
+        return;
+      }
+
+      // Check if this is edit mode
+      const editMode = inventoryItem.isEditMode === true;
+
+      // Format date
+      const itemDate = inventoryItem.date || inventoryItem.created_at || inventoryItem.createdAt;
+      let formattedDate = getTodayDate();
+      if (itemDate) {
+        const dateObj = new Date(itemDate);
+        formattedDate = dateObj.toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
+      }
+
+      // Get vendor name from vendor_id
+      const vendorId = inventoryItem.vendor_id || inventoryItem.vendorId;
+      let vendorName = '';
+      if (vendorId && vendorNameOptions.length > 0) {
+        const vendor = vendorNameOptions.find(v => 
+          v.id === vendorId || String(v.id) === String(vendorId)
+        );
+        vendorName = vendor ? (vendor.value || vendor.label || '') : '';
+      }
+
+      // Get stocking location from stocking_location_id
+      const stockingLocationId = inventoryItem.stocking_location_id || inventoryItem.stockingLocationId;
+      let stockingLocation = '';
+      if (stockingLocationId && siteOptions.length > 0) {
+        const site = siteOptions.find(s => 
+          (s.id === stockingLocationId || String(s.id) === String(stockingLocationId)) &&
+          s.markedAsStockingLocation === true
+        );
+        stockingLocation = site ? (site.value || site.label || '') : '';
+      }
+
+      // Get PO number
+      const poNumber = inventoryItem.purchase_no || inventoryItem.purchaseNo || inventoryItem.purchase_number || '';
+
+      // Set incoming data (including inventoryId if in edit mode)
+      setIncomingData({
+        poNumber: poNumber === 'NO_PO' ? '' : poNumber,
+        vendorName: vendorName,
+        vendorId: vendorId,
+        stockingLocation: stockingLocation,
+        date: formattedDate,
+        inventoryId: editMode && inventoryItem.id ? inventoryItem.id : null
+      });
+
+      // Process inventory items
+      const inventoryItems = inventoryItem.inventoryItems || inventoryItem.inventory_items || [];
+      let formattedItems = [];
+      if (Array.isArray(inventoryItems) && inventoryItems.length > 0) {
+        // Transform inventory items to the format expected by items
+        formattedItems = inventoryItems.map((invItem, index) => {
+          // Get IDs from the inventory item
+          const itemId = invItem.item_id || invItem.itemId || null;
+          const brandId = invItem.brand_id || invItem.brandId || null;
+          const modelId = invItem.model_id || invItem.modelId || null;
+          const typeId = invItem.type_id || invItem.typeId || null;
+          const categoryId = invItem.category_id || invItem.categoryId || null;
+
+          // First, try to get names from the inventory item itself (if available)
+          let itemName = invItem.itemName || invItem.item_name || '';
+          let brand = invItem.brandName || invItem.brand_name || invItem.brand || '';
+          let model = invItem.modelName || invItem.model_name || invItem.model || '';
+          let type = invItem.typeName || invItem.type_name || invItem.type || '';
+          let category = invItem.categoryName || invItem.category_name || invItem.category || '';
+
+          // If names are missing, resolve from IDs using API data (if available)
+          // This will work even if APIs are still loading - names will resolve as APIs load
+          if (!itemName && itemId && poItemName.length > 0) {
+            itemName = resolveItemName(itemId);
+          }
+          if (!brand && brandId && brandId !== 0 && poBrand.length > 0) {
+            brand = resolveBrandName(brandId);
+          }
+          if (!model && modelId && poModel.length > 0) {
+            model = resolveModelName(modelId);
+          }
+          if (!type && typeId && typeId !== 0 && poType.length > 0) {
+            type = resolveTypeName(typeId);
+          }
+          // Always try to resolve category from categoryId if available (even if category is already set)
+          // This ensures category is resolved when categoryOptions loads
+          if (categoryId && categoryOptions.length > 0) {
+            const resolvedCategory = resolveCategoryName(categoryId);
+            if (resolvedCategory) {
+              category = resolvedCategory;
+            }
+          }
+
+          // If itemName includes category (format: "ItemName, Category")
+          if (itemName && itemName.includes(',')) {
+            const parts = itemName.split(',');
+            itemName = parts[0].trim();
+            // Only use category from itemName if we don't already have a resolved category
+            if (!category || category === '') {
+              category = parts[1] ? parts[1].trim() : category;
+            }
+          }
+
+          return {
+            id: index + 1,
+            name: itemName && category ? `${itemName}, ${category}` : itemName || '',
+            brand: brand || '',
+            model: model || '',
+            type: type || '',
+            category: category || '',
+            quantity: Math.abs(invItem.quantity || 0),
+            price: invItem.amount && invItem.quantity ? Math.abs(invItem.amount / invItem.quantity) : 0,
+            itemId: itemId,
+            brandId: brandId,
+            modelId: modelId,
+            typeId: typeId,
+            categoryId: categoryId,
+          };
+        });
+      }
+
+      // Set items immediately (names will resolve as APIs load)
+      setItems(formattedItems);
+      setHasOpenedAdd(formattedItems.length > 0);
+
+      // Set edit mode if needed
+      if (editMode) {
+        setIsEditMode(true);
+      }
+
+      // Clear from localStorage after loading
+      localStorage.removeItem('editingInventory');
+    };
+
+    window.addEventListener('editInventory', handleEditInventory);
+
+    return () => {
+      window.removeEventListener('editInventory', handleEditInventory);
+    };
+  }, [vendorNameOptions, siteOptions, poItemName, poBrand, poModel, poType, categoryOptions]);
+
+  // Check localStorage on mount and when essential dependencies are loaded
+  useEffect(() => {
+    const editingInventory = localStorage.getItem('editingInventory');
+    if (editingInventory && vendorNameOptions.length > 0 && siteOptions.length > 0) {
+      try {
+        const inventoryItem = JSON.parse(editingInventory);
+        // Dispatch event to trigger loadInventoryData
+        window.dispatchEvent(new CustomEvent('editInventory', { detail: inventoryItem }));
+        // Clear from localStorage after loading
+        localStorage.removeItem('editingInventory');
+      } catch (error) {
+        console.error('Error parsing editingInventory from localStorage:', error);
+      }
+    }
+  }, [vendorNameOptions, siteOptions]);
+
+  // Re-resolve item names when API data loads (for items already in state)
+  // This ensures names are resolved even if APIs weren't loaded when items were first set
+  useEffect(() => {
+    if (items.length > 0 && (poItemName.length > 0 || poBrand.length > 0 || poModel.length > 0 || poType.length > 0 || categoryOptions.length > 0)) {
+      setItems(prevItems => {
+        const updatedItems = prevItems.map(item => {
+          let itemName = item.name ? item.name.split(',')[0].trim() : '';
+          // Extract category from item.category first, then from item.name if category is empty
+          let category = item.category || '';
+          if (!category && item.name && item.name.includes(',')) {
+            category = item.name.split(',')[1]?.trim() || '';
+          }
+          let brand = item.brand || '';
+          let model = item.model || '';
+          let type = item.type || '';
+          // Re-resolve names if we have IDs but missing names
+          if (!itemName && item.itemId && poItemName.length > 0) {
+            itemName = resolveItemName(item.itemId);
+          }
+          if (!brand && item.brandId && item.brandId !== 0 && poBrand.length > 0) {
+            brand = resolveBrandName(item.brandId);
+          }
+          if (!model && item.modelId && poModel.length > 0) {
+            model = resolveModelName(item.modelId);
+          }
+          if (!type && item.typeId && item.typeId !== 0 && poType.length > 0) {
+            type = resolveTypeName(item.typeId);
+          }
+          // Always try to resolve category from categoryId if available (even if category is already set)
+          // This ensures category is resolved when categoryOptions loads
+          if (item.categoryId && categoryOptions.length > 0) {
+            const resolvedCategory = resolveCategoryName(item.categoryId);
+            if (resolvedCategory) {
+              category = resolvedCategory;
+            }
+          }
+          return {
+            ...item,
+            name: itemName && category ? `${itemName}, ${category}` : itemName || '',
+            brand: brand || '',
+            model: model || '',
+            type: type || '',
+            category: category || ''
+          };
+        });
+        // Only update if names actually changed
+        const hasChanges = updatedItems.some((updatedItem, index) => {
+          const original = prevItems[index];
+          return updatedItem.name !== original.name || 
+                 updatedItem.brand !== original.brand || 
+                 updatedItem.model !== original.model || 
+                 updatedItem.type !== original.type ||
+                 updatedItem.category !== original.category;
+        });
+        return hasChanges ? updatedItems : prevItems;
+      });
+    }
+  }, [poItemName, poBrand, poModel, poType, categoryOptions]);
   // Cleanup preview URLs on unmount
   useEffect(() => {
     return () => {
@@ -1088,20 +1343,13 @@ const Incoming = ({ user }) => {
         return;
       }
       const stockingLocationId = stockingLocationSite.id;
-      // Get incoming count for ENO
-      const countResponse = await fetch(
-        `https://backendaab.in/aabuildersDash/api/inventory/incomingCount?stockingLocationId=${stockingLocationId}`
-      );      
-      if (!countResponse.ok) {
-        throw new Error('Failed to fetch incoming count');
-      }      
-      const incomingCount = await countResponse.json();
-      const eno = String(incomingCount + 1 || 0);
+      
       // Convert date from DD/MM/YYYY to YYYY-MM-DD format for backend
       const dateParts = incomingData.date.split('/');
       const formattedDate = dateParts.length === 3 
         ? `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}` 
         : incomingData.date;
+      
       // Prepare inventory items - ensure quantities are positive
       const inventoryItems = items.map(item => ({
         item_id: item.itemId || null,
@@ -1112,20 +1360,44 @@ const Incoming = ({ user }) => {
         quantity: Math.abs(item.quantity || 0), // Always positive for incoming
         amount: Math.abs((item.price || 0) * (item.quantity || 0))
       }));
-      // Prepare payload
-      const payload = {
+      
+      // Check if this is an update or new record
+      const isUpdate = isEditMode && incomingData.inventoryId;
+      
+      let payload = {
         vendor_id: incomingData.vendorId,
         stocking_location_id: stockingLocationId,
         inventory_type: 'incoming',
         date: formattedDate,
-        eno: eno,
         purchase_no: incomingData.poNumber || 'NO_PO',
         created_by: (user && user.username) || '',
         inventoryItems: inventoryItems
       };
-      // Save to backend
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/inventory/save', {
-        method: 'POST',
+      
+      // For new records, get ENO
+      if (!isUpdate) {
+        const countResponse = await fetch(
+          `https://backendaab.in/aabuildersDash/api/inventory/incomingCount?stockingLocationId=${stockingLocationId}`
+        );      
+        if (!countResponse.ok) {
+          throw new Error('Failed to fetch incoming count');
+        }      
+        const incomingCount = await countResponse.json();
+        const eno = String(incomingCount + 1 || 0);
+        payload.eno = eno;
+      } else {
+        // For updates, include the inventory ID
+        payload.id = incomingData.inventoryId;
+      }
+      const username = (user && user.username) || '';
+      // Save or update to backend
+      const url = isUpdate 
+        ? `https://backendaab.in/aabuildersDash/api/inventory/edit_with_history/${incomingData.inventoryId}?changedBy=${encodeURIComponent(username)}`
+        : 'https://backendaab.in/aabuildersDash/api/inventory/save';
+      const method = isUpdate ? 'PUT' : 'POST';
+      
+      const response = await fetch(url, {
+        method: method,
         headers: {
           'Content-Type': 'application/json'
         },
@@ -1169,14 +1441,15 @@ const Incoming = ({ user }) => {
           }
         }
       }      
-      alert('Inventory data saved successfully!');
+      alert(`Inventory data ${isUpdate ? 'updated' : 'saved'} successfully!`);
       // Reset form
       setIncomingData({
         poNumber: '',
         vendorName: '',
         vendorId: null,
         stockingLocation: '',
-        date: getTodayDate()
+        date: getTodayDate(),
+        inventoryId: null
       });
       setItems([]);
       setHasOpenedAdd(false);
@@ -1229,7 +1502,7 @@ const Incoming = ({ user }) => {
                   onClick={handleSaveIncoming}
                   className="text-[13px] font-medium text-black leading-normal rounded-[8px] px-3 py-1.5 hover:bg-gray-100"
                 >
-                  Add to Stock
+                  {isEditMode ? 'Update' : 'Add to Stock'}
                 </button>
               )}
               {hasOpenedAdd && (

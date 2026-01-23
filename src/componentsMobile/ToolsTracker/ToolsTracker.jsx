@@ -2,25 +2,23 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../PurchaseOrder/Header';
 import Sidebar from '../Bars/Sidebar';
-import InventoryTabs from './InventoryTabs';
+import ToolsTrackerTabs from './ToolsTrackerTabs';
 import BottomNav from '../PurchaseOrder/BottomNav';
-import Outgoing from './Outgoing';
-import Incoming from './Incoming';
-import AddInput from './AddInput';
+import Entry from './Entry';
 import History from './History';
-import ProjectUsageReport from './ProjectUsageReport';
-import IncomingTracker from './IncomingTracker';
+import PendingItems from './PendingItems';
+import AddInput from './AddInput';
 import NetStock from './NetStock';
-import NonPOHistory from './NonPOHistory';
-import EditStock from './EditStock';
+import ToolsHistory from './ToolsHistory';
+import ServiceHistory from './ServiceHistory';
 
-const Inventory = ({ user, onLogout }) => {
+const ToolsTracker = ({ user, onLogout }) => {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState('inventory');
+  const [currentPage, setCurrentPage] = useState('tools-tracker');
   const [activeTab, setActiveTab] = useState(() => {
-    const savedTab = localStorage.getItem('inventoryActiveTab');
-    return savedTab || 'net-stock';
+    const savedTab = localStorage.getItem('toolsTrackerActiveTab');
+    return savedTab || 'entry';
   });
 
   const handleMenuClick = () => {
@@ -43,38 +41,35 @@ const Inventory = ({ user, onLogout }) => {
       navigate('/toolsTracker');
     }
   };
+
   const handleTabChange = (tab) => {
     setActiveTab(tab);
-    localStorage.setItem('inventoryActiveTab', tab);
+    localStorage.setItem('toolsTrackerActiveTab', tab);
   };
+
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'outgoing':
-        return <Outgoing user={user} />;
-      case 'incoming':
-        return <Incoming user={user} />;
-      case 'net-stock':
-        return <NetStock />;
+      case 'entry':
+        return <Entry user={user} />;
       case 'history':
-        return <History onTabChange={handleTabChange} />
+        return <History user={user} />;
+      case 'pending-items':
+        return <PendingItems user={user} />;
       case 'add-input':
-        return <AddInput />;
-      case 'incoming-tracker':
-        return <IncomingTracker user={user} />;
-      case 'project-usage-report':
-        return <ProjectUsageReport />;
-      case 'project-usage-history':
-        return <ProjectUsageReport />;
-      case 'non-po-history':
-        return <NonPOHistory onTabChange={handleTabChange} />;
-      case 'edit-stock':
-        return <EditStock />;
+        return <AddInput user={user} />;
+      case 'net-stock':
+        return <NetStock user={user} />;
+      case 'tools-history':
+        return <ToolsHistory user={user} />;
+      case 'service-history':
+        return <ServiceHistory user={user} />;
       default:
-        return null;
+        return <Entry user={user} />;
     }
   };
+
   return (
-    <div className="relative w-full  bg-white max-w-[360px] mx-auto" style={{ fontFamily: "'Manrope', sans-serif" }}>
+    <div className="relative w-full bg-white max-w-[360px] mx-auto" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
@@ -85,13 +80,13 @@ const Inventory = ({ user, onLogout }) => {
       />
       {/* Header - Fixed */}
       <Header
-        title="Inventory"
+        title="Tools Tracker"
         user={user}
         onLogout={onLogout}
         onMenuClick={handleMenuClick}
       />
       {/* Tabs - Fixed */}
-      <InventoryTabs activeTab={activeTab} onTabChange={handleTabChange} />
+      <ToolsTrackerTabs activeTab={activeTab} onTabChange={handleTabChange} />
       {/* Content Area */}
       <div className="mt-[90px]">
         {renderTabContent()}
@@ -101,4 +96,5 @@ const Inventory = ({ user, onLogout }) => {
     </div>
   );
 };
-export default Inventory;
+
+export default ToolsTracker;

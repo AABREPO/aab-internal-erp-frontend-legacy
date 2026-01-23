@@ -2693,8 +2693,10 @@ const PurchaseOrder = ({ user, onLogout }) => {
     } else if (page === 'inventory') {
       setCurrentPage('inventory');
       navigate('/inventory');
+    } else if (page === 'tools-tracker') {
+      setCurrentPage('tools-tracker');
+      navigate('/toolsTracker');
     }
-    // Other pages can be handled here when implemented
   };
   return (
     <div className="relative w-full min-h-screen bg-white max-w-[360px] mx-auto pb-[80px]" style={{ fontFamily: "'Manrope', sans-serif" }}>

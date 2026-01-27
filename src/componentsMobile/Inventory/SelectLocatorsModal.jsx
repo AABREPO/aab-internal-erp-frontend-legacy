@@ -3,19 +3,16 @@ import React, { useState, useEffect } from 'react';
 const SelectLocatorsModal = ({ isOpen, onClose, onSelect, selectedValues = [], options = [], fieldName = 'Locators', onAddNew }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [localSelected, setLocalSelected] = useState(selectedValues);
-
   // Update local selected when selectedValues prop changes
   useEffect(() => {
     setLocalSelected(selectedValues);
   }, [selectedValues]);
-
   // Reset search when modal opens/closes
   useEffect(() => {
     if (!isOpen) {
       setSearchQuery('');
     }
   }, [isOpen]);
-
   // Filter options based on search query
   const normalizeSearchText = (text) => {
     return text
@@ -24,13 +21,11 @@ const SelectLocatorsModal = ({ isOpen, onClose, onSelect, selectedValues = [], o
       .replace(/\s+/g, ' ')
       .trim();
   };
-
   const normalizedQuery = normalizeSearchText(searchQuery);
   const filteredOptions = options.filter(option => {
     const normalizedOption = normalizeSearchText(option);
     return normalizedOption.includes(normalizedQuery);
   });
-
   // Check if search query doesn't match any existing option
   const searchQueryTrimmed = searchQuery.trim();
   const canCreateNew = onAddNew && searchQueryTrimmed.length > 0 && !options.some(opt => {
@@ -38,9 +33,7 @@ const SelectLocatorsModal = ({ isOpen, onClose, onSelect, selectedValues = [], o
     const normalizedQuery = normalizeSearchText(searchQueryTrimmed);
     return normalizedOpt === normalizedQuery;
   });
-
   if (!isOpen) return null;
-
   const handleToggleSelect = (value) => {
     const newSelected = localSelected.includes(value)
       ? localSelected.filter(v => v !== value)
@@ -49,12 +42,10 @@ const SelectLocatorsModal = ({ isOpen, onClose, onSelect, selectedValues = [], o
     // Immediately call onSelect to update the backend
     onSelect(newSelected);
   };
-
   const handleConfirm = () => {
     onSelect(localSelected);
     onClose();
   };
-
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {
       // Call onSelect with current selection before closing
@@ -62,7 +53,6 @@ const SelectLocatorsModal = ({ isOpen, onClose, onSelect, selectedValues = [], o
       onClose();
     }
   };
-
   const handleCreateNew = () => {
     if (canCreateNew && onAddNew) {
       onAddNew(searchQueryTrimmed);
@@ -71,15 +61,11 @@ const SelectLocatorsModal = ({ isOpen, onClose, onSelect, selectedValues = [], o
       setSearchQuery('');
     }
   };
-
   return (
-    <div 
-      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-      onClick={handleBackdropClick}
-      style={{ fontFamily: "'Manrope', sans-serif" }}
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+      onClick={handleBackdropClick} style={{ fontFamily: "'Manrope', sans-serif" }}
     >
-      <div 
-        className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[60vh] flex flex-col"
+      <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[60vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -96,7 +82,6 @@ const SelectLocatorsModal = ({ isOpen, onClose, onSelect, selectedValues = [], o
             ×
           </button>
         </div>
-
         {/* Search Bar */}
         <div className="px-6 pt-4 pb-4">
           <div className="relative">
@@ -116,16 +101,12 @@ const SelectLocatorsModal = ({ isOpen, onClose, onSelect, selectedValues = [], o
             </div>
           </div>
         </div>
-
         {/* Options List */}
         <div className="flex-1 overflow-y-auto mb-4 px-6">
           <div className="shadow-md rounded-lg overflow-hidden">
             {/* Create New Option */}
             {canCreateNew && (
-              <button
-                onClick={handleCreateNew}
-                className="w-full h-[36px] px-6 flex items-center bg-gray-100 gap-2 hover:bg-[#F5F5F5] transition-colors"
-              >
+              <button onClick={handleCreateNew} className="w-full h-[36px] px-6 flex items-center bg-gray-100 gap-2 hover:bg-[#F5F5F5] transition-colors">
                 <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M7 3V11M3 7H11" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
@@ -137,12 +118,9 @@ const SelectLocatorsModal = ({ isOpen, onClose, onSelect, selectedValues = [], o
             {filteredOptions.length > 0 ? (
               <div className="space-y-0">
                 {filteredOptions.map((option, index) => {
-                  const isSelected = localSelected.includes(option);
-                  
+                  const isSelected = localSelected.includes(option);                  
                   return (
-                    <button
-                      key={index}
-                      onClick={() => handleToggleSelect(option)}
+                    <button key={index} onClick={() => handleToggleSelect(option)}
                       className={`w-full h-[40px] px-6 flex items-center justify-between transition-colors ${
                         isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
                       }`}
@@ -151,7 +129,6 @@ const SelectLocatorsModal = ({ isOpen, onClose, onSelect, selectedValues = [], o
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         <p className="text-[14px] font-medium text-black text-left truncate">{option}</p>
                       </div>
-
                       {/* Right: Checkbox */}
                       <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 ml-3">
                         {isSelected ? (
@@ -182,6 +159,4 @@ const SelectLocatorsModal = ({ isOpen, onClose, onSelect, selectedValues = [], o
     </div>
   );
 };
-
 export default SelectLocatorsModal;
-

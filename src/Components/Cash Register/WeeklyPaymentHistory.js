@@ -53,6 +53,7 @@ const History = ({ username, userRoles = [] }) => {
     const [weeks, setWeeks] = useState([]);
     const [lastWeekWithData, setLastWeekWithData] = useState(null);
     const [lastEditableWeek, setLastEditableWeek] = useState(null); // { weekNumber, year }
+    const [lastActiveWeek, setLastActiveWeek] = useState(null);
     const [vendorOptions, setVendorOptions] = useState([]);
     const [contractorOptions, setContractorOptions] = useState([]);
     const [siteOptions, setSiteOptions] = useState([]);
@@ -140,19 +141,21 @@ const History = ({ username, userRoles = [] }) => {
     const scrollRef = useRef(null);
     const paymentsScrollRef = useRef(null);
     const isDragging = useRef(false);
+    const activeScrollRef = useRef(null); // Track which scroll container is currently active
     const start = useRef({ x: 0, y: 0 });
-    const scroll = useRef({ left: 0, top: 0 });
+    const lastPosition = useRef({ x: 0, y: 0 });
     const velocity = useRef({ x: 0, y: 0 });
     const animationFrame = useRef(null);
     const lastMove = useRef({ time: 0, x: 0, y: 0 });
+    
     const handleMouseDown = (e, ref) => {
         if (!ref.current) return;
+        e.preventDefault(); // Prevent default behavior
+        e.stopPropagation(); // Prevent event from bubbling to other scroll containers
         isDragging.current = true;
+        activeScrollRef.current = ref.current; // Store the active scroll container
         start.current = { x: e.clientX, y: e.clientY };
-        scroll.current = {
-            left: ref.current.scrollLeft,
-            top: ref.current.scrollTop,
-        };
+        lastPosition.current = { x: e.clientX, y: e.clientY };
         lastMove.current = {
             time: Date.now(),
             x: e.clientX,
@@ -160,20 +163,40 @@ const History = ({ username, userRoles = [] }) => {
         };
         ref.current.style.cursor = 'grabbing';
         ref.current.style.userSelect = 'none';
+        ref.current.style.scrollBehavior = 'auto'; // Disable smooth scroll during drag for immediate response
         cancelMomentum();
     };
+    
     const handleMouseMove = (e, ref) => {
-        if (!isDragging.current || !ref.current) return;
-        const dx = e.clientX - start.current.x;
-        const dy = e.clientY - start.current.y;
+        if (!isDragging.current || !ref.current || activeScrollRef.current !== ref.current) return;
+        e.stopPropagation(); // Prevent event from bubbling to other scroll containers
+        
         const now = Date.now();
         const dt = now - lastMove.current.time || 16;
+        
+        // Calculate delta movement (incremental change)
+        const deltaX = e.clientX - lastPosition.current.x;
+        const deltaY = e.clientY - lastPosition.current.y;
+        
+        // Update velocity for momentum (based on last move, not start position)
         velocity.current = {
             x: (e.clientX - lastMove.current.x) / dt,
             y: (e.clientY - lastMove.current.y) / dt,
         };
-        ref.current.scrollLeft = scroll.current.left - dx;
-        ref.current.scrollTop = scroll.current.top - dy;
+        
+        // Use scrollBy for smooth, continuous scrolling based on incremental movement
+        // This feels more natural like normal scrolling
+        if (ref.current && (deltaX !== 0 || deltaY !== 0)) {
+            ref.current.scrollBy({
+                left: -deltaX,
+                top: -deltaY,
+                behavior: 'auto' // Instant but smooth
+            });
+        }
+        
+        // Update last position for next incremental calculation
+        lastPosition.current = { x: e.clientX, y: e.clientY };
+        
         lastMove.current = {
             time: now,
             x: e.clientX,
@@ -181,12 +204,17 @@ const History = ({ username, userRoles = [] }) => {
         };
     };
     const handleMouseUp = (ref) => {
-        if (!isDragging.current || !ref.current) return;
+        if (!isDragging.current || !ref.current || activeScrollRef.current !== ref.current) return;
         isDragging.current = false;
-        ref.current.style.cursor = '';
-        ref.current.style.userSelect = '';
+        if (ref.current) {
+            ref.current.style.cursor = '';
+            ref.current.style.userSelect = '';
+            ref.current.style.scrollBehavior = ''; // Restore default scroll behavior
+        }
         applyMomentum();
+        activeScrollRef.current = null; // Clear the active ref after momentum is applied
     };
+    
     const cancelMomentum = () => {
         if (animationFrame.current) {
             cancelAnimationFrame(animationFrame.current);
@@ -194,13 +222,16 @@ const History = ({ username, userRoles = [] }) => {
         }
     };
     const applyMomentum = () => {
-        if (!scrollRef.current && !paymentsScrollRef.current) return;
+        if (!activeScrollRef.current) return;
         const friction = 0.95;
         const minVelocity = 0.1;
         const step = () => {
             const { x, y } = velocity.current;
-            const activeRef = scrollRef.current || paymentsScrollRef.current;
-            if (!activeRef) return;
+            const activeRef = activeScrollRef.current;
+            if (!activeRef) {
+                cancelMomentum();
+                return;
+            }
             if (Math.abs(x) > minVelocity || Math.abs(y) > minVelocity) {
                 activeRef.scrollLeft -= x * 20;
                 activeRef.scrollTop -= y * 20;
@@ -209,6 +240,7 @@ const History = ({ username, userRoles = [] }) => {
                 animationFrame.current = requestAnimationFrame(step);
             } else {
                 cancelMomentum();
+                activeScrollRef.current = null; // Clear the active ref when momentum ends
             }
         };
         animationFrame.current = requestAnimationFrame(step);
@@ -816,6 +848,29 @@ const History = ({ username, userRoles = [] }) => {
         };
         fetchWeeks();
     }, [year]);
+    
+    // Fetch active weeks from API and set the last week as default
+    useEffect(() => {
+        const fetchActiveWeeks = async () => {
+            try {
+                const response = await axios.get('https://backendaab.in/aabuildersDash/api/payments-received/active_weeks');
+                if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+                    const lastWeek = response.data[response.data.length - 1];
+                    setLastActiveWeek(lastWeek);
+                    // Set the selected week to the last active week if weeks are loaded and no week is currently selected
+                    if (weeks.length > 0 && !selectedWeek) {
+                        const weekExists = weeks.some(w => w.number === lastWeek);
+                        if (weekExists) {
+                            setSelectedWeek(lastWeek.toString());
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching active weeks:', error);
+            }
+        };
+        fetchActiveWeeks();
+    }, [weeks.length, selectedWeek]);
     
     // Find the most recent week (across all years) that has data with status === true
     useEffect(() => {
@@ -2673,14 +2728,24 @@ const History = ({ username, userRoles = [] }) => {
             const currentSelectedWeek = selectedWeek;
             const selectedWeekExists = currentSelectedWeek && weeks.some(w => w.number === Number(currentSelectedWeek));
             if (!selectedWeekExists) {
-                // If selected week doesn't exist in new year, select the last week
-                setSelectedWeek(weeks[weeks.length - 1].number);
+                // If lastActiveWeek is available and exists in weeks, use it; otherwise use the last week
+                if (lastActiveWeek !== null) {
+                    const lastActiveWeekExists = weeks.some(w => w.number === lastActiveWeek);
+                    if (lastActiveWeekExists) {
+                        setSelectedWeek(lastActiveWeek.toString());
+                    } else {
+                        setSelectedWeek(weeks[weeks.length - 1].number);
+                    }
+                } else {
+                    // If selected week doesn't exist in new year, select the last week
+                    setSelectedWeek(weeks[weeks.length - 1].number);
+                }
             }
         } else {
             // If no weeks available for the selected year, clear the selection
             setSelectedWeek("");
         }
-    }, [weeks, year]);
+    }, [weeks, year, lastActiveWeek]);
     const fetchAuditDetailsForExpense = async (expensesId) => {
         try {
             const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly_payment_audit/expenses/${expensesId}`);
@@ -2862,8 +2927,15 @@ const History = ({ username, userRoles = [] }) => {
                         </div>
                         <div className="w-full h-[600px] rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden">
                             <div ref={scrollRef} className="overflow-auto max-h-[600px] thin-scrollbar"
+                                style={{ 
+                                    willChange: 'scroll-position', 
+                                    WebkitOverflowScrolling: 'touch',
+                                    transform: 'translateZ(0)', // Force hardware acceleration
+                                    backfaceVisibility: 'hidden' // Optimize rendering
+                                }}
                                 onMouseDown={(e) => handleMouseDown(e, scrollRef)} onMouseMove={(e) => handleMouseMove(e, scrollRef)}
                                 onMouseUp={() => handleMouseUp(scrollRef)} onMouseLeave={() => handleMouseUp(scrollRef)}
+                                onWheel={(e) => e.stopPropagation()}
                             >
                                 <table className="w-[1320px] border-collapse text-left">
                                     <thead className="sticky top-0 z-10 bg-white">
@@ -3048,7 +3120,7 @@ const History = ({ username, userRoles = [] }) => {
                                                 </th>
                                                 <th className="pt-2 pb-2 w-[80px] sm:w-[100px]">
                                                     <select
-                                                        value={selectType}
+                                                        value={selectType} 
                                                         onChange={(e) => setSelectType(e.target.value)}
                                                         className="p-1 rounded-md bg-transparent w-[100px] sm:w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
                                                         placeholder="Type..."
@@ -3712,10 +3784,17 @@ const History = ({ username, userRoles = [] }) => {
                                 </h1>
                             </div>
                             <div ref={paymentsScrollRef} className="rounded-lg border-l-8 border-l-[#BF9853] w-full overflow-y-auto max-h-[300px] thin-scrollbar"
+                                style={{ 
+                                    willChange: 'scroll-position', 
+                                    WebkitOverflowScrolling: 'touch',
+                                    transform: 'translateZ(0)', // Force hardware acceleration
+                                    backfaceVisibility: 'hidden' // Optimize rendering
+                                }}
                                 onMouseDown={(e) => handleMouseDown(e, paymentsScrollRef)}
                                 onMouseMove={(e) => handleMouseMove(e, paymentsScrollRef)}
                                 onMouseUp={() => handleMouseUp(paymentsScrollRef)}
                                 onMouseLeave={() => handleMouseUp(paymentsScrollRef)}
+                                onWheel={(e) => e.stopPropagation()}
                             >
                                 <table className="w-full border-collapse">
                                     <thead className="bg-[#FAF6ED] h-12">

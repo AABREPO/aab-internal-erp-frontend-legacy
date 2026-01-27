@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 
 const ToolsTrackerTabs = ({ activeTab = 'entry', onTabChange }) => {
   const tabs = [
-    { id: 'entry', label: 'Entry' },
+    { id: 'transfer', label: 'Transfer' },
     { id: 'history', label: 'History' },
     { id: 'pending-items', label: 'Pending Items' },
     { id: 'add-input', label: 'AddInput' },

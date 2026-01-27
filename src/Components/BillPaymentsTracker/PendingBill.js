@@ -232,7 +232,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 throw new Error(`Invalid JSON response: ${parseError.message}`);
             }
             setApiData(data);
-            console.log(data);
         } catch (error) {
             console.error("Error fetching tracker data:", error);
             setError(error.message);
@@ -498,25 +497,20 @@ const PendingBill = ({ username, userRoles = [] }) => {
     };
     const getFilteredData = () => {
         let filteredData = [...apiData];
-
         filteredData = filteredData.filter(item => {
             const status = paymentStatuses[item.id] || 'To Pay';
             const hasPaidToday = paidTodayBills[item.id] || false;
-
             // Show bills that are not paid (To Pay status)
             if (status === 'To Pay') {
                 return true;
             }
-
             // Show bills that have payments made today (regardless of payment status)
             if (hasPaidToday) {
                 return true;
             }
-
             // Hide bills that are fully paid or partially paid but not paid today
             return false;
         });
-
         if (filters.vendorName) {
             const selectedVendorId = filters.vendorName.id;
             filteredData = filteredData.filter(item =>
@@ -597,11 +591,9 @@ const PendingBill = ({ username, userRoles = [] }) => {
             bill.billVerifications &&
             bill.billVerifications.length > 0
         );
-
         if (vendorBills.length === 0) {
             return null;
         }
-
         // Sort bills by date (most recent first), then by ID (most recent first) as fallback
         vendorBills.sort((a, b) => {
             const dateA = a.bill_arrival_date || a.billArrivalDate || a.created_at || a.createdAt || '';
@@ -611,16 +603,13 @@ const PendingBill = ({ username, userRoles = [] }) => {
             }
             return (b.id || 0) - (a.id || 0);
         });
-
         // Get the most recent bill
         const mostRecentBill = vendorBills[0];
-
         // Get the last verification from the most recent bill's billVerifications array
         const verifications = mostRecentBill.billVerifications || [];
         if (verifications.length === 0) {
             return null;
         }
-
         // Find the last non-empty, non-NO_PO bill number from the verifications
         for (let i = verifications.length - 1; i >= 0; i--) {
             const billNumber = verifications[i].bill_number || verifications[i].billNumber;
@@ -628,7 +617,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 return billNumber.trim();
             }
         }
-
         return null;
     };
     const handleVerifyClick = (bill) => {
@@ -643,7 +631,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 existingBillNumbers.push('')
             }
             setPoNumbers(existingBillNumbers.slice(0, numberOfBills))
-
             // Handle extra bills
             if (extraBills > 0) {
                 const extraBillNumbers = existingBillNumbers.slice(numberOfBills, numberOfBills + extraBills)
@@ -654,7 +641,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
             } else {
                 setExtraPoNumbers([])
             }
-
             const initialVerified = {}
             const initialNoPo = {}
             const initialExtraVerified = {}
@@ -767,7 +753,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
         if (selectedBill.billVerifications && selectedBill.billVerifications[index]) {
             const billVerification = selectedBill.billVerifications[index]
             const billId = billVerification.id
-
             try {
                 const response = await axios.put(
                     `https://backendaab.in/aabuildersDash/api/vendor-payments/bill/${billId}/duplicate`,
@@ -793,8 +778,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
             }
         } else {
             // If bill verification doesn't exist yet, we need to create it first
-            // This would happen if the bill hasn't been submitted yet
-            // For now, just keep the local state - it will be saved when the bill is submitted
         }
     }
     const handleExtraDuplicateChange = async (index, checked) => {
@@ -819,7 +802,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     const updatedBillVerifications = [...selectedBill.billVerifications]
                     updatedBillVerifications[actualIndex] = { ...updatedBillVerifications[actualIndex], is_duplicate: checked }
                     setSelectedBill({ ...selectedBill, billVerifications: updatedBillVerifications })
-
                     // Refresh the API data
                     fetchTrackerData()
                 }
@@ -831,8 +813,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
             }
         } else {
             // If bill verification doesn't exist yet, we need to create it first
-            // This would happen if the bill hasn't been submitted yet
-            // For now, just keep the local state - it will be saved when the bill is submitted
         }
     }
     const toggleDuplicateMode = () => {
@@ -3168,8 +3148,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
         }
     }
     // ISO 8601 week number calculation
-    // Week belongs to the year that contains the Thursday of that week
-    // Week 1 is the week with the year's first Thursday
     const getISOWeekNumber = (date) => {
         const d = new Date(date);
         d.setHours(0, 0, 0, 0);
@@ -3255,7 +3233,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 carryForwardToUse = Math.min(carryForwardAmount, remainingAfterPayments);
             }
             const newRemainingAmount = Math.max(0, remainingAfterPayments - carryForwardToUse);
-
             // Calculate excess amount: if payment total exceeds the amount needed to pay
             const amountNeededToPay = Math.max(0, actualAmount - currentReceivedAmount - normalizedDiscount);
             const totalPaymentBeingMade = totalPaymentAmount + carryForwardToUse;
@@ -3974,7 +3951,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 const persistedIsVerified = persistedVerification.is_verified === true || persistedVerification.status === 'VERIFIED'
                 const persistedIsPaid = persistedVerification.is_paid === true || persistedVerification.status === 'PAID'
                 const persistedIsDuplicate = persistedVerification.is_duplicate === true
-
                 // Check if bill is duplicate and verified - show different border color
                 if (persistedIsDuplicate && persistedIsVerified) {
                     borderClass = 'border-purple-500'
@@ -4641,8 +4617,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                     <img src={edit} alt="edit" className="w-4 h-4" />
                                                 </button>
                                                 {isAdminUser() && (
-                                                    <button
-                                                        className="px-2 py-1.5 transition-colors duration-200 flex items-center justify-start hover:bg-gray-100 rounded"
+                                                    <button className="px-2 py-1.5 transition-colors duration-200 flex items-center justify-start hover:bg-gray-100 rounded"
                                                         onClick={() => handleDelete(item.id)}
                                                     >
                                                         <img src={deletes} alt="delete" className="w-4 h-4" />
@@ -4784,8 +4759,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                         </p>
                                     </div>
                                     <div>
-                                        <button className="w-8 h-8 flex items-center justify-end transition-colors duration-200 text-gray-500 text-xl"
-                                            onClick={handleCancel}>
+                                        <button className="w-8 h-8 flex items-center justify-end transition-colors duration-200 text-gray-500 text-xl" onClick={handleCancel}>
                                             ×
                                         </button>
                                     </div>

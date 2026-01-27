@@ -13,7 +13,6 @@ const ToolsTrackerHeading = ({ username, userRoles = [] }) => {
   const [isMobile, setIsMobile] = useState(() => {
     return window.innerWidth <= 768;
   });
-
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth <= 768);
@@ -23,16 +22,13 @@ const ToolsTrackerHeading = ({ username, userRoles = [] }) => {
       window.removeEventListener('resize', handleResize);
     };
   }, []);
-
   const [activeTab, setActiveTab] = useState(
     localStorage.getItem('activePaintTab') || 'toolstrackerentry'
   );
-
   useEffect(() => {
     // Save the active tab to localStorage whenever it changes
     localStorage.setItem('activePaintTab', activeTab);
   }, [activeTab]);
-
   if (isMobile) {
     const storedUser = localStorage.getItem('user');
     const user = storedUser ? JSON.parse(storedUser) : { username, userRoles };
@@ -42,7 +38,6 @@ const ToolsTrackerHeading = ({ username, userRoles = [] }) => {
       </div>
     );
   }
-
   const renderContent = () => {
     switch (activeTab) {
       case 'toolstrackerentry':
@@ -65,61 +60,35 @@ const ToolsTrackerHeading = ({ username, userRoles = [] }) => {
         return <ToolTrackerEntry username={username} userRoles={userRoles} />;
     }
   };
-
   return (
     <div className="bg-[#FAF6ED] w-full h-auto min-h-screen">
       {/* Top Navigation Tabs */}
       <div className="topbar-title">
-        <h2
-          className={`link ${activeTab === 'toolstrackerentry' ? 'active' : ''}`}
-          onClick={() => setActiveTab('toolstrackerentry')}
-        >
+        <h2 className={`link ${activeTab === 'toolstrackerentry' ? 'active' : ''}`} onClick={() => setActiveTab('toolstrackerentry')}>
           Entry
         </h2>
-        <h2
-          className={`link ${activeTab === 'toolstrackertableview' ? 'active' : ''}`}
-          onClick={() => setActiveTab('toolstrackertableview')}
-        >
+        <h2 className={`link ${activeTab === 'toolstrackertableview' ? 'active' : ''}`} onClick={() => setActiveTab('toolstrackertableview')}>
           Table View
         </h2>
-        <h2
-          className={`link ${activeTab === 'toolstrackerpendingitems' ? 'active' : ''}`}
-          onClick={() => setActiveTab('toolstrackerpendingitems')}
-        >
+        <h2 className={`link ${activeTab === 'toolstrackerpendingitems' ? 'active' : ''}`} onClick={() => setActiveTab('toolstrackerpendingitems')}>
           Pending Items
         </h2>
-        <h2
-          className={`link ${activeTab === 'toolstrackerdatabase' ? 'active' : ''}`}
-          onClick={() => setActiveTab('toolstrackerdatabase')}
-        >
+        <h2 className={`link ${activeTab === 'toolstrackerdatabase' ? 'active' : ''}`} onClick={() => setActiveTab('toolstrackerdatabase')}>
           Database
         </h2>
-        <h2
-          className={`link ${activeTab === 'toolstrackeraddinput' ? 'active' : ''}`}
-          onClick={() => setActiveTab('toolstrackeraddinput')}
-        >
+        <h2 className={`link ${activeTab === 'toolstrackeraddinput' ? 'active' : ''}`} onClick={() => setActiveTab('toolstrackeraddinput')}>
           Add Input
         </h2>
-        <h2
-          className={`link ${activeTab === 'toolstrackernetstock' ? 'active' : ''}`}
-          onClick={() => setActiveTab('toolstrackernetstock')}
-        >
+        <h2 className={`link ${activeTab === 'toolstrackernetstock' ? 'active' : ''}`} onClick={() => setActiveTab('toolstrackernetstock')}>
           Net Stock
         </h2>
-        <h2
-          className={`link ${activeTab === 'toolstrackertoolhistory' ? 'active' : ''}`}
-          onClick={() => setActiveTab('toolstrackertoolhistory')}
-        >
+        <h2 className={`link ${activeTab === 'toolstrackertoolhistory' ? 'active' : ''}`} onClick={() => setActiveTab('toolstrackertoolhistory')}>
           Tool History
         </h2>
-        <h2
-          className={`link ${activeTab === 'toolstrackerservicehistory' ? 'active' : ''}`}
-          onClick={() => setActiveTab('toolstrackerservicehistory')}
-        >
+        <h2 className={`link ${activeTab === 'toolstrackerservicehistory' ? 'active' : ''}`} onClick={() => setActiveTab('toolstrackerservicehistory')}>
           Service History
         </h2>
       </div>
-
       {/* Dynamic Content Area */}
       <div className="content px-4">
         {renderContent()}
@@ -127,5 +96,4 @@ const ToolsTrackerHeading = ({ username, userRoles = [] }) => {
     </div>
   )
 }
-
 export default ToolsTrackerHeading

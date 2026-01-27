@@ -146,22 +146,14 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
         return null;
     }
   };
-
   if (!isOpen) return null;
-
   return (
     <>
       {/* Overlay */}
-      <div 
-        className="fixed inset-0 bg-black bg-opacity-50 z-[55]"
-        onClick={onClose}
-      />
-      
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-[55]" onClick={onClose} />
       {/* Sidebar */}
-      <div 
-        className="fixed h-full w-[280px] bg-white z-[60] shadow-lg overflow-y-auto left-0 top-0"
-        style={{ fontFamily: "'Manrope', sans-serif" }}
-        onClick={(e) => e.stopPropagation()}
+      <div className="fixed h-full w-[280px] bg-white z-[60] shadow-lg overflow-y-auto left-0 top-0"
+        style={{ fontFamily: "'Manrope', sans-serif" }} onClick={(e) => e.stopPropagation()}
       >
         <div className="flex flex-col h-full">
           {/* Sidebar Header */}
@@ -170,16 +162,12 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
                 <img src={logo} alt="logo" className="w-8 h-8" />
               <span className="font-semibold text-lg text-black">BUILDERS</span>
             </div>
-            <button 
-              onClick={onClose}
-              className="w-6 h-6 flex items-center justify-center"
-            >
+            <button onClick={onClose} className="w-6 h-6 flex items-center justify-center">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
           </div>
-
           {/* Menu Items */}
           <div className="flex-1 py-4">
             {menuItems.map((item) => (
@@ -241,7 +229,6 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
               </div>
             ))}
           </div>
-
           {/* Footer - Last Updated */}
           <div className="p-4 border-t border-gray-200">
             <p className="text-xs text-gray-600">
@@ -253,6 +240,4 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
     </>
   );
 };
-
 export default Sidebar;
-

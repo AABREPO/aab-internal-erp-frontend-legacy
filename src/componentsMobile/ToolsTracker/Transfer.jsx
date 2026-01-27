@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import SearchableDropdown from '../PurchaseOrder/SearchableDropdown';
 
-const Entry = ({ user }) => {
+const Transfer = ({ user }) => {
   const [entryNo, setEntryNo] = useState(0);
   const [date, setDate] = useState(() => {
     const today = new Date();
@@ -12,17 +12,25 @@ const Entry = ({ user }) => {
   });
   const [selectedFrom, setSelectedFrom] = useState(null);
   const [selectedTo, setSelectedTo] = useState(null);
+  const [selectedServiceStore, setSelectedServiceStore] = useState(null);
   const [selectedIncharge, setSelectedIncharge] = useState(null);
   const [items, setItems] = useState([]);
   const [fromOptions, setFromOptions] = useState([]);
   const [toOptions, setToOptions] = useState([]);
+  const [serviceStoreOptions, setServiceStoreOptions] = useState([]);
   const [inchargeOptions, setInchargeOptions] = useState([]);
   const [showFromDropdown, setShowFromDropdown] = useState(false);
   const [showToDropdown, setShowToDropdown] = useState(false);
+  const [showServiceStoreDropdown, setShowServiceStoreDropdown] = useState(false);
   const [showInchargeDropdown, setShowInchargeDropdown] = useState(false);
   const [toSearchQuery, setToSearchQuery] = useState('');
   const [toFavorites, setToFavorites] = useState(() => {
     const saved = localStorage.getItem('favoriteToSites');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [serviceStoreSearchQuery, setServiceStoreSearchQuery] = useState('');
+  const [serviceStoreFavorites, setServiceStoreFavorites] = useState(() => {
+    const saved = localStorage.getItem('favoriteServiceStores');
     return saved ? JSON.parse(saved) : [];
   });
   const [fromSearchQuery, setFromSearchQuery] = useState('');
@@ -35,6 +43,7 @@ const Entry = ({ user }) => {
     const saved = localStorage.getItem('favoriteIncharges');
     return saved ? JSON.parse(saved) : [];
   });
+  const [entryServiceMode, setEntryServiceMode] = useState('Entry');
   const [showAddItemsModal, setShowAddItemsModal] = useState(false);
   const [itemNameOptions, setItemNameOptions] = useState([]);
   const [brandOptions, setBrandOptions] = useState([]);
@@ -47,7 +56,6 @@ const Entry = ({ user }) => {
     itemId: '',
     quantity: ''
   });
-
   // Fetch sites/projects for From and To dropdowns
   useEffect(() => {
     const fetchSites = async () => {
@@ -77,7 +85,39 @@ const Entry = ({ user }) => {
     };
     fetchSites();
   }, []);
-
+  // Fetch vendors for Service Store dropdown (only those with makeAsServiceShop === true)
+  useEffect(() => {
+    const fetchServiceStoreVendors = async () => {
+      try {
+        const response = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll', {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          console.log('All vendor data:', data);
+          // Filter only vendors with makeAsServiceShop === true
+          const serviceStoreVendors = data
+            .filter(vendor => vendor.makeAsServiceShop === true)
+            .map(vendor => ({
+              value: vendor.vendorName,
+              label: vendor.vendorName,
+              id: vendor.id,
+            }));
+          console.log('Service store vendors:', serviceStoreVendors);
+          setServiceStoreOptions(serviceStoreVendors);
+        } else {
+          console.log('Error fetching service store vendors.');
+        }
+      } catch (error) {
+        console.error('Error fetching service store vendors:', error);
+      }
+    };
+    fetchServiceStoreVendors();
+  }, []);
   // Fetch site incharge
   useEffect(() => {
     const fetchSiteIncharge = async () => {
@@ -101,7 +141,6 @@ const Entry = ({ user }) => {
     };
     fetchSiteIncharge();
   }, []);
-
   // Fetch entry number
   useEffect(() => {
     const fetchEntryNo = async () => {
@@ -117,13 +156,13 @@ const Entry = ({ user }) => {
     };
     fetchEntryNo();
   }, []);
-
-  // Note: Modal backdrop clicks are handled within each modal component
-
   // Reset search when dropdowns close
   useEffect(() => {
     if (!showToDropdown) {
       setToSearchQuery('');
+    }
+    if (!showServiceStoreDropdown) {
+      setServiceStoreSearchQuery('');
     }
     if (!showFromDropdown) {
       setFromSearchQuery('');
@@ -131,8 +170,7 @@ const Entry = ({ user }) => {
     if (!showInchargeDropdown) {
       setInchargeSearchQuery('');
     }
-  }, [showToDropdown, showFromDropdown, showInchargeDropdown]);
-
+  }, [showToDropdown, showServiceStoreDropdown, showFromDropdown, showInchargeDropdown]);
   // Normalize search text for flexible matching
   const normalizeSearchText = (text) => {
     if (!text) return '';
@@ -142,7 +180,6 @@ const Entry = ({ user }) => {
       .replace(/\s+/g, ' ')
       .trim();
   };
-
   // Filter and sort To options
   const getFilteredToOptions = () => {
     const normalizedQuery = normalizeSearchText(toSearchQuery);
@@ -150,7 +187,6 @@ const Entry = ({ user }) => {
       const normalizedLabel = normalizeSearchText(option.label);
       return normalizedLabel.includes(normalizedQuery);
     });
-
     // Sort: favorites first, then alphabetically
     return filtered.sort((a, b) => {
       const aIsFavorite = toFavorites.includes(a.id);
@@ -160,7 +196,6 @@ const Entry = ({ user }) => {
       return a.label.localeCompare(b.label);
     });
   };
-
   // Handle toggle favorite for To options
   const handleToggleToFavorite = (e, optionId) => {
     e.stopPropagation();
@@ -170,7 +205,6 @@ const Entry = ({ user }) => {
     setToFavorites(newFavorites);
     localStorage.setItem('favoriteToSites', JSON.stringify(newFavorites));
   };
-
   // Filter and sort From options
   const getFilteredFromOptions = () => {
     const normalizedQuery = normalizeSearchText(fromSearchQuery);
@@ -178,7 +212,6 @@ const Entry = ({ user }) => {
       const normalizedLabel = normalizeSearchText(option.label);
       return normalizedLabel.includes(normalizedQuery);
     });
-
     // Sort: favorites first, then alphabetically
     return filtered.sort((a, b) => {
       const aIsFavorite = fromFavorites.includes(a.id);
@@ -188,7 +221,6 @@ const Entry = ({ user }) => {
       return a.label.localeCompare(b.label);
     });
   };
-
   // Handle toggle favorite for From options
   const handleToggleFromFavorite = (e, optionId) => {
     e.stopPropagation();
@@ -198,7 +230,6 @@ const Entry = ({ user }) => {
     setFromFavorites(newFavorites);
     localStorage.setItem('favoriteFromSites', JSON.stringify(newFavorites));
   };
-
   // Filter and sort Incharge options
   const getFilteredInchargeOptions = () => {
     const normalizedQuery = normalizeSearchText(inchargeSearchQuery);
@@ -206,7 +237,6 @@ const Entry = ({ user }) => {
       const normalizedLabel = normalizeSearchText(option.label);
       return normalizedLabel.includes(normalizedQuery);
     });
-
     // Sort: favorites first, then alphabetically
     return filtered.sort((a, b) => {
       const aIsFavorite = inchargeFavorites.includes(a.id);
@@ -216,7 +246,6 @@ const Entry = ({ user }) => {
       return a.label.localeCompare(b.label);
     });
   };
-
   // Handle toggle favorite for Incharge options
   const handleToggleInchargeFavorite = (e, optionId) => {
     e.stopPropagation();
@@ -226,15 +255,39 @@ const Entry = ({ user }) => {
     setInchargeFavorites(newFavorites);
     localStorage.setItem('favoriteIncharges', JSON.stringify(newFavorites));
   };
-
+  // Filter and sort Service Store options
+  const getFilteredServiceStoreOptions = () => {
+    const normalizedQuery = normalizeSearchText(serviceStoreSearchQuery);
+    const filtered = serviceStoreOptions.filter(option => {
+      const normalizedLabel = normalizeSearchText(option.label);
+      return normalizedLabel.includes(normalizedQuery);
+    });
+    // Sort: favorites first, then alphabetically
+    return filtered.sort((a, b) => {
+      const aIsFavorite = serviceStoreFavorites.includes(a.id);
+      const bIsFavorite = serviceStoreFavorites.includes(b.id);
+      if (aIsFavorite && !bIsFavorite) return -1;
+      if (!aIsFavorite && bIsFavorite) return 1;
+      return a.label.localeCompare(b.label);
+    });
+  };
+  // Handle toggle favorite for Service Store options
+  const handleToggleServiceStoreFavorite = (e, optionId) => {
+    e.stopPropagation();
+    const newFavorites = serviceStoreFavorites.includes(optionId)
+      ? serviceStoreFavorites.filter(id => id !== optionId)
+      : [...serviceStoreFavorites, optionId];
+    setServiceStoreFavorites(newFavorites);
+    localStorage.setItem('favoriteServiceStores', JSON.stringify(newFavorites));
+  };
   const formatDate = (dateString) => {
     const [day, month, year] = dateString.split('/');
     return `${day}/${month}/${year}`;
   };
-
-  // Check if all three fields are filled
-  const areFieldsFilled = selectedFrom && selectedTo && selectedIncharge;
-
+  // Check if all required fields are filled based on mode
+  const areFieldsFilled = entryServiceMode === 'Entry' 
+    ? (selectedFrom && selectedTo && selectedIncharge)
+    : (selectedFrom && selectedServiceStore && selectedIncharge);
   // Fetch categories
   useEffect(() => {
     const fetchCategories = async () => {
@@ -260,7 +313,6 @@ const Entry = ({ user }) => {
     };
     fetchCategories();
   }, []);
-
   // Fetch item names
   useEffect(() => {
     const fetchItemNames = async () => {
@@ -287,7 +339,6 @@ const Entry = ({ user }) => {
       fetchItemNames();
     }
   }, [selectedCategory]);
-
   // Fetch brands
   useEffect(() => {
     const fetchBrands = async () => {
@@ -315,7 +366,6 @@ const Entry = ({ user }) => {
       fetchBrands();
     }
   }, [selectedCategory]);
-
   // Fetch item IDs when item name or brand is selected
   useEffect(() => {
     if (addItemFormData.itemName || addItemFormData.brand) {
@@ -331,13 +381,11 @@ const Entry = ({ user }) => {
       setItemIdOptions([]);
     }
   }, [addItemFormData.itemName, addItemFormData.brand]);
-
   const handleAddItem = () => {
     if (areFieldsFilled) {
       setShowAddItemsModal(true);
     }
   };
-
   const handleCloseAddItemsModal = () => {
     setShowAddItemsModal(false);
     setAddItemFormData({
@@ -347,7 +395,6 @@ const Entry = ({ user }) => {
       quantity: ''
     });
   };
-
   const handleAddItemSubmit = () => {
     if (addItemFormData.itemName && addItemFormData.brand && addItemFormData.itemId && addItemFormData.quantity) {
       const newItem = {
@@ -358,21 +405,44 @@ const Entry = ({ user }) => {
       handleCloseAddItemsModal();
     }
   };
-
   const handleFieldChange = (field, value) => {
     setAddItemFormData(prev => ({
       ...prev,
       [field]: value
     }));
   };
-
   return (
-    <div className="flex flex-col min-h-[calc(100vh-90px-80px)] bg-white">
+    <div className="flex flex-col min-h-[calc(100vh-90px-80px)] bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* Entry Number and Date */}
       <div className="flex-shrink-0 px-4 pt-2 pb-1">
         <p className="text-[12px] font-medium text-black leading-normal">
-          #{entryNo} {date}
+          #NO {date}
         </p>
+      </div>
+      {/* Entry/Service Segmented Control */}
+      <div className="flex-shrink-0 px-4 pt-4 pb-3">
+        <div className="flex bg-[#E0E0E0] items-center h-[36px] rounded-[8px] p-1">
+          <button
+            onClick={() => setEntryServiceMode('Entry')}
+            className={`flex-1 h-full rounded-[6px] text-[12px] font-semibold leading-normal transition-colors ${
+              entryServiceMode === 'Entry'
+                ? 'bg-white text-black'
+                : 'bg-transparent text-[#848484]'
+            }`}
+          >
+            Entry
+          </button>
+          <button
+            onClick={() => setEntryServiceMode('Service')}
+            className={`flex-1 h-full rounded-[6px] text-[12px] font-semibold leading-normal transition-colors ${
+              entryServiceMode === 'Service'
+                ? 'bg-white text-black'
+                : 'bg-transparent text-[#848484]'
+            }`}
+          >
+            Service
+          </button>
+        </div>
       </div>
 
       {/* Input Fields */}
@@ -556,49 +626,97 @@ const Entry = ({ user }) => {
           </div>
         )}
 
-        {/* To Field */}
-        <div className="mb-4 relative dropdown-container">
-          <p className="text-[12px] font-semibold text-black leading-normal mb-1">
-            To<span className="text-[#eb2f8e]">*</span>
-          </p>
-          <div className="relative">
-            <div
-              onClick={() => {
-                setShowToDropdown(!showToDropdown);
-                setShowFromDropdown(false);
-                setShowInchargeDropdown(false);
-              }}
-              className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
-              style={{
-                color: selectedTo ? '#000' : '#9E9E9E',
-                boxSizing: 'border-box',
-                paddingRight: selectedTo ? '40px' : '40px'
-              }}
-            >
-              {selectedTo ? selectedTo.label : 'Select'}
-            </div>
-            {selectedTo && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedTo(null);
+        {/* To Field - Only show in Entry mode */}
+        {entryServiceMode === 'Entry' && (
+          <div className="mb-4 relative dropdown-container">
+            <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+              To<span className="text-[#eb2f8e]">*</span>
+            </p>
+            <div className="relative">
+              <div
+                onClick={() => {
+                  setShowToDropdown(!showToDropdown);
+                  setShowFromDropdown(false);
+                  setShowServiceStoreDropdown(false);
+                  setShowInchargeDropdown(false);
                 }}
-                className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                style={{
+                  color: selectedTo ? '#000' : '#9E9E9E',
+                  boxSizing: 'border-box',
+                  paddingRight: selectedTo ? '40px' : '40px'
+                }}
               >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                {selectedTo ? selectedTo.label : 'Select'}
+              </div>
+              {selectedTo && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedTo(null);
+                  }}
+                  className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              )}
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-              </button>
-            )}
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-              <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
+        {/* Service Store Field - Only show in Service mode */}
+        {entryServiceMode === 'Service' && (
+          <div className="mb-4 relative dropdown-container">
+            <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+              Service Store<span className="text-[#eb2f8e]">*</span>
+            </p>
+            <div className="relative">
+              <div
+                onClick={() => {
+                  setShowServiceStoreDropdown(!showServiceStoreDropdown);
+                  setShowFromDropdown(false);
+                  setShowToDropdown(false);
+                  setShowInchargeDropdown(false);
+                }}
+                className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                style={{
+                  color: selectedServiceStore ? '#000' : '#9E9E9E',
+                  boxSizing: 'border-box',
+                  paddingRight: selectedServiceStore ? '40px' : '40px'
+                }}
+              >
+                {selectedServiceStore ? selectedServiceStore.label : 'Select'}
+              </div>
+              {selectedServiceStore && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedServiceStore(null);
+                  }}
+                  className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              )}
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        )}
         {/* To Field Modal */}
         {showToDropdown && (
           <div 
@@ -734,6 +852,143 @@ const Entry = ({ user }) => {
             </div>
           </div>
         )}
+
+        {/* Service Store Field Modal */}
+        {showServiceStoreDropdown && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowServiceStoreDropdown(false);
+              }
+            }}
+            style={{ fontFamily: "'Manrope', sans-serif" }}
+          >
+            <div 
+              className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[60vh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex justify-between items-center px-6 pt-5">
+                <p className="text-[16px] font-semibold text-black">Select Service Store</p>
+                <button 
+                  onClick={() => setShowServiceStoreDropdown(false)} 
+                  className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity"
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Search Bar */}
+              <div className="px-6 pt-4 pb-4">
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={serviceStoreSearchQuery}
+                    onChange={(e) => setServiceStoreSearchQuery(e.target.value)}
+                    placeholder="Search"
+                    className="w-full h-[32px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                    autoFocus
+                  />
+                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="6.5" cy="6.5" r="5.5" stroke="#747474" strokeWidth="1.5" />
+                      <path d="M9.5 9.5L12 12" stroke="#747474" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* Options List */}
+              <div className="flex-1 overflow-y-auto mb-4 px-6">
+                <div className="shadow-md rounded-lg overflow-hidden">
+                  {/* Create New Option - Show when typing something that doesn't exist */}
+                  {serviceStoreSearchQuery.trim() && !serviceStoreOptions.some(opt => {
+                    const normalizedOpt = normalizeSearchText(opt.label);
+                    const normalizedQuery = normalizeSearchText(serviceStoreSearchQuery.trim());
+                    return normalizedOpt === normalizedQuery;
+                  }) && (
+                    <button
+                      onClick={() => {
+                        // Handle new item creation - you can add your logic here
+                        console.log('Create new item:', serviceStoreSearchQuery);
+                      }}
+                      className="w-full h-[36px] px-6 flex items-center bg-gray-100 gap-2 hover:bg-[#F5F5F5] transition-colors"
+                    >
+                      <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M7 3V11M3 7H11" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
+                        </svg>
+                      </div>
+                      <p className="text-[14px] text-gray-600 font-normal text-left truncate">"{serviceStoreSearchQuery.trim()}"</p>
+                    </button>
+                  )}
+                  {getFilteredServiceStoreOptions().length > 0 ? (
+                    <div className="space-y-0">
+                      {getFilteredServiceStoreOptions().map((option) => {
+                        const isFavorite = serviceStoreFavorites.includes(option.id);
+                        const isSelected = selectedServiceStore?.id === option.id;
+                        
+                        return (
+                          <button
+                            key={option.id}
+                            onClick={() => {
+                              setSelectedServiceStore(option);
+                              setShowServiceStoreDropdown(false);
+                            }}
+                            className={`w-full h-[40px] px-6 flex items-center justify-between transition-colors ${
+                              isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                            }`}
+                          >
+                            {/* Left: Star Icon and Option Text */}
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <button
+                                onClick={(e) => handleToggleServiceStoreFavorite(e, option.id)}
+                                className="w-6 h-6 flex items-center justify-center flex-shrink-0"
+                              >
+                                {isFavorite ? (
+                                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                ) : (
+                                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                )}
+                              </button>
+                              <p className="text-[14px] font-medium text-black text-left truncate">{option.label}</p>
+                            </div>
+
+                            {/* Right: Radio Button */}
+                            <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 ml-3">
+                              {isSelected ? (
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <circle cx="10" cy="10" r="9" stroke="#e4572e" strokeWidth="2" fill="none"/>
+                                  <circle cx="10" cy="10" r="4" fill="#e4572e"/>
+                                </svg>
+                              ) : (
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <circle cx="10" cy="10" r="9" stroke="#9E9E9E" strokeWidth="1.5" fill="none"/>
+                                </svg>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-4">
+                      <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
+                        {serviceStoreSearchQuery ? 'No options found' : 'No options available'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Project Incharge Field */}
         <div className="mb-4 relative dropdown-container">
           <p className="text-[12px] font-semibold text-black leading-normal mb-1">
@@ -745,6 +1000,7 @@ const Entry = ({ user }) => {
                 setShowInchargeDropdown(!showInchargeDropdown);
                 setShowFromDropdown(false);
                 setShowToDropdown(false);
+                setShowServiceStoreDropdown(false);
               }}
               className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
               style={{
@@ -907,7 +1163,7 @@ const Entry = ({ user }) => {
               <span className="text-[10px] font-medium text-black">{items.length}</span>
             </div>
           </div>
-          {areFieldsFilled && (
+          {entryServiceMode === 'Service' && areFieldsFilled && (
             <div className="cursor-pointer" onClick={() => {/* Handle search */}}>
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="7" cy="7" r="5.5" stroke="#000" strokeWidth="1.5" />
@@ -917,18 +1173,15 @@ const Entry = ({ user }) => {
           )}
         </div>
       </div>
-      {/* Floating Action Button - Changes to black when fields are filled */}
+
+      {/* Floating Action Button - Light Gray */}
       <div 
-        className={`fixed bottom-[110px] right-[24px] lg:right-[calc(50%-164px)] z-30 ${
-          areFieldsFilled ? 'cursor-pointer' : 'cursor-not-allowed pointer-events-none opacity-50'
-        }`} 
-        onClick={areFieldsFilled ? handleAddItem : undefined}
+        className="fixed bottom-[110px] right-[24px] lg:right-[calc(50%-164px)] z-30 cursor-pointer"
+        onClick={handleAddItem}
       >
-        <div className={`w-[48px] h-[43px] rounded-full flex items-center justify-center ${
-          areFieldsFilled ? 'bg-black' : 'bg-[#E0E0E0]'
-        }`}>
+        <div className="w-[48px] h-[43px] rounded-full flex items-center justify-center bg-[#E0E0E0]">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 5V19M5 12H19" stroke={areFieldsFilled ? "#fff" : "#000"} strokeWidth="2" strokeLinecap="round" />
+            <path d="M12 5V19M5 12H19" stroke="#000" strokeWidth="2" strokeLinecap="round" />
           </svg>
         </div>
       </div>
@@ -1050,4 +1303,4 @@ const Entry = ({ user }) => {
   );
 };
 
-export default Entry;
+export default Transfer;

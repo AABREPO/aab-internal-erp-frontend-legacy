@@ -278,24 +278,15 @@ const AddInput = () => {
   // Update stocking location status when locators are selected/deselected
   const updateStockingLocationStatus = async (newSelectedLocators) => {
     try {
-      console.log('updateStockingLocationStatus called with:', newSelectedLocators);
-      console.log('previousSelectedLocators:', previousSelectedLocators);
-      console.log('outgoingSiteOptions:', outgoingSiteOptions);
-
       // Process all sites - update based on whether they're in the new selection
       const updatePromises = [];
-
       for (const site of outgoingSiteOptions) {
         if (site.id && site.value) {
           const shouldBeSelected = newSelectedLocators.includes(site.value);
           const wasSelected = previousSelectedLocators.includes(site.value);
-
           // Only update if the status needs to change
           if (shouldBeSelected !== wasSelected) {
             const url = `https://backendaab.in/aabuilderDash/api/project_Names/${site.id}/stocking-location?markedAsStockingLocation=${shouldBeSelected}`;
-            console.log(`Updating site ${site.value} (id: ${site.id}): ${shouldBeSelected ? 'true' : 'false'}`);
-            console.log(`Sending PUT request to: ${url}`);
-
             const updatePromise = fetch(url, {
               method: 'PUT',
               credentials: 'include',
@@ -305,7 +296,6 @@ const AddInput = () => {
             })
               .then(response => {
                 if (response.ok) {
-                  console.log(`✓ Successfully updated site ${site.id} (${site.value}): ${shouldBeSelected}`);
                   return { success: true, siteId: site.id, siteName: site.value };
                 } else {
                   console.error(`✗ Failed to update site ${site.id}: ${response.status} ${response.statusText}`);
@@ -316,45 +306,36 @@ const AddInput = () => {
                 console.error(`✗ Error updating site ${site.id}:`, error);
                 return { success: false, siteId: site.id, siteName: site.value, error: error.message };
               });
-
             updatePromises.push(updatePromise);
           } else {
             console.log(`Skipping site ${site.value} - no change needed (was: ${wasSelected}, should be: ${shouldBeSelected})`);
           }
         }
       }
-
       // Wait for all updates to complete
       await Promise.all(updatePromises);
-
       // Update previous selection for next comparison
       setPreviousSelectedLocators(newSelectedLocators);
-
       // Refresh site data to get updated markedAsStockingLocation values
       await refreshSiteData();
     } catch (error) {
       console.error('Error updating stocking location status:', error);
     }
   };
-
   const [selectedCategories, setSelectedCategories] = useState([]);
-
   // Category options from API (with IDs) and strings for dropdown
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [categoryOptionsStrings, setCategoryOptionsStrings] = useState([]);
-
   // State for fetched data (same as PurchaseOrder Input Data page)
   const [poItemName, setPoItemName] = useState([]);
   const [poModel, setPoModel] = useState([]);
   const [poBrand, setPoBrand] = useState([]);
   const [poType, setPoType] = useState([]);
-
   // Options for dropdowns (merged API + localStorage)
   const [itemNameOptions, setItemNameOptions] = useState([]);
   const [modelOptions, setModelOptions] = useState([]);
   const [brandOptions, setBrandOptions] = useState([]);
   const [typeOptions, setTypeOptions] = useState([]);
-
   // Fetch item names from API
   const fetchPoItemName = async () => {
     try {
@@ -368,11 +349,9 @@ const AddInput = () => {
         const extractedNames = data.map(item =>
           item.itemName || item.poItemName || item.name || item.item_name || ''
         ).filter(name => name !== '');
-
         // Merge with any previously saved item names from localStorage
         const savedItemNames = localStorage.getItem('itemNameOptions');
         const savedNames = savedItemNames ? JSON.parse(savedItemNames) : [];
-
         // Combine API names with saved names, removing duplicates
         const allNames = [...new Set([...extractedNames, ...savedNames])];
         setItemNameOptions(allNames);
@@ -1761,7 +1740,6 @@ const AddInput = () => {
         isOpen={showLocatorsModal}
         onClose={() => setShowLocatorsModal(false)}
         onSelect={async (values) => {
-          console.log('SelectLocatorsModal onSelect called with values:', values);
           setSelectedLocators(values);
           await updateStockingLocationStatus(values);
           // Don't close modal immediately - let user continue selecting

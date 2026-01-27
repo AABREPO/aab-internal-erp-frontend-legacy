@@ -24,7 +24,6 @@ import editIcon from '../Images/edit.png';
 // Module-level cache that persists across component remounts
 const siteEngineersCache = { data: null };
 const supportStaffCache = { data: null };
-
 const PurchaseOrder = ({ user, onLogout }) => {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -46,7 +45,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
   const [showInchargeModal, setShowInchargeModal] = useState(false);
   const [showSearchItemsModal, setShowSearchItemsModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(''); // Store selected category to persist across modal opens
-
   const getTodayDate = () => {
     const today = new Date();
     return today.toISOString().split("T")[0]; // YYYY-MM-DD (best for input[type="date"])
@@ -55,7 +53,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
     const d = new Date(date);
     return d.toLocaleDateString('en-GB'); // DD/MM/YYYY
   };
-
   const [poData, setPoData] = useState({
     poNumber: '',
     date: formatDate(getTodayDate()),   // current date by default
@@ -65,13 +62,10 @@ const PurchaseOrder = ({ user, onLogout }) => {
     contact: '',
     created_by: '', // For PDF footer
   });
-
-
   // State to track selected vendor, site, and incharge with IDs
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [selectedSite, setSelectedSite] = useState(null);
   const [selectedIncharge, setSelectedIncharge] = useState(null); // { id, name, mobileNumber, type: 'employee' | 'support staff' }
-
   const [items, setItems] = useState([]);
   const [hasOpenedAdd, setHasOpenedAdd] = useState(false); // track if + page has been opened
   const [isEditMode, setIsEditMode] = useState(false); // track if in edit mode
@@ -86,16 +80,12 @@ const PurchaseOrder = ({ user, onLogout }) => {
   const [isPdfGenerated, setIsPdfGenerated] = useState(false); // track if PDF has been generated
   const [pdfBlob, setPdfBlob] = useState(null); // store generated PDF blob
   const [isGenerating, setIsGenerating] = useState(false); // track if PO is being generated
-
   // State for vendor name options from API
   const [vendorNameOptions, setVendorNameOptions] = useState([]);
-
   // State for project name options from API
   const [siteOptions, setSiteOptions] = useState([]);
-
   // Cache for quick employee lookups by ID (prevents repeated network calls when opening multiple POs)
-  const quickEmployeeCacheRef = useRef(new Map());
-  
+  const quickEmployeeCacheRef = useRef(new Map());  
   // State for employee list options from API - initialize from module-level cache immediately
   const [employeeList, setEmployeeList] = useState(() => {
     return siteEngineersCache.data || [];
@@ -112,17 +102,13 @@ const PurchaseOrder = ({ user, onLogout }) => {
   // State for tile data (for TILE category with category_id = 10)
   const [tileData, setTileData] = useState([]);
   const [tileSizeData, setTileSizeData] = useState([]);
-
   // Check if we're in empty/home state
   const isEmptyState = !poData.vendorName && !poData.projectName && !poData.projectIncharge && items.length === 0 && !isEditMode;
-
   // Check if all required fields are filled (for enabling AddButton)
   const areFieldsFilled = poData.vendorName && poData.projectName && poData.projectIncharge;
-
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
-
   // Helper function to find name by ID from API data
   const findNameById = (dataArray, id, fieldName) => {
     if (!id || !dataArray || !Array.isArray(dataArray)) return '';
@@ -134,29 +120,23 @@ const PurchaseOrder = ({ user, onLogout }) => {
     });
     return found ? (found[fieldName] || found.name || '') : '';
   };
-
   // Update ref when expandedItemId changes
   useEffect(() => {
     expandedItemIdRef.current = expandedItemId;
   }, [expandedItemId]);
-
   // Global mouse handlers for desktop support (like History.jsx)
   useEffect(() => {
     if (items.length === 0) return;
-
     const minSwipeDistance = 50;
     const globalMouseMoveHandler = (e) => {
       setSwipeStates(prev => {
         let hasChanges = false;
         const newState = { ...prev };
-
         items.forEach(item => {
           const state = prev[item.id];
           if (!state) return;
-
           const deltaX = e.clientX - state.startX;
           const isExpanded = expandedItemIdRef.current === item.id;
-
           // Only update if dragging horizontally
           if (deltaX < 0 || (isExpanded && deltaX > 0)) {
             newState[item.id] = {
@@ -167,23 +147,18 @@ const PurchaseOrder = ({ user, onLogout }) => {
             hasChanges = true;
           }
         });
-
         return hasChanges ? newState : prev;
       });
     };
-
     const globalMouseUpHandler = () => {
       setSwipeStates(prev => {
         let hasChanges = false;
         const newState = { ...prev };
-
         items.forEach(item => {
           const state = prev[item.id];
           if (!state) return;
-
           const deltaX = state.currentX - state.startX;
           const absDeltaX = Math.abs(deltaX);
-
           if (absDeltaX >= minSwipeDistance) {
             if (deltaX < 0) {
               // Swiped left (reveal buttons)
@@ -198,29 +173,23 @@ const PurchaseOrder = ({ user, onLogout }) => {
               setExpandedItemId(null);
             }
           }
-
           // Remove swipe state for this card
           delete newState[item.id];
           hasChanges = true;
         });
-
         return hasChanges ? newState : prev;
       });
     };
-
     // Add global mouse event listeners
     document.addEventListener('mousemove', globalMouseMoveHandler);
     document.addEventListener('mouseup', globalMouseUpHandler);
-
     return () => {
       document.removeEventListener('mousemove', globalMouseMoveHandler);
       document.removeEventListener('mouseup', globalMouseUpHandler);
     };
   }, [items]);
-
   // Normalize string for case/space-insensitive comparison
   const normalize = (value) => (value || '').toString().trim().toLowerCase();
-
   // Resolve category id from a category name/value using current options
   const resolveCategoryId = (categoryName) => {
     if (!categoryName || !categoryOptions || !categoryOptions.length) return null;
@@ -234,10 +203,8 @@ const PurchaseOrder = ({ user, onLogout }) => {
     });
     return found ? (found.id || found._id || null) : null;
   };
-
   // Ref to track if we're currently loading from editPO event (prevents clearing items when effect re-runs)
-  const isLoadingFromEventRef = useRef(false);
-  
+  const isLoadingFromEventRef = useRef(false);  
   // Listen for editPO event from History component
   useEffect(() => {
     const handleEditPO = (event) => {
@@ -250,8 +217,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
         setSelectedIncharge(null);
         setHasOpenedAdd(false);
         setIsPdfGenerated(false);
-        setPdfBlob(null);
-        
+        setPdfBlob(null);        
         // Restore selected vendor quickly (prefer ID from history/clone; avoids waiting for vendorNameOptions getAll)
         const vendorId = po.vendor_id || po.vendorId || null;
         if (vendorId) {
@@ -332,7 +298,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
           originalSiteInchargeMobileNumber: po.site_incharge_mobile_number || po.contact || null,
           originalSiteInchargeType: po.site_incharge_type || po.siteInchargeType || null,
         });
-
         // Restore selected site (client) quickly (prefer ID from history/clone; avoids waiting for siteOptions getAll)
         const clientId = po.client_id || po.clientId || null;
         if (clientId) {
@@ -344,11 +309,9 @@ const PurchaseOrder = ({ user, onLogout }) => {
             setSelectedSite({ id: siteByName.id, name: siteByName.value });
           }
         }
-
         // Restore selected incharge if we have its ID - check both employee and support staff
         const inchargeId = po.site_incharge_id || po.siteInchargeId || null;
         const inchargeType = po.site_incharge_type || po.siteInchargeType || null;
-
         if (inchargeId) {
           let inchargeFound = false;
           if (inchargeType === 'support staff' || inchargeType === 'support_staff') {
@@ -380,7 +343,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
               }
             }
           }
-
           // If not found yet (because lists haven't loaded), fetch quickly by ID (employee)
           if (!inchargeFound && (!inchargeType || inchargeType === 'employee')) {
             (async () => {
@@ -449,16 +411,12 @@ const PurchaseOrder = ({ user, onLogout }) => {
             }
           }
         }
-
         // Ensure items have proper id field and all required fields for ItemCard component
         const itemsWithIds = (po.items || []).map((item, index) => {
-          console.log('Processing item from history:', item);
-
           // Extract item name - PREFER prefetched itemName over name field (which might be just ID)
           // Prefer explicit item_id / itemId over generic id (which might be purchaseTable row id)
           const rawItemId = item.itemId || item.item_id || null;
           let itemId = rawItemId || item.id || null;
-          
           // Prefer prefetched itemName first (from clone operation), then fall back to name
           let itemName = item.itemName || '';
           // If itemName is empty, check name field, but validate it's not just the ID
@@ -470,11 +428,9 @@ const PurchaseOrder = ({ user, onLogout }) => {
             } else {
               itemName = nameStr;
             }
-          }
-          
+          }          
           let category = item.categoryName || item.category || '';
           const existingCategoryId = item.categoryId || item.category_id || null;
-
           // If name includes comma, split it (format: "ItemName, Category")
           if (itemName && itemName.includes(',')) {
             const parts = itemName.split(',');
@@ -484,10 +440,8 @@ const PurchaseOrder = ({ user, onLogout }) => {
               category = parts[1].trim();
             }
           }
-
           // Check if this is TILE category (category_id = 10)
-          const isTileCategory = existingCategoryId === 10 || String(existingCategoryId) === '10';
-          
+          const isTileCategory = existingCategoryId === 10 || String(existingCategoryId) === '10';          
           // If name is still empty but we have itemId, look it up from appropriate API data
           // Only do this if arrays are loaded (don't block on empty arrays)
           if (!itemName && rawItemId) {
@@ -501,13 +455,11 @@ const PurchaseOrder = ({ user, onLogout }) => {
               itemName = findNameById(poItemName, rawItemId, 'itemName') ||
                 findNameById(poItemName, rawItemId, 'name') || '';
             }
-          }
-          
+          }          
           // Ensure itemId is set from rawItemId if available
           if (!itemId && rawItemId) {
             itemId = rawItemId;
-          }
-          
+          }          
           // Only try to find ID from name if we don't have itemId yet AND arrays are loaded
           if (!itemId && itemName) {
             if (isTileCategory && tileData && tileData.length > 0) {
@@ -526,7 +478,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
               itemId = foundItem ? (foundItem.id || foundItem._id) : null;
             }
           }
-
           // Look up category from categoryId if not already extracted (prefer prefetched categoryName)
           let resolvedCategoryId = existingCategoryId;
           if (!category && existingCategoryId && categoryOptions && categoryOptions.length > 0) {
@@ -552,10 +503,8 @@ const PurchaseOrder = ({ user, onLogout }) => {
           if (!resolvedCategoryId && existingCategoryId) {
             resolvedCategoryId = existingCategoryId;
           }
-
           // Reconstruct name with category (format: "ItemName, Category")
           const fullName = itemName ? `${itemName}, ${category}` : '';
-
           // Handle brand - PREFER prefetched brandName/brand fields first
           let brand = item.brandName || item.brand || '';
           let brandId = item.brandId || item.brand_id || null;
@@ -565,7 +514,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
               findNameById(poBrand, brandId, 'brandName') ||
               findNameById(poBrand, brandId, 'name') || '';
           }
-
           // Handle model - PREFER prefetched modelName/model fields first
           let model = item.modelName || item.model || '';
           let modelId = item.modelId || item.model_id || null;
@@ -584,7 +532,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
                 findNameById(poModel, modelId, 'name') || '';
             }
           }
-
           // Handle type - PREFER prefetched typeName/typeColor/type fields first
           let type = item.typeName || item.typeColor || item.type || '';
           let typeId = item.typeId || item.type_id || null;
@@ -607,13 +554,11 @@ const PurchaseOrder = ({ user, onLogout }) => {
           if (!typeId && (item.typeId || item.type_id)) {
             typeId = item.typeId || item.type_id;
           }
-
           // Handle price - calculate from amount if needed
           let price = item.price || 0;
           if (!price && item.amount && item.quantity) {
             price = item.amount / item.quantity;
           }
-
           const transformedItem = {
             ...item,
             id: `item-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
@@ -634,8 +579,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
           };
           return transformedItem;
         });
-        // Set items immediately - don't wait for arrays to load
-        console.log('Setting items from editPO:', itemsWithIds.length, 'items', itemsWithIds);
         // Ensure we have valid items before setting
         if (itemsWithIds && itemsWithIds.length > 0) {
           setItems(itemsWithIds);
@@ -649,8 +592,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
         // IMPORTANT: Reset previousVendorId for clone to ensure PO number generation triggers
         if (po.isClone) {
           previousVendorId.current = null;
-        }
-        
+        }        
         // Check if this is a clone operation - if so, don't set isEditFromHistory to show "Generate PO" instead of "Update PO"
         if (po.isClone) {
           setIsEditFromHistory(false); // Clone should show "Generate PO"
@@ -662,25 +604,21 @@ const PurchaseOrder = ({ user, onLogout }) => {
           // For edit, start with hasOpenedAdd = false so summary card shows initially (before + click)
           setHasOpenedAdd(false);
         }
-
         setIsPdfGenerated(false);
         setPdfBlob(null);
         // Switch to create tab
-        setActiveTab('create');
-        
+        setActiveTab('create');        
         // Reset flag after a short delay to allow state updates to complete
         setTimeout(() => {
           isLoadingFromEventRef.current = false;
         }, 100);
       }
     };
-
     window.addEventListener('editPO', handleEditPO);
     return () => {
       window.removeEventListener('editPO', handleEditPO);
     };
   }, [user, vendorNameOptions, siteOptions, employeeList, supportStaffList, poItemName, poBrand, poModel, poType, categoryOptions, tileData, tileSizeData]);
-
   // Listen for viewPO event from History component (view mode with PDF generation)
   useEffect(() => {
     const handleViewPO = (event) => {
@@ -688,11 +626,9 @@ const PurchaseOrder = ({ user, onLogout }) => {
       if (po) {
         // Treat view the same as edit/clone for data hydration, but keep view-only UI (Download)
         isLoadingFromEventRef.current = true;
-
         // Reset PDF state first to prevent showing wrong PDF data when switching between POs
         setIsPdfGenerated(false);
         setPdfBlob(null);
-
         // Restore selected vendor quickly (prefer ID from payload; avoids waiting for vendorNameOptions getAll)
         const vendorId = po.vendor_id || po.vendorId || null;
         if (vendorId) {
@@ -715,7 +651,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
             displayPoNumber = `#${parts[2]}`;
           }
         }
-
         // Load PO data into form
         setPoData({
           poNumber: displayPoNumber,
@@ -734,7 +669,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
           originalSiteInchargeMobileNumber: po.site_incharge_mobile_number || po.contact || null,
           originalSiteInchargeType: po.site_incharge_type || po.siteInchargeType || null,
         });
-
         // Restore selected site (client) quickly (prefer ID from payload)
         const clientId = po.client_id || po.clientId || null;
         if (clientId) {
@@ -743,11 +677,9 @@ const PurchaseOrder = ({ user, onLogout }) => {
           const siteByName = siteOptions.find(s => s.value === po.projectName);
           if (siteByName) setSelectedSite({ id: siteByName.id, name: siteByName.value });
         }
-
         // Restore selected incharge quickly (prefer ID; fallback to quick fetch)
         const inchargeId = po.site_incharge_id || po.siteInchargeId || null;
         const inchargeType = po.site_incharge_type || po.siteInchargeType || null;
-
         if (inchargeId) {
           let inchargeFound = false;
           if (inchargeType === 'support staff' || inchargeType === 'support_staff') {
@@ -779,7 +711,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
               }
             }
           }
-
           // If not found yet (lists not loaded), fetch quickly by ID (employee)
           if (!inchargeFound && (!inchargeType || inchargeType === 'employee')) {
             (async () => {
@@ -832,7 +763,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
           }
           // Check if this is TILE category (category_id = 10)
           const isTileCategory = existingCategoryId === 10 || String(existingCategoryId) === '10';
-          
           if (!itemName && rawItemId) {
             if (isTileCategory && tileData && tileData.length > 0) {
               // For TILE category, look up from tileData
@@ -862,7 +792,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
               itemId = foundItem ? (foundItem.id || foundItem._id) : null;
             }
           }
-
           let resolvedCategoryId = existingCategoryId;
           if (!category && existingCategoryId && categoryOptions && categoryOptions.length > 0) {
             const categoryOption = categoryOptions.find(cat => String(cat.id) === String(existingCategoryId));
@@ -878,9 +807,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
             });
             resolvedCategoryId = foundCategory ? (foundCategory.id || foundCategory._id) : null;
           }
-
           const fullName = itemName ? `${itemName}, ${category}` : '';
-
           let brand = item.brand || item.brandName || '';
           let brandId = item.brandId || item.brand_id || null;
           if (!brand && item.brandId && poBrand && poBrand.length > 0) {
@@ -888,7 +815,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
               findNameById(poBrand, item.brandId, 'brandName') ||
               findNameById(poBrand, item.brandId, 'name') || '';
           }
-
           let model = item.model || item.modelName || '';
           let modelId = item.modelId || item.model_id || null;
           if (!model && item.modelId) {
@@ -905,7 +831,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
                 findNameById(poModel, item.modelId, 'name') || '';
             }
           }
-
           let type = item.type || item.typeName || item.typeColor || '';
           let typeId = item.typeId || item.type_id || null;
           if (!type && item.typeId && poType && poType.length > 0) {
@@ -921,12 +846,10 @@ const PurchaseOrder = ({ user, onLogout }) => {
             });
             typeId = foundType ? (foundType.id || foundType._id) : null;
           }
-
           let price = item.price || 0;
           if (!price && item.amount && item.quantity) {
             price = item.amount / item.quantity;
           }
-
           return {
             ...item,
             id: `item-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
@@ -952,20 +875,17 @@ const PurchaseOrder = ({ user, onLogout }) => {
         setHasOpenedAdd(itemsWithIds.length > 0);
         // Switch to create tab
         setActiveTab('create');
-
         // Reset flag after a short delay to avoid other effects clearing state mid-load
         setTimeout(() => {
           isLoadingFromEventRef.current = false;
         }, 100);
       }
     };
-
     window.addEventListener('viewPO', handleViewPO);
     return () => {
       window.removeEventListener('viewPO', handleViewPO);
     };
   }, [user, vendorNameOptions, siteOptions, employeeList, supportStaffList, poItemName, poBrand, poModel, poType, categoryOptions, tileData, tileSizeData]);
-
   // Auto-generate PDF when in view-only mode and all required data is available
   useEffect(() => {
     const generateViewOnlyPDF = async () => {
@@ -979,7 +899,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
           fetchPoBrand(),
           fetchPoType()
         ]);
-
         // Construct payload for PDF generation
         const currentPoNo = poData.poNumber.replace('#', '').trim();
         const username = poData.created_by || (user && user.username) || '';
@@ -992,7 +911,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
           poData.originalSiteInchargeMobileNumber ||
           "";
         const siteInchargeTypeForPayload = selectedIncharge?.type || poData.originalSiteInchargeType || null;
-
         const payload = {
           vendor_id: selectedVendor.id,
           client_id: clientIdForPayload,
@@ -1006,7 +924,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
             const nameParts = item.name ? item.name.split(',') : [];
             const itemNameOnly = nameParts[0] ? nameParts[0].trim() : '';
             const categoryName = item.category || (nameParts[1] ? nameParts[1].trim() : '');
-
             return {
               item_id: item.itemId || null,
               category_id: item.categoryId || null,
@@ -1018,26 +935,22 @@ const PurchaseOrder = ({ user, onLogout }) => {
             };
           })
         };
-
         // Generate PDF without saving to API or auto-downloading (view-only mode)
         generatePDF(payload, true);
       }
     };
     generateViewOnlyPDF();
   }, [isViewOnlyFromHistory, isPdfGenerated, selectedVendor, selectedSite, selectedIncharge, items, poData, user]);
-
   // Save activeTab to localStorage whenever it changes
   useEffect(() => {
     if (activeTab) {
       localStorage.setItem('activeTab', activeTab);
     }
   }, [activeTab]);
-
   // Clear editingPO from localStorage on mount to ensure fresh start on page reload
   useEffect(() => {
     // Clear any editingPO from localStorage on page reload to start fresh
     localStorage.removeItem('editingPO');
-
     // Reset all state to ensure clean start on page reload
     setPoData({
       poNumber: '',
@@ -1064,7 +977,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
     previousVendorId.current = null; // Reset previous vendor ID tracking
     hasLoadedNetStockItems.current = false; // Reset to allow loading NetStock items
   }, []);
-
   // Get available items function - returns the actual API data structure
   // Uses the nested otherPOEntityList from the API instead of generating combinations
   const getAvailableItems = useCallback(() => {
@@ -1076,19 +988,16 @@ const PurchaseOrder = ({ user, onLogout }) => {
         useNestedStructure: true
       };
     }
-
     // Fallback to old format if API data not available
     const extractedItemNames = poItemName.map(item => item.itemName || item.name || '').filter(name => name !== '');
     const extractedBrands = poBrand.map(item => item.brand || item.name || '').filter(brand => brand !== '');
     const extractedModels = poModel.map(item => item.model || item.name || '').filter(model => model !== '');
     const extractedTypes = poType.map(item => item.typeColor || item.type || item.name || '').filter(type => type !== '');
     const category = categoryOptions.length > 0 ? categoryOptions[0].label : '';
-
     const fallbackItemNames = extractedItemNames.length > 0 ? extractedItemNames : JSON.parse(localStorage.getItem('itemNameOptions') || '[]');
     const fallbackBrands = extractedBrands.length > 0 ? extractedBrands : JSON.parse(localStorage.getItem('brandOptions') || '[]');
     const fallbackModels = extractedModels.length > 0 ? extractedModels : JSON.parse(localStorage.getItem('modelOptions') || '[]');
     const fallbackTypes = extractedTypes.length > 0 ? extractedTypes : JSON.parse(localStorage.getItem('typeOptions') || '[]');
-
     return {
       itemNames: fallbackItemNames,
       brands: fallbackBrands,
@@ -1098,12 +1007,10 @@ const PurchaseOrder = ({ user, onLogout }) => {
       useNestedStructure: false
     };
   }, [poItemName, poBrand, poModel, poType, categoryOptions]);
-
   // Fetch vendor names from API
   useEffect(() => {
     fetchVendorNames();
   }, []);
-
   const fetchVendorNames = async () => {
     try {
       const response = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll');
@@ -1123,13 +1030,11 @@ const PurchaseOrder = ({ user, onLogout }) => {
       console.error('Error:', error);
     }
   };
-
   // Extract vendor names as strings for the dropdown - convert to state for creatable functionality
   const [vendorOptions, setVendorOptions] = useState([]);
   useEffect(() => {
     setVendorOptions(vendorNameOptions.map(option => option.value));
   }, [vendorNameOptions]);
-
   // Fetch project names (sites) from API
   useEffect(() => {
     const fetchSites = async () => {
@@ -1158,13 +1063,11 @@ const PurchaseOrder = ({ user, onLogout }) => {
     };
     fetchSites();
   }, []);
-
   // Extract project names as strings for the dropdown - convert to state for creatable functionality
   const [projectOptions, setProjectOptions] = useState([]);
   useEffect(() => {
     setProjectOptions(siteOptions.map(option => option.value));
   }, [siteOptions]);
-
   // Fetch employee list and support staff list from API in parallel
   // Cached data is shown instantly (from useState initialization), fresh data fetched in background
   useEffect(() => {

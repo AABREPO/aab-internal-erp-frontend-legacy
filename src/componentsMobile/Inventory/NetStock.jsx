@@ -109,7 +109,6 @@ const NetStock = () => {
     };
     fetchLocationNames();
   }, []);
-
   // Fetch item names from API (for getting names and minQty/defaultQty)
   useEffect(() => {
     const fetchItemNames = async () => {
@@ -125,7 +124,6 @@ const NetStock = () => {
     };
     fetchItemNames();
   }, []);
-
   // Fetch brand, model, type APIs for name resolution
   useEffect(() => {
     const fetchAll = async () => {
@@ -135,7 +133,6 @@ const NetStock = () => {
           fetch('https://backendaab.in/aabuildersDash/api/po_model/getAll'),
           fetch('https://backendaab.in/aabuildersDash/api/po_type/getAll')
         ]);
-
         if (brandRes.ok) {
           const brandData = await brandRes.json();
           setPoBrand(brandData);
@@ -154,7 +151,6 @@ const NetStock = () => {
     };
     fetchAll();
   }, []);
-
   // Calculate net stock from inventory data based on selected stocking location
   const calculateNetStock = (inventoryRecords, selectedLocationId) => {
     // Filter out deleted records
@@ -162,19 +158,13 @@ const NetStock = () => {
       const recordDeleteStatus = record.delete_status !== undefined ? record.delete_status : record.deleteStatus;
       return !recordDeleteStatus;
     });
-
     // Group by composite key: item_id-category_id-model_id-brand_id-type_id
-    // Calculate net stock for each unique combination. For transfer records we treat them specially:
-    // - When viewing a specific location: subtract from source (stocking_location_id) and add to destination (to_stocking_location_id)
-    // - When viewing across all locations (selectedLocationId is falsy): transfer is neutral (no net change)
     const stockMap = {}; // Key: composite key, Value: net stock quantity
-
     activeRecords.forEach(record => {
       const recordStockingLocationId = record.stocking_location_id || record.stockingLocationId;
       const inventoryType = (record.inventory_type || record.inventoryType || '').toString().toLowerCase();
       const toStockingLocationId = record.to_stocking_location_id || record.toStockingLocationId || null;
       const inventoryItems = record.inventoryItems || record.inventory_items || [];
-
       if (Array.isArray(inventoryItems)) {
         inventoryItems.forEach(invItem => {
           const itemId = invItem.item_id || invItem.itemId || null;
@@ -182,11 +172,9 @@ const NetStock = () => {
           const modelId = invItem.model_id || invItem.modelId || null;
           const brandId = invItem.brand_id || invItem.brandId || null;
           const typeId = invItem.type_id || invItem.typeId || null;
-
           if (itemId !== null && itemId !== undefined) {
             // Create composite key for unique combination
             const compositeKey = `${itemId || 'null'}-${categoryId || 'null'}-${modelId || 'null'}-${brandId || 'null'}-${typeId || 'null'}`;
-
             if (!stockMap[compositeKey]) {
               stockMap[compositeKey] = {
                 itemId: itemId,
@@ -199,9 +187,7 @@ const NetStock = () => {
             }
             // Convert quantity to number
             const quantity = Number(invItem.quantity) || 0;
-
             let delta = 0;
-
             if (!selectedLocationId) {
               // Viewing across all locations: transfers are neutral (they move stock between locations)
               if (inventoryType === 'transfer' && toStockingLocationId) {
@@ -241,7 +227,6 @@ const NetStock = () => {
       netStock: Math.max(0, item.quantity) // Ensure non-negative
     }));
   };
-
   // Fetch inventory data
   useEffect(() => {
     const fetchInventory = async () => {
@@ -253,10 +238,8 @@ const NetStock = () => {
           setLoading(false);
           return;
         }
-
         const inventoryRecords = await response.json();
         setInventoryData(inventoryRecords);
-
         // Calculate initial net stock (all locations)
         const inventoryItems = calculateNetStock(inventoryRecords, null);
         setStockQuantities(inventoryItems);
@@ -268,20 +251,16 @@ const NetStock = () => {
     };
     fetchInventory();
   }, []);
-
   // Recalculate net stock when stocking location changes
   useEffect(() => {
     if (inventoryData.length === 0) return;
-
     const selectedLocationOption = stockingLocationOptions.find(loc =>
       loc.value === selectedStockingLocation || loc.label === selectedStockingLocation
     );
     const selectedLocationId = selectedLocationOption?.id || null;
-
     const inventoryItems = calculateNetStock(inventoryData, selectedLocationId);
     setStockQuantities(inventoryItems);
   }, [selectedStockingLocation, inventoryData, stockingLocationOptions]);
-
   // Process inventory items and match with item names API to get display names and minQty/defaultQty
   useEffect(() => {
     if (stockQuantities.length === 0 || itemNamesData.length === 0) {
@@ -290,19 +269,15 @@ const NetStock = () => {
       }
       return;
     }
-
     setLoading(true);
     const processedData = [];
-
     // Create lookup maps from item names API
     const itemNameMap = {}; // itemId -> item data
     const entityMap = {}; // composite key -> entity data
-
     itemNamesData.forEach(item => {
       const itemId = item.id || item._id || null;
       if (itemId) {
         itemNameMap[String(itemId)] = item;
-
         // Map entities by composite key, include qty info if present
         const otherPOEntityList = item.otherPOEntityList || [];
         otherPOEntityList.forEach(entity => {
@@ -311,7 +286,6 @@ const NetStock = () => {
           const modelId = entity.modelId || entity.model_id || null;
           const typeId = entity.typeId || entity.type_id || null;
           const categoryId = item.categoryId || item.category_id || null;
-
           const entityKey = `${entityItemId || 'null'}-${categoryId || 'null'}-${modelId || 'null'}-${brandId || 'null'}-${typeId || 'null'}`;
           const defaultQtyFromEntity = entity.defaultQty || entity.default_qty || '25';
           const minQtyFromEntity = entity.minimumQty || entity.minimum_qty || entity.minQty || entity.min_qty || '5';
@@ -326,7 +300,6 @@ const NetStock = () => {
         });
       }
     });
-
     // Process each inventory item
     stockQuantities.forEach(invItem => {
       const itemId = invItem.itemId;
@@ -407,25 +380,20 @@ const NetStock = () => {
           const brandName = brandId ? findNameById(poBrand, brandId, 'brand') : '';
           const modelName = modelId ? findNameById(poModel, modelId, 'model') : '';
           const typeName = typeId ? findNameById(poType, typeId, 'typeColor') || findNameById(poType, typeId, 'type') : '';
-
           // Extract qty info from itemData when available. Prefer matching entry in otherPOEntityList when possible
           let defaultQtyFromItem = itemData.defaultQty || itemData.default_qty || '25';
           let minQtyFromItem = itemData.minimumQuantity || itemData.minimumQty || itemData.minimum_qty || itemData.minQty || itemData.min_qty || itemData.minimum || '5';
-
           if (Array.isArray(itemData.otherPOEntityList) && itemData.otherPOEntityList.length) {
             const matchEntity = itemData.otherPOEntityList.find(ent => {
               // Try to match by brand/model/type when available
               const eBrand = ent.brandId || ent.brand_id || ent.brandName || '';
               const eModel = ent.modelId || ent.model_id || ent.modelName || '';
               const eType = ent.typeId || ent.type_id || ent.typeColor || '';
-
               const brandMatch = !brandId || String(eBrand) === String(brandId) || String(eBrand) === String(ent.brandName) || String(ent.brandName) === String(brandId);
               const modelMatch = !modelId || String(eModel) === String(modelId) || String(eModel) === String(ent.modelName) || String(ent.modelName) === String(modelId);
               const typeMatch = !typeId || String(eType) === String(typeId) || String(eType) === String(ent.typeColor) || String(ent.typeColor) === String(typeId);
-
               // Also allow matching by category if provided
               const categoryMatch = !categoryIdFromItem || String(ent.categoryId || ent.category_id) === String(categoryIdFromItem);
-
               return brandMatch && modelMatch && typeMatch && categoryMatch;
             });
             if (matchEntity) {
@@ -504,7 +472,6 @@ const NetStock = () => {
         (item.category || '').toLowerCase().includes(query)
       );
     }
-
     // Apply dropdown selectionFilter to the displayed list
     if (selectionFilter) {
       if (selectionFilter === 'Minimum') {
@@ -526,7 +493,6 @@ const NetStock = () => {
         // All -> no additional filtering
       }
     }
-
     setFilteredData(filtered);
   }, [selectedCategory, searchQuery, netStockData, categoryOptions, selectionFilter]);
   // Sync selectAll state with selectedCards
@@ -537,7 +503,6 @@ const NetStock = () => {
       setSelectAll(false);
     }
   }, [selectedCards, filteredData]);
-
   // Keep the toggle state in sync: if ALL filtered items are currently selected, show toggle ON.
   useEffect(() => {
     if (!filteredData || filteredData.length === 0) {
@@ -547,11 +512,8 @@ const NetStock = () => {
     const allSelected = filteredData.every(i => selectedCards.includes(i.id));
     if (allSelected !== selectAllFiltered) setSelectAllFiltered(allSelected);
   }, [selectedCards, filteredData]);
-
   // Selection of items is controlled only by the toggle button now.
   // Changing the dropdown filter will NOT auto-select items.
-
-
   const handleDateConfirm = (date) => {
     setSelectedDate(date);
     setShowDatePicker(false);
@@ -649,7 +611,6 @@ const NetStock = () => {
       </div>
       {/* Filters Section */}
       <div className="flex-shrink-0 px-4 pt-2 mb-2">
-
         {/* Category Filter */}
         <div className="mb-2">
           <div className="flex items-center justify-between">
@@ -771,8 +732,6 @@ const NetStock = () => {
             </div>
           </div>
         </div>
-        {/* Filter Count Display */}
-
         {/* Toggle switch matching provided image (adds/removes only filtered items) */}
         <div className="flex items-center justify-between">
           {selectionFilter && (

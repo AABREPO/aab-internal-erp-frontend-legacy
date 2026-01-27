@@ -4,7 +4,7 @@ import Header from '../PurchaseOrder/Header';
 import Sidebar from '../Bars/Sidebar';
 import ToolsTrackerTabs from './ToolsTrackerTabs';
 import BottomNav from '../PurchaseOrder/BottomNav';
-import Entry from './Entry';
+import Transfer from './Transfer';
 import History from './History';
 import PendingItems from './PendingItems';
 import AddInput from './AddInput';
@@ -18,17 +18,14 @@ const ToolsTracker = ({ user, onLogout }) => {
   const [currentPage, setCurrentPage] = useState('tools-tracker');
   const [activeTab, setActiveTab] = useState(() => {
     const savedTab = localStorage.getItem('toolsTrackerActiveTab');
-    return savedTab || 'entry';
+    return savedTab || 'Transfer';
   });
-
   const handleMenuClick = () => {
     setSidebarOpen(true);
   };
-
   const handleSidebarClose = () => {
     setSidebarOpen(false);
   };
-
   const handleNavigate = (page) => {
     if (page === 'purchase-order') {
       setCurrentPage('purchase-order');
@@ -41,16 +38,14 @@ const ToolsTracker = ({ user, onLogout }) => {
       navigate('/toolsTracker');
     }
   };
-
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     localStorage.setItem('toolsTrackerActiveTab', tab);
   };
-
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'entry':
-        return <Entry user={user} />;
+      case 'Transfer':
+        return <Transfer user={user} />;
       case 'history':
         return <History user={user} />;
       case 'pending-items':
@@ -64,10 +59,9 @@ const ToolsTracker = ({ user, onLogout }) => {
       case 'service-history':
         return <ServiceHistory user={user} />;
       default:
-        return <Entry user={user} />;
+        return <Transfer user={user} />;
     }
   };
-
   return (
     <div className="relative w-full bg-white max-w-[360px] mx-auto" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* Sidebar */}
@@ -96,5 +90,4 @@ const ToolsTracker = ({ user, onLogout }) => {
     </div>
   );
 };
-
 export default ToolsTracker;

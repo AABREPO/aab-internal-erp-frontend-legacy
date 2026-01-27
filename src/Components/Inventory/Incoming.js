@@ -126,7 +126,6 @@ const Incoming = ({ username, userRoles = [] }) => {
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching tile area names.');
         }
     };
     useEffect(() => {
@@ -148,7 +147,6 @@ const Incoming = ({ username, userRoles = [] }) => {
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching tile area names.');
         }
     };
     const scrollRef = useRef(null);
@@ -222,7 +220,6 @@ const Incoming = ({ username, userRoles = [] }) => {
         };
         animationFrame.current = requestAnimationFrame(step);
     };
-
     useEffect(() => {
         fetchVendorNames();
     }, []);
@@ -242,7 +239,6 @@ const Incoming = ({ username, userRoles = [] }) => {
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching vendor names.');
         }
     };
     useEffect(() => {
@@ -290,10 +286,8 @@ const Incoming = ({ username, userRoles = [] }) => {
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching tile area names.');
         }
     };
-
     useEffect(() => {
         fetchPoOrders();
     }, [selectedVendorName]);
@@ -303,7 +297,6 @@ const Incoming = ({ username, userRoles = [] }) => {
             if (response.ok) {
                 const data = await response.json();
                 setAllPurchaseOrders(data);
-                console.log(data);
                 if (selectedVendorName) {
                     // Filter all POs that match the vendor name
                     const matchingPOs = data.filter(po => po.vendorName === selectedVendorName);
@@ -324,10 +317,8 @@ const Incoming = ({ username, userRoles = [] }) => {
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching tile area names.');
         }
     };
-
     const formatDateOnly = (dateString) => {
         const date = new Date(dateString);
         const day = String(date.getDate()).padStart(2, '0');
@@ -353,7 +344,6 @@ const Incoming = ({ username, userRoles = [] }) => {
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching tile area names.');
         }
     };
     useEffect(() => {
@@ -370,7 +360,6 @@ const Incoming = ({ username, userRoles = [] }) => {
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error fetching tile area names.');
         }
     };
     const handleCategoryChange = (selectedOption) => {
@@ -396,13 +385,11 @@ const Incoming = ({ username, userRoles = [] }) => {
         }));
         setItemNameOptions(itemNameOpts);
     };
-
     const handleItemNameChange = (option) => {
         setSelectedItemName(option);
         setSelectedModel(null);
         setSelectedBrand(null);
         setSelectedType(null);
-
         if (!option?.value || !selectedCategory) {
             setModelOptions([]);
             setBrandOptions([]);
@@ -655,7 +642,6 @@ const Incoming = ({ username, userRoles = [] }) => {
             handleItemNameChange(selectedItemName);
         }
     }, [selectedItemName, itemNameOptions, selectedCategory, poItemName]);
-
     useEffect(() => {
         if (
             selectedItemName &&
@@ -677,7 +663,6 @@ const Incoming = ({ username, userRoles = [] }) => {
             handleBrandChange(selectedBrand);
         }
     }, [selectedBrand, brandOptions, selectedModel, selectedItemName, poItemName]);
-
     const toggleSelection = (item) => {
         setSelectedOptions((prev) =>
             prev.includes(item)
@@ -685,17 +670,14 @@ const Incoming = ({ username, userRoles = [] }) => {
                 : [...prev, item]
         );
     };
-
     const filteredOptions = siteOptions.filter((option) =>
         option.label.toLowerCase().includes(search.toLowerCase())
     );
-
     useEffect(() => {
         if (selectedVendorName && poNos) {
             const matchedPO = allPurchaseOrders.find(
                 (item) => item.vendorName === selectedVendorName && item.eno === poNos
             );
-
             if (matchedPO && Array.isArray(matchedPO.purchaseTable)) {
                 setFilteredPurchaseItems(matchedPO.purchaseTable);
             } else {
@@ -705,8 +687,6 @@ const Incoming = ({ username, userRoles = [] }) => {
             setFilteredPurchaseItems([]);
         }
     }, [selectedVendorName, poNos, allPurchaseOrders]);
-
-
     useEffect(() => {
         const fetchSavedLocations = async () => {
             try {
@@ -1000,7 +980,6 @@ const Incoming = ({ username, userRoles = [] }) => {
                                                 const quantity = Number(item.quantity) || 0;
                                                 const price = Number(item.amount) || 0;
                                                 const amount = quantity * price;
-
                                                 return (
                                                     <tr key={index} className="border-b border-[#e6e1d1]">
                                                         <td className="py-2 px-3">{index + 1}</td>
@@ -1067,15 +1046,10 @@ const Incoming = ({ username, userRoles = [] }) => {
                             })}
                         </div>
                         <div className="flex justify-end space-x-2">
-                            <button
-                                className="px-4 py-2 bg-gray-300 rounded-md text-sm"
-                                onClick={() => setStockingLocationAddPopup(false)} >
+                            <button className="px-4 py-2 bg-gray-300 rounded-md text-sm" onClick={() => setStockingLocationAddPopup(false)}>
                                 Cancel
                             </button>
-                            <button
-                                className="px-4 py-2 bg-[#BF9853] text-white rounded-md text-sm"
-                                onClick={handleSubmit}
-                            >
+                            <button className="px-4 py-2 bg-[#BF9853] text-white rounded-md text-sm" onClick={handleSubmit}>
                                 Submit
                             </button>
                         </div>

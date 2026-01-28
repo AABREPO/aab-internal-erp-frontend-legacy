@@ -5268,8 +5268,9 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                             }`}>
                                             <h4 className="text-sm font-semibold text-gray-700">Previous Payment Details:</h4>
                                             <div className="space-y-4">
-                                                {existingPaymentDetails.map((payment, index) => (
+                                                {[...existingPaymentDetails].reverse().map((payment, index) => (
                                                     <div key={payment.id || index} className="text-left p-3 shadow-lg rounded-lg mb-4">
+                                                        <h5 className="text-sm font-semibold text-gray-800 mb-2">Payment - {existingPaymentDetails.length - index}</h5>
                                                         <div className=" border border-[#BF9853] border-opacity-35 rounded-md p-4">
                                                             <div className='grid grid-cols-3 gap-4'>
                                                                 <div>

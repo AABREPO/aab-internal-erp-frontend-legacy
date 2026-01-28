@@ -197,7 +197,6 @@ const AddInput = ({ user }) => {
       console.error("Error refreshing vendor data: ", error);
     }
   };
-
   // Update service shop status when vendors are selected/deselected
   const updateServiceShopStatus = async (newSelectedVendors) => {
     try {
@@ -583,10 +582,7 @@ const AddInput = ({ user }) => {
               <div className="shadow-md rounded-lg overflow-hidden">
                 {getPickerOptions().length > 0 ? (
                   getPickerOptions().map((opt) => (
-                    <button
-                      key={opt}
-                      type="button"
-                      onClick={() => handleSheetPickerSelect(sheetOpenPicker, opt)}
+                    <button key={opt} type="button" onClick={() => handleSheetPickerSelect(sheetOpenPicker, opt)}
                       className="w-full h-[40px] px-6 flex items-center text-left hover:bg-[#F5F5F5] transition-colors text-[14px] font-medium text-black"
                     >
                       {opt}

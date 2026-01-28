@@ -122,6 +122,18 @@ const BillDatabase = ({ username, userRoles = [] }) => {
     const [overallPaymentPdfFile, setOverallPaymentPdfFile] = useState(null)
     const [uploadingOverallPdf, setUploadingOverallPdf] = useState(false)
     const overallPdfInputRef = useRef(null)
+
+    // Payment details export PDF (preview + filter)
+    const [showPaymentDetailsPdfModal, setShowPaymentDetailsPdfModal] = useState(false)
+    const [paymentPdfFromDate, setPaymentPdfFromDate] = useState('')
+    const [paymentPdfToDate, setPaymentPdfToDate] = useState('')
+
+    // Overall vendor payment details PDF (all bills for selected vendor)
+    const [showOverallVendorPdfModal, setShowOverallVendorPdfModal] = useState(false)
+    const [overallVendorPdfFromDate, setOverallVendorPdfFromDate] = useState('')
+    const [overallVendorPdfToDate, setOverallVendorPdfToDate] = useState('')
+    const [overallVendorPdfLoading, setOverallVendorPdfLoading] = useState(false)
+    const [overallVendorPdfData, setOverallVendorPdfData] = useState([]) // [{ bill, payments }]
     // Check modal states
     const [showCheckModal, setShowCheckModal] = useState(false)
     const [checkFilteredExpenses, setCheckFilteredExpenses] = useState([])
@@ -299,6 +311,386 @@ const BillDatabase = ({ username, userRoles = [] }) => {
         }
     }
 
+    const fetchPaymentDetailsRaw = async (vendorPaymentsTrackerId) => {
+        try {
+            const response = await fetch(`https://backendaab.in/aabuildersDash/api/vendor-bill-tracker/get/${vendorPaymentsTrackerId}`, {
+                method: 'GET',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            if (!response.ok) return []
+            const data = await response.json()
+            return Array.isArray(data) ? data : []
+        } catch (e) {
+            console.error('Error fetching payment details:', e)
+            return []
+        }
+    }
+
+    const normalizeDateOnly = (value) => {
+        if (!value) return ''
+        // Prefer YYYY-MM-DD if already provided
+        if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value
+        const d = new Date(value)
+        if (Number.isNaN(d.getTime())) return ''
+        const yyyy = d.getFullYear()
+        const mm = String(d.getMonth() + 1).padStart(2, '0')
+        const dd = String(d.getDate()).padStart(2, '0')
+        return `${yyyy}-${mm}-${dd}`
+    }
+
+    const formatInrForPdf = (amount) => {
+        const n = Number(amount)
+        if (!Number.isFinite(n)) return ''
+        const formatted = n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        // Add space between negative sign and number for better visibility
+        if (n < 0) {
+            return formatted.replace('-', '- ')
+        }
+        return formatted
+    }
+
+    const formatPdfDateTime = (payment) => {
+        // Backend payloads vary; use the most informative field available.
+        const candidate =
+            payment?.timestamp ||
+            payment?.created_at ||
+            payment?.createdAt ||
+            payment?.date
+        if (!candidate) return '-'
+        // Use formatDate function for consistent formatting (DD/MM/YYYY HH:MM AM/PM)
+        return formatDate(candidate)
+    }
+
+    const formatBillTimestamp = (bill) => {
+        // Get timestamp from bill object
+        const candidate =
+            bill?.timestamp ||
+            bill?.created_at ||
+            bill?.createdAt ||
+            bill?.bill_arrival_date ||
+            bill?.billArrivalDate
+        if (!candidate) return '-'
+        // Use formatDate function for consistent formatting (DD/MM/YYYY HH:MM AM/PM)
+        return formatDate(candidate)
+    }
+
+    const getFilteredPaymentDetailsForPdf = () => {
+        const list = Array.isArray(existingPaymentDetails) ? existingPaymentDetails : []
+        const from = normalizeDateOnly(paymentPdfFromDate)
+        const to = normalizeDateOnly(paymentPdfToDate)
+        if (!from && !to) return list
+        const fromTime = from ? new Date(from).getTime() : null
+        const toTime = to ? new Date(to).getTime() : null
+        return list.filter((p) => {
+            const dStr = normalizeDateOnly(p?.date)
+            if (!dStr) return false
+            const t = new Date(dStr).getTime()
+            if (fromTime && t < fromTime) return false
+            if (toTime && t > toTime) return false
+            return true
+        })
+    }
+
+    const openPaymentDetailsPdfPreview = () => {
+        const list = Array.isArray(existingPaymentDetails) ? existingPaymentDetails : []
+        const dates = list
+            .map((p) => normalizeDateOnly(p?.date))
+            .filter(Boolean)
+            .sort()
+        if (dates.length > 0) {
+            setPaymentPdfFromDate(dates[0])
+            setPaymentPdfToDate(dates[dates.length - 1])
+        } else {
+            setPaymentPdfFromDate('')
+            setPaymentPdfToDate('')
+        }
+        setShowPaymentDetailsPdfModal(true)
+    }
+
+    const openOverallVendorPdfPreview = async () => {
+        if (!filters.vendorName?.id) return
+        setOverallVendorPdfLoading(true)
+        setShowOverallVendorPdfModal(true)
+        try {
+            const selectedVendorId = filters.vendorName.id
+            // Use apiData to get ALL bills for the vendor (not just fully finished ones)
+            const vendorBills = apiData.filter(b => (b.vendor_id || b.vendorId) === selectedVendorId)
+            const results = await Promise.all(
+                vendorBills.map(async (bill) => {
+                    const payments = await fetchPaymentDetailsRaw(bill.id)
+                    return { bill, payments }
+                })
+            )
+            // Set default payment-date range based on all payment dates (if any)
+            const allDates = results
+                .flatMap(r => (Array.isArray(r.payments) ? r.payments : []))
+                .map(p => normalizeDateOnly(p?.date))
+                .filter(Boolean)
+                .sort()
+            if (allDates.length > 0) {
+                setOverallVendorPdfFromDate(allDates[0])
+                setOverallVendorPdfToDate(allDates[allDates.length - 1])
+            } else {
+                setOverallVendorPdfFromDate('')
+                setOverallVendorPdfToDate('')
+            }
+            setOverallVendorPdfData(results)
+        } finally {
+            setOverallVendorPdfLoading(false)
+        }
+    }
+    const getFilteredOverallVendorPdfData = () => {
+        const from = normalizeDateOnly(overallVendorPdfFromDate)
+        const to = normalizeDateOnly(overallVendorPdfToDate)
+        const fromTime = from ? new Date(from).getTime() : null
+        const toTime = to ? new Date(to).getTime() : null
+        return (Array.isArray(overallVendorPdfData) ? overallVendorPdfData : []).map(({ bill, payments }) => {
+            const filteredPayments = (Array.isArray(payments) ? payments : []).filter(p => {
+                if (!fromTime && !toTime) return true
+                const dStr = normalizeDateOnly(p?.date)
+                if (!dStr) return false
+                const t = new Date(dStr).getTime()
+                if (fromTime && t < fromTime) return false
+                if (toTime && t > toTime) return false
+                return true
+            })
+            return { bill, payments: filteredPayments }
+        })
+    }
+    const generateOverallVendorPaymentDetailsPdf = () => {
+        if (!filters.vendorName?.id) return
+        const vendorName = filters.vendorName?.label || filters.vendorName?.value || ''
+        const data = getFilteredOverallVendorPdfData()
+        const generatedAt = new Date()
+        const generatedAtText = `Generated: ${formatDate(generatedAt)}`
+        const doc = new jsPDF()
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(15)
+        doc.text('Overall Payment Details', 14, 14)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(11)
+        doc.text(`Vendor: ${vendorName}`, 14, 20)
+        if (overallVendorPdfFromDate || overallVendorPdfToDate) {
+            doc.setFontSize(10)
+            doc.text(`Payment Date Filter: ${formatDateOnly(overallVendorPdfFromDate) || '-'} to ${formatDateOnly(overallVendorPdfToDate) || '-'}`, 14, 26)
+        }
+        const head = [[
+            'S.No',
+            'Date and Time',
+            'No Of Bill',
+            'Bill Payment',
+            'Carry Forward',
+            'Bill Amount',
+            'Payment Mode'
+        ]]
+        const body = []
+        let sno = 1
+        let totalBillAmountAll = 0
+        let totalBillPaymentAll = 0
+        let totalCarryForwardAll = 0
+        data.forEach(({ bill, payments }) => {
+            const billAmount = Number(bill?.total_amount || bill?.totalAmount || 0) || 0
+            const noOfBills = bill?.no_of_bills || bill?.noOfBills || '-'
+            // Get timestamp from bill object for bill amount row
+            const billTimestamp = formatBillTimestamp(bill)
+            totalBillAmountAll += billAmount
+            // Bill row (bill amount once)
+            body.push([
+                String(sno++),
+                billTimestamp,
+                String(noOfBills),
+                '',
+                '',
+                formatInrForPdf(billAmount),
+                ''
+            ])
+            ;(Array.isArray(payments) ? payments : []).forEach((p) => {
+                const mode = p?.vendor_bill_payment_mode || p?.mode || ''
+                const isCarryForwardMode = String(mode).toLowerCase().includes('carry forward') || (Number(p?.carry_forward_amount) || 0) > 0
+                const billPay = isCarryForwardMode ? 0 : (Number(p?.amount) || 0)
+                const cfPay = isCarryForwardMode
+                    ? ((Number(p?.carry_forward_amount) || 0) || (Number(p?.amount) || 0))
+                    : (Number(p?.carry_forward_amount) || 0)
+                totalBillPaymentAll += billPay
+                totalCarryForwardAll += cfPay
+                body.push([
+                    String(sno++),
+                    formatPdfDateTime(p),
+                    '',
+                    billPay ? formatInrForPdf(billPay) : '',
+                    cfPay ? formatInrForPdf(cfPay) : '',
+                    '',
+                    mode || '-'
+                ])
+            })
+        })
+        const balance = totalBillAmountAll - totalBillPaymentAll
+        body.push(['', '', '', '', '', '', ''])
+        body.push(['', 'TOTAL', '', formatInrForPdf(totalBillPaymentAll), formatInrForPdf(totalCarryForwardAll), formatInrForPdf(totalBillAmountAll), ''])
+        body.push(['', 'BALANCE', '',  '', '', formatInrForPdf(balance), ''])
+        doc.autoTable({
+            startY: (overallVendorPdfFromDate || overallVendorPdfToDate) ? 32 : 26,
+            head,
+            body,
+            margin: { left: 10, right: 10, top: 22, bottom: 12 },
+            theme: 'grid',
+            styles: { fontSize: 9, cellPadding: 2.2, overflow: 'linebreak', lineWidth: 0.1 },
+            headStyles: {
+                fillColor: [191, 152, 83],
+                textColor: 255,
+                fontStyle: 'bold'
+            },
+            alternateRowStyles: { fillColor: [250, 246, 237] },
+            columnStyles: {
+                0: { cellWidth: 12 },
+                1: { cellWidth: 42 },
+                2: { cellWidth: 20 },
+                3: { cellWidth: 28, halign: 'right' },
+                4: { cellWidth: 28, halign: 'right' },
+                5: { cellWidth: 28, halign: 'right' },
+                6: { cellWidth: 32 }
+            },
+            didParseCell: function (data) {
+                // Make TOTAL and BALANCE rows extra bold (bold + darker color)
+                if (data.row.raw && data.row.raw.length > 0) {
+                    const firstCell = data.row.raw[1] // Second column (Date and Time column)
+                    if (firstCell === 'TOTAL' || firstCell === 'BALANCE' || firstCell === 'BALANCE (Bill Payment - Bill Amount)') {
+                        data.cell.styles.fontStyle = 'bold'
+                        data.cell.styles.textColor = [0, 0, 0] // Pure black for darker/bright appearance
+                    }
+                }
+            },
+            didDrawPage: function (data) {
+                const pageWidth = doc.internal.pageSize.getWidth()
+                const pageHeight = doc.internal.pageSize.getHeight()
+                // Footer separator
+                doc.setDrawColor(220)
+                doc.setLineWidth(0.2)
+                doc.line(10, pageHeight - 10, pageWidth - 10, pageHeight - 10)
+                // Footer text
+                doc.setFontSize(9)
+                doc.setTextColor(90)
+                doc.text(`Page ${data.pageNumber}`, pageWidth / 2, pageHeight - 6, { align: 'center' })
+                doc.text(generatedAtText, pageWidth - 10, pageHeight - 6, { align: 'right' })
+                doc.setTextColor(0)
+            }
+        })
+        const safeVendor = (vendorName || 'Vendor').replace(/\s+/g, '_')
+        doc.save(`Overall_Payment_Details_${safeVendor}_${new Date().toISOString().split('T')[0]}.pdf`)
+    }
+    const generatePaymentDetailsPdf = () => {
+        const filteredPayments = getFilteredPaymentDetailsForPdf()
+        if (!selectedPaymentBill) {
+            alert('No bill selected')
+            return
+        }
+        const billAmount = Number(selectedPaymentBill?.total_amount || selectedPaymentBill?.totalAmount || actualAmount || 0) || 0
+        const noOfBills = selectedPaymentBill?.no_of_bills || selectedPaymentBill?.noOfBills || '-'
+        const billArrival = selectedPaymentBill?.bill_arrival_date || selectedPaymentBill?.billArrivalDate
+        // Totals for balance
+        const totalBillPayment = filteredPayments.reduce((sum, p) => sum + (Number(p?.amount) || 0), 0)
+        const totalCarryForward = filteredPayments.reduce((sum, p) => sum + (Number(p?.carry_forward_amount) || 0), 0)
+        const balance = totalBillPayment - billAmount
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+        const vendorName = getVendorNameById(selectedPaymentBill?.vendor_id || selectedPaymentBill?.vendorId) || ''
+        const title = `Payment Details - ${vendorName}`
+        doc.setFontSize(13)
+        doc.text(title, 14, 12)
+        doc.setFontSize(10)
+        doc.text(`Bill Date: ${billArrival ? new Date(billArrival).toLocaleDateString('en-GB') : '-'}`, 14, 18)
+        doc.text(`No. of Bills: ${noOfBills}`, 70, 18)
+        doc.text(`Bill Amount: ${formatIndianCurrency(billAmount)}`, 120, 18)
+        if (paymentPdfFromDate || paymentPdfToDate) {
+            doc.text(`Filter: ${paymentPdfFromDate || '-'} to ${paymentPdfToDate || '-'}`, 185, 18)
+        }
+        const head = [[
+            'S.No',
+            'Date and Time',
+            'No Of Bill',
+            'Bill Payment',
+            'Carry Forward',
+            'Bill Amount',
+            'Payment Mode'
+        ]]
+        const body = []
+        // Row 1: Bill summary (bill amount only once) - use timestamp from bill
+        const billTimestamp = formatBillTimestamp(selectedPaymentBill)
+        body.push([
+            '1',
+            billTimestamp,
+            String(noOfBills),
+            '',
+            '',
+            formatIndianCurrency(billAmount),
+            ''
+        ])
+        // Payment rows (start from row 2)
+        filteredPayments.forEach((p, idx) => {
+            const mode = p?.vendor_bill_payment_mode || p?.mode || ''
+            const isCarryForwardMode = String(mode).toLowerCase().includes('carry forward') || (Number(p?.carry_forward_amount) || 0) > 0
+            const billPay = isCarryForwardMode ? 0 : (Number(p?.amount) || 0)
+            const cfPay = isCarryForwardMode ? ((Number(p?.carry_forward_amount) || 0) || (Number(p?.amount) || 0)) : (Number(p?.carry_forward_amount) || 0)
+            body.push([
+                String(idx + 2),
+                formatPdfDateTime(p),
+                '',
+                billPay ? formatIndianCurrency(billPay) : '',
+                cfPay ? formatIndianCurrency(cfPay) : '',
+                '',
+                mode || '-'
+            ])
+        })
+        // Totals row(s)
+        body.push(['', '', '', '', '', '', ''])
+        body.push([
+            '',
+            'TOTAL',
+            '',
+            formatIndianCurrency(totalBillPayment),
+            totalCarryForward ? formatIndianCurrency(totalCarryForward) : '',
+            '',
+            ''
+        ])
+        body.push([
+            '',
+            'BALANCE (Bill Payment - Bill Amount)',
+            '',
+            formatIndianCurrency(balance),
+            '',
+            '',
+            ''
+        ])
+        doc.autoTable({
+            startY: 24,
+            head,
+            body,
+            styles: { fontSize: 9, cellPadding: 2, overflow: 'linebreak' },
+            headStyles: { fillColor: [191, 152, 83], textColor: 255 },
+            columnStyles: {
+                0: { cellWidth: 12 },
+                1: { cellWidth: 42 },
+                2: { cellWidth: 18 },
+                3: { cellWidth: 28, halign: 'right' },
+                4: { cellWidth: 28, halign: 'right' },
+                5: { cellWidth: 28, halign: 'right' },
+                6: { cellWidth: 32 }
+            },
+            didParseCell: function (data) {
+                // Make TOTAL and BALANCE rows extra bold (bold + darker color)
+                if (data.row.raw && data.row.raw.length > 0) {
+                    const firstCell = data.row.raw[1] // Second column (Date and Time column)
+                    if (firstCell === 'TOTAL' || firstCell === 'BALANCE (Bill Payment - Bill Amount)') {
+                        data.cell.styles.fontStyle = 'bold'
+                        data.cell.styles.textColor = [0, 0, 0] // Pure black for darker/bright appearance
+                    }
+                }
+            }
+        })
+        const safeVendor = (vendorName || 'Vendor').replace(/\s+/g, '_')
+        const fileName = `Payment_Details_${safeVendor}_${new Date().toISOString().split('T')[0]}.pdf`
+        doc.save(fileName)
+    }
     const fetchCarryForwardData = async (vendorId) => {
         try {
             const response = await fetch("https://backendaab.in/aabuildersDash/api/vendor_carry_forward/getAll", {
@@ -331,7 +723,6 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             setCarryForwardAmount(0);
         }
     };
-
     const handlePaymentClick = async (item) => {
         setSelectedPaymentBill(item)
         findVendorAccountDetails(item?.vendor_id)
@@ -379,7 +770,6 @@ const BillDatabase = ({ username, userRoles = [] }) => {
         }
         setShowPaymentModal(true)
     }
-
     // Additional handlers for popups (simplified versions)
     const handleEntryCancel = () => {
         setShowEntryModal(false)
@@ -400,64 +790,53 @@ const BillDatabase = ({ username, userRoles = [] }) => {
         setNumberInputLocked(false)
         setHasStartedEditing(false)
     }
-
     const handlePreviousEntryInputChange = (field, value) => {
         setPreviousEntryEditData(prev => ({
             ...prev,
             [field]: value
         }))
     }
-
     const getUserOptions = () => {
         return userList.map(user => ({
             value: user.name || user.username,
             label: user.name || user.username
         }))
     }
-
     const isAdminUser = () => {
         return username === 'Admin' || username === 'Mahalingam M'
     }
-
     const areAllBillsVerifiedAndNotPaid = () => {
         if (!selectedBill) return false
         return selectedBill.billVerifications &&
             selectedBill.billVerifications.every(v => v.is_verified === true || v.status === 'VERIFIED')
     }
-
     const isSendRequestDisabled = () => {
         if (!selectedBill) return true
         const totalNumbers = poNumbers.length + Object.values(noPoSelections).filter(Boolean).length
         return totalNumbers === 0
     }
-
     const hasUnverifiedBillNumbers = () => {
         if (!selectedBill) return false
         return poNumbers.some(po => !po.verified)
     }
-
     const isSubmitDisabled = () => {
         return isSendRequestDisabled() || hasUnverifiedBillNumbers()
     }
-
     const handleSubmit = () => {
         // Simplified submit handler
         console.log('Submit clicked')
     }
-
     const handleInputChange = (field, value) => {
         setFormData(prev => ({
             ...prev,
             [field]: value
         }))
     }
-
     const handleKeyPress = (e) => {
         if (e.key === 'Enter') {
             // Handle enter key
         }
     }
-
     // Additional missing handlers for popups
     const handleCancel = () => {
         setShowModal(false)
@@ -471,7 +850,6 @@ const BillDatabase = ({ username, userRoles = [] }) => {
         setOriginalData(null)
         setHasBeenSubmitted(false)
     }
-
     const handlePoNumberChange = (index, value) => {
         const numericValue = value.replace(/[^0-9]/g, '')
         const newPoNumbers = [...poNumbers]
@@ -513,7 +891,6 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             })
         }
     }
-
     const renderInputFields = () => {
         const fields = []
         const noOfBills = selectedBill?.noOfBills || selectedBill?.no_of_bills || 0
@@ -602,27 +979,21 @@ const BillDatabase = ({ username, userRoles = [] }) => {
         }
         return fields
     }
-
     const handleCheckPO = () => {
         console.log('Check PO clicked')
     }
-
     const handleApproveRequest = () => {
         console.log('Approve request clicked')
     }
-
     const handleRejectRequest = () => {
         console.log('Reject request clicked')
     }
-
     const handleSendRequest = () => {
         console.log('Send request clicked')
     }
-
     const toggleEditMode = () => {
         setIsEditMode(!isEditMode)
     }
-
     const handlePreviousEntrySave = async (entryId) => {
         try {
             const response = await fetch(`https://backendaab.in/aabuildersDash/api/bill-entry/update/${entryId}`, {
@@ -651,14 +1022,12 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             alert(`Error updating previous entry: ${error.message}`)
         }
     }
-
     const canEditEntry = (entry) => {
         if (isAdminUser()) {
             return true;
         }
         return entry.entered_by === username;
     }
-
     const handleEditPreviousEntry = (entry) => {
         setEditingPreviousEntry(entry.id)
         setPreviousEntryEditData({
@@ -666,24 +1035,20 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             date: new Date(entry.entered_date).toISOString().split('T')[0]
         })
     }
-
     const handleEntryInputChange = (field, value) => {
         setEntryFormData(prev => ({
             ...prev,
             [field]: value
         }))
     }
-
     const handleDynamicFieldChange = (fieldId, value) => {
         setAdditionalFields(prev => prev.map(field =>
             field.id === fieldId ? { ...field, value } : field
         ))
     }
-
     const handleRemoveField = (fieldId) => {
         setAdditionalFields(prev => prev.filter(field => field.id !== fieldId))
     }
-
     const handleAddField = () => {
         const newField = {
             id: Date.now(),
@@ -693,7 +1058,6 @@ const BillDatabase = ({ username, userRoles = [] }) => {
         }
         setAdditionalFields(prev => [...prev, newField])
     }
-
     const handleEntrySubmit = async () => {
         if (!entryFormData.date) {
             alert('Please fill all required fields')
@@ -745,7 +1109,6 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             alert(`Error saving bill entry: ${error.message}`)
         }
     }
-
     const handleNumberInputChange = (e) => {
         const value = e.target.value
         if (value === '' || !isNaN(Number(value))) {
@@ -753,7 +1116,6 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             setHasStartedEditing(true)
         }
     }
-
     const handleAdjustmentAmountUpdate = async () => {
         if (numberInputValue === undefined || numberInputValue === null) {
             alert('Please enter an adjustment amount')
@@ -918,7 +1280,6 @@ const BillDatabase = ({ username, userRoles = [] }) => {
         const fileName = `Matching_Expenses_${vendorName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`
         doc.save(fileName)
     }
-
     const handlePaymentCancel = () => {
         setShowPaymentModal(false)
         setSelectedPaymentBill(null)
@@ -950,7 +1311,6 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             overallPdfInputRef.current.value = '';
         }
     }
-
     const sanitizeAmountInput = (input) => {
         if (!input) return ''
         const cleaned = input.replace(/[^\d.]/g, '')
@@ -960,7 +1320,6 @@ const BillDatabase = ({ username, userRoles = [] }) => {
         const decimalPart = parts[1] ? parts[1].slice(0, 2) : ''
         return decimalPart ? `${integerPart}.${decimalPart}` : integerPart
     }
-
     const handlePaymentEntryChange = (entryId, field, value) => {
         setPaymentEntries(prev => prev.map(entry => {
             if (entry.id !== entryId) {
@@ -986,7 +1345,6 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             return { ...entry, [field]: value }
         }))
     }
-
     // Helper function to convert image to PDF
     const convertImageToPdf = (file) => {
         return new Promise((resolve, reject) => {
@@ -997,11 +1355,9 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                 resolve(file);
                 return;
             }
-
             // Create an image element to load the file
             const img = new Image();
             const reader = new FileReader();
-
             reader.onload = (e) => {
                 img.onload = () => {
                     try {
@@ -1010,15 +1366,12 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                         const pdfHeight = 297; // A4 height in mm
                         const imgWidth = img.width;
                         const imgHeight = img.height;
-
                         // Calculate aspect ratio
                         const imgAspectRatio = imgWidth / imgHeight;
                         const pdfAspectRatio = pdfWidth / pdfHeight;
-
                         // Determine orientation
                         const orientation = imgWidth > imgHeight ? 'landscape' : 'portrait';
                         let finalWidth, finalHeight;
-
                         if (orientation === 'landscape') {
                             // Use landscape dimensions
                             if (imgAspectRatio > pdfAspectRatio) {
@@ -1042,18 +1395,15 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                 finalWidth = pdfHeight * imgAspectRatio;
                             }
                         }
-
                         // Center the image on the page
                         const xOffset = (pdfWidth - finalWidth) / 2;
                         const yOffset = (pdfHeight - finalHeight) / 2;
-
                         // Create a new PDF document
                         const pdf = new jsPDF({
                             orientation: orientation,
                             unit: 'mm',
                             format: 'a4'
                         });
-
                         // Determine image format for PDF
                         let imgFormat = 'JPEG';
                         if (file.type === 'image/png') {
@@ -1061,41 +1411,32 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                         } else if (file.type === 'image/gif') {
                             imgFormat = 'GIF';
                         }
-
                         // Add the image to PDF
                         pdf.addImage(img, imgFormat, xOffset, yOffset, finalWidth, finalHeight);
-
                         // Convert PDF to blob
                         const pdfBlob = pdf.output('blob');
-
                         // Create a File object from the blob with .pdf extension
                         const pdfFile = new File([pdfBlob], file.name.replace(/\.[^/.]+$/, '') + '.pdf', {
                             type: 'application/pdf',
                             lastModified: Date.now()
                         });
-
                         resolve(pdfFile);
                     } catch (error) {
                         console.error('Error converting image to PDF:', error);
                         reject(error);
                     }
                 };
-
                 img.onerror = () => {
                     reject(new Error('Failed to load image'));
                 };
-
                 img.src = e.target.result;
             };
-
             reader.onerror = () => {
                 reject(new Error('Failed to read file'));
             };
-
             reader.readAsDataURL(file);
         });
     }
-
     const handleFileAttachment = async (entryId, file) => {
         try {
             // Convert image to PDF if it's an image
@@ -1108,14 +1449,11 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             alert('Error processing file. Please try again.');
         }
     }
-
     const handleExistingPaymentFileUpload = async (paymentId, file) => {
         if (!file) return;
-
         try {
             // Convert image to PDF if it's an image
             const processedFile = await convertImageToPdf(file);
-
             // Find the payment details to generate a proper filename
             const payment = existingPaymentDetails?.find(p => p.id === paymentId);
             const now = new Date();
@@ -1140,14 +1478,11 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                 method: "POST",
                 body: formData,
             });
-
             if (!uploadResponse.ok) {
                 throw new Error('File upload failed');
             }
-
             const uploadResult = await uploadResponse.json();
             const billUrl = uploadResult.url;
-
             // Update the payment with bill_url using the update API
             const updateResponse = await fetch(`https://backendaab.in/aabuildersDash/api/vendor-bill-tracker/update/${paymentId}`, {
                 method: "PUT",
@@ -1157,16 +1492,13 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                 },
                 body: JSON.stringify({ bill_url: billUrl })
             });
-
             if (!updateResponse.ok) {
                 throw new Error(`Failed to update bill URL: ${updateResponse.statusText}`);
             }
-
             // Update local state
             setExistingPaymentDetails(prev => prev.map(payment =>
                 payment.id === paymentId ? { ...payment, bill_url: billUrl } : payment
             ));
-
             // Also update in apiData if present
             setApiData(prev => prev.map(bill => {
                 if (bill.id === selectedPaymentBill?.id) {
@@ -1177,25 +1509,20 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                 }
                 return bill;
             }));
-
             alert('File uploaded and payment updated successfully!');
         } catch (error) {
             console.error('Error uploading file for existing payment:', error);
             alert('Error uploading file. Please try again.');
         }
     }
-
     const handleOverallPaymentPdfChange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
         if (!selectedPaymentBill || !selectedPaymentBill.id) {
             alert('Please select a payment bill first');
             return;
         }
-
         setUploadingOverallPdf(true);
-
         try {
             // Convert image to PDF if it's an image
             const processedFile = await convertImageToPdf(file);
@@ -1222,19 +1549,15 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             const fileName = `${timestamp} ${displayVendorName} - summary bill.pdf`;
             formData.append('file', processedFile);
             formData.append('file_name', fileName);
-
             const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
                 method: "POST",
                 body: formData,
             });
-
             if (!uploadResponse.ok) {
                 throw new Error('File upload failed');
             }
-
             const uploadResult = await uploadResponse.json();
             const pdfUrl = uploadResult.url;
-
             // Update the overall payment PDF URL via API
             const billId = selectedPaymentBill.id; // This is the tracker ID
             const response = await fetch(
@@ -1247,20 +1570,16 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                     }
                 }
             );
-
             if (!response.ok) {
                 throw new Error(`Failed to update PDF URL: ${response.statusText}`);
             }
-
             const updatedTracker = await response.json();
-
             // Update the local state with the new PDF URL
             setSelectedPaymentBill(prev => ({
                 ...prev,
                 over_all_payment_pdf_url: pdfUrl,
                 overAllPaymentPdfUrl: pdfUrl // Also set camelCase version for consistency
             }));
-
             // Also update in apiData if present
             setApiData(prev => prev.map(bill =>
                 bill.id === billId ? {
@@ -1269,7 +1588,6 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                     overAllPaymentPdfUrl: pdfUrl
                 } : bill
             ));
-
             alert('PDF uploaded successfully!');
         } catch (error) {
             console.error('Error uploading overall payment PDF:', error);
@@ -1283,7 +1601,6 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             }
         }
     }
-
     const handleAddPaymentEntry = () => {
         const newEntry = {
             id: Date.now(),
@@ -1299,7 +1616,6 @@ const BillDatabase = ({ username, userRoles = [] }) => {
         }
         setPaymentEntries(prev => [...prev, newEntry])
     }
-
     // Auto-fill amount when carry forward checkbox is checked
     useEffect(() => {
         if (useCarryForward && carryForwardAmount > 0 && paymentEntries.length > 0 && showPaymentModal) {
@@ -1681,7 +1997,15 @@ const BillDatabase = ({ username, userRoles = [] }) => {
 
     const formatIndianCurrency = (amount) => {
         if (!amount) return '₹0'
-        return `₹${parseInt(amount).toLocaleString()}`
+        const n = Number(amount)
+        if (!Number.isFinite(n)) return '₹0'
+        const absValue = Math.abs(n)
+        const formatted = parseInt(absValue).toLocaleString()
+        // Add space between negative sign and number for better visibility
+        if (n < 0) {
+            return `₹- ${formatted}`
+        }
+        return `₹${formatted}`
     }
     const formatDateOnly = (dateString) => {
         if (!dateString) return '-';
@@ -2368,10 +2692,21 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             </div>
             <div className="bg-white p-5 ml-10 mr-10">
                 <div className="mb-4 ml-5 mr-5">
-                    <div className="text-sm text-gray-600">
-                        Showing {filteredData.length} of {baseData.length} entries
-                        {(filters.vendorName || filters.fromDate || filters.toDate || filters.paymentStatus) && (
-                            <span className="ml-2 text-blue-600">(filtered)</span>
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="text-sm text-gray-600">
+                            Showing {filteredData.length} of {baseData.length} entries
+                            {(filters.vendorName || filters.fromDate || filters.toDate || filters.paymentStatus) && (
+                                <span className="ml-2 text-blue-600">(filtered)</span>
+                            )}
+                        </div>
+                        {filters.vendorName?.id && (
+                            <button
+                                type="button"
+                                onClick={openOverallVendorPdfPreview}
+                                className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg font-medium hover:bg-[#FAF6ED]"
+                            >
+                                Export PDF
+                            </button>
                         )}
                     </div>
                 </div>
@@ -2482,7 +2817,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                         </td>
                                     </tr>
                                 )}
-                                {sortedData.map((item, index) => (
+                                {[...sortedData].reverse().map((item, index) => (
                                     <tr key={`api-${item.id || index}`} className={`${index % 2 === 0 ? 'bg-white' : 'bg-[#FAF6ED]'}`}>
                                         <td className="px-2 py-3 text-left text-sm font-semibold border-b border-gray-100">{index + 1}</td>
                                         <td className="px-2 py-3 text-left text-sm font-semibold border-b border-gray-100">
@@ -3508,6 +3843,280 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showPaymentDetailsPdfModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+                    <div className="bg-white rounded-lg w-full max-w-[1400px] max-h-[90vh] shadow-lg flex flex-col">
+                        <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
+                            <div className="flex justify-between items-center gap-4">
+                                <h3 className="text-lg font-semibold text-left flex-1">
+                                    Payment Details PDF Preview
+                                </h3>
+                                <button
+                                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl font-bold"
+                                    onClick={() => setShowPaymentDetailsPdfModal(false)}
+                                >
+                                    ×
+                                </button>
+                            </div>
+                            <div className="mt-3 flex flex-wrap items-end gap-4">
+                                <div>
+                                    <label className="block text-sm font-semibold mb-1">From Date</label>
+                                    <input
+                                        type="date"
+                                        value={paymentPdfFromDate}
+                                        onChange={(e) => setPaymentPdfFromDate(e.target.value)}
+                                        className="w-[180px] h-[38px] px-3 border-2 border-[#BF9853] border-opacity-20 rounded-lg text-sm focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold mb-1">To Date</label>
+                                    <input
+                                        type="date"
+                                        value={paymentPdfToDate}
+                                        onChange={(e) => setPaymentPdfToDate(e.target.value)}
+                                        className="w-[180px] h-[38px] px-3 border-2 border-[#BF9853] border-opacity-20 rounded-lg text-sm focus:outline-none"
+                                    />
+                                </div>
+                                <div className="text-sm text-gray-600">
+                                    Rows: {getFilteredPaymentDetailsForPdf().length}
+                                </div>
+                                <div className="flex-1" />
+                                <button
+                                    type="button"
+                                    className="px-4 py-2 bg-[#BF9853] text-white rounded font-medium hover:bg-[#a67c3a] transition-colors duration-200"
+                                    onClick={generatePaymentDetailsPdf}
+                                >
+                                    Download PDF
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-auto p-4">
+                            <div className="overflow-x-auto border-l-8 border-l-[#BF9853] rounded-lg">
+                                <table className="table-fixed min-w-full border-collapse">
+                                    <thead>
+                                        <tr className="bg-[#FAF6ED]">
+                                            <th className="px-3 py-3 text-left font-bold text-sm border-b w-[60px]">S.No</th>
+                                            <th className="px-3 py-3 text-left font-bold text-sm border-b w-[180px]">Date and Time</th>
+                                            <th className="px-3 py-3 text-left font-bold text-sm border-b w-[110px]">No Of Bill</th>
+                                            <th className="px-3 py-3 text-right font-bold text-sm border-b w-[140px]">Bill Payment</th>
+                                            <th className="px-3 py-3 text-right font-bold text-sm border-b w-[140px]">Carry Forward</th>
+                                            <th className="px-3 py-3 text-right font-bold text-sm border-b w-[140px]">Bill Amount</th>
+                                            <th className="px-3 py-3 text-left font-bold text-sm border-b w-[140px]">Payment Mode</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {(() => {
+                                            const filtered = getFilteredPaymentDetailsForPdf()
+                                            const billAmount = Number(selectedPaymentBill?.total_amount || selectedPaymentBill?.totalAmount || actualAmount || 0) || 0
+                                            const noOfBills = selectedPaymentBill?.no_of_bills || selectedPaymentBill?.noOfBills || '-'
+                                            const billArrival = selectedPaymentBill?.timestamp || selectedPaymentBill?.billArrivalDate
+                                            const totalBillPayment = filtered.reduce((sum, p) => sum + (Number(p?.amount) || 0), 0)
+                                            const balance = totalBillPayment - billAmount
+                                            const rows = []
+                                            // Get timestamp from bill object for bill amount row
+                                            const billTimestamp = formatBillTimestamp(selectedPaymentBill)
+                                            rows.push({
+                                                sno: 1,
+                                                dateTime: billTimestamp,
+                                                noOfBill: String(noOfBills),
+                                                billPayment: '',
+                                                carryForward: '',
+                                                billAmount: formatIndianCurrency(billAmount),
+                                                mode: ''
+                                            })
+                                            filtered.forEach((p, idx) => {
+                                                const mode = p?.vendor_bill_payment_mode || p?.mode || ''
+                                                const isCarryForwardMode = String(mode).toLowerCase().includes('carry forward') || (Number(p?.carry_forward_amount) || 0) > 0
+                                                const billPay = isCarryForwardMode ? 0 : (Number(p?.amount) || 0)
+                                                const cfPay = isCarryForwardMode ? ((Number(p?.carry_forward_amount) || 0) || (Number(p?.amount) || 0)) : (Number(p?.carry_forward_amount) || 0)
+                                                rows.push({
+                                                    sno: idx + 2,
+                                                    dateTime: formatPdfDateTime(p),
+                                                    noOfBill: '',
+                                                    billPayment: billPay ? formatIndianCurrency(billPay) : '',
+                                                    carryForward: cfPay ? formatIndianCurrency(cfPay) : '',
+                                                    billAmount: '',
+                                                    mode: mode || '-'
+                                                })
+                                            })
+                                            return (
+                                                <>
+                                                    {rows.map((r, idx) => (
+                                                        <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-[#FAF6ED]'}>
+                                                            <td className="px-3 py-2 text-left text-sm font-semibold border-b">{r.sno}</td>
+                                                            <td className="px-3 py-2 text-left text-sm font-semibold border-b">{r.dateTime}</td>
+                                                            <td className="px-3 py-2 text-left text-sm font-semibold border-b">{r.noOfBill}</td>
+                                                            <td className="px-3 py-2 text-right text-sm font-semibold border-b">{r.billPayment}</td>
+                                                            <td className="px-3 py-2 text-right text-sm font-semibold border-b">{r.carryForward}</td>
+                                                            <td className="px-3 py-2 text-right text-sm font-semibold border-b">{r.billAmount}</td>
+                                                            <td className="px-3 py-2 text-left text-sm font-semibold border-b">{r.mode}</td>
+                                                        </tr>
+                                                    ))}
+                                                    <tr className="bg-[#BF9853]">
+                                                        <td className="px-3 py-2 text-left text-sm font-bold border-b" colSpan={2}>BALANCE</td>
+                                                        <td className="px-3 py-2 border-b" />
+                                                        <td className="px-3 py-2 border-b" />
+                                                        <td className="px-3 py-2 border-b" />
+                                                        <td className="px-3 py-2 border-b" />
+                                                        <td className="px-3 py-2 text-right text-sm font-bold border-b">{formatIndianCurrency(balance)}</td>
+                                                    </tr>
+                                                </>
+                                            )
+                                        })()}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
+                            <button
+                                type="button"
+                                className="px-4 py-2 bg-white text-[#BF9853] border border-[#BF9853] rounded"
+                                onClick={() => setShowPaymentDetailsPdfModal(false)}
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {showOverallVendorPdfModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4">
+                    <div className="bg-white rounded-lg w-full max-w-[1600px] max-h-[90vh] shadow-lg flex flex-col">
+                        <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
+                            <div className="flex justify-between items-center gap-4">
+                                <h3 className="text-lg font-semibold text-left flex-1">
+                                    Overall Vendor Payment PDF Preview - {filters.vendorName?.label || ''}
+                                </h3>
+                                <button
+                                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl font-bold"
+                                    onClick={() => setShowOverallVendorPdfModal(false)}
+                                >
+                                    ×
+                                </button>
+                            </div>
+                            <div className="mt-3 flex flex-wrap items-end gap-4">
+                                <div>
+                                    <label className="block text-sm font-semibold mb-1">From Date</label>
+                                    <input
+                                        type="date"
+                                        value={overallVendorPdfFromDate}
+                                        onChange={(e) => setOverallVendorPdfFromDate(e.target.value)}
+                                        className="w-[180px] h-[38px] px-3 border-2 border-[#BF9853] border-opacity-20 rounded-lg text-sm focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold mb-1">To Date</label>
+                                    <input
+                                        type="date"
+                                        value={overallVendorPdfToDate}
+                                        onChange={(e) => setOverallVendorPdfToDate(e.target.value)}
+                                        className="w-[180px] h-[38px] px-3 border-2 border-[#BF9853] border-opacity-20 rounded-lg text-sm focus:outline-none"
+                                    />
+                                </div>
+                                <div className="flex-1" />
+                                <button
+                                    type="button"
+                                    className="px-4 py-2 bg-[#BF9853] text-white rounded font-medium hover:bg-[#a67c3a] transition-colors duration-200 disabled:opacity-60"
+                                    onClick={generateOverallVendorPaymentDetailsPdf}
+                                    disabled={overallVendorPdfLoading}
+                                >
+                                    {overallVendorPdfLoading ? 'Loading...' : 'Download PDF'}
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-auto p-4">
+                            {overallVendorPdfLoading ? (
+                                <div className="text-center py-10 text-sm text-gray-500">Loading payment details...</div>
+                            ) : (
+                                <div className="overflow-x-auto border-l-8 border-l-[#BF9853] rounded-lg">
+                                    <table className="table-fixed min-w-full border-collapse">
+                                        <thead>
+                                            <tr className="bg-[#FAF6ED]">
+                                                <th className="px-3 py-3 text-left font-bold text-sm border-b w-[60px]">S.No</th>
+                                                <th className="px-3 py-3 text-left font-bold text-sm border-b w-[180px]">Date and Time</th>
+                                                <th className="px-3 py-3 text-left font-bold text-sm border-b w-[110px]">No Of Bill</th>
+                                                <th className="px-3 py-3 text-right font-bold text-sm border-b w-[140px]">Bill Payment</th>
+                                                <th className="px-3 py-3 text-right font-bold text-sm border-b w-[140px]">Carry Forward</th>
+                                                <th className="px-3 py-3 text-right font-bold text-sm border-b w-[140px]">Bill Amount</th>
+                                                <th className="px-3 py-3 text-left font-bold text-sm border-b w-[140px]">Payment Mode</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {(() => {
+                                                const data = getFilteredOverallVendorPdfData()
+                                                let sno = 1
+                                                let totalBillAmountAll = 0
+                                                let totalBillPaymentAll = 0
+                                                const rows = []
+                                                data.forEach(({ bill, payments }) => {
+                                                    const billAmount = Number(bill?.total_amount || bill?.totalAmount || 0) || 0
+                                                    const noOfBills = bill?.no_of_bills || bill?.noOfBills || '-'
+                                                    // Get timestamp from bill object for bill amount row
+                                                    const billTimestamp = formatBillTimestamp(bill)
+                                                    totalBillAmountAll += billAmount
+                                                    rows.push({
+                                                        sno: sno++,
+                                                        dateTime: billTimestamp,
+                                                        noOfBill: String(noOfBills),
+                                                        billPayment: '',
+                                                        carryForward: '',
+                                                        billAmount: formatIndianCurrency(billAmount),
+                                                        mode: ''
+                                                    })
+                                                    ;(Array.isArray(payments) ? payments : []).forEach((p) => {
+                                                        const mode = p?.vendor_bill_payment_mode || p?.mode || ''
+                                                        const isCarryForwardMode = String(mode).toLowerCase().includes('carry forward') || (Number(p?.carry_forward_amount) || 0) > 0
+                                                        const billPay = isCarryForwardMode ? 0 : (Number(p?.amount) || 0)
+                                                        const cfPay = isCarryForwardMode
+                                                            ? ((Number(p?.carry_forward_amount) || 0) || (Number(p?.amount) || 0))
+                                                            : (Number(p?.carry_forward_amount) || 0)
+                                                        totalBillPaymentAll += billPay
+                                                        rows.push({
+                                                            sno: sno++,
+                                                            dateTime: formatPdfDateTime(p),
+                                                            noOfBill: '',
+                                                            billPayment: billPay ? formatIndianCurrency(billPay) : '',
+                                                            carryForward: cfPay ? formatIndianCurrency(cfPay) : '',
+                                                            billAmount: '',
+                                                            mode: mode || '-'
+                                                        })
+                                                    })
+                                                })
+                                                const balance = totalBillAmountAll - totalBillPaymentAll
+                                                return (
+                                                    <>
+                                                        {rows.map((r, idx) => (
+                                                            <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-[#FAF6ED]'}>
+                                                                <td className="px-3 py-2 text-left text-sm font-semibold border-b">{r.sno}</td>
+                                                                <td className="px-3 py-2 text-left text-sm font-semibold border-b">{r.dateTime}</td>
+                                                                <td className="px-3 py-2 text-left text-sm font-semibold border-b">{r.noOfBill}</td>
+                                                                <td className="px-3 py-2 text-right text-sm font-semibold border-b">{r.billPayment}</td>
+                                                                <td className="px-3 py-2 text-right text-sm font-semibold border-b">{r.carryForward}</td>
+                                                                <td className="px-3 py-2 text-right text-sm font-semibold border-b">{r.billAmount}</td>
+                                                                <td className="px-3 py-2 text-left text-sm font-semibold border-b">{r.mode}</td>
+                                                            </tr>
+                                                        ))}
+                                                        <tr className="bg-[#BF9853]">
+                                                            <td className="px-3 py-2 text-left text-sm font-bold border-b" colSpan={2}>BALANCE</td>
+                                                            <td className="px-3 py-2 border-b" />                                                            
+                                                            <td className="px-3 py-2 border-b" />
+                                                            <td className="px-3 py-2 border-b" />
+                                                            <td className="px-3 py-2 text-right text-sm font-bold border-b">{formatIndianCurrency(balance)}</td>
+                                                            <td className="px-3 py-2 border-b" />
+                                                        </tr>
+                                                    </>
+                                                )
+                                            })()}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

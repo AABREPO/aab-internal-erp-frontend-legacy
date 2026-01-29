@@ -4242,7 +4242,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
     // -----------------------------
     const projectedRemainingAmount = Math.max(
         0,
-        remainingAfterPayments - carryForwardToUse
+        remainingAfterPayments - discountValue - carryForwardToUse
     );
     // -----------------------------
     // LIVE RECEIVED AMOUNT (PREVIOUS + CURRENT + CF)

@@ -13,6 +13,7 @@ const EntryChecking = () => {
     const [filteredExpenses, setFilteredExpenses] = useState([]);
     const [vendorOptions, setVendorOptions] = useState([]);
     const [contractorOptions, setContractorOptions] = useState([]);
+    const [projectNameOptions, setProjectNameOptions] = useState([]);
     const [selectedSiteName, setSelectedSiteName] = useState('');
     const [selectedVendor, setSelectedVendor] = useState('');
     const [selectedContractor, setSelectedContractor] = useState('');
@@ -114,10 +115,13 @@ const EntryChecking = () => {
                 const vendorOptions = uniqueVendorOptions.map(name => ({ value: name, label: name }));
                 const uniqueContractorOptions = [...new Set(response.data.map(expense => expense.contractor))];
                 const contractorOption = uniqueContractorOptions.map(name => ({ value: name, label: name }));
+                const uniqueProjectNames = [...new Set(response.data.map(expense => expense.siteName).filter(Boolean))];
+                const projectNameOption = uniqueProjectNames.map(name => ({ value: name, label: name }));
                 // Set the unique dropdown options in state
                 setAccountTypeOptions(uniqueAccountTypes);
                 setVendorOptions(vendorOptions);
                 setContractorOptions(contractorOption);
+                setProjectNameOptions(projectNameOption);
             })
             .catch((error) => {
                 console.error('Error fetching expenses:', error);
@@ -300,6 +304,13 @@ const EntryChecking = () => {
                                             <button onClick={() => setSelectedContractor('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
                                         </span>
                                     )}
+                                    {selectedSiteName && (
+                                        <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
+                                            <span className="font-normal">Project Name: </span>
+                                            <span className="font-bold">{selectedSiteName}</span>
+                                            <button onClick={() => setSelectedSiteName('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                        </span>
+                                    )}
                                     {selectedCategory && (
                                         <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
                                             <span className="font-normal">Category: </span>
@@ -338,38 +349,50 @@ const EntryChecking = () => {
                             </button>
                         </div>
                     </div>
-                    <div className="grid gap-2 lg:grid-cols-8 md:grid-cols-4 sm:grid-cols-1">
+                    <div className="flex flex-wrap lg:flex-nowrap gap-3 items-end mb-2">
                         <div className="flex flex-col">
-                            <label className="font-bold text-left">Date Of Entry:</label>
+                            <label className="font-bold text-left text-sm">Date Of Entry:</label>
                             <input
                                 type="date"
                                 value={selectedDate}
                                 onChange={(e) => setSelectedDate(e.target.value)}
-                                className="p-2 mt-2 rounded-md bg-transparent w-full border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
+                                className="p-1 mt-2 rounded-md bg-transparent w-full max-w-[155px] border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
                             />
                         </div>
                         <div className="flex flex-col">
-                            <label className="font-bold text-left">From Date:</label>
+                            <label className="font-bold text-left text-sm">From Date:</label>
                             <input
                                 type="date"
                                 value={selectedStartDate}
                                 onChange={(e) => setSelectedStartDate(e.target.value)}
-                                className="p-2 mt-2 rounded-md bg-transparent w-full border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
+                                className="p-1 mt-2 rounded-md bg-transparent w-full max-w-[155px] border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
                             />
                         </div>
                         <div className="flex flex-col">
-                            <label className="font-bold text-left">To Date:</label>
+                            <label className="font-bold text-left text-sm">To Date:</label>
                             <input
                                 type="date"
                                 value={selectedEndDate}
                                 onChange={(e) => setSelectedEndDate(e.target.value)}
-                                className="p-2 mt-2 rounded-md bg-transparent w-full border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
+                                className="p-1 mt-2 rounded-md bg-transparent w-full max-w-[155px] border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
                             />
                         </div>
-                        <div className="flex flex-col">
-                            <label className="font-bold text-left">Vendor:</label>
+                        <div className="flex flex-col flex-1 min-w-[140px]">
+                            <label className="font-bold text-left text-sm">Project Name:</label>
                             <Select
-                                className="mt-2 p-1"
+                                className="mt-2"
+                                options={projectNameOptions}
+                                value={selectedSiteName ? { value: selectedSiteName, label: selectedSiteName } : null}
+                                onChange={(selectedOption) => setSelectedSiteName(selectedOption ? selectedOption.value : '')}
+                                placeholder="Search Project"
+                                isClearable
+                                styles={customSelectStyles}
+                            />
+                        </div>
+                        <div className="flex flex-col flex-1 min-w-[140px]">
+                            <label className="font-bold text-left text-sm">Vendor:</label>
+                            <Select
+                                className="mt-2"
                                 options={vendorOptions}
                                 value={selectedVendor ? { value: selectedVendor, label: selectedVendor } : null}
                                 onChange={(selectedOption) => setSelectedVendor(selectedOption ? selectedOption.value : '')}
@@ -378,10 +401,10 @@ const EntryChecking = () => {
                                 styles={customSelectStyles}
                             />
                         </div>
-                        <div className="flex flex-col">
-                            <label className="font-bold text-left">Contractor:</label>
+                        <div className="flex flex-col flex-1 min-w-[140px]">
+                            <label className="font-bold text-left text-sm">Contractor:</label>
                             <Select
-                                className="p-1 mt-2"
+                                className="mt-2"
                                 options={contractorOptions}
                                 value={selectedContractor ? { value: selectedContractor, label: selectedContractor } : null}
                                 onChange={(selectedOption) => setSelectedContractor(selectedOption ? selectedOption.value : '')}
@@ -390,10 +413,10 @@ const EntryChecking = () => {
                                 styles={customSelectStyles}
                             />
                         </div>
-                        <div className="flex flex-col">
-                            <label className="font-bold text-left">A/C Type:</label>
+                        <div className="flex flex-col flex-1 max-w-[200px]">
+                            <label className="font-bold text-left text-sm">A/C Type:</label>
                             <Select
-                                className="p-1 mt-2"
+                                className="mt-2"
                                 options={accountTypeOptions.map(type => ({ value: type, label: type }))}
                                 value={selectedAccountType ? { value: selectedAccountType, label: selectedAccountType } : null}
                                 onChange={(selectedOption) => setSelectedAccountType(selectedOption ? selectedOption.value : '')}
@@ -401,16 +424,16 @@ const EntryChecking = () => {
                                 isClearable
                                 styles={customSelectStyles}
                             />
-                        </div>
+                        </div>                        
                         <div className="flex flex-col">
-                            <label className="font-bold text-left">No Of Bills:</label>
-                            <div className="w-full h-11 p-2 mt-3 rounded-lg border-[4px] border-[#FAF6ED] text-left">
+                            <label className="font-bold text-left text-sm">No Of Bills:</label>
+                            <div className="w-full h-[38px] p-2 mt-2 rounded-md border-[3px] border-[#BF9853] border-opacity-[20%] text-left">
                                 {isAnyFilterSelected ? filteredCount : ''}
                             </div>
                         </div>
                         <div className="flex flex-col">
-                            <label className="font-bold text-left">Amount:</label>
-                            <div className="w-full h-11 p-2 mt-3 rounded-lg border-[4px] border-[#FAF6ED] text-left">
+                            <label className="font-bold text-left text-sm">Amount:</label>
+                            <div className="w-full max-w-[130px] h-[38px] p-2 mt-2 rounded-md border-[3px] border-[#BF9853] border-opacity-[20%] text-left">
                                 {isAnyFilterSelected
                                     ? `₹${Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}`
                                     : ''}

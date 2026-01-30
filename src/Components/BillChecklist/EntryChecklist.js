@@ -4,6 +4,8 @@ import axios from 'axios';
 import edit from '../Images/Edit.svg';
 import history from '../Images/History.svg';
 import remove from '../Images/Delete.svg';
+import Filter from '../Images/filter (3).png';
+import Reload from '../Images/rotate-right.png';
 const EntryChecklist = () => {
     const [expenses, setExpenses] = useState([]);
     const [filteredExpenses, setFilteredExpenses] = useState([]);
@@ -17,6 +19,15 @@ const EntryChecklist = () => {
     const [filteredChecklistNumbers, setFilteredChecklistNumbers] = useState([]);
     const [audits, setAudits] = useState([]);
     const [showModal, setShowModal] = useState(false);
+    const [showTableFilter, setShowTableFilter] = useState(false);
+    const [tableFilters, setTableFilters] = useState({
+        date: '',
+        siteName: '',
+        vendor: '',
+        contractor: '',
+        category: ''
+    });
+    const [displayedExpenses, setDisplayedExpenses] = useState([]);
     const scrollRef = useRef(null);
     const isDragging = useRef(false);
     const start = useRef({ x: 0, y: 0 });
@@ -140,12 +151,31 @@ const EntryChecklist = () => {
     const handleYearChange = (e) => {
         const selectedYear = e.target.value;
         setYear(selectedYear);
-        filterChecklistByYearMonth(selectedYear, month);
+        filterChecklistByYearMonth(selectedYear, month, entryDate);
     };
     const handleMonthChange = (e) => {
         const selectedMonth = e.target.value;
         setMonth(selectedMonth);
-        filterChecklistByYearMonth(year, selectedMonth);
+        filterChecklistByYearMonth(year, selectedMonth, entryDate);
+    };
+    const handleEntryDateChange = (e) => {
+        const selectedDate = e.target.value;
+        setEntryDate(selectedDate);
+        filterChecklistByYearMonth(year, month, selectedDate);
+        if (selectedDate) {
+            const filtered = expenses.filter(exp => {
+                const expDate = new Date(exp.timestamp).toISOString().split('T')[0];
+                return expDate === selectedDate;
+            });
+            setFilteredExpenses(filtered);
+            setEntriesCount(filtered.length);
+            const uniqueChecklistNos = [...new Set(filtered.map(exp => exp.dailyChecklistNo))];
+            if (uniqueChecklistNos.length > 0) {
+                setSelectedChecklistNo(uniqueChecklistNos[0]);
+            } else {
+                setSelectedChecklistNo('');
+            }
+        }
     };
     useEffect(() => {
         if (expenses && expenses.length > 0) {
@@ -154,8 +184,8 @@ const EntryChecklist = () => {
             setFilteredChecklistNumbers(allChecklistNos);
         }
     }, [expenses]);
-    const filterChecklistByYearMonth = (selectedYear, selectedMonth) => {
-        if (!selectedYear && !selectedMonth) {
+    const filterChecklistByYearMonth = (selectedYear, selectedMonth, selectedDate) => {
+        if (!selectedYear && !selectedMonth && !selectedDate) {
             const allChecklistNos = [...new Set(expenses.map(exp => exp.dailyChecklistNo))];
             setFilteredChecklistNumbers(allChecklistNos);
             return;
@@ -164,9 +194,11 @@ const EntryChecklist = () => {
             const timestamp = new Date(exp.timestamp);
             const expYear = timestamp.getFullYear();
             const expMonth = timestamp.toLocaleString('default', { month: 'long' });
+            const expDate = timestamp.toISOString().split('T')[0];
             return (
                 (!selectedYear || expYear.toString() === selectedYear.toString()) &&
-                (!selectedMonth || expMonth === selectedMonth)
+                (!selectedMonth || expMonth === selectedMonth) &&
+                (!selectedDate || expDate === selectedDate)
             );
         });
         const uniqueChecklistNos = [...new Set(filtered.map(exp => exp.dailyChecklistNo))];
@@ -189,7 +221,54 @@ const EntryChecklist = () => {
             console.error("Error fetching audit details:", error);
         }
     };
-    const isYearOrMonthSelected = year || month;
+    const isYearOrMonthSelected = year || month || entryDate;
+    useEffect(() => {
+        let result = [...filteredExpenses];
+        if (tableFilters.date) {
+            result = result.filter(exp => {
+                const expDate = new Date(exp.date).toISOString().split('T')[0];
+                return expDate === tableFilters.date;
+            });
+        }
+        if (tableFilters.siteName) {
+            result = result.filter(exp =>
+                exp.siteName?.toLowerCase().includes(tableFilters.siteName.toLowerCase())
+            );
+        }
+        if (tableFilters.vendor) {
+            result = result.filter(exp =>
+                exp.vendor?.toLowerCase().includes(tableFilters.vendor.toLowerCase())
+            );
+        }
+        if (tableFilters.contractor) {
+            result = result.filter(exp =>
+                exp.contractor?.toLowerCase().includes(tableFilters.contractor.toLowerCase())
+            );
+        }
+        if (tableFilters.category) {
+            result = result.filter(exp =>
+                exp.category?.toLowerCase().includes(tableFilters.category.toLowerCase())
+            );
+        }
+        setDisplayedExpenses(result);
+    }, [filteredExpenses, tableFilters]);
+    const handleTableFilterChange = (field, value) => {
+        setTableFilters(prev => ({ ...prev, [field]: value }));
+    };
+    const resetTableFilters = () => {
+        setTableFilters({
+            date: '',
+            siteName: '',
+            vendor: '',
+            contractor: '',
+            category: ''
+        });
+    };
+    const totalAmount = displayedExpenses.reduce((sum, exp) => sum + Number(exp.amount || 0), 0);
+    const uniqueSiteNames = [...new Set(filteredExpenses.map(exp => exp.siteName).filter(Boolean))];
+    const uniqueVendors = [...new Set(filteredExpenses.map(exp => exp.vendor).filter(Boolean))];
+    const uniqueContractors = [...new Set(filteredExpenses.map(exp => exp.contractor).filter(Boolean))];
+    const uniqueCategories = [...new Set(filteredExpenses.map(exp => exp.category).filter(Boolean))];
     const safeChecklistOptions = Array.isArray(isYearOrMonthSelected ? filteredChecklistNumbers : checklistNumbers)
         ? (isYearOrMonthSelected ? filteredChecklistNumbers : checklistNumbers)
         : [];
@@ -248,7 +327,7 @@ const EntryChecklist = () => {
                         </div>
                         <div className="flex flex-col">
                             <label className="text-base font-semibold mb-1 text-left">Entry Date</label>
-                            <input type="date" value={entryDate}
+                            <input type="date" value={entryDate} onChange={handleEntryDateChange}
                                 className="border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] rounded-lg px-3 py-2 w-[168px] h-[45px] focus:outline-none" />
                         </div>
                         <div className="flex flex-col">
@@ -262,8 +341,62 @@ const EntryChecklist = () => {
                 </div>
             </div>
             <div className=" mx-auto max-w-[1850px] overflow-x-auto p-4 border-collapse mt-5 bg-[#FFFFFF] ml-10 mr-6 rounded-md">
-                <div className='mb-3 flex flex-col sm:flex-row lg:justify-between sm:items-center text-right cursor-default'>
-                    <div className='hidden sm:block'></div>
+                <div className='mb-3 flex flex-col sm:flex-row lg:justify-between sm:items-center cursor-default'>
+                    <div className='flex items-center gap-4'>
+                        <button className='pl-2' onClick={() => setShowTableFilter(!showTableFilter)}>
+                            <img
+                                src={Filter}
+                                alt="Toggle Filter"
+                                className="w-7 h-7 border border-[#BF9853] rounded-md"
+                            />
+                        </button>
+                        {(tableFilters.date || tableFilters.siteName || tableFilters.vendor || tableFilters.contractor || tableFilters.category) && (
+                            <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
+                                {tableFilters.date && (
+                                    <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
+                                        <span className="font-normal">Date: </span>
+                                        <span className="font-bold">{tableFilters.date}</span>
+                                        <button onClick={() => handleTableFilterChange('date', '')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                    </span>
+                                )}
+                                {tableFilters.siteName && (
+                                    <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
+                                        <span className="font-normal">Site Name: </span>
+                                        <span className="font-bold">{tableFilters.siteName}</span>
+                                        <button onClick={() => handleTableFilterChange('siteName', '')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                    </span>
+                                )}
+                                {tableFilters.vendor && (
+                                    <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
+                                        <span className="font-normal">Vendor Name: </span>
+                                        <span className="font-bold">{tableFilters.vendor}</span>
+                                        <button onClick={() => handleTableFilterChange('vendor', '')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                    </span>
+                                )}
+                                {tableFilters.contractor && (
+                                    <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
+                                        <span className="font-normal">Contractor Name: </span>
+                                        <span className="font-bold">{tableFilters.contractor}</span>
+                                        <button onClick={() => handleTableFilterChange('contractor', '')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                    </span>
+                                )}
+                                {tableFilters.category && (
+                                    <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
+                                        <span className="font-normal">Category: </span>
+                                        <span className="font-bold">{tableFilters.category}</span>
+                                        <button onClick={() => handleTableFilterChange('category', '')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                        <button
+                            onClick={resetTableFilters}
+                            className='w-36 h-9 border border-[#BF9853] rounded-md font-semibold text-sm text-[#BF9853] flex items-center justify-center gap-2'
+                        >
+                            <img className='w-4 h-4' src={Reload} alt="Reload" />
+                            Reset Table
+                        </button>
+                    </div>
                     <div className='flex flex-col sm:flex-row items-end sm:items-center gap-2 sm:gap-6 mt-2 sm:mt-0'>
                         <span className='text-[#E4572E] font-semibold hover:underline cursor-pointer'>Export PDF</span>
                         <span className='text-[#007233] font-semibold hover:underline cursor-pointer'>Export XL</span>
@@ -281,7 +414,7 @@ const EntryChecklist = () => {
                     >
                         <table className="table-fixed  min-w-[1765px] w-screen border-collapse">
                             <thead>
-                                <tr className="bg-[#FAF6ED] sticky top-0 z-10">
+                                <tr className="bg-[#FAF6ED] sticky top-0 z-9">
                                     <th className="px-2 w-[240px] font-bold text-left">Time stamp</th>
                                     <th className="px-2 p-2 w-36 font-bold text-left">Date</th>
                                     <th className="px-2 w-[120px] font-bold text-left">E.No</th>
@@ -295,9 +428,235 @@ const EntryChecklist = () => {
                                     <th className="px-3 w-[120px] font-bold text-left">Attach file</th>
                                     <th className="px-2 w-[120px] font-bold text-left">Activity</th>
                                 </tr>
+                                {showTableFilter && (
+                                    <tr className="bg-[#FAF6ED] sticky top-[32px] z-9">
+                                        <th className="px-2 w-[240px]"></th>
+                                        <th className="px-2 w-36">
+                                            <input
+                                                type="date"
+                                                value={tableFilters.date}
+                                                onChange={(e) => handleTableFilterChange('date', e.target.value)}
+                                                className="p-1 mt-3 mb-3 rounded-md bg-transparent w-32 border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
+                                                placeholder="dd-mm-yyyy"
+                                            />
+                                        </th>
+                                        <th className="px-2 w-[120px]"></th>
+                                        <th className="px-2 w-[300px]">
+                                            <Select
+                                                className="w-60 mt-3 mb-3"
+                                                options={uniqueSiteNames.map(site => ({ value: site, label: site }))}
+                                                value={tableFilters.siteName ? { value: tableFilters.siteName, label: tableFilters.siteName } : null}
+                                                onChange={(selectedOption) => handleTableFilterChange('siteName', selectedOption ? selectedOption.value : '')}
+                                                placeholder="Search Site..."
+                                                menuPlacement="bottom"
+                                                menuPosition="fixed"
+                                                isClearable
+                                                styles={{
+                                                    control: (provided, state) => ({
+                                                        ...provided,
+                                                        backgroundColor: 'transparent',
+                                                        borderWidth: '3px',
+                                                        borderColor: state.isFocused
+                                                            ? 'rgba(191, 152, 83, 0.2)'
+                                                            : 'rgba(191, 152, 83, 0.2)',
+                                                        borderRadius: '6px',
+                                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                        '&:hover': {
+                                                            borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                        },
+                                                    }),
+                                                    placeholder: (provided) => ({
+                                                        ...provided,
+                                                        fontSize: '13px',
+                                                        color: '#999',
+                                                        textAlign: 'left',
+                                                    }),
+                                                    menu: (provided) => ({
+                                                        ...provided,
+                                                        zIndex: 9999,
+                                                    }),
+                                                    option: (provided, state) => ({
+                                                        ...provided,
+                                                        textAlign: 'left',
+                                                        fontWeight: 'normal',
+                                                        fontSize: '15px',
+                                                        backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                        color: 'black',
+                                                    }),
+                                                    singleValue: (provided) => ({
+                                                        ...provided,
+                                                        textAlign: 'left',
+                                                        fontWeight: 'normal',
+                                                        color: 'black',
+                                                    }),
+                                                }}
+                                            />
+                                        </th>
+                                        <th className="px-2 w-[220px]">
+                                            <Select
+                                                className="w-48 mt-3 mb-3"
+                                                options={uniqueVendors.map(vendor => ({ value: vendor, label: vendor }))}
+                                                value={tableFilters.vendor ? { value: tableFilters.vendor, label: tableFilters.vendor } : null}
+                                                onChange={(selectedOption) => handleTableFilterChange('vendor', selectedOption ? selectedOption.value : '')}
+                                                placeholder="Search Vendor"
+                                                menuPlacement="bottom"
+                                                menuPosition="fixed"
+                                                isClearable
+                                                styles={{
+                                                    control: (provided, state) => ({
+                                                        ...provided,
+                                                        backgroundColor: 'transparent',
+                                                        borderWidth: '3px',
+                                                        borderColor: state.isFocused
+                                                            ? 'rgba(191, 152, 83, 0.2)'
+                                                            : 'rgba(191, 152, 83, 0.2)',
+                                                        borderRadius: '6px',
+                                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                        '&:hover': {
+                                                            borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                        },
+                                                    }),
+                                                    placeholder: (provided) => ({
+                                                        ...provided,
+                                                        fontSize: '13px',
+                                                        color: '#999',
+                                                        textAlign: 'left',
+                                                    }),
+                                                    menu: (provided) => ({
+                                                        ...provided,
+                                                        zIndex: 9999,
+                                                    }),
+                                                    option: (provided, state) => ({
+                                                        ...provided,
+                                                        textAlign: 'left',
+                                                        fontWeight: 'normal',
+                                                        fontSize: '15px',
+                                                        backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                        color: 'black',
+                                                    }),
+                                                    singleValue: (provided) => ({
+                                                        ...provided,
+                                                        textAlign: 'left',
+                                                        fontWeight: 'normal',
+                                                        color: 'black',
+                                                    }),
+                                                }}
+                                            />
+                                        </th>
+                                        <th className="px-2 w-[220px]">
+                                            <Select
+                                                className="w-48 mt-3 mb-3"
+                                                options={uniqueContractors.map(contractor => ({ value: contractor, label: contractor }))}
+                                                value={tableFilters.contractor ? { value: tableFilters.contractor, label: tableFilters.contractor } : null}
+                                                onChange={(selectedOption) => handleTableFilterChange('contractor', selectedOption ? selectedOption.value : '')}
+                                                placeholder="Search Contractor"
+                                                menuPlacement="bottom"
+                                                menuPosition="fixed"
+                                                isClearable
+                                                styles={{
+                                                    control: (provided, state) => ({
+                                                        ...provided,
+                                                        backgroundColor: 'transparent',
+                                                        borderWidth: '3px',
+                                                        borderColor: state.isFocused
+                                                            ? 'rgba(191, 152, 83, 0.2)'
+                                                            : 'rgba(191, 152, 83, 0.2)',
+                                                        borderRadius: '6px',
+                                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                        '&:hover': {
+                                                            borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                        },
+                                                    }),
+                                                    placeholder: (provided) => ({
+                                                        ...provided,
+                                                        fontSize: '13px',
+                                                        color: '#999',
+                                                        textAlign: 'left',
+                                                    }),
+                                                    menu: (provided) => ({
+                                                        ...provided,
+                                                        zIndex: 9999,
+                                                    }),
+                                                    option: (provided, state) => ({
+                                                        ...provided,
+                                                        textAlign: 'left',
+                                                        fontWeight: 'normal',
+                                                        fontSize: '15px',
+                                                        backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                        color: 'black',
+                                                    }),
+                                                    singleValue: (provided) => ({
+                                                        ...provided,
+                                                        textAlign: 'left',
+                                                        fontWeight: 'normal',
+                                                        color: 'black',
+                                                    }),
+                                                }}
+                                            />
+                                        </th>
+                                        <th className="px-2 w-[120px]"></th>
+                                        <th className="px-2 w-[120px] text-left font-semibold text-[#BF9853]">
+                                            ₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </th>
+                                        <th className="px-2 w-[120px]"></th>
+                                        <th className="px-2 w-[220px]">
+                                            <Select
+                                                className="w-48 mt-3 mb-3"
+                                                options={uniqueCategories.map(category => ({ value: category, label: category }))}
+                                                value={tableFilters.category ? { value: tableFilters.category, label: tableFilters.category } : null}
+                                                onChange={(selectedOption) => handleTableFilterChange('category', selectedOption ? selectedOption.value : '')}
+                                                placeholder="Search Category"
+                                                menuPlacement="bottom"
+                                                menuPosition="fixed"
+                                                isClearable
+                                                styles={{
+                                                    control: (provided, state) => ({
+                                                        ...provided,
+                                                        backgroundColor: 'transparent',
+                                                        borderWidth: '3px',
+                                                        borderColor: state.isFocused
+                                                            ? 'rgba(191, 152, 83, 0.2)'
+                                                            : 'rgba(191, 152, 83, 0.2)',
+                                                        borderRadius: '6px',
+                                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                        '&:hover': {
+                                                            borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                        },
+                                                    }),
+                                                    placeholder: (provided) => ({
+                                                        ...provided,
+                                                        fontSize: '13px',
+                                                        color: '#999',
+                                                        textAlign: 'left',
+                                                    }),
+                                                    menu: (provided) => ({
+                                                        ...provided,
+                                                        zIndex: 9999,
+                                                    }),
+                                                    option: (provided, state) => ({
+                                                        ...provided,
+                                                        textAlign: 'left',
+                                                        fontWeight: 'normal',
+                                                        fontSize: '15px',
+                                                        backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                        color: 'black',
+                                                    }),
+                                                    singleValue: (provided) => ({
+                                                        ...provided,
+                                                        textAlign: 'left',
+                                                        fontWeight: 'normal',
+                                                        color: 'black',
+                                                    }),
+                                                }}
+                                            />
+                                        </th>
+                                        <th className="px-3 w-[120px]"></th>
+                                        <th className="px-2 w-[120px]"></th>
+                                    </tr>
+                                )}
                             </thead>
                             <tbody>
-                                {filteredExpenses.map((expense, index) => (
+                                {displayedExpenses.map((expense, index) => (
                                     <tr key={index}>
                                         <td className="px-2 text-left font-semibold">{formatDate(expense.timestamp)}</td>
                                         <td className="px-2 text-left font-semibold">{formatDateOnly(expense.date)}</td>

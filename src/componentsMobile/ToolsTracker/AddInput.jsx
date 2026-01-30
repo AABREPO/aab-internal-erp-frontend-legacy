@@ -188,7 +188,9 @@ const AddInput = ({ user }) => {
           setToolsItemIdFullData(Array.isArray(data) ? data : []);
           const itemIdOpts = (Array.isArray(data) ? data : [])
             .map(item => item?.item_id?.trim() ?? item?.itemId?.trim())
-            .filter(item => item);
+            .filter(item => item)
+            // Filter out purely numeric values (these are likely database IDs, not actual item IDs)
+            .filter(item => !/^\d+$/.test(item));
           setApiItemIdOptions(itemIdOpts);
         }
       } catch (error) {
@@ -716,42 +718,45 @@ const AddInput = ({ user }) => {
     if (!itemName) {
       alert('Item Name is required.');
       return;
-    }
-    
-    // Validate required fields
-    if (!addSheetForm.model?.trim()) {
-      alert('Model is required.');
-      return;
-    }
-    if (!addSheetForm.machineNumber?.trim()) {
-      alert('Machine Number is required.');
-      return;
-    }
-    if (!addSheetForm.brand?.trim()) {
-      alert('Brand is required.');
-      return;
-    }
-    if (!addSheetForm.purchaseDate) {
-      alert('Purchase Date is required.');
-      return;
-    }
-    if (!addSheetForm.warrantyDate) {
-      alert('Warranty Date is required.');
-      return;
-    }
-    if (!addSheetForm.contact?.trim()) {
-      alert('Contact is required.');
-      return;
-    }
-    if (!addSheetForm.purchaseStore?.trim()) {
-      alert('Purchase Store is required.');
-      return;
-    }
-    if (!addSheetForm.shopAddress?.trim()) {
-      alert('Shop Address is required.');
-      return;
-    }
-    
+    }    
+    // Check if quantity is entered (not empty and not '0')
+    const hasQuantity = addSheetForm.quantity && addSheetForm.quantity !== '0' && addSheetForm.quantity.trim() !== '';    
+    // Validate required fields only if quantity is NOT entered
+    // When quantity is entered, all other fields become optional
+    if (!hasQuantity) {
+      if (!addSheetForm.model?.trim()) {
+        alert('Model is required.');
+        return;
+      }
+      if (!addSheetForm.machineNumber?.trim()) {
+        alert('Machine Number is required.');
+        return;
+      }
+      if (!addSheetForm.brand?.trim()) {
+        alert('Brand is required.');
+        return;
+      }
+      if (!addSheetForm.purchaseDate) {
+        alert('Purchase Date is required.');
+        return;
+      }
+      if (!addSheetForm.warrantyDate) {
+        alert('Warranty Date is required.');
+        return;
+      }
+      if (!addSheetForm.contact?.trim()) {
+        alert('Contact is required.');
+        return;
+      }
+      if (!addSheetForm.purchaseStore?.trim()) {
+        alert('Purchase Store is required.');
+        return;
+      }
+      if (!addSheetForm.shopAddress?.trim()) {
+        alert('Shop Address is required.');
+        return;
+      }
+    }    
     // Validate that item_ids_id is not already in use with a machine_number (unless tool_status is "Dead")
     if (addSheetForm.itemId) {
       const { inUse, machineNumber } = isItemIdInUseWithMachine(addSheetForm.itemIdDbId, addSheetForm.itemId);
@@ -759,15 +764,12 @@ const AddInput = ({ user }) => {
         alert(`Item ID "${addSheetForm.itemId}" is already assigned to machine number "${machineNumber}" and the tool status is not Dead. Please select a different Item ID.`);
         return;
       }
-    }
-    
+    }    
     if (isUploading) {
       alert('Please wait for file upload to complete.');
       return;
-    }
-    
-    setIsSaving(true);
-    
+    }    
+    setIsSaving(true);    
     try {
       // Find the item name ID from existing data - check for exact match (case-insensitive, trimmed)
       const normalizedItemName = itemName.toLowerCase().trim();
@@ -776,11 +778,9 @@ const AddInput = ({ user }) => {
           const existingName = (item?.item_name ?? item?.itemName ?? '').toLowerCase().trim();
           return existingName === normalizedItemName;
         }
-      );
-      
+      );      
       // Use existing item name ID if found, otherwise use the one from form
-      let itemNameId = existingItemName?.id ?? addSheetForm.itemNameId;
-      
+      let itemNameId = existingItemName?.id ?? addSheetForm.itemNameId;      
       // Build payload for ToolsTrackerItemStockManagement API - send IDs instead of names
       const stockManagementPayload = {
         item_name_id: itemNameId ? String(itemNameId) : itemName, // Use ID if available, otherwise use name
@@ -796,23 +796,19 @@ const AddInput = ({ user }) => {
         quantity: addSheetForm.quantity || '0',
         file_url: fileUrl || '',
         tool_status: 'Available'
-      };
-      
+      };      
       // Save to ToolsTrackerItemStockManagement API
       const stockRes = await fetch(`${TOOLS_STOCK_MANAGEMENT_BASE_URL}/save`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(stockManagementPayload)
-      });
-      
+      });      
       if (!stockRes.ok) {
         throw new Error(`Failed to save stock management: ${stockRes.status} ${stockRes.statusText}`);
-      }
-      
+      }      
       // Also save to tools_item_name for legacy/table display purposes
-      const newDetail = buildNewToolDetail();
-      
+      const newDetail = buildNewToolDetail();      
       // Check if item name already exists in the database - MUST use existing one, never create duplicate
       if (existingItemName?.id) {
         // Item name exists - UPDATE it by adding the new tool detail
@@ -820,8 +816,7 @@ const AddInput = ({ user }) => {
           ? existingItemName.tools_details
           : Array.isArray(existingItemName?.toolsDetails)
             ? existingItemName.toolsDetails
-            : [];
-        
+            : [];        
         const payload = {
           category_id: existingItemName?.category_id ?? existingItemName?.categoryId ?? selectedCategory ?? null,
           item_name: existingItemName?.item_name ?? existingItemName?.itemName, // Use the EXACT existing name
@@ -851,8 +846,7 @@ const AddInput = ({ user }) => {
           body: JSON.stringify(payload)
         });
         if (!res.ok) throw new Error(`Failed to save new ToolsItemNameList: ${res.status} ${res.statusText}`);
-      }
-      
+      }      
       // Refresh item names + details
       const refreshed = await fetch(`${TOOLS_ITEM_NAME_BASE_URL}/getAll`, {
         method: 'GET',
@@ -867,8 +861,7 @@ const AddInput = ({ user }) => {
           .filter(Boolean);
         setItemNameOptions(Array.from(new Set(names)));
         setSelectedItemName(itemName);
-      }
-      
+      }      
       // Refresh stock management data
       const stockRefreshed = await fetch(`${TOOLS_STOCK_MANAGEMENT_BASE_URL}/getAll`, {
         method: 'GET',
@@ -878,8 +871,7 @@ const AddInput = ({ user }) => {
       if (stockRefreshed.ok) {
         const stockData = await stockRefreshed.json();
         setStockManagementData(Array.isArray(stockData) ? stockData : []);
-      }
-      
+      }      
       alert('Saved successfully!');
       handleCloseAddNewSheet();
     } catch (e) {
@@ -920,23 +912,19 @@ const AddInput = ({ user }) => {
     }
     handleAddSheetFieldChange(field, value);
     closeSheetPicker();
-  };
-  
+  };  
   // Handle creating a new Item ID from the picker modal
   const handleCreateNewItemId = async () => {
     if (!newItemIdValue || !newItemIdValue.trim()) {
       alert('Please enter an Item ID');
       return;
-    }
-    
-    const trimmedItemId = newItemIdValue.trim();
-    
+    }    
+    const trimmedItemId = newItemIdValue.trim();    
     // Check if already exists
     if (apiItemIdOptions.some(id => id.toLowerCase() === trimmedItemId.toLowerCase())) {
       alert('This Item ID already exists. Please enter a different one.');
       return;
-    }
-    
+    }    
     try {
       // Save new item ID to API
       const payload = { item_id: trimmedItemId };
@@ -945,19 +933,16 @@ const AddInput = ({ user }) => {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
-      });
-      
+      });      
       if (!res.ok) {
         throw new Error(`Failed to save: ${res.status} ${res.statusText}`);
-      }
-      
+      }      
       // Refresh item IDs list
       const refreshed = await fetch(`${TOOLS_ITEM_ID_BASE_URL}/getAll`, {
         method: 'GET',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' }
-      });
-      
+      });      
       if (refreshed.ok) {
         const data = await refreshed.json();
         const dataArray = Array.isArray(data) ? data : [];
@@ -965,22 +950,19 @@ const AddInput = ({ user }) => {
         const itemIdOpts = dataArray
           .map(item => item?.item_id?.trim() ?? item?.itemId?.trim())
           .filter(item => item);
-        setApiItemIdOptions(itemIdOpts);
-        
+        setApiItemIdOptions(itemIdOpts);        
         // Find the newly created item ID's database ID from the refreshed data
         const newItemIdObj = dataArray.find(
           item => (item?.item_id?.trim() ?? item?.itemId?.trim())?.toLowerCase() === trimmedItemId.toLowerCase()
         );
-        const newItemIdDbId = newItemIdObj?.id ?? null;
-        
+        const newItemIdDbId = newItemIdObj?.id ?? null;        
         // Set the form values directly with the new item ID and its database ID
         setAddSheetForm(prev => ({
           ...prev,
           itemId: trimmedItemId,
           itemIdDbId: newItemIdDbId,
           quantity: '0' // Clear quantity when item ID is selected
-        }));
-        
+        }));        
         closeSheetPicker();
       }
     } catch (e) {
@@ -990,8 +972,7 @@ const AddInput = ({ user }) => {
   };
   const renderSheetDropdown = (field, value, placeholder) => (
     <div className="relative w-full">
-      <div
-        onClick={() => openSheetPicker(field)}
+      <div onClick={() => openSheetPicker(field)}
         className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
         style={{ color: value ? '#000' : '#9E9E9E', boxSizing: 'border-box', paddingRight: '40px' }}
       >
@@ -1017,10 +998,7 @@ const AddInput = ({ user }) => {
       <div className="flex-shrink-0 px-4 pt-2 pb-3">
         <div className="flex items-center justify-between border-b border-gray-200 gap-2">
           <p className="text-[12px] mb-2 font-medium text-black leading-normal">Category</p>
-          <button
-            onClick={() => setShowVendorsModal(true)}
-            className="text-[12px] mb-2 font-medium text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
-          >
+          <button onClick={() => setShowVendorsModal(true)} className="text-[12px] mb-2 font-medium text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity">
             Manage shops
           </button>
         </div>
@@ -1148,7 +1126,7 @@ const AddInput = ({ user }) => {
                 </div>
                 <div className="flex-1">
                   <p className="text-[12px] font-medium text-black mb-1">
-                    Model<span className="text-[#eb2f8e]">*</span>
+                    Model{!(addSheetForm.quantity && addSheetForm.quantity !== '0' && addSheetForm.quantity.trim() !== '') && <span className="text-[#eb2f8e]">*</span>}
                   </p>
                   <input
                     type="text"
@@ -1163,7 +1141,7 @@ const AddInput = ({ user }) => {
               <div className="flex gap-3 mb-2">
                 <div className="flex-1">
                   <p className="text-[12px] font-medium text-black mb-1">
-                    Machine Number<span className="text-[#eb2f8e]">*</span>
+                    Machine Number{!(addSheetForm.quantity && addSheetForm.quantity !== '0' && addSheetForm.quantity.trim() !== '') && <span className="text-[#eb2f8e]">*</span>}
                   </p>
                   <input
                     type="text"
@@ -1175,7 +1153,7 @@ const AddInput = ({ user }) => {
                 </div>
                 <div className="flex-1">
                   <p className="text-[12px] font-medium text-black mb-1">
-                    Brand<span className="text-[#eb2f8e]">*</span>
+                    Brand{!(addSheetForm.quantity && addSheetForm.quantity !== '0' && addSheetForm.quantity.trim() !== '') && <span className="text-[#eb2f8e]">*</span>}
                   </p>
                   {renderSheetDropdown('brand', addSheetForm.brand, 'Select')}
                 </div>
@@ -1184,7 +1162,7 @@ const AddInput = ({ user }) => {
               <div className="flex gap-3 w-[100px] mb-2">
                 <div className="flex-1">
                   <p className="text-[12px] font-medium text-black mb-1">
-                    Purchase Date<span className="text-[#eb2f8e]">*</span>
+                    Purchase Date{!(addSheetForm.quantity && addSheetForm.quantity !== '0' && addSheetForm.quantity.trim() !== '') && <span className="text-[#eb2f8e]">*</span>}
                   </p>
                   <div className="relative">
                     <input
@@ -1197,7 +1175,7 @@ const AddInput = ({ user }) => {
                 </div>
                 <div className="flex-1">
                   <p className="text-[12px] font-medium text-black mb-1">
-                    Warranty Date<span className="text-[#eb2f8e]">*</span>
+                    Warranty Date{!(addSheetForm.quantity && addSheetForm.quantity !== '0' && addSheetForm.quantity.trim() !== '') && <span className="text-[#eb2f8e]">*</span>}
                   </p>
                   <div className="relative">
                     <input
@@ -1213,7 +1191,7 @@ const AddInput = ({ user }) => {
               <div className="flex gap-3 mb-2">
                 <div className="flex-1">
                   <p className="text-[12px] font-medium text-black mb-1">
-                    Contact<span className="text-[#eb2f8e]">*</span>
+                    Contact{!(addSheetForm.quantity && addSheetForm.quantity !== '0' && addSheetForm.quantity.trim() !== '') && <span className="text-[#eb2f8e]">*</span>}
                   </p>
                   <input
                     type="text"
@@ -1225,7 +1203,7 @@ const AddInput = ({ user }) => {
                 </div>
                 <div className="flex-1">
                   <p className="text-[12px] font-medium text-black mb-1">
-                    Purchase Store<span className="text-[#eb2f8e]">*</span>
+                    Purchase Store{!(addSheetForm.quantity && addSheetForm.quantity !== '0' && addSheetForm.quantity.trim() !== '') && <span className="text-[#eb2f8e]">*</span>}
                   </p>
                   {renderSheetDropdown('purchaseStore', addSheetForm.purchaseStore, 'Select')}
                 </div>
@@ -1233,7 +1211,7 @@ const AddInput = ({ user }) => {
               {/* Row 6: Shop Address* full width */}
               <div className="mb-2">
                 <p className="text-[12px] font-medium text-black mb-1">
-                  Shop Address<span className="text-[#eb2f8e]">*</span>
+                  Shop Address{!(addSheetForm.quantity && addSheetForm.quantity !== '0' && addSheetForm.quantity.trim() !== '') && <span className="text-[#eb2f8e]">*</span>}
                 </p>
                 <input
                   type="text"
@@ -1284,18 +1262,12 @@ const AddInput = ({ user }) => {
             </div>
             {/* Footer: Cancel + Save */}
             <div className="flex-shrink-0 flex gap-4 px-6 pb-6 pt-2">
-              <button 
-                type="button" 
-                onClick={handleCloseAddNewSheet} 
-                disabled={isSaving || isUploading}
+              <button type="button" onClick={handleCloseAddNewSheet} disabled={isSaving || isUploading}
                 className={`flex-1 h-[40px] border border-black rounded-[8px] text-[14px] font-bold text-black bg-white ${(isSaving || isUploading) ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 Cancel
               </button>
-              <button 
-                type="button" 
-                onClick={handleAddSheetSave} 
-                disabled={isSaving || isUploading}
+              <button type="button" onClick={handleAddSheetSave} disabled={isSaving || isUploading}
                 className={`flex-1 h-[40px] rounded-[8px] text-[14px] font-bold text-white bg-black ${(isSaving || isUploading) ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 {isSaving ? 'Saving...' : isUploading ? 'Uploading...' : 'Save'}
@@ -1319,8 +1291,7 @@ const AddInput = ({ user }) => {
               <button type="button" onClick={closeSheetPicker} className="text-red-500 text-[20px] font-semibold hover:opacity-80">
                 ×
               </button>
-            </div>
-            
+            </div>            
             {/* Show input form for creating new Item ID */}
             {showNewItemIdInput && sheetOpenPicker === 'itemId' ? (
               <div className="px-6 pt-4 pb-6">
@@ -1344,11 +1315,7 @@ const AddInput = ({ user }) => {
                   >
                     Back
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleCreateNewItemId}
-                    className="flex-1 h-[40px] rounded-[8px] text-[14px] font-bold text-white bg-black"
-                  >
+                  <button type="button" onClick={handleCreateNewItemId} className="flex-1 h-[40px] rounded-[8px] text-[14px] font-bold text-white bg-black">
                     Create
                   </button>
                 </div>

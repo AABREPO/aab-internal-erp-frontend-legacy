@@ -45,9 +45,10 @@ const ToolsTracker = ({ user, onLogout }) => {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'Transfer':
+      case 'transfer':
         return <Transfer user={user} />;
       case 'history':
-        return <History user={user} />;
+        return <History user={user} onTabChange={handleTabChange} />;
       case 'pending-items':
         return <PendingItems user={user} />;
       case 'add-input':
@@ -57,7 +58,7 @@ const ToolsTracker = ({ user, onLogout }) => {
       case 'tools-history':
         return <ToolsHistory user={user} />;
       case 'service-history':
-        return <ServiceHistory user={user} />;
+        return <ServiceHistory user={user} onTabChange={handleTabChange} />;
       default:
         return <Transfer user={user} />;
     }

@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import EditIcon from '../Images/edit1.png';
+import DeleteIcon from '../Images/delete.png';
 
 const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_management';
 const PROJECT_NAMES_BASE_URL = 'https://backendaab.in/aabuilderDash/api/project_Names';
@@ -8,7 +10,7 @@ const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools
 const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_brand';
 const TOOLS_ITEM_ID_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_id';
 
-const ServiceHistory = ({ user }) => {
+const ServiceHistory = ({ user, onTabChange }) => {
   const [historyData, setHistoryData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [projectsMap, setProjectsMap] = useState({});
@@ -27,6 +29,26 @@ const ServiceHistory = ({ user }) => {
     itemId: '',
     machineStatus: ''
   });
+  // Bottom sheet state
+  const [showBottomSheet, setShowBottomSheet] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState(null);
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  
+  const statusOptions = [
+    { value: 'Working', label: 'Working' },
+    { value: 'Not Working', label: 'Not Working' },
+    { value: 'Under Repair', label: 'Under Repair' }
+  ];
+  // Swipe detection state - track per card
+  const [swipeStates, setSwipeStates] = useState({});
+  const [expandedEntryId, setExpandedEntryId] = useState(null);
+  const expandedEntryIdRef = useRef(expandedEntryId);
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    expandedEntryIdRef.current = expandedEntryId;
+  }, [expandedEntryId]);
 
   // Fetch lookup data for mapping IDs to names
   useEffect(() => {
@@ -326,6 +348,191 @@ const ServiceHistory = ({ user }) => {
     }));
   };
 
+  // Bottom sheet handlers
+  const handleCardClickForBottomSheet = (entry) => {
+    setSelectedEntry(entry);
+    setSelectedStatus(entry.machineStatus || '');
+    setShowBottomSheet(true);
+  };
+
+  const handleCloseBottomSheet = () => {
+    setShowBottomSheet(false);
+    setSelectedEntry(null);
+    setSelectedStatus('');
+    setShowStatusDropdown(false);
+  };
+
+  const handleSaveFilter = () => {
+    // Handle save logic here if needed
+    handleCloseBottomSheet();
+  };
+
+  const handleCardClick = (e) => {
+    // Don't trigger if clicking on the action buttons
+    if (e.target.closest('.action-button')) {
+      return;
+    }
+    // Don't trigger if clicking on item ID (for image viewer)
+    if (e.target.closest('.item-id-clickable')) {
+      return;
+    }
+    // Close expanded card if clicking elsewhere
+    if (expandedEntryId) {
+      setExpandedEntryId(null);
+    } else {
+      // Open bottom sheet if card is not expanded
+      const entryId = e.currentTarget.dataset.entryId;
+      if (entryId) {
+        const entry = historyData.find(ent => ent.id === entryId);
+        if (entry) {
+          handleCardClickForBottomSheet(entry);
+        }
+      }
+    }
+  };
+
+  // Swipe handlers
+  const minSwipeDistance = 50;
+  const handleTouchStart = (e, entryId) => {
+    const touch = e.touches ? e.touches[0] : { clientX: e.clientX };
+    setSwipeStates(prev => ({
+      ...prev,
+      [entryId]: {
+        startX: touch.clientX,
+        currentX: touch.clientX,
+        isSwiping: false
+      }
+    }));
+  };
+
+  const handleTouchMove = (e, entryId) => {
+    e.preventDefault();
+    const touch = e.touches ? e.touches[0] : { clientX: e.clientX };
+    setSwipeStates(prev => {
+      const state = prev[entryId];
+      if (!state) return prev;
+      const deltaX = touch.clientX - state.startX;
+      const isExpanded = expandedEntryIdRef.current === entryId;
+      // Only allow left swipe (negative deltaX)
+      if (deltaX < 0 || (isExpanded && deltaX > 0)) {
+        return {
+          ...prev,
+          [entryId]: {
+            ...state,
+            currentX: touch.clientX,
+            isSwiping: true
+          }
+        };
+      }
+      return prev;
+    });
+  };
+
+  const handleTouchEnd = (entryId) => {
+    setSwipeStates(prev => {
+      const state = prev[entryId];
+      if (!state) return prev;
+      const deltaX = state.currentX - state.startX;
+      const absDeltaX = Math.abs(deltaX);
+      
+      if (absDeltaX >= minSwipeDistance) {
+        if (deltaX < 0) {
+          // Swiped left (reveal buttons)
+          setExpandedEntryId(entryId);
+        } else {
+          // Swiped right (hide buttons)
+          setExpandedEntryId(null);
+        }
+      } else {
+        // Small movement - snap back
+        if (expandedEntryIdRef.current === entryId) {
+          setExpandedEntryId(null);
+        }
+      }
+      
+      // Remove swipe state
+      const newState = { ...prev };
+      delete newState[entryId];
+      return newState;
+    });
+  };
+
+  const handleMouseDown = (e, entryId) => {
+    if (e.button !== 0) return; // Only handle left mouse button
+    const syntheticEvent = {
+      touches: [{ clientX: e.clientX }],
+      preventDefault: () => e.preventDefault()
+    };
+    handleTouchStart(syntheticEvent, entryId);
+  };
+
+  // Global mouse handlers for desktop support
+  useEffect(() => {
+    if (historyData.length === 0) return;
+
+    const globalMouseMoveHandler = (e) => {
+      setSwipeStates(prev => {
+        let hasChanges = false;
+        const newState = { ...prev };
+        historyData.forEach(entry => {
+          const state = prev[entry.id];
+          if (!state) return;
+          const deltaX = e.clientX - state.startX;
+          const isExpanded = expandedEntryIdRef.current === entry.id;
+          // Only update if dragging horizontally
+          if (deltaX < 0 || (isExpanded && deltaX > 0)) {
+            newState[entry.id] = {
+              ...state,
+              currentX: e.clientX,
+              isSwiping: true
+            };
+            hasChanges = true;
+          }
+        });
+        return hasChanges ? newState : prev;
+      });
+    };
+
+    const globalMouseUpHandler = () => {
+      setSwipeStates(prev => {
+        let hasChanges = false;
+        const newState = { ...prev };
+        historyData.forEach(entry => {
+          const state = prev[entry.id];
+          if (!state) return;
+          const deltaX = state.currentX - state.startX;
+          const absDeltaX = Math.abs(deltaX);
+          if (absDeltaX >= minSwipeDistance) {
+            if (deltaX < 0) {
+              // Swiped left (reveal buttons)
+              setExpandedEntryId(entry.id);
+            } else {
+              // Swiped right (hide buttons)
+              setExpandedEntryId(null);
+            }
+          } else {
+            // Small movement - snap back
+            if (expandedEntryIdRef.current === entry.id) {
+              setExpandedEntryId(null);
+            }
+          }
+          // Remove swipe state for this card
+          delete newState[entry.id];
+          hasChanges = true;
+        });
+        return hasChanges ? newState : prev;
+      });
+    };
+
+    // Add global mouse event listeners
+    document.addEventListener('mousemove', globalMouseMoveHandler);
+    document.addEventListener('mouseup', globalMouseUpHandler);
+    return () => {
+      document.removeEventListener('mousemove', globalMouseMoveHandler);
+      document.removeEventListener('mouseup', globalMouseUpHandler);
+    };
+  }, [historyData]);
+
   // Get status display text and color
   const getStatusDisplay = (status) => {
     switch (status) {
@@ -343,13 +550,11 @@ const ServiceHistory = ({ user }) => {
   return (
     <div className="flex flex-col bg-white min-h-[calc(100vh-90px-80px)]" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* Top Header Section */}
-      <div className="flex-shrink-0 px-4 pt-4 pb-3">
+      <div className="flex-shrink-0 px-4 pt-4 pb-1">
         <div className="flex justify-between items-start border-b border-gray-200 pb-2 mb-2">
           <div>
             <p className="text-[14px] font-medium text-black leading-normal">Shop Name</p>
           </div>
-        </div>
-        <div className="flex justify-between items-center gap-x-4 gap-y-0 mt-1">
           <div className="flex items-center gap-3">
             <span className="text-[12px] text-[#848484] leading-normal flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-[#848484]" />
@@ -362,7 +567,6 @@ const ServiceHistory = ({ user }) => {
           </div>
         </div>
       </div>
-
       {/* Filter and Download Row */}
       <div className="flex justify-between items-center px-4 pb-3">
         <div className="flex items-center gap-1">
@@ -387,7 +591,7 @@ const ServiceHistory = ({ user }) => {
             <p className="text-[12px] text-gray-500">No service history entries found.</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-200">
+          <div className="space-y-3">
             {historyData.map((entry) => {
               const { date, time } = formatDateTime(entry.createdDateTime);
               
@@ -410,37 +614,59 @@ const ServiceHistory = ({ user }) => {
               // Service cost (placeholder - you may need to add this field to the data)
               const serviceCost = entry.serviceCost || 0;
               
+              // Swipe state and offset calculation
+              const entryId = entry.id;
+              const swipeState = swipeStates[entryId];
+              const isExpanded = expandedEntryId === entryId;
+              const buttonWidth = 96; // 2 * 40px + gap
+              const swipeOffset =
+                swipeState && swipeState.isSwiping
+                  ? Math.max(-buttonWidth, swipeState.currentX - swipeState.startX)
+                  : isExpanded
+                    ? -buttonWidth
+                    : 0;
+
               return (
-                <div
-                  key={entry.id}
-                  className="py-4"
-                >
+                <div key={entry.id} className="relative overflow-hidden">
+                  {/* Card */}
+                  <div
+                    data-entry-id={entryId}
+                    className="bg-white border-2 border-[#E0E0E0] rounded-[8px] px-3 py-2 cursor-pointer transition-transform duration-300 ease-out select-none"
+                    style={{
+                      transform: `translateX(${swipeOffset}px)`,
+                      touchAction: 'pan-y',
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none'
+                    }}
+                    onTouchStart={(e) => handleTouchStart(e, entryId)}
+                    onTouchMove={(e) => handleTouchMove(e, entryId)}
+                    onTouchEnd={() => handleTouchEnd(entryId)}
+                    onMouseDown={(e) => handleMouseDown(e, entryId)}
+                    onClick={handleCardClick}
+                  >
                   {/* Row 1: Entry number + Item Name | Date (if separate) */}
                   <div className="flex items-start justify-between mb-1">
-                    <p className="text-[13px] font-semibold text-black leading-normal">
+                    <p className="text-[13px] font-semibold text-black leading-snug truncate flex-1 min-w-0">
                       #{entry.eno}, {itemName}
                     </p>
                   </div>
 
                   {/* Row 2: Machine Number | Person Name */}
                   <div className="flex items-start justify-between mb-1">
-                    <p className="text-[14px] font-semibold text-black leading-normal">
+                    <p className="text-[14px] font-semibold text-black leading-snug truncate flex-1 min-w-0">
                       {entry.machineNumber || '-'}
                     </p>
-                    <p className="text-[12px] text-black leading-normal">
+                    <p className="text-[12px] text-black leading-snug flex-shrink-0 ml-2">
                       {inchargeName}
                     </p>
                   </div>
 
                   {/* Row 3: Shop Name | Status + Cost */}
                   <div className="flex items-start justify-between mb-1">
-                    <p 
-                      className={`text-[12px] font-medium leading-normal ${hasImages ? 'text-[#E4572E] cursor-pointer underline' : 'text-[#BF9853]'}`}
-                      onClick={() => hasImages && handleOpenImageViewer(entry, itemName, itemIdName || 'View')}
-                    >
+                    <p className="text-[12px] font-medium leading-snug truncate flex-1 min-w-0 text-[#BF9853]">
                       {shopName}
                     </p>
-                    <p className="text-[11px] leading-normal">
+                    <p className="text-[11px] leading-snug flex-shrink-0 ml-2">
                       <span className={`font-medium ${statusDisplay.color}`}>
                         {statusDisplay.text}
                       </span>
@@ -450,14 +676,64 @@ const ServiceHistory = ({ user }) => {
 
                   {/* Row 4: Date/Time | Item ID (green) */}
                   <div className="flex items-start justify-between">
-                    <p className="text-[11px] text-[#848484] leading-normal">
+                    <p className="text-[11px] text-[#848484] leading-snug truncate flex-1 min-w-0">
                       {date} • {time}
                     </p>
                     {itemIdName && (
-                      <p className="text-[13px] font-semibold text-[#4CAF50] leading-normal">
+                      <p 
+                        className={`item-id-clickable text-[13px] font-semibold leading-snug flex-shrink-0 ml-2 ${hasImages ? 'text-[#E4572E] cursor-pointer underline' : 'text-[#4CAF50]'}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (hasImages) {
+                            handleOpenImageViewer(entry, itemName, itemIdName || 'View');
+                          }
+                        }}
+                      >
                         {itemIdName}
                       </p>
                     )}
+                  </div>
+                  </div>
+
+                  {/* Action Buttons - Behind the card on the right, revealed on swipe */}
+                  <div
+                    className="absolute right-0 top-0 bottom-0 flex gap-2 flex-shrink-0 z-0"
+                    style={{
+                      opacity:
+                        isExpanded ||
+                          (swipeState && swipeState.isSwiping && swipeOffset < -20)
+                          ? 1
+                          : 0,
+                      transition: 'opacity 0.2s ease-out',
+                      pointerEvents: isExpanded ? 'auto' : 'none'
+                    }}
+                  >
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedEntryId(null);
+                        // Handle edit - store only entry ID to avoid localStorage quota issues
+                        localStorage.setItem('editingToolsTrackerEntryId', String(entry.entryId));
+                        // Switch to Transfer tab
+                        if (onTabChange) {
+                          onTabChange('transfer');
+                        }
+                      }}
+                      className="action-button w-[40px] h-full bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
+                    >
+                      <img src={EditIcon} alt="Edit" className="w-[18px] h-[18px]" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedEntryId(null);
+                        // Handle delete - you can add delete functionality here
+                        console.log('Delete entry:', entry);
+                      }}
+                      className="action-button w-[40px] h-full bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm"
+                    >
+                      <img src={DeleteIcon} alt="Delete" className="w-[18px] h-[18px]" />
+                    </button>
                   </div>
                 </div>
               );
@@ -551,6 +827,102 @@ const ServiceHistory = ({ user }) => {
               >
                 {imageViewerData.machineStatus}
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom Sheet Modal */}
+      {showBottomSheet && (
+        <div 
+          className="fixed inset-0 z-50 flex items-end"
+          onClick={handleCloseBottomSheet}
+          style={{ fontFamily: "'Manrope', sans-serif" }}
+        >
+          {/* Semi-transparent overlay */}
+          <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+          
+          {/* Bottom Sheet */}
+          <div 
+            className="relative z-10 w-full bg-white rounded-t-[20px] shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-200">
+              <p className="text-[16px] font-semibold text-black">Select Filters</p>
+              <button
+                onClick={handleCloseBottomSheet}
+                className="w-6 h-6 flex items-center justify-center"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M18 6L6 18M6 6L18 18" stroke="#F44336" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="px-4 py-4">
+              {/* Machine Status Filter */}
+              <div className="mb-4">
+                <label className="block text-[14px] font-medium text-black mb-2">
+                  Machine Status
+                </label>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                    className="w-full px-3 py-2.5 text-left bg-white border border-gray-300 rounded-[8px] flex items-center justify-between"
+                  >
+                    <span className={`text-[14px] ${selectedStatus ? 'text-black' : 'text-gray-400'}`}>
+                      {selectedStatus || 'Select Status'}
+                    </span>
+                    <svg 
+                      width="16" 
+                      height="16" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      xmlns="http://www.w3.org/2000/svg"
+                      className={`transform transition-transform ${showStatusDropdown ? 'rotate-180' : ''}`}
+                    >
+                      <path d="M6 9L12 15L18 9" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
+                  
+                  {showStatusDropdown && (
+                    <div className="absolute z-30 w-full bottom-full mb-1 bg-white border border-gray-300 rounded-[8px] shadow-lg max-h-48 overflow-y-auto">
+                      {statusOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          onClick={() => {
+                            setSelectedStatus(option.value);
+                            setShowStatusDropdown(false);
+                          }}
+                          className={`w-full px-3 py-2.5 text-left text-[14px] hover:bg-gray-100 ${
+                            selectedStatus === option.value ? 'bg-gray-100 font-medium' : ''
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 px-4 pb-2">
+              <button
+                onClick={handleCloseBottomSheet}
+                className="flex-1 px-4 py-3 text-[14px] font-medium text-black bg-white border border-gray-300 rounded-[8px] hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveFilter}
+                className="flex-1 px-4 py-3 text-[14px] font-medium text-white bg-black rounded-[8px] hover:bg-gray-800"
+              >
+                Save
+              </button>
             </div>
           </div>
         </div>

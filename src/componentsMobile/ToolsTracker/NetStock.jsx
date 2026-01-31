@@ -28,14 +28,14 @@ const NetStock = ({ user }) => {
   }, [showItemNameDropdown, showItemIdDropdown]);
 
   return (
-    <div className="flex flex-col bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
+    <div className="flex flex-col bg-white px-4" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* Category and Brand Section */}
         <div className="flex justify-between mb-2 mt-2">
           <p className="text-[12px] text-[#848484] leading-normal mb-2">Category</p>
           <p className="text-[12px] text-[#848484] leading-normal mb-2">Brand</p>
         </div>
         {/* Table/List Segmented Control */}
-        <div className="flex-shrink-0 px-4 pt-2">
+        <div className="flex-shrink-0 pt-2">
           <div className="flex bg-gray-100 items-center h-9 shadow-sm flex-1 rounded-md">
             <button
               onClick={() => setViewMode('table')}

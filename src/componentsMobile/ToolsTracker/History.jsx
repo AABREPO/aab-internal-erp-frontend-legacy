@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import EditIcon from '../Images/edit1.png';
+import DeleteIcon from '../Images/delete.png';
 
 const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_management';
 const PROJECT_NAMES_BASE_URL = 'https://backendaab.in/aabuilderDash/api/project_Names';
@@ -8,16 +10,16 @@ const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools
 const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_brand';
 const TOOLS_ITEM_ID_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_id';
 
-const History = ({ user }) => {
+const History = ({ user, onTabChange }) => {
   const [historyData, setHistoryData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fullEntriesData, setFullEntriesData] = useState([]); // Store full entries before flattening
   const [projectsMap, setProjectsMap] = useState({});
   const [vendorsMap, setVendorsMap] = useState({});
   const [employeesMap, setEmployeesMap] = useState({});
   const [itemNamesMap, setItemNamesMap] = useState({});
   const [brandsMap, setBrandsMap] = useState({});
   const [itemIdsMap, setItemIdsMap] = useState({});
-  // Image viewer state
   const [showImageViewer, setShowImageViewer] = useState(false);
   const [imageViewerData, setImageViewerData] = useState({
     images: [],
@@ -26,11 +28,15 @@ const History = ({ user }) => {
     itemId: '',
     machineStatus: ''
   });
-  // Fetch lookup data for mapping IDs to names
+  const [swipeStates, setSwipeStates] = useState({});
+  const [expandedEntryId, setExpandedEntryId] = useState(null);
+  const expandedEntryIdRef = useRef(expandedEntryId);
+  useEffect(() => {
+    expandedEntryIdRef.current = expandedEntryId;
+  }, [expandedEntryId]);
   useEffect(() => {
     const fetchLookupData = async () => {
       try {
-        // Fetch projects (using siteName field like Transfer.jsx)
         const projectsRes = await fetch(`${PROJECT_NAMES_BASE_URL}/getAll`, {
           method: 'GET',
           credentials: 'include',
@@ -44,7 +50,6 @@ const History = ({ user }) => {
           });
           setProjectsMap(map);
         }
-        // Fetch vendors (using vendorName field like Transfer.jsx)
         const vendorsRes = await fetch(`${VENDOR_NAMES_BASE_URL}/getAll`, {
           method: 'GET',
           credentials: 'include',
@@ -58,7 +63,6 @@ const History = ({ user }) => {
           });
           setVendorsMap(map);
         }
-        // Fetch employees
         const employeesRes = await fetch(`${EMPLOYEE_DETAILS_BASE_URL}/site_engineers`, {
           method: 'GET',
           credentials: 'include',
@@ -72,7 +76,6 @@ const History = ({ user }) => {
           });
           setEmployeesMap(map);
         }
-        // Fetch item names
         const itemNamesRes = await fetch(`${TOOLS_ITEM_NAME_BASE_URL}/getAll`, {
           method: 'GET',
           credentials: 'include',
@@ -86,7 +89,6 @@ const History = ({ user }) => {
           });
           setItemNamesMap(map);
         }
-        // Fetch brands
         const brandsRes = await fetch(`${TOOLS_BRAND_BASE_URL}/getAll`, {
           method: 'GET',
           credentials: 'include',
@@ -100,7 +102,6 @@ const History = ({ user }) => {
           });
           setBrandsMap(map);
         }
-        // Fetch item IDs
         const itemIdsRes = await fetch(`${TOOLS_ITEM_ID_BASE_URL}/getAll`, {
           method: 'GET',
           credentials: 'include',
@@ -111,11 +112,9 @@ const History = ({ user }) => {
           const map = {};
           (Array.isArray(data) ? data : []).forEach(i => {
             const toolsId = i.item_id || i.itemId || '';
-            // Store with both string and number keys for flexible lookup
             map[i.id] = toolsId;
             map[String(i.id)] = toolsId;
           });
-          console.log('ItemIds Map:', map);
           setItemIdsMap(map);
         }
       } catch (error) {
@@ -124,7 +123,6 @@ const History = ({ user }) => {
     };
     fetchLookupData();
   }, []);
-  // Fetch history data from tools tracker management API
   useEffect(() => {
     const fetchHistory = async () => {
       try {
@@ -135,13 +133,16 @@ const History = ({ user }) => {
           headers: { 'Content-Type': 'application/json' }
         });        
         if (response.ok) {
-          const data = await response.json();          
-          // Flatten the data - create separate entries for each item
+          const data = await response.json();
+          const fullEntries = (Array.isArray(data) ? data : []).filter(entry => {
+            const entryType = entry.tools_entry_type || entry.toolsEntryType || 'Entry';
+            return entryType.toLowerCase() === 'entry';
+          });
+          setFullEntriesData(fullEntries);
           const flattenedData = [];
-          (Array.isArray(data) ? data : []).forEach(entry => {
+          fullEntries.forEach(entry => {
             const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];            
             if (entryItems.length === 0) {
-              // If no items, still show the entry
               flattenedData.push({
                 id: `${entry.id}-0`,
                 entryId: entry.id,
@@ -163,17 +164,13 @@ const History = ({ user }) => {
                 images: []
               });
             } else {
-              // Create separate entry for each item
               entryItems.forEach((item, index) => {
-                // Process images - convert base64 to data URLs if needed
                 const rawImages = item.tools_item_live_images || item.toolsItemLiveImages || [];
                 const processedImages = rawImages.map(img => {
-                  // If tools_image exists (byte array as base64), convert to data URL
                   if (img.tools_image || img.toolsImage) {
                     const base64Data = img.tools_image || img.toolsImage;
                     return `data:image/jpeg;base64,${base64Data}`;
                   }
-                  // Fallback to URL if exists
                   if (img.tools_image_url || img.toolsImageUrl) {
                     return img.tools_image_url || img.toolsImageUrl;
                   }
@@ -202,14 +199,12 @@ const History = ({ user }) => {
               });
             }
           });          
-          // Sort by created_date_time (newest first)
           flattenedData.sort((a, b) => {
             const dateA = new Date(a.createdDateTime);
             const dateB = new Date(b.createdDateTime);
             return dateB - dateA;
           });          
-          // Filter to only show 'Entry' type data (exclude Service and other types)
-          const filteredData = flattenedData.filter(entry => entry.toolsEntryType === 'entry');          
+          const filteredData = flattenedData.filter(entry => entry.toolsEntryType === 'entry');
           setHistoryData(filteredData);
         } else {
           console.error('Failed to fetch history data');
@@ -224,7 +219,6 @@ const History = ({ user }) => {
     };
     fetchHistory();
   }, []);
-  // Format timestamp to date and time
   const formatDateTime = (timestamp) => {
     if (!timestamp) return { date: '', time: '' };
     try {
@@ -244,13 +238,10 @@ const History = ({ user }) => {
       return { date: '', time: '' };
     }
   };
-  // Get location name (project or vendor)
   const getLocationName = (id, checkVendorsFirst = false) => {
     if (!id) return '-';    
-    // Convert to string for comparison
     const idStr = String(id);    
     if (checkVendorsFirst) {
-      // Check vendors first (for service stores)
       if (vendorsMap[idStr]) {
         return vendorsMap[idStr];
       }
@@ -258,14 +249,12 @@ const History = ({ user }) => {
         return vendorsMap[id];
       }
     }    
-    // Check projects
     if (projectsMap[idStr]) {
       return projectsMap[idStr];
     }
     if (projectsMap[id]) {
       return projectsMap[id];
     }    
-    // Check vendors
     if (vendorsMap[idStr]) {
       return vendorsMap[idStr];
     }
@@ -274,7 +263,6 @@ const History = ({ user }) => {
     }    
     return '-';
   };
-  // Image viewer handlers
   const handleOpenImageViewer = (entry, itemName, itemId) => {
     if (entry.images.length === 0) {
       alert('No images available for this item');
@@ -304,13 +292,138 @@ const History = ({ user }) => {
       currentIndex: prev.currentIndex === prev.images.length - 1 ? 0 : prev.currentIndex + 1
     }));
   };
+  const minSwipeDistance = 50;
+  const handleTouchStart = (e, entryId) => {
+    const touch = e.touches ? e.touches[0] : { clientX: e.clientX };
+    setSwipeStates(prev => ({
+      ...prev,
+      [entryId]: {
+        startX: touch.clientX,
+        currentX: touch.clientX,
+        isSwiping: false
+      }
+    }));
+  };
+  const handleTouchMove = (e, entryId) => {
+    e.preventDefault();
+    const touch = e.touches ? e.touches[0] : { clientX: e.clientX };
+    setSwipeStates(prev => {
+      const state = prev[entryId];
+      if (!state) return prev;
+      const deltaX = touch.clientX - state.startX;
+      const isExpanded = expandedEntryIdRef.current === entryId;
+      if (deltaX < 0 || (isExpanded && deltaX > 0)) {
+        return {
+          ...prev,
+          [entryId]: {
+            ...state,
+            currentX: touch.clientX,
+            isSwiping: true
+          }
+        };
+      }
+      return prev;
+    });
+  };
+  const handleTouchEnd = (entryId) => {
+    setSwipeStates(prev => {
+      const state = prev[entryId];
+      if (!state) return prev;
+      const deltaX = state.currentX - state.startX;
+      const absDeltaX = Math.abs(deltaX);
+      if (absDeltaX >= minSwipeDistance) {
+        if (deltaX < 0) {
+          setExpandedEntryId(entryId);
+        } else {
+          setExpandedEntryId(null);
+        }
+      } else {
+        if (expandedEntryIdRef.current === entryId) {
+          setExpandedEntryId(null);
+        }
+      }
+      const newState = { ...prev };
+      delete newState[entryId];
+      return newState;
+    });
+  };
+  const handleMouseDown = (e, entryId) => {
+    if (e.button !== 0) return; // Only handle left mouse button
+    const syntheticEvent = {
+      touches: [{ clientX: e.clientX }],
+      preventDefault: () => e.preventDefault()
+    };
+    handleTouchStart(syntheticEvent, entryId);
+  };
+  const handleCardClick = (e) => {
+    if (e.target.closest('.action-button')) {
+      return;
+    }
+    if (expandedEntryId) {
+      setExpandedEntryId(null);
+    }
+  };
+  useEffect(() => {
+    if (historyData.length === 0) return;
+    const globalMouseMoveHandler = (e) => {
+      setSwipeStates(prev => {
+        let hasChanges = false;
+        const newState = { ...prev };
+        historyData.forEach(entry => {
+          const state = prev[entry.id];
+          if (!state) return;
+          const deltaX = e.clientX - state.startX;
+          const isExpanded = expandedEntryIdRef.current === entry.id;
+          if (deltaX < 0 || (isExpanded && deltaX > 0)) {
+            newState[entry.id] = {
+              ...state,
+              currentX: e.clientX,
+              isSwiping: true
+            };
+            hasChanges = true;
+          }
+        });
+        return hasChanges ? newState : prev;
+      });
+    };
+    const globalMouseUpHandler = () => {
+      setSwipeStates(prev => {
+        let hasChanges = false;
+        const newState = { ...prev };
+        historyData.forEach(entry => {
+          const state = prev[entry.id];
+          if (!state) return;
+          const deltaX = state.currentX - state.startX;
+          const absDeltaX = Math.abs(deltaX);
+          if (absDeltaX >= minSwipeDistance) {
+            if (deltaX < 0) {
+              setExpandedEntryId(entry.id);
+            } else {
+              setExpandedEntryId(null);
+            }
+          } else {
+            if (expandedEntryIdRef.current === entry.id) {
+              setExpandedEntryId(null);
+            }
+          }
+          delete newState[entry.id];
+          hasChanges = true;
+        });
+        return hasChanges ? newState : prev;
+      });
+    };
+    document.addEventListener('mousemove', globalMouseMoveHandler);
+    document.addEventListener('mouseup', globalMouseUpHandler);
+    return () => {
+      document.removeEventListener('mousemove', globalMouseMoveHandler);
+      document.removeEventListener('mouseup', globalMouseUpHandler);
+    };
+  }, [historyData]);
   return (
     <div className="flex flex-col bg-white min-h-[calc(100vh-90px-80px)]" style={{ fontFamily: "'Manrope', sans-serif" }}>
-      {/* Category Header */}
       <div className="flex-shrink-0 px-4 pt-4 pb-2 border-b border-gray-200">
         <p className="text-[12px] text-black font-medium">Category</p>
       </div>
-      {/* History Entries List */}
       <div className="flex-1 px-4 overflow-y-auto pb-4">
         {loading ? (
           <div className="flex items-center justify-center py-8">
@@ -321,50 +434,68 @@ const History = ({ user }) => {
             <p className="text-[12px] text-gray-500">No history entries found.</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-200">
+          <div className="mt-3 shadow-lg rounded-lg">
             {historyData.map((entry) => {
               const { date, time } = formatDateTime(entry.createdDateTime);
-              const fromLocation = getLocationName(entry.fromProjectId, false);              
-              // For "To" location - check based on entry type
+              const fromLocation = getLocationName(entry.fromProjectId, false);
               let toLocation = '-';
               if (entry.toolsEntryType === 'Entry') {
-                // Entry type: check toProjectId first, then serviceStoreId
                 toLocation = getLocationName(entry.toProjectId, false);
                 if (toLocation === '-') {
                   toLocation = getLocationName(entry.serviceStoreId, true);
                 }
               } else {
-                // Service type: check serviceStoreId first (vendors), then toProjectId
                 toLocation = getLocationName(entry.serviceStoreId, true);
                 if (toLocation === '-') {
                   toLocation = getLocationName(entry.toProjectId, false);
                 }
               }              
               const inchargeName = employeesMap[entry.projectInchargeId] || employeesMap[String(entry.projectInchargeId)] || '-';
-              const itemName = itemNamesMap[entry.itemNameId] || itemNamesMap[String(entry.itemNameId)] || entry.itemNameId || '-';              
-              // Get item ID name (like "AA DM 01") from the map using item_ids_id
+              const itemName = itemNamesMap[entry.itemNameId] || itemNamesMap[String(entry.itemNameId)] || entry.itemNameId || '-';
               const itemIdName = entry.itemIdsId ? (itemIdsMap[entry.itemIdsId] || itemIdsMap[String(entry.itemIdsId)] || '') : '';
               const hasImages = entry.images.length > 0;              
-              // Determine what to show: itemIdName (like "AA DM 01") or quantity
               const displayValue = itemIdName || (entry.quantity > 0 ? String(entry.quantity) : '');
+              const entryId = entry.id;
+              const swipeState = swipeStates[entryId];
+              const isExpanded = expandedEntryId === entryId;
+              const buttonWidth = 96;
+              const swipeOffset =
+                swipeState && swipeState.isSwiping
+                  ? Math.max(-buttonWidth, swipeState.currentX - swipeState.startX)
+                  : isExpanded
+                    ? -buttonWidth
+                    : 0;
               return (
-                <div key={entry.id} className="py-4">
-                  {/* Row 1: Entry number + Item Name | Item ID Name or Quantity */}
+                <div key={entry.id} className="relative overflow-hidden">
+                  <div
+                    className="bg-white border-2 border-[#E0E0E0] rounded-[8px] px-3 py-2 cursor-pointer transition-transform duration-300 ease-out select-none"
+                    style={{
+                      transform: `translateX(${swipeOffset}px)`,
+                      touchAction: 'pan-y',
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none'
+                    }}
+                    onTouchStart={(e) => handleTouchStart(e, entryId)}
+                    onTouchMove={(e) => handleTouchMove(e, entryId)}
+                    onTouchEnd={() => handleTouchEnd(entryId)}
+                    onMouseDown={(e) => handleMouseDown(e, entryId)}
+                    onClick={handleCardClick}
+                  >
                   <div className="flex items-start justify-between mb-1">
-                    <p className="text-[12px] font-semibold text-black leading-normal">
+                    <p className="text-[12px] font-semibold text-black leading-snug truncate flex-1 min-w-0">
                       #{entry.eno}, {itemName}
                     </p>
-                    <div className="flex flex-col items-end">
+                    <div className="flex flex-col items-end flex-shrink-0 ml-2">
                       {displayValue ? (
                         <p 
-                          className={`text-[12px] font-semibold leading-normal ${hasImages ? 'text-[#E4572E] cursor-pointer underline' : 'text-black'}`}
+                          className={`text-[12px] font-semibold leading-snug ${hasImages ? 'text-[#E4572E] cursor-pointer underline' : 'text-black'}`}
                           onClick={() => hasImages && handleOpenImageViewer(entry, itemName, displayValue)}
                         >
                           {displayValue}
                         </p>
                       ) : hasImages ? (
                         <p 
-                          className="text-[12px] font-semibold leading-normal text-[#E4572E] cursor-pointer underline"
+                          className="text-[12px] font-semibold leading-snug text-[#E4572E] cursor-pointer underline"
                           onClick={() => handleOpenImageViewer(entry, itemName, 'View')}
                         >
                           📷 Image
@@ -372,23 +503,21 @@ const History = ({ user }) => {
                       ) : null}
                     </div>
                   </div>
-                  {/* Row 2: From | Machine Number */}
                   <div className="flex items-start justify-between mb-1">
-                    <p className="text-[11px] text-[#848484] leading-normal">
+                    <p className="text-[11px] text-[#848484] leading-snug truncate flex-1 min-w-0">
                       From - {fromLocation}
                     </p>
                     {entry.machineNumber && (
-                      <p className="text-[12px] leading-normal text-black">
+                      <p className="text-[12px] leading-snug text-black flex-shrink-0 ml-2">
                         {entry.machineNumber}
                       </p>
                     )}
                   </div>
-                  {/* Row 3: To | Status */}
                   <div className="flex items-start justify-between mb-1">
-                    <p className="text-[11px] text-[#BF9853] leading-normal">
+                    <p className="text-[11px] text-[#BF9853] leading-snug truncate flex-1 min-w-0">
                       To - {toLocation}
                     </p>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 flex-shrink-0 ml-2">
                       <span
                         className={`w-1.5 h-1.5 rounded-full ${
                           entry.machineStatus === 'Working' ? 'bg-[#4CAF50]' : 
@@ -398,7 +527,7 @@ const History = ({ user }) => {
                         }`}
                       ></span>
                       <p
-                        className={`text-[11px] font-medium leading-normal ${
+                        className={`text-[11px] font-medium leading-snug ${
                           entry.machineStatus === 'Working' ? 'text-[#4CAF50]' : 
                           entry.machineStatus === 'Not Working' ? 'text-[#F44336]' :
                           entry.machineStatus === 'Under Repair' ? 'text-[#FF9800]' :
@@ -409,14 +538,46 @@ const History = ({ user }) => {
                       </p>
                     </div>
                   </div>
-                  {/* Row 4: Date/Time | Person Name */}
                   <div className="flex items-start justify-between">
-                    <p className="text-[11px] text-[#848484] leading-normal">
+                    <p className="text-[11px] text-[#848484] leading-snug truncate flex-1 min-w-0">
                       {date} • {time}
                     </p>
-                    <p className="text-[12px] font-medium text-black leading-normal">
+                    <p className="text-[12px] font-medium text-black leading-snug flex-shrink-0 ml-2">
                       {inchargeName}
                     </p>
+                  </div>
+                  </div>
+                  <div
+                    className="absolute right-0 top-0 bottom-0 flex gap-2 flex-shrink-0 z-0"
+                    style={{
+                      opacity:
+                        isExpanded ||
+                          (swipeState && swipeState.isSwiping && swipeOffset < -20)
+                          ? 1
+                          : 0,
+                      transition: 'opacity 0.2s ease-out',
+                      pointerEvents: isExpanded ? 'auto' : 'none'
+                    }}
+                  >
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedEntryId(null);
+                        localStorage.setItem('editingToolsTrackerEntryId', String(entry.entryId));
+                        if (onTabChange) {
+                          onTabChange('transfer');
+                        }
+                      }}
+                      className="action-button w-[40px] h-full bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
+                    >
+                      <img src={EditIcon} alt="Edit" className="w-[18px] h-[18px]" />
+                    </button>
+                    <button
+                      onClick={(e) => {e.stopPropagation();setExpandedEntryId(null);}}
+                      className="action-button w-[40px] h-full bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm"
+                    >
+                      <img src={DeleteIcon} alt="Delete" className="w-[18px] h-[18px]" />
+                    </button>
                   </div>
                 </div>
               );
@@ -424,27 +585,21 @@ const History = ({ user }) => {
           </div>
         )}
       </div>
-      {/* Image Viewer Modal - Floating style */}
       {showImageViewer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={handleCloseImageViewer} style={{ fontFamily: "'Manrope', sans-serif" }} >
-          {/* Semi-transparent overlay */}
-          <div className="absolute inset-0 bg-black bg-opacity-40"></div>          
-          {/* Image Container */}
+          <div className="absolute inset-0 bg-black bg-opacity-40"></div>
           <div className="relative z-10 w-full max-w-[90%] mx-4" onClick={(e) => e.stopPropagation()} >
-            {/* Image */}
             <div className="relative">
               <img
                 src={imageViewerData.images[imageViewerData.currentIndex]}
                 alt={`${imageViewerData.itemName} - ${imageViewerData.currentIndex + 1}`}
                 className="w-full h-auto max-h-[60vh] object-contain rounded-lg shadow-2xl"
               />              
-              {/* Close Button - Inside image at top right */}
               <button onClick={handleCloseImageViewer} className="absolute -top-7 -right-1 w-8 h-8 rounded-full flex items-center justify-center z-20 ">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M18 6L6 18M6 6L18 18" stroke="#E4572E" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>              
-              {/* Previous Button */}
               {imageViewerData.images.length > 1 && (
                 <button onClick={handlePrevImage}
                   className="absolute left-2 top-1/2 transform -translate-y-1/2 w-10 h-10 bg-black/50 rounded-full flex items-center justify-center"
@@ -454,7 +609,6 @@ const History = ({ user }) => {
                   </svg>
                 </button>
               )}
-              {/* Next Button */}
               {imageViewerData.images.length > 1 && (
                 <button onClick={handleNextImage}
                   className="absolute right-2 top-1/2 transform -translate-y-1/2 w-10 h-10 bg-black/50 rounded-full flex items-center justify-center"
@@ -464,7 +618,6 @@ const History = ({ user }) => {
                   </svg>
                 </button>
               )}
-              {/* Image Counter */}
               {imageViewerData.images.length > 1 && (
                 <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 bg-black/50 px-3 py-1 rounded-full">
                   <span className="text-[12px] text-white">
@@ -473,7 +626,6 @@ const History = ({ user }) => {
                 </div>
               )}
             </div>
-            {/* Status indicator below image */}
             <div className="flex items-center justify-center gap-2 mt-3">
               <span
                 className={`w-2 h-2 rounded-full ${

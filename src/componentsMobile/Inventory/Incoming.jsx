@@ -272,7 +272,7 @@ const Incoming = ({ user }) => {
     setLoadingPOItems(true);
     try {
       let data = allPurchaseOrders;
-      let po = null;      
+      let po = null;
       // If we have a cached PO, use it directly (from SelectPOModal)
       if (cachedPO) {
         po = cachedPO;
@@ -280,23 +280,23 @@ const Incoming = ({ user }) => {
         // Use cached data if available, otherwise fetch
         if (data.length === 0) {
           data = await fetchAllPurchaseOrders();
-        }      
+        }
         // Find the PO with matching ENO - use numeric comparison for better matching
-        const targetEno = getNumericEno(eno);        
+        const targetEno = getNumericEno(eno);
         // Filter by vendor first to narrow down the search
-        const vendorPOs = incomingData.vendorId 
+        const vendorPOs = incomingData.vendorId
           ? data.filter(p => String(p.vendor_id || p.vendorId) === String(incomingData.vendorId))
-          : data;        
+          : data;
         // Find ALL POs with matching ENO for this vendor
         const matchingPOs = vendorPOs.filter(p => {
           const poEno = getNumericEno(p.eno || p.ENO || p.poNumber || p.po_number || '');
           return poEno === targetEno && poEno !== 0;
-        });        
+        });
         // Prioritize PO with items - find all POs with items, then pick the most recent one
         const posWithItems = matchingPOs.filter(p => {
           const items = p.purchaseTable || p.purchase_table || p.items || [];
           return items.length > 0;
-        });        
+        });
         if (posWithItems.length > 0) {
           // If multiple POs have items, pick the most recent one (highest ID)
           po = posWithItems.reduce((latest, current) => {
@@ -313,163 +313,163 @@ const Incoming = ({ user }) => {
           });
         }
       }
-        if (po) {
-          // Handle purchaseTable - it might be an array or might need to be accessed differently
-          const purchaseTableItems = po.purchaseTable || po.purchase_table || po.items || [];          
-          if (purchaseTableItems.length === 0) {
-            setLoadingPOItems(false);
-            return;
-          }
-          // Fetch existing inventory records for this PO number to check already added quantities
-          // Map using composite key: item_id-category_id-model_id-brand_id-type_id
-          let inventoryItemQuantities = {}; // Map of composite key to total quantity already added
-          try {
-            const poNumberStr = String(eno).replace('#', '').trim();
-            const inventoryResponse = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll');
-            if (inventoryResponse.ok) {
-              const inventoryRecords = await inventoryResponse.json();              
-              // Filter inventory records by purchase_no matching the PO number and exclude deleted records
-              const matchingInventoryRecords = inventoryRecords.filter(record => {
-                // Exclude deleted records
-                const recordDeleteStatus = record.delete_status !== undefined ? record.delete_status : record.deleteStatus;
-                if (recordDeleteStatus) {
-                  return false;
-                }                
-                // Match by purchase_no
-                const recordPurchaseNo = record.purchase_no || record.purchaseNo || record.purchase_number || '';
-                const recordPurchaseNoStr = String(recordPurchaseNo).replace('#', '').trim();
-                return recordPurchaseNoStr === poNumberStr;
-              });              
-              // Calculate total quantity per full row (composite key) from inventory records
-              matchingInventoryRecords.forEach(record => {
-                const inventoryItems = record.inventoryItems || record.inventory_items || [];
-                if (Array.isArray(inventoryItems)) {
-                  inventoryItems.forEach(invItem => {
-                    const itemId = invItem.item_id || invItem.itemId || null;
-                    const categoryId = invItem.category_id || invItem.categoryId || null;
-                    const modelId = invItem.model_id || invItem.modelId || null;
-                    const brandId = invItem.brand_id || invItem.brandId || null;
-                    const typeId = invItem.type_id || invItem.typeId || null;
-                    const quantity = Math.abs(invItem.quantity || 0); // Use absolute value for incoming                    
-                    // Create composite key for full row matching
-                    const compositeKey = `${itemId || 'null'}-${categoryId || 'null'}-${modelId || 'null'}-${brandId || 'null'}-${typeId || 'null'}`;                    
-                    if (itemId !== null && itemId !== undefined) {
-                      inventoryItemQuantities[compositeKey] = (inventoryItemQuantities[compositeKey] || 0) + quantity;
-                    }
-                  });
-                }
-              });
-            }
-          } catch (error) {
-            console.error('Error fetching inventory records:', error);
-            // Continue with PO items even if inventory fetch fails
-          }
-          // Transform purchaseTable items to the format expected by items
-          // Use functional update to get current items and generate IDs correctly
-          setItems(prevItems => {
-            const maxId = prevItems.length > 0 ? Math.max(...prevItems.map(i => i.id)) : 0;            
-            // First, filter and adjust quantities based on inventory (matching full row)
-            const filteredAndAdjustedItems = purchaseTableItems
-              .map((item) => {
-                const poItemId = item.item_id || item.itemId || null;
-                const poCategoryId = item.category_id || item.categoryId || null;
-                const poModelId = item.model_id || item.modelId || null;
-                const poBrandId = item.brand_id || item.brandId || null;
-                const poTypeId = item.type_id || item.typeId || null;
-                const poQuantity = item.quantity || 0;                
-                // If item_id exists, check inventory quantities using full row match
-                if (poItemId !== null && poItemId !== undefined) {
-                  // Create composite key for full row matching (same format as inventory)
-                  const compositeKey = `${poItemId || 'null'}-${poCategoryId || 'null'}-${poModelId || 'null'}-${poBrandId || 'null'}-${poTypeId || 'null'}`;
-                  const alreadyAddedQty = inventoryItemQuantities[compositeKey] || 0;                  
-                  // Calculate balance quantity
-                  const balanceQty = poQuantity - alreadyAddedQty;                  
-                  // If balance is 0 or negative, don't include this item
-                  if (balanceQty <= 0) {
-                    return null;
-                  }                  
-                  // Use balance quantity instead of PO quantity
-                  return { ...item, quantity: balanceQty };
-                }                
-                // If no item_id, include as is
-                return item;
-              })
-              .filter(item => item !== null); // Remove items with 0 or negative balance
-            // Then transform to the expected format
-            const transformedItems = filteredAndAdjustedItems.map((item, index) => {
-              // Look up item name - check multiple possible field names
-              let itemName = item.itemName || item.name || item.item_name || '';
-              // Try to get item name from poItemName API data if not provided in purchaseTable
-              if (!itemName && (item.item_id || item.itemId) && poItemName && poItemName.length > 0) {
-                const itemId = item.item_id || item.itemId;
-                itemName = findNameById(poItemName, itemId, 'itemName') ||
-                  findNameById(poItemName, itemId, 'name') || '';
-              }              
-              // Fallback if still no name - check if name is just the ID
-              if (!itemName) {
-                const itemId = item.item_id || item.itemId || '';
-                if (itemId && String(itemName) === String(itemId)) {
-                  // Name was just the ID, treat as missing
-                  itemName = '';
-                }
-                itemName = itemName || (itemId ? `Item ${itemId}` : 'Item');
-              }
-              // Look up category name from categoryOptions if we have category_id
-              // Check multiple possible field names
-              let categoryName = item.categoryName || item.category_name || item.category || '';
-              const categoryId = item.category_id || item.categoryId;
-              if (!categoryName && categoryId && categoryOptions && categoryOptions.length > 0) {
-                const foundCategory = categoryOptions.find(cat => String(cat.id) === String(categoryId));
-                categoryName = foundCategory ? foundCategory.label : '';
-              }
-              // Look up brand name from poBrand if we have brand_id
-              // Check multiple possible field names
-              let brand = item.brandName || item.brand_name || item.brand || '';
-              const brandId = item.brand_id || item.brandId;
-              if (!brand && brandId && poBrand && poBrand.length > 0) {
-                brand = findNameById(poBrand, brandId, 'brand') ||
-                  findNameById(poBrand, brandId, 'brandName') ||
-                  findNameById(poBrand, brandId, 'name') || '';
-              }
-              // Look up model name from poModel if we have model_id
-              // Check multiple possible field names
-              let model = item.modelName || item.model_name || item.model || '';
-              const modelId = item.model_id || item.modelId;
-              if (!model && modelId && poModel && poModel.length > 0) {
-                model = findNameById(poModel, modelId, 'model') ||
-                  findNameById(poModel, modelId, 'modelName') ||
-                  findNameById(poModel, modelId, 'name') || '';
-              }
-              // Look up type name from poType if we have type_id
-              // Check multiple possible field names
-              let type = item.typeName || item.type_name || item.type || item.typeColor || '';
-              const typeId = item.type_id || item.typeId;
-              if (!type && typeId && poType && poType.length > 0) {
-                type = findNameById(poType, typeId, 'typeColor') ||
-                  findNameById(poType, typeId, 'type') ||
-                  findNameById(poType, typeId, 'typeName') ||
-                  findNameById(poType, typeId, 'name') || '';
-              }
-              const newItemId = maxId + 1 + index;
-              return {
-                id: newItemId,
-                name: `${itemName}${categoryName ? ', ' + categoryName : ''}`,
-                brand: brand,
-                model: model,
-                type: type,
-                category: categoryName || '',
-                quantity: item.quantity || 0,
-                price: item.price || (item.amount && item.quantity ? item.amount / item.quantity : 0) || 0,
-                itemId: item.item_id || item.itemId || null,
-                brandId: brandId || null,
-                modelId: modelId || null,
-                typeId: typeId || null,
-                categoryId: categoryId || null,
-              };
-            });
-            return [...prevItems, ...transformedItems];
-          });
+      if (po) {
+        // Handle purchaseTable - it might be an array or might need to be accessed differently
+        const purchaseTableItems = po.purchaseTable || po.purchase_table || po.items || [];
+        if (purchaseTableItems.length === 0) {
+          setLoadingPOItems(false);
+          return;
         }
+        // Fetch existing inventory records for this PO number to check already added quantities
+        // Map using composite key: item_id-category_id-model_id-brand_id-type_id
+        let inventoryItemQuantities = {}; // Map of composite key to total quantity already added
+        try {
+          const poNumberStr = String(eno).replace('#', '').trim();
+          const inventoryResponse = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll');
+          if (inventoryResponse.ok) {
+            const inventoryRecords = await inventoryResponse.json();
+            // Filter inventory records by purchase_no matching the PO number and exclude deleted records
+            const matchingInventoryRecords = inventoryRecords.filter(record => {
+              // Exclude deleted records
+              const recordDeleteStatus = record.delete_status !== undefined ? record.delete_status : record.deleteStatus;
+              if (recordDeleteStatus) {
+                return false;
+              }
+              // Match by purchase_no
+              const recordPurchaseNo = record.purchase_no || record.purchaseNo || record.purchase_number || '';
+              const recordPurchaseNoStr = String(recordPurchaseNo).replace('#', '').trim();
+              return recordPurchaseNoStr === poNumberStr;
+            });
+            // Calculate total quantity per full row (composite key) from inventory records
+            matchingInventoryRecords.forEach(record => {
+              const inventoryItems = record.inventoryItems || record.inventory_items || [];
+              if (Array.isArray(inventoryItems)) {
+                inventoryItems.forEach(invItem => {
+                  const itemId = invItem.item_id || invItem.itemId || null;
+                  const categoryId = invItem.category_id || invItem.categoryId || null;
+                  const modelId = invItem.model_id || invItem.modelId || null;
+                  const brandId = invItem.brand_id || invItem.brandId || null;
+                  const typeId = invItem.type_id || invItem.typeId || null;
+                  const quantity = Math.abs(invItem.quantity || 0); // Use absolute value for incoming                    
+                  // Create composite key for full row matching
+                  const compositeKey = `${itemId || 'null'}-${categoryId || 'null'}-${modelId || 'null'}-${brandId || 'null'}-${typeId || 'null'}`;
+                  if (itemId !== null && itemId !== undefined) {
+                    inventoryItemQuantities[compositeKey] = (inventoryItemQuantities[compositeKey] || 0) + quantity;
+                  }
+                });
+              }
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching inventory records:', error);
+          // Continue with PO items even if inventory fetch fails
+        }
+        // Transform purchaseTable items to the format expected by items
+        // Use functional update to get current items and generate IDs correctly
+        setItems(prevItems => {
+          const maxId = prevItems.length > 0 ? Math.max(...prevItems.map(i => i.id)) : 0;
+          // First, filter and adjust quantities based on inventory (matching full row)
+          const filteredAndAdjustedItems = purchaseTableItems
+            .map((item) => {
+              const poItemId = item.item_id || item.itemId || null;
+              const poCategoryId = item.category_id || item.categoryId || null;
+              const poModelId = item.model_id || item.modelId || null;
+              const poBrandId = item.brand_id || item.brandId || null;
+              const poTypeId = item.type_id || item.typeId || null;
+              const poQuantity = item.quantity || 0;
+              // If item_id exists, check inventory quantities using full row match
+              if (poItemId !== null && poItemId !== undefined) {
+                // Create composite key for full row matching (same format as inventory)
+                const compositeKey = `${poItemId || 'null'}-${poCategoryId || 'null'}-${poModelId || 'null'}-${poBrandId || 'null'}-${poTypeId || 'null'}`;
+                const alreadyAddedQty = inventoryItemQuantities[compositeKey] || 0;
+                // Calculate balance quantity
+                const balanceQty = poQuantity - alreadyAddedQty;
+                // If balance is 0 or negative, don't include this item
+                if (balanceQty <= 0) {
+                  return null;
+                }
+                // Use balance quantity instead of PO quantity
+                return { ...item, quantity: balanceQty };
+              }
+              // If no item_id, include as is
+              return item;
+            })
+            .filter(item => item !== null); // Remove items with 0 or negative balance
+          // Then transform to the expected format
+          const transformedItems = filteredAndAdjustedItems.map((item, index) => {
+            // Look up item name - check multiple possible field names
+            let itemName = item.itemName || item.name || item.item_name || '';
+            // Try to get item name from poItemName API data if not provided in purchaseTable
+            if (!itemName && (item.item_id || item.itemId) && poItemName && poItemName.length > 0) {
+              const itemId = item.item_id || item.itemId;
+              itemName = findNameById(poItemName, itemId, 'itemName') ||
+                findNameById(poItemName, itemId, 'name') || '';
+            }
+            // Fallback if still no name - check if name is just the ID
+            if (!itemName) {
+              const itemId = item.item_id || item.itemId || '';
+              if (itemId && String(itemName) === String(itemId)) {
+                // Name was just the ID, treat as missing
+                itemName = '';
+              }
+              itemName = itemName || (itemId ? `Item ${itemId}` : 'Item');
+            }
+            // Look up category name from categoryOptions if we have category_id
+            // Check multiple possible field names
+            let categoryName = item.categoryName || item.category_name || item.category || '';
+            const categoryId = item.category_id || item.categoryId;
+            if (!categoryName && categoryId && categoryOptions && categoryOptions.length > 0) {
+              const foundCategory = categoryOptions.find(cat => String(cat.id) === String(categoryId));
+              categoryName = foundCategory ? foundCategory.label : '';
+            }
+            // Look up brand name from poBrand if we have brand_id
+            // Check multiple possible field names
+            let brand = item.brandName || item.brand_name || item.brand || '';
+            const brandId = item.brand_id || item.brandId;
+            if (!brand && brandId && poBrand && poBrand.length > 0) {
+              brand = findNameById(poBrand, brandId, 'brand') ||
+                findNameById(poBrand, brandId, 'brandName') ||
+                findNameById(poBrand, brandId, 'name') || '';
+            }
+            // Look up model name from poModel if we have model_id
+            // Check multiple possible field names
+            let model = item.modelName || item.model_name || item.model || '';
+            const modelId = item.model_id || item.modelId;
+            if (!model && modelId && poModel && poModel.length > 0) {
+              model = findNameById(poModel, modelId, 'model') ||
+                findNameById(poModel, modelId, 'modelName') ||
+                findNameById(poModel, modelId, 'name') || '';
+            }
+            // Look up type name from poType if we have type_id
+            // Check multiple possible field names
+            let type = item.typeName || item.type_name || item.type || item.typeColor || '';
+            const typeId = item.type_id || item.typeId;
+            if (!type && typeId && poType && poType.length > 0) {
+              type = findNameById(poType, typeId, 'typeColor') ||
+                findNameById(poType, typeId, 'type') ||
+                findNameById(poType, typeId, 'typeName') ||
+                findNameById(poType, typeId, 'name') || '';
+            }
+            const newItemId = maxId + 1 + index;
+            return {
+              id: newItemId,
+              name: `${itemName}${categoryName ? ', ' + categoryName : ''}`,
+              brand: brand,
+              model: model,
+              type: type,
+              category: categoryName || '',
+              quantity: item.quantity || 0,
+              price: item.price || (item.amount && item.quantity ? item.amount / item.quantity : 0) || 0,
+              itemId: item.item_id || item.itemId || null,
+              brandId: brandId || null,
+              modelId: modelId || null,
+              typeId: typeId || null,
+              categoryId: categoryId || null,
+            };
+          });
+          return [...prevItems, ...transformedItems];
+        });
+      }
     } catch (error) {
       console.error('Error fetching PO items:', error);
     } finally {
@@ -517,7 +517,7 @@ const Incoming = ({ user }) => {
       const vendorId = inventoryItem.vendor_id || inventoryItem.vendorId;
       let vendorName = '';
       if (vendorId && vendorNameOptions.length > 0) {
-        const vendor = vendorNameOptions.find(v => 
+        const vendor = vendorNameOptions.find(v =>
           v.id === vendorId || String(v.id) === String(vendorId)
         );
         vendorName = vendor ? (vendor.value || vendor.label || '') : '';
@@ -527,7 +527,7 @@ const Incoming = ({ user }) => {
       const stockingLocationId = inventoryItem.stocking_location_id || inventoryItem.stockingLocationId;
       let stockingLocation = '';
       if (stockingLocationId && siteOptions.length > 0) {
-        const site = siteOptions.find(s => 
+        const site = siteOptions.find(s =>
           (s.id === stockingLocationId || String(s.id) === String(stockingLocationId)) &&
           s.markedAsStockingLocation === true
         );
@@ -702,11 +702,11 @@ const Incoming = ({ user }) => {
         // Only update if names actually changed
         const hasChanges = updatedItems.some((updatedItem, index) => {
           const original = prevItems[index];
-          return updatedItem.name !== original.name || 
-                 updatedItem.brand !== original.brand || 
-                 updatedItem.model !== original.model || 
-                 updatedItem.type !== original.type ||
-                 updatedItem.category !== original.category;
+          return updatedItem.name !== original.name ||
+            updatedItem.brand !== original.brand ||
+            updatedItem.model !== original.model ||
+            updatedItem.type !== original.type ||
+            updatedItem.category !== original.category;
         });
         return hasChanges ? updatedItems : prevItems;
       });
@@ -887,19 +887,19 @@ const Incoming = ({ user }) => {
       const updatedItems = items.map(item =>
         item.id === editingItem.id
           ? {
-              ...item,
-              name: `${itemData.itemName}, ${itemData.category}`,
-              brand: itemData.brand,
-              model: itemData.model,
-              type: itemData.type,
-              quantity: parseInt(itemData.quantity),
-              category: itemData.category || '',
-              itemId: itemData.itemId || item.itemId || null,
-              brandId: itemData.brandId || item.brandId || null,
-              modelId: itemData.modelId || item.modelId || null,
-              typeId: itemData.typeId || item.typeId || null,
-              categoryId: itemData.categoryId || item.categoryId || resolveCategoryId(itemData.category) || null,
-            }
+            ...item,
+            name: `${itemData.itemName}, ${itemData.category}`,
+            brand: itemData.brand,
+            model: itemData.model,
+            type: itemData.type,
+            quantity: parseInt(itemData.quantity),
+            category: itemData.category || '',
+            itemId: itemData.itemId || item.itemId || null,
+            brandId: itemData.brandId || item.brandId || null,
+            modelId: itemData.modelId || item.modelId || null,
+            typeId: itemData.typeId || item.typeId || null,
+            categoryId: itemData.categoryId || item.categoryId || resolveCategoryId(itemData.category) || null,
+          }
           : item
       );
       setItems(updatedItems);
@@ -977,12 +977,12 @@ const Incoming = ({ user }) => {
   // Convert image to PDF format
   const convertImageToPDF = (file) => {
     return new Promise((resolve, reject) => {
-      const fileType = file.type;  
+      const fileType = file.type;
       // If already a PDF, return as is
       if (fileType === 'application/pdf') {
         resolve(file);
         return;
-      }      
+      }
       // If it's an image, convert to PDF
       if (fileType.startsWith('image/')) {
         const reader = new FileReader();
@@ -993,13 +993,13 @@ const Incoming = ({ user }) => {
             const imgWidth = img.width;
             const imgHeight = img.height;
             const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = pdf.internal.pageSize.getHeight();      
+            const pdfHeight = pdf.internal.pageSize.getHeight();
             // Calculate dimensions to fit the image in PDF
             const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
             const width = imgWidth * ratio;
             const height = imgHeight * ratio;
             const x = (pdfWidth - width) / 2;
-            const y = (pdfHeight - height) / 2;            
+            const y = (pdfHeight - height) / 2;
             pdf.addImage(e.target.result, 'JPEG', x, y, width, height);
             // Convert PDF to Blob
             const pdfBlob = pdf.output('blob');
@@ -1023,7 +1023,7 @@ const Incoming = ({ user }) => {
   // Convert file to JPG format (for preview)
   const convertFileToJPG = (file) => {
     return new Promise((resolve, reject) => {
-      const fileType = file.type;  
+      const fileType = file.type;
       // If already an image, convert to JPG
       if (fileType.startsWith('image/')) {
         const reader = new FileReader();
@@ -1055,14 +1055,14 @@ const Incoming = ({ user }) => {
             if (window.pdfjsLib) {
               pdfResolve();
               return;
-            }            
+            }
             const script = document.createElement('script');
             script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
             script.onload = () => pdfResolve();
             script.onerror = () => pdfReject(new Error('Failed to load PDF.js'));
             document.head.appendChild(script);
           });
-        };        
+        };
         loadPDFJS().then(() => {
           window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
           // Read PDF file as ArrayBuffer
@@ -1072,26 +1072,26 @@ const Incoming = ({ user }) => {
             window.pdfjsLib.getDocument({ data: arrayBuffer }).promise.then((pdf) => {
               // Render all pages
               const numPages = pdf.numPages;
-              const pagePromises = [];              
+              const pagePromises = [];
               // Get all page viewports first to calculate total height
               for (let pageNum = 1; pageNum <= numPages; pageNum++) {
                 pagePromises.push(pdf.getPage(pageNum));
-              }              
+              }
               Promise.all(pagePromises).then((pages) => {
                 const scale = 2.0;
                 let totalHeight = 0;
-                let maxWidth = 0;                
+                let maxWidth = 0;
                 // Calculate total dimensions
                 pages.forEach((page) => {
                   const viewport = page.getViewport({ scale });
                   totalHeight += viewport.height;
                   maxWidth = Math.max(maxWidth, viewport.width);
-                });                
+                });
                 // Create a single canvas for all pages
                 const canvas = document.createElement('canvas');
                 const context = canvas.getContext('2d');
                 canvas.width = maxWidth;
-                canvas.height = totalHeight;                
+                canvas.height = totalHeight;
                 // Fill white background
                 context.fillStyle = '#ffffff';
                 context.fillRect(0, 0, canvas.width, canvas.height);
@@ -1108,17 +1108,17 @@ const Incoming = ({ user }) => {
                       resolve(jpgFile);
                     }, 'image/jpeg', 0.9);
                     return;
-                  }                  
+                  }
                   const page = pages[pageIndex];
                   const viewport = page.getViewport({ scale });
                   // Save context state
                   context.save();
                   // Translate to position for this page
-                  context.translate(0, currentY);                  
+                  context.translate(0, currentY);
                   const renderContext = {
                     canvasContext: context,
                     viewport: viewport
-                  };                  
+                  };
                   page.render(renderContext).promise.then(() => {
                     // Restore context after rendering
                     context.restore();
@@ -1131,7 +1131,7 @@ const Incoming = ({ user }) => {
                     currentY += viewport.height;
                     renderPage(pageIndex + 1);
                   });
-                };                
+                };
                 // Start rendering from first page
                 renderPage(0);
               }).catch(() => {
@@ -1147,7 +1147,7 @@ const Incoming = ({ user }) => {
           reader.readAsArrayBuffer(file);
         }).catch(() => {
           createPDFPlaceholder(file, resolve);
-        });        
+        });
         function createPDFPlaceholder(file, resolve) {
           const canvas = document.createElement('canvas');
           canvas.width = 800;
@@ -1228,8 +1228,8 @@ const Incoming = ({ user }) => {
         const progress = (uploadedSize / totalSize) * 100;
         const remaining = totalSize - uploadedSize;
         const timeLeft = Math.ceil(remaining / uploadSpeed);
-        setAttachedFiles(prev => prev.map(f => 
-          f.id === fileId 
+        setAttachedFiles(prev => prev.map(f =>
+          f.id === fileId
             ? { ...f, progress: Math.min(progress, 99), timeLeft }
             : f
         ));
@@ -1256,7 +1256,7 @@ const Incoming = ({ user }) => {
           hour12: true
         })
           .replace(",", "")
-          .replace(/\s/g, "-");        
+          .replace(/\s/g, "-");
         // Add milliseconds and a unique counter to ensure uniqueness for each file
         const milliseconds = now.getMilliseconds();
         // Use fileId converted to a unique string (combine timestamp and random parts)
@@ -1266,14 +1266,14 @@ const Incoming = ({ user }) => {
         // Upload to Google Drive
         const formData = new FormData();
         formData.append('file', pdfFile);
-        formData.append('file_name', finalName);        
+        formData.append('file_name', finalName);
         const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
           method: "POST",
           body: formData,
-        });        
+        });
         if (!uploadResponse.ok) {
           throw new Error('File upload failed');
-        }        
+        }
         const uploadResult = await uploadResponse.json();
         const pdfUrl = uploadResult.url;
         // Convert file to JPG for preview
@@ -1284,18 +1284,18 @@ const Incoming = ({ user }) => {
           const newPreviews = { ...prev, [fileId]: previewUrl };
           filePreviewsRef.current = newPreviews;
           return newPreviews;
-        });        
+        });
         // Complete upload
         clearInterval(progressInterval);
-        setAttachedFiles(prev => prev.map(f => 
-          f.id === fileId 
+        setAttachedFiles(prev => prev.map(f =>
+          f.id === fileId
             ? { ...f, progress: 100, status: 'completed', convertedFile: jpgFile, pdfUrl: pdfUrl, timeLeft: 0 }
             : f
         ));
       } catch (error) {
         clearInterval(progressInterval);
-        setAttachedFiles(prev => prev.map(f => 
-          f.id === fileId 
+        setAttachedFiles(prev => prev.map(f =>
+          f.id === fileId
             ? { ...f, status: 'error', progress: 0 }
             : f
         ));
@@ -1337,19 +1337,19 @@ const Incoming = ({ user }) => {
       // Find stocking location ID from siteOptions
       const stockingLocationSite = siteOptions.find(
         site => site.value === incomingData.stockingLocation && site.markedAsStockingLocation === true
-      ); 
+      );
       if (!stockingLocationSite || !stockingLocationSite.id) {
         alert('Stocking location ID not found. Please select a valid stocking location.');
         return;
       }
       const stockingLocationId = stockingLocationSite.id;
-      
+
       // Convert date from DD/MM/YYYY to YYYY-MM-DD format for backend
       const dateParts = incomingData.date.split('/');
-      const formattedDate = dateParts.length === 3 
-        ? `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}` 
+      const formattedDate = dateParts.length === 3
+        ? `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`
         : incomingData.date;
-      
+
       // Prepare inventory items - ensure quantities are positive
       const inventoryItems = items.map(item => ({
         item_id: item.itemId || null,
@@ -1360,10 +1360,10 @@ const Incoming = ({ user }) => {
         quantity: Math.abs(item.quantity || 0), // Always positive for incoming
         amount: Math.abs((item.price || 0) * (item.quantity || 0))
       }));
-      
+
       // Check if this is an update or new record
       const isUpdate = isEditMode && incomingData.inventoryId;
-      
+
       let payload = {
         vendor_id: incomingData.vendorId,
         stocking_location_id: stockingLocationId,
@@ -1373,15 +1373,15 @@ const Incoming = ({ user }) => {
         created_by: (user && user.username) || '',
         inventoryItems: inventoryItems
       };
-      
+
       // For new records, get ENO
       if (!isUpdate) {
         const countResponse = await fetch(
           `https://backendaab.in/aabuildersDash/api/inventory/incomingCount?stockingLocationId=${stockingLocationId}`
-        );      
+        );
         if (!countResponse.ok) {
           throw new Error('Failed to fetch incoming count');
-        }      
+        }
         const incomingCount = await countResponse.json();
         const eno = String(incomingCount + 1 || 0);
         payload.eno = eno;
@@ -1391,11 +1391,11 @@ const Incoming = ({ user }) => {
       }
       const username = (user && user.username) || '';
       // Save or update to backend
-      const url = isUpdate 
+      const url = isUpdate
         ? `https://backendaab.in/aabuildersDash/api/inventory/edit_with_history/${incomingData.inventoryId}?changedBy=${encodeURIComponent(username)}`
         : 'https://backendaab.in/aabuildersDash/api/inventory/save';
       const method = isUpdate ? 'PUT' : 'POST';
-      
+
       const response = await fetch(url, {
         method: method,
         headers: {
@@ -1440,7 +1440,7 @@ const Incoming = ({ user }) => {
             alert(`Inventory saved successfully, but there was an error saving PDF attachments: ${pdfError.message}`);
           }
         }
-      }      
+      }
       alert(`Inventory data ${isUpdate ? 'updated' : 'saved'} successfully!`);
       // Reset form
       setIncomingData({
@@ -1466,9 +1466,9 @@ const Incoming = ({ user }) => {
     <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden">
       {/* PO Number and Date Row - Only show when not in empty state */}
       {!isEmptyState && (
-        <div className="flex-shrink-0 px-4 pt-2 pb-1 border-b border-gray-100">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+        <div className="px-4">
+          <div className="sticky top-[100px] z-30 bg-white flex items-center justify-between mt-2 border-b border-[#E0E0E0]">
+            <div className="flex items-center gap-2 mb-2">
               <button
                 type="button"
                 onClick={() => {
@@ -1476,13 +1476,12 @@ const Incoming = ({ user }) => {
                     setShowPOModal(true);
                   }
                 }}
-                className={`text-[12px] font-medium leading-normal ${
-                  incomingData.poNumber
-                    ? 'text-black'
-                    : incomingData.vendorName && incomingData.stockingLocation
+                className={`text-[12px] font-medium leading-normal ${incomingData.poNumber
+                  ? 'text-black'
+                  : incomingData.vendorName && incomingData.stockingLocation
                     ? 'text-[#616161] underline-offset-2 hover:underline'
                     : 'text-[#9E9E9E]'
-                }`}
+                  }`}
                 disabled={!incomingData.vendorName || !incomingData.stockingLocation}
               >
                 {incomingData.poNumber ? `#${incomingData.poNumber}` : '#PO'}
@@ -1490,12 +1489,12 @@ const Incoming = ({ user }) => {
               <button
                 type="button"
                 onClick={() => setShowDatePicker(true)}
-                className="text-[12px] font-medium text-[#616161] leading-normal underline-offset-2 hover:underline"
+                className="text-[12px] font-medium text-black leading-normal underline-offset-2 hover:underline"
               >
                 {incomingData.date}
               </button>
             </div>
-            <div className="flex items-center">
+            <div className="flex items-center mb-2">
               {hasOpenedAdd && items.length > 0 && (
                 <button
                   type="button"
@@ -1523,11 +1522,11 @@ const Incoming = ({ user }) => {
       )}
       {/* Form Fields - visible while you are selecting the fields (before first + click) */}
       {!showAddItems && !hasOpenedAdd && (
-        <div className="flex-shrink-0 px-4 pt-2">
+        <div className="px-4">
           {/* Date in empty state */}
           {isEmptyState && (
-            <div className="mb-4 border-b border-gray-200 pb-2">
-              <div className="flex items-center gap-2">
+            <div className="sticky z-30 bg-white flex items-center justify-between mt-2 border-b border-[#E0E0E0]">
+              <div className="flex items-center gap-2 mb-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -1535,13 +1534,12 @@ const Incoming = ({ user }) => {
                       setShowPOModal(true);
                     }
                   }}
-                  className={`text-[12px] font-medium leading-normal ${
-                    incomingData.poNumber
-                      ? 'text-black'
-                      : incomingData.vendorName && incomingData.stockingLocation
+                  className={`text-[12px] font-medium leading-normal ${incomingData.poNumber
+                    ? 'text-black'
+                    : incomingData.vendorName && incomingData.stockingLocation
                       ? 'text-[#616161] underline-offset-2 hover:underline'
                       : 'text-[#9E9E9E]'
-                  }`}
+                    }`}
                   disabled={!incomingData.vendorName || !incomingData.stockingLocation}
                 >
                   {incomingData.poNumber ? `#${incomingData.poNumber}` : '#PO'}
@@ -1549,82 +1547,91 @@ const Incoming = ({ user }) => {
                 <button
                   type="button"
                   onClick={() => setShowDatePicker(true)}
-                  className="text-[12px] font-medium text-[#616161] leading-normal underline-offset-2 hover:underline"
+                  className="text-[12px] font-medium text-black leading-normal underline-offset-2 hover:underline"
                 >
                   {incomingData.date}
                 </button>
               </div>
             </div>
           )}
-        {/* Vendor Name Field */}
-        <div className="mb-2 relative">
-          <p className="text-[12px] font-semibold text-black leading-normal mb-1">
-            Vendor Name<span className="text-[#eb2f8e]">*</span>
-          </p>
-          <div className="relative">
-            <div
-              onClick={() => setShowVendorModal(true)}
-              className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium bg-white flex items-center cursor-pointer"
-              style={{
-                paddingRight: incomingData.vendorName ? '40px' : '12px',
-                boxSizing: 'border-box',
-                color: incomingData.vendorName ? '#000' : '#9E9E9E'
-              }}
-            >
-              {incomingData.vendorName || 'Select Vendor Name'}
+          {/* Vendor Name Field */}
+          <div className="space-y-[6px]">
+            <div className="mt-2 relative">
+              <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                Vendor Name<span className="text-[#eb2f8e]">*</span>
+              </p>
+              <div className="relative">
+                <div
+                  onClick={() => setShowVendorModal(true)}
+                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium bg-white flex items-center cursor-pointer justify-between"
+                  style={{
+                    paddingRight: incomingData.vendorName ? '40px' : '12px',
+                    boxSizing: 'border-box',
+                    color: incomingData.vendorName ? '#000' : '#9E9E9E'
+                  }}
+                >
+                  <span>{incomingData.vendorName || 'Select Vendor Name'}</span>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                {incomingData.vendorName && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIncomingData({ ...incomingData, vendorName: '', vendorId: null, poNumber: '' });
+                      setItems([]); // Clear items when vendor is cleared
+                    }}
+                    className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                    style={{ right: '24px' }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
-            {incomingData.vendorName && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIncomingData({ ...incomingData, vendorName: '', vendorId: null, poNumber: '' });
-                  setItems([]); // Clear items when vendor is cleared
-                }}
-                className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                style={{ right: '24px' }}
-              >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            )}
-          </div>
-        </div>
-        {/* Stocking Location Field */}
-        <div className="mb-2 relative">
-          <p className="text-[12px] font-semibold text-black leading-normal mb-1">
-            Stocking Location<span className="text-[#eb2f8e]">*</span>
-          </p>
-          <div className="relative">
-            <div
-              onClick={() => setShowStockingLocationModal(true)}
-              className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium bg-white flex items-center cursor-pointer"
-              style={{
-                paddingRight: incomingData.stockingLocation ? '40px' : '12px',
-                boxSizing: 'border-box',
-                color: incomingData.stockingLocation ? '#000' : '#9E9E9E'
-              }}
-            >
-              {incomingData.stockingLocation || 'Select Stocking Location'}
+
+            {/* Stocking Location Field */}
+            <div className="relative">
+              <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                Stocking Location<span className="text-[#eb2f8e]">*</span>
+              </p>
+              <div className="relative">
+                <div
+                  onClick={() => setShowStockingLocationModal(true)}
+                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium bg-white flex items-center cursor-pointer justify-between"
+                  style={{
+                    paddingRight: incomingData.stockingLocation ? '40px' : '12px',
+                    boxSizing: 'border-box',
+                    color: incomingData.stockingLocation ? '#000' : '#9E9E9E'
+                  }}
+                >
+                  <span>{incomingData.stockingLocation || 'Select Stocking Location'}</span>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                {incomingData.stockingLocation && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIncomingData({ ...incomingData, stockingLocation: '', poNumber: '' });
+                    }}
+                    className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                    style={{ right: '24px' }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
-            {incomingData.stockingLocation && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIncomingData({ ...incomingData, stockingLocation: '', poNumber: '' });
-                }}
-                className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                style={{ right: '24px' }}
-              >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            )}
           </div>
-        </div>
         </div>
       )}
       {/* Summary details card - show after first + click */}
@@ -1653,7 +1660,7 @@ const Incoming = ({ user }) => {
         <>
           {/* Items Section - Show only when all fields are filled */}
           {(!isEmptyState || isEditMode) && incomingData.vendorName && incomingData.stockingLocation && (
-            <div className="flex flex-col flex-1 min-h-0 mx-4 mb-4">
+            <div className="flex flex-col flex-1 min-h-0 mx-4 mb-4 mt-2">
               {/* Items Header - Fixed */}
               <div className="flex-shrink-0 flex items-center gap-2 mb-2 border-b border-[#E0E0E0] pb-2">
                 <p className="text-[14px] font-medium text-black leading-normal">Items</p>
@@ -1784,7 +1791,7 @@ const Incoming = ({ user }) => {
             className="flex items-center gap-2 bg-black text-white rounded-full px-4 py-2.5 text-[14px] font-medium"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M8 2V10M8 2L5 5M8 2L11 5M3 10V13C3 13.5523 3.44772 14 4 14H12C12.5523 14 13 13.5523 13 13V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M8 2V10M8 2L5 5M8 2L11 5M3 10V13C3 13.5523 3.44772 14 4 14H12C12.5523 14 13 13.5523 13 13V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             File Upload
           </button>
@@ -1806,8 +1813,8 @@ const Incoming = ({ user }) => {
         onClose={() => setShowVendorModal(false)}
         onSelect={(value) => {
           const vendorOption = vendorNameOptions.find(opt => opt.value === value);
-          setIncomingData({ 
-            ...incomingData, 
+          setIncomingData({
+            ...incomingData,
             vendorName: value,
             vendorId: vendorOption?.id || null,
             poNumber: '' // Clear PO number when vendor changes
@@ -1876,7 +1883,7 @@ const Incoming = ({ user }) => {
         stockingLocationId={(() => {
           const stockingLocationSite = siteOptions.find(
             site => site.value === incomingData.stockingLocation && site.markedAsStockingLocation === true
-          );console.log("stockingLocationId", stockingLocationSite?.id);
+          ); console.log("stockingLocationId", stockingLocationSite?.id);
           return stockingLocationSite?.id || null;
         })()}
         disableAvailabilityCheck={true}
@@ -1921,7 +1928,7 @@ const Incoming = ({ user }) => {
                 className="w-6 h-6 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 4L4 12M4 4L12 12" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M12 4L4 12M4 4L12 12" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
             </div>
@@ -1942,7 +1949,7 @@ const Incoming = ({ user }) => {
                 />
                 <div className="flex flex-col items-center justify-center">
                   <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="mb-2">
-                    <path d="M24 8V32M24 8L18 14M24 8L30 14M12 32V40C12 41.1046 12.8954 42 14 42H34C35.1046 42 36 41.1046 36 40V32" stroke="#FF9800" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M24 8V32M24 8L18 14M24 8L30 14M12 32V40C12 41.1046 12.8954 42 14 42H34C35.1046 42 36 41.1046 36 40V32" stroke="#FF9800" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   <p className="text-[14px] font-medium text-[#FF9800] mb-1">Click to Upload</p>
                   <p className="text-[12px] font-medium text-[#9E9E9E]">(Max, File size: 5 MB)</p>
@@ -1954,8 +1961,8 @@ const Incoming = ({ user }) => {
                   <p className="text-[14px] font-semibold text-black mb-3">File Uploading</p>
                   <div className="space-y-3">
                     {attachedFiles.map((file) => (
-                      <div 
-                        key={file.id} 
+                      <div
+                        key={file.id}
                         className="flex items-start gap-3 p-3 bg-gray-50 rounded-[8px] cursor-pointer hover:bg-gray-100 transition-colors"
                         onClick={() => {
                           if (file.status === 'completed' && filePreviews[file.id]) {
@@ -1967,15 +1974,15 @@ const Incoming = ({ user }) => {
                         {/* File Icon/Preview */}
                         <div className="w-10 h-10 flex items-center justify-center bg-gray-200 rounded overflow-hidden flex-shrink-0">
                           {filePreviews[file.id] && file.status === 'completed' ? (
-                            <img 
-                              src={filePreviews[file.id]} 
+                            <img
+                              src={filePreviews[file.id]}
                               alt={file.name}
                               className="w-full h-full object-cover"
                             />
                           ) : (
                             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M5 3C4.44772 3 4 3.44772 4 4V16C4 16.5523 4.44772 17 5 17H15C15.5523 17 16 16.5523 16 16V7.41421C16 7.149 15.8946 6.89464 15.7071 6.70711L11.2929 2.29289C11.1054 2.10536 10.851 2 10.5858 2H5Z" stroke="#616161" strokeWidth="1.5"/>
-                              <path d="M11 2V7H16" stroke="#616161" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M5 3C4.44772 3 4 3.44772 4 4V16C4 16.5523 4.44772 17 5 17H15C15.5523 17 16 16.5523 16 16V7.41421C16 7.149 15.8946 6.89464 15.7071 6.70711L11.2929 2.29289C11.1054 2.10536 10.851 2 10.5858 2H5Z" stroke="#616161" strokeWidth="1.5" />
+                              <path d="M11 2V7H16" stroke="#616161" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                           )}
                         </div>
@@ -2017,7 +2024,7 @@ const Incoming = ({ user }) => {
                           className="w-6 h-6 flex items-center justify-center hover:bg-gray-200 rounded transition-colors flex-shrink-0"
                         >
                           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M4 4L12 12M12 4L4 12" stroke="#616161" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M4 4L12 12M12 4L4 12" stroke="#616161" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                           </svg>
                         </button>
                       </div>
@@ -2042,14 +2049,14 @@ const Incoming = ({ user }) => {
             className="w-8 h-8 flex items-center justify-center rounded-full transition-colors z-[60] ml-[320px] shadow-sm mb-2"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 4L4 12M4 4L12 12" stroke="#E4572E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M12 4L4 12M4 4L12 12" stroke="#E4572E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
           <div className="bg-white rounded-[8px] w-full h-full max-w-[18vw] max-h-[55vh] overflow-hidden flex flex-col shadow-lg">
             {/* Invoice Image Content - White background like document */}
             <div className="flex-1 overflow-y-auto overflow-x-hidden bg-white">
-              <img 
-                src={selectedFilePreview} 
+              <img
+                src={selectedFilePreview}
                 alt="Invoice"
                 className="w-full h-auto object-contain"
                 style={{ display: 'block', maxWidth: '100%' }}

@@ -1155,10 +1155,10 @@ const InputData = () => {
                 </div>
 
                 {/* Form Fields */}
-                <div className="space-y-3 mb-4">
+                <div className="space-y-[6px] mb-4">
                     {/* Item Name */}
                     <div>
-                        <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+                        <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
                             Item Name<span className="text-[#eb2f8e]">*</span>
                         </p>
                         <div className="relative">
@@ -1212,7 +1212,7 @@ const InputData = () => {
 
                     {/* Model */}
                     <div>
-                        <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+                        <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
                             Model<span className="text-[#eb2f8e]">*</span>
                         </p>
                         <div className="relative">
@@ -1266,7 +1266,7 @@ const InputData = () => {
 
                     {/* Type */}
                     <div>
-                        <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+                        <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
                             Type<span className="text-[#eb2f8e]">*</span>
                         </p>
                         <div className="relative">
@@ -1321,7 +1321,7 @@ const InputData = () => {
                     <div className="flex gap-3">
                         {/* Brand */}
                         <div>
-                            <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+                            <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
                                 Brand<span className="text-[#eb2f8e]">*</span>
                             </p>
                             <div className="relative">
@@ -1375,7 +1375,7 @@ const InputData = () => {
 
                         {/* Min Qty */}
                         <div>
-                            <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+                            <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
                                 Min Qty
                             </p>
                             <input
@@ -1388,7 +1388,7 @@ const InputData = () => {
                         </div>
                          {/* Default Qty */}
                     <div>
-                        <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+                        <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
                             Default Qty
                         </p>
                         <input

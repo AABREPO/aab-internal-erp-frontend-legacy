@@ -663,7 +663,7 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
     let resolvedCategoryId =
       initialData.categoryId ||
       findIdByLabel(categoryOptions, formData.category || selectedCategory, ['label', 'name', 'categoryName', 'category']);
-    
+
     // If still no categoryId found, try to find by matching category name
     if (!resolvedCategoryId && categoryOptions.length > 0) {
       const categoryToMatch = (formData.category || selectedCategory || '').toLowerCase().trim();
@@ -673,7 +673,7 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
       });
       resolvedCategoryId = matchedCategory ? (matchedCategory.id || matchedCategory._id || null) : null;
     }
-    
+
     // Category is mandatory - throw error if still missing
     if (!resolvedCategoryId) {
       alert('Category is required. Please select a valid category.');
@@ -716,17 +716,17 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
         style={{ fontFamily: "'Manrope', sans-serif" }}
         onClick={handleBackdropClick}
       >
-        <div className="bg-white w-full max-w-[360px] h-[422px] rounded-tl-[16px] rounded-tr-[16px] relative z-50" onClick={(e) => e.stopPropagation()}>
+        <div className="bg-white w-full max-w-[360px] h-[410px] rounded-tl-[16px] rounded-tr-[16px] relative z-50" onClick={(e) => e.stopPropagation()}>
           {/* Header with Title and Category */}
-          <div className="flex items-center justify-between px-6 pt-5 pb-4">
+          <div className="flex items-center justify-between px-6 pt-5 mb-3">
             {/* Title on the left */}
             <p className="text-[16px] font-medium text-black leading-normal">
-              Add Items to Outgoing
+              Add Items
             </p>
             {/* Category label on the right */}
             <button
               onClick={() => setShowCategoryModal(true)}
-              className="text-[16px] font-semibold text-black underline decoration-solid"
+              className="text-[16px] font-medium text-black decoration-solid"
               style={{ textUnderlinePosition: 'from-font' }}
             >
               {(formData.category || selectedCategory) || 'Category'}
@@ -734,110 +734,108 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
           </div>
 
           {/* Form fields - Fields are disabled until category is selected */}
-          <div className="px-6 pb-32">
+          <div className="px-6 mb-2">
             {/* Check if category is selected */}
-            {(() => {
-              const isCategorySelected = !!(formData.category || selectedCategory);
-              return (
-                <>
-                  {/* Item Name - Disabled until category is selected */}
-                  <div className="mb-[10px] relative">
-                    <p className="text-[13px] font-medium text-black mb-1 leading-normal">
-                      Item Name<span className="text-[#eb2f8e]">*</span>
-                    </p>
-                    <SearchableDropdown
-                      value={formData.itemName}
-                      onChange={(value) => handleFieldSelect('itemName', value)}
-                      onAddNew={(value) => handleFieldAddNew('itemName', value)}
-                      options={itemNameOptions}
-                      placeholder="12A Switch"
-                      fieldName="Item Name"
-                      showAllOptions={true}
-                      disabled={!isCategorySelected}
-                    />
-                  </div>
-
-                  {/* Model - Disabled until category is selected */}
-                  <div className="mb-[10px] relative">
-                    <p className="text-[13px] font-medium text-black mb-1 leading-normal">
-                      Model<span className="text-[#eb2f8e]">*</span>
-                    </p>
-                    <SearchableDropdown
-                      value={formData.model}
-                      onChange={(value) => handleFieldSelect('model', value)}
-                      onAddNew={(value) => handleFieldAddNew('model', value)}
-                      options={modelOptions}
-                      placeholder="Natural Cream"
-                      fieldName="Model"
-                      showAllOptions={true}
-                      disabled={!isCategorySelected}
-                    />
-                  </div>
-
-                  {/* Type - Disabled until category is selected */}
-                  <div className="w-full mb-[10px] relative">
-                    <p className="text-[13px] font-medium text-black mb-1 leading-normal">
-                      Type<span className="text-[#eb2f8e]">*</span>
-                    </p>
-                    <SearchableDropdown
-                      value={formData.type}
-                      onChange={(value) => handleFieldSelect('type', value)}
-                      onAddNew={(value) => handleFieldAddNew('type', value)}
-                      options={typeOptions}
-                      placeholder="Flip Type"
-                      className="w-full h-[32px]"
-                      fieldName="Type"
-                      showAllOptions={true}
-                      disabled={!isCategorySelected}
-                    />
-                  </div>
-
-                  {/* Brand and Quantity row */}
-                  <div className="flex gap-3 mb-10">
-                    {/* Brand - Disabled until category is selected */}
-                    <div className="w-full relative">
-                      <p className="text-[13px] font-medium text-black mb-1 leading-normal">
-                        Brand<span className="text-[#eb2f8e]">*</span>
+            <div className="space-y-[6px]">
+              {(() => {
+                const isCategorySelected = !!(formData.category || selectedCategory);
+                return (
+                  <>
+                    {/* Item Name - Disabled until category is selected */}
+                    <div className=" relative">
+                      <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
+                        Item Name<span className="text-[#eb2f8e]">*</span>
                       </p>
                       <SearchableDropdown
-                        value={formData.brand}
-                        onChange={(value) => handleFieldSelect('brand', value)}
-                        onAddNew={(value) => handleFieldAddNew('brand', value)}
-                        options={brandOptions}
-                        placeholder="Kundan"
-                        fieldName="Brand"
+                        value={formData.itemName}
+                        onChange={(value) => handleFieldSelect('itemName', value)}
+                        onAddNew={(value) => handleFieldAddNew('itemName', value)}
+                        options={itemNameOptions}
+                        placeholder="12A Switch"
+                        fieldName="Item Name"
                         showAllOptions={true}
                         disabled={!isCategorySelected}
                       />
                     </div>
-
-                    {/* Quantity */}
-                    <div className="w-[100px] relative">
-                      <p className="text-[13px] font-medium text-black mb-1 leading-normal">
-                        Quantity<span className="text-[#eb2f8e]">*</span>
+                    {/* Model - Disabled until category is selected */}
+                    <div className=" relative">
+                      <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
+                        Model<span className="text-[#eb2f8e]">*</span>
                       </p>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={formData.quantity}
-                          onChange={handleQuantityChange}
-                          className={`w-[100px] h-[32px] border rounded-[8px] px-3 text-[12px] font-medium bg-white focus:outline-none ${quantityError ? 'border-[#e06256] text-black' : 'border-[#d6d6d6] text-black'
-                            }`}
-                          placeholder="Enter"
+                      <SearchableDropdown
+                        value={formData.model}
+                        onChange={(value) => handleFieldSelect('model', value)}
+                        onAddNew={(value) => handleFieldAddNew('model', value)}
+                        options={modelOptions}
+                        placeholder="Natural Cream"
+                        fieldName="Model"
+                        showAllOptions={true}
+                        disabled={!isCategorySelected}
+                      />
+                    </div>
+                    {/* Type - Disabled until category is selected */}
+                    <div className="w-full relative">
+                      <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
+                        Type<span className="text-[#eb2f8e]">*</span>
+                      </p>
+                      <SearchableDropdown
+                        value={formData.type}
+                        onChange={(value) => handleFieldSelect('type', value)}
+                        onAddNew={(value) => handleFieldAddNew('type', value)}
+                        options={typeOptions}
+                        placeholder="Flip Type"
+                        className="w-full h-[32px]"
+                        fieldName="Type"
+                        showAllOptions={true}
+                        disabled={!isCategorySelected}
+                      />
+                    </div>
+                    {/* Brand and Quantity row */}
+                    <div className="flex gap-3">
+                      {/* Brand - Disabled until category is selected */}
+                      <div className="w-full relative">
+                        <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
+                          Brand<span className="text-[#eb2f8e]">*</span>
+                        </p>
+                        <SearchableDropdown
+                          value={formData.brand}
+                          onChange={(value) => handleFieldSelect('brand', value)}
+                          onAddNew={(value) => handleFieldAddNew('brand', value)}
+                          options={brandOptions}
+                          placeholder="Kundan"
+                          fieldName="Brand"
+                          showAllOptions={true}
+                          disabled={!isCategorySelected}
                         />
-                        {quantityError && (
-                          <p className="absolute -bottom-5 left-0 text-[10px] text-[#f57368] leading-normal">
-                            {quantityError}
-                          </p>
-                        )}
+                      </div>
+                      {/* Quantity */}
+                      <div className="w-[100px] relative">
+                        <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
+                          Quantity<span className="text-[#eb2f8e]">*</span>
+                        </p>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={formData.quantity}
+                            onChange={handleQuantityChange}
+                            className={`w-[100px] h-[32px] border rounded-[8px] px-3 text-[12px] font-medium bg-white focus:outline-none ${quantityError ? 'border-[#e06256] text-black' : 'border-[#d6d6d6] text-black'
+                              }`}
+                            placeholder="Enter"
+                          />
+                          {quantityError && (
+                            <p className="absolute -bottom-5 left-0 text-[10px] text-[#f57368] leading-normal">
+                              {quantityError}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </>
-              );
-            })()}
+                  </>
+                );
+              })()}
+            </div>
             {/* Buttons */}
-            <div className=" bottom-6 flex gap-4">
+            <div className="mt-10 mb-3 flex gap-4">
               <button
                 onClick={onClose}
                 className="w-[175px] h-[40px] border border-[#949494] rounded-[8px] text-[14px] font-bold text-[#363636] bg-white leading-normal"
@@ -852,8 +850,6 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
               </button>
             </div>
           </div>
-
-
         </div>
       </div>
 

@@ -1695,7 +1695,7 @@ const History = () => {
             placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-[328px] h-[43px] pl-10 pr-4 border border-[#E0E0E0] rounded-3xl text-[14px] font-medium text-black placeholder:text-[#9E9E9E] focus:outline-none"
+            className="w-[328px] h-[40px] pl-10 pr-4 border border-[#E0E0E0] rounded-3xl text-[14px] font-medium text-black placeholder:text-[#9E9E9E] focus:outline-none"
           />
           <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -2041,26 +2041,26 @@ const History = () => {
       {/* Filter Modal */}
       {showFilterModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif" }} onClick={() => setShowFilterModal(false)}>
-          <div className="bg-white w-full max-w-[360px] rounded-tl-[16px] rounded-tr-[16px] relative z-50 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }} onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white w-full max-w-[360px] h-[402px] rounded-tl-[16px] rounded-tr-[16px] relative z-50 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }} onClick={(e) => e.stopPropagation()}>
             {/* Title */}
             <div className="px-6 pt-5 pb-4 flex items-center justify-between">
-              <p className="text-[16px] font-semibold text-black">Select Filters</p>
+              <p className="text-[14px] font-semibold text-black">Select Filters</p>
               {/* Branch Filter Button */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowBranchModal(true);
                 }}
-                className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+                className="text-[14px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
               >
                 {filters.branch || 'Branch'}
               </button>
             </div>
-            <div className="px-6 pb-32">
-              <div className="space-y-4">
+            <div className="px-6">
+              <div className="space-y-[6px]">
                 {/* Vendor Name Filter */}
                 <div>
-                  <label className="text-[12px] font-semibold text-black mb-1 block">
+                  <label className="text-[12px] font-semibold text-black mb-0.5 block">
                     Vendor Name
                   </label>
                   <SearchableDropdown
@@ -2075,7 +2075,7 @@ const History = () => {
                 </div>
                 {/* Client Name Filter */}
                 <div>
-                  <label className="text-[12px] font-semibold text-black mb-1 block">
+                  <label className="text-[12px] font-semibold text-black mb-0.5 block">
                     Project Name
                   </label>
                   <SearchableDropdown
@@ -2090,7 +2090,7 @@ const History = () => {
                 </div>
                 {/* Site Incharge Filter */}
                 <div>
-                  <label className="text-[12px] font-semibold text-black mb-1 block">
+                  <label className="text-[12px] font-semibold text-black mb-0.5 block">
                     Site Incharge
                   </label>
                   <SearchableDropdown
@@ -2106,7 +2106,7 @@ const History = () => {
                 <div className="flex gap-2">
                   {/* Date Filter */}
                   <div className="flex-1">
-                    <label className="text-[12px] font-semibold text-black mb-1 block">Date</label>
+                    <label className="text-[12px] font-semibold text-black mb-0.5 block">Date</label>
                     <div className="relative">
                       <button
                         type="button"
@@ -2130,7 +2130,7 @@ const History = () => {
                   </div>
                   {/* PO.No Filter */}
                   <div className="flex-1">
-                    <label className="text-[12px] font-semibold text-black mb-1 block">PO.No</label>
+                    <label className="text-[12px] font-semibold text-black mb-0.5 block">PO.No</label>
                     <div className="relative">
                       <input
                         type="text"
@@ -2145,7 +2145,7 @@ const History = () => {
               </div>
             </div>            
             {/* Action Buttons - Fixed at bottom */}
-            <div className="absolute bottom-6 left-0 right-0 px-6 flex gap-4">
+            <div className="absolute mt-10 left-0 right-0 px-6 flex gap-4">
               <button
                 onClick={() => setShowFilterModal(false)}
                 className="w-[175px] h-[40px] border border-[#949494] rounded-[8px] text-[14px] font-bold text-[#363636] bg-white leading-normal"

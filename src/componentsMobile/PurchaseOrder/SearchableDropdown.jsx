@@ -295,39 +295,34 @@ const SearchableDropdown = ({
             setIsOpen(true);
             setSearchQuery(''); // Clear search to show all options including selected one
           }}
-          className={`${className || 'w-full h-[32px]'} border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 text-[12px] font-medium text-black bg-white focus:outline-none`}
+          className={`${className || 'w-full h-[32px]'} border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium text-black bg-white focus:outline-none`}
           style={{ 
-            paddingRight: value ? '32px' : '12px',
             boxSizing: 'border-box'
           }}
           placeholder={placeholder}
         />
-        {/* Clear Button (X) - Show when value exists */}
-        {value && (
-          <button
-            type="button"
-            onClick={handleClear}
-            className="clear-button absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors z-10"
-            style={{ right: '8px' }}
-            tabIndex={-1}
+        {/* Dropdown Arrow - Always visible */}
+        <div
+          className="absolute top-1/2 transform -translate-y-1/2 pointer-events-none"
+          style={{ right: '10px' }}
+        >
+          <svg 
+            width="12" 
+            height="12" 
+            viewBox="0 0 12 12" 
+            fill="none" 
+            xmlns="http://www.w3.org/2000/svg"
+            className={`transition-transform ${isOpen ? 'rotate-180' : ''}`}
           >
-            <svg 
-              width="12" 
-              height="12" 
-              viewBox="0 0 12 12" 
-              fill="none" 
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path 
-                d="M9 3L3 9M3 3L9 9" 
-                stroke="#000" 
-                strokeWidth="1.5" 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-              />
-            </svg>
-          </button>
-        )}
+            <path 
+              d="M2.5 4.5L6 8L9.5 4.5" 
+              stroke="#666" 
+              strokeWidth="1.5" 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+            />
+          </svg>
+        </div>
       </div>
 
       {/* Dropdown Menu */}

@@ -1208,7 +1208,7 @@ const EditStock = () => {
     <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden bg-white">
       {/* Category Text */}
       {activeSubTab === 'update' && activeSubTab !== 'history' && (
-        <div className="flex-shrink-0 px-4 pt-4 pb-2">
+        <div className="flex-shrink-0 px-4 pt-2 pb-2">
           <div className="flex items-center justify-between flex-1">
             <p className="text-[12px] font-medium text-black leading-normal">
               #
@@ -1223,7 +1223,7 @@ const EditStock = () => {
         </div>
       )}
       {activeSubTab === 'history' && (
-        <div className="flex-shrink-0 px-4 pt-4 pb-2">
+        <div className="flex-shrink-0 px-4 pt-2 pb-2">
           <div className="flex items-center justify-between flex-1">
             <div
               onClick={() => setShowEnoModal(true)}
@@ -1246,7 +1246,7 @@ const EditStock = () => {
         </div>
       )}
       {activeSubTab === 'transfer' && (
-        <div className="flex-shrink-0 px-4 pt-4 pb-2 flex items-center justify-between">
+        <div className="flex-shrink-0 px-4 pt-2 pb-2 flex items-center justify-between">
           <div className="flex items-center justify-between flex-1">
             <p className="text-[12px] font-medium text-black leading-normal">
               #
@@ -1285,7 +1285,7 @@ const EditStock = () => {
           <button
             type="button"
             onClick={() => setActiveSubTab('transfer')}
-            className={`flex-1 h-[32px] rounded-md text-[12px] font-medium leading-normal transition-colors ${activeSubTab === 'transfer'
+            className={`flex-1 h-[32px] rounded-md text-[12px] font-medium leading-normal transition-colors duration-1000 ease-out ${activeSubTab === 'transfer'
               ? 'bg-white text-black'
               : 'bg-gray-100 text-gray-600'
               }`}
@@ -1295,7 +1295,7 @@ const EditStock = () => {
           <button
             type="button"
             onClick={() => setActiveSubTab('update')}
-            className={`flex-1 h-[32px] rounded-md text-[12px] font-medium leading-normal transition-colors ${activeSubTab === 'update'
+            className={`flex-1 h-[32px] rounded-md text-[12px] font-medium leading-normal transition-colors duration-1000 ease-out ${activeSubTab === 'update'
               ? 'bg-white text-black'
               : 'bg-gray-100 text-gray-600'
               }`}
@@ -1305,7 +1305,7 @@ const EditStock = () => {
           <button
             type="button"
             onClick={() => setActiveSubTab('history')}
-            className={`flex-1 h-[32px] rounded-md text-[12px] font-medium leading-normal transition-colors ${activeSubTab === 'history'
+            className={`flex-1 h-[32px] rounded-md text-[12px] font-medium leading-normal transition-colors duration-1000 ease-out ${activeSubTab === 'history'
               ? 'bg-white text-black'
               : 'bg-gray-100 text-gray-600'
               }`}
@@ -1343,8 +1343,21 @@ const EditStock = () => {
             onClick={() => setShowFilterSheet(true)}
             className="flex items-center gap-2 text-[12px] font-medium text-gray-700"
           >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M2 4H14M4 8H12M6 12H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+              {/* Top horizontal line */}
+              <line x1="2" y1="5" x2="16" y2="5" stroke={(filterData.stockingLocation || filterData.itemName || filterData.transfer || filterData.update) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
+              {/* Top vertical line intersecting center */}
+              <line x1="9" y1="3" x2="9" y2="7" stroke={(filterData.stockingLocation || filterData.itemName || filterData.transfer || filterData.update) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
+              {/* Top arrows pointing left and right */}
+              <path d="M7 4L9 5L11 4" stroke={(filterData.stockingLocation || filterData.itemName || filterData.transfer || filterData.update) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              <path d="M7 6L9 5L11 6" stroke={(filterData.stockingLocation || filterData.itemName || filterData.transfer || filterData.update) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              {/* Bottom horizontal line */}
+              <line x1="2" y1="13" x2="16" y2="13" stroke={(filterData.stockingLocation || filterData.itemName || filterData.transfer || filterData.update) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
+              {/* Bottom vertical line intersecting center */}
+              <line x1="9" y1="11" x2="9" y2="15" stroke={(filterData.stockingLocation || filterData.itemName || filterData.transfer || filterData.update) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
+              {/* Bottom arrows pointing left and right */}
+              <path d="M7 12L9 13L11 12" stroke={(filterData.stockingLocation || filterData.itemName || filterData.transfer || filterData.update) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              <path d="M7 14L9 13L11 14" stroke={(filterData.stockingLocation || filterData.itemName || filterData.transfer || filterData.update) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
             </svg>
             {!(filterData.stockingLocation || filterData.itemName || filterData.transfer || filterData.update) && (
               <span className="text-[12px] font-medium text-black">Filter</span>
@@ -1422,77 +1435,79 @@ const EditStock = () => {
       )}
       {/* Transfer Form Fields (shown when Transfer tab is active) */}
       {activeSubTab === 'transfer' && (
-        <div className="flex-1 px-4 pb-4 space-y-2">
+        <div className="flex-1 px-4 pb-4">
           {/* From Field */}
-          <div className="mt-2">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-[12px] font-semibold text-black leading-normal">
-                From
-              </p>
-              <button
-                onClick={() => setShowProjects(!showProjects)}
-                className="flex items-center justify-center"
-              >
-                <img
-                  src={showProjects ? Change2 : Change1}
-                  alt="change"
-                  className="w-5 h-5"
-                />
-              </button>
-            </div>
-            <div className="relative">
-              <div
-                onClick={() => setShowFromModal(true)}
-                className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer justify-between"
-                style={{
-                  color: fromLocation ? '#000' : '#9E9E9E'
-                }}
-              >
-                <span>{getDisplayValue(fromLocation) || 'Select Location'}</span>
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 12 12"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="absolute right-3"
+          <div className="space-y-[6px]">
+            <div className="mt-2">
+              <div className="flex items-center justify-between mb-0.5">
+                <p className="text-[12px] font-semibold text-black leading-normal">
+                  From
+                </p>
+                <button
+                  onClick={() => setShowProjects(!showProjects)}
+                  className="flex items-center justify-center"
                 >
-                  <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                  <img
+                    src={showProjects ? Change2 : Change1}
+                    alt="change"
+                    className="w-5 h-5"
+                  />
+                </button>
+              </div>
+              <div className="relative">
+                <div
+                  onClick={() => setShowFromModal(true)}
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer justify-between"
+                  style={{
+                    color: fromLocation ? '#000' : '#9E9E9E'
+                  }}
+                >
+                  <span>{getDisplayValue(fromLocation) || 'Select Location'}</span>
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="absolute right-3"
+                  >
+                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
               </div>
             </div>
-          </div>
-          {/* To Field */}
-          <div>
-            <p className="text-[12px] font-semibold text-black leading-normal mb-1">
-              To
-            </p>
-            <div className="relative">
-              <div
-                onClick={() => setShowToModal(true)}
-                className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer justify-between"
-                style={{
-                  color: toLocation ? '#000' : '#9E9E9E'
-                }}
-              >
-                <span>{getDisplayValue(toLocation) || 'Select Location'}</span>
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 12 12"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="absolute right-3"
+            {/* To Field */}
+            <div>
+              <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                To
+              </p>
+              <div className="relative">
+                <div
+                  onClick={() => setShowToModal(true)}
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer justify-between"
+                  style={{
+                    color: toLocation ? '#000' : '#9E9E9E'
+                  }}
                 >
-                  <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                  <span>{getDisplayValue(toLocation) || 'Select Location'}</span>
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="absolute right-3"
+                  >
+                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
               </div>
             </div>
           </div>
           {/* Items Field - Show only after selecting both From and To */}
           {fromLocation && toLocation && fromLocation !== 'Stock Room A' && toLocation !== 'Stock Room B' && (
             <div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mt-3 mb-2 px-2">
                 <div className="flex items-center gap-2">
                   <p className="text-[12px] font-semibold text-black leading-normal">
                     Items
@@ -1526,7 +1541,7 @@ const EditStock = () => {
                   return (
                     <div
                       key={index}
-                      className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm cursor-pointer select-none"
+                      className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm cursor-pointer select-none"
                     >
                       <div className=" ">
                         <div className="flex items-center justify-between">
@@ -1652,7 +1667,7 @@ const EditStock = () => {
                   <p className="text-[14px] text-gray-500">No items found</p>
                 </div>
               ) : (
-                <div className="shadow-md mt-2">
+                <div className="mt-2">
                   {filteredUpdateData.map((item, index) => {
                     const itemId = `${item.itemId}-${item.categoryId}-${item.modelId}-${item.brandId}-${item.typeId}-${index}`;
                     const isExpanded = expandedItemId === itemId;
@@ -1665,18 +1680,20 @@ const EditStock = () => {
                           ? -buttonWidth
                           : 0;
                     return (
-                      <div key={itemId} className="relative overflow-hidden">
+                      <div key={itemId} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-gray-50 rounded-[8px] h-[100px]">
                         {/* Card */}
                         <div
                           ref={(el) => {
                             if (el) cardRefs.current[itemId] = el;
                           }}
-                          className="bg-white border border-[rgba(0,0,0,0.16)] rounded-[8px] p-3 cursor-pointer transition-transform duration-300 ease-out select-none"
+                          className="flex-1 bg-white rounded-[8px] h-full px-3 py-1 transition-all duration-300 ease-out"
                           style={{
                             transform: `translateX(${swipeOffset}px)`,
-                            touchAction: 'pan-x pan-y',
-                            userSelect: 'none',
-                            WebkitUserSelect: 'none'
+                            touchAction: 'pan-y',
+                            userSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+                            WebkitUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+                            MozUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+                            msUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto'
                           }}
                           onClick={(e) => {
                             if (blockClickRef.current) {
@@ -1733,12 +1750,14 @@ const EditStock = () => {
                         </div>
                         {/* Edit Button - Behind the card on the right, revealed on swipe (ONLY EDIT, NO DELETE) */}
                         <div
-                          className="absolute right-0 top-0 bottom-0 flex items-center z-0"
+                          className="absolute right-0 top-0 flex items-center z-0"
                           style={{
                             opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
+                            transform: swipeOffset < 0
+                              ? `translateX(${Math.max(0, buttonWidth + swipeOffset)}px)`
+                              : `translateX(${buttonWidth}px)`,
                             transition: 'opacity 0.2s ease-out',
-                            pointerEvents: isExpanded ? 'auto' : 'none',
-                            width: `${buttonWidth}px`
+                            pointerEvents: isExpanded ? 'auto' : 'none'
                           }}
                         >
                           <button
@@ -1747,9 +1766,9 @@ const EditStock = () => {
                               e.stopPropagation();
                               handleEditClick(item);
                             }}
-                            className="action-button w-full h-full bg-[#007233] flex items-center justify-center hover:bg-[#005a26] transition-colors"
+                            className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
                           >
-                            <img src={Edit} alt="Edit" className="w-5 h-5" style={{ filter: 'brightness(0) invert(1)' }} />
+                            <img src={Edit} alt="Edit" className="w-[18px] h-[18px]" style={{ filter: 'brightness(0) invert(1)' }} />
                           </button>
                         </div>
                       </div>
@@ -1773,57 +1792,59 @@ const EditStock = () => {
               <p className="text-[14px] text-gray-500">No history records found</p>
             </div>
           ) : (
-            <div className="">
+            <div>
               {filteredHistoryList.map(record => (
-                <div key={record.id} className="bg-white border border-[rgba(0,0,0,0.08)] rounded-[8px] p-2">
-                  <div className="flex items-start justify-between mb-1">
-                    <div className="flex-1 pr-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-[11px] font-semibold text-black truncate">{record.itemsText || 'No items'}</p>
-                        <p>
-                          {record.category && (
-                            <span className={`px-2 py-1 rounded-full text-[11px] font-medium ${getCategoryColor(record.category)} mb-2`}>
-                              {record.category.toUpperCase()}
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <p className="text-[10px] text-gray-400 mt-1">{record.model}</p>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <p className="text-[10px] text-gray-400 mt-1">{record.brand && record.typeName ? `${record.brand}, ${record.typeName}` : (record.brand || record.typeName || '')}</p>
-                        {String(record.type || '').toLowerCase() === 'transfer' ? null : (
-                          <p className="text-[10px] text-gray-400 mt-1">Changed Count: <span className="font-semibold text-black">{Number(record.quantity || 0)}</span></p>
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <p className="text-[10px] text-gray-400 mt-1">{record.formattedDate}</p>
-                        <div className="flex items-center gap-2">
+                <div key={record.id} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-gray-50 rounded-[8px] h-[100px]">
+                  <div className="flex-1 bg-white rounded-[8px] h-full px-3 py-3">
+                    <div className="flex items-start justify-between mb-1">
+                      <div className="flex-1 pr-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[11px] font-semibold text-black truncate">{record.itemsText || 'No items'}</p>
+                          <p>
+                            {record.category && (
+                              <span className={`px-2 py-1 rounded-full text-[11px] font-medium ${getCategoryColor(record.category)} mb-2`}>
+                                {record.category.toUpperCase()}
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] text-gray-400 mt-1">{record.model}</p>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] text-gray-400 mt-1">{record.brand && record.typeName ? `${record.brand}, ${record.typeName}` : (record.brand || record.typeName || '')}</p>
                           {String(record.type || '').toLowerCase() === 'transfer' ? null : (
-                            <p className="text-[10px] text-gray-400 mt-1">Old Count: <span className="font-semibold text-black">{(() => {
-                              const newCountAtRecord = getLocationStockAtTime(record.itemId, record.categoryId, record.modelId, record.brandId, record.typeId, record.stockingLocationId, record.dateValue);
-                              const qty = Number(record.quantity || 0);
-                              return Math.max(0, newCountAtRecord - qty);
-                            })()}</span></p>
+                            <p className="text-[10px] text-gray-400 mt-1">Changed Count: <span className="font-semibold text-black">{Number(record.quantity || 0)}</span></p>
                           )}
                         </div>
-                      </div>
-                      <div className={`flex ${String(record.type || '').toLowerCase() === 'transfer' ? 'items-start' : 'items-center'} justify-between`}>
-                        {String(record.type || '').toLowerCase() === 'transfer' ? (
-                          <div className="flex flex-col">
-                            {record.fromLocationName && <p className="text-[10px] text-gray-500 truncate"> {record.fromLocationName}</p>}
-                            <p className="text-[9px] text-gray-500 text-center">to</p>
-                            {record.toLocationName && <p className="text-[10px] text-gray-500 truncate">{record.toLocationName}</p>}
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] text-gray-400 mt-1">{record.formattedDate}</p>
+                          <div className="flex items-center gap-2">
+                            {String(record.type || '').toLowerCase() === 'transfer' ? null : (
+                              <p className="text-[10px] text-gray-400 mt-1">Old Count: <span className="font-semibold text-black">{(() => {
+                                const newCountAtRecord = getLocationStockAtTime(record.itemId, record.categoryId, record.modelId, record.brandId, record.typeId, record.stockingLocationId, record.dateValue);
+                                const qty = Number(record.quantity || 0);
+                                return Math.max(0, newCountAtRecord - qty);
+                              })()}</span></p>
+                            )}
                           </div>
-                        ) : (
-                          <p className="text-[10px] text-gray-500 mt-1 truncate">{record.fromLocationName || record.locationName}</p>
-                        )}
-                        {String(record.type || '').toLowerCase() === 'transfer' ? (
-                          <p className="text-[10px] text-[#007323] mt-1">Transfer Count: <span className="font-semibold text-[#007323]">{record.quantity || 0}</span></p>
-                        ) : (
-                          <p className="text-[10px] text-[#007323] mt-1">New Count: <span className="font-semibold text-[#007323]">{getLocationStockAtTime(record.itemId, record.categoryId, record.modelId, record.brandId, record.typeId, record.stockingLocationId, record.dateValue)}</span></p>
-                        )}
+                        </div>
+                        <div className={`flex ${String(record.type || '').toLowerCase() === 'transfer' ? 'items-start' : 'items-center'} justify-between`}>
+                          {String(record.type || '').toLowerCase() === 'transfer' ? (
+                            <div className="flex flex-col">
+                              {record.fromLocationName && <p className="text-[10px] text-gray-500 truncate"> {record.fromLocationName}</p>}
+                              <p className="text-[9px] text-gray-500 text-center">to</p>
+                              {record.toLocationName && <p className="text-[10px] text-gray-500 truncate">{record.toLocationName}</p>}
+                            </div>
+                          ) : (
+                            <p className="text-[10px] text-gray-500 mt-1 truncate">{record.fromLocationName || record.locationName}</p>
+                          )}
+                          {String(record.type || '').toLowerCase() === 'transfer' ? (
+                            <p className="text-[10px] text-[#007323] mt-1">Transfer Count: <span className="font-semibold text-[#007323]">{record.quantity || 0}</span></p>
+                          ) : (
+                            <p className="text-[10px] text-[#007323] mt-1">New Count: <span className="font-semibold text-[#007323]">{getLocationStockAtTime(record.itemId, record.categoryId, record.modelId, record.brandId, record.typeId, record.stockingLocationId, record.dateValue)}</span></p>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2100,341 +2121,343 @@ const EditStock = () => {
           {/* Bottom Sheet */}
           <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-[360px] bg-white rounded-t-[20px] z-50 shadow-lg">
             {/* Header */}
-            <div className="flex-shrink-0">
-              <div className='flex justify-end mr-4 mt-1'>
-                <button onClick={() => setShowFilterSheet(false)} className="text-red-500 hover:text-red-700 text-xl font-bold">
-                  ✕
-                </button>
-              </div>
+            <div className='flex justify-between items-center mt-3'>
               <div className="flex justify-between items-center px-6">
                 <h2 className="text-lg font-semibold text-gray-800">
                   Select Filters
                 </h2>
               </div>
+              <div className=' mr-4 mt-1'>
+                <button onClick={() => setShowFilterSheet(false)} className="text-red-500 hover:text-red-700 text-xl font-bold">
+                  ✕
+                </button>
+              </div>
             </div>
             {/* Filter Form */}
             <div className="px-6 py-4 space-y-4 overflow-y-hidden overflow-x-hidden flex-1" style={{ maxHeight: 'calc(80vh - 140px)' }}>
               {/* Stocking Location */}
-              <div className="relative" data-dropdown="stockingLocationFilter">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Stocking Location
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Select Stocking Location"
-                    value={stockingLocationFilterOpen ? stockingLocationFilterSearch : (filterData.stockingLocation || '')}
-                    onChange={(e) => {
-                      setStockingLocationFilterSearch(e.target.value);
-                      setStockingLocationFilterOpen(true);
-                      setItemNameFilterOpen(false);
-                      setTransferFilterOpen(false);
-                      setUpdateFilterOpen(false);
-                    }}
-                    onFocus={() => {
-                      setStockingLocationFilterOpen(true);
-                      setItemNameFilterOpen(false);
-                      setTransferFilterOpen(false);
-                      setUpdateFilterOpen(false);
-                      if (!stockingLocationFilterOpen) {
-                        setStockingLocationFilterSearch('');
-                      }
-                    }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:border-gray-400 bg-white pr-10"
-                  />
-                  <svg
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setStockingLocationFilterOpen(!stockingLocationFilterOpen);
-                      if (!stockingLocationFilterOpen) {
-                        setStockingLocationFilterSearch('');
-                      }
-                    }}
-                    className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 cursor-pointer transition-transform ${stockingLocationFilterOpen ? 'rotate-180' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                  {stockingLocationFilterOpen && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-hidden">
-                      <div className="overflow-y-auto max-h-48">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFilterData({ ...filterData, stockingLocation: '' });
-                            setStockingLocationFilterOpen(false);
-                            setStockingLocationFilterSearch('');
-                          }}
-                          className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${!filterData.stockingLocation ? 'bg-gray-100' : ''}`}
-                        >
-                          All Locations
-                        </button>
-                        {[...new Set(historyList.map(r => r.locationName).filter(Boolean))]
-                          .filter(loc =>
-                            loc.toLowerCase().includes(stockingLocationFilterSearch.toLowerCase())
-                          )
-                          .map((location) => (
-                            <button
-                              key={location}
-                              type="button"
-                              onClick={() => {
-                                setFilterData({ ...filterData, stockingLocation: location });
-                                setStockingLocationFilterOpen(false);
-                                setStockingLocationFilterSearch('');
-                              }}
-                              className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${filterData.stockingLocation === location ? 'bg-gray-100' : ''}`}
-                            >
-                              {location}
-                            </button>
-                          ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-              {/* Item Name */}
-              <div className="relative" data-dropdown="itemNameFilter">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Item Name
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Select Item Name"
-                    value={itemNameFilterOpen ? itemNameFilterSearch : (filterData.itemName || '')}
-                    onChange={(e) => {
-                      setItemNameFilterSearch(e.target.value);
-                      setItemNameFilterOpen(true);
-                      setStockingLocationFilterOpen(false);
-                      setTransferFilterOpen(false);
-                      setUpdateFilterOpen(false);
-                    }}
-                    onFocus={() => {
-                      setItemNameFilterOpen(true);
-                      setStockingLocationFilterOpen(false);
-                      setTransferFilterOpen(false);
-                      setUpdateFilterOpen(false);
-                      if (!itemNameFilterOpen) {
-                        setItemNameFilterSearch('');
-                      }
-                    }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:border-gray-400 bg-white pr-10"
-                  />
-                  <svg
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setItemNameFilterOpen(!itemNameFilterOpen);
-                      if (!itemNameFilterOpen) {
-                        setItemNameFilterSearch('');
-                      }
-                    }}
-                    className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 cursor-pointer transition-transform ${itemNameFilterOpen ? 'rotate-180' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                  {itemNameFilterOpen && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-hidden">
-                      <div className="overflow-y-auto max-h-24">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFilterData({ ...filterData, itemName: '' });
-                            setItemNameFilterOpen(false);
-                            setItemNameFilterSearch('');
-                          }}
-                          className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${!filterData.itemName ? 'bg-gray-100' : ''}`}
-                        >
-                          All Items
-                        </button>
-                        {[...new Set(historyList.map(r => r.itemsText).filter(Boolean))]
-                          .filter(item =>
-                            item.toLowerCase().includes(itemNameFilterSearch.toLowerCase())
-                          )
-                          .map((item) => (
-                            <button
-                              key={item}
-                              type="button"
-                              onClick={() => {
-                                setFilterData({ ...filterData, itemName: item });
-                                setItemNameFilterOpen(false);
-                                setItemNameFilterSearch('');
-                              }}
-                              className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${filterData.itemName === item ? 'bg-gray-100' : ''}`}
-                            >
-                              {item}
-                            </button>
-                          ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {/* Transfer */}
-                <div className="relative" data-dropdown="transferFilter">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Transfer
+              <div className='space-y-[6px]'>
+                <div className="relative" data-dropdown="stockingLocationFilter">
+                  <label className="block text-sm font-medium text-black mb-0.5">
+                    Stocking Location
                   </label>
                   <div className="relative">
                     <input
                       type="text"
-                      placeholder="Select Transfer"
-                      value={transferFilterOpen ? transferFilterSearch : (filterData.transfer || '')}
+                      placeholder="Select Stocking Location"
+                      value={stockingLocationFilterOpen ? stockingLocationFilterSearch : (filterData.stockingLocation || '')}
                       onChange={(e) => {
-                        setTransferFilterSearch(e.target.value);
-                        setTransferFilterOpen(true);
-                        setStockingLocationFilterOpen(false);
+                        setStockingLocationFilterSearch(e.target.value);
+                        setStockingLocationFilterOpen(true);
                         setItemNameFilterOpen(false);
+                        setTransferFilterOpen(false);
                         setUpdateFilterOpen(false);
                       }}
                       onFocus={() => {
-                        setTransferFilterOpen(true);
-                        setStockingLocationFilterOpen(false);
+                        setStockingLocationFilterOpen(true);
                         setItemNameFilterOpen(false);
+                        setTransferFilterOpen(false);
                         setUpdateFilterOpen(false);
-                        if (!transferFilterOpen) {
-                          setTransferFilterSearch('');
+                        if (!stockingLocationFilterOpen) {
+                          setStockingLocationFilterSearch('');
                         }
                       }}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:border-gray-400 bg-white pr-10"
+                      className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded-lg text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white pr-10"
                     />
                     <svg
                       onClick={(e) => {
                         e.stopPropagation();
-                        setTransferFilterOpen(!transferFilterOpen);
-                        if (!transferFilterOpen) {
-                          setTransferFilterSearch('');
+                        setStockingLocationFilterOpen(!stockingLocationFilterOpen);
+                        if (!stockingLocationFilterOpen) {
+                          setStockingLocationFilterSearch('');
                         }
                       }}
-                      className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 cursor-pointer transition-transform ${transferFilterOpen ? 'rotate-180' : ''}`}
+                      className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 cursor-pointer transition-transform ${stockingLocationFilterOpen ? 'rotate-180' : ''}`}
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
-                    {transferFilterOpen && (
-                      <div className="absolute z-50 w-full bottom-full mb-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-hidden">
+                    {stockingLocationFilterOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-hidden">
                         <div className="overflow-y-auto max-h-48">
                           <button
                             type="button"
                             onClick={() => {
-                              setFilterData({ ...filterData, transfer: '' });
-                              setTransferFilterOpen(false);
-                              setTransferFilterSearch('');
+                              setFilterData({ ...filterData, stockingLocation: '' });
+                              setStockingLocationFilterOpen(false);
+                              setStockingLocationFilterSearch('');
                             }}
-                            className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${!filterData.transfer ? 'bg-gray-100' : ''}`}
+                            className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${!filterData.stockingLocation ? 'bg-gray-100' : ''}`}
                           >
-                            All
+                            All Locations
                           </button>
-                          {['Transfer'].filter(opt =>
-                            opt.toLowerCase().includes(transferFilterSearch.toLowerCase())
-                          ).map((option) => (
-                            <button
-                              key={option}
-                              type="button"
-                              onClick={() => {
-                                setFilterData({ ...filterData, transfer: option });
-                                setTransferFilterOpen(false);
-                                setTransferFilterSearch('');
-                              }}
-                              className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${filterData.transfer === option ? 'bg-gray-100' : ''}`}
-                            >
-                              {option}
-                            </button>
-                          ))}
+                          {[...new Set(historyList.map(r => r.locationName).filter(Boolean))]
+                            .filter(loc =>
+                              loc.toLowerCase().includes(stockingLocationFilterSearch.toLowerCase())
+                            )
+                            .map((location) => (
+                              <button
+                                key={location}
+                                type="button"
+                                onClick={() => {
+                                  setFilterData({ ...filterData, stockingLocation: location });
+                                  setStockingLocationFilterOpen(false);
+                                  setStockingLocationFilterSearch('');
+                                }}
+                                className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${filterData.stockingLocation === location ? 'bg-gray-100' : ''}`}
+                              >
+                                {location}
+                              </button>
+                            ))}
                         </div>
                       </div>
                     )}
                   </div>
                 </div>
-                {/* Update */}
-                <div className="relative" data-dropdown="updateFilter">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Update
+                {/* Item Name */}
+                <div className="relative" data-dropdown="itemNameFilter">
+                  <label className="block text-sm font-medium text-black mb-0.5">
+                    Item Name
                   </label>
                   <div className="relative">
                     <input
                       type="text"
-                      placeholder="Select Update"
-                      value={updateFilterOpen ? updateFilterSearch : (filterData.update || '')}
+                      placeholder="Select Item Name"
+                      value={itemNameFilterOpen ? itemNameFilterSearch : (filterData.itemName || '')}
                       onChange={(e) => {
-                        setUpdateFilterSearch(e.target.value);
-                        setUpdateFilterOpen(true);
+                        setItemNameFilterSearch(e.target.value);
+                        setItemNameFilterOpen(true);
                         setStockingLocationFilterOpen(false);
-                        setItemNameFilterOpen(false);
                         setTransferFilterOpen(false);
+                        setUpdateFilterOpen(false);
                       }}
                       onFocus={() => {
-                        setUpdateFilterOpen(true);
+                        setItemNameFilterOpen(true);
                         setStockingLocationFilterOpen(false);
-                        setItemNameFilterOpen(false);
                         setTransferFilterOpen(false);
-                        if (!updateFilterOpen) {
-                          setUpdateFilterSearch('');
+                        setUpdateFilterOpen(false);
+                        if (!itemNameFilterOpen) {
+                          setItemNameFilterSearch('');
                         }
                       }}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:border-gray-400 bg-white pr-10"
+                      className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded-lg text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white pr-10"
                     />
                     <svg
                       onClick={(e) => {
                         e.stopPropagation();
-                        setUpdateFilterOpen(!updateFilterOpen);
-                        if (!updateFilterOpen) {
-                          setUpdateFilterSearch('');
+                        setItemNameFilterOpen(!itemNameFilterOpen);
+                        if (!itemNameFilterOpen) {
+                          setItemNameFilterSearch('');
                         }
                       }}
-                      className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 cursor-pointer transition-transform ${updateFilterOpen ? 'rotate-180' : ''}`}
+                      className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 cursor-pointer transition-transform ${itemNameFilterOpen ? 'rotate-180' : ''}`}
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
-                    {updateFilterOpen && (
-                      <div className="absolute z-50 w-full bottom-full mb-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-hidden">
-                        <div className="overflow-y-auto max-h-48">
+                    {itemNameFilterOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-hidden">
+                        <div className="overflow-y-auto max-h-24">
                           <button
                             type="button"
                             onClick={() => {
-                              setFilterData({ ...filterData, update: '' });
-                              setUpdateFilterOpen(false);
-                              setUpdateFilterSearch('');
+                              setFilterData({ ...filterData, itemName: '' });
+                              setItemNameFilterOpen(false);
+                              setItemNameFilterSearch('');
                             }}
-                            className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${!filterData.update ? 'bg-gray-100' : ''}`}
+                            className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${!filterData.itemName ? 'bg-gray-100' : ''}`}
                           >
-                            All
+                            All Items
                           </button>
-                          {['Update'].filter(opt =>
-                            opt.toLowerCase().includes(updateFilterSearch.toLowerCase())
-                          ).map((option) => (
-                            <button
-                              key={option}
-                              type="button"
-                              onClick={() => {
-                                setFilterData({ ...filterData, update: option });
-                                setUpdateFilterOpen(false);
-                                setUpdateFilterSearch('');
-                              }}
-                              className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${filterData.update === option ? 'bg-gray-100' : ''}`}
-                            >
-                              {option}
-                            </button>
-                          ))}
+                          {[...new Set(historyList.map(r => r.itemsText).filter(Boolean))]
+                            .filter(item =>
+                              item.toLowerCase().includes(itemNameFilterSearch.toLowerCase())
+                            )
+                            .map((item) => (
+                              <button
+                                key={item}
+                                type="button"
+                                onClick={() => {
+                                  setFilterData({ ...filterData, itemName: item });
+                                  setItemNameFilterOpen(false);
+                                  setItemNameFilterSearch('');
+                                }}
+                                className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${filterData.itemName === item ? 'bg-gray-100' : ''}`}
+                              >
+                                {item}
+                              </button>
+                            ))}
                         </div>
                       </div>
                     )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {/* Transfer */}
+                  <div className="relative" data-dropdown="transferFilter">
+                    <label className="block text-sm font-medium text-black mb-0.5">
+                      Transfer
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Select Transfer"
+                        value={transferFilterOpen ? transferFilterSearch : (filterData.transfer || '')}
+                        onChange={(e) => {
+                          setTransferFilterSearch(e.target.value);
+                          setTransferFilterOpen(true);
+                          setStockingLocationFilterOpen(false);
+                          setItemNameFilterOpen(false);
+                          setUpdateFilterOpen(false);
+                        }}
+                        onFocus={() => {
+                          setTransferFilterOpen(true);
+                          setStockingLocationFilterOpen(false);
+                          setItemNameFilterOpen(false);
+                          setUpdateFilterOpen(false);
+                          if (!transferFilterOpen) {
+                            setTransferFilterSearch('');
+                          }
+                        }}
+                        className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded-lg text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white pr-10"
+                      />
+                      <svg
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setTransferFilterOpen(!transferFilterOpen);
+                          if (!transferFilterOpen) {
+                            setTransferFilterSearch('');
+                          }
+                        }}
+                        className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 cursor-pointer transition-transform ${transferFilterOpen ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                      {transferFilterOpen && (
+                        <div className="absolute z-50 w-full bottom-full mb-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-hidden">
+                          <div className="overflow-y-auto max-h-48">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFilterData({ ...filterData, transfer: '' });
+                                setTransferFilterOpen(false);
+                                setTransferFilterSearch('');
+                              }}
+                              className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${!filterData.transfer ? 'bg-gray-100' : ''}`}
+                            >
+                              All
+                            </button>
+                            {['Transfer'].filter(opt =>
+                              opt.toLowerCase().includes(transferFilterSearch.toLowerCase())
+                            ).map((option) => (
+                              <button
+                                key={option}
+                                type="button"
+                                onClick={() => {
+                                  setFilterData({ ...filterData, transfer: option });
+                                  setTransferFilterOpen(false);
+                                  setTransferFilterSearch('');
+                                }}
+                                className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${filterData.transfer === option ? 'bg-gray-100' : ''}`}
+                              >
+                                {option}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {/* Update */}
+                  <div className="relative" data-dropdown="updateFilter">
+                    <label className="block text-sm font-medium text-black mb-0.5">
+                      Update
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Select Update"
+                        value={updateFilterOpen ? updateFilterSearch : (filterData.update || '')}
+                        onChange={(e) => {
+                          setUpdateFilterSearch(e.target.value);
+                          setUpdateFilterOpen(true);
+                          setStockingLocationFilterOpen(false);
+                          setItemNameFilterOpen(false);
+                          setTransferFilterOpen(false);
+                        }}
+                        onFocus={() => {
+                          setUpdateFilterOpen(true);
+                          setStockingLocationFilterOpen(false);
+                          setItemNameFilterOpen(false);
+                          setTransferFilterOpen(false);
+                          if (!updateFilterOpen) {
+                            setUpdateFilterSearch('');
+                          }
+                        }}
+                        className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded-lg text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white pr-10"
+                      />
+                      <svg
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setUpdateFilterOpen(!updateFilterOpen);
+                          if (!updateFilterOpen) {
+                            setUpdateFilterSearch('');
+                          }
+                        }}
+                        className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 cursor-pointer transition-transform ${updateFilterOpen ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                      {updateFilterOpen && (
+                        <div className="absolute z-50 w-full bottom-full mb-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-hidden">
+                          <div className="overflow-y-auto max-h-48">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFilterData({ ...filterData, update: '' });
+                                setUpdateFilterOpen(false);
+                                setUpdateFilterSearch('');
+                              }}
+                              className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${!filterData.update ? 'bg-gray-100' : ''}`}
+                            >
+                              All
+                            </button>
+                            {['Update'].filter(opt =>
+                              opt.toLowerCase().includes(updateFilterSearch.toLowerCase())
+                            ).map((option) => (
+                              <button
+                                key={option}
+                                type="button"
+                                onClick={() => {
+                                  setFilterData({ ...filterData, update: option });
+                                  setUpdateFilterOpen(false);
+                                  setUpdateFilterSearch('');
+                                }}
+                                className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${filterData.update === option ? 'bg-gray-100' : ''}`}
+                              >
+                                {option}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
             {/* Action Buttons */}
-            <div className="flex-shrink-0 flex gap-3 px-6 py-4 border-t border-gray-200">
+            <div className="flex-shrink-0 flex gap-3 px-6 py-4">
               <button
                 onClick={() => {
                   setFilterData({ stockingLocation: '', itemName: '', transfer: '', update: '' });

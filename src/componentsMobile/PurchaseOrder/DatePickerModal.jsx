@@ -54,9 +54,8 @@ const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
     }
   }, [selectedMonth, selectedYear, selectedDay]);
 
-  // Generate years for keyboard navigation
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 11 }, (_, i) => currentYear - 5 + i);
+  // Generate years dynamically - no limit, supports unlimited year selection
+  // Years are generated dynamically based on selectedYear
 
   // Keyboard navigation
   useEffect(() => {
@@ -83,11 +82,11 @@ const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
             setSelectedMonth(selectedMonth + 1);
           }
         } else if (column === 'year') {
-          const currentIndex = years.indexOf(selectedYear);
-          if (e.key === 'ArrowUp' && currentIndex > 0) {
-            setSelectedYear(years[currentIndex - 1]);
-          } else if (e.key === 'ArrowDown' && currentIndex < years.length - 1) {
-            setSelectedYear(years[currentIndex + 1]);
+          // Unlimited year selection - no bounds
+          if (e.key === 'ArrowUp') {
+            setSelectedYear(selectedYear - 1);
+          } else if (e.key === 'ArrowDown') {
+            setSelectedYear(selectedYear + 1);
           }
         }
       } else if (e.key === 'Tab') {
@@ -105,7 +104,7 @@ const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, selectedDay, selectedMonth, selectedYear, focusedColumn, years]);
+  }, [isOpen, selectedDay, selectedMonth, selectedYear, focusedColumn]);
 
   // Scroll to selected item when it changes
   useEffect(() => {
@@ -160,11 +159,11 @@ const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
         setSelectedMonth(selectedMonth - 1);
       }
     } else if (type === 'year') {
-      const currentIndex = years.indexOf(selectedYear);
-      if (delta > 0 && currentIndex < years.length - 1) {
-        setSelectedYear(years[currentIndex + 1]);
-      } else if (delta < 0 && currentIndex > 0) {
-        setSelectedYear(years[currentIndex - 1]);
+      // Unlimited year selection - no bounds
+      if (delta > 0) {
+        setSelectedYear(selectedYear + 1);
+      } else if (delta < 0) {
+        setSelectedYear(selectedYear - 1);
       }
     }
   };
@@ -194,7 +193,6 @@ const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
 
   const allDays = getAllDays();
   const allMonths = months;
-  const allYears = years;
 
   // Get visible range for each column (showing 3 items with selected in middle)
   const getVisibleDays = () => {
@@ -211,10 +209,9 @@ const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
     return allMonths.slice(start, start + 3);
   };
 
+  // Generate visible years dynamically based on selectedYear (no limit)
   const getVisibleYears = () => {
-    const index = allYears.indexOf(selectedYear);
-    const start = Math.max(0, Math.min(index - 1, allYears.length - 3));
-    return allYears.slice(start, start + 3);
+    return [selectedYear - 1, selectedYear, selectedYear + 1];
   };
 
   const visibleDays = getVisibleDays();

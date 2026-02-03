@@ -633,14 +633,23 @@ const ProjectUsageReport = () => {
   return (
     <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden">
       {/* Date Row */}
-      <div className="flex-shrink-0 px-4 pt-1 pb-1.5 border-b border-gray-100">
-        <button
-          type="button"
-          onClick={() => setShowDatePicker(true)}
-          className="text-[12px] font-medium text-[#616161] leading-normal underline-offset-2 hover:underline"
-        >
-          {date}
-        </button>
+      <div className="px-4">
+        <div className="sticky z-30 bg-white flex items-center justify-between mt-2">
+          <button
+            type="button"
+            onClick={() => setShowDatePicker(true)}
+            className="text-[12px] font-medium text-black leading-normal underline-offset-2 hover:underline"
+          >
+            {date}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowCategoryModal(true)}
+            className="text-[12px] font-medium text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+          >
+            {selectedCategory || 'Category'}
+          </button>
+        </div>
       </div>
       {/* Report/History Tabs */}
       <div className="flex-shrink-0 px-4 pt-2">
@@ -648,7 +657,7 @@ const ProjectUsageReport = () => {
           <button
             type="button"
             onClick={() => setActiveTab('history')}
-            className={`flex-1 py-1 px-4 ml-1 h-8 rounded text-[14px] font-medium transition-colors ${activeTab === 'history'
+            className={`flex-1 py-1 px-4 ml-1 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${activeTab === 'history'
               ? 'bg-white text-black'
               : 'bg-gray-100 text-gray-600'
               }`}
@@ -658,7 +667,7 @@ const ProjectUsageReport = () => {
           <button
             type="button"
             onClick={() => setActiveTab('report')}
-            className={`flex-1 py-1 px-4 mr-1 h-8 rounded text-[14px] font-medium transition-colors ${activeTab === 'report'
+            className={`flex-1 py-1 px-4 mr-1 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${activeTab === 'report'
               ? 'bg-white text-black'
               : 'bg-gray-100 text-gray-600'
               }`}
@@ -668,10 +677,10 @@ const ProjectUsageReport = () => {
         </div>
       </div>
       {/* Filters Section */}
-      <div className="flex-shrink-0 px-4 pt-4 mb-2">
+      <div className="flex-shrink-0 px-4 pt-2 mb-2">
         {/* Project Name Filter */}
         <div className="mb-2">
-          <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+          <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
             Project Name
           </p>
           <div className="relative">
@@ -695,43 +704,6 @@ const ProjectUsageReport = () => {
                 onClick={(e) => {
                   e.stopPropagation();
                   setSelectedProject('');
-                }}
-                className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                style={{ right: '24px' }}
-              >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            )}
-          </div>
-        </div>
-        {/* Category Filter */}
-        <div className="mb-4">
-          <p className="text-[12px] font-semibold text-black leading-normal mb-1">
-            Category
-          </p>
-          <div className="relative">
-            <div
-              onClick={() => setShowCategoryModal(true)}
-              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium bg-white flex items-center cursor-pointer justify-between"
-              style={{
-                paddingRight: selectedCategory ? '40px' : '12px',
-                boxSizing: 'border-box',
-                color: selectedCategory ? '#000' : '#9E9E9E'
-              }}
-            >
-              <span>{selectedCategory || 'Select Category'}</span>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            {selectedCategory && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedCategory('');
                 }}
                 className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                 style={{ right: '24px' }}
@@ -777,13 +749,13 @@ const ProjectUsageReport = () => {
               <p className="text-[14px] text-gray-500">No usage data found</p>
             </div>
           ) : (
-            <div className="shadow-md mt-2">
+            <div className="mt-2">
               {filteredData.map((item, index) => {
                 const itemId = `${item.itemId}-${item.categoryId}-${item.modelId}-${item.brandId}-${item.typeId}-${item.projectId}-${index}`;
                 const isExpanded = expandedItemId === itemId;
                 const swipeState = swipeStates[itemId];
-                // Width of the combined action buttons (2 * 40px + gap)
-                const buttonWidth = 96;
+                // Width of the combined action buttons (2 * 48px + gap)
+                const buttonWidth = 110;
                 // Calculate swipe offset for smooth animation
                 const swipeOffset =
                   swipeState && swipeState.isSwiping
@@ -800,18 +772,20 @@ const ProjectUsageReport = () => {
                 if (item.type) detailsParts.push(item.type);
                 const details = detailsParts.join(', ');
                 return (
-                  <div key={itemId} className="relative overflow-hidden">
+                  <div key={itemId} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-gray-50 rounded-[8px] h-[100px]">
                     {/* Card */}
                     <div
                       ref={(el) => {
                         if (el) cardRefs.current[itemId] = el;
                       }}
-                      className="bg-white border border-[rgba(0,0,0,0.16)] rounded-[8px] p-2 cursor-pointer transition-transform duration-300 ease-out select-none"
+                      className="flex-1 bg-white rounded-[8px] h-full px-3 py-3 transition-all duration-300 ease-out"
                       style={{
                         transform: `translateX(${swipeOffset}px)`,
                         touchAction: 'pan-y',
-                        userSelect: 'none',
-                        WebkitUserSelect: 'none'
+                        userSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+                        WebkitUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+                        MozUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+                        msUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto'
                       }}
                       onTouchStart={(e) => handleTouchStart(e, itemId)}
                       onTouchMove={(e) => handleTouchMove(e, itemId)}
@@ -835,12 +809,12 @@ const ProjectUsageReport = () => {
                         {/* Left Side */}
                         <div className="flex items-center justify-between">
                           {/* Item Name */}
-                          <p className="text-[14px] font-semibold text-black mb-1">
+                          <p className="text-[14px] font-semibold text-black">
                             {item.itemName}
                           </p>
                           {/* Category Tag */}
                           {item.category && (
-                            <span className={`px-2 py-1 mb-2 rounded-full text-[10px] font-medium ${getCategoryColor(item.category)}`}>
+                            <span className={`px-2 py-1  rounded-full text-[10px] font-medium ${getCategoryColor(item.category)}`}>
                               {item.category.toUpperCase()}
                             </span>
                           )}
@@ -848,18 +822,18 @@ const ProjectUsageReport = () => {
                         <div className="flex items-center justify-between">
                           {/* Model */}
                           {item.model && (
-                            <p className="text-[12px] font-medium text-gray-600 mb-1">
+                            <p className="text-[12px] font-medium text-gray-600">
                               {item.model}
                             </p>
                           )}
                         </div>
                         <div className="flex items-center justify-between">
                           {/* Brand and Type */}
-                          <p className="text-[12px] font-medium text-gray-600 mb-1">
+                          <p className="text-[12px] font-medium text-gray-600">
                             {item.brand && item.type ? `${item.brand}, ${item.type}` : item.brand || item.type || ''}
                           </p>
                           {/* Usage */}
-                          <p className="text-[11px] font-semibold text-[#007233] mb-1">
+                          <p className="text-[11px] font-semibold text-[#007233]">
                             Usage {item.usage || 0}
                           </p>
                         </div>
@@ -885,13 +859,13 @@ const ProjectUsageReport = () => {
 
                     {/* Action Buttons - Behind the card on the right, revealed on swipe */}
                     <div
-                      className="absolute right-0 top-0 flex gap-2 flex-shrink-0 z-0"
+                      className="absolute top-[2.5px] flex gap-2 flex-shrink-0 z-0"
                       style={{
-                        opacity:
-                          isExpanded ||
-                            (swipeState && swipeState.isSwiping && swipeOffset < -20)
-                            ? 1
-                            : 0,
+                        right: '2px',
+                        opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
+                        transform: swipeOffset < 0 
+                          ? `translateX(${Math.max(0, 110 + swipeOffset)}px)` 
+                          : 'translateX(110px)',
                         transition: 'opacity 0.2s ease-out',
                         pointerEvents: isExpanded ? 'auto' : 'none'
                       }}
@@ -901,8 +875,8 @@ const ProjectUsageReport = () => {
                           e.stopPropagation();
                           handleEdit(item);
                         }}
-                        className="action-button w-[40px] h-full bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
-                        style={{ minHeight: '100px' }}
+                        className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
+                        title="Edit"
                       >
                         <img src={Edit} alt="Edit" className="w-[18px] h-[18px]" />
                       </button>
@@ -911,8 +885,8 @@ const ProjectUsageReport = () => {
                           e.stopPropagation();
                           handleDelete(item);
                         }}
-                        className="action-button w-[40px] h-full bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm"
-                        style={{ minHeight: '100px' }}
+                        className="action-button w-[48px] h-[95px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm"
+                        title="Delete"
                       >
                         <img src={Delete} alt="Delete" className="w-[18px] h-[18px]" />
                       </button>
@@ -933,7 +907,7 @@ const ProjectUsageReport = () => {
               <p className="text-[14px] text-gray-500">No history data found</p>
             </div>
           ) : (
-            <div className="shadow-md mt-2">
+            <div className="mt-2">
               {filteredHistoryData.map((item, index) => {
                 const itemId = `${item.itemId}-${item.categoryId}-${item.modelId}-${item.brandId}-${item.typeId}-${item.projectId}-${index}`;
                 const isExpanded = expandedItemId === itemId;
@@ -951,18 +925,20 @@ const ProjectUsageReport = () => {
                       : 0;
 
                 return (
-                  <div key={itemId} className="relative overflow-hidden">
+                  <div key={itemId} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-gray-50 rounded-[8px] h-[112px]">
                     {/* Card */}
                     <div
                       ref={(el) => {
                         if (el) cardRefs.current[itemId] = el;
                       }}
-                      className="bg-white border border-[rgba(0,0,0,0.16)] rounded-[8px] p-2 cursor-pointer transition-transform duration-300 ease-out select-none"
+                      className="flex-1 bg-white rounded-[6px] h-full px-4 py-2 transition-all duration-300 ease-out"
                       style={{
                         transform: `translateX(${swipeOffset}px)`,
                         touchAction: 'pan-y',
-                        userSelect: 'none',
-                        WebkitUserSelect: 'none'
+                        userSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+                        WebkitUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+                        MozUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+                        msUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto'
                       }}
                       onTouchStart={(e) => handleTouchStart(e, itemId)}
                       onTouchMove={(e) => handleTouchMove(e, itemId)}
@@ -982,72 +958,72 @@ const ProjectUsageReport = () => {
                         }
                       }}
                     >
-                      <div className="flex items-start justify-between">
-                        {/* Left Side */}
-                        <div className="flex-1 pr-3">
-                          {/* Item Name */}
-                          <p className="text-[14px] font-semibold text-black mb-1">
+                      <div className="flex flex-col">
+                        {/* Row 1: Item Name and Category Tag */}
+                        <div className="flex items-start justify-between">
+                          <p className="text-[14px] font-semibold text-black">
                             {item.itemName}
                           </p>
-
-                          {/* Model */}
-                          <p className="text-[12px] font-medium text-gray-600 mb-1">
-                            {item.model || ''}
-                          </p>
-
-                          {/* Brand and Type */}
-                          <p className="text-[12px] font-medium text-gray-600 mb-1">
-                            {item.brand && item.type ? `${item.brand}, ${item.type}` : item.brand || item.type || ''}
-                          </p>
-
-                          {/* Date */}
-                          <p className="text-[12px] font-medium text-gray-600 mb-1">
-                            {item.formattedDate}
-                          </p>
-
-                          {/* Project Name */}
-                          <p className="text-[12px] font-medium text-gray-700">
-                            {item.projectName || ''}
-                          </p>
-                        </div>
-
-                        {/* Right Side */}
-                        <div className="flex flex-col items-end">
-                          {/* Category Tag */}
                           {item.category && (
-                            <span className={`px-2 py-1 mb-2 rounded-full text-[10px] font-medium ${getCategoryColor(item.category)}`}>
+                            <span className={`px-2 py-1 rounded-full text-[10px] font-medium ${getCategoryColor(item.category)}`}>
                               {item.category.toUpperCase()}
                             </span>
                           )}
-                          
-                          {/* Dispatch or Return */}
+                        </div>
+
+                        {/* Row 2: Model with empty space on right */}
+                        <div className="flex items-start justify-between">
+                          <p className="text-[12px] font-medium text-gray-600">
+                            {item.model || ''}
+                          </p>
+                          <div></div>
+                        </div>
+
+                        {/* Row 3: Brand and Type with Dispatch/Return on right */}
+                        <div className="flex items-start justify-between">
+                          <p className="text-[12px] font-medium text-gray-600">
+                            {item.brand && item.type ? `${item.brand}, ${item.type}` : item.brand || item.type || ''}
+                          </p>
                           {item.dispatchQty > 0 ? (
-                            <p className="text-[12px] font-medium text-[#BF9853] mb-1">
+                            <p className="text-[12px] font-medium text-[#BF9853]">
                               Dispatch {item.dispatchQty}
                             </p>
                           ) : item.returnQty > 0 ? (
-                            <p className="text-[12px] font-medium text-[#007233] mb-1">
+                            <p className="text-[12px] font-medium text-[#007233]">
                               Return {item.returnQty}
                             </p>
                           ) : null}
+                        </div>
 
-                          {/* Amount */}
+                        {/* Row 4: Date */}
+                        <div className="flex items-start justify-between">
+                          <p className="text-[12px] font-medium text-gray-600">
+                            {item.formattedDate}
+                          </p>
                           <p className="text-[14px] font-semibold text-black">
                             {formatAmount(item.totalAmount)}
                           </p>
+                        </div>
+
+                        {/* Row 5: Project Name and Amount */}
+                        <div className="flex items-start justify-between">
+                          <p className="text-[12px] font-medium text-gray-700">
+                            {item.projectName || ''}
+                          </p>
+
                         </div>
                       </div>
                     </div>
 
                     {/* Action Buttons - Behind the card on the right, revealed on swipe */}
                     <div
-                      className="absolute right-0 top-0 flex gap-2 flex-shrink-0 z-0"
+                      className="absolute top-[2.5px] flex gap-2 flex-shrink-0 z-0"
                       style={{
-                        opacity:
-                          isExpanded ||
-                            (swipeState && swipeState.isSwiping && swipeOffset < -20)
-                            ? 1
-                            : 0,
+                        right: '2px',
+                        opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
+                        transform: swipeOffset < 0 
+                          ? `translateX(${Math.max(0, 110 + swipeOffset)}px)` 
+                          : 'translateX(110px)',
                         transition: 'opacity 0.2s ease-out',
                         pointerEvents: isExpanded ? 'auto' : 'none'
                       }}
@@ -1057,8 +1033,8 @@ const ProjectUsageReport = () => {
                           e.stopPropagation();
                           handleEdit(item);
                         }}
-                        className="action-button w-[40px] h-full bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
-                        style={{ minHeight: '100px' }}
+                        className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
+                        title="Edit"
                       >
                         <img src={Edit} alt="Edit" className="w-[18px] h-[18px]" />
                       </button>
@@ -1067,8 +1043,8 @@ const ProjectUsageReport = () => {
                           e.stopPropagation();
                           handleDelete(item);
                         }}
-                        className="action-button w-[40px] h-full bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm"
-                        style={{ minHeight: '100px' }}
+                        className="action-button w-[48px] h-[95px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm"
+                        title="Delete"
                       >
                         <img src={Delete} alt="Delete" className="w-[18px] h-[18px]" />
                       </button>

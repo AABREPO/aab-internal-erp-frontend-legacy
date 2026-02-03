@@ -733,27 +733,27 @@ const History = ({ onTabChange }) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
+    <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* Date and Category Section */}
-      <div className="flex-shrink-0 px-4 pt-2">
-        <div className="flex items-center justify-between flex-1">
-          <p className="text-[12px] font-medium text-black leading-normal">
+      <div className="px-4 pt-2">
+        <div className="flex items-center justify-between">
+          <button className="text-[12px] font-medium text-black leading-normal">
             {getTodayDate()}
-          </p>
-          <p className="text-[12px] font-medium text-black leading-normal">
+          </button>
+          <button className="text-[12px] font-medium text-black leading-normal">
             Category
-          </p>
+          </button>
         </div>
       </div>
       {/* Stack Return/Dispatch Toggle */}
-      <div className="flex-shrink-0 px-4 pt-3">
-        <div className="flex items-center gap-2">
+      <div className="px-4 pt-3">
+        <div className="flex items-center ga">
           {/* Stack Return/Dispatch Tabs */}
-          <div className="flex bg-gray-100 items-center h-9 shadow-sm flex-1">
+          <div className="flex bg-gray-100 items-center h-9 flex-1">
             <button
               type="button"
               onClick={() => setActiveType('stack return')}
-              className={`flex-1 py-1 px-4 ml-1 h-8 rounded text-[14px] font-medium transition-colors ${activeType === 'stack return'
+              className={`flex-1 py-1 px-4 ml-1 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${activeType === 'stack return'
                 ? 'bg-white text-black'
                 : 'bg-gray-100 text-gray-600'
                 }`}
@@ -763,7 +763,7 @@ const History = ({ onTabChange }) => {
             <button
               type="button"
               onClick={() => setActiveType('dispatch')}
-              className={`flex-1 py-1 px-4 mr-1 h-8 rounded-lg text-[14px] font-medium transition-colors ${activeType === 'dispatch'
+              className={`flex-1 py-1 px-4 mr-1 h-8 rounded-lg text-[14px] font-medium transition-colors duration-1000 ease-out ${activeType === 'dispatch'
                 ? 'bg-white text-black'
                 : 'bg-gray-100 text-gray-600'
                 }`}
@@ -775,7 +775,7 @@ const History = ({ onTabChange }) => {
       </div>
 
       {/* Search Bar */}
-      <div className="px-4 pt-4 pb-3">
+      <div className="flex-shrink-0 px-4 pt-4 pb-3">
         <div className="relative">
           <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -794,15 +794,28 @@ const History = ({ onTabChange }) => {
       </div>
 
       {/* Filter */}
-      <div className="px-4 pb-3">
+      <div className="flex-shrink-0 px-4 pb-3">
         <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
             onClick={() => setShowFilterModal(true)}
             className="flex items-center gap-2 cursor-pointer"
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M2 4H14M4 8H12M6 12H10" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+              {/* Top horizontal line */}
+              <line x1="2" y1="5" x2="16" y2="5" stroke={(filterProjectName || filterProjectIncharge || filterStockingLocation || filterSRNumber || filterDate) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
+              {/* Top vertical line intersecting center */}
+              <line x1="9" y1="3" x2="9" y2="7" stroke={(filterProjectName || filterProjectIncharge || filterStockingLocation || filterSRNumber || filterDate) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
+              {/* Top arrows pointing left and right */}
+              <path d="M7 4L9 5L11 4" stroke={(filterProjectName || filterProjectIncharge || filterStockingLocation || filterSRNumber || filterDate) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              <path d="M7 6L9 5L11 6" stroke={(filterProjectName || filterProjectIncharge || filterStockingLocation || filterSRNumber || filterDate) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              {/* Bottom horizontal line */}
+              <line x1="2" y1="13" x2="16" y2="13" stroke={(filterProjectName || filterProjectIncharge || filterStockingLocation || filterSRNumber || filterDate) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
+              {/* Bottom vertical line intersecting center */}
+              <line x1="9" y1="11" x2="9" y2="15" stroke={(filterProjectName || filterProjectIncharge || filterStockingLocation || filterSRNumber || filterDate) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
+              {/* Bottom arrows pointing left and right */}
+              <path d="M7 12L9 13L11 12" stroke={(filterProjectName || filterProjectIncharge || filterStockingLocation || filterSRNumber || filterDate) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              <path d="M7 14L9 13L11 14" stroke={(filterProjectName || filterProjectIncharge || filterStockingLocation || filterSRNumber || filterDate) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
             </svg>
             {!(filterProjectName || filterProjectIncharge || filterStockingLocation || filterSRNumber || filterDate) && (
               <span className="text-[12px] font-medium text-black">Filter</span>
@@ -897,7 +910,7 @@ const History = ({ onTabChange }) => {
       </div>
 
       {/* History List */}
-      <div className="flex-1 overflow-y-auto px-4">
+      <div className="flex overflow-y-auto px-4">
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <p className="text-[12px] text-gray-500">Loading...</p>
@@ -907,7 +920,7 @@ const History = ({ onTabChange }) => {
             <p className="text-[12px] text-gray-500">No history found</p>
           </div>
         ) : (
-          <div className="shadow-md border border-gray-200 rounded-lg">
+          <div>
             {filteredData.map((item) => {
               // Get created_date_time and add 5.30 hours
               const createdDateTime = item.created_date_time || item.createdDateTime || item.created_at;
@@ -929,12 +942,12 @@ const History = ({ onTabChange }) => {
               if (swipeState && swipeState.isSwiping) {
                 const deltaX = swipeState.currentX - swipeState.startX;
                 if (deltaX < 0) {
-                  swipeOffset = Math.max(-160, Math.min(0, deltaX));
+                  swipeOffset = Math.max(-110, Math.min(0, deltaX));
                 } else {
                   swipeOffset = Math.min(48, Math.max(0, deltaX));
                 }
               } else if (isExpanded) {
-                swipeOffset = -160;
+                swipeOffset = -110;
               } else if (isCloneExpanded) {
                 swipeOffset = 48;
               } else {
@@ -942,7 +955,7 @@ const History = ({ onTabChange }) => {
               }
 
               return (
-                <div key={item.id} className="relative overflow-hidden">
+                <div key={item.id} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-gray-50 rounded-[8px] h-[100px]">
                   {/* Clone Button - Behind the card on the left, revealed on right swipe */}
                   <div
                     className="absolute left-0 top-0 flex gap-2 flex-shrink-0 z-0"
@@ -957,7 +970,7 @@ const History = ({ onTabChange }) => {
                         e.stopPropagation();
                         handleClone(item);
                       }}
-                      className="action-button w-[48px] h-full bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 transition-colors shadow-sm min-h-[80px]"
+                      className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                       title="Clone"
                     >
                       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -975,10 +988,14 @@ const History = ({ onTabChange }) => {
                         delete cardRefs.current[item.id];
                       }
                     }}
-                    className="bg-white border border-[rgba(0,0,0,0.16)] rounded-[8px] p-2 hover:bg-gray-50 transition-all duration-300 ease-out relative"
+                    className="flex-1 bg-white rounded-[8px] h-full px-3 py-3 transition-all duration-300 ease-out"
                     style={{
                       transform: `translateX(${swipeOffset}px)`,
-                      touchAction: 'pan-y'
+                      touchAction: 'pan-y',
+                      userSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+                      WebkitUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+                      MozUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+                      msUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto'
                     }}
                     onTouchStart={(e) => handleTouchStart(e, item.id)}
                     onTouchMove={(e) => handleTouchMove(e, item.id)}
@@ -1039,6 +1056,9 @@ const History = ({ onTabChange }) => {
                     className="absolute right-0 top-0 flex gap-2 flex-shrink-0 z-0"
                     style={{
                       opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
+                      transform: swipeOffset < 0
+                        ? `translateX(${Math.max(0, 110 + swipeOffset)}px)`
+                        : 'translateX(110px)',
                       transition: 'opacity 0.2s ease-out',
                       pointerEvents: isExpanded ? 'auto' : 'none'
                     }}
@@ -1048,7 +1068,7 @@ const History = ({ onTabChange }) => {
                         e.stopPropagation();
                         handleEdit(item);
                       }}
-                      className="action-button w-[48px] h-full bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 transition-colors shadow-sm min-h-[80px]"
+                      className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
                       title="Edit"
                     >
                       <img src={Edit} alt="Edit" className="w-[18px] h-[18px]" />
@@ -1058,7 +1078,7 @@ const History = ({ onTabChange }) => {
                         e.stopPropagation();
                         handleDelete(item.id);
                       }}
-                      className="action-button w-[48px] h-full bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm min-h-[80px]"
+                      className="action-button w-[48px] h-[95px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm"
                       title="Delete"
                     >
                       <img src={Delete} alt="Delete" className="w-[18px] h-[18px]" />
@@ -1085,11 +1105,11 @@ const History = ({ onTabChange }) => {
           }}
         >
           <div
-            className="bg-white w-full max-w-[360px] h-[450px] rounded-t-3xl shadow-lg"
+            className="bg-white w-full max-w-[360px] h-[400px] rounded-t-3xl shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-200">
+            <div className="flex items-center justify-between px-4 pt-4 mb-3">
               <h2 className="text-[16px] font-semibold text-black">Select Filters</h2>
               <button
                 type="button"
@@ -1108,221 +1128,223 @@ const History = ({ onTabChange }) => {
             </div>
 
             {/* Modal Content */}
-            <div className="px-4 py-4 space-y-2 h-[250px] overflow-visible">
+            <div className="px-4 overflow-visible">
               {/* Project Name */}
-              <div className="relative">
-                <label className="block text-[14px] font-medium text-gray-700 mb-2">Project Name</label>
+              <div className="space-y-[6px]">
                 <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Select"
-                    value={filterProjectName}
-                    onChange={(e) => {
-                      setFilterProjectName(e.target.value);
-                      setShowProjectDropdown(true);
-                    }}
-                    onFocus={() => setShowProjectDropdown(true)}
-                    className="w-full h-[40px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400"
-                    style={{
-                      paddingRight: filterProjectName ? '60px' : '40px'
-                    }}
-                  />
-                  {filterProjectName && (
+                  <label className="block text-[14px] font-medium text-black mb-0.5">Project Name</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Select"
+                      value={filterProjectName}
+                      onChange={(e) => {
+                        setFilterProjectName(e.target.value);
+                        setShowProjectDropdown(true);
+                      }}
+                      onFocus={() => setShowProjectDropdown(true)}
+                      className="w-full h-[32px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400"
+                      style={{
+                        paddingRight: filterProjectName ? '60px' : '40px'
+                      }}
+                    />
+                    {filterProjectName && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFilterProjectName('');
+                          setShowProjectDropdown(false);
+                        }}
+                        className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                        style={{ right: '24px' }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFilterProjectName('');
-                        setShowProjectDropdown(false);
-                      }}
-                      className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                      style={{ right: '24px' }}
+                      onClick={() => setShowProjectDropdown(!showProjectDropdown)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
                     >
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M4 6L8 10L12 6" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setShowProjectDropdown(!showProjectDropdown)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M4 6L8 10L12 6" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                  {showProjectDropdown && (
-                    <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                      {clientData.map((client) => (
-                        <div
-                          key={client.id || client._id}
-                          className="px-3 py-2 text-[14px] text-gray-700 hover:bg-gray-100 cursor-pointer"
-                          onClick={() => {
-                            setFilterProjectName(client.value || client.label || client.siteName || '');
-                            setShowProjectDropdown(false);
-                          }}
-                        >
-                          {client.value || client.label || client.siteName || ''}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-              {/* Project Incharge */}
-              <div className="relative">
-                <label className="block text-[14px] font-medium text-gray-700 mb-2">Project Incharge</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Select"
-                    value={filterProjectIncharge}
-                    onChange={(e) => {
-                      setFilterProjectIncharge(e.target.value);
-                      setShowInchargeDropdown(true);
-                    }}
-                    onFocus={() => setShowInchargeDropdown(true)}
-                    className="w-full h-[40px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400"
-                    style={{
-                      paddingRight: filterProjectIncharge ? '60px' : '40px'
-                    }}
-                  />
-                  {filterProjectIncharge && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFilterProjectIncharge('');
-                        setShowInchargeDropdown(false);
-                      }}
-                      className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                      style={{ right: '24px' }}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setShowInchargeDropdown(!showInchargeDropdown)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M4 6L8 10L12 6" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                  {showInchargeDropdown && (
-                    <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                      {employeeData.map((employee) => (
-                        <div
-                          key={employee.id || employee._id}
-                          className="px-3 py-2 text-[14px] text-gray-700 hover:bg-gray-100 cursor-pointer"
-                          onClick={() => {
-                            const empName = employee.employeeName || employee.name || employee.fullName || employee.employee_name || '';
-                            setFilterProjectIncharge(empName);
-                            setShowInchargeDropdown(false);
-                          }}
-                        >
-                          {employee.employeeName || employee.name || employee.fullName || employee.employee_name || ''}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-              {/* Stocking Location */}
-
-              <div className="flex-1">
-                <label className="block text-[14px] font-medium text-gray-700 mb-2">Stocking Location</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Select"
-                    value={filterStockingLocation}
-                    onChange={(e) => {
-                      setFilterStockingLocation(e.target.value);
-                      setShowLocationDropdown(true);
-                    }}
-                    onFocus={() => setShowLocationDropdown(true)}
-                    className="w-full h-[40px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400"
-                    style={{
-                      paddingRight: filterStockingLocation ? '60px' : '40px'
-                    }}
-                  />
-                  {filterStockingLocation && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFilterStockingLocation('');
-                        setShowLocationDropdown(false);
-                      }}
-                      className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                      style={{ right: '24px' }}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setShowLocationDropdown(!showLocationDropdown)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M4 6L8 10L12 6" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                  {showLocationDropdown && (
-                    <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                      {clientData
-                        .filter(client => client.markedAsStockingLocation === true)
-                        .map((client) => (
+                    {showProjectDropdown && (
+                      <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                        {clientData.map((client) => (
                           <div
                             key={client.id || client._id}
                             className="px-3 py-2 text-[14px] text-gray-700 hover:bg-gray-100 cursor-pointer"
                             onClick={() => {
-                              setFilterStockingLocation(client.value || client.label || client.siteName || '');
-                              setShowLocationDropdown(false);
+                              setFilterProjectName(client.value || client.label || client.siteName || '');
+                              setShowProjectDropdown(false);
                             }}
                           >
                             {client.value || client.label || client.siteName || ''}
                           </div>
                         ))}
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+                {/* Project Incharge */}
+                <div className="relative">
+                  <label className="block text-[14px] font-medium text-black mb-0.5">Project Incharge</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Select"
+                      value={filterProjectIncharge}
+                      onChange={(e) => {
+                        setFilterProjectIncharge(e.target.value);
+                        setShowInchargeDropdown(true);
+                      }}
+                      onFocus={() => setShowInchargeDropdown(true)}
+                      className="w-full h-[32px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400"
+                      style={{
+                        paddingRight: filterProjectIncharge ? '60px' : '40px'
+                      }}
+                    />
+                    {filterProjectIncharge && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFilterProjectIncharge('');
+                          setShowInchargeDropdown(false);
+                        }}
+                        className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                        style={{ right: '24px' }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowInchargeDropdown(!showInchargeDropdown)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M4 6L8 10L12 6" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                    {showInchargeDropdown && (
+                      <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                        {employeeData.map((employee) => (
+                          <div
+                            key={employee.id || employee._id}
+                            className="px-3 py-2 text-[14px] text-gray-700 hover:bg-gray-100 cursor-pointer"
+                            onClick={() => {
+                              const empName = employee.employeeName || employee.name || employee.fullName || employee.employee_name || '';
+                              setFilterProjectIncharge(empName);
+                              setShowInchargeDropdown(false);
+                            }}
+                          >
+                            {employee.employeeName || employee.name || employee.fullName || employee.employee_name || ''}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {/* Stocking Location */}
+
+                <div className="flex-1">
+                  <label className="block text-[14px] font-medium text-black mb-0.5">Stocking Location</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Select"
+                      value={filterStockingLocation}
+                      onChange={(e) => {
+                        setFilterStockingLocation(e.target.value);
+                        setShowLocationDropdown(true);
+                      }}
+                      onFocus={() => setShowLocationDropdown(true)}
+                      className="w-full h-[32px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400"
+                      style={{
+                        paddingRight: filterStockingLocation ? '60px' : '40px'
+                      }}
+                    />
+                    {filterStockingLocation && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFilterStockingLocation('');
+                          setShowLocationDropdown(false);
+                        }}
+                        className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                        style={{ right: '24px' }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowLocationDropdown(!showLocationDropdown)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M4 6L8 10L12 6" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                    {showLocationDropdown && (
+                      <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                        {clientData
+                          .filter(client => client.markedAsStockingLocation === true)
+                          .map((client) => (
+                            <div
+                              key={client.id || client._id}
+                              className="px-3 py-2 text-[14px] text-gray-700 hover:bg-gray-100 cursor-pointer"
+                              onClick={() => {
+                                setFilterStockingLocation(client.value || client.label || client.siteName || '');
+                                setShowLocationDropdown(false);
+                              }}
+                            >
+                              {client.value || client.label || client.siteName || ''}
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
 
 
-              <div className=" flex items-center gap-2">
-                {/* Date */}
-                <div className="flex-1">
-                  <label className="block text-[14px] font-medium text-gray-700 mb-2">Date</label>
-                  <input
-                    type="date"
-                    value={filterDate}
-                    onChange={(e) => setFilterDate(e.target.value)}
-                    className="w-full h-[40px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400"
-                  />
-                </div>
-                {/* Entry Number */}
-                <div className="flex-1">
-                  <label className="block text-[14px] font-medium text-gray-700 mb-2">Entry Number</label>
-                  <input
-                    type="text"
-                    placeholder="Enter"
-                    value={filterSRNumber}
-                    onChange={(e) => setFilterSRNumber(e.target.value)}
-                    className="w-full h-[40px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400"
-                  />
+                <div className=" flex items-center gap-2 ">
+                  {/* Date */}
+                  <div className="flex-1">
+                    <label className="block text-[14px] font-medium text-black mb-0.5">Date</label>
+                    <input
+                      type="date"
+                      value={filterDate}
+                      onChange={(e) => setFilterDate(e.target.value)}
+                      className="w-full h-[32px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400"
+                    />
+                  </div>
+                  {/* Entry Number */}
+                  <div className="flex-1">
+                    <label className="block text-[14px] font-medium text-black mb-0.5">Entry Number</label>
+                    <input
+                      type="text"
+                      placeholder="Enter"
+                      value={filterSRNumber}
+                      onChange={(e) => setFilterSRNumber(e.target.value)}
+                      className="w-full h-[32px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400"
+                    />
+                  </div>
                 </div>
               </div>
               {/* Modal Footer */}
-              <div className="flex items-center justify-end gap-3 pt-2">
+              <div className="flex items-center justify-end gap-3 mt-10">
                 <button
                   type="button"
                   onClick={() => {
@@ -1336,7 +1358,7 @@ const History = ({ onTabChange }) => {
                     setShowInchargeDropdown(false);
                     setShowLocationDropdown(false);
                   }}
-                  className="px-6 py-2 border border-black rounded-lg text-[14px] font-medium text-black bg-white hover:bg-gray-50"
+                  className="px-6 py-2 w-[175px] h-[40px] border border-black rounded-lg text-[14px] font-medium text-black bg-white hover:bg-gray-50"
                 >
                   Cancel
                 </button>
@@ -1348,7 +1370,7 @@ const History = ({ onTabChange }) => {
                     setShowInchargeDropdown(false);
                     setShowLocationDropdown(false);
                   }}
-                  className="px-6 py-2 bg-black text-white rounded-lg text-[14px] font-medium hover:bg-gray-800"
+                  className="px-6 py-2 w-[175px] h-[40px] bg-black text-white rounded-lg text-[14px] font-medium hover:bg-gray-800"
                 >
                   Save
                 </button>

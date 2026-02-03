@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import SearchableDropdown from '../PurchaseOrder/SearchableDropdown';
+import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 import EditIcon from '../Images/edit1.png';
 import DeleteIcon from '../Images/delete.png';
 
@@ -19,6 +20,11 @@ const Transfer = ({ user }) => {
   const [selectedTo, setSelectedTo] = useState(null);
   const [selectedServiceStore, setSelectedServiceStore] = useState(null);
   const [selectedIncharge, setSelectedIncharge] = useState(null);
+  const [selectedRelocateItemId, setSelectedRelocateItemId] = useState(null);
+  const [selectedCurrentLocation, setSelectedCurrentLocation] = useState(null);
+  const [selectedRelocateLocation, setSelectedRelocateLocation] = useState(null);
+  const [relocateItemDetails, setRelocateItemDetails] = useState(null);
+  const [vendorOptions, setVendorOptions] = useState([]);
   const [items, setItems] = useState([]);
   const [fromOptions, setFromOptions] = useState([]);
   const [toOptions, setToOptions] = useState([]);
@@ -28,6 +34,9 @@ const Transfer = ({ user }) => {
   const [showToDropdown, setShowToDropdown] = useState(false);
   const [showServiceStoreDropdown, setShowServiceStoreDropdown] = useState(false);
   const [showInchargeDropdown, setShowInchargeDropdown] = useState(false);
+  const [showRelocateItemIdDropdown, setShowRelocateItemIdDropdown] = useState(false);
+  const [showCurrentLocationDropdown, setShowCurrentLocationDropdown] = useState(false);
+  const [showRelocateLocationDropdown, setShowRelocateLocationDropdown] = useState(false);
   const [toSearchQuery, setToSearchQuery] = useState('');
   const [toFavorites, setToFavorites] = useState(() => {
     const saved = localStorage.getItem('favoriteToSites');
@@ -46,6 +55,11 @@ const Transfer = ({ user }) => {
   const [inchargeSearchQuery, setInchargeSearchQuery] = useState('');
   const [inchargeFavorites, setInchargeFavorites] = useState(() => {
     const saved = localStorage.getItem('favoriteIncharges');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [relocateLocationSearchQuery, setRelocateLocationSearchQuery] = useState('');
+  const [relocateLocationFavorites, setRelocateLocationFavorites] = useState(() => {
+    const saved = localStorage.getItem('favoriteRelocateLocations');
     return saved ? JSON.parse(saved) : [];
   });
   const [entryServiceMode, setEntryServiceMode] = useState('Entry');
@@ -70,6 +84,7 @@ const Transfer = ({ user }) => {
   const [toolsItemIdFullData, setToolsItemIdFullData] = useState([]);
   const [apiItemIdOptions, setApiItemIdOptions] = useState([]);
   const [stockManagementData, setStockManagementData] = useState([]);
+  const [toolsTrackerManagementData, setToolsTrackerManagementData] = useState([]);
   const [selectedItemNameQuantity, setSelectedItemNameQuantity] = useState(0);
   const [selectedItemMachineNumber, setSelectedItemMachineNumber] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -83,6 +98,7 @@ const Transfer = ({ user }) => {
   const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_management';
   const [isSaving, setIsSaving] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [showUniversalSearchModal, setShowUniversalSearchModal] = useState(false);
   const [universalSearchQuery, setUniversalSearchQuery] = useState('');
   const [showSearchConfirmModal, setShowSearchConfirmModal] = useState(false);
@@ -154,6 +170,13 @@ const Transfer = ({ user }) => {
               id: vendor.id,
             }));
           setServiceStoreOptions(serviceStoreVendors);
+          // Also store all vendors for purchase store lookup
+          const allVendors = data.map(vendor => ({
+            value: vendor.vendorName,
+            label: vendor.vendorName,
+            id: vendor.id,
+          }));
+          setVendorOptions(allVendors);
         } else {
           console.log('Error fetching service store vendors.');
         }
@@ -188,7 +211,15 @@ const Transfer = ({ user }) => {
   useEffect(() => {
     const fetchEntryNo = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/tools_tracker_management/getEntryCount');
+        let endpoint;
+        if (entryServiceMode === 'Service') {
+          endpoint = `${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getServiceCount`;
+        } else if (entryServiceMode === 'Relocate') {
+          endpoint = `${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getRelocationCount`;
+        } else {
+          endpoint = `${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getEntryCount`;
+        }
+        const response = await fetch(endpoint);
         if (response.ok) {
           const data = await response.json();
           setEntryNo(data + 1);
@@ -198,7 +229,16 @@ const Transfer = ({ user }) => {
       }
     };
     fetchEntryNo();
-  }, []);
+  }, [entryServiceMode]);
+  useEffect(() => {
+    // Update current location in relocateItemDetails when selectedCurrentLocation changes
+    if (entryServiceMode === 'Relocate' && relocateItemDetails && selectedCurrentLocation) {
+      setRelocateItemDetails(prev => ({
+        ...prev,
+        currentLocation: selectedCurrentLocation.label || ''
+      }));
+    }
+  }, [selectedCurrentLocation, entryServiceMode]);
   useEffect(() => {
     if (!showToDropdown) {
       setToSearchQuery('');
@@ -344,6 +384,28 @@ const Transfer = ({ user }) => {
     setInchargeFavorites(newFavorites);
     localStorage.setItem('favoriteIncharges', JSON.stringify(newFavorites));
   };
+  const getFilteredRelocateLocationOptions = () => {
+    const normalizedQuery = normalizeSearchText(relocateLocationSearchQuery);
+    const filtered = fromOptions.filter(option => {
+      const normalizedLabel = normalizeSearchText(option.label);
+      return normalizedLabel.includes(normalizedQuery);
+    });
+    return filtered.sort((a, b) => {
+      const aIsFavorite = relocateLocationFavorites.includes(a.id);
+      const bIsFavorite = relocateLocationFavorites.includes(b.id);
+      if (aIsFavorite && !bIsFavorite) return -1;
+      if (!aIsFavorite && bIsFavorite) return 1;
+      return a.label.localeCompare(b.label);
+    });
+  };
+  const handleToggleRelocateLocationFavorite = (e, optionId) => {
+    e.stopPropagation();
+    const newFavorites = relocateLocationFavorites.includes(optionId)
+      ? relocateLocationFavorites.filter(id => id !== optionId)
+      : [...relocateLocationFavorites, optionId];
+    setRelocateLocationFavorites(newFavorites);
+    localStorage.setItem('favoriteRelocateLocations', JSON.stringify(newFavorites));
+  };
   const getFilteredServiceStoreOptions = () => {
     const normalizedQuery = normalizeSearchText(serviceStoreSearchQuery);
     const filtered = serviceStoreOptions.filter(option => {
@@ -372,14 +434,31 @@ const Transfer = ({ user }) => {
   };
   const areFieldsFilled = entryServiceMode === 'Entry'
     ? (selectedFrom && selectedTo && selectedIncharge)
+    : entryServiceMode === 'Relocate'
+    ? (selectedRelocateItemId && selectedCurrentLocation && selectedRelocateLocation)
     : (selectedFrom && selectedServiceStore && selectedIncharge);
   const handleSwitchToEntry = () => {
     setEntryServiceMode('Entry');
     setSelectedServiceStore(null);
+    setSelectedRelocateItemId(null);
+    setSelectedCurrentLocation(null);
+    setSelectedRelocateLocation(null);
+    setRelocateItemDetails(null);
   };
   const handleSwitchToService = () => {
     setEntryServiceMode('Service');
     setSelectedTo(null);
+    setSelectedRelocateItemId(null);
+    setSelectedCurrentLocation(null);
+    setSelectedRelocateLocation(null);
+    setRelocateItemDetails(null);
+  };
+  const handleSwitchToRelocate = () => {
+    setEntryServiceMode('Relocate');
+    setSelectedTo(null);
+    setSelectedServiceStore(null);
+    setSelectedFrom(null);
+    setRelocateLocationSearchQuery('');
   };
   useEffect(() => {
     const fetchToolsItemNames = async () => {
@@ -466,6 +545,24 @@ const Transfer = ({ user }) => {
       }
     };
     fetchStockManagement();
+  }, []);
+  useEffect(() => {
+    const fetchToolsTrackerManagement = async () => {
+      try {
+        const response = await fetch(`${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getAll`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setToolsTrackerManagementData(Array.isArray(data) ? data : []);
+        }
+      } catch (error) {
+        console.error('Error fetching tools tracker management data:', error);
+      }
+    };
+    fetchToolsTrackerManagement();
   }, []);
   useEffect(() => {
     if (fromOptions.length === 0 || inchargeOptions.length === 0 || toolsItemNameListData.length === 0) {
@@ -627,9 +724,49 @@ const Transfer = ({ user }) => {
   const handleAddItemSubmit = () => {
     if (addItemFormData.itemName) {
       if (editingItem) {
+        const newItemNameId = addItemFormData.itemNameId ? String(addItemFormData.itemNameId) : editingItem.item_name_id;
+        const newItemIdDbId = addItemFormData.itemIdDbId ? String(addItemFormData.itemIdDbId) : editingItem.item_ids_id;
+        const newBrandId = addItemFormData.brandId ? String(addItemFormData.brandId) : editingItem.brand_id;
+        const newMachineNumber = addItemFormData.machineNumber || editingItem.machine_number || '';
+        
+        // If itemId is selected, only check the full set (itemIdsId + brandId + machineNumber)
+        // Don't check itemNameId separately when itemId is selected
+        if (selectedFrom && newItemIdDbId) {
+          const itemSetValidation = validateItemSetAvailability(
+            newItemIdDbId,
+            newBrandId,
+            newMachineNumber,
+            newItemNameId,
+            addItemFormData.itemName,
+            selectedFrom.id
+          );
+          
+          if (!itemSetValidation.isValid) {
+            alert(itemSetValidation.errorMessage);
+            return;
+          }
+        } else if (selectedFrom && newItemNameId) {
+          // Only check itemNameId if itemId is NOT selected (for quantity-based transfers)
+          // Check quantity availability with brandId if provided
+          const newBrandId = addItemFormData.brandId ? String(addItemFormData.brandId) : editingItem.brand_id;
+          const newQuantity = addItemFormData.quantity ? String(addItemFormData.quantity) : String(editingItem.quantity || 0);
+          const validation = validateItemLocation(
+            newItemNameId,
+            addItemFormData.itemName,
+            newBrandId,
+            newQuantity,
+            selectedFrom.id
+          );
+          
+          if (!validation.isValid) {
+            alert(validation.errorMessage);
+            return;
+          }
+        }
+        
         const updatedItem = {
           ...editingItem,
-          item_name_id: addItemFormData.itemNameId ? String(addItemFormData.itemNameId) : editingItem.item_name_id,
+          item_name_id: newItemNameId,
           item_ids_id: addItemFormData.itemIdDbId ? String(addItemFormData.itemIdDbId) : editingItem.item_ids_id,
           brand_id: addItemFormData.brandId ? String(addItemFormData.brandId) : editingItem.brand_id,
           machine_number: addItemFormData.machineNumber || '',
@@ -699,7 +836,458 @@ const Transfer = ({ user }) => {
     setIsUploading(false);
     e.target.value = '';
   };
+  // Helper function to get current location of an item
+  const getItemCurrentLocation = (itemNameId) => {
+    if (!itemNameId) return null;
+    
+    const itemNameIdStr = String(itemNameId);
+    let currentLocationId = null;
+    let locationType = null; // 'project' or 'home'
+    
+    // First, check in tools_tracker_management entries (transfer history)
+    // Find the most recent entry for this item to determine its current location
+    let mostRecentEntry = null;
+    let mostRecentDate = null;
+    
+    for (const entry of toolsTrackerManagementData) {
+      const entryType = entry.tools_entry_type || entry.toolsEntryType || '';
+      if (entryType.toLowerCase() !== 'entry') continue; // Only check Entry type, not Service
+      
+      const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
+      const hasItem = entryItems.some(entryItem => {
+        const entryItemNameId = entryItem.item_name_id || entryItem.itemNameId;
+        return entryItemNameId && String(entryItemNameId) === itemNameIdStr;
+      });
+      
+      if (hasItem) {
+        const entryDate = entry.created_date_time || entry.createdDateTime || entry.timestamp || '';
+        if (!mostRecentDate || entryDate > mostRecentDate) {
+          mostRecentDate = entryDate;
+          mostRecentEntry = entry;
+        }
+      }
+    }
+    
+    // If item is found in transfer history, get its toProjectId
+    if (mostRecentEntry) {
+      const entryToProjectId = mostRecentEntry.to_project_id || mostRecentEntry.toProjectId;
+      if (entryToProjectId) {
+        currentLocationId = String(entryToProjectId);
+        locationType = 'project';
+        return { locationId: currentLocationId, locationType };
+      }
+    }
+    
+    // If no toProjectId found, check home_location_id from stock management
+    const stockItem = stockManagementData.find(stock => {
+      const stockItemNameId = stock.item_name_id || stock.itemNameId;
+      return stockItemNameId && String(stockItemNameId) === itemNameIdStr;
+    });
+    
+    if (stockItem) {
+      const homeLocationId = stockItem.home_location_id || stockItem.homeLocationId;
+      if (homeLocationId) {
+        currentLocationId = String(homeLocationId);
+        locationType = 'home';
+        return { locationId: currentLocationId, locationType };
+      }
+    }
+    
+    return null; // Item location not found
+  };
+
+  // Helper function to check if a specific item set (itemIdsId + brandId + machineNumber) is available at a location
+  const isItemSetAvailableAtLocation = (itemIdsId, brandId, machineNumber, locationId) => {
+    if (!itemIdsId || !locationId) return false;
+    
+    const itemIdsIdStr = String(itemIdsId);
+    const brandIdStr = brandId ? String(brandId) : null;
+    const machineNumberStr = machineNumber ? String(machineNumber).trim() : '';
+    const locationIdStr = String(locationId);
+    
+    // First check stock management - if item is at home location
+    const stockItem = stockManagementData.find(stock => {
+      const stockItemIdsId = stock.item_ids_id || stock.itemIdsId;
+      const stockBrandId = stock.brand_name_id || stock.brandNameId;
+      const stockMachineNumber = stock.machine_number || stock.machineNumber || '';
+      
+      const itemIdsMatch = stockItemIdsId && String(stockItemIdsId) === itemIdsIdStr;
+      const brandMatch = !brandIdStr || (stockBrandId && String(stockBrandId) === brandIdStr);
+      const machineMatch = !machineNumberStr || (stockMachineNumber && String(stockMachineNumber).trim() === machineNumberStr);
+      
+      return itemIdsMatch && brandMatch && machineMatch;
+    });
+    
+    if (stockItem) {
+      const homeLocationId = stockItem.home_location_id || stockItem.homeLocationId;
+      if (homeLocationId && String(homeLocationId) === locationIdStr) {
+        // Item set is at home location matching the requested location
+        return true;
+      }
+    }
+    
+    // Track transfers to find current location of this specific item set
+    // Find the most recent transfer entry that includes this exact item set
+    let mostRecentEntry = null;
+    let mostRecentDate = null;
+    
+    for (const entry of toolsTrackerManagementData) {
+      const entryType = entry.tools_entry_type || entry.toolsEntryType || '';
+      if (entryType.toLowerCase() !== 'entry') continue; // Only check Entry type, not Service
+      
+      const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
+      const hasMatchingItemSet = entryItems.some(entryItem => {
+        const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
+        const entryBrandId = entryItem.brand_id || entryItem.brandId;
+        const entryMachineNumber = entryItem.machine_number || entryItem.machineNumber || '';
+        
+        const itemIdsMatch = entryItemIdsId && String(entryItemIdsId) === itemIdsIdStr;
+        const brandMatch = !brandIdStr || (entryBrandId && String(entryBrandId) === brandIdStr);
+        const machineMatch = !machineNumberStr || (entryMachineNumber && String(entryMachineNumber).trim() === machineNumberStr);
+        
+        return itemIdsMatch && brandMatch && machineMatch;
+      });
+      
+      if (hasMatchingItemSet) {
+        const entryDate = entry.created_date_time || entry.createdDateTime || entry.timestamp || '';
+        if (!mostRecentDate || entryDate > mostRecentDate) {
+          mostRecentDate = entryDate;
+          mostRecentEntry = entry;
+        }
+      }
+    }
+    
+    // If item set was found in transfer history, check its current location
+    if (mostRecentEntry) {
+      const entryToProjectId = mostRecentEntry.to_project_id || mostRecentEntry.toProjectId;
+      if (entryToProjectId && String(entryToProjectId) === locationIdStr) {
+        // Item set is currently at this location
+        return true;
+      }
+    }
+    
+    // If item set not found in transfers and not at home location, it's not available
+    return false;
+  };
+
+  // Helper function to get current location of an item set (itemIdsId + brandId + machineNumber)
+  const getItemSetCurrentLocation = (itemIdsId, brandId, machineNumber) => {
+    if (!itemIdsId) return null;
+    
+    const itemIdsIdStr = String(itemIdsId);
+    const brandIdStr = brandId ? String(brandId) : null;
+    const machineNumberStr = machineNumber ? String(machineNumber).trim() : '';
+    let currentLocationId = null;
+    let locationType = null; // 'project' or 'home'
+    
+    // First, check in tools_tracker_management entries (transfer history)
+    // Find the most recent entry for this item set to determine its current location
+    let mostRecentEntry = null;
+    let mostRecentDate = null;
+    
+    for (const entry of toolsTrackerManagementData) {
+      const entryType = entry.tools_entry_type || entry.toolsEntryType || '';
+      if (entryType.toLowerCase() !== 'entry') continue; // Only check Entry type, not Service
+      
+      const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
+      const hasMatchingItemSet = entryItems.some(entryItem => {
+        const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
+        const entryBrandId = entryItem.brand_id || entryItem.brandId;
+        const entryMachineNumber = entryItem.machine_number || entryItem.machineNumber || '';
+        
+        const itemIdsMatch = entryItemIdsId && String(entryItemIdsId) === itemIdsIdStr;
+        const brandMatch = !brandIdStr || (entryBrandId && String(entryBrandId) === brandIdStr);
+        const machineMatch = !machineNumberStr || (entryMachineNumber && String(entryMachineNumber).trim() === machineNumberStr);
+        
+        return itemIdsMatch && brandMatch && machineMatch;
+      });
+      
+      if (hasMatchingItemSet) {
+        const entryDate = entry.created_date_time || entry.createdDateTime || entry.timestamp || '';
+        if (!mostRecentDate || entryDate > mostRecentDate) {
+          mostRecentDate = entryDate;
+          mostRecentEntry = entry;
+        }
+      }
+    }
+    
+    // If item set is found in transfer history, get its toProjectId
+    if (mostRecentEntry) {
+      const entryToProjectId = mostRecentEntry.to_project_id || mostRecentEntry.toProjectId;
+      if (entryToProjectId) {
+        currentLocationId = String(entryToProjectId);
+        locationType = 'project';
+        return { locationId: currentLocationId, locationType };
+      }
+    }
+    
+    // If no toProjectId found, check home_location_id from stock management
+    const stockItem = stockManagementData.find(stock => {
+      const stockItemIdsId = stock.item_ids_id || stock.itemIdsId;
+      const stockBrandId = stock.brand_name_id || stock.brandNameId;
+      const stockMachineNumber = stock.machine_number || stock.machineNumber || '';
+      
+      const itemIdsMatch = stockItemIdsId && String(stockItemIdsId) === itemIdsIdStr;
+      const brandMatch = !brandIdStr || (stockBrandId && String(stockBrandId) === brandIdStr);
+      const machineMatch = !machineNumberStr || (stockMachineNumber && String(stockMachineNumber).trim() === machineNumberStr);
+      
+      return itemIdsMatch && brandMatch && machineMatch;
+    });
+    
+    if (stockItem) {
+      const homeLocationId = stockItem.home_location_id || stockItem.homeLocationId;
+      if (homeLocationId) {
+        currentLocationId = String(homeLocationId);
+        locationType = 'home';
+        return { locationId: currentLocationId, locationType };
+      }
+    }
+    
+    return null; // Item set location not found
+  };
+
+  // Helper function to calculate available quantity of itemNameId (with optional brandId) at a location
+  const getAvailableQuantityAtLocation = (itemNameId, brandId, locationId) => {
+    if (!itemNameId || !locationId) return 0;
+    
+    const itemNameIdStr = String(itemNameId);
+    const brandIdStr = brandId ? String(brandId) : null;
+    const locationIdStr = String(locationId);
+    let availableQuantity = 0;
+    
+    // Start with quantity from stock management (home location)
+    // Filter by itemNameId and optionally brandId
+    const stockItems = stockManagementData.filter(stock => {
+      const stockItemNameId = stock.item_name_id || stock.itemNameId;
+      const stockBrandId = stock.brand_name_id || stock.brandNameId;
+      const stockHomeLocationId = stock.home_location_id || stock.homeLocationId;
+      
+      const itemNameMatch = stockItemNameId && String(stockItemNameId) === itemNameIdStr;
+      const brandMatch = !brandIdStr || (stockBrandId && String(stockBrandId) === brandIdStr);
+      const locationMatch = stockHomeLocationId && String(stockHomeLocationId) === locationIdStr;
+      // Only count items without itemIdsId (quantity-based items)
+      const noItemIdsId = !stock.item_ids_id && !stock.itemIdsId;
+      
+      return itemNameMatch && brandMatch && locationMatch && noItemIdsId;
+    });
+    
+    // Sum quantities from stock management
+    stockItems.forEach(stock => {
+      const qty = parseInt(stock.quantity || 0, 10);
+      availableQuantity += qty;
+    });
+    
+    // Track transfers: add items transferred TO this location, subtract items transferred FROM this location
+    for (const entry of toolsTrackerManagementData) {
+      const entryType = entry.tools_entry_type || entry.toolsEntryType || '';
+      if (entryType.toLowerCase() !== 'entry') continue; // Only check Entry type, not Service
+      
+      const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
+      const entryToProjectId = entry.to_project_id || entry.toProjectId;
+      const entryFromProjectId = entry.from_project_id || entry.fromProjectId;
+      
+      for (const entryItem of entryItems) {
+        // Only count items without itemIdsId (quantity-based items)
+        const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
+        if (entryItemIdsId) continue; // Skip items with itemIdsId
+        
+        const entryItemNameId = entryItem.item_name_id || entryItem.itemNameId;
+        const entryBrandId = entryItem.brand_id || entryItem.brandId;
+        
+        const itemNameMatch = entryItemNameId && String(entryItemNameId) === itemNameIdStr;
+        const brandMatch = !brandIdStr || (entryBrandId && String(entryBrandId) === brandIdStr);
+        
+        if (itemNameMatch && brandMatch) {
+          const itemQuantity = parseInt(entryItem.quantity || 0, 10);
+          
+          // If transferred TO this location, add to available quantity
+          if (entryToProjectId && String(entryToProjectId) === locationIdStr) {
+            availableQuantity += itemQuantity;
+          }
+          
+          // If transferred FROM this location, subtract from available quantity
+          if (entryFromProjectId && String(entryFromProjectId) === locationIdStr) {
+            availableQuantity -= itemQuantity;
+          }
+        }
+      }
+    }
+    
+    return Math.max(0, availableQuantity); // Ensure non-negative
+  };
+
+  // Validation function to check if item can be transferred from selected location (with quantity check)
+  const validateItemLocation = (itemNameId, itemName, brandId, quantity, fromProjectId) => {
+    if (!itemNameId || !fromProjectId) return { isValid: true };
+    
+    const fromProjectIdStr = String(fromProjectId);
+    const requestedQuantity = parseInt(quantity || 0, 10);
+    
+    // If quantity is specified, check available quantity
+    if (requestedQuantity > 0) {
+      const availableQuantity = getAvailableQuantityAtLocation(itemNameId, brandId, fromProjectIdStr);
+      
+      if (availableQuantity < requestedQuantity) {
+        const projectOption = toOptions.find(opt => String(opt.id) === fromProjectIdStr);
+        const projectName = projectOption?.label || projectOption?.name || fromProjectIdStr;
+        
+        const itemDetails = [
+          `Item Name ID: ${itemNameId}`,
+          brandId ? `Brand ID: ${brandId}` : null
+        ].filter(Boolean).join(', ');
+        
+        return {
+          isValid: false,
+          errorMessage: `Cannot transfer item "${itemName}" (${itemDetails}). Only ${availableQuantity} unit(s) available at "${projectName}" (Project ID: ${fromProjectIdStr}), but ${requestedQuantity} unit(s) requested.`
+        };
+      }
+    } else {
+      // If no quantity specified, check if item exists at location (legacy check)
+      const locationInfo = getItemCurrentLocation(itemNameId);
+      if (!locationInfo) {
+        // Item location not found - allow transfer (might be new item)
+        return { isValid: true };
+      }      
+      const { locationId, locationType } = locationInfo;      
+      if (locationId !== fromProjectIdStr) {
+        // Find location name for error message
+        let locationName = locationId;
+        if (locationType === 'project') {
+          const projectOption = toOptions.find(opt => String(opt.id) === locationId);
+          locationName = projectOption?.label || projectOption?.name || locationId;
+        } else if (locationType === 'home') {
+          const projectOption = toOptions.find(opt => String(opt.id) === locationId);
+          locationName = projectOption?.label || projectOption?.name || `Home Location (ID: ${locationId})`;
+        }
+        return {
+          isValid: false,
+          errorMessage: `Cannot transfer item "${itemName}" (Item Name ID: ${itemNameId}). This item is currently ${locationType === 'project' ? 'in project' : 'at home location'} "${locationName}" (ID: ${locationId}), not in the selected "From" project.`
+        };
+      }
+    }    
+    return { isValid: true };
+  };
+  // Validation function to check if item set (itemIdsId + brandId + machineNumber) is available at location (before sending to backend)
+  const validateItemSetAvailability = (itemIdsId, brandId, machineNumber, itemNameId, itemName, fromProjectId) => {
+    if (!itemIdsId || !fromProjectId) return { isValid: true }; // If no itemId selected, skip check    
+    const fromProjectIdStr = String(fromProjectId);
+    const isAvailable = isItemSetAvailableAtLocation(itemIdsId, brandId, machineNumber, fromProjectIdStr);    
+    if (!isAvailable) {
+      const projectOption = toOptions.find(opt => String(opt.id) === fromProjectIdStr);
+      const projectName = projectOption?.label || projectOption?.name || fromProjectIdStr;      
+      // Find where the item set currently is
+      let currentLocation = null;
+      let currentLocationName = 'unknown location';      
+      const itemIdsIdStr = String(itemIdsId);
+      const brandIdStr = brandId ? String(brandId) : null;
+      const machineNumberStr = machineNumber ? String(machineNumber).trim() : '';      
+      // Check stock management
+      const stockItem = stockManagementData.find(stock => {
+        const stockItemIdsId = stock.item_ids_id || stock.itemIdsId;
+        const stockBrandId = stock.brand_name_id || stock.brandNameId;
+        const stockMachineNumber = stock.machine_number || stock.machineNumber || '';        
+        const itemIdsMatch = stockItemIdsId && String(stockItemIdsId) === itemIdsIdStr;
+        const brandMatch = !brandIdStr || (stockBrandId && String(stockBrandId) === brandIdStr);
+        const machineMatch = !machineNumberStr || (stockMachineNumber && String(stockMachineNumber).trim() === machineNumberStr);        
+        return itemIdsMatch && brandMatch && machineMatch;
+      });
+      
+      if (stockItem) {
+        const homeLocationId = stockItem.home_location_id || stockItem.homeLocationId;
+        if (homeLocationId) {
+          currentLocation = String(homeLocationId);
+          const homeOption = toOptions.find(opt => String(opt.id) === currentLocation);
+          currentLocationName = homeOption?.label || homeOption?.name || `Home Location (ID: ${currentLocation})`;
+        }
+      }
+      
+      // Check transfer history for current location
+      let mostRecentEntry = null;
+      let mostRecentDate = null;
+      for (const entry of toolsTrackerManagementData) {
+        const entryType = entry.tools_entry_type || entry.toolsEntryType || '';
+        if (entryType.toLowerCase() !== 'entry') continue;
+        
+        const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
+        const hasMatchingItemSet = entryItems.some(entryItem => {
+          const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
+          const entryBrandId = entryItem.brand_id || entryItem.brandId;
+          const entryMachineNumber = entryItem.machine_number || entryItem.machineNumber || '';
+          
+          const itemIdsMatch = entryItemIdsId && String(entryItemIdsId) === itemIdsIdStr;
+          const brandMatch = !brandIdStr || (entryBrandId && String(entryBrandId) === brandIdStr);
+          const machineMatch = !machineNumberStr || (entryMachineNumber && String(entryMachineNumber).trim() === machineNumberStr);
+          
+          return itemIdsMatch && brandMatch && machineMatch;
+        });
+        
+        if (hasMatchingItemSet) {
+          const entryDate = entry.created_date_time || entry.createdDateTime || entry.timestamp || '';
+          if (!mostRecentDate || entryDate > mostRecentDate) {
+            mostRecentDate = entryDate;
+            mostRecentEntry = entry;
+          }
+        }
+      }
+      
+      if (mostRecentEntry) {
+        const entryToProjectId = mostRecentEntry.to_project_id || mostRecentEntry.toProjectId;
+        if (entryToProjectId) {
+          currentLocation = String(entryToProjectId);
+          const currentOption = toOptions.find(opt => String(opt.id) === currentLocation);
+          currentLocationName = currentOption?.label || currentOption?.name || currentLocation;
+        }
+      }
+      
+      const itemSetDetails = [
+        `Item ID: ${itemIdsId}`,
+        brandId ? `Brand ID: ${brandId}` : null,
+        machineNumber ? `Machine Number: ${machineNumber}` : null
+      ].filter(Boolean).join(', ');
+      
+      return {
+        isValid: false,
+        errorMessage: `Cannot transfer item "${itemName}" (${itemSetDetails}). This item set is currently at "${currentLocationName}" (ID: ${currentLocation || 'unknown'}), not at the selected "From" project "${projectName}" (Project ID: ${fromProjectIdStr}).`
+      };
+    }
+    
+    return { isValid: true };
+  };
+
   const handleConfirmUpload = () => {
+    // If itemId is selected, only check the full set (itemIdsId + brandId + machineNumber)
+    // Don't check itemNameId separately when itemId is selected
+    if (selectedFrom && addItemFormData.itemIdDbId) {
+      const itemSetValidation = validateItemSetAvailability(
+        addItemFormData.itemIdDbId,
+        addItemFormData.brandId,
+        addItemFormData.machineNumber,
+        addItemFormData.itemNameId,
+        addItemFormData.itemName,
+        selectedFrom.id
+      );
+      
+      if (!itemSetValidation.isValid) {
+        alert(itemSetValidation.errorMessage);
+        return;
+      }
+    } else if (selectedFrom && addItemFormData.itemNameId) {
+      // Only check itemNameId if itemId is NOT selected (for quantity-based transfers)
+      // Check quantity availability with brandId if provided
+      const validation = validateItemLocation(
+        addItemFormData.itemNameId,
+        addItemFormData.itemName,
+        addItemFormData.brandId,
+        addItemFormData.quantity,
+        selectedFrom.id
+      );
+      
+      if (!validation.isValid) {
+        alert(validation.errorMessage);
+        return;
+      }
+    }
+
     const uploadedImages = uploadFiles
       .filter(f => f.base64Data) // Only include files with base64 data
       .map(f => ({
@@ -730,45 +1318,202 @@ const Transfer = ({ user }) => {
     handleCloseAddItemsModal();
   };
   const handleSaveTransfer = async () => {
-    if (!selectedFrom || !selectedIncharge) {
-      alert('Please fill in all required fields (From and Project Incharge)');
-      return;
+    if (entryServiceMode === 'Relocate') {
+      if (!selectedRelocateItemId || !selectedCurrentLocation || !selectedRelocateLocation) {
+        alert('Please fill in all required fields (Item ID, Current Location, and Relocate Location)');
+        return;
+      }
+    } else {
+      if (!selectedFrom || !selectedIncharge) {
+        alert('Please fill in all required fields (From and Project Incharge)');
+        return;
+      }
+      if (entryServiceMode === 'Entry' && !selectedTo) {
+        alert('Please select the "To" field');
+        return;
+      }
+      if (entryServiceMode === 'Service' && !selectedServiceStore) {
+        alert('Please select the Service Store');
+        return;
+      }
+      if (items.length === 0) {
+        alert('Please add at least one item');
+        return;
+      }
     }
-    if (entryServiceMode === 'Entry' && !selectedTo) {
-      alert('Please select the "To" field');
-      return;
+
+    // Validation: Check if items are available at fromProjectId (before sending to backend)
+    // Skip validation for Relocate mode as it uses different flow
+    if (entryServiceMode !== 'Relocate' && selectedFrom) {
+      const fromProjectId = String(selectedFrom.id);
+      
+      for (const item of items) {
+        if (!item.item_name_id) continue;
+        
+        // If itemId is selected, only check the full set (itemIdsId + brandId + machineNumber)
+        // Don't check itemNameId separately when itemId is selected
+        if (item.item_ids_id) {
+          const itemSetValidation = validateItemSetAvailability(
+            item.item_ids_id,
+            item.brand_id,
+            item.machine_number,
+            item.item_name_id,
+            item.itemName,
+            fromProjectId
+          );
+          
+          if (!itemSetValidation.isValid) {
+            alert(itemSetValidation.errorMessage);
+            setIsSaving(false);
+            return;
+          }
+        } else {
+          // Only check itemNameId if itemId is NOT selected (for quantity-based transfers)
+          // Check quantity availability with brandId if provided
+          const validation = validateItemLocation(
+            item.item_name_id,
+            item.itemName,
+            item.brand_id,
+            item.quantity,
+            fromProjectId
+          );
+          
+          if (!validation.isValid) {
+            alert(validation.errorMessage);
+            setIsSaving(false);
+            return;
+          }
+        }
+      }
     }
-    if (entryServiceMode === 'Service' && !selectedServiceStore) {
-      alert('Please select the Service Store');
-      return;
+
+    // Additional validation: Check if items are currently in a different project (for Entry mode)
+    if (entryServiceMode === 'Entry' && selectedTo && selectedFrom) {
+      const targetProjectId = String(selectedTo.id);
+      const fromProjectId = String(selectedFrom.id);
+      
+      for (const item of items) {
+        // If itemId is selected, check by full set (itemIdsId + brandId + machineNumber)
+        // Otherwise, check by itemNameId (for quantity-based transfers)
+        if (item.item_ids_id) {
+          // Check by full set
+          const locationInfo = getItemSetCurrentLocation(
+            item.item_ids_id,
+            item.brand_id,
+            item.machine_number
+          );
+          if (!locationInfo) continue; // Item set location not found - allow transfer
+          
+          const { locationId, locationType } = locationInfo;
+          
+          // If item set is in a project (not home), check if it's different from both FROM and TO
+          if (locationType === 'project') {
+            const currentProjectId = String(locationId);
+            
+            // Allow transfer if we're transferring FROM the project where item set currently is
+            // Block if item set is in a different project than both FROM and TO
+            if (currentProjectId !== fromProjectId && currentProjectId !== targetProjectId) {
+              const projectOption = toOptions.find(opt => String(opt.id) === currentProjectId);
+              const projectName = projectOption?.label || projectOption?.name || currentProjectId;
+              const itemName = item.itemName || 'Unknown Item';
+              const itemSetDetails = [
+                `Item ID: ${item.itemId || item.item_ids_id}`,
+                item.brand_id ? `Brand ID: ${item.brand_id}` : null,
+                item.machine_number ? `Machine Number: ${item.machine_number}` : null
+              ].filter(Boolean).join(', ');
+              alert(`Cannot transfer item "${itemName}" (${itemSetDetails}). This item set is currently in project "${projectName}" (Project ID: ${currentProjectId}). Please return it to home location first or transfer it from the current project.`);
+              setIsSaving(false);
+              return;
+            }
+          }
+        } else if (item.item_name_id) {
+          // Check by itemNameId (for quantity-based transfers)
+          const locationInfo = getItemCurrentLocation(item.item_name_id);
+          if (!locationInfo) continue; // Item location not found - allow transfer
+          
+          const { locationId, locationType } = locationInfo;
+          
+          // If item is in a project (not home), check if it's different from both FROM and TO
+          if (locationType === 'project') {
+            const currentProjectId = String(locationId);
+            
+            // Allow transfer if we're transferring FROM the project where item currently is
+            // Block if item is in a different project than both FROM and TO
+            if (currentProjectId !== fromProjectId && currentProjectId !== targetProjectId) {
+              const projectOption = toOptions.find(opt => String(opt.id) === currentProjectId);
+              const projectName = projectOption?.label || projectOption?.name || currentProjectId;
+              const itemName = item.itemName || 'Unknown Item';
+              alert(`Cannot transfer item "${itemName}" (Item Name ID: ${item.item_name_id}). This item is currently in project "${projectName}" (Project ID: ${currentProjectId}). Please return it to home location first or transfer it from the current project.`);
+              setIsSaving(false);
+              return;
+            }
+          }
+        }
+      }
     }
-    if (items.length === 0) {
-      alert('Please add at least one item');
-      return;
-    }
+
     setIsSaving(true);
     try {
-      const payload = {
-        from_project_id: selectedFrom?.id ? String(selectedFrom.id) : null,
-        to_project_id: entryServiceMode === 'Entry' && selectedTo?.id ? String(selectedTo.id) : null,
-        project_incharge_id: selectedIncharge?.id ? String(selectedIncharge.id) : null,
-        service_store_id: entryServiceMode === 'Service' && selectedServiceStore?.id ? String(selectedServiceStore.id) : null,
-        created_by: user?.name || user?.username || 'mobile',
-        tools_entry_type: entryServiceMode.toLowerCase(), // "entry" or "service"
-        eno: String(entryNo),
-        tools_tracker_item_name_table: items.map(item => ({
-          timestamp: item.timestamp || new Date().toISOString().slice(0, 19),
-          item_name_id: item.item_name_id || null,
-          item_ids_id: item.item_ids_id || null,
-          brand_id: item.brand_id || null,
-          model: item.model || '',
-          machine_number: item.machine_number || '',
-          quantity: item.quantity || 0,
-          machine_status: item.machine_status || 'Working',
-          description: item.description || '',
-          tools_item_live_images: item.tools_item_live_images || []
-        }))
-      };
+      let payload;
+      
+      if (entryServiceMode === 'Relocate') {
+        // For Relocate mode, get item details from stock management
+        const stockItem = stockManagementData.find(item => {
+          const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
+          return String(itemIdsId) === String(selectedRelocateItemId);
+        });
+        
+        if (!stockItem) {
+          alert('Item not found in stock management');
+          setIsSaving(false);
+          return;
+        }
+        
+        payload = {
+          from_project_id: selectedCurrentLocation?.id ? String(selectedCurrentLocation.id) : null,
+          to_project_id: selectedRelocateLocation?.id ? String(selectedRelocateLocation.id) : null,
+          project_incharge_id: null,
+          service_store_id: null,
+          created_by: user?.name || user?.username || 'mobile',
+          tools_entry_type: 'relocation',
+          eno: String(entryNo),
+          tools_tracker_item_name_table: [{
+            timestamp: new Date().toISOString().slice(0, 19),
+            item_name_id: stockItem.item_name_id || stockItem.itemNameId || null,
+            item_ids_id: String(selectedRelocateItemId),
+            brand_id: stockItem.brand_id || stockItem.brandId || stockItem.brand_name_id || stockItem.brandNameId || null,
+            model: stockItem.model || '',
+            machine_number: stockItem.machine_number || stockItem.machineNumber || '',
+            quantity: stockItem.quantity || 0,
+            machine_status: stockItem.machine_status || stockItem.machineStatus || 'Working',
+            description: '',
+            home_location_id: selectedRelocateLocation?.id ? String(selectedRelocateLocation.id) : null,
+            tools_item_live_images: []
+          }]
+        };
+      } else {
+        payload = {
+          from_project_id: selectedFrom?.id ? String(selectedFrom.id) : null,
+          to_project_id: entryServiceMode === 'Entry' && selectedTo?.id ? String(selectedTo.id) : null,
+          project_incharge_id: selectedIncharge?.id ? String(selectedIncharge.id) : null,
+          service_store_id: entryServiceMode === 'Service' && selectedServiceStore?.id ? String(selectedServiceStore.id) : null,
+          created_by: user?.name || user?.username || 'mobile',
+          tools_entry_type: entryServiceMode.toLowerCase(), // "entry" or "service"
+          eno: String(entryNo),
+          tools_tracker_item_name_table: items.map(item => ({
+            timestamp: item.timestamp || new Date().toISOString().slice(0, 19),
+            item_name_id: item.item_name_id || null,
+            item_ids_id: item.item_ids_id || null,
+            brand_id: item.brand_id || null,
+            model: item.model || '',
+            machine_number: item.machine_number || '',
+            quantity: item.quantity || 0,
+            machine_status: item.machine_status || 'Working',
+            description: item.description || '',
+            tools_item_live_images: item.tools_item_live_images || []
+          }))
+        };
+      }
       const response = await fetch(`${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/save`, {
         method: 'POST',
         credentials: 'include',
@@ -786,6 +1531,10 @@ const Transfer = ({ user }) => {
       setSelectedTo(null);
       setSelectedServiceStore(null);
       setSelectedIncharge(null);
+      setSelectedRelocateItemId(null);
+      setSelectedCurrentLocation(null);
+      setSelectedRelocateLocation(null);
+      setRelocateItemDetails(null);
       setItems([]);
       setEntryNo(prev => prev + 1);
     } catch (error) {
@@ -1098,15 +1847,121 @@ const Transfer = ({ user }) => {
           item => (item?.item_id?.trim() ?? item?.itemId?.trim()) === value
         );
         updated.itemIdDbId = itemIdObj?.id ?? null;
-        const stockItem = stockManagementData.find(item => {
-          const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
-          return String(itemIdsId) === String(itemIdObj?.id);
-        });
-        const machineNum = stockItem?.machine_number ?? stockItem?.machineNumber ?? '';
-        updated.machineNumber = machineNum;
-        setSelectedItemMachineNumber(machineNum);
+        
+        if (itemIdObj?.id) {
+          const itemIdsIdStr = String(itemIdObj.id);
+          
+          // Find all entries with this item_ids_id from both stockManagementData and toolsTrackerManagementData
+          const allEntries = [];
+          
+          // Get from stockManagementData
+          stockManagementData.forEach(item => {
+            const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
+            if (String(itemIdsId) === itemIdsIdStr) {
+              allEntries.push({
+                id: item?.id ?? item?._id ?? 0,
+                timestamp: item?.timestamp || item?.created_date_time || item?.createdDateTime || '',
+                item_name_id: item?.item_name_id ?? item?.itemNameId,
+                brand_id: item?.brand_id ?? item?.brandId ?? item?.brand_name_id ?? item?.brandNameId,
+                machine_number: item?.machine_number ?? item?.machineNumber ?? ''
+              });
+            }
+          });
+          
+          // Get from toolsTrackerManagementData
+          toolsTrackerManagementData.forEach(entry => {
+            const entryItems = entry?.tools_tracker_item_name_table ?? entry?.toolsTrackerItemNameTable ?? [];
+            entryItems.forEach(item => {
+              const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
+              if (String(itemIdsId) === itemIdsIdStr) {
+                allEntries.push({
+                  id: entry?.id ?? entry?._id ?? 0,
+                  timestamp: entry?.created_date_time ?? entry?.createdDateTime ?? entry?.timestamp ?? '',
+                  item_name_id: item?.item_name_id ?? item?.itemNameId,
+                  brand_id: item?.brand_id ?? item?.brandId,
+                  machine_number: item?.machine_number ?? item?.machineNumber ?? ''
+                });
+              }
+            });
+          });
+          
+          // Sort by id descending (highest id = most recent) or timestamp descending
+          allEntries.sort((a, b) => {
+            // First try to sort by id (numeric comparison)
+            const idA = parseInt(a.id) || 0;
+            const idB = parseInt(b.id) || 0;
+            if (idB !== idA) {
+              return idB - idA;
+            }
+            // If ids are equal or both 0, sort by timestamp
+            if (a.timestamp && b.timestamp) {
+              return new Date(b.timestamp) - new Date(a.timestamp);
+            }
+            return 0;
+          });
+          
+          // Get the last (most recent) entry
+          const lastEntry = allEntries.length > 0 ? allEntries[0] : null;
+          
+          if (lastEntry) {
+            // Set Item Name from the last entry
+            if (lastEntry.item_name_id) {
+              const itemNameObj = toolsItemNameListData.find(
+                item => String(item?.id) === String(lastEntry.item_name_id)
+              );
+              if (itemNameObj) {
+                updated.itemName = itemNameObj?.item_name ?? itemNameObj?.itemName ?? '';
+                updated.itemNameId = itemNameObj?.id ?? null;
+              }
+            }
+            
+            // Set Brand from the last entry
+            if (lastEntry.brand_id) {
+              const brandObj = toolsBrandFullData.find(
+                b => String(b?.id) === String(lastEntry.brand_id)
+              );
+              if (brandObj) {
+                updated.brand = brandObj?.tools_brand ?? brandObj?.toolsBrand ?? '';
+                updated.brandId = brandObj?.id ?? null;
+              }
+            }
+            
+            // Set Machine Number from the last entry
+            if (lastEntry.machine_number) {
+              updated.machineNumber = lastEntry.machine_number;
+              setSelectedItemMachineNumber(lastEntry.machine_number);
+            } else {
+              updated.machineNumber = '';
+              setSelectedItemMachineNumber('');
+            }
+          } else {
+            // If no entry found, try to get itemName from stockManagementData (fallback)
+            const stockItem = stockManagementData.find(item => {
+              const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
+              return String(itemIdsId) === itemIdsIdStr;
+            });
+            
+            if (stockItem?.item_name_id) {
+              const itemNameObj = toolsItemNameListData.find(
+                item => String(item?.id) === String(stockItem.item_name_id)
+              );
+              if (itemNameObj) {
+                updated.itemName = itemNameObj?.item_name ?? itemNameObj?.itemName ?? '';
+                updated.itemNameId = itemNameObj?.id ?? null;
+              }
+            }
+            
+            const machineNum = stockItem?.machine_number ?? stockItem?.machineNumber ?? '';
+            updated.machineNumber = machineNum;
+            setSelectedItemMachineNumber(machineNum);
+          }
+        }
       } else if (field === 'itemId' && !value) {
         updated.itemIdDbId = null;
+        updated.itemName = '';
+        updated.itemNameId = null;
+        updated.brand = '';
+        updated.brandId = null;
         updated.machineNumber = '';
         setSelectedItemMachineNumber('');
       }
@@ -1137,6 +1992,18 @@ const Transfer = ({ user }) => {
       if (!res.ok) {
         throw new Error(`Failed to save: ${res.status} ${res.statusText}`);
       }
+      // Try to get ID from response first
+      let savedItemId = null;
+      try {
+        const responseText = await res.clone().text();
+        if (responseText) {
+          const responseData = JSON.parse(responseText);
+          savedItemId = responseData?.id ?? responseData?._id ?? null;
+        }
+      } catch {
+        // If response doesn't have JSON, continue to refresh
+      }
+      
       const refreshed = await fetch(`${TOOLS_ITEM_NAME_BASE_URL}/getAll`, {
         method: 'GET',
         credentials: 'include',
@@ -1149,7 +2016,21 @@ const Transfer = ({ user }) => {
           .map(item => item?.item_name ?? item?.itemName)
           .filter(Boolean);
         setItemNameOptions(Array.from(new Set(names)));
-        handleFieldChange('itemName', trimmedName);
+        
+        // Find the ID from refreshed data if not in response
+        if (!savedItemId) {
+          const newItem = (Array.isArray(data) ? data : []).find(
+            item => (item?.item_name ?? item?.itemName) === trimmedName
+          );
+          savedItemId = newItem?.id ?? newItem?._id ?? null;
+        }
+        
+        // Set both itemName and itemNameId
+        setAddItemFormData(prev => ({
+          ...prev,
+          itemName: trimmedName,
+          itemNameId: savedItemId
+        }));
       }
     } catch (e) {
       console.error('Error saving new Item Name:', e);
@@ -1178,6 +2059,18 @@ const Transfer = ({ user }) => {
       if (!res.ok) {
         throw new Error(`Failed to save: ${res.status} ${res.statusText}`);
       }
+      // Try to get ID from response first
+      let savedBrandId = null;
+      try {
+        const responseText = await res.clone().text();
+        if (responseText) {
+          const responseData = JSON.parse(responseText);
+          savedBrandId = responseData?.id ?? responseData?._id ?? null;
+        }
+      } catch {
+        // If response doesn't have JSON, continue to refresh
+      }
+      
       const refreshed = await fetch(`${TOOLS_BRAND_BASE_URL}/getAll`, {
         method: 'GET',
         credentials: 'include',
@@ -1190,7 +2083,21 @@ const Transfer = ({ user }) => {
           .map(b => b?.tools_brand?.trim() ?? b?.toolsBrand?.trim())
           .filter(b => b);
         setBrandOptions(Array.from(new Set(brandOpts)));
-        handleFieldChange('brand', trimmedBrand);
+        
+        // Find the ID from refreshed data if not in response
+        if (!savedBrandId) {
+          const newBrand = (Array.isArray(data) ? data : []).find(
+            b => (b?.tools_brand?.trim() ?? b?.toolsBrand?.trim()) === trimmedBrand
+          );
+          savedBrandId = newBrand?.id ?? newBrand?._id ?? null;
+        }
+        
+        // Set both brand and brandId
+        setAddItemFormData(prev => ({
+          ...prev,
+          brand: trimmedBrand,
+          brandId: savedBrandId
+        }));
       }
     } catch (e) {
       console.error('Error saving new Brand:', e);
@@ -1219,6 +2126,18 @@ const Transfer = ({ user }) => {
       if (!res.ok) {
         throw new Error(`Failed to save: ${res.status} ${res.statusText}`);
       }
+      // Try to get ID from response first
+      let savedItemIdDbId = null;
+      try {
+        const responseText = await res.clone().text();
+        if (responseText) {
+          const responseData = JSON.parse(responseText);
+          savedItemIdDbId = responseData?.id ?? responseData?._id ?? null;
+        }
+      } catch {
+        // If response doesn't have JSON, continue to refresh
+      }
+      
       const refreshed = await fetch(`${TOOLS_ITEM_ID_BASE_URL}/getAll`, {
         method: 'GET',
         credentials: 'include',
@@ -1233,7 +2152,21 @@ const Transfer = ({ user }) => {
           .filter(item => !/^\d+$/.test(item));
         setApiItemIdOptions(itemIdOpts);
         setItemIdOptions(itemIdOpts);
-        handleFieldChange('itemId', trimmedItemId);
+        
+        // Find the ID from refreshed data if not in response
+        if (!savedItemIdDbId) {
+          const newItemId = (Array.isArray(data) ? data : []).find(
+            item => (item?.item_id?.trim() ?? item?.itemId?.trim()) === trimmedItemId
+          );
+          savedItemIdDbId = newItemId?.id ?? newItemId?._id ?? null;
+        }
+        
+        // Set both itemId and itemIdDbId
+        setAddItemFormData(prev => ({
+          ...prev,
+          itemId: trimmedItemId,
+          itemIdDbId: savedItemIdDbId
+        }));
       }
     } catch (e) {
       console.error('Error saving new Item ID:', e);
@@ -1243,16 +2176,21 @@ const Transfer = ({ user }) => {
   return (
     <div className="flex flex-col min-h-[calc(100vh-90px-80px)] bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
       <div className="flex-shrink-0 px-4 pt-2 pb-1 flex items-center justify-between">
-        <p className="text-[12px] font-medium text-black leading-normal">
-          #{entryNo || 'NO'} {date}
-        </p>
+        <div className="flex items-center gap-1">
+          <p className="text-[12px] font-medium text-black leading-normal">
+            #{entryNo || 'NO'}
+          </p>
+          <button type="button" onClick={() => setShowDatePicker(true)} className="text-[12px] font-medium text-black leading-normal underline-offset-2 hover:underline">
+            {date}
+          </button>
+        </div>
         <div className='flex gap-3'>
           {items.length > 0 && areFieldsFilled && (
             <button onClick={() => setShowConfirmModal(true)} disabled={isSaving} className="flex items-center gap-1 text-[14px] font-medium text-black">
               {isSaving ? (
                 <span className="text-gray-500">...</span>
               ) : (
-                <span>{entryServiceMode === 'Service' ? 'Sent to service' : 'Transfer'}</span>
+                <span>{entryServiceMode === 'Service' ? 'Sent to service' : entryServiceMode === 'Relocate' ? 'Relocate' : 'Transfer'}</span>
               )}
             </button>
           )}
@@ -1286,34 +2224,67 @@ const Transfer = ({ user }) => {
           >
             Service
           </button>
+          <button
+            onClick={handleSwitchToRelocate}
+            className={`flex-1 h-full rounded-[6px] text-[12px] font-semibold leading-normal transition-colors ${entryServiceMode === 'Relocate'
+              ? 'bg-white text-black'
+              : 'bg-transparent text-[#848484]'
+              }`}
+          >
+            Relocate
+          </button>
         </div>
       </div>
-      {items.length > 0 && !isEditingTransferDetails && (
+      {((items.length > 0 && !isEditingTransferDetails) || (entryServiceMode === 'Relocate' && selectedRelocateItemId && !isEditingTransferDetails)) && (
         <div className="flex-shrink-0 px-4 pt-2">
           <div className="border border-gray-200 rounded-lg p-3">
             <div className="space-y-1">
-              <div className="flex items-center">
-                <span className="text-[12px] text-gray-500 w-[100px]">From</span>
-                <span className="text-[12px] text-gray-500 mx-2">:</span>
-                <span className="text-[12px] text-gray-700">{selectedFrom?.label || '-'}</span>
-              </div>
-              <div className="flex items-center">
-                <span className="text-[12px] text-gray-500 w-[100px]">{entryServiceMode === 'Entry' ? 'To' : 'Service Store'}</span>
-                <span className="text-[12px] text-gray-500 mx-2">:</span>
-                <span className="text-[12px] text-gray-700">
-                  {entryServiceMode === 'Entry' ? (selectedTo?.label || '-') : (selectedServiceStore?.label || '-')}
-                </span>
-              </div>
-              <div className="flex items-center">
-                <span className="text-[12px] text-gray-500 w-[100px]">Project Incharge</span>
-                <span className="text-[12px] text-gray-500 mx-2">:</span>
-                <span className="text-[12px] text-gray-700">{selectedIncharge?.label || '-'}</span>
-              </div>
+              {entryServiceMode === 'Relocate' ? (
+                <>
+                  <div className="flex items-center">
+                    <span className="text-[12px] text-gray-500 w-[100px]">Item ID</span>
+                    <span className="text-[12px] text-gray-500 mx-2">:</span>
+                    <span className="text-[12px] text-gray-700">
+                      {selectedRelocateItemId ? (toolsItemIdFullData.find(i => String(i?.id) === String(selectedRelocateItemId))?.item_id || toolsItemIdFullData.find(i => String(i?.id) === String(selectedRelocateItemId))?.itemId || '-') : '-'}
+                    </span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="text-[12px] text-gray-500 w-[100px]">Current Location</span>
+                    <span className="text-[12px] text-gray-500 mx-2">:</span>
+                    <span className="text-[12px] text-gray-700">{selectedCurrentLocation?.label || '-'}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="text-[12px] text-gray-500 w-[100px]">Relocate Location</span>
+                    <span className="text-[12px] text-gray-500 mx-2">:</span>
+                    <span className="text-[12px] text-gray-700">{selectedRelocateLocation?.label || '-'}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center">
+                    <span className="text-[12px] text-gray-500 w-[100px]">From</span>
+                    <span className="text-[12px] text-gray-500 mx-2">:</span>
+                    <span className="text-[12px] text-gray-700">{selectedFrom?.label || '-'}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="text-[12px] text-gray-500 w-[100px]">{entryServiceMode === 'Entry' ? 'To' : 'Service Store'}</span>
+                    <span className="text-[12px] text-gray-500 mx-2">:</span>
+                    <span className="text-[12px] text-gray-700">
+                      {entryServiceMode === 'Entry' ? (selectedTo?.label || '-') : (selectedServiceStore?.label || '-')}
+                    </span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="text-[12px] text-gray-500 w-[100px]">Project Incharge</span>
+                    <span className="text-[12px] text-gray-500 mx-2">:</span>
+                    <span className="text-[12px] text-gray-700">{selectedIncharge?.label || '-'}</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
       )}
-      {(items.length === 0 || isEditingTransferDetails) && (
+      {(items.length === 0 || isEditingTransferDetails) && entryServiceMode !== 'Relocate' && (
         <div className="flex-shrink-0 px-4 pt-4">
           <div className="mb-4 relative dropdown-container">
             <p className="text-[12px] font-semibold text-black leading-normal mb-1">
@@ -1356,7 +2327,7 @@ const Transfer = ({ user }) => {
               </div>
             </div>
           </div>
-          {showFromDropdown && (
+          {showFromDropdown && entryServiceMode !== 'Relocate' && (
             <div
               className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
               onClick={(e) => {
@@ -1420,6 +2391,60 @@ const Transfer = ({ user }) => {
                             <button
                               key={option.id}
                               onClick={() => {
+                                // Validate existing items before changing "From" project
+                                if (items.length > 0) {
+                                  const invalidItems = [];
+                                  for (const item of items) {
+                                    if (!item.item_name_id) continue;
+                                    
+                                    // If itemId is selected, only check the full set (itemIdsId + brandId + machineNumber)
+                                    // Don't check itemNameId separately when itemId is selected
+                                    if (item.item_ids_id) {
+                                      const itemSetValidation = validateItemSetAvailability(
+                                        item.item_ids_id,
+                                        item.brand_id,
+                                        item.machine_number,
+                                        item.item_name_id,
+                                        item.itemName,
+                                        option.id
+                                      );
+                                      
+                                      if (!itemSetValidation.isValid) {
+                                        invalidItems.push({
+                                          name: item.itemName || 'Unknown Item',
+                                          error: itemSetValidation.errorMessage
+                                        });
+                                      }
+                                    } else {
+                                      // Only check itemNameId if itemId is NOT selected (for quantity-based transfers)
+                                      // Check quantity availability with brandId if provided
+                                      const validation = validateItemLocation(
+                                        item.item_name_id,
+                                        item.itemName,
+                                        item.brand_id,
+                                        item.quantity,
+                                        option.id
+                                      );
+                                      
+                                      if (!validation.isValid) {
+                                        invalidItems.push({
+                                          name: item.itemName || 'Unknown Item',
+                                          error: validation.errorMessage
+                                        });
+                                      }
+                                    }
+                                  }
+                                  
+                                  if (invalidItems.length > 0) {
+                                    const errorMessage = invalidItems
+                                      .map(inv => inv.error)
+                                      .join('\n\n');
+                                    alert(`Cannot change "From" project. The following items are not in the selected location:\n\n${errorMessage}`);
+                                    setShowFromDropdown(false);
+                                    return;
+                                  }
+                                }
+                                
                                 setSelectedFrom(option);
                                 setShowFromDropdown(false);
                                 setIsEditingTransferDetails(false);
@@ -1555,6 +2580,44 @@ const Transfer = ({ user }) => {
                   </svg>
                 </div>
               </div>
+            </div>
+          )}
+          {entryServiceMode === 'Relocate' && selectedRelocateItemId && relocateItemDetails && (
+            <div className="mb-4">
+              <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                <p className="text-[14px] font-semibold text-black mb-3">Product Detail</p>
+                <div className="space-y-2">
+                  <div className="flex items-start">
+                    <span className="text-[12px] font-medium text-gray-600 w-[120px] flex-shrink-0">Item Name</span>
+                    <span className="text-[12px] font-medium text-black flex-1">: {relocateItemDetails.itemName || '-'}</span>
+                  </div>
+                  <div className="flex items-start">
+                    <span className="text-[12px] font-medium text-gray-600 w-[120px] flex-shrink-0">Birth Location</span>
+                    <span className="text-[12px] font-medium text-black flex-1">: {relocateItemDetails.birthLocation || '-'}</span>
+                  </div>
+                  <div className="flex items-start">
+                    <span className="text-[12px] font-medium text-gray-600 w-[120px] flex-shrink-0">Current Location</span>
+                    <span className="text-[12px] font-medium text-black flex-1">: {relocateItemDetails.currentLocation || '-'}</span>
+                  </div>
+                  <div className="flex items-start">
+                    <span className="text-[12px] font-medium text-gray-600 w-[120px] flex-shrink-0">Purchase Store</span>
+                    <span className="text-[12px] font-medium text-black flex-1">: {relocateItemDetails.purchaseStore || '-'}</span>
+                  </div>
+                </div>
+              </div>
+              {relocateItemDetails.imageUrl && (
+                <div className="mt-4 flex justify-center">
+                  <img 
+                    src={relocateItemDetails.imageUrl} 
+                    alt={relocateItemDetails.itemName || 'Product'} 
+                    className="max-w-full h-auto rounded-lg shadow-md"
+                    style={{ maxHeight: '300px' }}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
             </div>
           )}
           {showToDropdown && (
@@ -1941,6 +3004,366 @@ const Transfer = ({ user }) => {
           )}
         </div>
       )}
+      {entryServiceMode === 'Relocate' && (
+        <div className="flex-shrink-0 px-4 pt-4">
+          <div className="mb-4 relative dropdown-container">
+            <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+              Item ID<span className="text-[#eb2f8e]">*</span>
+            </p>
+            <SearchableDropdown
+              value={selectedRelocateItemId ? (toolsItemIdFullData.find(i => String(i?.id) === String(selectedRelocateItemId))?.item_id || toolsItemIdFullData.find(i => String(i?.id) === String(selectedRelocateItemId))?.itemId || '') : ''}
+              onChange={(value) => {
+                const itemIdObj = toolsItemIdFullData.find(
+                  item => (item?.item_id?.trim() ?? item?.itemId?.trim()) === value
+                );
+                if (itemIdObj) {
+                  setSelectedRelocateItemId(itemIdObj.id);
+                  const itemIdsIdStr = String(itemIdObj.id);
+                  
+                  // First, check transfer history for the most recent toProjectId
+                  let currentLocationId = null;
+                  let mostRecentEntry = null;
+                  let mostRecentDate = null;
+                  
+                  // Find the most recent transfer entry for this itemId
+                  for (const entry of toolsTrackerManagementData) {
+                    const entryType = entry.tools_entry_type || entry.toolsEntryType || '';
+                    if (entryType.toLowerCase() !== 'entry') continue; // Only check Entry type transfers
+                    
+                    const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
+                    const hasMatchingItemId = entryItems.some(entryItem => {
+                      const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
+                      return entryItemIdsId && String(entryItemIdsId) === itemIdsIdStr;
+                    });
+                    
+                    if (hasMatchingItemId) {
+                      const entryDate = entry.created_date_time || entry.createdDateTime || entry.timestamp || '';
+                      if (!mostRecentDate || entryDate > mostRecentDate) {
+                        mostRecentDate = entryDate;
+                        mostRecentEntry = entry;
+                      }
+                    }
+                  }
+                  
+                  // If found a transfer entry with toProjectId, use that as current location
+                  if (mostRecentEntry) {
+                    const toProjectId = mostRecentEntry.to_project_id || mostRecentEntry.toProjectId;
+                    if (toProjectId) {
+                      currentLocationId = String(toProjectId);
+                    }
+                  }
+                  
+                  // If no toProjectId found in transfer history, use home_location_id from stock management
+                  if (!currentLocationId) {
+                    const stockItem = stockManagementData.find(item => {
+                      const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
+                      return String(itemIdsId) === itemIdsIdStr;
+                    });
+                    
+                    if (stockItem) {
+                      const homeLocationId = stockItem.home_location_id || stockItem.homeLocationId;
+                      if (homeLocationId) {
+                        currentLocationId = String(homeLocationId);
+                      }
+                    }
+                  }
+                  
+                  // Set the current location
+                  let locationOption = null;
+                  if (currentLocationId) {
+                    locationOption = toOptions.find(opt => String(opt.id) === currentLocationId);
+                    if (locationOption) {
+                      setSelectedCurrentLocation(locationOption);
+                    }
+                  }
+                  
+                  // Get item details from stock management
+                  const stockItem = stockManagementData.find(item => {
+                    const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
+                    return String(itemIdsId) === itemIdsIdStr;
+                  });
+                  
+                  if (stockItem) {
+                    // Get item name
+                    const itemNameId = stockItem.item_name_id || stockItem.itemNameId;
+                    const itemNameObj = toolsItemNameListData.find(i => String(i?.id) === String(itemNameId));
+                    const itemName = itemNameObj?.item_name || itemNameObj?.itemName || '';
+                    
+                    // Get purchase store name
+                    const purchaseStoreId = stockItem.purchase_store_id || stockItem.purchaseStoreId;
+                    const purchaseStore = purchaseStoreId 
+                      ? vendorOptions.find(v => String(v.id) === String(purchaseStoreId))?.label || ''
+                      : '';
+                    
+                    // Get birth location (original home location)
+                    const birthLocationId = stockItem.home_location_id || stockItem.homeLocationId;
+                    const birthLocation = birthLocationId
+                      ? toOptions.find(opt => String(opt.id) === String(birthLocationId))?.label || ''
+                      : '';
+                    
+                    // Get current location label
+                    const currentLocationLabel = locationOption?.label || '';
+                    
+                    // Get last updated image from transfer history
+                    let lastImageUrl = '';
+                    if (mostRecentEntry) {
+                      const entryItems = mostRecentEntry.tools_tracker_item_name_table || mostRecentEntry.toolsTrackerItemNameTable || [];
+                      const matchingEntryItem = entryItems.find(entryItem => {
+                        const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
+                        return entryItemIdsId && String(entryItemIdsId) === itemIdsIdStr;
+                      });
+                      
+                      if (matchingEntryItem) {
+                        const images = matchingEntryItem.tools_item_live_images || matchingEntryItem.toolsItemLiveImages || [];
+                        if (images.length > 0) {
+                          // Get the last image (most recent)
+                          const lastImage = images[images.length - 1];
+                          if (lastImage.tools_image || lastImage.toolsImage) {
+                            const base64Data = lastImage.tools_image || lastImage.toolsImage;
+                            lastImageUrl = `data:image/jpeg;base64,${base64Data}`;
+                          }
+                        }
+                      }
+                    }
+                    
+                    // Fallback to stock management image if no transfer history image found
+                    const imageUrl = lastImageUrl || stockItem.file_url || stockItem.fileUrl || '';
+                    
+                    // Set item details for display
+                    setRelocateItemDetails({
+                      itemName: itemName,
+                      birthLocation: birthLocation,
+                      currentLocation: currentLocationLabel,
+                      purchaseStore: purchaseStore,
+                      imageUrl: imageUrl
+                    });
+                  } else {
+                    setRelocateItemDetails(null);
+                  }
+                } else {
+                  setSelectedRelocateItemId(null);
+                  setSelectedCurrentLocation(null);
+                  setRelocateItemDetails(null);
+                }
+              }}
+              options={itemIdOptions}
+              placeholder="Select Item ID"
+              fieldName="Item ID"
+              showAllOptions={true}
+            />
+          </div>
+          <div className="mb-4 relative dropdown-container">
+            <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+              Current Location<span className="text-[#eb2f8e]">*</span>
+            </p>
+            <div className="relative">
+              <div
+                onClick={() => {
+                  setShowCurrentLocationDropdown(!showCurrentLocationDropdown);
+                  setShowFromDropdown(false);
+                  setShowToDropdown(false);
+                  setShowServiceStoreDropdown(false);
+                  setShowInchargeDropdown(false);
+                  setShowRelocateLocationDropdown(false);
+                }}
+                className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                style={{
+                  color: selectedCurrentLocation ? '#000' : '#9E9E9E',
+                  boxSizing: 'border-box',
+                  paddingRight: selectedCurrentLocation ? '40px' : '40px'
+                }}
+              >
+                {selectedCurrentLocation ? selectedCurrentLocation.label : 'Select'}
+              </div>
+              {selectedCurrentLocation && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedCurrentLocation(null);
+                    setRelocateItemDetails(null);
+                  }}
+                  className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              )}
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            </div>
+          </div>
+          <div className="mb-4 relative dropdown-container">
+            <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+              Relocate Location<span className="text-[#eb2f8e]">*</span>
+            </p>
+            <div className="relative">
+              <div
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('Relocate Location clicked');
+                  setShowRelocateLocationDropdown(true);
+                  setShowFromDropdown(false);
+                  setShowToDropdown(false);
+                  setShowServiceStoreDropdown(false);
+                  setShowInchargeDropdown(false);
+                  setShowCurrentLocationDropdown(false);
+                }}
+                className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                style={{
+                  color: selectedRelocateLocation ? '#000' : '#9E9E9E',
+                  boxSizing: 'border-box',
+                  paddingRight: '40px'
+                }}
+              >
+                {selectedRelocateLocation ? selectedRelocateLocation.label : 'Select'}
+              </div>
+              {selectedRelocateLocation && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedRelocateLocation(null);
+                  }}
+                  className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                  style={{ zIndex: 5 }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              )}
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none" style={{ zIndex: 1 }}>
+                <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {showRelocateLocationDropdown && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowRelocateLocationDropdown(false);
+            }
+          }}
+          style={{ fontFamily: "'Manrope', sans-serif", zIndex: 9999 }}
+        >
+          <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[60vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center px-6 pt-5">
+              <p className="text-[16px] font-semibold text-black">Select Relocate Location</p>
+              <button onClick={() => {
+                setShowRelocateLocationDropdown(false);
+                setRelocateLocationSearchQuery('');
+              }} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
+                ×
+              </button>
+            </div>
+            <div className="px-6 pt-4 pb-4">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={relocateLocationSearchQuery}
+                  onChange={(e) => setRelocateLocationSearchQuery(e.target.value)}
+                  placeholder="Search"
+                  className="w-full h-[32px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                  autoFocus
+                />
+                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="6.5" cy="6.5" r="5.5" stroke="#747474" strokeWidth="1.5" />
+                    <path d="M9.5 9.5L12 12" stroke="#747474" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto mb-4 px-6">
+              <div className="shadow-md rounded-lg overflow-hidden">
+                {relocateLocationSearchQuery.trim() && !fromOptions.some(opt => {
+                  const normalizedOpt = normalizeSearchText(opt.label);
+                  const normalizedQuery = normalizeSearchText(relocateLocationSearchQuery.trim());
+                  return normalizedOpt === normalizedQuery;
+                }) && (
+                    <button
+                      onClick={() => {
+                      }}
+                      className="w-full h-[36px] px-6 flex items-center bg-gray-100 gap-2 hover:bg-[#F5F5F5] transition-colors"
+                    >
+                      <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M7 3V11M3 7H11" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
+                        </svg>
+                      </div>
+                      <p className="text-[14px] text-gray-600 font-normal text-left truncate">"{relocateLocationSearchQuery.trim()}"</p>
+                    </button>
+                  )}
+                {getFilteredRelocateLocationOptions().length > 0 ? (
+                  <div className="space-y-0">
+                    {getFilteredRelocateLocationOptions().map((option) => {
+                      const isFavorite = relocateLocationFavorites.includes(option.id);
+                      const isSelected = selectedRelocateLocation?.id === option.id;
+                      return (
+                        <button
+                          key={option.id}
+                          onClick={() => {
+                            setSelectedRelocateLocation(option);
+                            setShowRelocateLocationDropdown(false);
+                            setRelocateLocationSearchQuery('');
+                            setIsEditingTransferDetails(false);
+                          }}
+                          className={`w-full h-[40px] px-6 flex items-center justify-between transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                            }`}
+                        >
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <button onClick={(e) => handleToggleRelocateLocationFavorite(e, option.id)} className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                              {isFavorite ? (
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              ) : (
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              )}
+                            </button>
+                            <p className="text-[14px] font-medium text-black text-left truncate">{option.label}</p>
+                          </div>
+                          <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 ml-3">
+                            {isSelected ? (
+                              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="10" cy="10" r="9" stroke="#e4572e" strokeWidth="2" fill="none" />
+                                <circle cx="10" cy="10" r="4" fill="#e4572e" />
+                              </svg>
+                            ) : (
+                              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="10" cy="10" r="9" stroke="#9E9E9E" strokeWidth="1.5" fill="none" />
+                              </svg>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-4">
+                    <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
+                      {relocateLocationSearchQuery ? 'No options found' : 'No options available'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex-shrink-0 px-4 pt-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -1949,7 +3372,7 @@ const Transfer = ({ user }) => {
               <span className="text-[10px] font-medium text-black">{items.length}</span>
             </div>
           </div>
-          {areFieldsFilled && (
+          {areFieldsFilled && entryServiceMode !== 'Relocate' && (
             <div className="cursor-pointer" onClick={handleOpenUniversalSearch}>
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="9" cy="9" r="6" stroke="#000" strokeWidth="1.5" />
@@ -2139,14 +3562,16 @@ const Transfer = ({ user }) => {
           </div>
         </div>
       )}
-      <div className="fixed bottom-[110px] right-[24px] lg:right-[calc(50%-164px)] z-30 cursor-pointer" onClick={areFieldsFilled ? handleAddItem : undefined}>
-        <div className={`w-[56px] h-[56px] rounded-full flex items-center justify-center shadow-lg ${areFieldsFilled ? 'bg-black' : 'bg-gray-400'
-          }`}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 5V19M5 12H19" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
-          </svg>
+      {entryServiceMode !== 'Relocate' && (
+        <div className="fixed bottom-[110px] right-[24px] lg:right-[calc(50%-164px)] z-30 cursor-pointer" onClick={areFieldsFilled ? handleAddItem : undefined}>
+          <div className={`w-[56px] h-[56px] rounded-full flex items-center justify-center shadow-lg ${areFieldsFilled ? 'bg-black' : 'bg-gray-400'
+            }`}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 5V19M5 12H19" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </div>
         </div>
-      </div>
+      )}
       {showAddItemsModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif" }} onClick={handleCloseAddItemsModal} >
           <div className="bg-white w-full max-w-[360px] rounded-tl-[16px] rounded-tr-[16px] relative z-50" onClick={(e) => e.stopPropagation()}>
@@ -2182,21 +3607,47 @@ const Transfer = ({ user }) => {
                     placeholder="Drilling Machine"
                     fieldName="Item Name"
                     showAllOptions={true}
+                    disabled={!!addItemFormData.itemId}
                   />
                 </div>
                 <div className="w-[80px] relative">
                   <p className="text-[13px] font-medium text-black mb-1 leading-normal">
                     Quantity
                   </p>
-                  <input
-                    type="text"
-                    value={addItemFormData.quantity}
-                    onChange={(e) => handleFieldChange('quantity', e.target.value)}
-                    disabled={!!addItemFormData.itemId}
-                    className={`w-full h-[32px] border border-[#d6d6d6] rounded-[8px] px-3 text-[12px] font-medium focus:outline-none text-black ${addItemFormData.itemId ? 'bg-gray-100 cursor-not-allowed text-gray-400' : 'bg-white'
-                      }`}
-                    placeholder="Enter"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={addItemFormData.quantity}
+                      onChange={(e) => handleFieldChange('quantity', e.target.value)}
+                      disabled={!!addItemFormData.itemId}
+                      className={`w-full h-[32px] border border-[#d6d6d6] rounded-[8px] px-3 pr-7 text-[12px] font-medium focus:outline-none text-black ${addItemFormData.itemId ? 'bg-gray-100 cursor-not-allowed text-gray-400' : 'bg-white'
+                        }`}
+                      placeholder="Enter"
+                    />
+                    {addItemFormData.quantity && addItemFormData.quantity.trim() !== '' && !addItemFormData.itemId && (
+                      <button
+                        type="button"
+                        onClick={() => handleFieldChange('quantity', '')}
+                        className="absolute top-1/2 transform -translate-y-1/2 right-2 w-5 h-5 flex items-center justify-center hover:bg-gray-200 rounded-full transition-colors"
+                      >
+                        <svg 
+                          width="12" 
+                          height="12" 
+                          viewBox="0 0 12 12" 
+                          fill="none" 
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path 
+                            d="M9 3L3 9M3 3L9 9" 
+                            stroke="#666" 
+                            strokeWidth="1.5" 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round" 
+                          />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="mb-[10px] relative">
@@ -2546,6 +3997,15 @@ const Transfer = ({ user }) => {
           </div>
         </div>
       )}
+      <DatePickerModal
+        isOpen={showDatePicker}
+        onClose={() => setShowDatePicker(false)}
+        onConfirm={(formattedDate) => {
+          setDate(formattedDate);
+          setShowDatePicker(false);
+        }}
+        initialDate={date}
+      />
       {showUniversalSearchModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-end justify-center" onClick={handleCloseUniversalSearch} style={{ fontFamily: "'Manrope', sans-serif" }}>
           <div className="bg-white w-full max-w-[400px] rounded-tl-[16px] rounded-tr-[16px] max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>

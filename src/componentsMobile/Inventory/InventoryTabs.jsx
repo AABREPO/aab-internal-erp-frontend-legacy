@@ -15,18 +15,19 @@ const InventoryTabs = ({ activeTab = 'net-stock', onTabChange }) => {
 
   const tabsContainerRef = useRef(null);
   const activeTabRef = useRef(null);
+  const fixedContainerRef = useRef(null);
   const [underlineStyle, setUnderlineStyle] = useState({ left: 0, width: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
 
   const updateUnderlinePosition = () => {
-    if (activeTabRef.current && tabsContainerRef.current) {
-      const container = tabsContainerRef.current;
+    if (activeTabRef.current && fixedContainerRef.current) {
+      const fixedContainer = fixedContainerRef.current;
       const activeTabElement = activeTabRef.current;
       
-      // Get the exact position relative to the fixed container
-      const containerRect = container.getBoundingClientRect();
+      // Get positions relative to viewport
+      const containerRect = fixedContainer.getBoundingClientRect();
       const tabRect = activeTabElement.getBoundingClientRect();
       
       // Calculate position relative to the fixed container
@@ -38,7 +39,7 @@ const InventoryTabs = ({ activeTab = 'net-stock', onTabChange }) => {
   };
 
   useEffect(() => {
-    if (activeTabRef.current && tabsContainerRef.current) {
+    if (activeTabRef.current && tabsContainerRef.current && fixedContainerRef.current) {
       const container = tabsContainerRef.current;
       const activeTabElement = activeTabRef.current;
       
@@ -94,11 +95,11 @@ const InventoryTabs = ({ activeTab = 'net-stock', onTabChange }) => {
           scrollbar-width: none;
         }
       `}</style>
-      <div className="fixed top-[50px] transform w-full max-w-[340px] h-[40px] overflow-x-auto bg-white z-40 inventory-tabs-container" style={{ fontFamily: "'Manrope', sans-serif" }}>
-        <div className="relative h-full overflow-x-auto scrollbar-hide inventory-tabs-scroll" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+      <div ref={fixedContainerRef} className="fixed top-[50px] transform w-full max-w-[357px] h-[40px] overflow-x-auto bg-white z-40 inventory-tabs-container" style={{ fontFamily: "'Manrope', sans-serif" }}>
+        <div className="relative h-full px-4 overflow-x-auto scrollbar-hide inventory-tabs-scroll" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           <div 
             ref={tabsContainerRef}
-            className="flex items-center gap-4 px-4 h-full overflow-x-auto scrollbar-hide cursor-grab active:cursor-grabbing inventory-tabs-scroll"
+            className="flex items-center gap-4 px- h-full overflow-x-auto scrollbar-hide cursor-grab active:cursor-grabbing inventory-tabs-scroll"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           onMouseDown={(e) => {
             setIsDragging(true);

@@ -2635,7 +2635,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                       <p className="text-[12px] font-medium text-black leading-normal">{poData.poNumber}</p>
                     )}
                     <button type="button" onClick={() => setShowDatePicker(true)}
-                      className="text-[12px] font-medium text-[#616161] leading-normal underline-offset-2 hover:underline"
+                      className="text-[12px] font-medium text-black leading-normal underline-offset-2 hover:underline"
                     >
                       {poData.date}
                     </button>
@@ -2653,7 +2653,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                         type="button"
                         onClick={generatePO}
                         disabled={isGenerating}
-                        className={`text-[13px] font-bold leading-normal ${isGenerating ? 'text-gray-400 cursor-not-allowed' : 'text-black'}`}
+                        className={`text-[13px] font-medium leading-normal ${isGenerating ? 'text-gray-400 cursor-not-allowed' : 'text-black'}`}
                       >
                         {isGenerating ? (isEditFromHistory ? 'Updating...' : 'Generating...') : (isEditFromHistory ? 'Update PO' : 'Generate PO')}
                       </button>
@@ -2699,10 +2699,10 @@ const PurchaseOrder = ({ user, onLogout }) => {
             {/* For edit/clone mode: show dropdowns before clicking + */}
             {/* For regular flow: show dropdowns before clicking + (when selecting fields) */}
             {(!hasOpenedAdd && isEditMode) || ((!showAddItems && !hasOpenedAdd) && !isEditMode) || (items.length > 0 && hasOpenedAdd && (!poData.vendorName || !poData.projectName || !poData.projectIncharge)) ? (
-              <div className="flex-shrink-0 px-4 pt-4">
+              <div className="flex-shrink-0 px-4 pt-4 space-y-[6px]">
                 {/* Vendor Name Field */}
-                <div className="mb-4 relative">
-                  <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+                <div className=" relative">
+                  <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
                     Vendor Name<span className="text-[#eb2f8e]">*</span>
                   </p>
                   <div className="relative">
@@ -2713,10 +2713,9 @@ const PurchaseOrder = ({ user, onLogout }) => {
                           setShowVendorModal(true);
                         }
                       }}
-                      className={`w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium flex items-center ${isEditFromHistory ? 'bg-gray-100 cursor-not-allowed' : 'bg-white cursor-pointer'
+                      className={`w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium flex items-center ${isEditFromHistory ? 'bg-gray-100 cursor-not-allowed' : 'bg-white cursor-pointer'
                         }`}
                       style={{
-                        paddingRight: poData.vendorName ? '40px' : '12px',
                         boxSizing: 'border-box',
                         color: poData.vendorName ? '#000' : '#9E9E9E'
                       }}
@@ -2724,7 +2723,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                       {poData.vendorName || 'Select Name'}
                     </div>
                     {/* Hide clear button when editing from History */}
-                    {poData.vendorName && !isEditFromHistory && (
+                    {poData.vendorName && !isEditFromHistory ? (
                       <button
                         type="button"
                         onClick={(e) => {
@@ -2733,77 +2732,90 @@ const PurchaseOrder = ({ user, onLogout }) => {
                           setPoData({ ...poData, vendorName: '', poNumber: '' });
                           previousVendorId.current = null; // Reset previous vendor ID tracking
                         }}
-                        className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                        style={{ right: '32px' }}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                       >
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       </button>
+                    ) : !poData.vendorName && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
                     )}
                   </div>
                 </div>
                 {/* Project Name Field */}
-                <div className="mb-4 relative">
-                  <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+                <div className=" relative">
+                  <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
                     Project Name<span className="text-[#eb2f8e]">*</span>
                   </p>
                   <div className="relative">
                     <div onClick={() => setShowProjectModal(true)}
-                      className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                      className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                       style={{
-                        paddingRight: poData.projectName ? '40px' : '12px',
                         boxSizing: 'border-box',
                         color: poData.projectName ? '#000' : '#9E9E9E'
                       }}
                     >
                       {poData.projectName || 'Select Name'}
                     </div>
-                    {poData.projectName && (
+                    {poData.projectName ? (
                       <button type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setPoData({ ...poData, projectName: '' });
                         }}
-                        className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                        style={{ right: '32px' }}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                       >
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       </button>
+                    ) : (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
                     )}
                   </div>
                 </div>
                 {/* Project Incharge Field */}
-                <div className="mb-4 relative">
-                  <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+                <div className=" relative">
+                  <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
                     Project Incharge<span className="text-[#eb2f8e]">*</span>
                   </p>
                   <div className="relative">
                     <div onClick={() => setShowInchargeModal(true)}
-                      className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                      className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                       style={{
-                        paddingRight: poData.projectIncharge ? '40px' : '12px',
                         boxSizing: 'border-box',
                         color: poData.projectIncharge ? '#000' : '#9E9E9E'
                       }}
                     >
                       {poData.projectIncharge || 'Select Name'}
                     </div>
-                    {poData.projectIncharge && (
+                    {poData.projectIncharge ? (
                       <button type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setPoData({ ...poData, projectIncharge: '' });
                         }}
-                        className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                        style={{ right: '32px' }}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                       >
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       </button>
+                    ) : (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -2855,7 +2867,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                 {/* Items Section - Show when items exist (from NetStock) or when all three fields are filled */}
                 {/* For edit/clone mode, always show items if they exist, regardless of hasOpenedAdd */}
                 {((items.length > 0 && (hasOpenedAdd || isEditMode)) || ((!isEmptyState || isEditMode) && poData.vendorName && poData.projectName && poData.projectIncharge)) && (
-                  <div className="flex flex-col flex-1 min-h-0 mx-4 mb-4">
+                  <div className="flex flex-col flex-1 min-h-0 mx-4 mb-4 mt-2">
                     {/* Items Header - Fixed */}
                     <div className="flex-shrink-0 flex items-center gap-2 mb-2 border-b border-[#E0E0E0] pb-2">
                       <p className="text-[14px] font-medium text-black leading-normal">Items</p>

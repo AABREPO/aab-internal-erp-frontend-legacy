@@ -1247,7 +1247,7 @@ const AddInput = () => {
       {/* New Input Section */}
       <div className="px-4 pt-2">
         {/* New Input Header - Sticky */}
-        <div className=" top-[100px] z-30 bg-white flex items-center justify-between mb-4 border-b border-[#E0E0E0] pb-2">
+        <div className=" top-[100px] z-30 bg-white flex items-center justify-between mb-2 border-b border-[#E0E0E0] pb-2">
           {/* Group Dropdown - Left Side */}
           <button
             onClick={() => setShowGroupModal(true)}
@@ -1273,12 +1273,11 @@ const AddInput = () => {
             </button>
           </div>
         </div>
-
         {/* Form Fields */}
-        <div className="mb-4">
+        <div className="space-y-[6px]">
           {/* Item Name */}
-          <div className="mb-2">
-            <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+          <div className="">
+            <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
               Item Name<span className="text-[#eb2f8e]">*</span>
             </p>
             <div className="relative">
@@ -1331,8 +1330,8 @@ const AddInput = () => {
           </div>
 
           {/* Model */}
-          <div className="mb-2">
-            <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+          <div className="">
+            <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
               Model<span className="text-[#eb2f8e]">*</span>
             </p>
             <div className="relative">
@@ -1385,8 +1384,8 @@ const AddInput = () => {
           </div>
 
           {/* Type */}
-          <div className="mb-2">
-            <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+          <div className="">
+            <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
               Type<span className="text-[#eb2f8e]">*</span>
             </p>
             <div className="relative">
@@ -1438,10 +1437,10 @@ const AddInput = () => {
             </div>
           </div>
 
-          <div className="flex gap-3 mb-2">
+          <div className="flex gap-3">
             {/* Brand */}
             <div>
-              <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+              <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
                 Brand<span className="text-[#eb2f8e]">*</span>
               </p>
               <div className="relative">
@@ -1495,7 +1494,7 @@ const AddInput = () => {
 
             {/* Min Qty */}
             <div>
-              <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+              <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
                 Min Qty
               </p>
               <input
@@ -1508,7 +1507,7 @@ const AddInput = () => {
             </div>
             {/* Default Qty */}
             <div>
-              <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+              <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
                 Default Qty
               </p>
               <input
@@ -1520,34 +1519,34 @@ const AddInput = () => {
               />
             </div>
           </div>
-
-
         </div>
         {/* Add to List / Update List Button */}
-        <button
-          onClick={handleAddToList}
-          disabled={!formData.itemName || !formData.model || !formData.type || !formData.brand}
-          className={`w-[328px] h-[32px] rounded-[8px] flex items-center justify-center gap-2 text-white text-[12px] font-medium transition-colors ${formData.itemName && formData.model && formData.type && formData.brand
+        <div className="mt-2">
+          <button
+            onClick={handleAddToList}
+            disabled={!formData.itemName || !formData.model || !formData.type || !formData.brand}
+            className={`w-[328px] h-[32px] rounded-[8px] flex items-center justify-center gap-2 text-white text-[12px] font-medium transition-colors ${formData.itemName && formData.model && formData.type && formData.brand
               ? 'bg-black hover:bg-gray-800'
               : 'bg-[#757575] cursor-not-allowed'
-            }`}
-        >
-          {editingRowIndex !== null ? (
-            <>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M13.3333 2L5.33333 10M13.3333 2L9.33333 2M13.3333 2L13.3333 6" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <span>Update List</span>
-            </>
-          ) : (
-            <>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M8 3V13M3 8H13" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-              <span>Add to List</span>
-            </>
-          )}
-        </button>
+              }`}
+          >
+            {editingRowIndex !== null ? (
+              <>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M13.3333 2L5.33333 10M13.3333 2L9.33333 2M13.3333 2L13.3333 6" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span>Update List</span>
+              </>
+            ) : (
+              <>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M8 3V13M3 8H13" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+                <span>Add to List</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
       {/* otherPOEntityList Table - Show when itemName is selected */}
       {formData.itemName && otherPOEntityList.length > 0 && (

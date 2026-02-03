@@ -58,7 +58,7 @@ const Outgoing = ({ user }) => {
   const [editTransactionId, setEditTransactionId] = useState('');
   const [editingInventoryId, setEditingInventoryId] = useState(null);
   const [pendingItemsFromClone, setPendingItemsFromClone] = useState([]);
-  const [fromHistory, setFromHistory] = useState(false);  
+  const [fromHistory, setFromHistory] = useState(false);
   // Outgoing page options (same as PurchaseOrder but independent)
   const [outgoingSiteOptions, setOutgoingSiteOptions] = useState([]);
   const [outgoingProjectOptions, setOutgoingProjectOptions] = useState([]);
@@ -133,7 +133,7 @@ const Outgoing = ({ user }) => {
       const stockingLocations = outgoingSiteOptions
         .filter(site => site.markedAsStockingLocation === true)
         .map(site => site.value || site.label || '')
-        .filter(Boolean);      
+        .filter(Boolean);
       // Remove duplicates
       const uniqueLocations = [...new Set(stockingLocations)];
       setStockingLocationOptions(uniqueLocations);
@@ -282,8 +282,8 @@ const Outgoing = ({ user }) => {
       const clientId = inventoryItem.client_id || inventoryItem.clientId;
       let projectName = '';
       if (clientId && outgoingSiteOptions.length > 0) {
-        const projectSite = outgoingSiteOptions.find(site => 
-          site.id === clientId || 
+        const projectSite = outgoingSiteOptions.find(site =>
+          site.id === clientId ||
           String(site.id) === String(clientId)
         );
         projectName = projectSite ? (projectSite.value || projectSite.label || '') : '';
@@ -298,8 +298,8 @@ const Outgoing = ({ user }) => {
       const stockingLocationId = inventoryItem.stocking_location_id || inventoryItem.stockingLocationId;
       let stockingLocation = '';
       if (stockingLocationId && outgoingSiteOptions.length > 0) {
-        const stockingLocationSite = outgoingSiteOptions.find(site => 
-          (site.id === stockingLocationId || String(site.id) === String(stockingLocationId)) && 
+        const stockingLocationSite = outgoingSiteOptions.find(site =>
+          (site.id === stockingLocationId || String(site.id) === String(stockingLocationId)) &&
           site.markedAsStockingLocation === true
         );
         stockingLocation = stockingLocationSite ? (stockingLocationSite.value || stockingLocationSite.label || '') : '';
@@ -312,7 +312,7 @@ const Outgoing = ({ user }) => {
       const inchargeId = inventoryItem.site_incharge_id || inventoryItem.siteInchargeId || null;
       let projectInchargeName = inventoryItem.project_incharge || inventoryItem.projectIncharge || '';
       if (inchargeId && outgoingEmployeeList.length > 0) {
-        const employee = outgoingEmployeeList.find(emp => 
+        const employee = outgoingEmployeeList.find(emp =>
           String(emp.id) === String(inchargeId)
         );
         if (employee) {
@@ -517,11 +517,11 @@ const Outgoing = ({ user }) => {
       // Only update if names actually changed
       const hasChanges = updatedItems.some((updatedItem, index) => {
         const original = items[index];
-        return updatedItem.name !== original.name || 
-               updatedItem.brand !== original.brand || 
-               updatedItem.model !== original.model || 
-               updatedItem.type !== original.type ||
-               updatedItem.category !== original.category;
+        return updatedItem.name !== original.name ||
+          updatedItem.brand !== original.brand ||
+          updatedItem.model !== original.model ||
+          updatedItem.type !== original.type ||
+          updatedItem.category !== original.category;
       });
       if (hasChanges) {
         setItems(updatedItems);
@@ -552,7 +552,7 @@ const Outgoing = ({ user }) => {
     // Get stocking location ID
     const stockingLocationSite = outgoingSiteOptions.find(
       site => site.value === outgoingData.stockingLocation && site.markedAsStockingLocation === true
-    );    
+    );
     if (!stockingLocationSite || !stockingLocationSite.id) {
       alert('Stocking location ID not found. Please select a valid stocking location.');
       return;
@@ -565,7 +565,7 @@ const Outgoing = ({ user }) => {
     const newCategory = normalizeValue(item.category);
     const newModel = normalizeValue(item.model);
     const newBrand = normalizeValue(item.brand);
-    const newType = normalizeValue(item.type);    
+    const newType = normalizeValue(item.type);
     // Check if an item with the same properties (including category) already exists
     const existingItemIndex = items.findIndex(existingItem => {
       const nameParts = existingItem.name ? existingItem.name.split(',') : [];
@@ -595,7 +595,7 @@ const Outgoing = ({ user }) => {
       try {
         const response = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll');
         if (response.ok) {
-          const inventoryRecords = await response.json();          
+          const inventoryRecords = await response.json();
           // Filter out deleted records and filter by stocking location
           const activeRecords = inventoryRecords.filter(record => {
             const recordDeleteStatus = record.delete_status !== undefined ? record.delete_status : record.deleteStatus;
@@ -613,16 +613,16 @@ const Outgoing = ({ user }) => {
                 const invCategoryId = invItem.category_id || invItem.categoryId || null;
                 const invModelId = invItem.model_id || invItem.modelId || null;
                 const invBrandId = invItem.brand_id || invItem.brandId || null;
-                const invTypeId = invItem.type_id || invItem.typeId || null;                
+                const invTypeId = invItem.type_id || invItem.typeId || null;
                 // Match by composite key: itemId + categoryId + modelId + brandId + typeId
                 const matchesItem = String(invItemId) === String(itemId) &&
                   String(invCategoryId || 'null') === String(item.categoryId || 'null') &&
                   String(invModelId || 'null') === String(item.modelId || 'null') &&
                   String(invBrandId || 'null') === String(item.brandId || 'null') &&
-                  String(invTypeId || 'null') === String(item.typeId || 'null');                
+                  String(invTypeId || 'null') === String(item.typeId || 'null');
                 if (matchesItem) {
                   const qty = Number(invItem.quantity) || 0;
-                  availableStock += qty;                  
+                  availableStock += qty;
                   // Get amount and calculate price per unit
                   const amount = Number(invItem.amount) || 0;
                   if (amount > 0 && qty > 0) {
@@ -756,19 +756,19 @@ const Outgoing = ({ user }) => {
       const updatedItems = items.map(item =>
         item.id === editingItem.id
           ? {
-              ...item,
-              name: `${itemData.itemName}, ${itemData.category}`,
-              brand: itemData.brand,
-              model: itemData.model,
-              type: itemData.type,
-              quantity: parseInt(itemData.quantity),
-              category: itemData.category || '',
-              itemId: itemData.itemId || item.itemId || null,
-              brandId: itemData.brandId || item.brandId || null,
-              modelId: itemData.modelId || item.modelId || null,
-              typeId: itemData.typeId || item.typeId || null,
-              categoryId: itemData.categoryId || item.categoryId || resolveCategoryId(itemData.category) || null,
-            }
+            ...item,
+            name: `${itemData.itemName}, ${itemData.category}`,
+            brand: itemData.brand,
+            model: itemData.model,
+            type: itemData.type,
+            quantity: parseInt(itemData.quantity),
+            category: itemData.category || '',
+            itemId: itemData.itemId || item.itemId || null,
+            brandId: itemData.brandId || item.brandId || null,
+            modelId: itemData.modelId || item.modelId || null,
+            typeId: itemData.typeId || item.typeId || null,
+            categoryId: itemData.categoryId || item.categoryId || resolveCategoryId(itemData.category) || null,
+          }
           : item
       );
       setItems(updatedItems);
@@ -940,7 +940,7 @@ const Outgoing = ({ user }) => {
       // Find stocking location ID from outgoingSiteOptions
       const stockingLocationSite = outgoingSiteOptions.find(
         site => site.value === outgoingData.stockingLocation && site.markedAsStockingLocation === true
-      );      
+      );
       if (!stockingLocationSite || !stockingLocationSite.id) {
         alert('Stocking location ID not found. Please select a valid stocking location.');
         return;
@@ -949,7 +949,7 @@ const Outgoing = ({ user }) => {
       // Find project/client ID from outgoingSiteOptions (needed for stock return validation)
       const projectSite = outgoingSiteOptions.find(
         site => site.value === outgoingData.projectName
-      );      
+      );
       if (!projectSite || !projectSite.id) {
         alert('Project ID not found. Please select a valid project.');
         return;
@@ -959,7 +959,7 @@ const Outgoing = ({ user }) => {
         try {
           const inventoryResponse = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll');
           if (inventoryResponse.ok) {
-            const inventoryRecords = await inventoryResponse.json();            
+            const inventoryRecords = await inventoryResponse.json();
             const activeRecords = inventoryRecords.filter(record => {
               const recordDeleteStatus = record.delete_status !== undefined ? record.delete_status : record.deleteStatus;
               return !recordDeleteStatus;
@@ -1024,15 +1024,15 @@ const Outgoing = ({ user }) => {
         try {
           const inventoryResponse = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll');
           if (inventoryResponse.ok) {
-            const inventoryRecords = await inventoryResponse.json();            
+            const inventoryRecords = await inventoryResponse.json();
             // Filter for outgoing records for this client_id (not deleted)
             const clientOutgoingRecords = inventoryRecords.filter(record => {
               const recordDeleteStatus = record.delete_status !== undefined ? record.delete_status : record.deleteStatus;
               const recordClientId = record.client_id || record.clientId;
               const inventoryType = (record.inventory_type || record.inventoryType || '').toString().toLowerCase();
-              return !recordDeleteStatus && 
-                     String(recordClientId) === String(clientId) && 
-                     inventoryType === 'outgoing';
+              return !recordDeleteStatus &&
+                String(recordClientId) === String(clientId) &&
+                inventoryType === 'outgoing';
             });
             // Check if this is an update (edit mode) - we need to exclude current record from calculations
             const isUpdate = isEditMode && editingInventoryId;
@@ -1056,14 +1056,14 @@ const Outgoing = ({ user }) => {
                   return;
                 }
                 const outgoingType = (record.outgoing_type || record.outgoingType || '').toString().toLowerCase();
-                const inventoryItems = record.inventoryItems || record.inventory_items || [];                
+                const inventoryItems = record.inventoryItems || record.inventory_items || [];
                 if (Array.isArray(inventoryItems)) {
                   inventoryItems.forEach(invItem => {
                     const invItemId = invItem.item_id || invItem.itemId || null;
                     const invCategoryId = invItem.category_id || invItem.categoryId || null;
                     const invModelId = invItem.model_id || invItem.modelId || null;
                     const invBrandId = invItem.brand_id || invItem.brandId || null;
-                    const invTypeId = invItem.type_id || invItem.typeId || null;                    
+                    const invTypeId = invItem.type_id || invItem.typeId || null;
                     // Match by composite key: itemId + categoryId + modelId + brandId + typeId
                     const matchesItem = String(invItemId) === String(itemId) &&
                       String(invCategoryId || 'null') === String(categoryId || 'null') &&
@@ -1130,8 +1130,8 @@ const Outgoing = ({ user }) => {
       }
       // Convert date from DD/MM/YYYY to YYYY-MM-DD format for backend
       const dateParts = outgoingData.date.split('/');
-      const formattedDate = dateParts.length === 3 
-        ? `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}` 
+      const formattedDate = dateParts.length === 3
+        ? `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`
         : outgoingData.date;
       const inventoryItems = items.map(item => {
         const baseQuantity = Math.abs(item.quantity || 0);
@@ -1179,7 +1179,7 @@ const Outgoing = ({ user }) => {
         payload.eno = eno;
       }
       // Determine API endpoint and method
-      const apiUrl = isUpdate 
+      const apiUrl = isUpdate
         ? `https://backendaab.in/aabuildersDash/api/inventory/edit_with_history/${editingInventoryId}?changedBy=${encodeURIComponent(username)}`
         : 'https://backendaab.in/aabuildersDash/api/inventory/save';
       const method = isUpdate ? 'PUT' : 'POST';
@@ -1222,12 +1222,12 @@ const Outgoing = ({ user }) => {
     <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden">
       {/* Date and Actions Row - Only show when not in empty state */}
       {!isEmptyState && (
-        <div className="flex-shrink-0 px-4 pt-2 pb-1 border-b border-gray-100">
-          <div className="flex items-center justify-between">
+        <div className="px-4">
+          <div className="sticky top-[100px] z-30 bg-white flex items-center justify-between mb-2 mt-0.5 border-b border-[#E0E0E0]">
             <button
               type="button"
               onClick={() => setShowDatePicker(true)}
-              className="text-[12px] font-medium text-[#616161] leading-normal underline-offset-2 hover:underline"
+              className="text-[12px] font-medium text-black leading-normal underline-offset-2 hover:underline"
             >
               {outgoingData.date}
             </button>
@@ -1295,122 +1295,133 @@ const Outgoing = ({ user }) => {
       )}
       {/* Form Fields - visible while you are selecting the three fields (before first + click) or when hideSummaryCard is true */}
       {(!hasOpenedAdd || hideSummaryCard) && (
-        <div className="flex-shrink-0 px-4 pt-1">
+        <div className="px-4 ">
           {/* Date in empty state */}
           {isEmptyState && (
-            <div className="mb-4 border-b border-gray-200 pb-2">
+            <div className="mb-2 items-center border-b border-gray-200 pb-2 mt-0.5">
               <button
                 type="button"
                 onClick={() => setShowDatePicker(true)}
-                className="text-[12px] font-medium text-[#616161] leading-normal underline-offset-2 hover:underline"
+                className="text-[12px] font-medium text-black leading-normal underline-offset-2 hover:underline"
               >
                 {outgoingData.date}
               </button>
             </div>
           )}
-        {/* Project Name Field */}
-        <div className="mb-2 relative">
-          <p className="text-[12px] font-semibold text-black leading-normal mb-1">
-            Project Name<span className="text-[#eb2f8e]">*</span>
-          </p>
-          <div className="relative">
-            <div
-              onClick={() => setShowProjectModal(true)}
-              className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium bg-white flex items-center cursor-pointer"
-              style={{
-                paddingRight: outgoingData.projectName ? '40px' : '12px',
-                boxSizing: 'border-box',
-                color: outgoingData.projectName ? '#000' : '#9E9E9E'
-              }}
-            >
-              {outgoingData.projectName || 'Select Project Name'}
+          {/* Project Name Field */}
+          <div className="space-y-[6px]">
+            <div className=" relative">
+              <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                Project Name<span className="text-[#eb2f8e]">*</span>
+              </p>
+              <div className="relative">
+                <div
+                  onClick={() => setShowProjectModal(true)}
+                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium bg-white flex items-center cursor-pointer justify-between"
+                  style={{
+                    paddingRight: outgoingData.projectName ? '40px' : '12px',
+                    boxSizing: 'border-box',
+                    color: outgoingData.projectName ? '#000' : '#9E9E9E'
+                  }}
+                >
+                  <span>{outgoingData.projectName || 'Select Project Name'}</span>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                {outgoingData.projectName && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOutgoingData({ ...outgoingData, projectName: '' });
+                    }}
+                    className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                    style={{ right: '24px' }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
-            {outgoingData.projectName && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setOutgoingData({ ...outgoingData, projectName: '' });
-                }}
-                className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                style={{ right: '24px' }}
-              >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            )}
-          </div>
-        </div>
-        {/* Project Incharge Field */}
-        <div className="mb-2 relative">
-          <p className="text-[12px] font-semibold text-black leading-normal mb-1">
-            Project Incharge<span className="text-[#eb2f8e]">*</span>
-          </p>
-          <div className="relative">
-            <div
-              onClick={() => setShowInchargeModal(true)}
-              className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium bg-white flex items-center cursor-pointer"
-              style={{
-                paddingRight: outgoingData.projectIncharge ? '40px' : '12px',
-                boxSizing: 'border-box',
-                color: outgoingData.projectIncharge ? '#000' : '#9E9E9E'
-              }}
-            >
-              {outgoingData.projectIncharge || 'Select Project Incharge'}
+            {/* Project Incharge Field */}
+            <div className=" relative">
+              <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                Project Incharge<span className="text-[#eb2f8e]">*</span>
+              </p>
+              <div className="relative">
+                <div
+                  onClick={() => setShowInchargeModal(true)}
+                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium bg-white flex items-center cursor-pointer justify-between"
+                  style={{
+                    paddingRight: outgoingData.projectIncharge ? '40px' : '12px',
+                    boxSizing: 'border-box',
+                    color: outgoingData.projectIncharge ? '#000' : '#9E9E9E'
+                  }}
+                >
+                  <span>{outgoingData.projectIncharge || 'Select Project Incharge'}</span>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                {outgoingData.projectIncharge && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedIncharge(null);
+                      setOutgoingData({ ...outgoingData, projectIncharge: '', contact: '' });
+                    }}
+                    className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                    style={{ right: '24px' }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
-            {outgoingData.projectIncharge && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedIncharge(null);
-                  setOutgoingData({ ...outgoingData, projectIncharge: '', contact: '' });
-                }}
-                className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                style={{ right: '24px' }}
-              >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            )}
-          </div>
-        </div>
-        {/* Stocking Location Field */}
-        <div className="mb-2 relative">
-          <p className="text-[12px] font-semibold text-black leading-normal mb-1">
-            Stocking Location<span className="text-[#eb2f8e]">*</span>
-          </p>
-          <div className="relative">
-            <div
-              onClick={() => setShowStockingLocationModal(true)}
-              className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium bg-white flex items-center cursor-pointer"
-              style={{
-                paddingRight: outgoingData.stockingLocation ? '40px' : '12px',
-                boxSizing: 'border-box',
-                color: outgoingData.stockingLocation ? '#000' : '#9E9E9E'
-              }}
-            >
-              {outgoingData.stockingLocation || 'Select Stocking Location'}
+            {/* Stocking Location Field */}
+            <div className="relative">
+              <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                Stocking Location<span className="text-[#eb2f8e]">*</span>
+              </p>
+              <div className="relative">
+                <div
+                  onClick={() => setShowStockingLocationModal(true)}
+                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium bg-white flex items-center cursor-pointer justify-between"
+                  style={{
+                    paddingRight: outgoingData.stockingLocation ? '40px' : '12px',
+                    boxSizing: 'border-box',
+                    color: outgoingData.stockingLocation ? '#000' : '#9E9E9E'
+                  }}
+                >
+                  <span>{outgoingData.stockingLocation || 'Select Stocking Location'}</span>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                {outgoingData.stockingLocation && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOutgoingData({ ...outgoingData, stockingLocation: '' });
+                    }}
+                    className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                    style={{ right: '24px' }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
-            {outgoingData.stockingLocation && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setOutgoingData({ ...outgoingData, stockingLocation: '' });
-                }}
-                className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                style={{ right: '24px' }}
-              >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            )}
           </div>
-        </div>
         </div>
       )}
       {/* Summary details card - show after first + click or in edit mode */}
@@ -1455,7 +1466,7 @@ const Outgoing = ({ user }) => {
         <>
           {/* Items Section - Show only when all three fields are filled */}
           {(!isEmptyState || isEditMode) && outgoingData.projectName && outgoingData.projectIncharge && outgoingData.stockingLocation && (
-            <div className="flex flex-col flex-1 min-h-0 mx-4 mb-4">
+            <div className="flex flex-col flex-1 min-h-0 mx-4 mb-4 mt-2">
               {/* Items Header - Fixed */}
               <div className="flex-shrink-0 flex items-center gap-2 mb-2 border-b border-[#E0E0E0] pb-2">
                 <p className="text-[14px] font-medium text-black leading-normal">Items</p>

@@ -82,18 +82,14 @@ const Dashboard = () => {
         if (selectedProperty) sessionStorage.setItem('selectedProperty', JSON.stringify(selectedProperty));
         if (selectedOccupancyStatus) sessionStorage.setItem('selectedOccupancyStatus', JSON.stringify(selectedOccupancyStatus));
     }, [paymentStatus, selectedShopNo, selectedDoorNo, selectedTenantName, selectedProperty, selectedOccupancyStatus]);
-
     const handleSort = (field) => {
         if (sortField === field) {
-            // Toggle the sort order
             setSortOrder((prevOrder) => (prevOrder === 'asc' ? 'desc' : 'asc'));
         } else {
             setSortField(field);
             setSortOrder('asc');
         }
     };
-
-    // Advanced drag and scroll functionality
     const handleMouseDown = (e) => {
         isDragging.current = true;
         start.current = { x: e.clientX, y: e.clientY };
@@ -110,7 +106,6 @@ const Dashboard = () => {
         scrollRef.current.style.userSelect = 'none';
         cancelMomentum();
     };
-
     const handleMouseMove = (e) => {
         if (!isDragging.current) return;
         const dx = e.clientX - start.current.x;
@@ -129,7 +124,6 @@ const Dashboard = () => {
             y: e.clientY,
         };
     };
-
     const handleMouseUp = () => {
         if (!isDragging.current) return;
         isDragging.current = false;
@@ -137,14 +131,12 @@ const Dashboard = () => {
         scrollRef.current.style.userSelect = '';
         applyMomentum();
     };
-
     const cancelMomentum = () => {
         if (animationFrame.current) {
             cancelAnimationFrame(animationFrame.current);
             animationFrame.current = null;
         }
     };
-
     const applyMomentum = () => {
         const friction = 0.95;
         const minVelocity = 0.1;
@@ -162,8 +154,6 @@ const Dashboard = () => {
         };
         animationFrame.current = requestAnimationFrame(step);
     };
-
-
     const vacantShops = useMemo(() => {
         return tableData.filter(shop =>
             shop.tenantName === "Vacant" || !shop.advance
@@ -528,10 +518,11 @@ const Dashboard = () => {
                 shopClosureDate: shop.active ? null : shopClosureDate || null,
                 shouldCollectAdvance: shop.shouldCollectAdvance ?? (shopInfoMap[shop.shopNo]?.shouldCollectAdvance ?? true)
             };
+            const hasAnotherActiveTenant = shopsForTable.some(
+                s => s.shopNo === shop.shopNo && s.active
+            );            
             if (!shop.active && wasActiveThisYear) {
-                const hasAnotherActiveTenant = shopsForTable.some(
-                    s => s.shopNo === shop.shopNo && s.active
-                );
+                // Show vacated tenant with their history for this year
                 finalTableData.push({
                     ...row,
                     tenantName: shop.tenantName || 'Vacated', 
@@ -542,6 +533,7 @@ const Dashboard = () => {
                     shopClosureDetails: shopClosureDetails, 
                     refundDetails: refundDetails 
                 });
+                // Only add vacant row if no new tenant has taken over
                 if (!hasAnotherActiveTenant) {
                     finalTableData.push({
                         ...row,
@@ -553,6 +545,9 @@ const Dashboard = () => {
                         vacated: false
                     });
                 }
+            } else if (!shop.active && !wasActiveThisYear && hasAnotherActiveTenant) {
+                // Skip old inactive tenant entries when there's already an active tenant
+                // This prevents showing duplicate "Vacant" entries for shops that have been re-allocated
             } else {
                 finalTableData.push(row);
             }
@@ -568,7 +563,6 @@ const Dashboard = () => {
             maximumFractionDigits: 0,
         }).format(Number(numericValue));
     };
-
     const handleSaveRentAdvance = async () => {
         const { tenantId, shopId } = selectedShop;
         try {
@@ -639,15 +633,12 @@ const Dashboard = () => {
             if (selectedMonth !== '' && paymentStatus !== '') {
                 const monthPayments = shop.months?.[selectedMonth] || [];
                 const totalAmount = monthPayments.reduce((a, b) => a + b, 0);
-
                 if (paymentStatus === 'paid') {
                     matchesMonthStatus = totalAmount > 0;
                 } else if (paymentStatus === 'unpaid') {
                     const startingDate = shop.startingDate ? new Date(shop.startingDate) : null;
                     const selectedMonthDate = new Date(parseInt(selectedYear), parseInt(selectedMonth), 1);
-
                     const hasStarted = startingDate ? startingDate <= selectedMonthDate : true;
-
                     matchesMonthStatus = totalAmount === 0 && hasStarted;
                 }
             }
@@ -663,7 +654,6 @@ const Dashboard = () => {
         selectedProperty,
         selectedOccupancyStatus,
     ]);
-
     const sortedTableData = useMemo(() => {
         return [...filteredTableData].sort((a, b) => {
             const normalize = (val) =>
@@ -681,19 +671,15 @@ const Dashboard = () => {
                     const numberMatch = str.match(/(\d+)/);
                     const number = numberMatch ? parseInt(numberMatch[1], 10) : 0;
                     return { letters, number };
-                };
-                
+                };                
                 const parsedA = parseShopNo(valA);
-                const parsedB = parseShopNo(valB);
-                
+                const parsedB = parseShopNo(valB);                
                 // Compare letters first
                 if (parsedA.letters < parsedB.letters) return sortOrder === 'asc' ? -1 : 1;
-                if (parsedA.letters > parsedB.letters) return sortOrder === 'asc' ? 1 : -1;
-                
+                if (parsedA.letters > parsedB.letters) return sortOrder === 'asc' ? 1 : -1;                
                 // If letters are same, compare numbers numerically
                 if (parsedA.number < parsedB.number) return sortOrder === 'asc' ? -1 : 1;
-                if (parsedA.number > parsedB.number) return sortOrder === 'asc' ? 1 : -1;
-                
+                if (parsedA.number > parsedB.number) return sortOrder === 'asc' ? 1 : -1;                
                 return 0;
             }
             // Default sorting for other fields
@@ -702,14 +688,12 @@ const Dashboard = () => {
             return 0;
         });
     }, [filteredTableData, sortField, sortOrder]);
-
     const options = projects
         .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
         .map((project) => ({
             value: project.projectReferenceName,
             label: project.projectReferenceName,
         }));
-
     const shopOptions = [...new Set(tableData.map(shop => shop.shopNo))].map(no => ({ value: no, label: no }));
     const filteredByShop = selectedShopNo
         ? tableData.filter(shop => shop.shopNo === selectedShopNo)
@@ -719,7 +703,6 @@ const Dashboard = () => {
         ? filteredByShop.filter(shop => shop.tenantName === selectedTenantName)
         : filteredByShop;
     const doorOptions = [...new Set(filteredByTenant.map(shop => shop.doorNo))].map(door => ({ value: door, label: door }));
-
     const handleExportPDF = () => {
         const doc = new jsPDF('landscape');
         const reportTitle =
@@ -818,7 +801,6 @@ const Dashboard = () => {
             paymentStatus?.trim().toLowerCase() === 'unpaid'
                 ? `Unpaid Shops Rent Report - ${selectedMonthYear}.pdf`
                 : `Shop-Rent-${selectedMonthYear}.pdf`;
-
         doc.save(fileName);
     };
     const handleExportVacantPDF = () => {
@@ -828,9 +810,8 @@ const Dashboard = () => {
             index + 1,
             shop.shopNo,
             shop.doorNo || 'N/A',
-            shop.propertyName || 'N/A' // propertyName stores projectReferenceName
+            shop.propertyName || 'N/A'
         ]);
-
         doc.text("Vacant Shop Details", 14, 10);
         doc.autoTable({
             head: [tableColumn],
@@ -865,21 +846,17 @@ const Dashboard = () => {
             const isVacant = shop.tenantName === "Vacant" || !shop.advance;
             const shouldInclude = !shopInfo || shopInfo.shouldCollectAdvance !== false;
             return isVacant && shouldInclude;
-        });
-        
-        // Remove duplicates based on shopNo
+        });        
         const uniqueVacantShops = vacantShops.reduce((acc, current) => {
             const existingShop = acc.find(shop => shop.shopNo === current.shopNo);
             if (!existingShop) {
                 acc.push(current);
             }
             return acc;
-        }, []);
-        
+        }, []);        
         return uniqueVacantShops;
     }, [filteredTableData, shopInfoMap]);
     const occupiedCount = sortedTableData.length - filteredVacantShops.length;
-
     const totalMonthlyRents = useMemo(() => {
         if (selectedMonth === '' || selectedYear === '') return 0;
         const selectedMonthIndex = parseInt(selectedMonth); // 0-based
@@ -915,7 +892,6 @@ const Dashboard = () => {
             return sum + rent; // Full rent
         }, 0);
     }, [tableData, shopInfoMap, selectedMonth, selectedYear]);
-
     const totalForSelectedMonth = useMemo(() => {
         if (selectedMonth === '' || selectedYear === '') return 0;
         return tableData.reduce((sum, shop) => {
@@ -929,7 +905,6 @@ const Dashboard = () => {
             return sum + totalAmount;
         }, 0);
     }, [filteredTableData, selectedMonth, selectedYear]);
-
     return (
         <div className="">
             <div className='mx-auto lg:w-[1750px] p-4 lg:pl-4 bg-white lg:ml-12 lg:mr-6 rounded-md text-left'>
@@ -1049,7 +1024,6 @@ const Dashboard = () => {
                                 onChange={(option) => {
                                     const value = option?.value || '';
                                     setSelectedDoorNo(value);
-
                                     if (value) {
                                         sessionStorage.setItem('selectedDoorNo', JSON.stringify(value));
                                     } else {
@@ -1092,7 +1066,6 @@ const Dashboard = () => {
                                 onChange={(e) => {
                                     const value = e.target.value;
                                     setPaymentStatus(value);
-
                                     if (value) {
                                         sessionStorage.setItem('paymentStatus', JSON.stringify(value));
                                     } else {
@@ -1199,17 +1172,11 @@ const Dashboard = () => {
                     </div>
                     <div className="font-semibold flex gap-2">
                         <span>Total Shop Vacancy:</span>
-                        <span
-                            className='font-bold cursor-pointer text-[#E4572E]'
-                            onClick={() => setShowVacantPopup(true)}
-                        >
+                        <span className='font-bold cursor-pointer text-[#E4572E]' onClick={() => setShowVacantPopup(true)}>
                             {filteredVacantShops.length}
                         </span>
                     </div>
-                    <button
-                        className='font-bold text-sm text-[#E4572E] cursor-pointer hover:underline text-left lg:text-right'
-                        onClick={handleExportPDF}
-                    >
+                    <button className='font-bold text-sm text-[#E4572E] cursor-pointer hover:underline text-left lg:text-right' onClick={handleExportPDF}>
                         Export PDF
                     </button>
                 </div>
@@ -1387,10 +1354,7 @@ const Dashboard = () => {
                             <span className="text-[#BF9853]">{selectedShop.tenantName}</span>?
                         </div>
                         <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
-                            <button 
-                                className="bg-gray-300 px-4 py-2 rounded-md text-sm sm:text-base" 
-                                onClick={() => { setShowConfirm(false); setSelectedShop(null); }}
-                            >
+                            <button className="bg-gray-300 px-4 py-2 rounded-md text-sm sm:text-base" onClick={() => { setShowConfirm(false); setSelectedShop(null); }}>
                                 Cancel
                             </button>
                             <button
@@ -1458,10 +1422,7 @@ const Dashboard = () => {
                             >
                                 Close
                             </button>
-                            <button 
-                                className="bg-[#BF9853] text-white px-4 py-2 rounded-md text-sm sm:text-base" 
-                                onClick={handleSaveRentAdvance}
-                            >
+                            <button className="bg-[#BF9853] text-white px-4 py-2 rounded-md text-sm sm:text-base" onClick={handleSaveRentAdvance}>
                                 Save
                             </button>
                         </div>
@@ -1476,16 +1437,10 @@ const Dashboard = () => {
                                 <h2 className="text-lg sm:text-xl font-semibold">Vacant Shop Details</h2>
                             </div>
                             <div className="flex items-center gap-4 sm:gap-7">
-                                <button 
-                                    className="text-[#E4572E] font-semibold text-sm cursor-pointer hover:underline" 
-                                    onClick={handleExportVacantPDF}
-                                >
+                                <button className="text-[#E4572E] font-semibold text-sm cursor-pointer hover:underline" onClick={handleExportVacantPDF}>
                                     Export PDF
                                 </button>
-                                <button 
-                                    onClick={() => setShowVacantPopup(false)} 
-                                    className="text-gray-500 hover:text-black text-lg sm:text-xl"
-                                >
+                                <button onClick={() => setShowVacantPopup(false)} className="text-gray-500 hover:text-black text-lg sm:text-xl">
                                     ✕
                                 </button>
                             </div>

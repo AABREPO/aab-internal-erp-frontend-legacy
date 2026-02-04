@@ -686,32 +686,33 @@ const ProjectUsageReport = () => {
           <div className="relative">
             <div
               onClick={() => setShowProjectModal(true)}
-              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium bg-white flex items-center cursor-pointer justify-between"
+              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
               style={{
-                paddingRight: selectedProject ? '40px' : '12px',
                 boxSizing: 'border-box',
                 color: selectedProject ? '#000' : '#9E9E9E'
               }}
             >
               <span>{selectedProject || 'Select Project'}</span>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
             </div>
-            {selectedProject && (
+            {selectedProject ? (
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   setSelectedProject('');
                 }}
-                className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                style={{ right: '24px' }}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
               >
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
+            ) : (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
             )}
           </div>
         </div>
@@ -866,7 +867,7 @@ const ProjectUsageReport = () => {
                         transform: swipeOffset < 0 
                           ? `translateX(${Math.max(0, 110 + swipeOffset)}px)` 
                           : 'translateX(110px)',
-                        transition: 'opacity 0.2s ease-out',
+                        transition: (swipeState && swipeState.isSwiping) ? 'none' : 'opacity 0.2s ease-out, transform 0.3s ease-out',
                         pointerEvents: isExpanded ? 'auto' : 'none'
                       }}
                     >
@@ -1024,7 +1025,7 @@ const ProjectUsageReport = () => {
                         transform: swipeOffset < 0 
                           ? `translateX(${Math.max(0, 110 + swipeOffset)}px)` 
                           : 'translateX(110px)',
-                        transition: 'opacity 0.2s ease-out',
+                        transition: (swipeState && swipeState.isSwiping) ? 'none' : 'opacity 0.2s ease-out, transform 0.3s ease-out',
                         pointerEvents: isExpanded ? 'auto' : 'none'
                       }}
                     >

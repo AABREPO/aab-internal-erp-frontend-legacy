@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Edit from '../Images/edit1.png';
 import Delete from '../Images/delete.png';
+import DatePickerModal from '../PurchaseOrder/DatePickerModal';
+import SearchableDropdown from '../PurchaseOrder/SearchableDropdown';
 
 const History = ({ onTabChange }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -20,6 +22,7 @@ const History = ({ onTabChange }) => {
   const [filterStockingLocation, setFilterStockingLocation] = useState('');
   const [filterSRNumber, setFilterSRNumber] = useState('');
   const [filterDate, setFilterDate] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [employeeData, setEmployeeData] = useState([]);
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
   const [showInchargeDropdown, setShowInchargeDropdown] = useState(false);
@@ -285,6 +288,26 @@ const History = ({ onTabChange }) => {
     }).format(price);
   };
 
+  const formatDDMMYYYYFromISO = (isoDate) => {
+    if (!isoDate) return '';
+    // Expecting YYYY-MM-DD (from previous <input type="date"> behavior)
+    if (typeof isoDate === 'string' && isoDate.includes('-')) {
+      const [year, month, day] = isoDate.split('-');
+      if (year && month && day) return `${day}/${month}/${year}`;
+    }
+    return '';
+  };
+
+  const formatISOFromDDMMYYYY = (ddmmyyyy) => {
+    if (!ddmmyyyy) return '';
+    // Expecting DD/MM/YYYY (from DatePickerModal)
+    if (typeof ddmmyyyy === 'string' && ddmmyyyy.includes('/')) {
+      const [day, month, year] = ddmmyyyy.split('/');
+      if (year && month && day) return `${year}-${month}-${day}`;
+    }
+    return '';
+  };
+
   // Update ref when expandedItemId changes
   useEffect(() => {
     expandedItemIdRef.current = expandedItemId;
@@ -295,12 +318,14 @@ const History = ({ onTabChange }) => {
 
   const handleTouchStart = (e, itemId) => {
     const touch = e.touches ? e.touches[0] : { clientX: e.clientX };
+    const wasCloneExpanded = cloneExpandedItemId === itemId;
     setSwipeStates(prev => ({
       ...prev,
       [itemId]: {
         startX: touch.clientX,
         currentX: touch.clientX,
-        isSwiping: false
+        isSwiping: false,
+        wasCloneExpanded: wasCloneExpanded
       }
     }));
   };
@@ -320,7 +345,8 @@ const History = ({ onTabChange }) => {
         [itemId]: {
           ...prev[itemId],
           currentX: touch.clientX,
-          isSwiping: true
+          isSwiping: true,
+          wasCloneExpanded: prev[itemId].wasCloneExpanded
         }
       }));
     }
@@ -331,11 +357,18 @@ const History = ({ onTabChange }) => {
     if (!state) return;
     const deltaX = state.currentX - state.startX;
     const absDeltaX = Math.abs(deltaX);
+    const wasCloneExpanded = state.wasCloneExpanded || false;
     if (absDeltaX >= minSwipeDistance) {
       if (deltaX < 0) {
-        // Swiped left (reveal buttons on right)
-        setExpandedItemId(itemId);
-        setCloneExpandedItemId(null);
+        // Swiped left
+        if (wasCloneExpanded) {
+          // If clone was expanded, only close clone button - don't show edit/delete buttons
+          setCloneExpandedItemId(null);
+        } else {
+          // If clone was NOT expanded, reveal edit/delete buttons on right
+          setExpandedItemId(itemId);
+          setCloneExpandedItemId(null);
+        }
       } else {
         // Swiped right (reveal clone button on left)
         if (expandedItemIdRef.current === itemId) {
@@ -406,12 +439,14 @@ const History = ({ onTabChange }) => {
           if (!state) return;
           const deltaX = e.clientX - state.startX;
           const isExpanded = expandedItemIdRef.current === item.id;
+          const isCloneExpanded = cloneExpandedItemId === item.id;
           // Only update if dragging horizontally
-          if (deltaX < 0 || (deltaX > 0 && !isExpanded) || (isExpanded && deltaX > 0)) {
+          if (deltaX < 0 || (deltaX > 0 && !isExpanded) || (isExpanded && deltaX > 0) || (isCloneExpanded && deltaX < 0)) {
             newState[item.id] = {
               ...state,
               currentX: e.clientX,
-              isSwiping: true
+              isSwiping: true,
+              wasCloneExpanded: state.wasCloneExpanded
             };
             hasChanges = true;
           }
@@ -431,11 +466,18 @@ const History = ({ onTabChange }) => {
           if (!state) return;
           const deltaX = state.currentX - state.startX;
           const absDeltaX = Math.abs(deltaX);
+          const wasCloneExpanded = state.wasCloneExpanded || false;
           if (absDeltaX >= minSwipeDistance) {
             if (deltaX < 0) {
-              // Swiped left (reveal buttons on right)
-              setExpandedItemId(item.id);
-              setCloneExpandedItemId(null);
+              // Swiped left
+              if (wasCloneExpanded) {
+                // If clone was expanded, only close clone button - don't show edit/delete buttons
+                setCloneExpandedItemId(null);
+              } else {
+                // If clone was NOT expanded, reveal edit/delete buttons on right
+                setExpandedItemId(item.id);
+                setCloneExpandedItemId(null);
+              }
             } else {
               // Swiped right (reveal clone button on left)
               if (expandedItemIdRef.current === item.id) {
@@ -746,7 +788,7 @@ const History = ({ onTabChange }) => {
         </div>
       </div>
       {/* Stack Return/Dispatch Toggle */}
-      <div className="px-4 pt-3">
+      <div className="px-4 mt-2">
         <div className="flex items-center ga">
           {/* Stack Return/Dispatch Tabs */}
           <div className="flex bg-gray-100 items-center h-9 flex-1">
@@ -1059,7 +1101,7 @@ const History = ({ onTabChange }) => {
                       transform: swipeOffset < 0
                         ? `translateX(${Math.max(0, 110 + swipeOffset)}px)`
                         : 'translateX(110px)',
-                      transition: 'opacity 0.2s ease-out',
+                      transition: (swipeState && swipeState.isSwiping) ? 'none' : 'opacity 0.2s ease-out, transform 0.3s ease-out',
                       pointerEvents: isExpanded ? 'auto' : 'none'
                     }}
                   >
@@ -1103,13 +1145,15 @@ const History = ({ onTabChange }) => {
               setShowLocationDropdown(false);
             }
           }}
+          style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           <div
             className="bg-white w-full max-w-[360px] h-[400px] rounded-t-3xl shadow-lg"
             onClick={(e) => e.stopPropagation()}
+            style={{ fontFamily: "'Manrope', sans-serif" }}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-4 pt-4 mb-3">
+            <div className="flex items-center justify-between px-6 pt-4 mb-3">
               <h2 className="text-[16px] font-semibold text-black">Select Filters</h2>
               <button
                 type="button"
@@ -1128,217 +1172,96 @@ const History = ({ onTabChange }) => {
             </div>
 
             {/* Modal Content */}
-            <div className="px-4 overflow-visible">
+            <div className="px-6 overflow-visible">
               {/* Project Name */}
               <div className="space-y-[6px]">
                 <div className="relative">
-                  <label className="block text-[14px] font-medium text-black mb-0.5">Project Name</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Select"
-                      value={filterProjectName}
-                      onChange={(e) => {
-                        setFilterProjectName(e.target.value);
-                        setShowProjectDropdown(true);
-                      }}
-                      onFocus={() => setShowProjectDropdown(true)}
-                      className="w-full h-[32px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400"
-                      style={{
-                        paddingRight: filterProjectName ? '60px' : '40px'
-                      }}
-                    />
-                    {filterProjectName && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setFilterProjectName('');
-                          setShowProjectDropdown(false);
-                        }}
-                        className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                        style={{ right: '24px' }}
-                      >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setShowProjectDropdown(!showProjectDropdown)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M4 6L8 10L12 6" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                    {showProjectDropdown && (
-                      <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                        {clientData.map((client) => (
-                          <div
-                            key={client.id || client._id}
-                            className="px-3 py-2 text-[14px] text-gray-700 hover:bg-gray-100 cursor-pointer"
-                            onClick={() => {
-                              setFilterProjectName(client.value || client.label || client.siteName || '');
-                              setShowProjectDropdown(false);
-                            }}
-                          >
-                            {client.value || client.label || client.siteName || ''}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <label className="block text-[13px] font-medium text-black mb-0.5">Project Name</label>
+                  <SearchableDropdown
+                    value={filterProjectName}
+                    onChange={(value) => {
+                      setFilterProjectName(value);
+                      setShowProjectDropdown(false);
+                      setShowInchargeDropdown(false);
+                      setShowLocationDropdown(false);
+                    }}
+                    options={[...new Set(clientData.map((c) => c.value || c.label || c.siteName || '').filter(Boolean))]}
+                    placeholder="Select"
+                    fieldName="Project Name"
+                    showAddNew={false}
+                    showAllOptions={true}
+                    className="w-full h-[32px]"
+                  />
                 </div>
                 {/* Project Incharge */}
                 <div className="relative">
-                  <label className="block text-[14px] font-medium text-black mb-0.5">Project Incharge</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Select"
-                      value={filterProjectIncharge}
-                      onChange={(e) => {
-                        setFilterProjectIncharge(e.target.value);
-                        setShowInchargeDropdown(true);
-                      }}
-                      onFocus={() => setShowInchargeDropdown(true)}
-                      className="w-full h-[32px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400"
-                      style={{
-                        paddingRight: filterProjectIncharge ? '60px' : '40px'
-                      }}
-                    />
-                    {filterProjectIncharge && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setFilterProjectIncharge('');
-                          setShowInchargeDropdown(false);
-                        }}
-                        className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                        style={{ right: '24px' }}
-                      >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setShowInchargeDropdown(!showInchargeDropdown)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M4 6L8 10L12 6" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                    {showInchargeDropdown && (
-                      <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                        {employeeData.map((employee) => (
-                          <div
-                            key={employee.id || employee._id}
-                            className="px-3 py-2 text-[14px] text-gray-700 hover:bg-gray-100 cursor-pointer"
-                            onClick={() => {
-                              const empName = employee.employeeName || employee.name || employee.fullName || employee.employee_name || '';
-                              setFilterProjectIncharge(empName);
-                              setShowInchargeDropdown(false);
-                            }}
-                          >
-                            {employee.employeeName || employee.name || employee.fullName || employee.employee_name || ''}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <label className="block text-[13px] font-medium text-black mb-0.5">Project Incharge</label>
+                  <SearchableDropdown
+                    value={filterProjectIncharge}
+                    onChange={(value) => {
+                      setFilterProjectIncharge(value);
+                      setShowProjectDropdown(false);
+                      setShowInchargeDropdown(false);
+                      setShowLocationDropdown(false);
+                    }}
+                    options={[...new Set(employeeData.map((e) => e.employeeName || e.name || e.fullName || e.employee_name || '').filter(Boolean))]}
+                    placeholder="Select"
+                    fieldName="Project Incharge"
+                    showAddNew={false}
+                    showAllOptions={true}
+                    className="w-full h-[32px]"
+                  />
                 </div>
                 {/* Stocking Location */}
 
                 <div className="flex-1">
-                  <label className="block text-[14px] font-medium text-black mb-0.5">Stocking Location</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Select"
-                      value={filterStockingLocation}
-                      onChange={(e) => {
-                        setFilterStockingLocation(e.target.value);
-                        setShowLocationDropdown(true);
-                      }}
-                      onFocus={() => setShowLocationDropdown(true)}
-                      className="w-full h-[32px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400"
-                      style={{
-                        paddingRight: filterStockingLocation ? '60px' : '40px'
-                      }}
-                    />
-                    {filterStockingLocation && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setFilterStockingLocation('');
-                          setShowLocationDropdown(false);
-                        }}
-                        className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                        style={{ right: '24px' }}
-                      >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setShowLocationDropdown(!showLocationDropdown)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M4 6L8 10L12 6" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                    {showLocationDropdown && (
-                      <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                        {clientData
-                          .filter(client => client.markedAsStockingLocation === true)
-                          .map((client) => (
-                            <div
-                              key={client.id || client._id}
-                              className="px-3 py-2 text-[14px] text-gray-700 hover:bg-gray-100 cursor-pointer"
-                              onClick={() => {
-                                setFilterStockingLocation(client.value || client.label || client.siteName || '');
-                                setShowLocationDropdown(false);
-                              }}
-                            >
-                              {client.value || client.label || client.siteName || ''}
-                            </div>
-                          ))}
-                      </div>
-                    )}
-                  </div>
+                  <label className="block text-[13px] font-medium text-black mb-0.5">Stocking Location</label>
+                  <SearchableDropdown
+                    value={filterStockingLocation}
+                    onChange={(value) => {
+                      setFilterStockingLocation(value);
+                      setShowProjectDropdown(false);
+                      setShowInchargeDropdown(false);
+                      setShowLocationDropdown(false);
+                    }}
+                    options={[...new Set(clientData.filter((c) => c.markedAsStockingLocation === true).map((c) => c.value || c.label || c.siteName || '').filter(Boolean))]}
+                    placeholder="Select"
+                    fieldName="Stocking Location"
+                    showAddNew={false}
+                    showAllOptions={true}
+                    className="w-full h-[32px]"
+                  />
                 </div>
 
 
                 <div className=" flex items-center gap-2 ">
                   {/* Date */}
                   <div className="flex-1">
-                    <label className="block text-[14px] font-medium text-black mb-0.5">Date</label>
-                    <input
-                      type="date"
-                      value={filterDate}
-                      onChange={(e) => setFilterDate(e.target.value)}
-                      className="w-full h-[32px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400"
-                    />
+                    <label className="block text-[13px] font-medium text-black mb-0.5">Date</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowDatePicker(true)}
+                      className="w-full h-[32px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400 flex items-center justify-between"
+                      style={{ fontFamily: "'Manrope', sans-serif" }}
+                    >
+                      <span className={`${filterDate ? 'text-black' : 'text-[#9E9E9E]'} truncate`}>
+                        {filterDate ? formatDDMMYYYYFromISO(filterDate) : 'Select Date'}
+                      </span>
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="flex-shrink-0 ml-2">
+                        <path d="M3 4H13M3 4V12C3 12.5523 3.44772 13 4 13H12C12.5523 13 13 12.5523 13 12V4M3 4C3 3.44772 3.44772 3 4 3H12C12.5523 3 13 3.44772 13 4M6 2V5M10 2V5" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" />
+                      </svg>
+                    </button>
                   </div>
                   {/* Entry Number */}
                   <div className="flex-1">
-                    <label className="block text-[14px] font-medium text-black mb-0.5">Entry Number</label>
+                    <label className="block text-[13px] font-medium text-black mb-0.5">Entry Number</label>
                     <input
                       type="text"
                       placeholder="Enter"
                       value={filterSRNumber}
                       onChange={(e) => setFilterSRNumber(e.target.value)}
-                      className="w-full h-[32px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400"
+                      className="w-full h-[32px] px-3 border border-gray-300 rounded-lg text-[12px] bg-white focus:outline-none focus:border-gray-400"
+                      style={{ fontFamily: "'Manrope', sans-serif" }}
                     />
                   </div>
                 </div>
@@ -1379,6 +1302,16 @@ const History = ({ onTabChange }) => {
           </div>
         </div>
       )}
+
+      <DatePickerModal
+        isOpen={showDatePicker}
+        onClose={() => setShowDatePicker(false)}
+        initialDate={formatDDMMYYYYFromISO(filterDate)}
+        onConfirm={(picked) => {
+          setFilterDate(formatISOFromDDMMYYYY(picked));
+          setShowDatePicker(false);
+        }}
+      />
     </div>
   );
 };

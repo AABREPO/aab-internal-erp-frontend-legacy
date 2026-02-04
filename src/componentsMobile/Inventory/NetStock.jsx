@@ -633,32 +633,33 @@ const NetStock = () => {
             <div className="relative">
               <div
                 onClick={() => setShowCategoryModal(true)}
-                className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium bg-white flex items-center cursor-pointer justify-between"
+                className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                 style={{
-                  paddingRight: selectedCategory ? '40px' : '12px',
                   boxSizing: 'border-box',
                   color: selectedCategory ? '#000' : '#9E9E9E'
                 }}
               >
                 <span>{selectedCategory || 'Select Category'}</span>
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
               </div>
-              {selectedCategory && (
+              {selectedCategory ? (
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     setSelectedCategory('');
                   }}
-                  className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                  style={{ right: '24px' }}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                 >
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
+              ) : (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
               )}
             </div>
           </div>
@@ -670,32 +671,33 @@ const NetStock = () => {
             <div className="relative">
               <div
                 onClick={() => setShowStockingLocationModal(true)}
-                className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium bg-white flex items-center cursor-pointer justify-between"
+                className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                 style={{
-                  paddingRight: selectedStockingLocation ? '40px' : '12px',
                   boxSizing: 'border-box',
                   color: selectedStockingLocation ? '#000' : '#9E9E9E'
                 }}
               >
                 <span>{selectedStockingLocation || 'Select Location'}</span>
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
               </div>
-              {selectedStockingLocation && (
+              {selectedStockingLocation ? (
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     setSelectedStockingLocation('');
                   }}
-                  className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                  style={{ right: '24px' }}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                 >
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
+              ) : (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
               )}
             </div>
           </div>

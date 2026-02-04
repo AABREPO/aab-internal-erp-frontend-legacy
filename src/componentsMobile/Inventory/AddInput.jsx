@@ -1611,10 +1611,13 @@ const AddInput = () => {
                     </div>
                     {/* Action Buttons - Behind the row on the right, revealed on swipe */}
                     <div
-                      className="absolute right-0 top-0 flex gap-2  z-0"
+                      className="absolute right-0 top-0 bottom-0 flex gap-2 z-0"
                       style={{
                         opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
-                        transition: 'opacity 0.2s ease-out',
+                        transform: swipeOffset < 0
+                          ? `translateX(${Math.max(0, 110 + swipeOffset)}px)`
+                          : 'translateX(110px)',
+                        transition: (swipeState && swipeState.isSwiping) ? 'none' : 'opacity 0.2s ease-out, transform 0.3s ease-out',
                         pointerEvents: isExpanded ? 'auto' : 'none'
                       }}
                     >
@@ -1623,7 +1626,7 @@ const AddInput = () => {
                           e.stopPropagation();
                           handleEditRow(index);
                         }}
-                        className="action-button w-full h-full bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
+                        className="action-button w-[44px] h-full bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
                         title="Edit"
                       >
                         <img src={Edit} alt="Edit" className="w-[18px] h-[18px]" />
@@ -1633,7 +1636,7 @@ const AddInput = () => {
                           e.stopPropagation();
                           handleDeleteRow(index);
                         }}
-                        className="action-button w-[48px] h-full bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm"
+                        className="action-button w-[44px] h-full bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm"
                         title="Delete"
                       >
                         <img src={Delete} alt="Delete" className="w-[18px] h-[18px]" />

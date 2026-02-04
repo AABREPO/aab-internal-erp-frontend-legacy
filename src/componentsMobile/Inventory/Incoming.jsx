@@ -1563,19 +1563,15 @@ const Incoming = ({ user }) => {
               <div className="relative">
                 <div
                   onClick={() => setShowVendorModal(true)}
-                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium bg-white flex items-center cursor-pointer justify-between"
+                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                   style={{
-                    paddingRight: incomingData.vendorName ? '40px' : '12px',
                     boxSizing: 'border-box',
                     color: incomingData.vendorName ? '#000' : '#9E9E9E'
                   }}
                 >
                   <span>{incomingData.vendorName || 'Select Vendor Name'}</span>
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
                 </div>
-                {incomingData.vendorName && (
+                {incomingData.vendorName ? (
                   <button
                     type="button"
                     onClick={(e) => {
@@ -1583,13 +1579,18 @@ const Incoming = ({ user }) => {
                       setIncomingData({ ...incomingData, vendorName: '', vendorId: null, poNumber: '' });
                       setItems([]); // Clear items when vendor is cleared
                     }}
-                    className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                    style={{ right: '24px' }}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                   >
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </button>
+                ) : (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
                 )}
               </div>
             </div>
@@ -1602,32 +1603,33 @@ const Incoming = ({ user }) => {
               <div className="relative">
                 <div
                   onClick={() => setShowStockingLocationModal(true)}
-                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium bg-white flex items-center cursor-pointer justify-between"
+                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                   style={{
-                    paddingRight: incomingData.stockingLocation ? '40px' : '12px',
                     boxSizing: 'border-box',
                     color: incomingData.stockingLocation ? '#000' : '#9E9E9E'
                   }}
                 >
                   <span>{incomingData.stockingLocation || 'Select Stocking Location'}</span>
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
                 </div>
-                {incomingData.stockingLocation && (
+                {incomingData.stockingLocation ? (
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       setIncomingData({ ...incomingData, stockingLocation: '', poNumber: '' });
                     }}
-                    className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                    style={{ right: '24px' }}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                   >
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </button>
+                ) : (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
                 )}
               </div>
             </div>

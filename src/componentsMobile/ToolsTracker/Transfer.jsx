@@ -3788,8 +3788,7 @@ const Transfer = ({ user }) => {
               <div className="px-6 pb-4">
                 <p className="text-[12px] font-medium text-black mb-2">Status</p>
                 <div className="relative">
-                  <div
-                    onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                  <div onClick={() => setShowStatusDropdown(!showStatusDropdown)}
                     className="w-full h-[40px] border border-gray-300 rounded-lg px-4 flex items-center justify-between cursor-pointer bg-white"
                   >
                     <span className="text-[14px] text-black">{uploadStatus}</span>
@@ -3827,9 +3826,7 @@ const Transfer = ({ user }) => {
               </div>
             </div>
             <div className="px-6 pb-6 pt-2 flex-shrink-0">
-              <button
-                onClick={handleConfirmUpload}
-                disabled={isUploading}
+              <button onClick={handleConfirmUpload} disabled={isUploading}
                 className={`w-full h-[48px] rounded-lg text-[16px] font-bold text-white ${isUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-black'
                   }`}
               >
@@ -3870,16 +3867,14 @@ const Transfer = ({ user }) => {
             </div>
             {imageViewerData.images.length > 1 && (
               <>
-                <button
-                  onClick={handlePrevImage}
+                <button onClick={handlePrevImage}
                   className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center bg-black bg-opacity-50 rounded-full text-white"
                 >
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
-                <button
-                  onClick={handleNextImage}
+                <button onClick={handleNextImage}
                   className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center bg-black bg-opacity-50 rounded-full text-white"
                 >
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -3914,8 +3909,7 @@ const Transfer = ({ user }) => {
             <div className="flex gap-2 items-center">
               {imageViewerData.images.map((img, index) => (
                 <div key={index} className="relative flex-shrink-0">
-                  <div
-                    onClick={() => setImageViewerData(prev => ({ ...prev, currentIndex: index }))}
+                  <div onClick={() => setImageViewerData(prev => ({ ...prev, currentIndex: index }))}
                     className={`w-[50px] h-[50px] rounded-lg overflow-hidden cursor-pointer border-2 ${index === imageViewerData.currentIndex ? 'border-[#E4572E]' : 'border-transparent'
                       }`}
                   >
@@ -3957,9 +3951,7 @@ const Transfer = ({ user }) => {
         </div>
       )}
       {showConfirmModal && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-          onClick={() => setShowConfirmModal(false)}
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" onClick={() => setShowConfirmModal(false)}
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           <div className="bg-white w-full max-w-[320px] rounded-[16px] p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
@@ -3977,8 +3969,7 @@ const Transfer = ({ user }) => {
               Please check that all the machines you take are in proper running condition before taking them.
             </p>
             <div className="flex gap-3">
-              <button
-                onClick={() => setShowConfirmModal(false)}
+              <button onClick={() => setShowConfirmModal(false)}
                 className="flex-1 h-[44px] border border-gray-300 rounded-[8px] text-[14px] font-semibold text-black bg-white hover:bg-gray-50 transition-colors"
               >
                 Cancel
@@ -4102,9 +4093,7 @@ const Transfer = ({ user }) => {
         </div>
       )}
       {showSearchConfirmModal && selectedSearchItem && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-          onClick={handleCancelSearchConfirm}
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" onClick={handleCancelSearchConfirm}
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           <div className="bg-white w-full max-w-[320px] rounded-[16px] p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
@@ -4122,14 +4111,12 @@ const Transfer = ({ user }) => {
               Do you Want to Confirm Move the machine please upload Image
             </p>
             <div className="flex gap-3">
-              <button
-                onClick={handleCancelSearchConfirm}
+              <button onClick={handleCancelSearchConfirm}
                 className="flex-1 h-[44px] border border-gray-300 rounded-[8px] text-[14px] font-semibold text-black bg-white hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
-              <button
-                onClick={handleConfirmSearchItem}
+              <button onClick={handleConfirmSearchItem}
                 className="flex-1 h-[44px] bg-black rounded-[8px] text-[14px] font-semibold text-white hover:bg-gray-800 transition-colors"
               >
                 Yes
@@ -4139,9 +4126,7 @@ const Transfer = ({ user }) => {
         </div>
       )}
       {showSearchUploadModal && selectedSearchItem && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-          onClick={handleCloseSearchUploadModal}
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" onClick={handleCloseSearchUploadModal}
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           <div className="bg-white w-full max-w-[360px] rounded-[16px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
@@ -4156,8 +4141,7 @@ const Transfer = ({ user }) => {
             </div>
             <div className="flex-1 overflow-y-auto">
               <div className="px-6 py-4">
-                <label
-                  htmlFor="search-file-upload-input"
+                <label htmlFor="search-file-upload-input"
                   className="flex flex-col items-center justify-center w-full h-[100px] border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
                 >
                   <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -4213,8 +4197,7 @@ const Transfer = ({ user }) => {
               <div className="px-6 pb-4">
                 <p className="text-[12px] font-medium text-black mb-2">Status</p>
                 <div className="relative">
-                  <div
-                    onClick={() => setShowSearchStatusDropdown(!showSearchStatusDropdown)}
+                  <div onClick={() => setShowSearchStatusDropdown(!showSearchStatusDropdown)}
                     className="w-full h-[40px] border border-gray-300 rounded-lg px-4 flex items-center justify-between cursor-pointer bg-white"
                   >
                     <span className="text-[14px] text-black">{searchUploadStatus}</span>

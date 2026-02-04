@@ -388,7 +388,6 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
     }
   };
 
-  // Helper: find an id from an array of objects by matching any of the provided name fields
   const findIdByLabel = (list, value, nameFields = []) => {
     if (!value || !Array.isArray(list)) return null;
     const target = value.toLowerCase().trim();
@@ -397,12 +396,9 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
     );
     return match ? (match.id || match._id || null) : null;
   };
-
   const handleFieldSelect = (field, value) => {
-    // Check if category is required for this field
     const fieldsRequiringCategory = ['itemName', 'model', 'brand', 'type'];
     const currentCategory = formData.category || selectedCategory;
-
     if (fieldsRequiringCategory.includes(field) && !currentCategory) {
       const fieldNames = {
         itemName: 'Item Name',
@@ -411,44 +407,35 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
         type: 'Type'
       };
       alert(`Please select a category first before selecting ${fieldNames[field]}.`);
-      return; // Don't allow selection without category
+      return;
     }
-
     setFormData({ ...formData, [field]: value });
-
-    // Add to options if it's a new value
     const optionSetters = {
       itemName: setItemNameOptions,
       model: setModelOptions,
       brand: setBrandOptions,
       type: setTypeOptions,
     };
-
     const optionArrays = {
       itemName: itemNameOptions,
       model: modelOptions,
       brand: brandOptions,
       type: typeOptions,
     };
-
     if (!optionArrays[field].includes(value)) {
       const newOptions = [...optionArrays[field], value];
       optionSetters[field](newOptions);
       saveOptions(field, newOptions);
     }
   };
-
-  // API handlers for saving new items (same as InputData.jsx)
   const handleSubmitItemName = async (itemName, selectedCategory) => {
     const categoryToUse = selectedCategory || formData.category || '';
-
     const payload = {
       itemName: itemName,
       category: categoryToUse,
       groupName: '',
-      otherPOEntityList: [], // Always empty when saving new item name
+      otherPOEntityList: [],
     };
-
     try {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/save', {
         method: 'POST',
@@ -457,14 +444,11 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
         },
         body: JSON.stringify(payload),
       });
-
       if (!response.ok) {
         throw new Error('Failed to submit data');
       }
       const data = await response.json();
-      // Reload item names from API
       await fetchPoItemName();
-      // Also refresh parent component's state
       if (onRefreshItemName) {
         await onRefreshItemName();
       }
@@ -473,19 +457,16 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
       throw error;
     }
   };
-
   const handleSubmitModel = async (model, selectedCategory) => {
     const categoryToUse = selectedCategory || formData.category || '';
     const categoryOption = categoryOptions.find(cat =>
       cat.label === categoryToUse || cat.value === categoryToUse
     );
     const categoryId = categoryOption?.value || categoryOption?.id || null;
-
     const newModelData = {
       model: model,
       category: categoryId,
     };
-
     try {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/po_model/save', {
         method: 'POST',
@@ -494,12 +475,8 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
         },
         body: JSON.stringify(newModelData),
       });
-
       if (response.ok) {
-        console.log('Model saved successfully!');
-        // Reload models from API
         await fetchPoModel();
-        // Also refresh parent component's state
         if (onRefreshModel) {
           await onRefreshModel();
         }
@@ -511,19 +488,16 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
       throw error;
     }
   };
-
   const handleSubmitBrand = async (brand, selectedCategory) => {
     const categoryToUse = selectedCategory || formData.category || '';
     const categoryOption = categoryOptions.find(cat =>
       cat.label === categoryToUse || cat.value === categoryToUse
     );
     const categoryId = categoryOption?.value || categoryOption?.id || null;
-
     const newBrandData = {
       brand,
       category: categoryId
     };
-
     try {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/po_brand/save', {
         method: 'POST',
@@ -532,12 +506,8 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
         },
         body: JSON.stringify(newBrandData),
       });
-
       if (response.ok) {
-        console.log('Brand saved successfully!');
-        // Reload brands from API
         await fetchPoBrand();
-        // Also refresh parent component's state
         if (onRefreshBrand) {
           await onRefreshBrand();
         }
@@ -549,19 +519,16 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
       throw error;
     }
   };
-
   const handleSubmitType = async (typeColor, selectedCategory) => {
     const categoryToUse = selectedCategory || formData.category || '';
     const categoryOption = categoryOptions.find(cat =>
       cat.label === categoryToUse || cat.value === categoryToUse
     );
     const categoryId = categoryOption?.value || categoryOption?.id || null;
-
     const newTypeData = {
       typeColor,
       category: categoryId
     };
-
     try {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/po_type/save', {
         method: 'POST',
@@ -570,12 +537,8 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
         },
         body: JSON.stringify(newTypeData),
       });
-
       if (response.ok) {
-        console.log('Type saved successfully!');
-        // Reload types from API
         await fetchPoType();
-        // Also refresh parent component's state
         if (onRefreshType) {
           await onRefreshType();
         }
@@ -587,12 +550,8 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
       throw error;
     }
   };
-
   const handleFieldAddNew = async (field, value) => {
-    // Get current category
     const currentCategory = formData.category || selectedCategory || '';
-
-    // Check if category is required for this field
     const fieldsRequiringCategory = ['itemName', 'model', 'brand', 'type'];
     if (fieldsRequiringCategory.includes(field) && !currentCategory) {
       const fieldNames = {
@@ -604,48 +563,36 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
       alert(`Please select a category first before adding new ${fieldNames[field]}.`);
       return;
     }
-
-    // Map field names to API handlers
     const apiHandlers = {
       itemName: handleSubmitItemName,
       model: handleSubmitModel,
       brand: handleSubmitBrand,
       type: handleSubmitType,
     };
-
-    // Call API handler if it exists for this field
     const apiHandler = apiHandlers[field];
     if (apiHandler) {
       try {
         await apiHandler(value, currentCategory);
-        // After successful API call, add to local state
         handleFieldSelect(field, value);
       } catch (error) {
         console.error(`Error saving ${field}:`, error);
         alert(`Failed to save ${field}. Please try again.`);
-        // Still add to local state even if API fails (fallback behavior)
         handleFieldSelect(field, value);
       }
     } else {
-      // No API handler, just add to local state
       handleFieldSelect(field, value);
     }
   };
-
   const handleAdd = () => {
-    // Validate category is selected first
     const currentCategory = formData.category || selectedCategory || '';
     if (!currentCategory) {
       alert('Please select a category first before adding items.');
       return;
     }
-
     if (!formData.quantity || isNaN(formData.quantity)) {
       setQuantityError('Please Enter Valid Quantity');
       return;
     }
-
-    // Resolve IDs for the selected values
     const resolvedItemId =
       initialData.itemId ||
       findIdByLabel(poItemName, formData.itemName, ['itemName', 'poItemName', 'name', 'item_name']);
@@ -658,13 +605,9 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
     const resolvedTypeId =
       initialData.typeId ||
       findIdByLabel(poType, formData.type, ['type', 'poType', 'typeName', 'name', 'typeColor']);
-
-    // Category is mandatory - resolve categoryId
     let resolvedCategoryId =
       initialData.categoryId ||
       findIdByLabel(categoryOptions, formData.category || selectedCategory, ['label', 'name', 'categoryName', 'category']);
-
-    // If still no categoryId found, try to find by matching category name
     if (!resolvedCategoryId && categoryOptions.length > 0) {
       const categoryToMatch = (formData.category || selectedCategory || '').toLowerCase().trim();
       const matchedCategory = categoryOptions.find(cat => {
@@ -673,13 +616,10 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
       });
       resolvedCategoryId = matchedCategory ? (matchedCategory.id || matchedCategory._id || null) : null;
     }
-
-    // Category is mandatory - throw error if still missing
     if (!resolvedCategoryId) {
       alert('Category is required. Please select a valid category.');
       return;
     }
-
     onAdd({
       ...formData,
       itemId: resolvedItemId || null,
@@ -688,7 +628,6 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
       typeId: resolvedTypeId || null,
       categoryId: resolvedCategoryId || null,
     });
-    // Clear all fields after adding, but preserve category
     const categoryToPreserve = formData.category || selectedCategory;
     setFormData({
       itemName: '',
@@ -696,14 +635,11 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
       brand: '',
       type: '',
       quantity: '',
-      category: categoryToPreserve, // Preserve current selection
+      category: categoryToPreserve,
     });
     setQuantityError('');
-    // Don't close the popup - let user close manually or continue adding items
   };
-
   const handleBackdropClick = (e) => {
-    // Close modal if clicking on the backdrop (not on the modal content)
     if (e.target === e.currentTarget) {
       onClose();
     }
@@ -711,19 +647,12 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
 
   return (
     <>
-      <div
-        className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-end justify-center"
-        style={{ fontFamily: "'Manrope', sans-serif" }}
-        onClick={handleBackdropClick}
-      >
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif" }} onClick={handleBackdropClick}>
         <div className="bg-white w-full max-w-[360px] h-[410px] rounded-tl-[16px] rounded-tr-[16px] relative z-50" onClick={(e) => e.stopPropagation()}>
-          {/* Header with Title and Category */}
           <div className="flex items-center justify-between px-6 pt-5 mb-3">
-            {/* Title on the left */}
             <p className="text-[16px] font-medium text-black leading-normal">
               Add Items
             </p>
-            {/* Category label on the right */}
             <button
               onClick={() => setShowCategoryModal(true)}
               className="text-[16px] font-medium text-black decoration-solid"
@@ -732,16 +661,12 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
               {(formData.category || selectedCategory) || 'Category'}
             </button>
           </div>
-
-          {/* Form fields - Fields are disabled until category is selected */}
           <div className="px-6 mb-2">
-            {/* Check if category is selected */}
             <div className="space-y-[6px]">
               {(() => {
                 const isCategorySelected = !!(formData.category || selectedCategory);
                 return (
                   <>
-                    {/* Item Name - Disabled until category is selected */}
                     <div className=" relative">
                       <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
                         Item Name<span className="text-[#eb2f8e]">*</span>
@@ -757,7 +682,6 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
                         disabled={!isCategorySelected}
                       />
                     </div>
-                    {/* Model - Disabled until category is selected */}
                     <div className=" relative">
                       <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
                         Model<span className="text-[#eb2f8e]">*</span>
@@ -773,7 +697,6 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
                         disabled={!isCategorySelected}
                       />
                     </div>
-                    {/* Type - Disabled until category is selected */}
                     <div className="w-full relative">
                       <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
                         Type<span className="text-[#eb2f8e]">*</span>
@@ -790,9 +713,7 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
                         disabled={!isCategorySelected}
                       />
                     </div>
-                    {/* Brand and Quantity row */}
                     <div className="flex gap-3">
-                      {/* Brand - Disabled until category is selected */}
                       <div className="w-full relative">
                         <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
                           Brand<span className="text-[#eb2f8e]">*</span>
@@ -808,7 +729,6 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
                           disabled={!isCategorySelected}
                         />
                       </div>
-                      {/* Quantity */}
                       <div className="w-[100px] relative">
                         <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
                           Quantity<span className="text-[#eb2f8e]">*</span>
@@ -820,6 +740,7 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
                             onChange={handleQuantityChange}
                             className={`w-[100px] h-[32px] border rounded-[8px] px-3 text-[12px] font-medium bg-white focus:outline-none ${quantityError ? 'border-[#e06256] text-black' : 'border-[#d6d6d6] text-black'
                               }`}
+                            style={{ fontFamily: "'Manrope', sans-serif" }}
                             placeholder="Enter"
                           />
                           {quantityError && (
@@ -834,7 +755,6 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
                 );
               })()}
             </div>
-            {/* Buttons */}
             <div className="mt-10 mb-3 flex gap-4">
               <button
                 onClick={onClose}
@@ -842,17 +762,13 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
               >
                 Cancel
               </button>
-              <button
-                onClick={handleAdd}
-                className="w-[175px] h-[40px] bg-black border border-[#f4ede2] rounded-[8px] text-[14px] font-bold text-white leading-normal"
-              >
+              <button onClick={handleAdd} className="w-[175px] h-[40px] bg-black border border-[#f4ede2] rounded-[8px] text-[14px] font-bold text-white leading-normal">
                 Add
               </button>
             </div>
           </div>
         </div>
       </div>
-
       <SelectVendorModal
         isOpen={showCategoryModal}
         onClose={() => setShowCategoryModal(false)}
@@ -868,6 +784,4 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
     </>
   );
 };
-
 export default AddItemsToOutgoing;
-

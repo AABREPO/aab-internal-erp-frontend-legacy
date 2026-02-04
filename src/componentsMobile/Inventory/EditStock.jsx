@@ -1229,10 +1229,7 @@ const EditStock = () => {
               onClick={() => setShowEnoModal(true)}
               className="text-[12px] font-medium text-black leading-normal cursor-pointer flex items-center gap-1"
             >
-              {selectedEno ? `#${selectedEno}` : 'Eno'}
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              {selectedEno ? `#${selectedEno}` : '# E.No'}
             </div>
             <div className="flex items-center gap-4">
               <button
@@ -1364,8 +1361,8 @@ const EditStock = () => {
             )}
           </button>
           {filterData.stockingLocation && (
-            <div className="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full flex-shrink-0">
-              <span className="text-[12px] font-medium text-black">Stocking Location</span>
+            <div className="flex items-center gap-1 px-6 py-1 bg-gray-100 rounded-full flex-shrink-0">
+              <span className="text-[13px] font-medium text-black">Stocking Location</span>
               <button
                 type="button"
                 onClick={(e) => {
@@ -1381,8 +1378,8 @@ const EditStock = () => {
             </div>
           )}
           {filterData.itemName && (
-            <div className="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full flex-shrink-0">
-              <span className="text-[12px] font-medium text-black">Item Name</span>
+            <div className="flex items-center gap-1 px-6 py-1 bg-gray-100 rounded-full flex-shrink-0">
+              <span className="text-[13px] font-medium text-black">Item Name</span>
               <button
                 type="button"
                 onClick={(e) => {
@@ -1398,8 +1395,8 @@ const EditStock = () => {
             </div>
           )}
           {filterData.transfer && (
-            <div className="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full flex-shrink-0">
-              <span className="text-[12px] font-medium text-black">Transfer</span>
+            <div className="flex items-center gap-1 px-6 py-1 bg-gray-100 rounded-full flex-shrink-0">
+              <span className="text-[13px] font-medium text-black">Transfer</span>
               <button
                 type="button"
                 onClick={(e) => {
@@ -1415,8 +1412,8 @@ const EditStock = () => {
             </div>
           )}
           {filterData.update && (
-            <div className="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full flex-shrink-0">
-              <span className="text-[12px] font-medium text-black">Update</span>
+            <div className="flex items-center gap-1 px-6 py-1 bg-gray-100 rounded-full flex-shrink-0">
+              <span className="text-[13px] font-medium text-black">Update</span>
               <button
                 type="button"
                 onClick={(e) => {
@@ -1457,23 +1454,34 @@ const EditStock = () => {
               <div className="relative">
                 <div
                   onClick={() => setShowFromModal(true)}
-                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer justify-between"
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                   style={{
-                    color: fromLocation ? '#000' : '#9E9E9E'
+                    color: fromLocation ? '#000' : '#9E9E9E',
+                    fontFamily: "'Manrope', sans-serif"
                   }}
                 >
                   <span>{getDisplayValue(fromLocation) || 'Select Location'}</span>
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 12 12"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="absolute right-3"
-                  >
-                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
                 </div>
+                {fromLocation && fromLocation !== 'Stock Room A' ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFromLocation('Stock Room A');
+                    }}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                ) : (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                )}
               </div>
             </div>
             {/* To Field */}
@@ -1484,23 +1492,34 @@ const EditStock = () => {
               <div className="relative">
                 <div
                   onClick={() => setShowToModal(true)}
-                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer justify-between"
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                   style={{
-                    color: toLocation ? '#000' : '#9E9E9E'
+                    color: toLocation ? '#000' : '#9E9E9E',
+                    fontFamily: "'Manrope', sans-serif"
                   }}
                 >
                   <span>{getDisplayValue(toLocation) || 'Select Location'}</span>
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 12 12"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="absolute right-3"
-                  >
-                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
                 </div>
+                {toLocation && toLocation !== 'Stock Room B' ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setToLocation('Stock Room B');
+                    }}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                ) : (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1591,19 +1610,16 @@ const EditStock = () => {
               <div className="relative">
                 <div
                   onClick={() => setShowUpdateLocationModal(true)}
-                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium bg-white flex items-center cursor-pointer justify-between"
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                   style={{
-                    paddingRight: updateSelectedLocation ? '40px' : '12px',
                     boxSizing: 'border-box',
-                    color: updateSelectedLocation ? '#000' : '#9E9E9E'
+                    color: updateSelectedLocation ? '#000' : '#9E9E9E',
+                    fontFamily: "'Manrope', sans-serif"
                   }}
                 >
                   <span>{updateSelectedLocation || 'Select Project'}</span>
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
                 </div>
-                {updateSelectedLocation && (
+                {updateSelectedLocation ? (
                   <button
                     type="button"
                     onClick={(e) => {
@@ -1611,13 +1627,18 @@ const EditStock = () => {
                       setUpdateSelectedLocation('');
                       setUpdateSearchQuery('');
                     }}
-                    className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                    style={{ right: '24px' }}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                   >
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </button>
+                ) : (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
                 )}
               </div>
             </div>
@@ -1637,6 +1658,7 @@ const EditStock = () => {
                     value={updateSearchQuery}
                     onChange={(e) => setUpdateSearchQuery(e.target.value)}
                     className="w-full h-[40px] rounded-full pl-10 pr-3 text-[12px] font-medium bg-white focus:outline-none"
+                    style={{ fontFamily: "'Manrope', sans-serif" }}
                   />
                 </div>
               )}
@@ -1756,7 +1778,7 @@ const EditStock = () => {
                             transform: swipeOffset < 0
                               ? `translateX(${Math.max(0, buttonWidth + swipeOffset)}px)`
                               : `translateX(${buttonWidth}px)`,
-                            transition: 'opacity 0.2s ease-out',
+                            transition: (swipeState && swipeState.isSwiping) ? 'none' : 'opacity 0.2s ease-out, transform 0.3s ease-out',
                             pointerEvents: isExpanded ? 'auto' : 'none'
                           }}
                         >
@@ -1995,7 +2017,7 @@ const EditStock = () => {
             }}
           />
           {/* Bottom Sheet */}
-          <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-[360px] bg-white rounded-t-[20px] z-50 shadow-lg">
+          <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-[360px] bg-white rounded-t-[20px] z-50 shadow-lg" style={{ fontFamily: "'Manrope', sans-serif" }}>
             {/* Header */}
             <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-200">
               <h2 className="text-[16px] font-semibold text-black">Update Stock</h2>
@@ -2029,6 +2051,7 @@ const EditStock = () => {
                   value={currentStock}
                   readOnly
                   className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-3 text-[12px] font-medium bg-gray-100 text-gray-600 cursor-not-allowed"
+                  style={{ fontFamily: "'Manrope', sans-serif" }}
                 />
               </div>
               {/* New Count */}
@@ -2041,6 +2064,7 @@ const EditStock = () => {
                   value={newCount}
                   onChange={(e) => setNewCount(e.target.value)}
                   className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-3 text-[12px] font-medium bg-white text-black"
+                  style={{ fontFamily: "'Manrope', sans-serif" }}
                   placeholder="Enter new count"
                 />
               </div>
@@ -2052,6 +2076,7 @@ const EditStock = () => {
                   value={moveDescription}
                   onChange={(e) => setMoveDescription(e.target.value)}
                   className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-3 text-[12px] font-medium bg-white text-black"
+                  style={{ fontFamily: "'Manrope', sans-serif" }}
                   placeholder="Enter description"
                 />
               </div>
@@ -2162,8 +2187,28 @@ const EditStock = () => {
                           setStockingLocationFilterSearch('');
                         }
                       }}
-                      className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded-lg text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white pr-10"
+                      className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded-lg text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white"
+                      style={{
+                        paddingRight: filterData.stockingLocation ? '60px' : '40px',
+                        fontFamily: "'Manrope', sans-serif"
+                      }}
                     />
+                    {filterData.stockingLocation && !stockingLocationFilterOpen && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFilterData({ ...filterData, stockingLocation: '' });
+                          setStockingLocationFilterSearch('');
+                        }}
+                        className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                        style={{ right: '24px' }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    )}
                     <svg
                       onClick={(e) => {
                         e.stopPropagation();
@@ -2172,15 +2217,18 @@ const EditStock = () => {
                           setStockingLocationFilterSearch('');
                         }
                       }}
-                      className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 cursor-pointer transition-transform ${stockingLocationFilterOpen ? 'rotate-180' : ''}`}
+                      className={`absolute top-1/2 transform -translate-y-1/2 cursor-pointer transition-transform ${stockingLocationFilterOpen ? 'rotate-180' : ''}`}
+                      style={{ right: filterData.stockingLocation && !stockingLocationFilterOpen ? '40px' : '12px' }}
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
+                      width="16"
+                      height="16"
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                     {stockingLocationFilterOpen && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-hidden">
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-hidden" style={{ fontFamily: "'Manrope', sans-serif" }}>
                         <div className="overflow-y-auto max-h-48">
                           <button
                             type="button"
@@ -2242,8 +2290,28 @@ const EditStock = () => {
                           setItemNameFilterSearch('');
                         }
                       }}
-                      className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded-lg text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white pr-10"
+                      className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded-lg text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white"
+                      style={{
+                        paddingRight: filterData.itemName ? '60px' : '40px',
+                        fontFamily: "'Manrope', sans-serif"
+                      }}
                     />
+                    {filterData.itemName && !itemNameFilterOpen && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFilterData({ ...filterData, itemName: '' });
+                          setItemNameFilterSearch('');
+                        }}
+                        className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                        style={{ right: '24px' }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    )}
                     <svg
                       onClick={(e) => {
                         e.stopPropagation();
@@ -2252,15 +2320,18 @@ const EditStock = () => {
                           setItemNameFilterSearch('');
                         }
                       }}
-                      className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 cursor-pointer transition-transform ${itemNameFilterOpen ? 'rotate-180' : ''}`}
+                      className={`absolute top-1/2 transform -translate-y-1/2 cursor-pointer transition-transform ${itemNameFilterOpen ? 'rotate-180' : ''}`}
+                      style={{ right: filterData.itemName && !itemNameFilterOpen ? '40px' : '12px' }}
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
+                      width="16"
+                      height="16"
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                     {itemNameFilterOpen && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-hidden">
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-hidden" style={{ fontFamily: "'Manrope', sans-serif" }}>
                         <div className="overflow-y-auto max-h-24">
                           <button
                             type="button"
@@ -2323,8 +2394,28 @@ const EditStock = () => {
                             setTransferFilterSearch('');
                           }
                         }}
-                        className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded-lg text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white pr-10"
+                        className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded-lg text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white"
+                        style={{
+                          paddingRight: filterData.transfer ? '60px' : '40px',
+                          fontFamily: "'Manrope', sans-serif"
+                        }}
                       />
+                      {filterData.transfer && !transferFilterOpen && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFilterData({ ...filterData, transfer: '' });
+                            setTransferFilterSearch('');
+                          }}
+                          className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                          style={{ right: '24px' }}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                      )}
                       <svg
                         onClick={(e) => {
                           e.stopPropagation();
@@ -2333,15 +2424,18 @@ const EditStock = () => {
                             setTransferFilterSearch('');
                           }
                         }}
-                        className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 cursor-pointer transition-transform ${transferFilterOpen ? 'rotate-180' : ''}`}
+                        className={`absolute top-1/2 transform -translate-y-1/2 cursor-pointer transition-transform ${transferFilterOpen ? 'rotate-180' : ''}`}
+                        style={{ right: filterData.transfer && !transferFilterOpen ? '40px' : '12px' }}
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
+                        width="16"
+                        height="16"
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                       {transferFilterOpen && (
-                        <div className="absolute z-50 w-full bottom-full mb-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-hidden">
+                        <div className="absolute z-50 w-full bottom-full mb-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-hidden" style={{ fontFamily: "'Manrope', sans-serif" }}>
                           <div className="overflow-y-auto max-h-48">
                             <button
                               type="button"
@@ -2401,8 +2495,28 @@ const EditStock = () => {
                             setUpdateFilterSearch('');
                           }
                         }}
-                        className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded-lg text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white pr-10"
+                        className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded-lg text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white"
+                        style={{
+                          paddingRight: filterData.update ? '60px' : '40px',
+                          fontFamily: "'Manrope', sans-serif"
+                        }}
                       />
+                      {filterData.update && !updateFilterOpen && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFilterData({ ...filterData, update: '' });
+                            setUpdateFilterSearch('');
+                          }}
+                          className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                          style={{ right: '24px' }}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                      )}
                       <svg
                         onClick={(e) => {
                           e.stopPropagation();
@@ -2411,15 +2525,18 @@ const EditStock = () => {
                             setUpdateFilterSearch('');
                           }
                         }}
-                        className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 cursor-pointer transition-transform ${updateFilterOpen ? 'rotate-180' : ''}`}
+                        className={`absolute top-1/2 transform -translate-y-1/2 cursor-pointer transition-transform ${updateFilterOpen ? 'rotate-180' : ''}`}
+                        style={{ right: filterData.update && !updateFilterOpen ? '40px' : '12px' }}
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
+                        width="16"
+                        height="16"
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                       {updateFilterOpen && (
-                        <div className="absolute z-50 w-full bottom-full mb-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-hidden">
+                        <div className="absolute z-50 w-full bottom-full mb-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-hidden" style={{ fontFamily: "'Manrope', sans-serif" }}>
                           <div className="overflow-y-auto max-h-48">
                             <button
                               type="button"

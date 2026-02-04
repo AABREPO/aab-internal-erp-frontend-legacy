@@ -348,7 +348,7 @@ const History = ({ user, onTabChange }) => {
     });
   };
   const handleMouseDown = (e, entryId) => {
-    if (e.button !== 0) return; // Only handle left mouse button
+    if (e.button !== 0) return;
     const syntheticEvent = {
       touches: [{ clientX: e.clientX }],
       preventDefault: () => e.preventDefault()
@@ -487,15 +487,13 @@ const History = ({ user, onTabChange }) => {
                     </p>
                     <div className="flex flex-col items-end flex-shrink-0 ml-2">
                       {displayValue ? (
-                        <p 
-                          className={`text-[12px] font-semibold leading-snug ${hasImages ? 'text-[#E4572E] cursor-pointer underline' : 'text-black'}`}
+                        <p className={`text-[12px] font-semibold leading-snug ${hasImages ? 'text-[#E4572E] cursor-pointer underline' : 'text-black'}`}
                           onClick={() => hasImages && handleOpenImageViewer(entry, itemName, displayValue)}
                         >
                           {displayValue}
                         </p>
                       ) : hasImages ? (
-                        <p 
-                          className="text-[12px] font-semibold leading-snug text-[#E4572E] cursor-pointer underline"
+                        <p className="text-[12px] font-semibold leading-snug text-[#E4572E] cursor-pointer underline"
                           onClick={() => handleOpenImageViewer(entry, itemName, 'View')}
                         >
                           📷 Image
@@ -572,8 +570,7 @@ const History = ({ user, onTabChange }) => {
                     >
                       <img src={EditIcon} alt="Edit" className="w-[18px] h-[18px]" />
                     </button>
-                    <button
-                      onClick={(e) => {e.stopPropagation();setExpandedEntryId(null);}}
+                    <button onClick={(e) => {e.stopPropagation();setExpandedEntryId(null);}}
                       className="action-button w-[40px] h-full bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm"
                     >
                       <img src={DeleteIcon} alt="Delete" className="w-[18px] h-[18px]" />

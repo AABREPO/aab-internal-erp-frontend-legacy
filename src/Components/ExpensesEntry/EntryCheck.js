@@ -352,28 +352,19 @@ const EntryChecking = () => {
                     <div className="flex flex-wrap lg:flex-nowrap gap-3 items-end mb-2">
                         <div className="flex flex-col">
                             <label className="font-bold text-left text-sm">Date Of Entry:</label>
-                            <input
-                                type="date"
-                                value={selectedDate}
-                                onChange={(e) => setSelectedDate(e.target.value)}
+                            <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
                                 className="p-1 mt-2 rounded-md bg-transparent w-full max-w-[155px] border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
                             />
                         </div>
                         <div className="flex flex-col">
                             <label className="font-bold text-left text-sm">From Date:</label>
-                            <input
-                                type="date"
-                                value={selectedStartDate}
-                                onChange={(e) => setSelectedStartDate(e.target.value)}
+                            <input type="date" value={selectedStartDate} onChange={(e) => setSelectedStartDate(e.target.value)}
                                 className="p-1 mt-2 rounded-md bg-transparent w-full max-w-[155px] border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
                             />
                         </div>
                         <div className="flex flex-col">
                             <label className="font-bold text-left text-sm">To Date:</label>
-                            <input
-                                type="date"
-                                value={selectedEndDate}
-                                onChange={(e) => setSelectedEndDate(e.target.value)}
+                            <input type="date" value={selectedEndDate} onChange={(e) => setSelectedEndDate(e.target.value)}
                                 className="p-1 mt-2 rounded-md bg-transparent w-full max-w-[155px] border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
                             />
                         </div>

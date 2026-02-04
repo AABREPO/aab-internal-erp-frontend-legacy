@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
+import DatePickerModal from '../PurchaseOrder/DatePickerModal';
+import SearchableDropdown from '../PurchaseOrder/SearchableDropdown';
 import Edit from '../Images/edit1.png';
 import Delete from '../Images/delete.png';
 
@@ -11,6 +13,7 @@ const NonPOHistory = ({ onTabChange }) => {
   const [vendorData, setVendorData] = useState([]);
   const [siteData, setSiteData] = useState([]);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [filterData, setFilterData] = useState({
     projectName: '',
     stockingLocation: '',
@@ -29,6 +32,24 @@ const NonPOHistory = ({ onTabChange }) => {
   const [swipeStates, setSwipeStates] = useState({});
   const expandedItemIdRef = useRef(expandedItemId);
   const cardRefs = useRef({});
+
+  const formatDDMMYYYYFromISO = (isoDate) => {
+    if (!isoDate) return '';
+    if (typeof isoDate === 'string' && isoDate.includes('-')) {
+      const [year, month, day] = isoDate.split('-');
+      if (year && month && day) return `${day}/${month}/${year}`;
+    }
+    return '';
+  };
+
+  const formatISOFromDDMMYYYY = (ddmmyyyy) => {
+    if (!ddmmyyyy) return '';
+    if (typeof ddmmyyyy === 'string' && ddmmyyyy.includes('/')) {
+      const [day, month, year] = ddmmyyyy.split('/');
+      if (year && month && day) return `${year}-${month}-${day}`;
+    }
+    return '';
+  };
 
   // Fetch vendor data
   useEffect(() => {
@@ -225,41 +246,12 @@ const NonPOHistory = ({ onTabChange }) => {
     setFilteredRecords(filtered);
   }, [nonPORecords, searchQuery]);
 
-  // Close dropdowns when filter sheet closes
+  // Close category modal when filter sheet closes
   useEffect(() => {
     if (!showFilterSheet) {
-      setProjectNameOpen(false);
-      setStockingLocationOpen(false);
       setShowCategoryModal(false);
-      setProjectNameSearch('');
-      setStockingLocationSearch('');
     }
   }, [showFilterSheet]);
-
-  // Close dropdowns when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (!showFilterSheet) return;
-
-      const target = event.target;
-      const isProjectNameDropdown = target.closest('[data-dropdown="projectName"]');
-      const isStockingLocationDropdown = target.closest('[data-dropdown="stockingLocation"]');
-
-      if (projectNameOpen && !isProjectNameDropdown) {
-        setProjectNameOpen(false);
-      }
-      if (stockingLocationOpen && !isStockingLocationDropdown) {
-        setStockingLocationOpen(false);
-      }
-    };
-
-    if (showFilterSheet) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-      };
-    }
-  }, [projectNameOpen, stockingLocationOpen, showFilterSheet]);
 
   // Update ref when expandedItemId changes
   useEffect(() => {
@@ -799,7 +791,7 @@ const NonPOHistory = ({ onTabChange }) => {
                       transform: swipeOffset < 0
                         ? `translateX(${Math.max(0, 110 + swipeOffset)}px)`
                         : 'translateX(110px)',
-                      transition: 'opacity 0.2s ease-out',
+                      transition: (swipeState && swipeState.isSwiping) ? 'none' : 'opacity 0.2s ease-out, transform 0.3s ease-out',
                       pointerEvents: isExpanded ? 'auto' : 'none'
                     }}
                   >
@@ -836,12 +828,19 @@ const NonPOHistory = ({ onTabChange }) => {
         <>
           {/* Overlay */}
           <div
-            className="fixed inset-0 bg-black bg-opacity-50 z-40"
-            onClick={() => setShowFilterSheet(false)}
-          />
-
+            className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end justify-center"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowFilterSheet(false);
+              }
+            }}
+          >
           {/* Bottom Sheet */}
-          <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-[360px] bg-white rounded-t-[20px] z-50 shadow-lg">
+          <div 
+            className="w-full max-w-[360px] bg-white rounded-t-[20px] shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+            style={{ zIndex: 51 }}
+          >
             {/* Header */}
             <div className="flex-shrink-0">
               <div className="flex justify-between items-center px-6 mt-3">
@@ -861,210 +860,66 @@ const NonPOHistory = ({ onTabChange }) => {
               </div>
             </div>
             {/* Filter Form */}
-            <div className="px-6 py-4 space-y-1 overflow-y-hidden overflow-x-hidden flex-1" style={{ maxHeight: 'calc(80vh - 140px)' }}>
+            <div className="px-6 py-4 space-y-1 overflow-visible flex-1" style={{ maxHeight: 'calc(80vh - 140px)' }}>
               {/* Project Name */}
               <div className="relative" data-dropdown="projectName">
-                <label className="block text-sm font-medium mb-0.5">
+                <label className="block text-[13px] font-medium text-black mb-0.5">
                   Project Name
                 </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Select Project"
-                    value={projectNameOpen ? projectNameSearch : (filterData.projectName ? siteData.find(s => s.id === filterData.projectName)?.siteName || '' : '')}
-                    onChange={(e) => {
-                      setProjectNameSearch(e.target.value);
-                      setProjectNameOpen(true);
-                      setStockingLocationOpen(false);
-                    }}
-                    onFocus={() => {
-                      setProjectNameOpen(true);
-                      setStockingLocationOpen(false);
-                      if (!projectNameOpen) {
-                        setProjectNameSearch('');
-                      }
-                    }}
-                    className="w-full h-[32px] px-3 border border-gray-300 rounded-[8px] focus:outline-none text-black focus:border-gray-400 bg-white placeholder:text-[12px]"
-                    style={{ paddingRight: filterData.projectName ? '60px' : '40px' }}
-                  />
-                  {filterData.projectName && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFilterData({ ...filterData, projectName: '' });
-                        setProjectNameOpen(false);
-                        setProjectNameSearch('');
-                      }}
-                      className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                  )}
-                  <svg
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setProjectNameOpen(!projectNameOpen);
-                      if (!projectNameOpen) {
-                        setProjectNameSearch('');
-                      }
-                    }}
-                    className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 cursor-pointer transition-transform ${projectNameOpen ? 'rotate-180' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                  {projectNameOpen && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 shadow-lg max-h-48 overflow-hidden">
-                      <div className="overflow-y-auto max-h-48">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFilterData({ ...filterData, projectName: '' });
-                            setProjectNameOpen(false);
-                            setProjectNameSearch('');
-                          }}
-                          className={`w-full h-[34px] px-4 py-2 text-left text-sm hover:bg-gray-100 ${!filterData.projectName ? 'bg-gray-100' : ''}`}
-                        >
-                          Select Project
-                        </button>
-                        {siteData
-                          .filter(site =>
-                            site.siteName?.toLowerCase().includes(projectNameSearch.toLowerCase())
-                          )
-                          .map((site) => (
-                            <button
-                              key={site.id}
-                              type="button"
-                              onClick={() => {
-                                setFilterData({ ...filterData, projectName: site.id });
-                                setProjectNameOpen(false);
-                                setProjectNameSearch('');
-                              }}
-                              className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${filterData.projectName === site.id ? 'bg-gray-100' : ''}`}
-                            >
-                              {site.siteName}
-                            </button>
-                          ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <SearchableDropdown
+                  value={filterData.projectName}
+                  onChange={(value) => {
+                    setFilterData({ ...filterData, projectName: value });
+                  }}
+                  options={[...new Set(siteData.map((s) => s.siteName || s.name || '').filter(Boolean))]}
+                  placeholder="Select"
+                  fieldName="Project Name"
+                  showAddNew={false}
+                  showAllOptions={true}
+                  className="w-full h-[32px]"
+                />
               </div>
 
               {/* Stocking Location */}
               <div className="relative" data-dropdown="stockingLocation">
-                <label className="block text-sm font-medium mb-0.5 mt-2">
+                <label className="block text-[13px] font-medium text-black mb-0.5 mt-2">
                   Stocking Location
                 </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="AA Stock Room A"
-                    value={stockingLocationOpen ? stockingLocationSearch : (filterData.stockingLocation ? siteData.find(s => s.id === filterData.stockingLocation)?.siteName || '' : '')}
-                    onChange={(e) => {
-                      setStockingLocationSearch(e.target.value);
-                      setStockingLocationOpen(true);
-                      setProjectNameOpen(false);
-                    }}
-                    onFocus={() => {
-                      setStockingLocationOpen(true);
-                      setProjectNameOpen(false);
-                      if (!stockingLocationOpen) {
-                        setStockingLocationSearch('');
-                      }
-                    }}
-                    className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded-[8px] text-black focus:outline-none focus:border-gray-400 bg-white placeholder:text-[12px]"
-                    style={{ paddingRight: filterData.stockingLocation ? '60px' : '40px' }}
-                  />
-                  {filterData.stockingLocation && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFilterData({ ...filterData, stockingLocation: '' });
-                        setStockingLocationOpen(false);
-                        setStockingLocationSearch('');
-                      }}
-                      className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                  )}
-                  <svg
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setStockingLocationOpen(!stockingLocationOpen);
-                      if (!stockingLocationOpen) {
-                        setStockingLocationSearch('');
-                      }
-                    }}
-                    className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 cursor-pointer transition-transform ${stockingLocationOpen ? 'rotate-180' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                  {stockingLocationOpen && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 shadow-lg overflow-hidden" style={{ maxHeight: '200px', bottom: 'auto', top: '100%' }}>
-                      <div className="overflow-y-auto" style={{ maxHeight: '100px' }}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFilterData({ ...filterData, stockingLocation: '' });
-                            setStockingLocationOpen(false);
-                            setStockingLocationSearch('');
-                          }}
-                          className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${!filterData.stockingLocation ? 'bg-gray-100' : ''}`}
-                        >
-                          AA Stock Room A
-                        </button>
-                        {siteData
-                          .filter(site =>
-                            site.siteName?.toLowerCase().includes(stockingLocationSearch.toLowerCase())
-                          )
-                          .map((site) => (
-                            <button
-                              key={site.id}
-                              type="button"
-                              onClick={() => {
-                                setFilterData({ ...filterData, stockingLocation: site.id });
-                                setStockingLocationOpen(false);
-                                setStockingLocationSearch('');
-                              }}
-                              className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${filterData.stockingLocation === site.id ? 'bg-gray-100' : ''}`}
-                            >
-                              {site.siteName}
-                            </button>
-                          ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <SearchableDropdown
+                  value={filterData.stockingLocation}
+                  onChange={(value) => {
+                    setFilterData({ ...filterData, stockingLocation: value });
+                  }}
+                  options={[...new Set(siteData.map((s) => s.siteName || s.name || '').filter(Boolean))]}
+                  placeholder="Select"
+                  fieldName="Stocking Location"
+                  showAddNew={false}
+                  showAllOptions={true}
+                  className="w-full h-[32px]"
+                />
               </div>
 
               {/* Date and Entry No */}
               <div className="grid grid-cols-2 gap-4" style={{ overflow: 'visible' }}>
                 <div className="relative">
-                  <label className="block text-sm font-medium mb-0.5 mt-2">
+                  <label className="block text-[13px] font-medium text-black mb-0.5 mt-2">
                     Date
                   </label>
-                  <input
-                    type="date"
-                    value={filterData.date}
-                    onChange={(e) => setFilterData({ ...filterData, date: e.target.value })}
-                    className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded-[8px] text-black focus:outline-none focus:border-gray-400 bg-white"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowDatePicker(true)}
+                    className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded-[8px] text-black focus:outline-none focus:border-gray-400 bg-white flex items-center justify-between"
+                  >
+                    <span className={`${filterData.date ? 'text-black' : 'text-[#9E9E9E]'} truncate`}>
+                      {filterData.date ? formatDDMMYYYYFromISO(filterData.date) : 'Select Date'}
+                    </span>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="flex-shrink-0 ml-2">
+                      <path d="M3 4H13M3 4V12C3 12.5523 3.44772 13 4 13H12C12.5523 13 13 12.5523 13 12V4M3 4C3 3.44772 3.44772 3 4 3H12C12.5523 3 13 3.44772 13 4M6 2V5M10 2V5" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                  </button>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-0.5 mt-2">
+                  <label className="block text-[13px] font-medium text-black mb-0.5 mt-2">
                     Entry.No
                   </label>
                   <input
@@ -1094,6 +949,7 @@ const NonPOHistory = ({ onTabChange }) => {
               </button>
             </div>
           </div>
+          </div>
         </>
       )}
 
@@ -1108,6 +964,16 @@ const NonPOHistory = ({ onTabChange }) => {
         options={categoryOptionsStrings}
         fieldName="Category"
         onAddNew={handleAddNewCategory}
+      />
+
+      <DatePickerModal
+        isOpen={showDatePicker}
+        onClose={() => setShowDatePicker(false)}
+        initialDate={formatDDMMYYYYFromISO(filterData.date)}
+        onConfirm={(picked) => {
+          setFilterData({ ...filterData, date: formatISOFromDDMMYYYY(picked) });
+          setShowDatePicker(false);
+        }}
       />
     </div>
   );

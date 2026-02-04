@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import SearchableDropdown from '../PurchaseOrder/SearchableDropdown';
 
 const IncomingTracker = ({ user }) => {
   const [activeStatus, setActiveStatus] = useState('live'); // 'live', 'closed', or 'history'
@@ -1554,7 +1555,7 @@ const IncomingTracker = ({ user }) => {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-4 pt-4 mb-3">
+            <div className="flex items-center justify-between px-6 pt-4 mb-3">
               <h2 className="text-[16px] font-semibold text-black">Select Filters</h2>
               <button
                 type="button"
@@ -1573,154 +1574,48 @@ const IncomingTracker = ({ user }) => {
             </div>
 
             {/* Modal Content */}
-            <div className="px-4 overflow-visible">
+            <div className="px-6 overflow-visible">
               {/* Vendor Name */}
               <div className="space-y-[6px]">
                 <div className="relative">
-                  <label className="block text-[14px] font-medium text-black mb-0.5">Vendor Name</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Select"
-                      value={filterVendorName}
-                      onChange={(e) => {
-                        setFilterVendorName(e.target.value);
-                        setShowVendorDropdown(true);
-                        setShowLocationDropdown(false);
-                        setShowPODropdown(false);
-                      }}
-                      onFocus={() => {
-                        setShowVendorDropdown(true);
-                        setShowLocationDropdown(false);
-                        setShowPODropdown(false);
-                      }}
-                      className="w-full h-[32px] px-3 rounded-[8px] border border-gray-300 text-[14px] bg-white focus:outline-none focus:border-gray-400"
-                      style={{
-                        paddingRight: filterVendorName ? '60px' : '40px'
-                      }}
-                    />
-                    {filterVendorName && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setFilterVendorName('');
-                          setShowVendorDropdown(false);
-                        }}
-                        className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                        style={{ right: '24px' }}
-                      >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowVendorDropdown(!showVendorDropdown);
-                        setShowLocationDropdown(false);
-                        setShowPODropdown(false);
-                      }}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M4 6L8 10L12 6" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                    {showVendorDropdown && (
-                      <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                        {vendorData.map((vendor) => (
-                          <div
-                            key={vendor.id || vendor._id}
-                            className="px-3 py-2 text-[14px] text-gray-700 hover:bg-gray-100 cursor-pointer"
-                            onClick={() => {
-                              setFilterVendorName(vendor.vendorName || vendor.name || '');
-                              setShowVendorDropdown(false);
-                            }}
-                          >
-                            {vendor.vendorName || vendor.name || ''}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <label className="block text-[13px] font-medium text-black mb-0.5">Vendor Name</label>
+                  <SearchableDropdown
+                    value={filterVendorName}
+                    onChange={(value) => {
+                      setFilterVendorName(value);
+                      setShowVendorDropdown(false);
+                      setShowLocationDropdown(false);
+                      setShowPODropdown(false);
+                    }}
+                    options={vendorData.map((v) => v.vendorName || v.name || '').filter(Boolean)}
+                    placeholder="Select"
+                    fieldName="Vendor Name"
+                    showAddNew={false}
+                    showAllOptions={true}
+                  />
                 </div>
                 {/* Stocking Location */}
                 <div className="relative flex items-center gap-2">
                   <div>
-                    <label className="text-[14px] font-medium text-black mb-0.5">Stocking Location</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Select"
-                        value={filterStockingLocation}
-                        onChange={(e) => {
-                          setFilterStockingLocation(e.target.value);
-                          setShowLocationDropdown(true);
-                          setShowVendorDropdown(false);
-                          setShowPODropdown(false);
-                        }}
-                        onFocus={() => {
-                          setShowLocationDropdown(true);
-                          setShowVendorDropdown(false);
-                          setShowPODropdown(false);
-                        }}
-                        className="w-full h-[32px] rounded-[8px] px-3 border border-gray-300 text-[14px] bg-white focus:outline-none focus:border-gray-400"
-                        style={{
-                          paddingRight: filterStockingLocation ? '60px' : '40px'
-                        }}
-                      />
-                      {filterStockingLocation && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setFilterStockingLocation('');
-                            setShowLocationDropdown(false);
-                          }}
-                          className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                          style={{ right: '24px' }}
-                        >
-                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowLocationDropdown(!showLocationDropdown);
-                          setShowVendorDropdown(false);
-                          setShowPODropdown(false);
-                        }}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M4 6L8 10L12 6" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </button>
-                      {showLocationDropdown && (
-                        <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                          {siteData.map((site) => (
-                            <div
-                              key={site.id || site._id}
-                              className="px-3 py-2 text-[14px] text-gray-700 hover:bg-gray-100 cursor-pointer"
-                              onClick={() => {
-                                setFilterStockingLocation(site.siteName || site.name || '');
-                                setShowLocationDropdown(false);
-                              }}
-                            >
-                              {site.siteName || site.name || ''}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <label className="text-[13px] font-medium text-black mb-0.5">Stocking Location</label>
+                    <SearchableDropdown
+                      value={filterStockingLocation}
+                      onChange={(value) => {
+                        setFilterStockingLocation(value);
+                        setShowVendorDropdown(false);
+                        setShowLocationDropdown(false);
+                        setShowPODropdown(false);
+                      }}
+                      options={siteData.map((s) => s.siteName || s.name || '').filter(Boolean)}
+                      placeholder="Select"
+                      fieldName="Stocking Location"
+                      showAddNew={false}
+                      showAllOptions={true}
+                    />
                   </div>
                   {/* PO. No */}
                   <div className="relative">
-                    <label className="block text-[14px] font-medium text-black mb-0.5">PO. No</label>
+                    <label className="block text-[13px] font-medium text-black mb-0.5">PO. No</label>
                     <div className="relative">
                       <input
                         type="text"
@@ -1794,7 +1689,7 @@ const IncomingTracker = ({ user }) => {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center gap-3 px-4 py-4">
+            <div className="flex items-center gap-3 px-6 py-4">
               <button
                 type="button"
                 onClick={() => {

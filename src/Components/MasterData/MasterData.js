@@ -2833,7 +2833,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         return [
           '149985391',
           formatId(item.id, prefix),
-          exportDataType === 'vendor' ? (item.vendorName || '') : (item.contractorName || ''),
+          item.account_holder_name || '',
           item.account_number || '',
           item.ifsc_code || '',
           '',
@@ -2982,7 +2982,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         return {
           'Customer ID': '149985391',
           'Beneficiary Code': formatId(item.id, prefix),
-          'Beneficiary Name': exportDataType === 'vendor' ? (item.vendorName || '') : (item.contractorName || ''),
+          'Beneficiary Name': item.account_holder_name || '',
           'Account Number': item.account_number || '',
           'IFSC Code': item.ifsc_code || '',
           'Account Type': '',

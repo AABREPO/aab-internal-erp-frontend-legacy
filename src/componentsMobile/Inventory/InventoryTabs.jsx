@@ -186,7 +186,6 @@ const InventoryTabs = ({ activeTab = 'net-stock', onTabChange }) => {
           ))}
         </div>
         </div>
-        {/* Three dots menu button */}
         <div ref={dropdownRef} className="absolute right-2 top-1/2 transform -translate-y-1/2" style={{ zIndex: 31 }}>
           <button ref={kebabButtonRef} onClick={handleDropdownToggle}
             className="w-[20px] h-[20px] flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity bg-white pointer-events-auto"
@@ -198,9 +197,7 @@ const InventoryTabs = ({ activeTab = 'net-stock', onTabChange }) => {
             </svg>
           </button>
         </div>
-        {/* Base border line in gray */}
         <div className="absolute bottom-0 left-0 w-full h-[1px]" style={{ backgroundColor: '#D9D9D9' }}>
-          {/* Active tab underline - positioned exactly below the clicked heading */}
           <div 
             className="absolute bottom-0 h-[1.70px] transition-all duration-300"
             style={{ 
@@ -211,7 +208,6 @@ const InventoryTabs = ({ activeTab = 'net-stock', onTabChange }) => {
           ></div>
         </div>
       </div>
-      {/* Dropdown Menu - Fixed positioning outside container to avoid overflow clipping */}
       {isDropdownOpen && (
         <div 
           ref={dropdownMenuRef}
@@ -242,5 +238,4 @@ const InventoryTabs = ({ activeTab = 'net-stock', onTabChange }) => {
     </>
   );
 };
-
 export default InventoryTabs;

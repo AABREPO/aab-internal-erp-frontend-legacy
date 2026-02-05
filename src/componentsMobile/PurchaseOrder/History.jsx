@@ -194,24 +194,19 @@ const History = () => {
         if (cachedData) {
           const cachedPOs = JSON.parse(cachedData);
           if (cachedPOs.length > 0) {
-            // Sort cached data
             const sorted = cachedPOs.sort((a, b) => {
               const idA = parseInt(a.id) || 0;
               const idB = parseInt(b.id) || 0;
               return idB - idA;
             });
             setPurchaseOrders(sorted);
-            // Continue to fetch fresh data in background (don't return early)
           }
         }
       } catch (error) {
         console.error('Error loading from cache:', error);
       }
     }
-    
     try {
-      // Use /get/latest for faster initial load (last 250 records)
-      // Use /getAll only when filters are applied
       const apiUrl = hasActiveFilters 
         ? 'https://backendaab.in/aabuildersDash/api/purchase_orders/getAll'
         : 'https://backendaab.in/aabuildersDash/api/purchase_orders/get/latest';
@@ -221,23 +216,16 @@ const History = () => {
         throw new Error('Failed to fetch purchase orders');
       }
       const data = await response.json();
-      console.log(data);
-
-      // Filter out deleted POs and transform API data to match expected format
       const transformedPOs = data
         .filter((po) => {
-          // Filter out POs with delete_status: true (backend uses delete_status field)
           return !(po.delete_status === true || po.deleteStatus === true);
         })
         .map((po) => {
-        // Fetch vendor name if we have vendor_id
         let vendorName = '';
         if (po.vendor_id && allVendors.length > 0) {
           const vendorMatch = allVendors.find(v => v.id === po.vendor_id);
           vendorName = vendorMatch?.vendorName || '';
         }
-
-        // Fetch project/site name if we have client_id
         let projectName = '';
         let projectBranch = '';
         if (po.client_id && allProjects.length > 0) {
@@ -245,8 +233,6 @@ const History = () => {
           projectName = projectMatch?.siteName || projectMatch?.projectName || '';
           projectBranch = projectMatch?.branch || '';
         }
-
-        // Fetch site incharge name if we have site_incharge_id - check both employees and support staff
         let projectIncharge = '';
         if (po.site_incharge_id) {
           const inchargeType = po.site_incharge_type || po.siteInchargeType;

@@ -288,14 +288,7 @@ const InputData = () => {
         try {
             const response = await fetch('https://backendaab.in/aabuildersDash/api/po_type/getAll');
             if (response.ok) {
-                const data = await response.json();
-                
-                // Debug: Log the first item to see its structure
-                if (Array.isArray(data) && data.length > 0) {
-                    console.log('PO Type API - First item:', data[0]);
-                    console.log('PO Type API - First item keys:', Object.keys(data[0]));
-                }
-
+                const data = await response.json();                
                 // Extract type names from API response - same logic as AddItemsToPO
                 let extractedTypes = [];
                 if (Array.isArray(data)) {
@@ -306,8 +299,6 @@ const InputData = () => {
                         // Array of objects - try to extract type field
                         extractedTypes = data.map(item => {
                             if (!item) return '';
-
-                            // Try various field name possibilities
                             const typeValue = item.type ||
                                 item.poType ||
                                 item.typeName ||
@@ -318,8 +309,6 @@ const InputData = () => {
                                 item.label ||
                                 item.po_type ||
                                 '';
-
-                            // If still empty, try to find any string field
                             if (!typeValue) {
                                 for (const key in item) {
                                     if (typeof item[key] === 'string' && item[key].trim() !== '') {
@@ -327,23 +316,13 @@ const InputData = () => {
                                     }
                                 }
                             }
-
                             return typeValue ? String(typeValue).trim() : '';
                         }).filter(type => type !== '' && type);
                     }
                 }
-
-                console.log('Extracted Types:', extractedTypes);
-
-                // Merge with any previously saved types from localStorage
                 const savedTypes = localStorage.getItem('typeOptions');
                 const savedTypeNames = savedTypes ? JSON.parse(savedTypes) : [];
-
-                // Combine API types with saved types, removing duplicates
                 const allTypes = [...new Set([...extractedTypes, ...savedTypeNames])];
-
-                console.log('All Types (API + Saved):', allTypes);
-
                 setTypeOptions(allTypes);
             } else {
                 console.log('Error fetching type names.');
@@ -396,7 +375,6 @@ const InputData = () => {
                 body: JSON.stringify({ category: newCategory.trim() }),
             });
             if (response.ok) {
-                console.log('Category saved successfully!');
                 await fetchPoCategory();
             }
         } catch (error) {
@@ -510,13 +488,11 @@ const InputData = () => {
                 body: JSON.stringify({ groupName: newGroupName.trim() }),
             });
             if (response.ok) {
-                console.log('Group name saved successfully!');
                 await fetchGroupNames();
                 if (!groupNameOptions.includes(newGroupName.trim())) {
                     setGroupNameOptions([...groupNameOptions, newGroupName.trim()]);
                 }
             } else {
-                console.log('Error saving group name.');
                 // Still add to local options for immediate use
                 if (!groupNameOptions.includes(newGroupName.trim())) {
                     setGroupNameOptions([...groupNameOptions, newGroupName.trim()]);
@@ -524,7 +500,6 @@ const InputData = () => {
             }
         } catch (error) {
             console.error('Error:', error);
-            console.log('Error saving group name.');
             // Still add to local options for immediate use
             if (!groupNameOptions.includes(newGroupName.trim())) {
                 setGroupNameOptions([...groupNameOptions, newGroupName.trim()]);
@@ -836,7 +811,6 @@ const InputData = () => {
             
             if (response.ok) {
                 const result = await response.json();
-                console.log('Item updated successfully:', result);
                 // Update local state
                 setPoEditItemList(updatedPoEditItemList);
                 setOtherPOEntityList(updatedPoEditItemList.otherPOEntityList || []);
@@ -1048,7 +1022,6 @@ const InputData = () => {
             });
             
             if (response.ok) {
-                console.log('Model saved successfully!');
                 // Reload models from API
                 await fetchPoModel();
             } else {
@@ -1083,7 +1056,6 @@ const InputData = () => {
             });
             
             if (response.ok) {
-                console.log('Brand saved successfully!');
                 // Reload brands from API
                 await fetchPoBrand();
             } else {
@@ -1118,7 +1090,6 @@ const InputData = () => {
             });
             
             if (response.ok) {
-                console.log('Type saved successfully!');
                 // Reload types from API
                 await fetchPoType();
             } else {

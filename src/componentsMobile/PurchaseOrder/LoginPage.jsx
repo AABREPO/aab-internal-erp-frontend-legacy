@@ -22,10 +22,7 @@ const LoginPage = ({
         try {
             const response = await axios.post(`${apiBaseUrl}/login`, { email, password });
             const { username, userImage, position, email: userEmail, userRoles, id } = response.data;
-
             setUserId(id);
-            console.log("ID: ", id);
-
             const userData = {
                 username: username || '',
                 userImage: userImage || '',
@@ -34,10 +31,7 @@ const LoginPage = ({
                 userRoles: userRoles || [],
                 userId: id,
             };
-
             onLogin(userData);
-
-            // Navigate to redirect path if provided
             if (redirectPath) {
                 navigate(redirectPath);
             }
@@ -46,15 +40,11 @@ const LoginPage = ({
             setError('Please Enter Valid User Details');
         }
     };
-
     const refreshUserData = async () => {
-        if (!userId) return;
-        
+        if (!userId) return;        
         try {
             const response = await axios.get(`${apiBaseUrl}/user/id/${userId}`);
             const { username, userImage, position, email: userEmail, userRoles } = response.data;
-
-            console.log("Refreshing!!!!");
             onLogin({
                 username: username || '',
                 userImage: userImage || '',
@@ -66,24 +56,19 @@ const LoginPage = ({
             console.error('Failed to refresh user data', err);
         }
     };
-
     useEffect(() => {
-        if (!userId) return;
-        
+        if (!userId) return;        
         const interval = setInterval(() => {
             refreshUserData();
         }, 10000); // every 10 seconds
-
         return () => clearInterval(interval);
     }, [userId]);
-
 
     return (
         <div className="relative flex items-center justify-center min-h-screen bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
             {/* Black sidebars */}
             <div className="hidden md:block fixed left-0 top-0 w-[calc((100%-800px)/2)] h-full bg-black"></div>
-            <div className="hidden md:block fixed right-0 top-0 w-[calc((100%-800px)/2)] h-full bg-black"></div>
-            
+            <div className="hidden md:block fixed right-0 top-0 w-[calc((100%-800px)/2)] h-full bg-black"></div>            
             {/* Main content area */}
             <div className="w-full max-w-[800px] mx-auto px-4">
                 <div className="bg-white rounded-[12px] p-8 shadow-lg border border-gray-200">
@@ -91,14 +76,12 @@ const LoginPage = ({
                     <h2 className="text-2xl font-bold text-black text-center mb-6">
                         Login
                     </h2>
-
                 <form onSubmit={handleLogin} className="space-y-4">
                     {error && (
                         <div className="p-4 mb-4 text-red-600 bg-red-50 rounded-[8px] border border-red-200 text-[14px] font-medium">
                             {error}
                         </div>
                     )}
-
                     <div>
                         <label htmlFor="email" className="block text-base font-bold text-black mb-2">
                             Email Address
@@ -113,7 +96,6 @@ const LoginPage = ({
                             placeholder='Enter Email Address'
                         />
                     </div>
-
                     <div className="relative">
                         <label htmlFor="password" className="block text-base font-bold text-black mb-2">
                             Password
@@ -127,11 +109,7 @@ const LoginPage = ({
                             required
                             placeholder='Enter Password'
                         />
-                        <button 
-                            type="button" 
-                            onClick={() => setShowPassword(!showPassword)} 
-                            className="absolute right-4 top-[38px] flex items-center"
-                        >
+                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-[38px] flex items-center">
                             {showPassword ? (
                                 <EyeSlashIcon className="h-5 w-5 text-gray-400" />
                             ) : (
@@ -139,7 +117,6 @@ const LoginPage = ({
                             )}
                         </button>
                     </div>
-
                     <button 
                         type="submit"
                         className="w-full h-[44px] bg-black text-white font-semibold rounded-[8px] text-[14px] uppercase hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black transition-colors"
@@ -152,6 +129,4 @@ const LoginPage = ({
         </div>
     );
 };
-
 export default LoginPage;
-

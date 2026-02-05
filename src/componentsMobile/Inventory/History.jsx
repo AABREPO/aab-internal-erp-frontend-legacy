@@ -838,11 +838,7 @@ const History = ({ onTabChange }) => {
       {/* Filter */}
       <div className="flex-shrink-0 px-4 pb-3">
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={() => setShowFilterModal(true)}
-            className="flex items-center gap-2 cursor-pointer"
-          >
+          <button type="button" onClick={() => setShowFilterModal(true)} className="flex items-center gap-2 cursor-pointer">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
               {/* Top horizontal line */}
               <line x1="2" y1="5" x2="16" y2="5" stroke={(filterProjectName || filterProjectIncharge || filterStockingLocation || filterSRNumber || filterDate) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />

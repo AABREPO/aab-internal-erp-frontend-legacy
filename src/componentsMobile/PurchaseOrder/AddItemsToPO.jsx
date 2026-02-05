@@ -410,7 +410,6 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
         body: JSON.stringify({ category: newCategory.trim() }),
       });
       if (response.ok) {
-        console.log('Category saved successfully!');
         // Reload categories from API
         const fetchResponse = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
         if (fetchResponse.ok) {
@@ -428,7 +427,6 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
           setCategoryOptionsStrings([...categoryOptionsStrings, newCategory.trim()]);
         }
       } else {
-        console.log('Error saving category.');
         // Still add to local options for immediate use
         if (!categoryOptionsStrings.includes(newCategory.trim())) {
           setCategoryOptionsStrings([...categoryOptionsStrings, newCategory.trim()]);
@@ -436,7 +434,6 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
       }
     } catch (error) {
       console.error('Error:', error);
-      console.log('Error saving category.');
       // Still add to local options for immediate use
       if (!categoryOptionsStrings.includes(newCategory.trim())) {
         setCategoryOptionsStrings([...categoryOptionsStrings, newCategory.trim()]);
@@ -537,7 +534,6 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
         body: JSON.stringify(newModelData),
       });
       if (response.ok) {
-        console.log('Model saved successfully!');
         // Reload models from API
         await fetchPoModel();
         // Also refresh parent component's state
@@ -571,7 +567,6 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
         body: JSON.stringify(newBrandData),
       });
       if (response.ok) {
-        console.log('Brand saved successfully!');
         // Reload brands from API
         await fetchPoBrand();
         // Also refresh parent component's state
@@ -605,7 +600,6 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
         body: JSON.stringify(newTypeData),
       });
       if (response.ok) {
-        console.log('Type saved successfully!');
         // Reload types from API
         await fetchPoType();
         // Also refresh parent component's state

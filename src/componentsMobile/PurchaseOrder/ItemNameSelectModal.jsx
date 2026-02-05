@@ -36,22 +36,14 @@ const ItemNameSelectModal = ({ isOpen, onClose, onSelect, selectedValue, options
   };
 
   return (
-    <div 
-      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-      onClick={handleBackdropClick}
-    >
-      <div 
-        className="bg-white w-full max-w-[360px] rounded-[16px] p-6 max-h-[80vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" onClick={handleBackdropClick}>
+      <div className="bg-white w-full max-w-[360px] rounded-[16px] p-6 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-4">
           <p className="text-[16px] font-medium text-black">Select Item Name</p>
           <button onClick={onClose} className="text-[#e4572e] text-[20px] font-semibold">
             ×
           </button>
         </div>
-
-        {/* Search Input */}
         <div className="mb-4 relative">
           <input
             type="text"
@@ -67,27 +59,19 @@ const ItemNameSelectModal = ({ isOpen, onClose, onSelect, selectedValue, options
             </svg>
           </div>
         </div>
-
-        {/* New Item Name Button */}
-        <button
-          onClick={handleAddNewClick}
-          className="w-full h-[36px] px-3 flex items-center gap-2 hover:bg-[#f3f5f7] text-left border-b border-[rgba(0,0,0,0.08)] mb-2"
-        >
+        <button onClick={handleAddNewClick} className="w-full h-[36px] px-3 flex items-center gap-2 hover:bg-[#f3f5f7] text-left border-b border-[rgba(0,0,0,0.08)] mb-2">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M7 3V11M3 7H11" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
           <p className="text-[12px] font-medium text-black">New Item Name</p>
         </button>
-
-        {/* Existing Options - Filtered by search */}
         {filteredOptions.length > 0 && (
           <div className="space-y-2">
             {filteredOptions.map((option, index) => {
               const isSelected = selectedValue === option;
               return (
                 <button
-                  key={index}
-                  onClick={() => handleSelect(option)}
+                  key={index} onClick={() => handleSelect(option)}
                   className={`w-full h-[36px] rounded-[6px] px-3 flex items-center justify-between ${
                     isSelected
                       ? 'bg-[#FFF3E0]'
@@ -95,7 +79,6 @@ const ItemNameSelectModal = ({ isOpen, onClose, onSelect, selectedValue, options
                   }`}
                 >
                   <p className="text-[12px] font-medium text-black">{option}</p>
-                  {/* Radio Button */}
                   <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
                     {isSelected ? (
                       <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -113,14 +96,11 @@ const ItemNameSelectModal = ({ isOpen, onClose, onSelect, selectedValue, options
             })}
           </div>
         )}
-
-        {/* No results message */}
         {filteredOptions.length === 0 && options.length > 0 && searchQuery && (
           <p className="text-[12px] text-[#777777] text-center py-4">
             No item names found matching "{searchQuery}". Add a new one above.
           </p>
         )}
-
         {options.length === 0 && (
           <p className="text-[12px] text-[#777777] text-center py-4">
             No item name options available. Add a new one above.
@@ -130,6 +110,4 @@ const ItemNameSelectModal = ({ isOpen, onClose, onSelect, selectedValue, options
     </div>
   );
 };
-
 export default ItemNameSelectModal;
-

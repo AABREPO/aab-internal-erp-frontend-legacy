@@ -2037,8 +2037,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
       });
       if (response.ok) {
         const result = await response.json();
-        console.log("Response from API:", result);
-        // Refresh all option arrays to ensure we have latest data before generating PDF
         await Promise.all([
           fetchPoItemName(),
           fetchPoModel(),

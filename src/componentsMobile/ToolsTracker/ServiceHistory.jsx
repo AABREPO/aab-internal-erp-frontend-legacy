@@ -727,8 +727,6 @@ const ServiceHistory = ({ user, onTabChange }) => {
                       onClick={(e) => {
                         e.stopPropagation();
                         setExpandedEntryId(null);
-                        // Handle delete - you can add delete functionality here
-                        console.log('Delete entry:', entry);
                       }}
                       className="action-button w-[40px] h-full bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm"
                     >

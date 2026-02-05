@@ -62,6 +62,11 @@ const Transfer = ({ user }) => {
     const saved = localStorage.getItem('favoriteRelocateLocations');
     return saved ? JSON.parse(saved) : [];
   });
+  const [currentLocationSearchQuery, setCurrentLocationSearchQuery] = useState('');
+  const [currentLocationFavorites, setCurrentLocationFavorites] = useState(() => {
+    const saved = localStorage.getItem('favoriteCurrentLocations');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [entryServiceMode, setEntryServiceMode] = useState('Entry');
   const [showAddItemsModal, setShowAddItemsModal] = useState(false);
   const [itemNameOptions, setItemNameOptions] = useState([]);
@@ -252,7 +257,13 @@ const Transfer = ({ user }) => {
     if (!showInchargeDropdown) {
       setInchargeSearchQuery('');
     }
-  }, [showToDropdown, showServiceStoreDropdown, showFromDropdown, showInchargeDropdown]);
+    if (!showCurrentLocationDropdown) {
+      setCurrentLocationSearchQuery('');
+    }
+    if (!showRelocateLocationDropdown) {
+      setRelocateLocationSearchQuery('');
+    }
+  }, [showToDropdown, showServiceStoreDropdown, showFromDropdown, showInchargeDropdown, showCurrentLocationDropdown, showRelocateLocationDropdown]);
   useEffect(() => {
     if (items.length === 0) return;
     const minSwipeDistance = 50;
@@ -405,6 +416,28 @@ const Transfer = ({ user }) => {
       : [...relocateLocationFavorites, optionId];
     setRelocateLocationFavorites(newFavorites);
     localStorage.setItem('favoriteRelocateLocations', JSON.stringify(newFavorites));
+  };
+  const getFilteredCurrentLocationOptions = () => {
+    const normalizedQuery = normalizeSearchText(currentLocationSearchQuery);
+    const filtered = fromOptions.filter(option => {
+      const normalizedLabel = normalizeSearchText(option.label);
+      return normalizedLabel.includes(normalizedQuery);
+    });
+    return filtered.sort((a, b) => {
+      const aIsFavorite = currentLocationFavorites.includes(a.id);
+      const bIsFavorite = currentLocationFavorites.includes(b.id);
+      if (aIsFavorite && !bIsFavorite) return -1;
+      if (!aIsFavorite && bIsFavorite) return 1;
+      return a.label.localeCompare(b.label);
+    });
+  };
+  const handleToggleCurrentLocationFavorite = (e, optionId) => {
+    e.stopPropagation();
+    const newFavorites = currentLocationFavorites.includes(optionId)
+      ? currentLocationFavorites.filter(id => id !== optionId)
+      : [...currentLocationFavorites, optionId];
+    setCurrentLocationFavorites(newFavorites);
+    localStorage.setItem('favoriteCurrentLocations', JSON.stringify(newFavorites));
   };
   const getFilteredServiceStoreOptions = () => {
     const normalizedQuery = normalizeSearchText(serviceStoreSearchQuery);
@@ -1471,7 +1504,7 @@ const Transfer = ({ user }) => {
         
         payload = {
           from_project_id: selectedCurrentLocation?.id ? String(selectedCurrentLocation.id) : null,
-          to_project_id: selectedRelocateLocation?.id ? String(selectedRelocateLocation.id) : null,
+          to_project_id: null,
           project_incharge_id: null,
           service_store_id: null,
           created_by: user?.name || user?.username || 'mobile',
@@ -2185,7 +2218,7 @@ const Transfer = ({ user }) => {
           </button>
         </div>
         <div className='flex gap-3'>
-          {items.length > 0 && areFieldsFilled && (
+          {((items.length > 0 && areFieldsFilled) || (entryServiceMode === 'Relocate' && areFieldsFilled)) && (
             <button onClick={() => setShowConfirmModal(true)} disabled={isSaving} className="flex items-center gap-1 text-[14px] font-medium text-black">
               {isSaving ? (
                 <span className="text-gray-500">...</span>
@@ -2235,51 +2268,27 @@ const Transfer = ({ user }) => {
           </button>
         </div>
       </div>
-      {((items.length > 0 && !isEditingTransferDetails) || (entryServiceMode === 'Relocate' && selectedRelocateItemId && !isEditingTransferDetails)) && (
+      {items.length > 0 && !isEditingTransferDetails && entryServiceMode !== 'Relocate' && (
         <div className="flex-shrink-0 px-4 pt-2">
           <div className="border border-gray-200 rounded-lg p-3">
             <div className="space-y-1">
-              {entryServiceMode === 'Relocate' ? (
-                <>
-                  <div className="flex items-center">
-                    <span className="text-[12px] text-gray-500 w-[100px]">Item ID</span>
-                    <span className="text-[12px] text-gray-500 mx-2">:</span>
-                    <span className="text-[12px] text-gray-700">
-                      {selectedRelocateItemId ? (toolsItemIdFullData.find(i => String(i?.id) === String(selectedRelocateItemId))?.item_id || toolsItemIdFullData.find(i => String(i?.id) === String(selectedRelocateItemId))?.itemId || '-') : '-'}
-                    </span>
-                  </div>
-                  <div className="flex items-center">
-                    <span className="text-[12px] text-gray-500 w-[100px]">Current Location</span>
-                    <span className="text-[12px] text-gray-500 mx-2">:</span>
-                    <span className="text-[12px] text-gray-700">{selectedCurrentLocation?.label || '-'}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <span className="text-[12px] text-gray-500 w-[100px]">Relocate Location</span>
-                    <span className="text-[12px] text-gray-500 mx-2">:</span>
-                    <span className="text-[12px] text-gray-700">{selectedRelocateLocation?.label || '-'}</span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center">
-                    <span className="text-[12px] text-gray-500 w-[100px]">From</span>
-                    <span className="text-[12px] text-gray-500 mx-2">:</span>
-                    <span className="text-[12px] text-gray-700">{selectedFrom?.label || '-'}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <span className="text-[12px] text-gray-500 w-[100px]">{entryServiceMode === 'Entry' ? 'To' : 'Service Store'}</span>
-                    <span className="text-[12px] text-gray-500 mx-2">:</span>
-                    <span className="text-[12px] text-gray-700">
-                      {entryServiceMode === 'Entry' ? (selectedTo?.label || '-') : (selectedServiceStore?.label || '-')}
-                    </span>
-                  </div>
-                  <div className="flex items-center">
-                    <span className="text-[12px] text-gray-500 w-[100px]">Project Incharge</span>
-                    <span className="text-[12px] text-gray-500 mx-2">:</span>
-                    <span className="text-[12px] text-gray-700">{selectedIncharge?.label || '-'}</span>
-                  </div>
-                </>
-              )}
+              <div className="flex items-center">
+                <span className="text-[12px] text-gray-500 w-[100px]">From</span>
+                <span className="text-[12px] text-gray-500 mx-2">:</span>
+                <span className="text-[12px] text-gray-700">{selectedFrom?.label || '-'}</span>
+              </div>
+              <div className="flex items-center">
+                <span className="text-[12px] text-gray-500 w-[100px]">{entryServiceMode === 'Entry' ? 'To' : 'Service Store'}</span>
+                <span className="text-[12px] text-gray-500 mx-2">:</span>
+                <span className="text-[12px] text-gray-700">
+                  {entryServiceMode === 'Entry' ? (selectedTo?.label || '-') : (selectedServiceStore?.label || '-')}
+                </span>
+              </div>
+              <div className="flex items-center">
+                <span className="text-[12px] text-gray-500 w-[100px]">Project Incharge</span>
+                <span className="text-[12px] text-gray-500 mx-2">:</span>
+                <span className="text-[12px] text-gray-700">{selectedIncharge?.label || '-'}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -2580,44 +2589,6 @@ const Transfer = ({ user }) => {
                   </svg>
                 </div>
               </div>
-            </div>
-          )}
-          {entryServiceMode === 'Relocate' && selectedRelocateItemId && relocateItemDetails && (
-            <div className="mb-4">
-              <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-                <p className="text-[14px] font-semibold text-black mb-3">Product Detail</p>
-                <div className="space-y-2">
-                  <div className="flex items-start">
-                    <span className="text-[12px] font-medium text-gray-600 w-[120px] flex-shrink-0">Item Name</span>
-                    <span className="text-[12px] font-medium text-black flex-1">: {relocateItemDetails.itemName || '-'}</span>
-                  </div>
-                  <div className="flex items-start">
-                    <span className="text-[12px] font-medium text-gray-600 w-[120px] flex-shrink-0">Birth Location</span>
-                    <span className="text-[12px] font-medium text-black flex-1">: {relocateItemDetails.birthLocation || '-'}</span>
-                  </div>
-                  <div className="flex items-start">
-                    <span className="text-[12px] font-medium text-gray-600 w-[120px] flex-shrink-0">Current Location</span>
-                    <span className="text-[12px] font-medium text-black flex-1">: {relocateItemDetails.currentLocation || '-'}</span>
-                  </div>
-                  <div className="flex items-start">
-                    <span className="text-[12px] font-medium text-gray-600 w-[120px] flex-shrink-0">Purchase Store</span>
-                    <span className="text-[12px] font-medium text-black flex-1">: {relocateItemDetails.purchaseStore || '-'}</span>
-                  </div>
-                </div>
-              </div>
-              {relocateItemDetails.imageUrl && (
-                <div className="mt-4 flex justify-center">
-                  <img 
-                    src={relocateItemDetails.imageUrl} 
-                    alt={relocateItemDetails.itemName || 'Product'} 
-                    className="max-w-full h-auto rounded-lg shadow-md"
-                    style={{ maxHeight: '300px' }}
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                    }}
-                  />
-                </div>
-              )}
             </div>
           )}
           {showToDropdown && (
@@ -3206,7 +3177,6 @@ const Transfer = ({ user }) => {
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  console.log('Relocate Location clicked');
                   setShowRelocateLocationDropdown(true);
                   setShowFromDropdown(false);
                   setShowToDropdown(false);
@@ -3245,6 +3215,44 @@ const Transfer = ({ user }) => {
               </div>
             </div>
           </div>
+          {selectedRelocateItemId && relocateItemDetails && (
+            <div className="mb-4">
+              <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                <p className="text-[14px] font-semibold text-black mb-3">Product Detail</p>
+                <div className="space-y-2">
+                  <div className="flex items-start">
+                    <span className="text-[12px] font-medium text-gray-600 w-[120px] flex-shrink-0">Item Name</span>
+                    <span className="text-[12px] font-medium text-black flex-1">: {relocateItemDetails.itemName || '-'}</span>
+                  </div>
+                  <div className="flex items-start">
+                    <span className="text-[12px] font-medium text-gray-600 w-[120px] flex-shrink-0">Birth Location</span>
+                    <span className="text-[12px] font-medium text-black flex-1">: {relocateItemDetails.birthLocation || '-'}</span>
+                  </div>
+                  <div className="flex items-start">
+                    <span className="text-[12px] font-medium text-gray-600 w-[120px] flex-shrink-0">Current Location</span>
+                    <span className="text-[12px] font-medium text-black flex-1">: {relocateItemDetails.currentLocation || '-'}</span>
+                  </div>
+                  <div className="flex items-start">
+                    <span className="text-[12px] font-medium text-gray-600 w-[120px] flex-shrink-0">Purchase Store</span>
+                    <span className="text-[12px] font-medium text-black flex-1">: {relocateItemDetails.purchaseStore || '-'}</span>
+                  </div>
+                </div>
+              </div>
+              {relocateItemDetails.imageUrl && (
+                <div className="mt-4 flex justify-center">
+                  <img 
+                    src={relocateItemDetails.imageUrl} 
+                    alt={relocateItemDetails.itemName || 'Product'} 
+                    className="max-w-full h-auto rounded-lg shadow-md"
+                    style={{ maxHeight: '300px' }}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
       {showRelocateLocationDropdown && (
@@ -3364,24 +3372,143 @@ const Transfer = ({ user }) => {
           </div>
         </div>
       )}
-      <div className="flex-shrink-0 px-4 pt-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <p className="text-[12px] font-semibold text-black leading-normal">Items</p>
-            <div className="w-[20px] h-[20px] rounded-full bg-[#E0E0E0] flex items-center justify-center">
-              <span className="text-[10px] font-medium text-black">{items.length}</span>
+      {showCurrentLocationDropdown && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowCurrentLocationDropdown(false);
+            }
+          }}
+          style={{ fontFamily: "'Manrope', sans-serif", zIndex: 9999 }}
+        >
+          <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[60vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center px-6 pt-5">
+              <p className="text-[16px] font-semibold text-black">Select Current Location</p>
+              <button onClick={() => {
+                setShowCurrentLocationDropdown(false);
+                setCurrentLocationSearchQuery('');
+              }} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
+                ×
+              </button>
+            </div>
+            <div className="px-6 pt-4 pb-4">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={currentLocationSearchQuery}
+                  onChange={(e) => setCurrentLocationSearchQuery(e.target.value)}
+                  placeholder="Search"
+                  className="w-full h-[32px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                  autoFocus
+                />
+                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="6.5" cy="6.5" r="5.5" stroke="#747474" strokeWidth="1.5" />
+                    <path d="M9.5 9.5L12 12" stroke="#747474" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto mb-4 px-6">
+              <div className="shadow-md rounded-lg overflow-hidden">
+                {currentLocationSearchQuery.trim() && !fromOptions.some(opt => {
+                  const normalizedOpt = normalizeSearchText(opt.label);
+                  const normalizedQuery = normalizeSearchText(currentLocationSearchQuery.trim());
+                  return normalizedOpt === normalizedQuery;
+                }) && (
+                    <button
+                      onClick={() => {
+                      }}
+                      className="w-full h-[36px] px-6 flex items-center bg-gray-100 gap-2 hover:bg-[#F5F5F5] transition-colors"
+                    >
+                      <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M7 3V11M3 7H11" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
+                        </svg>
+                      </div>
+                      <p className="text-[14px] text-gray-600 font-normal text-left truncate">"{currentLocationSearchQuery.trim()}"</p>
+                    </button>
+                  )}
+                {getFilteredCurrentLocationOptions().length > 0 ? (
+                  <div className="space-y-0">
+                    {getFilteredCurrentLocationOptions().map((option) => {
+                      const isFavorite = currentLocationFavorites.includes(option.id);
+                      const isSelected = selectedCurrentLocation?.id === option.id;
+                      return (
+                        <button
+                          key={option.id}
+                          onClick={() => {
+                            setSelectedCurrentLocation(option);
+                            setShowCurrentLocationDropdown(false);
+                            setCurrentLocationSearchQuery('');
+                            setIsEditingTransferDetails(false);
+                          }}
+                          className={`w-full h-[40px] px-6 flex items-center justify-between transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                            }`}
+                        >
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <button onClick={(e) => handleToggleCurrentLocationFavorite(e, option.id)} className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                              {isFavorite ? (
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              ) : (
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              )}
+                            </button>
+                            <p className="text-[14px] font-medium text-black text-left truncate">{option.label}</p>
+                          </div>
+                          <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 ml-3">
+                            {isSelected ? (
+                              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="10" cy="10" r="9" stroke="#e4572e" strokeWidth="2" fill="none" />
+                                <circle cx="10" cy="10" r="4" fill="#e4572e" />
+                              </svg>
+                            ) : (
+                              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="10" cy="10" r="9" stroke="#9E9E9E" strokeWidth="1.5" fill="none" />
+                              </svg>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-4">
+                    <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
+                      {currentLocationSearchQuery ? 'No options found' : 'No options available'}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-          {areFieldsFilled && entryServiceMode !== 'Relocate' && (
-            <div className="cursor-pointer" onClick={handleOpenUniversalSearch}>
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="9" cy="9" r="6" stroke="#000" strokeWidth="1.5" />
-                <path d="M13.5 13.5L17 17" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-            </div>
-          )}
         </div>
-      </div>
+      )}
+      {entryServiceMode !== 'Relocate' && (
+        <div className="flex-shrink-0 px-4 pt-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <p className="text-[12px] font-semibold text-black leading-normal">Items</p>
+              <div className="w-[20px] h-[20px] rounded-full bg-[#E0E0E0] flex items-center justify-center">
+                <span className="text-[10px] font-medium text-black">{items.length}</span>
+              </div>
+            </div>
+            {areFieldsFilled && (
+              <div className="cursor-pointer" onClick={handleOpenUniversalSearch}>
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="9" cy="9" r="6" stroke="#000" strokeWidth="1.5" />
+                  <path d="M13.5 13.5L17 17" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       {items.length > 0 && (
         <div className="flex-1 overflow-y-auto px-4 pt-2 pb-[120px]">
           <div className="shadow-md rounded-lg">

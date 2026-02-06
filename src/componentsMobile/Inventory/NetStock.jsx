@@ -561,12 +561,12 @@ const NetStock = () => {
     <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden">
       {/* Date Row */}
       <div className="px-4">
-        <div className=" pt-2 pb-2 border-b border-gray-200">
+        <div className=" pt-2 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <button
               type="button"
               onClick={() => setShowDatePicker(true)}
-              className="text-[12px] font-medium text-black leading-normal underline-offset-2 hover:underline"
+              className="text-[12px] font-medium text-black leading-normal underline-offset-2 mb-1 hover:underline"
             >
               {selectedDate}
             </button>
@@ -633,7 +633,7 @@ const NetStock = () => {
             <div className="relative">
               <div
                 onClick={() => setShowCategoryModal(true)}
-                className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                 style={{
                   boxSizing: 'border-box',
                   color: selectedCategory ? '#000' : '#9E9E9E'
@@ -671,7 +671,7 @@ const NetStock = () => {
             <div className="relative">
               <div
                 onClick={() => setShowStockingLocationModal(true)}
-                className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                 style={{
                   boxSizing: 'border-box',
                   color: selectedStockingLocation ? '#000' : '#9E9E9E'
@@ -716,7 +716,7 @@ const NetStock = () => {
               placeholder="Search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-[40px] border border-[rgba(0,0,0,0.16)] rounded-full pl-10 pr-3 text-[12px] font-medium bg-white"
+              className="w-full h-[40px] pl-10 pr-3 text-[12px] rounded-full font-medium bg-white focus:outline-none"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -727,7 +727,7 @@ const NetStock = () => {
               <select
                 value={selectionFilter || 'All'}
                 onChange={(e) => setSelectionFilter(e.target.value)}
-                className="h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-1 pr-1 text-[12px] font-medium bg-white"
+                className="h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-1 text-[12px] font-medium bg-white"
                 style={{ minWidth: '100px' }}
               >
                 <option value="All">All</option>
@@ -741,7 +741,7 @@ const NetStock = () => {
         {/* Toggle switch matching provided image (adds/removes only filtered items) */}
         <div className="flex items-center justify-between">
           {selectionFilter && (
-            <div className="mt-2">
+            <div className="mt-1">
               <div className="flex items-center">
                 <span className="text-[12px] font-medium text-black">
                   {selectionFilter}:
@@ -795,15 +795,15 @@ const NetStock = () => {
                 setSelectAllFiltered(false);
               }
             }}
-            className={`w-14 h-5 rounded-full mt- p-1 flex items-center transition-colors ${filteredData.length === 0 ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'} ${selectAllFiltered ? 'bg-[#BEE6CC]' : 'bg-[#cfd4d8]'}`}
+            className={`w-14 h-5 rounded-full p-1 flex items-center transition-colors ${filteredData.length === 0 ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'} ${selectAllFiltered ? 'bg-[#BEE6CC]' : 'bg-[#cfd4d8]'}`}
             title={filteredData.length === 0 ? 'No items to select' : (selectAllFiltered ? 'Unselect filtered items' : 'Select all filtered items')}
           >
-            <div className={`bg-white w-5 h-4 rounded-full shadow transform transition-transform duration-200 ease-in-out ${selectAllFiltered ? 'translate-x-6' : 'translate-x-0'}`}></div>
+            <div className={`bg-white w-5 h-4 rounded-full shadow transform transition-transform duration-200 ease-in-out ${selectAllFiltered ? 'translate-x-4' : 'translate-x-0'}`}></div>
           </div>
         </div>
       </div>
       {/* Product List */}
-      <div className="flex-1 overflow-y-auto px-3 pb-4 scrollbar-hide no-scrollbar scrollbar-none">
+      <div className="flex-1 overflow-y-auto px-4 pb-4 scrollbar-hide no-scrollbar scrollbar-none">
         {loading ? (
           <div className="flex justify-center items-center h-full">
             <p className="text-[14px] text-gray-500">Loading...</p>

@@ -24,6 +24,13 @@ const NetStock = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [itemNameOptions, setItemNameOptions] = useState([]);
   const [itemIdOptions, setItemIdOptions] = useState([]);
+  
+  // Edit stock bottom sheet state
+  const [showEditStockModal, setShowEditStockModal] = useState(false);
+  const [selectedItemForEdit, setSelectedItemForEdit] = useState(null);
+  const [newCount, setNewCount] = useState('');
+  const [swipeStates, setSwipeStates] = useState({});
+  const [expandedItemId, setExpandedItemId] = useState(null);
 
   // Fetch lookup data
   useEffect(() => {
@@ -324,17 +331,28 @@ const NetStock = ({ user }) => {
             });
           }
         }
-      } else if (quantity > 0) {
-        // Item with quantity only - use home location
+      } else if (!itemIdsId) {
+        // Item with quantity only (can be positive or negative) - use home location
         const homeLocation = getLocationName(homeLocationId);
         
         // Create merge key: location + itemName + brand
         const mergeKey = `${homeLocation}_${itemName}_${brand}_qty`;
         
         if (itemsMap.has(mergeKey)) {
-          // Merge: add quantities
+          // Merge: add quantities (including negative values)
           const existing = itemsMap.get(mergeKey);
           existing.quantity += quantity;
+          // Store stock record IDs for API calls
+          if (!existing.stockRecordIds) {
+            existing.stockRecordIds = [];
+          }
+          existing.stockRecordIds.push({
+            stockId: stock.id,
+            itemNameId,
+            brandId,
+            homeLocationId,
+            quantity: parseInt(stock.quantity || 0, 10)
+          });
         } else {
           itemsMap.set(mergeKey, {
             id: `qty_${itemNameId}_${brandId || ''}_${homeLocationId}`,
@@ -345,7 +363,18 @@ const NetStock = ({ user }) => {
             machineNumber: '-',
             status: '-',
             quantity,
-            hasItemId: false
+            hasItemId: false,
+            // Store IDs needed for API calls
+            itemNameId,
+            brandId,
+            homeLocationId,
+            stockRecordIds: [{
+              stockId: stock.id,
+              itemNameId,
+              brandId,
+              homeLocationId,
+              quantity: parseInt(stock.quantity || 0, 10)
+            }]
           });
         }
       }
@@ -416,8 +445,8 @@ const NetStock = ({ user }) => {
         if (itemId) {
           aggregated[key].itemIdSet.add(itemId);
         }
-      } else if (quantity > 0) {
-        // Sum quantities (only for items without itemIds)
+      } else {
+        // Sum quantities (including negative values) for items without itemIds
         aggregated[key].quantitySum += quantity;
       }
     });
@@ -500,6 +529,164 @@ const NetStock = ({ user }) => {
       document.removeEventListener('touchstart', handleClickOutside);
     };
   }, [showItemNameDropdown, showItemIdDropdown]);
+
+  // Swipe handlers for edit functionality
+  const minSwipeDistance = 50;
+  const handleTouchStart = (e, itemId) => {
+    const touch = e.touches ? e.touches[0] : { clientX: e.clientX };
+    setSwipeStates(prev => ({
+      ...prev,
+      [itemId]: {
+        startX: touch.clientX,
+        currentX: touch.clientX,
+        isSwiping: false
+      }
+    }));
+  };
+
+  const handleTouchMove = (e, itemId) => {
+    const touch = e.touches ? e.touches[0] : { clientX: e.clientX };
+    const state = swipeStates[itemId];
+    if (!state) return;
+
+    const deltaX = touch.clientX - state.startX;
+    const isExpanded = expandedItemId === itemId;
+
+    // Only allow swiping left to reveal edit action for items without itemId
+    if (deltaX < 0) {
+      e.preventDefault();
+      setSwipeStates(prev => ({
+        ...prev,
+        [itemId]: {
+          ...prev[itemId],
+          currentX: touch.clientX,
+          isSwiping: true
+        }
+      }));
+    } else if (isExpanded && deltaX > 0) {
+      // Allow swiping right to hide if already expanded
+      e.preventDefault();
+      setSwipeStates(prev => ({
+        ...prev,
+        [itemId]: {
+          ...prev[itemId],
+          currentX: touch.clientX,
+          isSwiping: true
+        }
+      }));
+    }
+  };
+
+  const handleTouchEnd = (itemId, item) => {
+    const state = swipeStates[itemId];
+    if (!state) return;
+
+    const deltaX = state.currentX - state.startX;
+    const absDeltaX = Math.abs(deltaX);
+
+    // Only allow edit for items without itemId but with quantity
+    if (absDeltaX >= minSwipeDistance && deltaX < 0 && !item.hasItemId && item.quantity > 0) {
+      // Swiped left - reveal edit button
+      setExpandedItemId(itemId);
+    } else if (absDeltaX >= minSwipeDistance && deltaX > 0) {
+      // Swiped right - hide buttons
+      setExpandedItemId(null);
+    } else {
+      // Small movement - snap back
+      if (expandedItemId === itemId) {
+        setExpandedItemId(null);
+      }
+    }
+
+    // Reset swipe state
+    setSwipeStates(prev => {
+      const newState = { ...prev };
+      delete newState[itemId];
+      return newState;
+    });
+  };
+
+  // Handle save edit stock
+  const handleSaveEditStock = async () => {
+    if (!selectedItemForEdit || !newCount) {
+      alert('Please enter a new count');
+      return;
+    }
+
+    const oldCount = selectedItemForEdit.quantity || 0;
+    const newCountNum = parseInt(newCount, 10);
+    
+    if (isNaN(newCountNum)) {
+      alert('Please enter a valid number');
+      return;
+    }
+
+    const quantityDifference = newCountNum - oldCount;
+
+    if (quantityDifference === 0) {
+      alert('New count is the same as old count');
+      return;
+    }
+
+    try {
+      // Get the stock record IDs for this item
+      const stockRecordIds = selectedItemForEdit.stockRecordIds || [];
+      
+      if (stockRecordIds.length === 0) {
+        alert('Unable to find stock records for this item');
+        return;
+      }
+
+      // For each stock record, update the quantity
+      // We'll create a new stock management entry with the difference
+      const stockManagementPayload = {
+        item_name_id: String(selectedItemForEdit.itemNameId || ''),
+        brand_name_id: selectedItemForEdit.brandId ? String(selectedItemForEdit.brandId) : '',
+        item_ids_id: '', // No itemId for quantity-only items
+        home_location_id: selectedItemForEdit.homeLocationId ? String(selectedItemForEdit.homeLocationId) : '',
+        quantity: String(quantityDifference), // Send the difference
+        tool_status: 'Available'
+      };
+
+      const stockRes = await fetch(`${TOOLS_STOCK_MANAGEMENT_BASE_URL}/save`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(stockManagementPayload)
+      });
+
+      if (!stockRes.ok) {
+        const errorText = await stockRes.text();
+        throw new Error(`Failed to save stock management: ${stockRes.status} ${stockRes.statusText} - ${errorText}`);
+      }
+
+      // Refresh data
+      const fetchData = async () => {
+        try {
+          const stockRes = await fetch(`${TOOLS_STOCK_MANAGEMENT_BASE_URL}/getAll`, {
+            method: 'GET',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }
+          });
+          if (stockRes.ok) {
+            const data = await stockRes.json();
+            setStockManagementData(Array.isArray(data) ? data : []);
+          }
+        } catch (error) {
+          console.error('Error refreshing data:', error);
+        }
+      };
+      await fetchData();
+
+      alert('Stock updated successfully');
+      setShowEditStockModal(false);
+      setSelectedItemForEdit(null);
+      setNewCount('');
+    } catch (error) {
+      console.error('Error updating stock:', error);
+      alert(`Error updating stock: ${error.message}`);
+    }
+  };
 
   return (
     <div className="flex flex-col bg-white px-4" style={{ fontFamily: "'Manrope', sans-serif" }}>
@@ -654,42 +841,102 @@ const NetStock = ({ user }) => {
               <p className="text-[14px] text-gray-500 text-center mt-8">No data available</p>
             ) : (
               <div className="space-y-3">
-                {tableData.map((item, index) => (
-                  <div key={item.id || index} className="border border-gray-200 rounded-lg p-3 bg-white">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1 min-w-0">
-                        {/* Top line: Location, Item Name - larger bold */}
-                        <p className="text-[14px] font-semibold text-black leading-tight mb-1">
-                          {item.location !== '-' ? `${item.location}, ${item.itemName}` : item.itemName}
-                        </p>
-                        {/* Middle line: Machine number - smaller regular */}
-                        {item.machineNumber !== '-' && (
-                          <p className="text-[12px] text-gray-700 leading-tight mb-1">{item.machineNumber}</p>
-                        )}
-                        {/* Bottom line: Brand - smaller regular */}
-                        <p className="text-[12px] text-gray-700 leading-tight">{item.brand}</p>
-                      </div>
-                      <div className="flex flex-col items-end gap-2 ml-3 flex-shrink-0">
-                        {/* Status badge - top right */}
-                        {item.status !== '-' && (
-                          <span className={`px-2 py-1 rounded-full text-[11px] font-medium whitespace-nowrap ${
-                            item.status === 'Working' ? 'bg-green-100 text-green-800' : 
-                            item.status === 'Dead' ? 'bg-orange-100 text-orange-800' : 
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {item.status}
-                          </span>
-                        )}
-                        {/* Item ID or Quantity - bottom right */}
-                        <p className="text-[12px] font-medium text-black">
-                          {item.hasItemId 
-                            ? (item.isMerged ? item.quantity : item.itemId) 
-                            : item.quantity}
-                        </p>
+                {tableData.map((item, index) => {
+                  const itemId = item.id || index;
+                  const swipeState = swipeStates[itemId];
+                  const isExpanded = expandedItemId === itemId;
+                  // Allow editing for items without itemId that have a non-zero quantity (can be positive or negative)
+                  const canEdit = !item.hasItemId && item.quantity !== 0;
+                  
+                  // Calculate swipe offset for items that can be edited (button width is 96px)
+                  const buttonWidth = 96;
+                  const swipeOffset = canEdit && swipeState && swipeState.isSwiping
+                    ? Math.max(-buttonWidth, Math.min(0, swipeState.currentX - swipeState.startX))
+                    : isExpanded && canEdit
+                      ? -buttonWidth
+                      : 0;
+
+                  return (
+                    <div key={itemId} className="relative overflow-hidden">
+                      {/* Edit Button - Behind the card on the right, revealed on swipe */}
+                      {canEdit && (
+                        <div
+                          className="absolute right-0 top-0 h-full w-10 bg-green-800 flex items-center justify-center z-10 transition-all duration-300 ease-out rounded-md"
+                          style={{
+                            opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
+                            transform: swipeOffset < 0 
+                              ? `translateX(${Math.max(0, 96 + swipeOffset)}px)` 
+                              : 'translateX(96px)',
+                            transition: (swipeState && swipeState.isSwiping) ? 'none' : 'opacity 0.2s ease-out, transform 0.3s ease-out',
+                          }}
+                        >
+                          <button
+                            onClick={() => {
+                              setSelectedItemForEdit(item);
+                              setNewCount(String(item.quantity));
+                              setShowEditStockModal(true);
+                              setExpandedItemId(null);
+                            }}
+                            className="w-full h-full flex items-center justify-center"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </button>
+                        </div>
+                      )}                      
+                      {/* Card */}
+                      <div
+                        className="border border-gray-200 rounded-lg p-3 bg-white relative transition-all duration-300 ease-out"
+                        style={{
+                          transform: `translateX(${swipeOffset}px)`,
+                          touchAction: canEdit ? 'pan-y' : 'auto',
+                          userSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+                          WebkitUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+                          MozUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+                          msUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto'
+                        }}
+                        onTouchStart={canEdit ? (e) => handleTouchStart(e, itemId) : undefined}
+                        onTouchMove={canEdit ? (e) => handleTouchMove(e, itemId) : undefined}
+                        onTouchEnd={canEdit ? () => handleTouchEnd(itemId, item) : undefined}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1 min-w-0">
+                            {/* Top line: Location, Item Name - larger bold */}
+                            <p className="text-[14px] font-semibold text-black leading-tight mb-1">
+                              {item.location !== '-' ? `${item.location}, ${item.itemName}` : item.itemName}
+                            </p>
+                            {/* Middle line: Machine number - smaller regular */}
+                            {item.machineNumber !== '-' && (
+                              <p className="text-[12px] text-gray-700 leading-tight mb-1">{item.machineNumber}</p>
+                            )}
+                            {/* Bottom line: Brand - smaller regular */}
+                            <p className="text-[12px] text-gray-700 leading-tight">{item.brand}</p>
+                          </div>
+                          <div className="flex flex-col items-end gap-2 ml-3 flex-shrink-0">
+                            {/* Status badge - top right */}
+                            {item.status !== '-' && (
+                              <span className={`px-2 py-1 rounded-full text-[11px] font-medium whitespace-nowrap ${
+                                item.status === 'Working' ? 'bg-green-100 text-green-800' : 
+                                item.status === 'Dead' ? 'bg-orange-100 text-orange-800' : 
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {item.status}
+                              </span>
+                            )}
+                            {/* Item ID or Quantity - bottom right */}
+                            <p className="text-[12px] font-medium text-black">
+                              {item.hasItemId 
+                                ? (item.isMerged ? item.quantity : item.itemId) 
+                                : item.quantity}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -732,6 +979,105 @@ const NetStock = ({ user }) => {
           </div>
         )}
       </div>
+
+      {/* Edit Stock Bottom Sheet Modal */}
+      {showEditStockModal && selectedItemForEdit && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 z-50"
+            onClick={() => {
+              setShowEditStockModal(false);
+              setSelectedItemForEdit(null);
+              setNewCount('');
+            }}
+          />
+          {/* Bottom Sheet */}
+          <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-[360px] bg-white rounded-t-[20px] z-50 shadow-lg" style={{ fontFamily: "'Manrope', sans-serif" }}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-200">
+              <h2 className="text-[16px] font-semibold text-black">Edit Stock</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEditStockModal(false);
+                  setSelectedItemForEdit(null);
+                  setNewCount('');
+                }}
+                className="text-red-500 hover:text-red-700"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+            {/* Content */}
+            <div className="px-4 py-4 space-y-4">
+              {/* Item Name - Read Only */}
+              <div>
+                <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+                  Item Name<span className="text-red-500">*</span>
+                </p>
+                <input
+                  type="text"
+                  value={selectedItemForEdit.itemName || ''}
+                  readOnly
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-3 text-[12px] font-medium bg-gray-100 text-gray-600 cursor-not-allowed"
+                  style={{ fontFamily: "'Manrope', sans-serif" }}
+                />
+              </div>
+              {/* Brand - Read Only */}
+              <div>
+                <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+                  Brand<span className="text-red-500">*</span>
+                </p>
+                <input
+                  type="text"
+                  value={selectedItemForEdit.brand || '-'}
+                  readOnly
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-3 text-[12px] font-medium bg-gray-100 text-gray-600 cursor-not-allowed"
+                  style={{ fontFamily: "'Manrope', sans-serif" }}
+                />
+              </div>
+              {/* New Count - Editable */}
+              <div>
+                <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+                  New Count<span className="text-red-500">*</span>
+                </p>
+                <input
+                  type="number"
+                  value={newCount}
+                  onChange={(e) => setNewCount(e.target.value)}
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-3 text-[12px] font-medium bg-white text-black"
+                  style={{ fontFamily: "'Manrope', sans-serif" }}
+                  placeholder="Enter"
+                />
+              </div>
+            </div>
+            {/* Action Buttons */}
+            <div className="px-4 pb-4 pt-2 flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEditStockModal(false);
+                  setSelectedItemForEdit(null);
+                  setNewCount('');
+                }}
+                className="flex-1 h-[40px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[14px] font-medium text-black bg-white hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEditStock}
+                className="flex-1 h-[40px] bg-black rounded-[8px] text-[14px] font-medium text-white hover:bg-gray-800"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

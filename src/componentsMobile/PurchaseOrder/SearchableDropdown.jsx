@@ -295,7 +295,7 @@ const SearchableDropdown = ({
             setIsOpen(true);
             setSearchQuery(''); // Clear search to show all options including selected one
           }}
-          className={`${className || 'w-full h-[32px]'} border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 text-[12px] font-medium text-black bg-white focus:outline-none`}
+          className={`${className || 'w-full h-[32px]'} border border-[rgba(0,0,0,0.16)] rounded pl-3 text-[12px] font-medium text-black bg-white focus:outline-none`}
           style={{ 
             boxSizing: 'border-box',
             paddingRight: value ? '60px' : '32px'

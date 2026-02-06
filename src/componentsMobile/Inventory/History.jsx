@@ -3,6 +3,8 @@ import Edit from '../Images/edit1.png';
 import Delete from '../Images/delete.png';
 import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 import SearchableDropdown from '../PurchaseOrder/SearchableDropdown';
+import Filter from '../Images/Filter.png'
+import Close from '../Images/close.png'
 
 const History = ({ onTabChange }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -788,14 +790,14 @@ const History = ({ onTabChange }) => {
         </div>
       </div>
       {/* Stack Return/Dispatch Toggle */}
-      <div className="px-4 mt-2">
+      <div className="px-4 mt-1">
         <div className="flex items-center ga">
           {/* Stack Return/Dispatch Tabs */}
-          <div className="flex bg-gray-100 items-center h-9 flex-1">
+          <div className="flex bg-gray-100 items-center rounded-md h-9 flex-1">
             <button
               type="button"
               onClick={() => setActiveType('stack return')}
-              className={`flex-1 py-1 px-4 ml-1 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${activeType === 'stack return'
+              className={`flex-1 py-1 px-4 ml-0.5 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${activeType === 'stack return'
                 ? 'bg-white text-black'
                 : 'bg-gray-100 text-gray-600'
                 }`}
@@ -805,7 +807,7 @@ const History = ({ onTabChange }) => {
             <button
               type="button"
               onClick={() => setActiveType('dispatch')}
-              className={`flex-1 py-1 px-4 mr-1 h-8 rounded-lg text-[14px] font-medium transition-colors duration-1000 ease-out ${activeType === 'dispatch'
+              className={`flex-1 py-1 px-4 mr-0.5 h-8 rounded-lg text-[14px] font-medium transition-colors duration-1000 ease-out ${activeType === 'dispatch'
                 ? 'bg-white text-black'
                 : 'bg-gray-100 text-gray-600'
                 }`}
@@ -817,7 +819,7 @@ const History = ({ onTabChange }) => {
       </div>
 
       {/* Search Bar */}
-      <div className="flex-shrink-0 px-4 pt-4 pb-3">
+      <div className="flex-shrink-0 px-4 pt-2 pb-2">
         <div className="relative">
           <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -839,22 +841,7 @@ const History = ({ onTabChange }) => {
       <div className="flex-shrink-0 px-4 pb-3">
         <div className="flex items-center gap-2 flex-wrap">
           <button type="button" onClick={() => setShowFilterModal(true)} className="flex items-center gap-2 cursor-pointer">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-              {/* Top horizontal line */}
-              <line x1="2" y1="5" x2="16" y2="5" stroke={(filterProjectName || filterProjectIncharge || filterStockingLocation || filterSRNumber || filterDate) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
-              {/* Top vertical line intersecting center */}
-              <line x1="9" y1="3" x2="9" y2="7" stroke={(filterProjectName || filterProjectIncharge || filterStockingLocation || filterSRNumber || filterDate) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
-              {/* Top arrows pointing left and right */}
-              <path d="M7 4L9 5L11 4" stroke={(filterProjectName || filterProjectIncharge || filterStockingLocation || filterSRNumber || filterDate) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-              <path d="M7 6L9 5L11 6" stroke={(filterProjectName || filterProjectIncharge || filterStockingLocation || filterSRNumber || filterDate) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-              {/* Bottom horizontal line */}
-              <line x1="2" y1="13" x2="16" y2="13" stroke={(filterProjectName || filterProjectIncharge || filterStockingLocation || filterSRNumber || filterDate) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
-              {/* Bottom vertical line intersecting center */}
-              <line x1="9" y1="11" x2="9" y2="15" stroke={(filterProjectName || filterProjectIncharge || filterStockingLocation || filterSRNumber || filterDate) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
-              {/* Bottom arrows pointing left and right */}
-              <path d="M7 12L9 13L11 12" stroke={(filterProjectName || filterProjectIncharge || filterStockingLocation || filterSRNumber || filterDate) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-              <path d="M7 14L9 13L11 14" stroke={(filterProjectName || filterProjectIncharge || filterStockingLocation || filterSRNumber || filterDate) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-            </svg>
+            <img src={Filter} alt="Filter" className="w-[13px] h-[11px]" />
             {!(filterProjectName || filterProjectIncharge || filterStockingLocation || filterSRNumber || filterDate) && (
               <span className="text-[12px] font-medium text-black">Filter</span>
             )}
@@ -1144,7 +1131,7 @@ const History = ({ onTabChange }) => {
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           <div
-            className="bg-white w-full max-w-[360px] h-[400px] rounded-t-3xl shadow-lg"
+            className="bg-white w-full max-w-[360px] h-[370px] rounded-t-3xl shadow-lg"
             onClick={(e) => e.stopPropagation()}
             style={{ fontFamily: "'Manrope', sans-serif" }}
           >
@@ -1161,9 +1148,7 @@ const History = ({ onTabChange }) => {
                 }}
                 className="text-red-500 hover:text-red-700"
               >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
               </button>
             </div>
 
@@ -1237,7 +1222,7 @@ const History = ({ onTabChange }) => {
                     <button
                       type="button"
                       onClick={() => setShowDatePicker(true)}
-                      className="w-full h-[32px] px-3 border border-gray-300 rounded-lg text-[14px] bg-white focus:outline-none focus:border-gray-400 flex items-center justify-between"
+                      className="w-full h-[32px] px-3 border border-gray-300 rounded text-[14px] bg-white focus:outline-none focus:border-gray-400 flex items-center justify-between"
                       style={{ fontFamily: "'Manrope', sans-serif" }}
                     >
                       <span className={`${filterDate ? 'text-black' : 'text-[#9E9E9E]'} truncate`}>
@@ -1256,14 +1241,14 @@ const History = ({ onTabChange }) => {
                       placeholder="Enter"
                       value={filterSRNumber}
                       onChange={(e) => setFilterSRNumber(e.target.value)}
-                      className="w-full h-[32px] px-3 border border-gray-300 rounded-lg text-[12px] bg-white focus:outline-none focus:border-gray-400"
+                      className="w-full h-[32px] px-3 border border-gray-300 rounded text-[12px] bg-white focus:outline-none focus:border-gray-400"
                       style={{ fontFamily: "'Manrope', sans-serif" }}
                     />
                   </div>
                 </div>
               </div>
               {/* Modal Footer */}
-              <div className="flex items-center justify-end gap-3 mt-10">
+              <div className="flex items-center justify-end gap-3 mt-5">
                 <button
                   type="button"
                   onClick={() => {

@@ -9,6 +9,7 @@ const EMPLOYEE_DETAILS_BASE_URL = 'https://backendaab.in/aabuildersDash/api/empl
 const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_name';
 const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_brand';
 const TOOLS_ITEM_ID_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_id';
+const TOOLS_MACHINE_STATUS_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools-machine-status';
 
 const ServiceHistory = ({ user, onTabChange }) => {
   const [historyData, setHistoryData] = useState([]);
@@ -36,10 +37,11 @@ const ServiceHistory = ({ user, onTabChange }) => {
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   
   const statusOptions = [
-    { value: 'Working', label: 'Working' },
-    { value: 'Not Working', label: 'Not Working' },
-    { value: 'Under Repair', label: 'Under Repair' }
+    { value: 'Working', label: 'Problem Solved' },
+    { value: 'Under Repair', label: 'Not Working' },
+    { value: 'Machine Dead', label: 'Machine Dead' }
   ];
+  const [statusSearchQuery, setStatusSearchQuery] = useState('');
   // Swipe detection state - track per card
   const [swipeStates, setSwipeStates] = useState({});
   const [expandedEntryId, setExpandedEntryId] = useState(null);
@@ -49,6 +51,65 @@ const ServiceHistory = ({ user, onTabChange }) => {
   useEffect(() => {
     expandedEntryIdRef.current = expandedEntryId;
   }, [expandedEntryId]);
+
+  // Helper function to fetch latest machine status from the new API
+  const fetchLatestMachineStatus = async (itemIdsId, machineNumber) => {
+    if (!itemIdsId || !machineNumber) return null;
+    try {
+      const response = await fetch(`${TOOLS_MACHINE_STATUS_BASE_URL}/item/${itemIdsId}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (response.ok) {
+        const statusList = await response.json();
+        if (Array.isArray(statusList) && statusList.length > 0) {
+          // Filter by machine number and get the latest one (by id, assuming higher id = newer)
+          const matchingStatuses = statusList.filter(
+            status => String(status.machine_number || status.machineNumber || '').trim() === String(machineNumber).trim()
+          );
+          if (matchingStatuses.length > 0) {
+            // Sort by id descending to get the latest
+            matchingStatuses.sort((a, b) => (b.id || 0) - (a.id || 0));
+            return matchingStatuses[0].machine_status || matchingStatuses[0].machineStatus || null;
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching machine status:', error);
+    }
+    return null;
+  };
+
+  // Helper function to save/update machine status
+  const saveMachineStatus = async (itemIdsId, machineNumber, machineStatus) => {
+    if (!itemIdsId || !machineNumber || !machineStatus) {
+      console.error('Missing required fields for saving machine status');
+      return false;
+    }
+    try {
+      const response = await fetch(`${TOOLS_MACHINE_STATUS_BASE_URL}/save`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          item_ids_id: String(itemIdsId),
+          machine_number: String(machineNumber),
+          machine_status: machineStatus,
+          created_by: user?.name || user?.username || 'mobile'
+        })
+      });
+      if (response.ok) {
+        return true;
+      } else {
+        console.error('Failed to save machine status:', response.statusText);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error saving machine status:', error);
+      return false;
+    }
+  };
 
   // Fetch lookup data for mapping IDs to names
   useEffect(() => {
@@ -241,7 +302,20 @@ const ServiceHistory = ({ user, onTabChange }) => {
           // Filter to only show 'Service' type data (exclude Entry and other types)
           const filteredData = flattenedData.filter(entry => entry.toolsEntryType === 'service');
           
-          setHistoryData(filteredData);
+          // Fetch latest machine status from the new API for each entry
+          const enrichedData = await Promise.all(
+            filteredData.map(async (entry) => {
+              if (entry.itemIdsId && entry.machineNumber) {
+                const latestStatus = await fetchLatestMachineStatus(entry.itemIdsId, entry.machineNumber);
+                if (latestStatus) {
+                  return { ...entry, machineStatus: latestStatus };
+                }
+              }
+              return entry;
+            })
+          );
+          
+          setHistoryData(enrichedData);
         } else {
           console.error('Failed to fetch history data');
           setHistoryData([]);
@@ -351,7 +425,9 @@ const ServiceHistory = ({ user, onTabChange }) => {
   // Bottom sheet handlers
   const handleCardClickForBottomSheet = (entry) => {
     setSelectedEntry(entry);
-    setSelectedStatus(entry.machineStatus || '');
+    // Map "Not Working" to "Machine Dead" for consistency
+    const statusToSet = entry.machineStatus === 'Not Working' ? 'Machine Dead' : (entry.machineStatus || '');
+    setSelectedStatus(statusToSet);
     setShowBottomSheet(true);
   };
 
@@ -360,10 +436,36 @@ const ServiceHistory = ({ user, onTabChange }) => {
     setSelectedEntry(null);
     setSelectedStatus('');
     setShowStatusDropdown(false);
+    setStatusSearchQuery('');
   };
 
-  const handleSaveFilter = () => {
-    // Handle save logic here if needed
+  const handleSaveFilter = async () => {
+    if (!selectedEntry || !selectedStatus) {
+      handleCloseBottomSheet();
+      return;
+    }
+
+    // Save machine status to the new API
+    const success = await saveMachineStatus(
+      selectedEntry.itemIdsId,
+      selectedEntry.machineNumber,
+      selectedStatus
+    );
+
+    if (success) {
+      // Update local state to reflect the change
+      setHistoryData(prevData =>
+        prevData.map(entry =>
+          entry.id === selectedEntry.id
+            ? { ...entry, machineStatus: selectedStatus }
+            : entry
+        )
+      );
+      alert('Machine status updated successfully');
+    } else {
+      alert('Failed to update machine status. Please try again.');
+    }
+
     handleCloseBottomSheet();
   };
 
@@ -539,6 +641,8 @@ const ServiceHistory = ({ user, onTabChange }) => {
       case 'Working':
         return { text: 'Problem Solved', color: 'text-[#BF9853]' };
       case 'Not Working':
+        return { text: 'Machine Dead', color: 'text-[#F44336]' };
+      case 'Machine Dead':
         return { text: 'Machine Dead', color: 'text-[#F44336]' };
       case 'Under Repair':
         return { text: 'Pending', color: 'text-[#BF9853]' };
@@ -810,7 +914,7 @@ const ServiceHistory = ({ user, onTabChange }) => {
               <span
                 className={`w-2 h-2 rounded-full ${
                   imageViewerData.machineStatus === 'Working' ? 'bg-[#4CAF50]' : 
-                  imageViewerData.machineStatus === 'Not Working' ? 'bg-[#F44336]' :
+                  imageViewerData.machineStatus === 'Not Working' || imageViewerData.machineStatus === 'Machine Dead' ? 'bg-[#F44336]' :
                   imageViewerData.machineStatus === 'Under Repair' ? 'bg-[#FF9800]' :
                   'bg-[#9E9E9E]'
                 }`}
@@ -818,12 +922,12 @@ const ServiceHistory = ({ user, onTabChange }) => {
               <p
                 className={`text-[12px] font-medium ${
                   imageViewerData.machineStatus === 'Working' ? 'text-[#4CAF50]' : 
-                  imageViewerData.machineStatus === 'Not Working' ? 'text-[#F44336]' :
+                  imageViewerData.machineStatus === 'Not Working' || imageViewerData.machineStatus === 'Machine Dead' ? 'text-[#F44336]' :
                   imageViewerData.machineStatus === 'Under Repair' ? 'text-[#FF9800]' :
                   'text-[#9E9E9E]'
                 }`}
               >
-                {imageViewerData.machineStatus}
+                {imageViewerData.machineStatus === 'Not Working' ? 'Machine Dead' : imageViewerData.machineStatus}
               </p>
             </div>
           </div>
@@ -865,45 +969,23 @@ const ServiceHistory = ({ user, onTabChange }) => {
                 <label className="block text-[14px] font-medium text-black mb-2">
                   Machine Status
                 </label>
-                <div className="relative">
-                  <button
-                    onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-                    className="w-full px-3 py-2.5 text-left bg-white border border-gray-300 rounded-[8px] flex items-center justify-between"
+                <button
+                  onClick={() => setShowStatusDropdown(true)}
+                  className="w-full px-3 py-2.5 text-left bg-white border border-gray-300 rounded-[8px] flex items-center justify-between"
+                >
+                  <span className={`text-[14px] ${selectedStatus ? 'text-black' : 'text-gray-400'}`}>
+                    {(statusOptions.find(o => o.value === selectedStatus)?.label) || 'Select Status'}
+                  </span>
+                  <svg 
+                    width="16" 
+                    height="16" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    xmlns="http://www.w3.org/2000/svg"
                   >
-                    <span className={`text-[14px] ${selectedStatus ? 'text-black' : 'text-gray-400'}`}>
-                      {selectedStatus || 'Select Status'}
-                    </span>
-                    <svg 
-                      width="16" 
-                      height="16" 
-                      viewBox="0 0 24 24" 
-                      fill="none" 
-                      xmlns="http://www.w3.org/2000/svg"
-                      className={`transform transition-transform ${showStatusDropdown ? 'rotate-180' : ''}`}
-                    >
-                      <path d="M6 9L12 15L18 9" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </button>
-                  
-                  {showStatusDropdown && (
-                    <div className="absolute z-30 w-full bottom-full mb-1 bg-white border border-gray-300 rounded-[8px] shadow-lg max-h-48 overflow-y-auto">
-                      {statusOptions.map((option) => (
-                        <button
-                          key={option.value}
-                          onClick={() => {
-                            setSelectedStatus(option.value);
-                            setShowStatusDropdown(false);
-                          }}
-                          className={`w-full px-3 py-2.5 text-left text-[14px] hover:bg-gray-100 ${
-                            selectedStatus === option.value ? 'bg-gray-100 font-medium' : ''
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                    <path d="M6 9L12 15L18 9" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
               </div>
             </div>
 
@@ -923,6 +1005,85 @@ const ServiceHistory = ({ user, onTabChange }) => {
               </button>
             </div>
           </div>
+
+          {/* Select Status Modal - centered overlay when Machine Status dropdown is clicked */}
+          {showStatusDropdown && (
+            <div 
+              className="fixed inset-0 z-[60] flex items-center justify-center px-4"
+              onClick={() => setShowStatusDropdown(false)}
+            >
+              <div 
+                className="absolute inset-0 bg-black bg-opacity-40"
+              />
+              <div 
+                className="relative z-10 w-full max-w-[340px] bg-white rounded-[12px] shadow-xl p-4"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[16px] font-semibold text-black">Select Status</p>
+                  <button
+                    onClick={() => setShowStatusDropdown(false)}
+                    className="w-6 h-6 flex items-center justify-center"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M18 6L6 18M6 6L18 18" stroke="#F44336" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
+                </div>
+                {/* Search Bar */}
+                <div className="relative mb-3">
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Search"
+                    value={statusSearchQuery}
+                    onChange={(e) => setStatusSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2.5 text-[14px] border border-gray-300 rounded-[8px] focus:outline-none focus:ring-1 focus:ring-gray-400"
+                  />
+                </div>
+                {/* Radio Options */}
+                <div className="space-y-0">
+                  {statusOptions
+                    .filter((opt) =>
+                      opt.label.toLowerCase().includes(statusSearchQuery.toLowerCase())
+                    )
+                    .map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => {
+                          setSelectedStatus(option.value);
+                          setShowStatusDropdown(false);
+                          setStatusSearchQuery('');
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-[8px] text-left ${
+                          selectedStatus === option.value
+                            ? 'bg-[#FFF3E0]'
+                            : 'hover:bg-gray-50'
+                        }`}
+                      >
+                        <span className={`text-[14px] ${selectedStatus === option.value ? 'font-medium' : ''}`}>
+                          {option.label}
+                        </span>
+                        <span
+                          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                            selectedStatus === option.value
+                              ? 'border-[#E07C24] bg-white'
+                              : 'border-gray-300 bg-white'
+                          }`}
+                        >
+                          {selectedStatus === option.value && (
+                            <span className="w-2.5 h-2.5 rounded-full bg-[#E07C24]" />
+                          )}
+                        </span>
+                      </button>
+                    ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

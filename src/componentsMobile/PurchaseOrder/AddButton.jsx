@@ -1,25 +1,23 @@
 import React from 'react';
+import FlottingButton from '../Images/Flotting Button Black.png'
+import FlottingButtonWhite from '../Images/Flotting Button.png'
+import New from '../Images/New.png'
 
 const AddButton = ({ onClick, disabled = false, showNew = false }) => {
   return (
     <div 
-      className={`fixed bottom-[110px] right-[24px] lg:right-[calc(50%-164px)] z-30 ${
+      className={`fixed bottom-[110px] right-0 lg:right-[calc(50%-164px)] z-30 ${
         disabled ? 'cursor-not-allowed pointer-events-none' : 'cursor-pointer'
       }`} 
       onClick={disabled ? undefined : onClick}
     >
-      <div className={`${showNew ? 'px-4' : 'w-[48px]'} h-[43px] rounded-full flex items-center justify-center ${
-        disabled ? 'bg-gray-400' : 'bg-black'
-      }`}>
+      <div className={`${showNew ? 'px-4' : 'w-[80px]'} h-[80px] rounded-full flex items-center justify-center `}>
         {showNew ? (
-          <span className="text-white text-[16px] font-medium flex items-center gap-3">
-            <span className="text-[30px]">+</span>
-            <span>New</span>
+          <span className="text-white text-[16px] font-medium flex items-center gap-2">
+            <img src={New} alt="New" className="w-[80px] h-[35px]" />
           </span>
         ) : (
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 5V19M5 12H19" stroke="white" strokeWidth="2" strokeLinecap="round" />
-          </svg>
+          <img src={disabled ? FlottingButtonWhite : FlottingButton} alt="+" className="w-[80px] h-[80px]" />
         )}
       </div>
     </div>

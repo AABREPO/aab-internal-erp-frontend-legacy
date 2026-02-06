@@ -1468,7 +1468,7 @@ const Incoming = ({ user }) => {
       {!isEmptyState && (
         <div className="px-4">
           <div className="sticky top-[100px] z-30 bg-white flex items-center justify-between mt-2 border-b border-[#E0E0E0]">
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-1">
               <button
                 type="button"
                 onClick={() => {
@@ -1494,7 +1494,7 @@ const Incoming = ({ user }) => {
                 {incomingData.date}
               </button>
             </div>
-            <div className="flex items-center mb-2">
+            <div className="flex items-center mb-1">
               {hasOpenedAdd && items.length > 0 && (
                 <button
                   type="button"
@@ -1526,7 +1526,7 @@ const Incoming = ({ user }) => {
           {/* Date in empty state */}
           {isEmptyState && (
             <div className="sticky z-30 bg-white flex items-center justify-between mt-2 border-b border-[#E0E0E0]">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-1">
                 <button
                   type="button"
                   onClick={() => {
@@ -1563,7 +1563,7 @@ const Incoming = ({ user }) => {
               <div className="relative">
                 <div
                   onClick={() => setShowVendorModal(true)}
-                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                   style={{
                     boxSizing: 'border-box',
                     color: incomingData.vendorName ? '#000' : '#9E9E9E'
@@ -1603,7 +1603,7 @@ const Incoming = ({ user }) => {
               <div className="relative">
                 <div
                   onClick={() => setShowStockingLocationModal(true)}
-                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                   style={{
                     boxSizing: 'border-box',
                     color: incomingData.stockingLocation ? '#000' : '#9E9E9E'

@@ -2711,7 +2711,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                           setShowVendorModal(true);
                         }
                       }}
-                      className={`w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium flex items-center ${isEditFromHistory ? 'bg-gray-100 cursor-not-allowed' : 'bg-white cursor-pointer'
+                      className={`w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium flex items-center ${isEditFromHistory ? 'bg-gray-100 cursor-not-allowed' : 'bg-white cursor-pointer'
                         }`}
                       style={{
                         boxSizing: 'border-box',
@@ -2752,7 +2752,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                   </p>
                   <div className="relative">
                     <div onClick={() => setShowProjectModal(true)}
-                      className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                      className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                       style={{
                         boxSizing: 'border-box',
                         color: poData.projectName ? '#000' : '#9E9E9E'
@@ -2788,7 +2788,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                   </p>
                   <div className="relative">
                     <div onClick={() => setShowInchargeModal(true)}
-                      className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                      className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                       style={{
                         boxSizing: 'border-box',
                         color: poData.projectIncharge ? '#000' : '#9E9E9E'

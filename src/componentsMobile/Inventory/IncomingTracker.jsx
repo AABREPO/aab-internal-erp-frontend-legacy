@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import SearchableDropdown from '../PurchaseOrder/SearchableDropdown';
+import Filter from '../Images/Filter.png'
+import Close from '../Images/close.png'
 
 const IncomingTracker = ({ user }) => {
   const [activeStatus, setActiveStatus] = useState('live'); // 'live', 'closed', or 'history'
@@ -25,6 +27,7 @@ const IncomingTracker = ({ user }) => {
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const [showPODropdown, setShowPODropdown] = useState(false);
+  
 
   // Fetch vendor data
   useEffect(() => {
@@ -761,19 +764,19 @@ const IncomingTracker = ({ user }) => {
       )}
       {/* Date and Category Buttons - Hide when detail view is open */}
       {!showDetailView && (
-        <div className="px-4">
-          <div className="flex items-center justify-between">
+        <div className="px-4 pt-2">
+          <div className="flex items-center justify-between  mb-1">
             {/* Date Button */}
             <button
               type="button"
-              className=" py-1.5 h-8 text-[12px] font-medium text-black"
+              className="text-[12px] font-medium text-black"
             >
               Date
             </button>
             {/* Category Button */}
             <button
               type="button"
-              className=" py-1.5 h-8 text-[12px] font-medium text-black"
+              className=" text-[12px] font-medium text-black"
             >
               Category
             </button>
@@ -781,10 +784,10 @@ const IncomingTracker = ({ user }) => {
         </div>
       )}
       {/* Live/Closed/History Toggle - Always visible */}
-      <div className="px-4 pt-1 pb-3">
+      <div className="px-4 pb-2">
         <div className="flex items-center gap-2">
           {/* Live/Closed/History Tabs */}
-          <div className="flex bg-gray-100 items-center h-9 shadow-sm flex-1">
+          <div className="flex bg-gray-100 items-center rounded-md h-9 shadow-sm flex-1">
             <button
               type="button"
               onClick={() => {
@@ -877,22 +880,7 @@ const IncomingTracker = ({ user }) => {
               onClick={() => setShowFilterModal(true)}
               className="flex items-center gap-2 text-[14px] font-medium text-gray-700"
             >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                {/* Top horizontal line */}
-                <line x1="2" y1="5" x2="16" y2="5" stroke={(filterVendorName || filterStockingLocation || filterPONo) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
-                {/* Top vertical line intersecting center */}
-                <line x1="9" y1="3" x2="9" y2="7" stroke={(filterVendorName || filterStockingLocation || filterPONo) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
-                {/* Top arrows pointing left and right */}
-                <path d="M7 4L9 5L11 4" stroke={(filterVendorName || filterStockingLocation || filterPONo) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                <path d="M7 6L9 5L11 6" stroke={(filterVendorName || filterStockingLocation || filterPONo) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                {/* Bottom horizontal line */}
-                <line x1="2" y1="13" x2="16" y2="13" stroke={(filterVendorName || filterStockingLocation || filterPONo) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
-                {/* Bottom vertical line intersecting center */}
-                <line x1="9" y1="11" x2="9" y2="15" stroke={(filterVendorName || filterStockingLocation || filterPONo) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
-                {/* Bottom arrows pointing left and right */}
-                <path d="M7 12L9 13L11 12" stroke={(filterVendorName || filterStockingLocation || filterPONo) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                <path d="M7 14L9 13L11 14" stroke={(filterVendorName || filterStockingLocation || filterPONo) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-              </svg>
+              <img src={Filter} alt="Filter" className="w-[13px] h-[11px]" />
               {!(filterVendorName || filterStockingLocation || filterPONo) && (
                 <span className="text-[12px] font-medium text-black">Filter</span>
               )}
@@ -1567,9 +1555,7 @@ const IncomingTracker = ({ user }) => {
                 }}
                 className="text-red-500 hover:text-red-700"
               >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
               </button>
             </div>
 
@@ -1632,7 +1618,7 @@ const IncomingTracker = ({ user }) => {
                           setShowVendorDropdown(false);
                           setShowLocationDropdown(false);
                         }}
-                        className="w-full max-w-[120px] h-[32px] rounded-[8px] px-3 border border-gray-300 text-[14px] bg-white focus:outline-none focus:border-gray-400"
+                        className="w-full max-w-[120px] h-[32px] rounded px-3 border border-gray-300 text-[14px] bg-white focus:outline-none focus:border-gray-400"
                         style={{
                           paddingRight: filterPONo ? '60px' : '40px'
                         }}

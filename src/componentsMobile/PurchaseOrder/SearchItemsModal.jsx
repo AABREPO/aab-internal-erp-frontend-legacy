@@ -1407,7 +1407,7 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="flex justify-between items-center px-6 pt-5 pb-4 border-b border-[#E0E0E0]">
+                <div className="flex justify-between items-center px-6 pt-5 pb-2">
                     <p className="text-[16px] font-semibold text-black">Search Items</p>
                     <button
                         onClick={onClose}
@@ -1420,27 +1420,26 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                 </div>
                 {/* Project Name Dropdown - ONLY for Update → Other Returns */}
                 {isFromUpdate && (
-                    <div className="relative mt-2 px-4">
+                    <div className="mt-2 px-4">
                         <p className="text-[12px] font-semibold text-black leading-normal mb-1">Project Name</p>
                         <div
                             onClick={() => setShowMoveProjectModal(true)}
-                            className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-3 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                            className="relative w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-3 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                             style={{ color: moveProject ? '#000' : '#9E9E9E', paddingRight: moveProject ? '40px' : '12px' }}
                         >
                             {moveProject || 'Select Project'}
+                            {moveProject && (
+                                <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); setMoveProject(''); setMoveProjectId(null); }}
+                                    className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                                >
+                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                    </svg>
+                                </button>
+                            )}
                         </div>
-                        {moveProject && (
-                            <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); setMoveProject(''); setMoveProjectId(null); }}
-                                className="absolute top-2/3 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                                style={{ right: '12px' }}
-                            >
-                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                            </button>
-                        )}
                         {/* Description Field */}
                         <div className="mt-2">
                             <p className="text-[12px] font-semibold text-black leading-normal mb-1">Description</p>
@@ -1448,14 +1447,14 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                                 type="text"
                                 value={moveDescription}
                                 onChange={(e) => setMoveDescription(e.target.value)}
-                                className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-3 text-[12px] font-medium bg-white text-black"
+                                className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-3 text-[12px] font-medium bg-white text-black"
                                 placeholder="Enter description"
                             />
                         </div>
                     </div>
                 )}
                 {/* Search Input */}
-                <div className="px-6 pt-4 pb-4 border-b border-[#E0E0E0]">
+                <div className="px-4 pt-4 pb-2">
                     <div className="relative">
                         <input
                             type="text"
@@ -1471,7 +1470,7 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                                 }, 300);
                             }}
                             placeholder="Search by Item Name, Model, Brand, or Type"
-                            className="w-full h-[40px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[14px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                            className="w-full h-[40px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-full text-[14px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
                             autoFocus={false}
                         />
                         <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
@@ -1483,7 +1482,7 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                     </div>
                 </div>
                 {/* Results List */}
-                <div className="flex-1 overflow-y-auto px-4 py-4" style={{ maxHeight: 'calc(100vh - 250px)' }}>
+                <div className="flex-1 overflow-y-auto px-6 py-4 no-scrollbar scrollbar-none" style={{ maxHeight: 'calc(100vh - 250px)' }}>
                     {(() => {
                         // For isFromUpdate, merge search results with selected items that aren't in search results
                         let itemsToDisplay = [...searchResults];
@@ -1508,7 +1507,7 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                         }
                         
                         return (
-                            <div className="space-y-3">
+                            <div className="space-y-[3px]">
                                 {itemsToDisplay.map((item) => {
                                 const itemId = getItemKey(item);
                                 // Find matching existing item

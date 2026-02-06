@@ -652,7 +652,7 @@ const ProjectUsageReport = () => {
         </div>
       </div>
       {/* Report/History Tabs */}
-      <div className="flex-shrink-0 px-4 pt-2">
+      <div className="flex-shrink-0 px-4 pt-1">
         <div className="flex bg-gray-100 items-center h-9 shadow-sm flex-1 rounded-md">
           <button
             type="button"
@@ -686,7 +686,7 @@ const ProjectUsageReport = () => {
           <div className="relative">
             <div
               onClick={() => setShowProjectModal(true)}
-              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
               style={{
                 boxSizing: 'border-box',
                 color: selectedProject ? '#000' : '#9E9E9E'

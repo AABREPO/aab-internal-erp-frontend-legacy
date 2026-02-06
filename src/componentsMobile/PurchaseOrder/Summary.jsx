@@ -241,7 +241,7 @@ const Summary = () => {
               <div className="relative">
                 <div
                   onClick={() => setShowVendorModal(true)}
-                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                   style={{
                     boxSizing: 'border-box',
                     color: selectedVendor ? '#000' : '#9E9E9E'
@@ -285,7 +285,7 @@ const Summary = () => {
               <div className="relative">
                 <div
                   onClick={() => setShowProjectModal(true)}
-                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                   style={{
                     boxSizing: 'border-box',
                     color: selectedProject ? '#000' : '#9E9E9E'
@@ -353,7 +353,7 @@ const Summary = () => {
       )}
       {/* Empty State */}
       {((viewMode === 'vendor' && selectedVendor) || (viewMode === 'project' && selectedProject)) && summaryData.length === 0 && (
-        <div className="bg-white rounded-[8px] border border-[rgba(0,0,0,0.16)] w-[328px] p-8 text-center">
+        <div className="bg-white rounded- border border-[rgba(0,0,0,0.16)] w-[328px] p-8 text-center">
           <p className="text-[12px] font-medium text-[#9E9E9E]">
             No {viewMode === 'vendor' ? 'projects' : 'vendors'} found
           </p>

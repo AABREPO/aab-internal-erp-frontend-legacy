@@ -1247,11 +1247,11 @@ const AddInput = () => {
       {/* New Input Section */}
       <div className="px-4 pt-2">
         {/* New Input Header - Sticky */}
-        <div className=" top-[100px] z-30 bg-white flex items-center justify-between mb-2 border-b border-[#E0E0E0] pb-2">
+        <div className=" top-[100px] z-30 bg-white flex items-center justify-between mb-2 border-b border-[#E0E0E0] pb-1">
           {/* Group Dropdown - Left Side */}
           <button
             onClick={() => setShowGroupModal(true)}
-            className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+            className="text-[12px] font-medium text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
           >
             {selectedGroup || 'Group'}
           </button>
@@ -1259,7 +1259,7 @@ const AddInput = () => {
             {/* Locators - Middle */}
             <button
               onClick={() => setShowLocatorsModal(true)}
-              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+              className="text-[12px] font-medium text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
             >
               Locators
             </button>
@@ -1267,7 +1267,7 @@ const AddInput = () => {
             {/* Category Dropdown - Right Side */}
             <button
               onClick={() => setShowCategoryModal(true)}
-              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+              className="text-[12px] font-medium text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
             >
               {category || 'Category'}
             </button>
@@ -1284,7 +1284,7 @@ const AddInput = () => {
               <button
                 type="button"
                 onClick={() => setShowItemNameModal(true)}
-                className="w-full h-[32px] px-3 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
+                className="w-full h-[32px] px-3 border border-[rgba(0,0,0,0.16)] rounded text-[12px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
                 style={{
                   paddingRight: formData.itemName ? '32px' : '12px',
                   boxSizing: 'border-box'
@@ -1338,7 +1338,7 @@ const AddInput = () => {
               <button
                 type="button"
                 onClick={() => setShowModelModal(true)}
-                className="w-full h-[32px] px-3 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
+                className="w-full h-[32px] px-3 border border-[rgba(0,0,0,0.16)] rounded text-[12px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
                 style={{
                   paddingRight: formData.model ? '32px' : '12px',
                   boxSizing: 'border-box'
@@ -1392,7 +1392,7 @@ const AddInput = () => {
               <button
                 type="button"
                 onClick={() => setShowTypeModal(true)}
-                className="w-full h-[32px] px-3 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
+                className="w-full h-[32px] px-3 border border-[rgba(0,0,0,0.16)] rounded text-[12px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
                 style={{
                   paddingRight: formData.type ? '32px' : '12px',
                   boxSizing: 'border-box'
@@ -1447,7 +1447,7 @@ const AddInput = () => {
                 <button
                   type="button"
                   onClick={() => setShowBrandModal(true)}
-                  className="w-[120px] h-[32px] px-3 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
+                  className="w-[120px] h-[32px] px-3 border border-[rgba(0,0,0,0.16)] rounded text-[12px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
                   style={{
                     paddingRight: formData.brand ? '32px' : '12px',
                     boxSizing: 'border-box'
@@ -1502,7 +1502,7 @@ const AddInput = () => {
                 value={formData.minQty}
                 onChange={(e) => handleFieldChange('minQty', e.target.value)}
                 placeholder="Type Min Qty"
-                className="w-[90px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium text-black bg-white placeholder:text-[#9E9E9E] focus:outline-none"
+                className="w-[90px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-4 text-[12px] font-medium text-black bg-white placeholder:text-[#9E9E9E] focus:outline-none"
               />
             </div>
             {/* Default Qty */}
@@ -1515,7 +1515,7 @@ const AddInput = () => {
                 value={formData.defaultQty}
                 onChange={(e) => handleFieldChange('defaultQty', e.target.value)}
                 placeholder="Type Default Qty"
-                className="w-[90px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium text-black bg-white placeholder:text-[#9E9E9E] focus:outline-none"
+                className="w-[90px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-4 text-[12px] font-medium text-black bg-white placeholder:text-[#9E9E9E] focus:outline-none"
               />
             </div>
           </div>
@@ -1525,7 +1525,7 @@ const AddInput = () => {
           <button
             onClick={handleAddToList}
             disabled={!formData.itemName || !formData.model || !formData.type || !formData.brand}
-            className={`w-[328px] h-[32px] rounded-[8px] flex items-center justify-center gap-2 text-white text-[12px] font-medium transition-colors ${formData.itemName && formData.model && formData.type && formData.brand
+            className={`w-[328px] h-[32px] rounded flex items-center justify-center gap-2 text-white text-[12px] font-medium transition-colors ${formData.itemName && formData.model && formData.type && formData.brand
               ? 'bg-black hover:bg-gray-800'
               : 'bg-[#757575] cursor-not-allowed'
               }`}

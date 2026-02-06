@@ -1222,8 +1222,8 @@ const Outgoing = ({ user }) => {
     <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden">
       {/* Date and Actions Row - Only show when not in empty state */}
       {!isEmptyState && (
-        <div className="px-4">
-          <div className="sticky top-[100px] z-30 bg-white flex items-center justify-between mb-2 mt-0.5 border-b border-[#E0E0E0]">
+        <div className="px-4 items-center">
+          <div className="sticky top-[100px] z-30 bg-white flex items-center justify-between mb-2 border-b border-[#E0E0E0]">
             <button
               type="button"
               onClick={() => setShowDatePicker(true)}
@@ -1253,14 +1253,14 @@ const Outgoing = ({ user }) => {
               ) : (
                 <>
                   <button type="button" onClick={() => handleSaveOutgoing('stock return')}
-                    className="flex items-center text-[13px] gap-1 font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
+                    className="flex items-center text-[12px] gap-1 font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
                   >
-                    Stock Return <img src={SR} alt="SR" className="w-[13px] h-[13px]" />
+                    Stock Return <img src={SR} alt="SR" className="w-[11px] h-[11px]" />
                   </button>
                   <button type="button" onClick={() => handleSaveOutgoing('dispatch')}
-                    className="flex items-center text-[13px] gap-1 font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
+                    className="flex items-center text-[12px] gap-1 font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
                   >
-                    Dispatch <img src={DP} alt="DP" className="w-[13px] h-[13px]" />
+                    Dispatch <img src={DP} alt="DP" className="w-[11px] h-[11px]" />
                   </button>
                   {hasOpenedAdd && (
                     <button
@@ -1269,7 +1269,7 @@ const Outgoing = ({ user }) => {
                         setHideSummaryCard(true);
                         setIsEditMode(true);
                       }}
-                      className="flex items-center font-semibold justify-center rounded p-1 ml-1"
+                      className="flex items-center font-semibold justify-center rounded ml-1"
                     >
                       <img src={editIcon} alt="Edit" className="w-[15px] h-[15px]" />
                     </button>
@@ -1284,7 +1284,7 @@ const Outgoing = ({ user }) => {
                     setHasOpenedAdd(false);
                     setHideSummaryCard(true);
                   }}
-                  className="flex items-center font-semibold justify-center rounded p-1"
+                  className="flex items-center font-semibold justify-center rounded"
                 >
                   <img src={editIcon} alt="Edit" className="w-[15px] h-[15px]" />
                 </button>
@@ -1298,7 +1298,7 @@ const Outgoing = ({ user }) => {
         <div className="px-4 ">
           {/* Date in empty state */}
           {isEmptyState && (
-            <div className="mb-2 items-center border-b border-gray-200 pb-2 mt-0.5">
+            <div className="mb-2 items-center border-b border-gray-200 pb-1 mt-0.5">
               <button
                 type="button"
                 onClick={() => setShowDatePicker(true)}
@@ -1317,7 +1317,7 @@ const Outgoing = ({ user }) => {
               <div className="relative">
                 <div
                   onClick={() => setShowProjectModal(true)}
-                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                   style={{
                     boxSizing: 'border-box',
                     color: outgoingData.projectName ? '#000' : '#9E9E9E'
@@ -1355,7 +1355,7 @@ const Outgoing = ({ user }) => {
               <div className="relative">
                 <div
                   onClick={() => setShowInchargeModal(true)}
-                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                   style={{
                     boxSizing: 'border-box',
                     color: outgoingData.projectIncharge ? '#000' : '#9E9E9E'
@@ -1394,7 +1394,7 @@ const Outgoing = ({ user }) => {
               <div className="relative">
                 <div
                   onClick={() => setShowStockingLocationModal(true)}
-                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                   style={{
                     boxSizing: 'border-box',
                     color: outgoingData.stockingLocation ? '#000' : '#9E9E9E'

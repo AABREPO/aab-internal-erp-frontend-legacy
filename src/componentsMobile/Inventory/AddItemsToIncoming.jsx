@@ -695,7 +695,7 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
         style={{ fontFamily: "'Manrope', sans-serif" }}
         onClick={handleBackdropClick}
       >
-        <div className="bg-white w-full max-w-[360px] h-[410px] rounded-tl-[16px] rounded-tr-[16px] relative z-50" onClick={(e) => e.stopPropagation()}>
+        <div className="bg-white w-full max-w-[360px] h-[370px] rounded-tl-[16px] rounded-tr-[16px] relative z-50" onClick={(e) => e.stopPropagation()}>
           {/* Header with Title and Category */}
           <div className="flex items-center justify-between px-6 pt-5 mb-3">
             {/* Title on the left */}
@@ -793,7 +793,7 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
                       type="text"
                       value={formData.quantity}
                       onChange={handleQuantityChange}
-                      className={`w-[100px] h-[32px] border rounded-[8px] px-3 text-[12px] font-medium bg-white focus:outline-none ${quantityError ? 'border-[#e06256] text-black' : 'border-[#d6d6d6] text-black'
+                      className={`w-[100px] h-[32px] border rounded px-3 text-[12px] font-medium bg-white focus:outline-none ${quantityError ? 'border-[#e06256] text-black' : 'border-[#d6d6d6] text-black'
                         }`}
                       style={{ fontFamily: "'Manrope', sans-serif" }}
                       placeholder="Enter"
@@ -808,7 +808,7 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
               </div>
             </div>
             {/* Buttons */}
-            <div className="mt-10 mb-3 flex gap-4">
+            <div className="mt-5 mb-3 flex gap-4">
               <button
                 onClick={onClose}
                 className="w-[175px] h-[40px] border border-[#949494] rounded-[8px] text-[14px] font-bold text-[#363636] bg-white leading-normal"

@@ -2027,7 +2027,7 @@ const History = () => {
       {/* Filter Modal */}
       {showFilterModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif" }} onClick={() => setShowFilterModal(false)}>
-          <div className="bg-white w-full max-w-[360px] h-[402px] rounded-tl-[16px] rounded-tr-[16px] relative z-50 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }} onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white w-full max-w-[360px] h-[370px] rounded-tl-[16px] rounded-tr-[16px] relative z-50 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }} onClick={(e) => e.stopPropagation()}>
             {/* Title */}
             <div className="px-6 pt-5 pb-4 flex items-center justify-between">
               <p className="text-[14px] font-semibold text-black">Select Filters</p>
@@ -2097,7 +2097,7 @@ const History = () => {
                       <button
                         type="button"
                         onClick={() => setShowDatePicker(true)}
-                        className="w-full h-[32px] px-4 border border-[#E0E0E0] rounded-[8px] text-[10px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
+                        className="w-full h-[32px] px-4 border border-[#E0E0E0] rounded text-[10px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
                       >
                         <span className={`${(filters.startDate || filters.endDate) ? 'text-black' : 'text-[#9E9E9E]'} whitespace-nowrap overflow-hidden text-ellipsis`}>
                           {filters.startDate && filters.endDate
@@ -2123,7 +2123,7 @@ const History = () => {
                         value={filters.poNumber}
                         onChange={(e) => setFilters({ ...filters, poNumber: e.target.value })}
                         placeholder="Enter"
-                        className="w-full h-[32px] px-4 border border-[#E0E0E0] rounded-[8px] text-[14px] font-medium text-black placeholder:text-[#9E9E9E] focus:outline-none"
+                        className="w-full h-[32px] px-4 border border-[#E0E0E0] rounded text-[14px] font-medium text-black placeholder:text-[#9E9E9E] focus:outline-none"
                       />
                     </div>
                   </div>
@@ -2131,7 +2131,7 @@ const History = () => {
               </div>
             </div>            
             {/* Action Buttons - Fixed at bottom */}
-            <div className="absolute mt-10 left-0 right-0 px-6 flex gap-4">
+            <div className="absolute mt-5 left-0 right-0 px-6 flex gap-4">
               <button
                 onClick={() => setShowFilterModal(false)}
                 className="w-[175px] h-[40px] border border-[#949494] rounded-[8px] text-[14px] font-bold text-[#363636] bg-white leading-normal"

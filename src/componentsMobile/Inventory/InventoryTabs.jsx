@@ -4,11 +4,11 @@ const InventoryTabs = ({ activeTab = 'net-stock', onTabChange }) => {
   const tabs = [
     { id: 'outgoing', label: 'Outgoing' },
     { id: 'incoming', label: 'Incoming' }, 
-    { id: 'project-usage-report', label: 'Project Usage' },
-    { id: 'net-stock', label: 'Net Stock' },
     { id: 'history', label: 'History' },
-    { id: 'add-input', label: 'Add Input' },
     { id: 'incoming-tracker', label: 'Incoming Tracker' },
+    { id: 'net-stock', label: 'Net Stock' },
+    { id: 'project-usage-report', label: 'Project Usage' },
+    { id: 'add-input', label: 'Add Input' },
     { id: 'non-po-history', label: 'Non PO History' },
     { id: 'edit-stock', label: 'Edit Stock ' }
   ];

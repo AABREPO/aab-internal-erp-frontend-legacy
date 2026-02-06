@@ -5,6 +5,8 @@ import Edit from '../Images/edit.png'
 import Change1 from '../Images/right-left.png'
 import Change2 from '../Images/two-arrow.png'
 import { to } from 'mathjs';
+import Filter from '../Images/Filter.png'
+import Close from '../Images/close.png'
 
 const EditStock = () => {
   const [activeSubTab, setActiveSubTab] = useState('transfer'); // 'transfer', 'update', 'history'
@@ -1208,7 +1210,7 @@ const EditStock = () => {
     <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden bg-white">
       {/* Category Text */}
       {activeSubTab === 'update' && activeSubTab !== 'history' && (
-        <div className="flex-shrink-0 px-4 pt-2 pb-2">
+        <div className="flex-shrink-0 px-4 pt-2 pb-1">
           <div className="flex items-center justify-between flex-1">
             <p className="text-[12px] font-medium text-black leading-normal">
               #
@@ -1223,7 +1225,7 @@ const EditStock = () => {
         </div>
       )}
       {activeSubTab === 'history' && (
-        <div className="flex-shrink-0 px-4 pt-2 pb-2">
+        <div className="flex-shrink-0 px-4 pt-2 pb-1">
           <div className="flex items-center justify-between flex-1">
             <div
               onClick={() => setShowEnoModal(true)}
@@ -1243,7 +1245,7 @@ const EditStock = () => {
         </div>
       )}
       {activeSubTab === 'transfer' && (
-        <div className="flex-shrink-0 px-4 pt-2 pb-2 flex items-center justify-between">
+        <div className="flex-shrink-0 px-4 pt-2 pb-1 flex items-center justify-between">
           <div className="flex items-center justify-between flex-1">
             <p className="text-[12px] font-medium text-black leading-normal">
               #
@@ -1278,11 +1280,11 @@ const EditStock = () => {
       )}
       {/* Sub-navigation Tabs: Transfer, Update, History */}
       <div className="flex-shrink-0 px-4">
-        <div className="flex bg-gray-100 items-center h-9 shadow-sm flex-1">
+        <div className="flex bg-gray-100 items-center h-9 shadow-sm rounded-md flex-1">
           <button
             type="button"
             onClick={() => setActiveSubTab('transfer')}
-            className={`flex-1 h-[32px] rounded-md text-[12px] font-medium leading-normal transition-colors duration-1000 ease-out ${activeSubTab === 'transfer'
+            className={`flex-1 h-[32px] rounded-md text-[12px] font-medium leading-normal ml-0.5 transition-colors duration-1000 ease-out ${activeSubTab === 'transfer'
               ? 'bg-white text-black'
               : 'bg-gray-100 text-gray-600'
               }`}
@@ -1302,7 +1304,7 @@ const EditStock = () => {
           <button
             type="button"
             onClick={() => setActiveSubTab('history')}
-            className={`flex-1 h-[32px] rounded-md text-[12px] font-medium leading-normal transition-colors duration-1000 ease-out ${activeSubTab === 'history'
+            className={`flex-1 h-[32px] rounded-md text-[12px] font-medium leading-normal mr-0.5 transition-colors duration-1000 ease-out ${activeSubTab === 'history'
               ? 'bg-white text-black'
               : 'bg-gray-100 text-gray-600'
               }`}
@@ -1340,22 +1342,7 @@ const EditStock = () => {
             onClick={() => setShowFilterSheet(true)}
             className="flex items-center gap-2 text-[12px] font-medium text-gray-700"
           >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-              {/* Top horizontal line */}
-              <line x1="2" y1="5" x2="16" y2="5" stroke={(filterData.stockingLocation || filterData.itemName || filterData.transfer || filterData.update) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
-              {/* Top vertical line intersecting center */}
-              <line x1="9" y1="3" x2="9" y2="7" stroke={(filterData.stockingLocation || filterData.itemName || filterData.transfer || filterData.update) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
-              {/* Top arrows pointing left and right */}
-              <path d="M7 4L9 5L11 4" stroke={(filterData.stockingLocation || filterData.itemName || filterData.transfer || filterData.update) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-              <path d="M7 6L9 5L11 6" stroke={(filterData.stockingLocation || filterData.itemName || filterData.transfer || filterData.update) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-              {/* Bottom horizontal line */}
-              <line x1="2" y1="13" x2="16" y2="13" stroke={(filterData.stockingLocation || filterData.itemName || filterData.transfer || filterData.update) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
-              {/* Bottom vertical line intersecting center */}
-              <line x1="9" y1="11" x2="9" y2="15" stroke={(filterData.stockingLocation || filterData.itemName || filterData.transfer || filterData.update) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
-              {/* Bottom arrows pointing left and right */}
-              <path d="M7 12L9 13L11 12" stroke={(filterData.stockingLocation || filterData.itemName || filterData.transfer || filterData.update) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-              <path d="M7 14L9 13L11 14" stroke={(filterData.stockingLocation || filterData.itemName || filterData.transfer || filterData.update) ? "#9E9E9E" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-            </svg>
+            <img src={Filter} alt="Filter" className="w-[13px] h-[11px]" />
             {!(filterData.stockingLocation || filterData.itemName || filterData.transfer || filterData.update) && (
               <span className="text-[12px] font-medium text-black">Filter</span>
             )}
@@ -1454,7 +1441,7 @@ const EditStock = () => {
               <div className="relative">
                 <div
                   onClick={() => setShowFromModal(true)}
-                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                   style={{
                     color: fromLocation ? '#000' : '#9E9E9E',
                     fontFamily: "'Manrope', sans-serif"
@@ -1492,7 +1479,7 @@ const EditStock = () => {
               <div className="relative">
                 <div
                   onClick={() => setShowToModal(true)}
-                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                   style={{
                     color: toLocation ? '#000' : '#9E9E9E',
                     fontFamily: "'Manrope', sans-serif"
@@ -1610,7 +1597,7 @@ const EditStock = () => {
               <div className="relative">
                 <div
                   onClick={() => setShowUpdateLocationModal(true)}
-                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
                   style={{
                     boxSizing: 'border-box',
                     color: updateSelectedLocation ? '#000' : '#9E9E9E',
@@ -2154,7 +2141,7 @@ const EditStock = () => {
               </div>
               <div className=' mr-4 mt-1'>
                 <button onClick={() => setShowFilterSheet(false)} className="text-red-500 hover:text-red-700 text-xl font-bold">
-                  ✕
+                  <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
                 </button>
               </div>
             </div>
@@ -2187,7 +2174,7 @@ const EditStock = () => {
                           setStockingLocationFilterSearch('');
                         }
                       }}
-                      className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded-lg text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white"
+                      className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white"
                       style={{
                         paddingRight: filterData.stockingLocation ? '60px' : '40px',
                         fontFamily: "'Manrope', sans-serif"
@@ -2290,7 +2277,7 @@ const EditStock = () => {
                           setItemNameFilterSearch('');
                         }
                       }}
-                      className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded-lg text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white"
+                      className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white"
                       style={{
                         paddingRight: filterData.itemName ? '60px' : '40px',
                         fontFamily: "'Manrope', sans-serif"
@@ -2394,7 +2381,7 @@ const EditStock = () => {
                             setTransferFilterSearch('');
                           }
                         }}
-                        className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded-lg text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white"
+                        className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white"
                         style={{
                           paddingRight: filterData.transfer ? '60px' : '40px',
                           fontFamily: "'Manrope', sans-serif"
@@ -2495,7 +2482,7 @@ const EditStock = () => {
                             setUpdateFilterSearch('');
                           }
                         }}
-                        className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded-lg text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white"
+                        className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white"
                         style={{
                           paddingRight: filterData.update ? '60px' : '40px',
                           fontFamily: "'Manrope', sans-serif"

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Close from '../Images/close.png'
 
 const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options = [], fieldName = 'Vendor', onAddNew, showStarIcon = true }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -115,7 +116,7 @@ const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options =
             onClick={onClose} 
             className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity"
           >
-            ×
+            <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
           </button>
         </div>
 
@@ -140,7 +141,7 @@ const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options =
         </div>
 
         {/* Options List */}
-        <div className="flex-1 overflow-y-auto mb-4 px-6">
+        <div className="flex-1 overflow-y-auto mb-4 px-6 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           <div className="shadow-md rounded-lg overflow-hidden">
             {/* Create New Option - Show when typing something that doesn't exist */}
             {canCreateNew && (

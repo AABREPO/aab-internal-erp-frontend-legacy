@@ -638,14 +638,14 @@ const ProjectUsageReport = () => {
           <button
             type="button"
             onClick={() => setShowDatePicker(true)}
-            className="text-[12px] font-medium text-black leading-normal underline-offset-2 hover:underline"
+            className="text-[12px] font-semibold text-black leading-normal underline-offset-2 hover:underline"
           >
             {date}
           </button>
           <button
             type="button"
             onClick={() => setShowCategoryModal(true)}
-            className="text-[12px] font-medium text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+            className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
           >
             {selectedCategory || 'Category'}
           </button>

@@ -310,7 +310,7 @@ const ToolsHistory = ({ user }) => {
         setMachineStatusHistory([]);
         return;
       }
-
+      
       setLoadingLog(true);
       try {
         const response = await fetch(`${TOOLS_MACHINE_STATUS_BASE_URL}/item/${selectedItemIdDbId}`, {
@@ -318,18 +318,18 @@ const ToolsHistory = ({ user }) => {
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
         });
-
+        
         if (response.ok) {
           const data = await response.json();
           const statusList = Array.isArray(data) ? data : [];
-
+          
           // Sort by id descending (newest first)
           const sortedStatuses = statusList.sort((a, b) => (b.id || 0) - (a.id || 0));
-
+          
           // Process to detect "Machine Number Changed" events and create log entries
           const processedLogs = [];
           const seenStatusIds = new Set();
-
+          
           // Group by machine number to detect changes
           const statusByMachineNumber = new Map();
           sortedStatuses.forEach(status => {
@@ -341,37 +341,37 @@ const ToolsHistory = ({ user }) => {
               statusByMachineNumber.get(machineNum).push(status);
             }
           });
-
+          
           // Process each status entry
           sortedStatuses.forEach((status, index) => {
             const machineNum = String(status.machine_number || status.machineNumber || '').trim();
             const machineStatus = String(status.machine_status || status.machineStatus || '').trim();
             const statusId = status.id || 0;
-
+            
             if (seenStatusIds.has(statusId)) return;
             seenStatusIds.add(statusId);
-
+            
             // Check if machine number changed from previous entry
             let isMachineNumberChange = false;
             let oldMachineNumber = null;
-
+            
             if (index > 0 && machineNum) {
               const prevStatus = sortedStatuses[index - 1];
               const prevMachineNum = String(prevStatus.machine_number || prevStatus.machineNumber || '').trim();
-
+              
               if (prevMachineNum && machineNum !== prevMachineNum) {
                 isMachineNumberChange = true;
                 oldMachineNumber = prevMachineNum;
               }
             }
-
+            
             // Format date - check for common timestamp field names
             // Spring Boot JPA entities often have createdAt, createdDate, or timestamp fields
-            const logDate = status.createdAt || status.created_at || status.createdDate ||
-              status.created_date || status.timestamp || status.dateCreated || null;
+            const logDate = status.createdAt || status.created_at || status.createdDate || 
+                           status.created_date || status.timestamp || status.dateCreated || null;
             let formattedDate = '';
             let formattedTime = '';
-
+            
             if (logDate) {
               try {
                 const date = new Date(logDate);
@@ -383,10 +383,10 @@ const ToolsHistory = ({ user }) => {
                 console.error('Error parsing date:', e);
               }
             }
-
+            
             // If no date available, show empty (or you could use a placeholder)
             // The UI will still show the status and machine number
-
+            
             // If machine number changed, add a change entry
             if (isMachineNumberChange && oldMachineNumber) {
               processedLogs.push({
@@ -400,7 +400,7 @@ const ToolsHistory = ({ user }) => {
                 time: formattedTime
               });
             }
-
+            
             // Add status entry
             if (machineStatus) {
               processedLogs.push({
@@ -414,10 +414,10 @@ const ToolsHistory = ({ user }) => {
               });
             }
           });
-
+          
           // Sort processed logs by id descending (newest first)
           processedLogs.sort((a, b) => (b.id || 0) - (a.id || 0));
-
+          
           setMachineStatusHistory(processedLogs);
         } else {
           setMachineStatusHistory([]);
@@ -429,7 +429,7 @@ const ToolsHistory = ({ user }) => {
         setLoadingLog(false);
       }
     };
-
+    
     fetchMachineStatusHistory();
   }, [selectedItemIdDbId]);
 
@@ -575,10 +575,10 @@ const ToolsHistory = ({ user }) => {
       );
       const detail = matches.length > 0
         ? matches.sort((a, b) => {
-          const ta = a?.timestamp ? new Date(a.timestamp).getTime() : 0;
-          const tb = b?.timestamp ? new Date(b.timestamp).getTime() : 0;
-          return tb - ta; // latest first
-        })[0]
+            const ta = a?.timestamp ? new Date(a.timestamp).getTime() : 0;
+            const tb = b?.timestamp ? new Date(b.timestamp).getTime() : 0;
+            return tb - ta; // latest first
+          })[0]
         : null;
       if (detail) {
         const brandId = detail?.brand_id ?? detail?.brandId;
@@ -609,11 +609,11 @@ const ToolsHistory = ({ user }) => {
 
   const renderDropdownTrigger = (label, value, placeholder, onClick, disabled = false) => (
     <div className="flex-1">
-      <p className="text-[12px] font-medium text-black mb-1 leading-normal">{label}</p>
+      <p className="text-[12px] font-medium text-black mb-0.5 leading-normal">{label}</p>
       <div className="relative">
         <div
           onClick={disabled ? undefined : onClick}
-          className={`w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-10 text-[12px] font-medium bg-white flex items-center ${disabled ? 'bg-[#E0E0E0] cursor-not-allowed' : 'cursor-pointer'}`}
+          className={`w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center ${disabled ? 'bg-[#E0E0E0] cursor-not-allowed' : 'cursor-pointer'}`}
           style={{
             color: value ? '#000' : '#9E9E9E',
             boxSizing: 'border-box'
@@ -638,35 +638,35 @@ const ToolsHistory = ({ user }) => {
       alert('Please select an item to edit');
       return;
     }
-
+    
     // Pre-populate form with selectedStockForCard data
     const stockItem = selectedStockForCard;
-
+    
     // Get item name
     const itemNameId = stockItem.item_name_id || stockItem.itemNameId;
     const itemNameObj = toolsItemNameListData.find(item => String(item?.id) === String(itemNameId));
     const itemName = itemNameObj?.item_name || itemNameObj?.itemName || '';
-
+    
     // Get brand
     const brandId = stockItem.brand_name_id || stockItem.brandNameId;
     const brandObj = toolsBrandFullData.find(b => String(b?.id) === String(brandId));
     const brandName = brandObj?.tools_brand || brandObj?.toolsBrand || '';
-
+    
     // Get item ID
     const itemIdsId = stockItem.item_ids_id || stockItem.itemIdsId;
     const itemIdObj = toolsItemIdFullData.find(i => String(i?.id) === String(itemIdsId));
     const itemIdName = itemIdObj?.item_id || itemIdObj?.itemId || '';
-
+    
     // Get purchase store
     const purchaseStoreId = stockItem.purchase_store_id || stockItem.purchaseStoreId;
     const purchaseStoreObj = purchaseStoreFullData.find(s => String(s?.id) === String(purchaseStoreId));
     const purchaseStoreName = purchaseStoreObj?.vendorName || purchaseStoreObj?.vendor_name || '';
-
+    
     // Get home location
     const homeLocationId = stockItem.home_location_id || stockItem.homeLocationId;
     const homeLocationObj = homeLocationFullData.find(l => String(l?.id) === String(homeLocationId));
     const homeLocationName = homeLocationObj?.siteName || homeLocationObj?.site_name || homeLocationObj?.projectName || homeLocationObj?.project_name || '';
-
+    
     setEditFormData({
       itemName: itemName,
       itemNameId: itemNameId || null,
@@ -686,7 +686,7 @@ const ToolsHistory = ({ user }) => {
       homeLocationId: homeLocationId || null,
       shopAddress: stockItem.shop_address || stockItem.shopAddress || ''
     });
-
+    
     setFileUrl(stockItem.file_url || stockItem.fileUrl || '');
     setSelectedFile(null);
     setShowEditSheet(true);
@@ -823,7 +823,7 @@ const ToolsHistory = ({ user }) => {
       alert('No item selected to update');
       return;
     }
-
+    
     const stockId = selectedStockForCard.id || selectedStockForCard._id;
     if (!stockId) {
       alert('Cannot update: Item ID not found');
@@ -984,8 +984,8 @@ const ToolsHistory = ({ user }) => {
               className="text-[12px] font-medium text-black leading-normal cursor-pointer hover:opacity-80 p-0 border-0 bg-transparent text-right flex-shrink-0 flex items-center gap-1"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M11 4H4C3.46957 4 2.96086 4.21071 2.58579 4.58579C2.21071 4.96086 2 5.46957 2 6V20C2 20.5304 2.21071 21.0391 2.58579 21.4142C2.96086 21.7893 3.46957 22 4 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M18.5 2.5C18.8978 2.10217 19.4374 1.87868 20 1.87868C20.5626 1.87868 21.1022 2.10217 21.5 2.5C21.8978 2.89782 22.1213 3.43739 22.1213 4C22.1213 4.56261 21.8978 5.10217 21.5 5.5L12 15L8 16L9 12L18.5 2.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M11 4H4C3.46957 4 2.96086 4.21071 2.58579 4.58579C2.21071 4.96086 2 5.46957 2 6V20C2 20.5304 2.21071 21.0391 2.58579 21.4142C2.96086 21.7893 3.46957 22 4 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M18.5 2.5C18.8978 2.10217 19.4374 1.87868 20 1.87868C20.5626 1.87868 21.1022 2.10217 21.5 2.5C21.8978 2.89782 22.1213 3.43739 22.1213 4C22.1213 4.56261 21.8978 5.10217 21.5 5.5L12 15L8 16L9 12L18.5 2.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
               Edit
             </button>
@@ -1011,16 +1011,18 @@ const ToolsHistory = ({ user }) => {
           <button
             type="button"
             onClick={() => setActiveSegment('item')}
-            className={`flex-1 py-1 px-4 ml-1 h-8 rounded text-[14px] font-medium transition-colors ${activeSegment === 'item' ? 'bg-white text-black' : 'bg-gray-100 text-gray-600'
-              }`}
+            className={`flex-1 py-1 px-4 ml-1 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${
+              activeSegment === 'item' ? 'bg-white text-black' : 'bg-gray-100 text-gray-600'
+            }`}
           >
             Item
           </button>
           <button
             type="button"
             onClick={() => setActiveSegment('log')}
-            className={`flex-1 py-1 px-4 ml-1 h-8 rounded text-[14px] font-medium transition-colors ${activeSegment === 'log' ? 'bg-white text-black' : 'bg-gray-100 text-gray-600'
-              }`}
+            className={`flex-1 py-1 px-4 ml-1 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${
+              activeSegment === 'log' ? 'bg-white text-black' : 'bg-gray-100 text-gray-600'
+            }`}
           >
             Log
           </button>
@@ -1030,8 +1032,8 @@ const ToolsHistory = ({ user }) => {
       {/* Item tab: Brand, Item ID, Machine Number, Location dropdowns + details card */}
       {activeSegment === 'item' && (
         <>
-          <div className="flex-shrink-0 px-4 pt-4 pb-2">
-            <div className="flex gap-3 mb-4">
+          <div className="flex-shrink-0 px-4 mt-2 pb-2 space-y-[6px]">
+            <div className="flex gap-3">
               {renderDropdownTrigger('Brand', selectedBrand, 'Select', () => {
                 setShowBrandPopup(true);
                 setShowItemNamePopup(false);
@@ -1060,9 +1062,9 @@ const ToolsHistory = ({ user }) => {
                 !selectedItemIdDbId
               )}
               <div className="flex-1 relative">
-                <p className="text-[12px] font-medium text-black mb-1 leading-normal">Location</p>
+                <p className="text-[12px] font-medium text-black mb-0.5 leading-normal">Location</p>
                 <div
-                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-3 text-[12px] font-medium bg-[#E0E0E0] text-black flex items-center"
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-3 text-[12px] font-medium bg-[#E0E0E0] text-black flex items-center"
                   style={{ boxSizing: 'border-box' }}
                 >
                   {currentLocation || '—'}
@@ -1070,45 +1072,47 @@ const ToolsHistory = ({ user }) => {
               </div>
             </div>
           </div>
+
           {/* Details card + image from stock management API */}
           {selectedItemName && selectedBrand && selectedItemId && selectedMachineNumber && selectedStockForCard && (
-            <div className="flex-1 px-4 pb-4 mt-2">
-              <div className="rounded-[8px] border border-[rgba(0,0,0,0.16)] p-3 bg-white">
-                {selectedStockForCard.model != null && String(selectedStockForCard.model).trim() !== '' && (
-                  <p className="text-[12px] text-black mb-1"><span className="font-medium">Model:</span> {selectedStockForCard.model}</p>
-                )}
-                {(selectedStockForCard.purchase_date ?? selectedStockForCard.purchaseDate) != null && String(selectedStockForCard.purchase_date ?? selectedStockForCard.purchaseDate).trim() !== '' && (
-                  <p className="text-[12px] text-black mb-1"><span className="font-medium">Purchase Date:</span> {selectedStockForCard.purchase_date ?? selectedStockForCard.purchaseDate}</p>
-                )}
-                {(selectedStockForCard.warranty_date ?? selectedStockForCard.warrantyDate) != null && String(selectedStockForCard.warranty_date ?? selectedStockForCard.warrantyDate).trim() !== '' && (
-                  <p className="text-[12px] text-black mb-1"><span className="font-medium">Warranty Date:</span> {selectedStockForCard.warranty_date ?? selectedStockForCard.warrantyDate}</p>
-                )}
-                {(selectedStockForCard.purchase_store_id ?? selectedStockForCard.purchaseStoreId) != null && (() => {
-                  const storeId = selectedStockForCard.purchase_store_id ?? selectedStockForCard.purchaseStoreId;
-                  const storeName = getLocationName(storeId) || storeId;
-                  return String(storeName).trim() !== '' ? (
-                    <p className="text-[12px] text-black mb-1"><span className="font-medium">Purchase Store:</span> {storeName}</p>
-                  ) : null;
-                })()}
-                {(selectedStockForCard.contact) != null && String(selectedStockForCard.contact).trim() !== '' && (
-                  <p className="text-[12px] text-black mb-1"><span className="font-medium">Contact:</span> {selectedStockForCard.contact}</p>
-                )}
-                {(selectedStockForCard.shop_address ?? selectedStockForCard.shopAddress) != null && String(selectedStockForCard.shop_address ?? selectedStockForCard.shopAddress).trim() !== '' && (
-                  <p className="text-[12px] text-black mb-1"><span className="font-medium">Shop Address:</span> {selectedStockForCard.shop_address ?? selectedStockForCard.shopAddress}</p>
-                )}
-                {(selectedStockForCard.tool_status ?? selectedStockForCard.toolStatus) != null && String(selectedStockForCard.tool_status ?? selectedStockForCard.toolStatus).trim() !== '' && (
-                  <p className="text-[12px] text-black mb-1"><span className="font-medium">Status:</span> {selectedStockForCard.tool_status ?? selectedStockForCard.toolStatus}</p>
-                )}
-              </div>
-              {(selectedStockForCard.file_url ?? selectedStockForCard.fileUrl) && (
-                <div className="mt-3 rounded-[8px] overflow-hidden border border-[rgba(0,0,0,0.16)]">
-                  <img src={selectedStockForCard.file_url ?? selectedStockForCard.fileUrl} alt={selectedItemName} className="w-full h-auto object-contain max-h-[280px]" />
-                </div>
-              )}
+        <div className="flex-1 px-4 pb-4 mt-2">
+          <div className="rounded-[8px] border border-[rgba(0,0,0,0.16)] p-3 bg-white">
+            {selectedStockForCard.model != null && String(selectedStockForCard.model).trim() !== '' && (
+              <p className="text-[12px] text-black mb-1"><span className="font-medium">Model:</span> {selectedStockForCard.model}</p>
+            )}
+            {(selectedStockForCard.purchase_date ?? selectedStockForCard.purchaseDate) != null && String(selectedStockForCard.purchase_date ?? selectedStockForCard.purchaseDate).trim() !== '' && (
+              <p className="text-[12px] text-black mb-1"><span className="font-medium">Purchase Date:</span> {selectedStockForCard.purchase_date ?? selectedStockForCard.purchaseDate}</p>
+            )}
+            {(selectedStockForCard.warranty_date ?? selectedStockForCard.warrantyDate) != null && String(selectedStockForCard.warranty_date ?? selectedStockForCard.warrantyDate).trim() !== '' && (
+              <p className="text-[12px] text-black mb-1"><span className="font-medium">Warranty Date:</span> {selectedStockForCard.warranty_date ?? selectedStockForCard.warrantyDate}</p>
+            )}
+            {(selectedStockForCard.purchase_store_id ?? selectedStockForCard.purchaseStoreId) != null && (() => {
+              const storeId = selectedStockForCard.purchase_store_id ?? selectedStockForCard.purchaseStoreId;
+              const storeName = getLocationName(storeId) || storeId;
+              return String(storeName).trim() !== '' ? (
+                <p className="text-[12px] text-black mb-1"><span className="font-medium">Purchase Store:</span> {storeName}</p>
+              ) : null;
+            })()}
+            {(selectedStockForCard.contact) != null && String(selectedStockForCard.contact).trim() !== '' && (
+              <p className="text-[12px] text-black mb-1"><span className="font-medium">Contact:</span> {selectedStockForCard.contact}</p>
+            )}
+            {(selectedStockForCard.shop_address ?? selectedStockForCard.shopAddress) != null && String(selectedStockForCard.shop_address ?? selectedStockForCard.shopAddress).trim() !== '' && (
+              <p className="text-[12px] text-black mb-1"><span className="font-medium">Shop Address:</span> {selectedStockForCard.shop_address ?? selectedStockForCard.shopAddress}</p>
+            )}
+            {(selectedStockForCard.tool_status ?? selectedStockForCard.toolStatus) != null && String(selectedStockForCard.tool_status ?? selectedStockForCard.toolStatus).trim() !== '' && (
+              <p className="text-[12px] text-black mb-1"><span className="font-medium">Status:</span> {selectedStockForCard.tool_status ?? selectedStockForCard.toolStatus}</p>
+            )}
+          </div>
+          {(selectedStockForCard.file_url ?? selectedStockForCard.fileUrl) && (
+            <div className="mt-3 rounded-[8px] overflow-hidden border border-[rgba(0,0,0,0.16)]">
+              <img src={selectedStockForCard.file_url ?? selectedStockForCard.fileUrl} alt={selectedItemName} className="w-full h-auto object-contain max-h-[280px]" />
             </div>
           )}
+        </div>
+      )}
         </>
       )}
+
       {/* Log tab: no dropdowns, just log entries list (Item ID is already in top right as button) */}
       {activeSegment === 'log' && (
         <div className="flex-1 px-4 pb-4 mt-4 min-h-[200px] overflow-y-auto">
@@ -1138,6 +1142,7 @@ const ToolsHistory = ({ user }) => {
                         {logEntry.date} • {logEntry.time}
                       </p>
                     </div>
+                    
                     {/* Right side: Machine Number(s) */}
                     <div className="flex-shrink-0 ml-2 text-right">
                       {logEntry.type === 'machine_number_changed' ? (
@@ -1162,10 +1167,12 @@ const ToolsHistory = ({ user }) => {
           )}
         </div>
       )}
+
       {/* Main content area for Item tab (spacer when no details card) */}
       {activeSegment === 'item' && (
         <div className="flex-1 px-4 pb-4 mt-4 min-h-[200px]" />
       )}
+
       {/* Popups */}
       <SelectOptionModal
         isOpen={showItemNamePopup}
@@ -1199,6 +1206,7 @@ const ToolsHistory = ({ user }) => {
         options={machineNumberOptions}
         fieldName="Machine Number"
       />
+
       {/* Edit Bottom Sheet Modal */}
       {showEditSheet && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif" }} onClick={handleCloseEditSheet}>
@@ -1328,8 +1336,8 @@ const ToolsHistory = ({ user }) => {
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 2H4C2.89543 2 2 2.89543 2 4V12C2 13.1046 2.89543 14 4 14H12C13.1046 14 14 13.1046 14 12V4C14 2.89543 13.1046 2 12 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        <path d="M11 1V4M5 1V4M2 7H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M12 2H4C2.89543 2 2 2.89543 2 4V12C2 13.1046 2.89543 14 4 14H12C13.1046 14 14 13.1046 14 12V4C14 2.89543 13.1046 2 12 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M11 1V4M5 1V4M2 7H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                     </div>
                   </div>
@@ -1350,8 +1358,8 @@ const ToolsHistory = ({ user }) => {
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 2H4C2.89543 2 2 2.89543 2 4V12C2 13.1046 2.89543 14 4 14H12C13.1046 14 14 13.1046 14 12V4C14 2.89543 13.1046 2 12 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        <path d="M11 1V4M5 1V4M2 7H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M12 2H4C2.89543 2 2 2.89543 2 4V12C2 13.1046 2.89543 14 4 14H12C13.1046 14 14 13.1046 14 12V4C14 2.89543 13.1046 2 12 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M11 1V4M5 1V4M2 7H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                     </div>
                   </div>
@@ -1438,6 +1446,7 @@ const ToolsHistory = ({ user }) => {
           </div>
         </div>
       )}
+
       {/* Sheet dropdown picker modal */}
       {showEditSheet && sheetOpenPicker && (
         <div
@@ -1496,6 +1505,7 @@ const ToolsHistory = ({ user }) => {
           </div>
         </div>
       )}
+
       {/* Date Picker Modal */}
       {showDatePicker && (
         <DatePickerModal

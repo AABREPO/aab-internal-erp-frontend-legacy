@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import EditIcon from '../Images/edit1.png';
 import DeleteIcon from '../Images/delete.png';
+import Filter from '../Images/Filter.png'
 
 const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_management';
 const PROJECT_NAMES_BASE_URL = 'https://backendaab.in/aabuilderDash/api/project_Names';
@@ -654,10 +655,10 @@ const ServiceHistory = ({ user, onTabChange }) => {
   return (
     <div className="flex flex-col bg-white min-h-[calc(100vh-90px-80px)]" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* Top Header Section */}
-      <div className="flex-shrink-0 px-4 pt-4 pb-1">
-        <div className="flex justify-between items-start border-b border-gray-200 pb-2 mb-2">
+      <div className="flex-shrink-0 px-4 pt-2 pb-1.5">
+        <div className="flex justify-between items-start border-b border-gray-200 pb-1.5">
           <div>
-            <p className="text-[14px] font-medium text-black leading-normal">Shop Name</p>
+            <p className="text-[12px] font-medium text-black leading-normal">Shop Name</p>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-[12px] text-[#848484] leading-normal flex items-center gap-1">
@@ -673,10 +674,8 @@ const ServiceHistory = ({ user, onTabChange }) => {
       </div>
       {/* Filter and Download Row */}
       <div className="flex justify-between items-center px-4 pb-3">
-        <div className="flex items-center gap-1">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M22 3H2L10 12.46V19L14 21V12.46L22 3Z" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+        <div className="flex items-center gap-2">
+        <img src={Filter} alt="Filter" className="w-[13px] h-[11px]" />
           <span className="text-[12px] font-medium text-black">Filter</span>
         </div>
         <button className="text-[14px] font-medium text-black cursor-pointer hover:opacity-80">

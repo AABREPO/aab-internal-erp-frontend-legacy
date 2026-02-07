@@ -5,6 +5,7 @@ import DateRangePickerModal from './DateRangePickerModal';
 import SelectVendorModal from './SelectVendorModal';
 import Edit from '../Images/edit1.png'
 import Delete from '../Images/delete.png'
+import Filter from '../Images/Filter.png'
 const History = () => {
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   // Cache for fast "get by id" lookups during clone (prevents repeated network calls)
@@ -1694,22 +1695,7 @@ const History = () => {
         <div className="flex items-center justify-between gap-5">
           <div className="flex items-center gap-2  min-w-0">
             <button onClick={() => setShowFilterModal(true)} className="flex items-center gap-2 px-0 flex-shrink-0" >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                {/* Top horizontal line */}
-                <line x1="2" y1="5" x2="16" y2="5" stroke={hasActiveFilters ? "#26bf94" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
-                {/* Top vertical line intersecting center */}
-                <line x1="9" y1="3" x2="9" y2="7" stroke={hasActiveFilters ? "#26bf94" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
-                {/* Top arrows pointing left and right */}
-                <path d="M7 4L9 5L11 4" stroke={hasActiveFilters ? "#26bf94" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                <path d="M7 6L9 5L11 6" stroke={hasActiveFilters ? "#26bf94" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                {/* Bottom horizontal line */}
-                <line x1="2" y1="13" x2="16" y2="13" stroke={hasActiveFilters ? "#26bf94" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
-                {/* Bottom vertical line intersecting center */}
-                <line x1="9" y1="11" x2="9" y2="15" stroke={hasActiveFilters ? "#26bf94" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" />
-                {/* Bottom arrows pointing left and right */}
-                <path d="M7 12L9 13L11 12" stroke={hasActiveFilters ? "#26bf94" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                <path d="M7 14L9 13L11 14" stroke={hasActiveFilters ? "#26bf94" : "#9E9E9E"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-              </svg>
+              <img src={Filter} alt='filter' className=' w-[11px] h-[11px]' />
               {!hasActiveFilters && (
                 <span className="text-[14px] font-medium flex-shrink-0 text-[#9E9E9E]">
                   Filter

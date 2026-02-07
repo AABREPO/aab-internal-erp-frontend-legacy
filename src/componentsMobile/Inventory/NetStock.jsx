@@ -560,13 +560,13 @@ const NetStock = () => {
   return (
     <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden">
       {/* Date Row */}
-      <div className="px-4">
-        <div className=" pt-2 border-b border-gray-200">
+      <div className="">
+        <div className=" px-4 pt-2 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <button
               type="button"
               onClick={() => setShowDatePicker(true)}
-              className="text-[12px] font-medium text-black leading-normal underline-offset-2 mb-1 hover:underline"
+              className="text-[12px] font-semibold text-black leading-normal underline-offset-2 mb-1 hover:underline"
             >
               {selectedDate}
             </button>
@@ -798,7 +798,7 @@ const NetStock = () => {
             className={`w-14 h-5 rounded-full p-1 flex items-center transition-colors ${filteredData.length === 0 ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'} ${selectAllFiltered ? 'bg-[#BEE6CC]' : 'bg-[#cfd4d8]'}`}
             title={filteredData.length === 0 ? 'No items to select' : (selectAllFiltered ? 'Unselect filtered items' : 'Select all filtered items')}
           >
-            <div className={`bg-white w-5 h-4 rounded-full shadow transform transition-transform duration-200 ease-in-out ${selectAllFiltered ? 'translate-x-4' : 'translate-x-0'}`}></div>
+            <div className={`bg-white w-5 h-4 rounded-full shadow transform transition-transform duration-200 ease-in-out ${selectAllFiltered ? 'translate-x-7' : 'translate-x-0'}`}></div>
           </div>
         </div>
       </div>

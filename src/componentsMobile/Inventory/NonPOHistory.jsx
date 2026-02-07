@@ -188,10 +188,15 @@ const NonPOHistory = ({ onTabChange }) => {
 
           // Get entry number
           const entryNumber = record.eno || record.ENO || record.entry_number || record.entryNumber || record.id || '';
+          // Get year from date
+          const year = dateObj.getFullYear();
+          // Format as NPO - year - entryNumber (like PO - year - entryNumber in PurchaseOrder History)
+          const formattedEntryNumber = entryNumber ? `NPO - ${year} - ${entryNumber}` : '';
 
           return {
             ...record,
             entryNumber,
+            formattedEntryNumber,
             vendorName,
             stockingLocation,
             numberOfItems,
@@ -714,7 +719,7 @@ const NonPOHistory = ({ onTabChange }) => {
                         delete cardRefs.current[recordId];
                       }
                     }}
-                    className="flex-1 bg-white rounded-[8px] h-full px-3 py-3 transition-all duration-300 ease-out"
+                    className="flex-1 bg-white rounded-[8px] h-full px-3 py-2 transition-all duration-300 ease-out"
                     style={{
                       transform: `translateX(${swipeOffset}px)`,
                       touchAction: 'pan-y',
@@ -730,21 +735,23 @@ const NonPOHistory = ({ onTabChange }) => {
                   >
                     <div className=" justify-between items-start">
                       {/* Left Side */}
-                      <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center justify-between mb-">
                         <div>
                           <span className="text-[12px] font-semibold text-black">
-                            #{record.entryNumber}
-                          </span>
-                          <span className="text-[12px] font-semibold text-black">
-                            , {record.vendorName}
+                            {record.formattedEntryNumber || `#${record.entryNumber}`}
                           </span>
                         </div>
-                        <p className="text-[12px] text-gray-600 mb-1">
+                        <p className="text-[12px] text-black mb-1">
                           No. of Items - {record.numberOfItems}
                         </p>
                       </div>
                       <div className="flex items-center justify-between">
-                        <p className="text-[12px] text-gray-600 mb-1">
+                        <span className="text-[12px] font-semibold text-black">
+                          {record.vendorName}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <p className="text-[11px] text-[#777777]">
                           {record.stockingLocation}
                         </p>
                         <p className="text-[12px] font-semibold text-[#BF9853]">
@@ -752,15 +759,18 @@ const NonPOHistory = ({ onTabChange }) => {
                         </p>
                       </div>
                       <div className="flex items-center justify-between">
-                        <p className="text-[12px] text-gray-500">
-                          {record.created_date_time && new Date(record.created_date_time).toLocaleString('en-GB', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            hour12: true
-                          })}
+                        <p className="text-[11px] text-[#777777]">
+                          {record.created_date_time && (() => {
+                            const date = new Date(record.created_date_time);
+                            const day = String(date.getDate()).padStart(2, '0');
+                            const month = String(date.getMonth() + 1).padStart(2, '0');
+                            const year = date.getFullYear();
+                            const hours = date.getHours();
+                            const minutes = String(date.getMinutes()).padStart(2, '0');
+                            const ampm = hours >= 12 ? 'PM' : 'AM';
+                            const displayHours = hours % 12 || 12;
+                            return `${day}/${month}/${year} • ${displayHours}:${minutes} ${ampm}`;
+                          })()}
                         </p>
                         <p className="text-[12px] font-semibold text-black">
                           ₹{record.totalAmount?.toLocaleString('en-IN') || '0'}

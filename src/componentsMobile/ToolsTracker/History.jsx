@@ -420,8 +420,8 @@ const History = ({ user, onTabChange }) => {
     };
   }, [historyData]);
   return (
-    <div className="flex flex-col bg-white min-h-[calc(100vh-90px-80px)]" style={{ fontFamily: "'Manrope', sans-serif" }}>
-      <div className="flex-shrink-0 px-4 pt-4 pb-2 border-b border-gray-200">
+    <div className="flex flex-col px-4 bg-white min-h-[calc(100vh-90px-80px)]" style={{ fontFamily: "'Manrope', sans-serif" }}>
+      <div className="flex items-center justify-between pt-2 pb-1.5 border-b border-gray-200">
         <p className="text-[12px] text-black font-medium">Category</p>
       </div>
       <div className="flex-1 px-4 overflow-y-auto pb-4">

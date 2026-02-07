@@ -1407,7 +1407,7 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="flex justify-between items-center px-6 pt-5 pb-2">
+                <div className="flex justify-between items-center px-6 pt-5">
                     <p className="text-[16px] font-semibold text-black">Search Items</p>
                     <button
                         onClick={onClose}
@@ -1420,7 +1420,7 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                 </div>
                 {/* Project Name Dropdown - ONLY for Update → Other Returns */}
                 {isFromUpdate && (
-                    <div className="mt-2 px-4">
+                    <div className=" px-4">
                         <p className="text-[12px] font-semibold text-black leading-normal mb-1">Project Name</p>
                         <div
                             onClick={() => setShowMoveProjectModal(true)}
@@ -1454,7 +1454,7 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                     </div>
                 )}
                 {/* Search Input */}
-                <div className="px-4 pt-4 pb-2">
+                <div className="px-4 pt-1">
                     <div className="relative">
                         <input
                             type="text"
@@ -1470,7 +1470,7 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                                 }, 300);
                             }}
                             placeholder="Search by Item Name, Model, Brand, or Type"
-                            className="w-full h-[40px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-full text-[14px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                            className="w-full h-[40px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-full text-[14px] font-medium text-black placeholder:text-[#bdbbbb] placeholder:text-[12px] placeholder:font-extralight bg-white focus:outline-none"
                             autoFocus={false}
                         />
                         <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
@@ -1482,7 +1482,7 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                     </div>
                 </div>
                 {/* Results List */}
-                <div className="flex-1 overflow-y-auto px-6 py-4 no-scrollbar scrollbar-none" style={{ maxHeight: 'calc(100vh - 250px)' }}>
+                <div className="flex-1 overflow-y-auto px-6 py-2 no-scrollbar scrollbar-none" style={{ maxHeight: 'calc(100vh - 250px)' }}>
                     {(() => {
                         // For isFromUpdate, merge search results with selected items that aren't in search results
                         let itemsToDisplay = [...searchResults];

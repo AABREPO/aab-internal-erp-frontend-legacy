@@ -1466,7 +1466,7 @@ const Incoming = ({ user }) => {
     <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden">
       {/* PO Number and Date Row - Only show when not in empty state */}
       {!isEmptyState && (
-        <div className="px-4">
+        <div className="">
           <div className="sticky top-[100px] z-30 bg-white flex items-center justify-between mt-2 border-b border-[#E0E0E0]">
             <div className="flex items-center gap-2 mb-1">
               <button
@@ -1489,7 +1489,7 @@ const Incoming = ({ user }) => {
               <button
                 type="button"
                 onClick={() => setShowDatePicker(true)}
-                className="text-[12px] font-medium text-black leading-normal underline-offset-2 hover:underline"
+                className="text-[12px] font-semibold text-black leading-normal underline-offset-2 hover:underline"
               >
                 {incomingData.date}
               </button>
@@ -1522,10 +1522,10 @@ const Incoming = ({ user }) => {
       )}
       {/* Form Fields - visible while you are selecting the fields (before first + click) */}
       {!showAddItems && !hasOpenedAdd && (
-        <div className="px-4">
+        <div className="">
           {/* Date in empty state */}
           {isEmptyState && (
-            <div className="sticky z-30 bg-white flex items-center justify-between mt-2 border-b border-[#E0E0E0]">
+            <div className="sticky z-30 px-4 bg-white flex items-center justify-between mt-2 border-b border-[#E0E0E0]">
               <div className="flex items-center gap-2 mb-1">
                 <button
                   type="button"
@@ -1555,7 +1555,7 @@ const Incoming = ({ user }) => {
             </div>
           )}
           {/* Vendor Name Field */}
-          <div className="space-y-[6px]">
+          <div className="space-y-[6px] px-4">
             <div className="mt-2 relative">
               <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
                 Vendor Name<span className="text-[#eb2f8e]">*</span>

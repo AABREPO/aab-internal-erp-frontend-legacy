@@ -769,14 +769,14 @@ const IncomingTracker = ({ user }) => {
             {/* Date Button */}
             <button
               type="button"
-              className="text-[12px] font-medium text-black"
+              className="text-[12px] font-semibold text-black"
             >
               Date
             </button>
             {/* Category Button */}
             <button
               type="button"
-              className=" text-[12px] font-medium text-black"
+              className=" text-[12px] font-semibold text-black"
             >
               Category
             </button>

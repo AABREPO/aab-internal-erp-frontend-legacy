@@ -639,13 +639,13 @@ const PendingItems = ({ user }) => {
   return (
     <div className="flex flex-col min-h-[calc(100vh-90px-80px)] bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* Home Location Filter */}
-      <div className="px-4 pt-4 pb-2">
+      <div className="px-4 pt-2 pb-1.5">
         <label className="block text-[13px] font-medium text-black mb-1">
           Home Location<span className="text-[#eb2f8e]">*</span>
         </label>
         <div
           onClick={() => setShowHomeLocationDropdown(true)}
-          className="w-full h-[32px] px-3 border border-[rgba(0,0,0,0.16)] rounded-[8px] flex items-center justify-between cursor-pointer bg-white"
+          className="w-full h-[32px] px-3 border border-[rgba(0,0,0,0.16)] rounded flex items-center justify-between cursor-pointer bg-white"
         >
           <span className={`text-[12px] ${selectedHomeLocation ? 'text-black font-medium' : 'text-[#9E9E9E]'}`}>
             {selectedHomeLocation ? selectedHomeLocation.value : 'Select Home Location'}
@@ -655,10 +655,10 @@ const PendingItems = ({ user }) => {
           </svg>
         </div>
       </div>
-      <div className="flex justify-between px-4 pt-2 mb-2">
+      <div className="flex justify-between px-4 mb-2">
         <div className="flex bg-gray-100 items-center h-6 shadow-sm rounded-full">
           <button onClick={() => setSelectedDays('all')}
-            className={`flex py-1 px-4 ml-1 h-5 rounded-full text-[11px] items-center font-medium transition-colors ${selectedDays === 'all'
+            className={`flex py-1 px-4 ml-0.5 h-5 rounded-full text-[11px] items-center font-medium transition-colors duration-1000 ease-out ${selectedDays === 'all'
                 ? 'bg-white text-black'
                 : 'bg-gray-100 text-gray-600'
               }`}
@@ -666,7 +666,7 @@ const PendingItems = ({ user }) => {
             All Days
           </button>
           <button onClick={() => setSelectedDays('30')}
-            className={`flex py-1 px-4 ml-1 h-5 rounded-full text-[11px] items-center font-medium transition-colors ${selectedDays === '30'
+            className={`flex py-1 px-4 h-5 rounded-full text-[11px] items-center font-medium transition-colors duration-1000 ease-out ${selectedDays === '30'
                 ? 'bg-white text-black'
                 : 'bg-gray-100 text-gray-600'
               }`}
@@ -674,7 +674,7 @@ const PendingItems = ({ user }) => {
             30 Days
           </button>
           <button onClick={() => setSelectedDays('60')}
-            className={`flex py-1 px-4 ml-1 h-5 rounded-full text-[11px] items-center font-medium transition-colors ${selectedDays === '60'
+            className={`flex py-1 px-4 mr-0.5 h-5 rounded-full text-[11px] items-center font-medium transition-colors duration-1000 ease-out ${selectedDays === '60'
                 ? 'bg-white text-black'
                 : 'bg-gray-100 text-gray-600'
               }`}

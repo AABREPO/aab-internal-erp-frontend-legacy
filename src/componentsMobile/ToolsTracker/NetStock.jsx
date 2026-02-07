@@ -691,17 +691,17 @@ const NetStock = ({ user }) => {
   return (
     <div className="flex flex-col bg-white px-4" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* Category and Brand Section */}
-      <div className="flex justify-between mb-2 mt-2">
-        <p className="text-[12px] text-[#848484] leading-normal mb-2">Category</p>
-        <p className="text-[12px] text-[#848484] leading-normal mb-2">Brand</p>
+      <div className="flex justify-between mt-2">
+        <p className="text-[12px] text-black font-medium leading-normal mb-2">Category</p>
+        <p className="text-[12px] text-black font-medium leading-normal mb-2">Brand</p>
       </div>
       
       {/* Table/List Segmented Control */}
-      <div className="flex-shrink-0 pt-2">
+      <div className="flex-shrink-0">
         <div className="flex bg-gray-100 items-center h-9 shadow-sm flex-1 rounded-md">
           <button
             onClick={() => setViewMode('table')}
-            className={`flex-1 py-1 px-4 ml-1 h-8 rounded text-[14px] font-medium transition-colors ${viewMode === 'table'
+            className={`flex-1 py-1 px-4 ml-0.5 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${viewMode === 'table'
               ? 'bg-white text-black'
               : 'bg-gray-100 text-gray-600'
               }`}
@@ -710,7 +710,7 @@ const NetStock = ({ user }) => {
           </button>
           <button
             onClick={() => setViewMode('list')}
-            className={`flex-1 py-1 px-4 ml-1 h-8 rounded text-[14px] font-medium transition-colors ${viewMode === 'list'
+            className={`flex-1 py-1 px-4 mr-0.5 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${viewMode === 'list'
               ? 'bg-white text-black'
               : 'bg-gray-100 text-gray-600'
               }`}
@@ -721,17 +721,17 @@ const NetStock = ({ user }) => {
       </div>
 
       {/* Item Name and Item ID Dropdowns */}
-      <div className="flex gap-3 mt-4">
+      <div className="flex gap-3 mt-2">
         {/* Item Name Dropdown */}
         <div className="flex-1 relative dropdown-container">
-          <p className="text-[12px] font-medium text-black mb-1 leading-normal">Item Name</p>
+          <p className="text-[12px] font-medium text-black mb-0.5 leading-normal">Item Name</p>
           <div className="relative">
             <div
               onClick={() => {
                 setShowItemNameDropdown(!showItemNameDropdown);
                 setShowItemIdDropdown(false);
               }}
-              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
               style={{
                 color: selectedItemName ? '#000' : '#9E9E9E',
                 boxSizing: 'border-box'
@@ -774,14 +774,14 @@ const NetStock = ({ user }) => {
 
         {/* Item ID Dropdown */}
         <div className="flex-1 relative dropdown-container">
-          <p className="text-[12px] font-medium text-black mb-1 leading-normal">Item ID</p>
+          <p className="text-[12px] font-medium text-black mb-0.5 leading-normal">Item ID</p>
           <div className="relative">
             <div
               onClick={() => {
                 setShowItemIdDropdown(!showItemIdDropdown);
                 setShowItemNameDropdown(false);
               }}
-              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
               style={{
                 color: selectedItemId ? '#000' : '#9E9E9E',
                 boxSizing: 'border-box'

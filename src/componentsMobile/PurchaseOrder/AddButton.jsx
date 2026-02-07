@@ -6,7 +6,7 @@ import New from '../Images/New.png'
 const AddButton = ({ onClick, disabled = false, showNew = false }) => {
   return (
     <div 
-      className={`fixed bottom-[110px] right-0 lg:right-[calc(50%-164px)] z-30 ${
+      className={`fixed bottom-[110px] right-[24px] lg:right-[calc(60%-174px)] z-30 ${
         disabled ? 'cursor-not-allowed pointer-events-none' : 'cursor-pointer'
       }`} 
       onClick={disabled ? undefined : onClick}

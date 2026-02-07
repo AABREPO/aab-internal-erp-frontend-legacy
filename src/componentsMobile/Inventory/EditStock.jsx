@@ -1212,12 +1212,12 @@ const EditStock = () => {
       {activeSubTab === 'update' && activeSubTab !== 'history' && (
         <div className="flex-shrink-0 px-4 pt-2 pb-1">
           <div className="flex items-center justify-between flex-1">
-            <p className="text-[12px] font-medium text-black leading-normal">
+            <p className="text-[12px] font-semibold text-black leading-normal">
               #
             </p>
             <button
               onClick={() => setShowCategoryModal(true)}
-              className="text-[12px] font-medium text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
             >
               Category
             </button>
@@ -1229,14 +1229,14 @@ const EditStock = () => {
           <div className="flex items-center justify-between flex-1">
             <div
               onClick={() => setShowEnoModal(true)}
-              className="text-[12px] font-medium text-black leading-normal cursor-pointer flex items-center gap-1"
+              className="text-[12px] font-semibold text-black leading-normal cursor-pointer flex items-center gap-1"
             >
               {selectedEno ? `#${selectedEno}` : '# E.No'}
             </div>
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setShowCategoryModal(true)}
-                className="text-[12px] font-medium text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+                className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
               >
                 Category
               </button>
@@ -1247,12 +1247,12 @@ const EditStock = () => {
       {activeSubTab === 'transfer' && (
         <div className="flex-shrink-0 px-4 pt-2 pb-1 flex items-center justify-between">
           <div className="flex items-center justify-between flex-1">
-            <p className="text-[12px] font-medium text-black leading-normal">
+            <p className="text-[12px] font-semibold text-black leading-normal">
               #
             </p>
             <button
               onClick={() => setShowCategoryModal(true)}
-              className="text-[12px] font-medium text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
             >
               Category
             </button>

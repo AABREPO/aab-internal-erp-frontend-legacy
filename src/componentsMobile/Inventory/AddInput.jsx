@@ -1245,13 +1245,13 @@ const AddInput = () => {
   return (
     <div className="relative w-full bg-white max-w-[360px] mx-auto" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* New Input Section */}
-      <div className="px-4 pt-2">
+      <div className=" pt-2">
         {/* New Input Header - Sticky */}
-        <div className=" top-[100px] z-30 bg-white flex items-center justify-between mb-2 border-b border-[#E0E0E0] pb-1">
+        <div className=" top-[100px] z-30 px-4 bg-white flex items-center justify-between mb-2 border-b border-[#E0E0E0] pb-1">
           {/* Group Dropdown - Left Side */}
           <button
             onClick={() => setShowGroupModal(true)}
-            className="text-[12px] font-medium text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+            className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
           >
             {selectedGroup || 'Group'}
           </button>
@@ -1259,7 +1259,7 @@ const AddInput = () => {
             {/* Locators - Middle */}
             <button
               onClick={() => setShowLocatorsModal(true)}
-              className="text-[12px] font-medium text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
             >
               Locators
             </button>
@@ -1267,14 +1267,14 @@ const AddInput = () => {
             {/* Category Dropdown - Right Side */}
             <button
               onClick={() => setShowCategoryModal(true)}
-              className="text-[12px] font-medium text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
             >
               {category || 'Category'}
             </button>
           </div>
         </div>
         {/* Form Fields */}
-        <div className="space-y-[6px]">
+        <div className="space-y-[6px] px-4">
           {/* Item Name */}
           <div className="">
             <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
@@ -1521,7 +1521,7 @@ const AddInput = () => {
           </div>
         </div>
         {/* Add to List / Update List Button */}
-        <div className="mt-2">
+        <div className="mt-2 px-4">
           <button
             onClick={handleAddToList}
             disabled={!formData.itemName || !formData.model || !formData.type || !formData.brand}

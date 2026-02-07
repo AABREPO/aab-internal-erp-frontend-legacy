@@ -1222,43 +1222,43 @@ const Outgoing = ({ user }) => {
     <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden">
       {/* Date and Actions Row - Only show when not in empty state */}
       {!isEmptyState && (
-        <div className="px-4 items-center">
-          <div className="sticky top-[100px] z-30 bg-white flex items-center justify-between mb-2 border-b border-[#E0E0E0]">
+        <div className="items-center border-b border-[#E0E0E0]">
+          <div className="sticky top-[100px] z-30 bg-white flex items-center justify-between mb-2 ">
             <button
               type="button"
               onClick={() => setShowDatePicker(true)}
-              className="text-[12px] font-medium text-black leading-normal underline-offset-2 hover:underline"
+              className="text-[12px] font-semibold text-black leading-normal underline-offset-2 hover:underline"
             >
               {outgoingData.date}
             </button>
             <div className="flex items-center">
               {isEditMode && fromHistory ? (
                 <button type="button" onClick={() => handleSaveOutgoing(outgoingData.outgoingType || 'stock return')}
-                  className="flex items-center text-[13px] font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
+                  className="flex items-center text-[13px] font-semibold text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
                 >
                   Update
                 </button>
               ) : fromHistory && !isEditMode && ((outgoingData.outgoingType || '').toLowerCase() === 'stock return' || (outgoingData.outgoingType || '').toLowerCase() === 'stockreturn') ? (
                 <button type="button" onClick={() => handleDownloadPDF()}
-                  className="flex items-center text-[13px] font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
+                  className="flex items-center text-[13px] font-semibold text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
                 >
                   Download
                 </button>
               ) : fromHistory && !isEditMode && (outgoingData.outgoingType || '').toLowerCase() === 'dispatch' ? (
                 <button type="button" onClick={() => handleDownloadPDF()}
-                  className="flex items-center text-[13px] font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
+                  className="flex items-center text-[13px] font-semibold text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
                 >
                   Download
                 </button>
               ) : (
                 <>
                   <button type="button" onClick={() => handleSaveOutgoing('stock return')}
-                    className="flex items-center text-[12px] gap-1 font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
+                    className="flex items-center text-[12px] gap-1 font-semibold text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
                   >
                     Stock Return <img src={SR} alt="SR" className="w-[11px] h-[11px]" />
                   </button>
                   <button type="button" onClick={() => handleSaveOutgoing('dispatch')}
-                    className="flex items-center text-[12px] gap-1 font-medium text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
+                    className="flex items-center text-[12px] gap-1 font-semibold text-black leading-normal hover:bg-gray-100 rounded-[8px] px-2 py-1.5"
                   >
                     Dispatch <img src={DP} alt="DP" className="w-[11px] h-[11px]" />
                   </button>
@@ -1295,10 +1295,10 @@ const Outgoing = ({ user }) => {
       )}
       {/* Form Fields - visible while you are selecting the three fields (before first + click) or when hideSummaryCard is true */}
       {(!hasOpenedAdd || hideSummaryCard) && (
-        <div className="px-4 ">
+        <div className=" ">
           {/* Date in empty state */}
           {isEmptyState && (
-            <div className="mb-2 items-center border-b border-gray-200 pb-1 mt-0.5">
+            <div className="mb-2 items-center px-4 border-b border-gray-200 pb-1 mt-0.5">
               <button
                 type="button"
                 onClick={() => setShowDatePicker(true)}
@@ -1309,7 +1309,7 @@ const Outgoing = ({ user }) => {
             </div>
           )}
           {/* Project Name Field */}
-          <div className="space-y-[6px]">
+          <div className="space-y-[6px] px-4">
             <div className=" relative">
               <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
                 Project Name<span className="text-[#eb2f8e]">*</span>

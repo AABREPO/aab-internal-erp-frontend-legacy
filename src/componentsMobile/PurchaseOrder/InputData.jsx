@@ -11,11 +11,11 @@ const InputData = () => {
     const [selectedGroupName, setSelectedGroupName] = useState('');
     const [showCategoryModal, setShowCategoryModal] = useState(false);
     const [showGroupModal, setShowGroupModal] = useState(false);
-    
+
     // Category and Group options as strings for dropdowns
     const [categoryOptionsStrings, setCategoryOptionsStrings] = useState([]);
     const [groupNameOptions, setGroupNameOptions] = useState([]);
-    
+
     // Modal states for all dropdowns
     const [showItemNameModal, setShowItemNameModal] = useState(false);
     const [showAddItemNameModal, setShowAddItemNameModal] = useState(false);
@@ -44,7 +44,7 @@ const InputData = () => {
     const [modelOptions, setModelOptions] = useState([]);
     const [brandOptions, setBrandOptions] = useState([]);
     const [typeOptions, setTypeOptions] = useState([]);
-    
+
     // Category options from API
     const [categoryOptions, setCategoryOptions] = useState([]);
 
@@ -73,7 +73,7 @@ const InputData = () => {
             if (saved) {
                 try {
                     const parsed = JSON.parse(saved);
-                    const cleaned = parsed.filter(item => 
+                    const cleaned = parsed.filter(item =>
                         item && typeof item === 'string' && item.trim() !== ''
                     );
                     if (cleaned.length !== parsed.length) {
@@ -94,7 +94,7 @@ const InputData = () => {
         fetchPoCategory();
         fetchGroupNames();
     }, []);
-    
+
     // Fetch categories with IDs from API
     const fetchPoCategory = async () => {
         try {
@@ -174,11 +174,11 @@ const InputData = () => {
                 const extractedNames = data.map(item =>
                     item.itemName || item.poItemName || item.name || item.item_name || ''
                 ).filter(name => name !== '');
-                
+
                 // Merge with any previously saved item names from localStorage
                 const savedItemNames = localStorage.getItem('itemNameOptions');
                 const savedNames = savedItemNames ? JSON.parse(savedItemNames) : [];
-                
+
                 // Combine API names with saved names, removing duplicates
                 const allNames = [...new Set([...extractedNames, ...savedNames])];
                 setItemNameOptions(allNames);
@@ -209,11 +209,11 @@ const InputData = () => {
                 const extractedModels = data.map(item =>
                     item.model || item.poModel || item.modelName || item.name || ''
                 ).filter(model => model !== '');
-                
+
                 // Merge with any previously saved models from localStorage
                 const savedModels = localStorage.getItem('modelOptions');
                 const savedModelNames = savedModels ? JSON.parse(savedModels) : [];
-                
+
                 // Combine API models with saved models, removing duplicates
                 const allModels = [...new Set([...extractedModels, ...savedModelNames])];
                 setModelOptions(allModels);
@@ -244,16 +244,16 @@ const InputData = () => {
                 const extractedBrands = data
                     .map(item => item.brand || item.poBrand || item.brandName || item.name || '')
                     .filter(brand => brand && brand.trim() !== '' && typeof brand === 'string');
-                
+
                 // Merge with any previously saved brands from localStorage
                 const savedBrands = localStorage.getItem('brandOptions');
                 const savedBrandNames = savedBrands ? JSON.parse(savedBrands) : [];
-                
+
                 // Filter out empty strings from saved brands as well
-                const validSavedBrands = savedBrandNames.filter(brand => 
+                const validSavedBrands = savedBrandNames.filter(brand =>
                     brand && brand.trim() !== '' && typeof brand === 'string'
                 );
-                
+
                 // Combine API brands with saved brands, removing duplicates and empty values
                 const allBrands = [...new Set([...extractedBrands, ...validSavedBrands])]
                     .filter(brand => brand && brand.trim() !== '');
@@ -264,7 +264,7 @@ const InputData = () => {
                 const savedBrands = localStorage.getItem('brandOptions');
                 if (savedBrands) {
                     const parsed = JSON.parse(savedBrands);
-                    const validBrands = parsed.filter(brand => 
+                    const validBrands = parsed.filter(brand =>
                         brand && brand.trim() !== '' && typeof brand === 'string'
                     );
                     setBrandOptions(validBrands);
@@ -276,7 +276,7 @@ const InputData = () => {
             const savedBrands = localStorage.getItem('brandOptions');
             if (savedBrands) {
                 const parsed = JSON.parse(savedBrands);
-                const validBrands = parsed.filter(brand => 
+                const validBrands = parsed.filter(brand =>
                     brand && brand.trim() !== '' && typeof brand === 'string'
                 );
                 setBrandOptions(validBrands);
@@ -288,7 +288,7 @@ const InputData = () => {
         try {
             const response = await fetch('https://backendaab.in/aabuildersDash/api/po_type/getAll');
             if (response.ok) {
-                const data = await response.json();                
+                const data = await response.json();
                 // Extract type names from API response - same logic as AddItemsToPO
                 let extractedTypes = [];
                 if (Array.isArray(data)) {
@@ -519,13 +519,13 @@ const InputData = () => {
         // If itemName is selected, fetch and display otherPOEntityList
         if (field === 'itemName') {
             if (value) {
-                const selectedItem = poItemNameData.find(item => 
+                const selectedItem = poItemNameData.find(item =>
                     (item.itemName || item.poItemName || item.name || '').toLowerCase() === value.toLowerCase()
                 );
                 if (selectedItem) {
                     setSelectedItemData(selectedItem);
                     setOtherPOEntityList(selectedItem.otherPOEntityList || []);
-                    
+
                     // Populate category and groupName if they exist
                     if (selectedItem.category) {
                         setCategory(selectedItem.category);
@@ -533,11 +533,11 @@ const InputData = () => {
                     if (selectedItem.groupName) {
                         setSelectedGroupName(selectedItem.groupName);
                     }
-                    
+
                     // Set the item ID for edit API
                     const itemId = selectedItem.id || selectedItem._id || null;
                     setPoItemNameId(itemId);
-                    
+
                     // Initialize poEditItemList for edit API
                     setPoEditItemList({
                         itemName: selectedItem.itemName || selectedItem.poItemName || selectedItem.name || value,
@@ -611,7 +611,7 @@ const InputData = () => {
             // Update existing entity in otherPOEntityList
             try {
                 const existingOtherPOEntityList = [...(selectedItemData.otherPOEntityList || [])];
-                
+
                 // Update the entity at editingRowIndex
                 existingOtherPOEntityList[editingRowIndex] = {
                     modelName: formData.model,
@@ -638,9 +638,9 @@ const InputData = () => {
                     if (response.ok) {
                         const data = await response.json();
                         setPoItemNameData(data);
-                        
+
                         // Update selectedItemData and otherPOEntityList with the new data
-                        const updatedSelectedItem = data.find(item => 
+                        const updatedSelectedItem = data.find(item =>
                             (item.id || item._id) === poItemNameId
                         );
                         if (updatedSelectedItem) {
@@ -691,7 +691,7 @@ const InputData = () => {
 
                 // Get existing otherPOEntityList from selectedItemData (most up-to-date)
                 const existingOtherPOEntityList = selectedItemData.otherPOEntityList || [];
-                
+
                 // Add to existing otherPOEntityList
                 const updatedOtherPOEntityList = [
                     ...existingOtherPOEntityList,
@@ -708,7 +708,7 @@ const InputData = () => {
 
                 // Call edit API
                 await handleSubmitEditItemName(updatedPoEditItemList);
-                
+
                 // Also add to local list for display
                 const newItem = {
                     id: Date.now(),
@@ -731,9 +731,9 @@ const InputData = () => {
                     if (response.ok) {
                         const data = await response.json();
                         setPoItemNameData(data);
-                        
+
                         // Update selectedItemData and otherPOEntityList with the new data
-                        const updatedSelectedItem = data.find(item => 
+                        const updatedSelectedItem = data.find(item =>
                             (item.id || item._id) === poItemNameId
                         );
                         if (updatedSelectedItem) {
@@ -808,7 +808,7 @@ const InputData = () => {
                 },
                 body: JSON.stringify(updatedPoEditItemList),
             });
-            
+
             if (response.ok) {
                 const result = await response.json();
                 // Update local state
@@ -940,8 +940,8 @@ const InputData = () => {
                 if (response.ok) {
                     const data = await response.json();
                     setPoItemNameData(data);
-                    
-                    const updatedSelectedItem = data.find(item => 
+
+                    const updatedSelectedItem = data.find(item =>
                         (item.id || item._id) === poItemNameId
                     );
                     if (updatedSelectedItem) {
@@ -970,14 +970,14 @@ const InputData = () => {
     const handleSubmitItemName = async (itemName, selectedCategory) => {
         // Use the category string (label) for itemName API
         const categoryToUse = selectedCategory || category;
-        
+
         const payload = {
             itemName: itemName,
             category: categoryToUse,
             groupName: selectedGroupName || '',
             otherPOEntityList: [], // Always empty when saving new item name
         };
-        
+
         try {
             const response = await fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/save', {
                 method: 'POST',
@@ -1002,16 +1002,16 @@ const InputData = () => {
     const handleSubmitModel = async (model, selectedCategory) => {
         // Find category ID from categoryOptions - use value (ID) for API
         const categoryToUse = selectedCategory || category;
-        const categoryOption = categoryOptions.find(cat => 
+        const categoryOption = categoryOptions.find(cat =>
             cat.label === categoryToUse || cat.value === categoryToUse
         );
         const categoryId = categoryOption?.value || categoryOption?.id || null;
-        
+
         const newModelData = {
             model: model,
             category: categoryId,
         };
-        
+
         try {
             const response = await fetch('https://backendaab.in/aabuildersDash/api/po_model/save', {
                 method: 'POST',
@@ -1020,7 +1020,7 @@ const InputData = () => {
                 },
                 body: JSON.stringify(newModelData),
             });
-            
+
             if (response.ok) {
                 // Reload models from API
                 await fetchPoModel();
@@ -1036,16 +1036,16 @@ const InputData = () => {
     const handleSubmitBrand = async (brand, selectedCategory) => {
         // Find category ID from categoryOptions - use value (ID) for API
         const categoryToUse = selectedCategory || category;
-        const categoryOption = categoryOptions.find(cat => 
+        const categoryOption = categoryOptions.find(cat =>
             cat.label === categoryToUse || cat.value === categoryToUse
         );
         const categoryId = categoryOption?.value || categoryOption?.id || null;
-        
-        const newBrandData = { 
-            brand, 
-            category: categoryId 
+
+        const newBrandData = {
+            brand,
+            category: categoryId
         };
-        
+
         try {
             const response = await fetch('https://backendaab.in/aabuildersDash/api/po_brand/save', {
                 method: 'POST',
@@ -1054,7 +1054,7 @@ const InputData = () => {
                 },
                 body: JSON.stringify(newBrandData),
             });
-            
+
             if (response.ok) {
                 // Reload brands from API
                 await fetchPoBrand();
@@ -1070,16 +1070,16 @@ const InputData = () => {
     const handleSubmitType = async (typeColor, selectedCategory) => {
         // Find category ID from categoryOptions - use value (ID) for API
         const categoryToUse = selectedCategory || category;
-        const categoryOption = categoryOptions.find(cat => 
+        const categoryOption = categoryOptions.find(cat =>
             cat.label === categoryToUse || cat.value === categoryToUse
         );
         const categoryId = categoryOption?.value || categoryOption?.id || null;
-        
-        const newTypeData = { 
-            typeColor, 
-            category: categoryId 
+
+        const newTypeData = {
+            typeColor,
+            category: categoryId
         };
-        
+
         try {
             const response = await fetch('https://backendaab.in/aabuildersDash/api/po_type/save', {
                 method: 'POST',
@@ -1088,7 +1088,7 @@ const InputData = () => {
                 },
                 body: JSON.stringify(newTypeData),
             });
-            
+
             if (response.ok) {
                 // Reload types from API
                 await fetchPoType();
@@ -1105,9 +1105,9 @@ const InputData = () => {
     return (
         <div className="relative w-full bg-white max-w-[360px] mx-auto" style={{ fontFamily: "'Manrope', sans-serif" }}>
             {/* New Input Section */}
-            <div className="px-4 pt-2">
+            <div className="mt-2">
                 {/* New Input Header - Sticky */}
-                <div className="sticky top-[100px] z-30 bg-white flex items-center justify-between mb-4 border-b border-[#E0E0E0] pb-2 shadow-sm">
+                <div className="sticky top-[100px] z-30 px-4 bg-white flex items-center justify-between mb-3 border-b border-[#E0E0E0] pb-1.5">
                     {/* Group Dropdown - Left Side */}
                     <button
                         onClick={() => setShowGroupModal(true)}
@@ -1115,7 +1115,7 @@ const InputData = () => {
                     >
                         {selectedGroupName || 'Group'}
                     </button>
-                    
+
                     {/* Category Dropdown - Right Side */}
                     <button
                         onClick={() => setShowCategoryModal(true)}
@@ -1126,7 +1126,7 @@ const InputData = () => {
                 </div>
 
                 {/* Form Fields */}
-                <div className="space-y-[6px] mb-4">
+                <div className="space-y-[6px] px-4  mb-4">
                     {/* Item Name */}
                     <div>
                         <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
@@ -1136,8 +1136,8 @@ const InputData = () => {
                             <button
                                 type="button"
                                 onClick={() => setShowItemNameModal(true)}
-                                className="w-full h-[32px] px-3 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
-                                style={{ 
+                                className="w-full h-[32px] px-3 border border-[rgba(0,0,0,0.16)] rounded text-[12px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
+                                style={{
                                     paddingRight: formData.itemName ? '32px' : '12px',
                                     boxSizing: 'border-box'
                                 }}
@@ -1161,19 +1161,19 @@ const InputData = () => {
                                     className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors z-10"
                                     style={{ right: '8px' }}
                                 >
-                                    <svg 
-                                        width="12" 
-                                        height="12" 
-                                        viewBox="0 0 12 12" 
-                                        fill="none" 
+                                    <svg
+                                        width="12"
+                                        height="12"
+                                        viewBox="0 0 12 12"
+                                        fill="none"
                                         xmlns="http://www.w3.org/2000/svg"
                                     >
-                                        <path 
-                                            d="M9 3L3 9M3 3L9 9" 
-                                            stroke="#000" 
-                                            strokeWidth="1.5" 
-                                            strokeLinecap="round" 
-                                            strokeLinejoin="round" 
+                                        <path
+                                            d="M9 3L3 9M3 3L9 9"
+                                            stroke="#000"
+                                            strokeWidth="1.5"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
                                         />
                                     </svg>
                                 </button>
@@ -1190,8 +1190,8 @@ const InputData = () => {
                             <button
                                 type="button"
                                 onClick={() => setShowModelModal(true)}
-                                className="w-full h-[32px] px-3 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
-                                style={{ 
+                                className="w-full h-[32px] px-3 border border-[rgba(0,0,0,0.16)] rounded text-[12px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
+                                style={{
                                     paddingRight: formData.model ? '32px' : '12px',
                                     boxSizing: 'border-box'
                                 }}
@@ -1215,19 +1215,19 @@ const InputData = () => {
                                     className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors z-10"
                                     style={{ right: '8px' }}
                                 >
-                                    <svg 
-                                        width="12" 
-                                        height="12" 
-                                        viewBox="0 0 12 12" 
-                                        fill="none" 
+                                    <svg
+                                        width="12"
+                                        height="12"
+                                        viewBox="0 0 12 12"
+                                        fill="none"
                                         xmlns="http://www.w3.org/2000/svg"
                                     >
-                                        <path 
-                                            d="M9 3L3 9M3 3L9 9" 
-                                            stroke="#000" 
-                                            strokeWidth="1.5" 
-                                            strokeLinecap="round" 
-                                            strokeLinejoin="round" 
+                                        <path
+                                            d="M9 3L3 9M3 3L9 9"
+                                            stroke="#000"
+                                            strokeWidth="1.5"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
                                         />
                                     </svg>
                                 </button>
@@ -1244,8 +1244,8 @@ const InputData = () => {
                             <button
                                 type="button"
                                 onClick={() => setShowTypeModal(true)}
-                                className="w-full h-[32px] px-3 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
-                                style={{ 
+                                className="w-full h-[32px] px-3 border border-[rgba(0,0,0,0.16)] rounded text-[12px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
+                                style={{
                                     paddingRight: formData.type ? '32px' : '12px',
                                     boxSizing: 'border-box'
                                 }}
@@ -1269,19 +1269,19 @@ const InputData = () => {
                                     className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors z-10"
                                     style={{ right: '8px' }}
                                 >
-                                    <svg 
-                                        width="12" 
-                                        height="12" 
-                                        viewBox="0 0 12 12" 
-                                        fill="none" 
+                                    <svg
+                                        width="12"
+                                        height="12"
+                                        viewBox="0 0 12 12"
+                                        fill="none"
                                         xmlns="http://www.w3.org/2000/svg"
                                     >
-                                        <path 
-                                            d="M9 3L3 9M3 3L9 9" 
-                                            stroke="#000" 
-                                            strokeWidth="1.5" 
-                                            strokeLinecap="round" 
-                                            strokeLinejoin="round" 
+                                        <path
+                                            d="M9 3L3 9M3 3L9 9"
+                                            stroke="#000"
+                                            strokeWidth="1.5"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
                                         />
                                     </svg>
                                 </button>
@@ -1299,8 +1299,8 @@ const InputData = () => {
                                 <button
                                     type="button"
                                     onClick={() => setShowBrandModal(true)}
-                                    className="w-[120px] h-[32px] px-3 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
-                                    style={{ 
+                                    className="w-[120px] h-[32px] px-3 border border-[rgba(0,0,0,0.16)] rounded text-[12px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
+                                    style={{
                                         paddingRight: formData.brand ? '32px' : '12px',
                                         boxSizing: 'border-box'
                                     }}
@@ -1324,19 +1324,19 @@ const InputData = () => {
                                         className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors z-10"
                                         style={{ right: '8px' }}
                                     >
-                                        <svg 
-                                            width="12" 
-                                            height="12" 
-                                            viewBox="0 0 12 12" 
-                                            fill="none" 
+                                        <svg
+                                            width="12"
+                                            height="12"
+                                            viewBox="0 0 12 12"
+                                            fill="none"
                                             xmlns="http://www.w3.org/2000/svg"
                                         >
-                                            <path 
-                                                d="M9 3L3 9M3 3L9 9" 
-                                                stroke="#000" 
-                                                strokeWidth="1.5" 
-                                                strokeLinecap="round" 
-                                                strokeLinejoin="round" 
+                                            <path
+                                                d="M9 3L3 9M3 3L9 9"
+                                                stroke="#000"
+                                                strokeWidth="1.5"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
                                             />
                                         </svg>
                                     </button>
@@ -1354,52 +1354,53 @@ const InputData = () => {
                                 value={formData.minQty}
                                 onChange={(e) => handleFieldChange('minQty', e.target.value)}
                                 placeholder="Type Min Qty"
-                                className="w-[90px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium text-black bg-white placeholder:text-[#9E9E9E] focus:outline-none"
+                                className="w-[90px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-4 text-[12px] font-medium text-black bg-white placeholder:text-[#9E9E9E] focus:outline-none"
                             />
                         </div>
-                         {/* Default Qty */}
-                    <div>
-                        <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-                            Default Qty
-                        </p>
-                        <input
-                            type="text"
-                            value={formData.defaultQty}
-                            onChange={(e) => handleFieldChange('defaultQty', e.target.value)}
-                            placeholder="Type Default Qty"
-                            className="w-[90px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-4 text-[12px] font-medium text-black bg-white placeholder:text-[#9E9E9E] focus:outline-none"
-                        />
-                    </div>
+                        {/* Default Qty */}
+                        <div>
+                            <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                                Default Qty
+                            </p>
+                            <input
+                                type="text"
+                                value={formData.defaultQty}
+                                onChange={(e) => handleFieldChange('defaultQty', e.target.value)}
+                                placeholder="Type Default Qty"
+                                className="w-[90px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-4 text-[12px] font-medium text-black bg-white placeholder:text-[#9E9E9E] focus:outline-none"
+                            />
+                        </div>
                     </div>
 
-                   
+
                 </div>
                 {/* Add to List / Update List Button */}
-                <button
-                    onClick={handleAddToList}
-                    disabled={!formData.itemName || !formData.model || !formData.type || !formData.brand}
-                    className={`w-[328px] h-[32px] rounded-[8px] flex items-center justify-center gap-2 text-white text-[12px] font-medium transition-colors ${
-                        formData.itemName && formData.model && formData.type && formData.brand
-                            ? 'bg-black hover:bg-gray-800'
-                            : 'bg-[#757575] cursor-not-allowed'
-                    }`}
-                >
-                    {editingRowIndex !== null ? (
-                        <>
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M13.3333 2L5.33333 10M13.3333 2L9.33333 2M13.3333 2L13.3333 6" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                            <span>Update List</span>
-                        </>
-                    ) : (
-                        <>
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M8 3V13M3 8H13" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-                            </svg>
-                            <span>Add to List</span>
-                        </>
-                    )}
-                </button>
+                <div className="px-4">
+                    <button
+                        onClick={handleAddToList}
+                        disabled={!formData.itemName || !formData.model || !formData.type || !formData.brand}
+                        className={`w-[328px] h-[32px] rounded flex items-center justify-center gap-2 text-white text-[12px] font-medium transition-colors ${formData.itemName && formData.model && formData.type && formData.brand
+                                ? 'bg-black hover:bg-gray-800'
+                                : 'bg-[#757575] cursor-not-allowed'
+                            }`}
+                    >
+                        {editingRowIndex !== null ? (
+                            <>
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M13.3333 2L5.33333 10M13.3333 2L9.33333 2M13.3333 2L13.3333 6" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                                <span>Update List</span>
+                            </>
+                        ) : (
+                            <>
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M8 3V13M3 8H13" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+                                </svg>
+                                <span>Add to List</span>
+                            </>
+                        )}
+                    </button>
+                </div>
             </div>
 
             {/* otherPOEntityList Table - Show when itemName is selected */}
@@ -1417,12 +1418,12 @@ const InputData = () => {
                             <div className="flex-1 text-[11px] font-semibold text-black px-2">Type</div>
                         </div>
                         {/* Table Rows */}
-                        <div className="divide-y divide-[#E0E0E0] overflow-y-auto no-scrollbar scrollbar-none" style={{maxHeight: 'calc(79vh - 420px)'}}>
+                        <div className="divide-y divide-[#E0E0E0] overflow-y-auto no-scrollbar scrollbar-none" style={{ maxHeight: 'calc(79vh - 420px)' }}>
                             {otherPOEntityList.map((entity, index) => {
                                 const isExpanded = expandedRowIndex === index;
                                 const swipeState = swipeStates[index];
                                 let swipeOffset = 0;
-                                
+
                                 if (swipeState && swipeState.isSwiping) {
                                     swipeOffset = Math.max(-110, Math.min(0, swipeState.currentX - swipeState.startX));
                                 } else if (isExpanded) {

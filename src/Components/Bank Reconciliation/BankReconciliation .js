@@ -51,6 +51,9 @@ const BankReconciliation = () => {
     credit: true,
     mode: true,
     remarks: false,
+    chequeNo: true,
+    chequeDate: true,
+    transactionNo: true,
     appliedFilters: true
   });
   // Table Filter state
@@ -320,8 +323,52 @@ const BankReconciliation = () => {
     setFilteredRecords(filtered);
     setCurrentPage(1);
   }, [records, startDate, endDate, selectedMonth, searchTerm, filterDate, filterModule, filterParticular, filterType, filterReceiptPayment, filterMode, sortConfig]);
+  // Column config for All Entries: which columns to show based on pdfSettings
+  const getAllEntriesColumns = () => {
+    const cols = [
+      { key: 'date', label: 'Date', setting: 'date', compulsory: true },
+      { key: 'module', label: 'Module', setting: 'module' },
+      { key: 'projectName', label: 'Project Name', setting: 'particular' },
+      { key: 'partyName', label: 'Party Name' },
+      { key: 'partyType', label: 'Party Type' },
+      { key: 'type', label: 'Type', setting: 'type' },
+      { key: 'receiptPayment', label: 'Receipt/Payment', setting: 'receiptPayment' },
+      { key: 'debit', label: 'Debit', setting: 'debit', compulsory: true },
+      { key: 'credit', label: 'Credit', setting: 'credit', compulsory: true },
+      { key: 'paymentMode', label: 'Payment Mode', setting: 'mode' },
+      { key: 'accountNo', label: 'Account No' },
+      { key: 'chequeNo', label: 'Cheque No', setting: 'chequeNo' },
+      { key: 'chequeDate', label: 'Cheque Date', setting: 'chequeDate' },
+      { key: 'transactionNo', label: 'Transaction No', setting: 'transactionNo' },
+      { key: 'remarks', label: 'Remarks', setting: 'remarks' }
+    ];
+    return cols.filter(c => c.compulsory || !c.setting || pdfSettings[c.setting]);
+  };
+
+  const getRecordCellValue = (record, key) => {
+    switch (key) {
+      case 'date': return record.date ? new Date(record.date).toLocaleDateString("en-GB") : "-";
+      case 'module': return record.module || "-";
+      case 'projectName': return record.projectName || "-";
+      case 'partyName': return record.partyName || "-";
+      case 'partyType': return record.partyType || "-";
+      case 'type': return record.type || "-";
+      case 'receiptPayment': return record.receiptPayment || "-";
+      case 'debit': return record.debit ? formatNumber(record.debit) : "-";
+      case 'credit': return record.credit ? formatNumber(record.credit) : "-";
+      case 'paymentMode': return record.paymentMode || "-";
+      case 'accountNo': return record.accountNo || "-";
+      case 'chequeNo': return record.chequeNo || "-";
+      case 'chequeDate': return record.chequeDate ? new Date(record.chequeDate).toLocaleDateString("en-GB") : "-";
+      case 'transactionNo': return record.transactionNo || "-";
+      case 'remarks': return record.remarks || "";
+      default: return "-";
+    }
+  };
+
   const generatePDF = () => {
-    const headers = ['Date', 'Module', 'Project Name', 'Party Name', 'Party Type', 'Type', 'Receipt/Payment', 'Debit', 'Credit', 'Payment Mode', 'Account No', 'Cheque No', 'Cheque Date', 'Transaction No', 'Remarks'];
+    const visibleColumns = getAllEntriesColumns();
+    const headers = visibleColumns.map(c => c.label);
     const orientation = 'landscape';
     const doc = new jsPDF(orientation, 'mm', 'a4');
     try {
@@ -340,29 +387,25 @@ const BankReconciliation = () => {
       doc.text(dateRange, 32, 28);
       startY = 45;
     }
-    const tableData = filteredRecords.map(record => {
-      return [
-        record.date ? new Date(record.date).toLocaleDateString("en-GB") : "-",
-        record.module,
-        record.projectName || "-",
-        record.partyName || "-",
-        record.partyType || "-",
-        record.type || "-",
-        record.receiptPayment,
-        record.debit ? formatNumber(record.debit) : "-",
-        record.credit ? formatNumber(record.credit) : "-",
-        record.paymentMode || "-",
-        record.accountNo || "-",
-        record.chequeNo || "-",
-        record.chequeDate ? new Date(record.chequeDate).toLocaleDateString("en-GB") : "-",
-        record.transactionNo || "-",
-        record.remarks || ""
-      ];
-    });
+    const tableData = filteredRecords.map(record =>
+      visibleColumns.map(col => getRecordCellValue(record, col.key))
+    );
+    // Use full page width: distribute column width so filtered-out columns don't leave empty space
+    const marginLeft = 14;
+    const marginRight = 14;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const tableWidth = pageWidth - marginLeft - marginRight;
+    const colCount = visibleColumns.length;
+    const cellWidth = colCount > 0 ? tableWidth / colCount : tableWidth;
+    const columnStyles = {};
+    for (let i = 0; i < colCount; i++) {
+      columnStyles[i] = { cellWidth };
+    }
     doc.autoTable({
       head: [headers],
       body: tableData,
       startY: startY,
+      columnStyles,
       styles: {
         fontSize: 6,
         textColor: [0, 0, 0],
@@ -376,7 +419,7 @@ const BankReconciliation = () => {
         lineWidth: 0.1,
         fillColor: null
       },
-      margin: { left: 14, right: 14 }
+      margin: { left: marginLeft, right: marginRight }
     });
     const totalDebit = filteredRecords.reduce((sum, record) => sum + (parseFloat(record.debit) || 0), 0);
     const totalCredit = filteredRecords.reduce((sum, record) => sum + (parseFloat(record.credit) || 0), 0);
@@ -1259,6 +1302,39 @@ const BankReconciliation = () => {
                       />
                     </label>
                   </div>
+                  <div className="bg-white p-4 rounded-lg border border-gray-200">
+                    <label className="flex items-center justify-between cursor-pointer">
+                      <span className="text-sm font-medium text-gray-700">Cheque No</span>
+                      <input
+                        type="checkbox"
+                        checked={pdfSettings.chequeNo}
+                        onChange={(e) => setPdfSettings({ ...pdfSettings, chequeNo: e.target.checked })}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                    </label>
+                  </div>
+                  <div className="bg-white p-4 rounded-lg border border-gray-200">
+                    <label className="flex items-center justify-between cursor-pointer">
+                      <span className="text-sm font-medium text-gray-700">Cheque Date</span>
+                      <input
+                        type="checkbox"
+                        checked={pdfSettings.chequeDate}
+                        onChange={(e) => setPdfSettings({ ...pdfSettings, chequeDate: e.target.checked })}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                    </label>
+                  </div>
+                  <div className="bg-white p-4 rounded-lg border border-gray-200">
+                    <label className="flex items-center justify-between cursor-pointer">
+                      <span className="text-sm font-medium text-gray-700">Transaction No</span>
+                      <input
+                        type="checkbox"
+                        checked={pdfSettings.transactionNo}
+                        onChange={(e) => setPdfSettings({ ...pdfSettings, transactionNo: e.target.checked })}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                    </label>
+                  </div>
                 </div>
                 <div className="mt-8">
                   <h3 className="text-sm font-medium text-gray-700 mb-4">Other Options</h3>
@@ -1403,47 +1479,27 @@ const BankReconciliation = () => {
                     <table className="w-full border-collapse text-sm">
                       <thead>
                         <tr className="bg-gray-50">
-                          <th className="border p-2 text-left font-medium">Date</th>
-                          <th className="border p-2 text-left font-medium">Module</th>
-                          <th className="border p-2 text-left font-medium">Project Name</th>
-                          <th className="border p-2 text-left font-medium">Party Name</th>
-                          <th className="border p-2 text-left font-medium">Party Type</th>
-                          <th className="border p-2 text-left font-medium">Type</th>
-                          <th className="border p-2 text-left font-medium">Receipt/Payment</th>
-                          <th className="border p-2 text-right font-medium">Debit</th>
-                          <th className="border p-2 text-right font-medium">Credit</th>
-                          <th className="border p-2 text-left font-medium">Payment Mode</th>
-                          <th className="border p-2 text-left font-medium">Account No</th>
-                          <th className="border p-2 text-left font-medium">Cheque No</th>
-                          <th className="border p-2 text-left font-medium">Cheque Date</th>
-                          <th className="border p-2 text-left font-medium">Transaction No</th>
-                          <th className="border p-2 text-left font-medium">Remarks</th>
+                          {getAllEntriesColumns().map((col) => (
+                            <th
+                              key={col.key}
+                              className={`border p-2 font-medium ${(col.key === 'debit' || col.key === 'credit') ? 'text-right' : 'text-left'}`}
+                            >
+                              {col.label}
+                            </th>
+                          ))}
                         </tr>
                       </thead>
                       <tbody>
                         {filteredRecords.slice(0, 10).map((record, idx) => (
                           <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                            <td className="border p-2">
-                              {record.date ? new Date(record.date).toLocaleDateString("en-GB") : "-"}
-                            </td>
-                            <td className="border p-2">{record.module}</td>
-                            <td className="border p-2">{record.projectName || "-"}</td>
-                            <td className="border p-2">{record.partyName || "-"}</td>
-                            <td className="border p-2">{record.partyType || "-"}</td>
-                            <td className="border p-2">{record.type || "-"}</td>
-                            <td className="border p-2">{record.receiptPayment}</td>
-                            <td className="border p-2 text-right text-red-600">
-                              {record.debit ? formatNumber(record.debit) : "-"}
-                            </td>
-                            <td className="border p-2 text-right text-green-600">
-                              {record.credit ? formatNumber(record.credit) : "-"}
-                            </td>
-                            <td className="border p-2">{record.paymentMode || "-"}</td>
-                            <td className="border p-2">{record.accountNo || "-"}</td>
-                            <td className="border p-2">{record.chequeNo || "-"}</td>
-                            <td className="border p-2">{record.chequeDate ? new Date(record.chequeDate).toLocaleDateString("en-GB") : "-"}</td>
-                            <td className="border p-2">{record.transactionNo || "-"}</td>
-                            <td className="border p-2">{record.remarks || "-"}</td>
+                            {getAllEntriesColumns().map((col) => (
+                              <td
+                                key={col.key}
+                                className={`border p-2 ${(col.key === 'debit' ? 'text-right text-red-600' : col.key === 'credit' ? 'text-right text-green-600' : '')}`}
+                              >
+                                {getRecordCellValue(record, col.key)}
+                              </td>
+                            ))}
                           </tr>
                         ))}
                       </tbody>

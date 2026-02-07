@@ -2626,14 +2626,14 @@ const PurchaseOrder = ({ user, onLogout }) => {
           <div className="flex flex-col h-[calc(100vh-85px-80px)] overflow-hidden">
             {/* PO Number and Date Row - Only show date when not in empty state */}
             {!isEmptyState && (
-              <div className="flex-shrink-0 px-4 pt-2 pb-1 border-b border-gray-100">
+              <div className="flex-shrink-0 px-4 pt-3 pb-1.5 border-b border-gray-100">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {poData.poNumber && (
-                      <p className="text-[12px] font-medium text-black leading-normal">{poData.poNumber}</p>
+                      <p className="text-[12px] font-semibold text-black leading-normal">{poData.poNumber}</p>
                     )}
                     <button type="button" onClick={() => setShowDatePicker(true)}
-                      className="text-[12px] font-medium text-black leading-normal underline-offset-2 hover:underline"
+                      className="text-[12px] font-semibold text-black leading-normal underline-offset-2 hover:underline"
                     >
                       {poData.date}
                     </button>
@@ -2641,7 +2641,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                   <div className="flex items-center gap-4">
                     {isPdfGenerated ? (
                       <>
-                        <button type="button" onClick={downloadPDF} className="text-[13px] font-medium text-black leading-normal" >
+                        <button type="button" onClick={downloadPDF} className="text-[13px] font-semibold text-black leading-normal" >
                           Download
                         </button>
 

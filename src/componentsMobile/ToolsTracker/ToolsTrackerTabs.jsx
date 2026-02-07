@@ -20,11 +20,18 @@ const ToolsTrackerTabs = ({ activeTab = 'entry', onTabChange }) => {
     if (activeTabRef.current && tabsContainerRef.current) {
       const container = tabsContainerRef.current;
       const activeTabElement = activeTabRef.current;
-      const containerRect = container.getBoundingClientRect();
-      const tabRect = activeTabElement.getBoundingClientRect();
-      const left = tabRect.left - containerRect.left;
-      const width = tabRect.width;
-      setUnderlineStyle({ left, width });
+      const outerContainer = container.closest('.tools-tracker-tabs-container');
+      if (outerContainer) {
+        const containerRect = outerContainer.getBoundingClientRect();
+        const tabRect = activeTabElement.getBoundingClientRect();
+        const left = tabRect.left - containerRect.left;
+        const width = tabRect.width;
+        setUnderlineStyle({ left, width });
+      } else {
+        const left = activeTabElement.offsetLeft;
+        const width = activeTabElement.offsetWidth;
+        setUnderlineStyle({ left, width });
+      }
     }
   };
   useEffect(() => {
@@ -70,71 +77,72 @@ const ToolsTrackerTabs = ({ activeTab = 'entry', onTabChange }) => {
           scrollbar-width: none;
         }
       `}</style>
-      <div className="fixed top-[50px] transform w-full max-w-[340px] h-[40px] overflow-x-auto bg-white z-40 tools-tracker-tabs-container" style={{ fontFamily: "'Manrope', sans-serif" }}>
-        <div className="relative h-full overflow-x-auto scrollbar-hide tools-tracker-tabs-scroll" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-          <div 
+      <div className="fixed top-[50px] transform w-full max-w-[357px] h-[40px] overflow-x-auto bg-white z-40 tools-tracker-tabs-container" style={{ fontFamily: "'Manrope', sans-serif" }}>
+        <div className="relative h-full px-4 pr-7 overflow-x-auto scrollbar-hide tools-tracker-tabs-scroll" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <div
             ref={tabsContainerRef}
-            className="flex items-center gap-4 px-4 h-full overflow-x-auto scrollbar-hide cursor-grab active:cursor-grabbing tools-tracker-tabs-scroll"
+            className="flex items-center gap-4 h-full overflow-x-auto scrollbar-hide cursor-grab active:cursor-grabbing tools-tracker-tabs-scroll"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-          onMouseDown={(e) => {
-            setIsDragging(true);
-            setStartX(e.pageX - tabsContainerRef.current.offsetLeft);
-            setScrollLeft(tabsContainerRef.current.scrollLeft);
-          }}
-          onMouseLeave={() => setIsDragging(false)}
-          onMouseUp={() => setIsDragging(false)}
-          onMouseMove={(e) => {
-            if (!isDragging) return;
-            e.preventDefault();
-            const x = e.pageX - tabsContainerRef.current.offsetLeft;
-            const walk = (x - startX) * 2;
-            tabsContainerRef.current.scrollLeft = scrollLeft - walk;
-          }}
-          onTouchStart={(e) => {
-            setIsDragging(true);
-            setStartX(e.touches[0].pageX - tabsContainerRef.current.offsetLeft);
-            setScrollLeft(tabsContainerRef.current.scrollLeft);
-          }}
-          onTouchEnd={() => setIsDragging(false)}
-          onTouchMove={(e) => {
-            if (!isDragging) return;
-            const x = e.touches[0].pageX - tabsContainerRef.current.offsetLeft;
-            const walk = (x - startX) * 2;
-            tabsContainerRef.current.scrollLeft = scrollLeft - walk;
-          }}
-        >
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              ref={activeTab === tab.id ? activeTabRef : null}
-              onClick={() => onTabChange(tab.id)}
-              className={`font-semibold text-[12px] leading-normal whitespace-nowrap flex-shrink-0 ${
-                activeTab === tab.id ? 'text-black' : 'text-[#848484]'
-              }`}
-            >
-              {tab.label}
+            onMouseDown={(e) => {
+              setIsDragging(true);
+              setStartX(e.pageX - tabsContainerRef.current.offsetLeft);
+              setScrollLeft(tabsContainerRef.current.scrollLeft);
+            }}
+            onMouseLeave={() => setIsDragging(false)}
+            onMouseUp={() => setIsDragging(false)}
+            onMouseMove={(e) => {
+              if (!isDragging) return;
+              e.preventDefault();
+              const x = e.pageX - tabsContainerRef.current.offsetLeft;
+              const walk = (x - startX) * 2;
+              tabsContainerRef.current.scrollLeft = scrollLeft - walk;
+            }}
+            onTouchStart={(e) => {
+              setIsDragging(true);
+              setStartX(e.touches[0].pageX - tabsContainerRef.current.offsetLeft);
+              setScrollLeft(tabsContainerRef.current.scrollLeft);
+            }}
+            onTouchEnd={() => setIsDragging(false)}
+            onTouchMove={(e) => {
+              if (!isDragging) return;
+              const x = e.touches[0].pageX - tabsContainerRef.current.offsetLeft;
+              const walk = (x - startX) * 2;
+              tabsContainerRef.current.scrollLeft = scrollLeft - walk;
+            }}
+          >
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                ref={activeTab === tab.id ? activeTabRef : null}
+                onClick={() => onTabChange(tab.id)}
+                className={`font-semibold text-[12px] leading-normal whitespace-nowrap flex-shrink-0 ${activeTab === tab.id ? 'text-black' : 'text-[#848484]'
+                  }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          <div className="absolute right-2 top-1/2 transform -translate-y-1/2" style={{ zIndex: 31 }}>
+            <button className="w-[20px] h-[20px] flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity bg-white pointer-events-auto">
+              <svg width="4" height="16" viewBox="0 0 4 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="2" cy="2" r="1.5" fill="#000" />
+                <circle cx="2" cy="8" r="1.5" fill="#000" />
+                <circle cx="2" cy="14" r="1.5" fill="#000" />
+              </svg>
             </button>
-          ))}
+          </div>
         </div>
-        <button className="absolute right-0 top-1/2 transform -translate-y-1/2 w-[20px] h-[20px] flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity bg-white z-10 pointer-events-auto">
-          <svg width="4" height="16" viewBox="0 0 4 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="2" cy="2" r="1.5" fill="#000"/>
-            <circle cx="2" cy="8" r="1.5" fill="#000"/>
-            <circle cx="2" cy="14" r="1.5" fill="#000"/>
-          </svg>
-        </button>
-      </div>      
-      <div className="absolute bottom-0 left-0 w-full h-[1px]" style={{ backgroundColor: '#D9D9D9' }}>
-        <div 
-          className="absolute bottom-0 h-[1.70px] transition-all duration-300"
-          style={{ 
-            backgroundColor: '#BF9853',
-            left: `${underlineStyle.left}px`,
-            width: `${underlineStyle.width}px`
-          }}
-        ></div>
+        <div className="absolute bottom-0 left-0 w-full h-[1px]" style={{ backgroundColor: '#D9D9D9' }}>
+          <div
+            className="absolute bottom-0 h-[1.70px] transition-all duration-300"
+            style={{
+              backgroundColor: '#BF9853',
+              left: `${underlineStyle.left}px`,
+              width: `${underlineStyle.width}px`
+            }}
+          ></div>
+        </div>
       </div>
-    </div>
     </>
   );
 };

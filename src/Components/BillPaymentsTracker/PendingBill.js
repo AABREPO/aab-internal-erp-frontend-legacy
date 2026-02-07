@@ -581,11 +581,11 @@ const PendingBill = ({ username, userRoles = [] }) => {
             handleAddBill();
         }
     };
-    const getLastBillNumberForVendor = (vendorId) => {
+    const getLastBillNumberForVendor = (vendorId, currentBill = null) => {
         if (!vendorId || !apiData || apiData.length === 0) {
             return null;
         }
-        // Filter bills for this vendor that have verifications
+        // Filter bills for this vendor that have verifications (include current so we can find its position)
         const vendorBills = apiData.filter(bill =>
             (bill.vendor_id === vendorId || bill.vendorId === vendorId) &&
             bill.billVerifications &&
@@ -594,19 +594,39 @@ const PendingBill = ({ username, userRoles = [] }) => {
         if (vendorBills.length === 0) {
             return null;
         }
-        // Sort bills by date (most recent first), then by ID (most recent first) as fallback
+        // Sort by date ascending (oldest first) so "previous" means earlier in the list
         vendorBills.sort((a, b) => {
             const dateA = a.bill_arrival_date || a.billArrivalDate || a.created_at || a.createdAt || '';
             const dateB = b.bill_arrival_date || b.billArrivalDate || b.created_at || b.createdAt || '';
             if (dateA && dateB) {
-                return new Date(dateB) - new Date(dateA);
+                const dateDiff = new Date(dateA) - new Date(dateB);
+                if (dateDiff !== 0) return dateDiff;
             }
-            return (b.id || 0) - (a.id || 0);
+            return (a.id || a.bill_id || 0) - (b.id || b.bill_id || 0);
         });
-        // Get the most recent bill
-        const mostRecentBill = vendorBills[0];
-        // Get the last verification from the most recent bill's billVerifications array
-        const verifications = mostRecentBill.billVerifications || [];
+        const currentBillId = currentBill && (currentBill.id != null || currentBill.bill_id != null) ? (currentBill.id ?? currentBill.bill_id) : null;
+        const currentDate = currentBill && (currentBill.bill_arrival_date || currentBill.billArrivalDate || currentBill.created_at || currentBill.createdAt) ? new Date(currentBill.bill_arrival_date || currentBill.billArrivalDate || currentBill.created_at || currentBill.createdAt).getTime() : null;
+        let previousEntryBill = null;
+        const currentIndex = currentBillId != null ? vendorBills.findIndex(bill => (bill.id ?? bill.bill_id) === currentBillId) : -1;
+        if (currentIndex > 0) {
+            // Current is in list: previous entry is the one immediately before it
+            previousEntryBill = vendorBills[currentIndex - 1];
+        } else if (currentIndex === -1 && currentDate != null) {
+            // Current bill not in list (e.g. no verifications yet): take the latest verified entry that is still before current's date
+            const beforeCurrent = vendorBills.filter(bill => {
+                const d = bill.bill_arrival_date || bill.billArrivalDate || bill.created_at || bill.createdAt;
+                if (!d) return false;
+                const billTime = new Date(d).getTime();
+                if (billTime < currentDate) return true;
+                if (billTime === currentDate && (bill.id ?? bill.bill_id) !== currentBillId) return (bill.id ?? bill.bill_id) < (currentBillId || 0);
+                return false;
+            });
+            previousEntryBill = beforeCurrent.length > 0 ? beforeCurrent[beforeCurrent.length - 1] : null;
+        }
+        if (!previousEntryBill) {
+            return null;
+        }
+        const verifications = previousEntryBill.billVerifications || [];
         if (verifications.length === 0) {
             return null;
         }
@@ -700,9 +720,9 @@ const PendingBill = ({ username, userRoles = [] }) => {
         setRangeEnd('')
         setCheckedBills({}) // Reset checked bills state for new verification
         setExtraCheckedBills({}) // Reset extra checked bills state for new verification
-        // Fetch and set last paid PO for this vendor
+        // Fetch and set last PO from the previous entry of this vendor (not the current entry)
         const vendorId = bill.vendorId || bill.vendor_id
-        const lastBillNumber = getLastBillNumberForVendor(vendorId)
+        const lastBillNumber = getLastBillNumberForVendor(vendorId, bill)
         setLastPaidPO(lastBillNumber || '')
         setShowModal(true)
     }

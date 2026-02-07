@@ -17,7 +17,7 @@ const History = ({ onTabChange }) => {
   const [swipeStates, setSwipeStates] = useState({});
   const expandedItemIdRef = useRef(expandedItemId);
   const cardRefs = useRef({});
-  const [activeType, setActiveType] = useState('stack return'); // 'stack return' or 'dispatch'
+  const [activeType, setActiveType] = useState('dispatch'); // 'stack return' or 'dispatch'
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filterProjectName, setFilterProjectName] = useState('');
   const [filterProjectIncharge, setFilterProjectIncharge] = useState('');
@@ -319,13 +319,15 @@ const History = ({ onTabChange }) => {
   const minSwipeDistance = 50;
 
   const handleTouchStart = (e, itemId) => {
-    const touch = e.touches ? e.touches[0] : { clientX: e.clientX };
+    const touch = e.touches ? e.touches[0] : { clientX: e.clientX, clientY: e.clientY };
     const wasCloneExpanded = cloneExpandedItemId === itemId;
     setSwipeStates(prev => ({
       ...prev,
       [itemId]: {
         startX: touch.clientX,
+        startY: touch.clientY || e.clientY || 0,
         currentX: touch.clientX,
+        currentY: touch.clientY || e.clientY || 0,
         isSwiping: false,
         wasCloneExpanded: wasCloneExpanded
       }
@@ -333,10 +335,15 @@ const History = ({ onTabChange }) => {
   };
 
   const handleTouchMove = (e, itemId) => {
-    const touch = e.touches ? e.touches[0] : { clientX: e.clientX };
+    const touch = e.touches ? e.touches[0] : { clientX: e.clientX, clientY: e.clientY };
     const state = swipeStates[itemId];
     if (!state) return;
+    const currentY = touch.clientY || e.clientY || 0;
     const deltaX = touch.clientX - state.startX;
+    const deltaY = Math.abs(currentY - state.startY);
+    const absDeltaX = Math.abs(deltaX);
+    // Only process if movement is primarily horizontal (horizontal movement is greater than vertical)
+    if (absDeltaX <= deltaY) return;
     const isExpanded = expandedItemIdRef.current === itemId;
     const isCloneExpanded = cloneExpandedItemId === itemId;
     // Allow swiping left to reveal buttons, swiping right to reveal clone, or swiping to hide if already expanded
@@ -347,6 +354,7 @@ const History = ({ onTabChange }) => {
         [itemId]: {
           ...prev[itemId],
           currentX: touch.clientX,
+          currentY: currentY,
           isSwiping: true,
           wasCloneExpanded: prev[itemId].wasCloneExpanded
         }
@@ -358,7 +366,17 @@ const History = ({ onTabChange }) => {
     const state = swipeStates[itemId];
     if (!state) return;
     const deltaX = state.currentX - state.startX;
+    const deltaY = Math.abs((state.currentY || 0) - state.startY);
     const absDeltaX = Math.abs(deltaX);
+    // If movement was primarily vertical, don't process as swipe
+    if (absDeltaX <= deltaY) {
+      setSwipeStates(prev => {
+        const newState = { ...prev };
+        delete newState[itemId];
+        return newState;
+      });
+      return;
+    }
     const wasCloneExpanded = state.wasCloneExpanded || false;
     if (absDeltaX >= minSwipeDistance) {
       if (deltaX < 0) {
@@ -406,6 +424,10 @@ const History = ({ onTabChange }) => {
         if (!state) return;
         const touch = e.touches[0];
         const deltaX = touch.clientX - state.startX;
+        const deltaY = Math.abs(touch.clientY - state.startY);
+        const absDeltaX = Math.abs(deltaX);
+        // Only prevent default if movement is primarily horizontal (horizontal movement is greater than vertical)
+        if (absDeltaX <= deltaY) return;
         const isExpanded = expandedItemIdRef.current === itemId;
         const isCloneExpanded = cloneExpandedItemId === itemId;
         // Prevent default scrolling when swiping horizontally
@@ -440,6 +462,10 @@ const History = ({ onTabChange }) => {
           const state = prev[item.id];
           if (!state) return;
           const deltaX = e.clientX - state.startX;
+          const deltaY = Math.abs(e.clientY - (state.startY || 0));
+          const absDeltaX = Math.abs(deltaX);
+          // Only update if movement is primarily horizontal (horizontal movement is greater than vertical)
+          if (absDeltaX <= deltaY) return;
           const isExpanded = expandedItemIdRef.current === item.id;
           const isCloneExpanded = cloneExpandedItemId === item.id;
           // Only update if dragging horizontally
@@ -447,6 +473,7 @@ const History = ({ onTabChange }) => {
             newState[item.id] = {
               ...state,
               currentX: e.clientX,
+              currentY: e.clientY,
               isSwiping: true,
               wasCloneExpanded: state.wasCloneExpanded
             };
@@ -467,7 +494,14 @@ const History = ({ onTabChange }) => {
           const state = prev[item.id];
           if (!state) return;
           const deltaX = state.currentX - state.startX;
+          const deltaY = Math.abs((state.currentY || 0) - state.startY);
           const absDeltaX = Math.abs(deltaX);
+          // If movement was primarily vertical, don't process as swipe
+          if (absDeltaX <= deltaY) {
+            delete newState[item.id];
+            hasChanges = true;
+            return; // Continue to next item
+          }
           const wasCloneExpanded = state.wasCloneExpanded || false;
           if (absDeltaX >= minSwipeDistance) {
             if (deltaX < 0) {
@@ -781,10 +815,10 @@ const History = ({ onTabChange }) => {
       {/* Date and Category Section */}
       <div className="px-4 pt-2">
         <div className="flex items-center justify-between">
-          <button className="text-[12px] font-medium text-black leading-normal">
+          <button className="text-[12px] font-semibold text-black leading-normal">
             {getTodayDate()}
           </button>
-          <button className="text-[12px] font-medium text-black leading-normal">
+          <button className="text-[12px] font-semibold text-black leading-normal">
             Category
           </button>
         </div>
@@ -796,23 +830,23 @@ const History = ({ onTabChange }) => {
           <div className="flex bg-gray-100 items-center rounded-md h-9 flex-1">
             <button
               type="button"
-              onClick={() => setActiveType('stack return')}
-              className={`flex-1 py-1 px-4 ml-0.5 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${activeType === 'stack return'
-                ? 'bg-white text-black'
-                : 'bg-gray-100 text-gray-600'
-                }`}
-            >
-              Stock Return
-            </button>
-            <button
-              type="button"
               onClick={() => setActiveType('dispatch')}
-              className={`flex-1 py-1 px-4 mr-0.5 h-8 rounded-lg text-[14px] font-medium transition-colors duration-1000 ease-out ${activeType === 'dispatch'
+              className={`flex-1 py-1 px-4 ml-0.5 h-8 rounded-lg text-[14px] font-medium transition-colors duration-1000 ease-out ${activeType === 'dispatch'
                 ? 'bg-white text-black'
                 : 'bg-gray-100 text-gray-600'
                 }`}
             >
               Dispatch
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveType('stack return')}
+              className={`flex-1 py-1 px-4 mr-0.5 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${activeType === 'stack return'
+                ? 'bg-white text-black'
+                : 'bg-gray-100 text-gray-600'
+                }`}
+            >
+              Stock Return
             </button>
           </div>
         </div>
@@ -935,7 +969,7 @@ const History = ({ onTabChange }) => {
       </div>
 
       {/* History List */}
-      <div className="flex overflow-y-auto px-4">
+      <div className="flex overflow-y-auto no-scrollbar scrollbar-none px-4">
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <p className="text-[12px] text-gray-500">Loading...</p>

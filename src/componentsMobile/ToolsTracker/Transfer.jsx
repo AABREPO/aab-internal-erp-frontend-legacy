@@ -5,6 +5,7 @@ import EditIcon from '../Images/edit1.png';
 import DeleteIcon from '../Images/delete.png';
 import FlottingButton from '../Images/Flotting Button Black.png'
 import FlottingButtonWhite from '../Images/Flotting Button.png'
+import Close from '../Images/close.png'
 
 const Transfer = ({ user }) => {
   const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_name';
@@ -509,8 +510,8 @@ const Transfer = ({ user }) => {
   const areFieldsFilled = entryServiceMode === 'Entry'
     ? (selectedFrom && selectedTo && selectedIncharge)
     : entryServiceMode === 'Relocate'
-    ? (selectedRelocateItemId && selectedCurrentLocation && selectedRelocateLocation)
-    : (selectedFrom && selectedServiceStore && selectedIncharge);
+      ? (selectedRelocateItemId && selectedCurrentLocation && selectedRelocateLocation)
+      : (selectedFrom && selectedServiceStore && selectedIncharge);
   const handleSwitchToEntry = () => {
     setEntryServiceMode('Entry');
     setSelectedServiceStore(null);
@@ -699,12 +700,12 @@ const Transfer = ({ user }) => {
                 return null;
               }).filter(Boolean);
               const localImageUrls = processedImages;
-              const itemName = toolsItemNameListData.find(i => String(i?.id) === String(item?.item_name_id ?? item?.itemNameId))?.item_name || 
-                               toolsItemNameListData.find(i => String(i?.id) === String(item?.item_name_id ?? item?.itemNameId))?.itemName || '';
-              const brand = toolsBrandFullData.find(b => String(b?.id) === String(item?.brand_id ?? item?.brandId))?.tools_brand || 
-                           toolsBrandFullData.find(b => String(b?.id) === String(item?.brand_id ?? item?.brandId))?.toolsBrand || '';
-              const itemId = toolsItemIdFullData.find(i => String(i?.id) === String(item?.item_ids_id ?? item?.itemIdsId))?.item_id || 
-                            toolsItemIdFullData.find(i => String(i?.id) === String(item?.item_ids_id ?? item?.itemIdsId))?.itemId || '';
+              const itemName = toolsItemNameListData.find(i => String(i?.id) === String(item?.item_name_id ?? item?.itemNameId))?.item_name ||
+                toolsItemNameListData.find(i => String(i?.id) === String(item?.item_name_id ?? item?.itemNameId))?.itemName || '';
+              const brand = toolsBrandFullData.find(b => String(b?.id) === String(item?.brand_id ?? item?.brandId))?.tools_brand ||
+                toolsBrandFullData.find(b => String(b?.id) === String(item?.brand_id ?? item?.brandId))?.toolsBrand || '';
+              const itemId = toolsItemIdFullData.find(i => String(i?.id) === String(item?.item_ids_id ?? item?.itemIdsId))?.item_id ||
+                toolsItemIdFullData.find(i => String(i?.id) === String(item?.item_ids_id ?? item?.itemIdsId))?.itemId || '';
               return {
                 id: item.id || Date.now() + index,
                 timestamp: item.timestamp || new Date().toISOString().slice(0, 19),
@@ -792,7 +793,7 @@ const Transfer = ({ user }) => {
                 const inchargeOption = inchargeOptions.find(opt => String(opt.id) === String(editData.project_incharge_id || editData.projectInchargeId));
                 if (inchargeOption) {
                   setSelectedIncharge(inchargeOption);
-                }                
+                }
                 loadItems();
               }
             }, 100);
@@ -842,7 +843,7 @@ const Transfer = ({ user }) => {
         const newItemIdDbId = addItemFormData.itemIdDbId ? String(addItemFormData.itemIdDbId) : editingItem.item_ids_id;
         const newBrandId = addItemFormData.brandId ? String(addItemFormData.brandId) : editingItem.brand_id;
         const newMachineNumber = addItemFormData.machineNumber || editingItem.machine_number || '';
-        
+
         // If itemId is selected, only check the full set (itemIdsId + brandId + machineNumber)
         // Don't check itemNameId separately when itemId is selected
         if (selectedFrom && newItemIdDbId) {
@@ -854,7 +855,7 @@ const Transfer = ({ user }) => {
             addItemFormData.itemName,
             selectedFrom.id
           );
-          
+
           if (!itemSetValidation.isValid) {
             alert(itemSetValidation.errorMessage);
             return;
@@ -871,13 +872,13 @@ const Transfer = ({ user }) => {
             newQuantity,
             selectedFrom.id
           );
-          
+
           if (!validation.isValid) {
             alert(validation.errorMessage);
             return;
           }
         }
-        
+
         const updatedItem = {
           ...editingItem,
           item_name_id: newItemNameId,
@@ -953,12 +954,12 @@ const Transfer = ({ user }) => {
   // Helper function to get current location of an item (quantity-based: itemNameId + brandId)
   const getItemCurrentLocation = (itemNameId, brandId) => {
     if (!itemNameId) return null;
-    
+
     const itemNameIdStr = String(itemNameId);
     const brandIdStr = brandId ? String(brandId) : null;
     let currentLocationId = null;
     let locationType = null; // 'project' or 'home'
-    
+
     // First, check in tools_tracker_management entries (transfer history)
     const matchesItem = (entryItem) => {
       const entryItemNameId = entryItem.item_name_id || entryItem.itemNameId;
@@ -969,7 +970,7 @@ const Transfer = ({ user }) => {
       const brandMatch = !brandIdStr || (entryBrandId && String(entryBrandId) === brandIdStr);
       return itemNameMatch && brandMatch;
     };
-    
+
     let mostRecentEntry = null;
     let mostRecentDate = null;
     for (const entry of toolsTrackerManagementData) {
@@ -985,7 +986,7 @@ const Transfer = ({ user }) => {
         }
       }
     }
-    
+
     if (mostRecentEntry) {
       const entryToProjectId = mostRecentEntry.to_project_id || mostRecentEntry.toProjectId;
       if (entryToProjectId) {
@@ -994,7 +995,7 @@ const Transfer = ({ user }) => {
         return { locationId: currentLocationId, locationType };
       }
     }
-    
+
     const stockItem = stockManagementData.find(stock => {
       const stockItemNameId = stock.item_name_id || stock.itemNameId;
       const stockBrandId = stock.brand_name_id || stock.brandNameId;
@@ -1003,7 +1004,7 @@ const Transfer = ({ user }) => {
       const brandMatch = !brandIdStr || (stockBrandId && String(stockBrandId) === brandIdStr);
       return itemNameMatch && brandMatch && noItemIdsId;
     });
-    
+
     if (stockItem) {
       const homeLocationId = stockItem.home_location_id || stockItem.homeLocationId;
       if (homeLocationId) {
@@ -1012,32 +1013,32 @@ const Transfer = ({ user }) => {
         return { locationId: currentLocationId, locationType };
       }
     }
-    
+
     return null;
   };
 
   // Helper function to check if a specific item set (itemIdsId + brandId + machineNumber) is available at a location
   const isItemSetAvailableAtLocation = (itemIdsId, brandId, machineNumber, locationId) => {
     if (!itemIdsId || !locationId) return false;
-    
+
     const itemIdsIdStr = String(itemIdsId);
     const brandIdStr = brandId ? String(brandId) : null;
     const machineNumberStr = machineNumber ? String(machineNumber).trim() : '';
     const locationIdStr = String(locationId);
-    
+
     // First check stock management - if item is at home location
     const stockItem = stockManagementData.find(stock => {
       const stockItemIdsId = stock.item_ids_id || stock.itemIdsId;
       const stockBrandId = stock.brand_name_id || stock.brandNameId;
       const stockMachineNumber = stock.machine_number || stock.machineNumber || '';
-      
+
       const itemIdsMatch = stockItemIdsId && String(stockItemIdsId) === itemIdsIdStr;
       const brandMatch = !brandIdStr || (stockBrandId && String(stockBrandId) === brandIdStr);
       const machineMatch = !machineNumberStr || (stockMachineNumber && String(stockMachineNumber).trim() === machineNumberStr);
-      
+
       return itemIdsMatch && brandMatch && machineMatch;
     });
-    
+
     if (stockItem) {
       const homeLocationId = stockItem.home_location_id || stockItem.homeLocationId;
       if (homeLocationId && String(homeLocationId) === locationIdStr) {
@@ -1045,29 +1046,29 @@ const Transfer = ({ user }) => {
         return true;
       }
     }
-    
+
     // Track transfers to find current location of this specific item set
     // Find the most recent transfer entry that includes this exact item set
     let mostRecentEntry = null;
     let mostRecentDate = null;
-    
+
     for (const entry of toolsTrackerManagementData) {
       const entryType = entry.tools_entry_type || entry.toolsEntryType || '';
       if (entryType.toLowerCase() !== 'entry') continue; // Only check Entry type, not Service
-      
+
       const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
       const hasMatchingItemSet = entryItems.some(entryItem => {
         const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
         const entryBrandId = entryItem.brand_id || entryItem.brandId;
         const entryMachineNumber = entryItem.machine_number || entryItem.machineNumber || '';
-        
+
         const itemIdsMatch = entryItemIdsId && String(entryItemIdsId) === itemIdsIdStr;
         const brandMatch = !brandIdStr || (entryBrandId && String(entryBrandId) === brandIdStr);
         const machineMatch = !machineNumberStr || (entryMachineNumber && String(entryMachineNumber).trim() === machineNumberStr);
-        
+
         return itemIdsMatch && brandMatch && machineMatch;
       });
-      
+
       if (hasMatchingItemSet) {
         const entryDate = entry.created_date_time || entry.createdDateTime || entry.timestamp || '';
         if (!mostRecentDate || entryDate > mostRecentDate) {
@@ -1076,7 +1077,7 @@ const Transfer = ({ user }) => {
         }
       }
     }
-    
+
     // If item set was found in transfer history, check its current location
     if (mostRecentEntry) {
       const entryToProjectId = mostRecentEntry.to_project_id || mostRecentEntry.toProjectId;
@@ -1085,7 +1086,7 @@ const Transfer = ({ user }) => {
         return true;
       }
     }
-    
+
     // If item set not found in transfers and not at home location, it's not available
     return false;
   };
@@ -1093,35 +1094,35 @@ const Transfer = ({ user }) => {
   // Helper function to get current location of an item set (itemIdsId + brandId + machineNumber)
   const getItemSetCurrentLocation = (itemIdsId, brandId, machineNumber) => {
     if (!itemIdsId) return null;
-    
+
     const itemIdsIdStr = String(itemIdsId);
     const brandIdStr = brandId ? String(brandId) : null;
     const machineNumberStr = machineNumber ? String(machineNumber).trim() : '';
     let currentLocationId = null;
     let locationType = null; // 'project' or 'home'
-    
+
     // First, check in tools_tracker_management entries (transfer history)
     // Find the most recent entry for this item set to determine its current location
     let mostRecentEntry = null;
     let mostRecentDate = null;
-    
+
     for (const entry of toolsTrackerManagementData) {
       const entryType = entry.tools_entry_type || entry.toolsEntryType || '';
       if (entryType.toLowerCase() !== 'entry') continue; // Only check Entry type, not Service
-      
+
       const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
       const hasMatchingItemSet = entryItems.some(entryItem => {
         const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
         const entryBrandId = entryItem.brand_id || entryItem.brandId;
         const entryMachineNumber = entryItem.machine_number || entryItem.machineNumber || '';
-        
+
         const itemIdsMatch = entryItemIdsId && String(entryItemIdsId) === itemIdsIdStr;
         const brandMatch = !brandIdStr || (entryBrandId && String(entryBrandId) === brandIdStr);
         const machineMatch = !machineNumberStr || (entryMachineNumber && String(entryMachineNumber).trim() === machineNumberStr);
-        
+
         return itemIdsMatch && brandMatch && machineMatch;
       });
-      
+
       if (hasMatchingItemSet) {
         const entryDate = entry.created_date_time || entry.createdDateTime || entry.timestamp || '';
         if (!mostRecentDate || entryDate > mostRecentDate) {
@@ -1130,7 +1131,7 @@ const Transfer = ({ user }) => {
         }
       }
     }
-    
+
     // If item set is found in transfer history, get its toProjectId
     if (mostRecentEntry) {
       const entryToProjectId = mostRecentEntry.to_project_id || mostRecentEntry.toProjectId;
@@ -1140,20 +1141,20 @@ const Transfer = ({ user }) => {
         return { locationId: currentLocationId, locationType };
       }
     }
-    
+
     // If no toProjectId found, check home_location_id from stock management
     const stockItem = stockManagementData.find(stock => {
       const stockItemIdsId = stock.item_ids_id || stock.itemIdsId;
       const stockBrandId = stock.brand_name_id || stock.brandNameId;
       const stockMachineNumber = stock.machine_number || stock.machineNumber || '';
-      
+
       const itemIdsMatch = stockItemIdsId && String(stockItemIdsId) === itemIdsIdStr;
       const brandMatch = !brandIdStr || (stockBrandId && String(stockBrandId) === brandIdStr);
       const machineMatch = !machineNumberStr || (stockMachineNumber && String(stockMachineNumber).trim() === machineNumberStr);
-      
+
       return itemIdsMatch && brandMatch && machineMatch;
     });
-    
+
     if (stockItem) {
       const homeLocationId = stockItem.home_location_id || stockItem.homeLocationId;
       if (homeLocationId) {
@@ -1162,69 +1163,69 @@ const Transfer = ({ user }) => {
         return { locationId: currentLocationId, locationType };
       }
     }
-    
+
     return null; // Item set location not found
   };
 
   // Helper function to calculate available quantity of itemNameId (with optional brandId) at a location
   const getAvailableQuantityAtLocation = (itemNameId, brandId, locationId) => {
     if (!itemNameId || !locationId) return 0;
-    
+
     const itemNameIdStr = String(itemNameId);
     const brandIdStr = brandId ? String(brandId) : null;
     const locationIdStr = String(locationId);
     let availableQuantity = 0;
-    
+
     // Start with quantity from stock management (home location)
     // Filter by itemNameId and optionally brandId
     const stockItems = stockManagementData.filter(stock => {
       const stockItemNameId = stock.item_name_id || stock.itemNameId;
       const stockBrandId = stock.brand_name_id || stock.brandNameId;
       const stockHomeLocationId = stock.home_location_id || stock.homeLocationId;
-      
+
       const itemNameMatch = stockItemNameId && String(stockItemNameId) === itemNameIdStr;
       const brandMatch = !brandIdStr || (stockBrandId && String(stockBrandId) === brandIdStr);
       const locationMatch = stockHomeLocationId && String(stockHomeLocationId) === locationIdStr;
       // Only count items without itemIdsId (quantity-based items)
       const noItemIdsId = !stock.item_ids_id && !stock.itemIdsId;
-      
+
       return itemNameMatch && brandMatch && locationMatch && noItemIdsId;
     });
-    
+
     // Sum quantities from stock management
     stockItems.forEach(stock => {
       const qty = parseInt(stock.quantity || 0, 10);
       availableQuantity += qty;
     });
-    
+
     // Track transfers: add items transferred TO this location, subtract items transferred FROM this location
     for (const entry of toolsTrackerManagementData) {
       const entryType = entry.tools_entry_type || entry.toolsEntryType || '';
       if (entryType.toLowerCase() !== 'entry') continue; // Only check Entry type, not Service
-      
+
       const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
       const entryToProjectId = entry.to_project_id || entry.toProjectId;
       const entryFromProjectId = entry.from_project_id || entry.fromProjectId;
-      
+
       for (const entryItem of entryItems) {
         // Only count items without itemIdsId (quantity-based items)
         const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
         if (entryItemIdsId) continue; // Skip items with itemIdsId
-        
+
         const entryItemNameId = entryItem.item_name_id || entryItem.itemNameId;
         const entryBrandId = entryItem.brand_id || entryItem.brandId;
-        
+
         const itemNameMatch = entryItemNameId && String(entryItemNameId) === itemNameIdStr;
         const brandMatch = !brandIdStr || (entryBrandId && String(entryBrandId) === brandIdStr);
-        
+
         if (itemNameMatch && brandMatch) {
           const itemQuantity = parseInt(entryItem.quantity || 0, 10);
-          
+
           // If transferred TO this location, add to available quantity
           if (entryToProjectId && String(entryToProjectId) === locationIdStr) {
             availableQuantity += itemQuantity;
           }
-          
+
           // If transferred FROM this location, subtract from available quantity
           if (entryFromProjectId && String(entryFromProjectId) === locationIdStr) {
             availableQuantity -= itemQuantity;
@@ -1232,7 +1233,7 @@ const Transfer = ({ user }) => {
         }
       }
     }
-    
+
     return Math.max(0, availableQuantity); // Ensure non-negative
   };
 
@@ -1284,28 +1285,28 @@ const Transfer = ({ user }) => {
   // Validation function to check if item can be transferred from selected location (with quantity check)
   const validateItemLocation = (itemNameId, itemName, brandId, quantity, fromProjectId) => {
     if (!itemNameId || !fromProjectId) return { isValid: true };
-    
+
     const fromProjectIdStr = String(fromProjectId);
     const requestedQuantity = parseInt(quantity || 0, 10);
-    
+
     // If quantity is specified, check available quantity
     if (requestedQuantity > 0) {
       const availableQuantity = getAvailableQuantityAtLocation(itemNameId, brandId, fromProjectIdStr);
-      
+
       if (availableQuantity < requestedQuantity) {
         const projectOption = toOptions.find(opt => String(opt.id) === fromProjectIdStr);
         const projectName = projectOption?.label || projectOption?.name || fromProjectIdStr;
-        
+
         const itemDetails = [
           `Item Name ID: ${itemNameId}`,
           brandId ? `Brand ID: ${brandId}` : null
         ].filter(Boolean).join(', ');
-        
+
         const currentLocations = getLocationsWithAvailableQuantity(itemNameId, brandId);
         const whereItIs = currentLocations.length > 0
           ? ` Currently available at: ${currentLocations.map(l => `"${l.locationName}" (${l.quantity} unit(s))`).join(', ')}.`
           : '';
-        
+
         return {
           isValid: false,
           errorMessage: `Cannot transfer item "${itemName}" (${itemDetails}). Only ${availableQuantity} unit(s) available at "${projectName}" (Project ID: ${fromProjectIdStr}), but ${requestedQuantity} unit(s) requested.${whereItIs}`
@@ -1316,8 +1317,8 @@ const Transfer = ({ user }) => {
       const locationInfo = getItemCurrentLocation(itemNameId, brandId);
       if (!locationInfo) {
         return { isValid: true };
-      }      
-      const { locationId, locationType } = locationInfo;      
+      }
+      const { locationId, locationType } = locationInfo;
       if (locationId !== fromProjectIdStr) {
         let locationName = locationId;
         if (locationType === 'project') {
@@ -1336,34 +1337,34 @@ const Transfer = ({ user }) => {
           errorMessage: `Cannot transfer item "${itemName}" (${itemDetails}). This item is currently ${locationType === 'project' ? 'in project' : 'at home location'} "${locationName}" (ID: ${locationId}), not in the selected "From" project.`
         };
       }
-    }    
+    }
     return { isValid: true };
   };
   // Validation function to check if item set (itemIdsId + brandId + machineNumber) is available at location (before sending to backend)
   const validateItemSetAvailability = (itemIdsId, brandId, machineNumber, itemNameId, itemName, fromProjectId) => {
     if (!itemIdsId || !fromProjectId) return { isValid: true }; // If no itemId selected, skip check    
     const fromProjectIdStr = String(fromProjectId);
-    const isAvailable = isItemSetAvailableAtLocation(itemIdsId, brandId, machineNumber, fromProjectIdStr);    
+    const isAvailable = isItemSetAvailableAtLocation(itemIdsId, brandId, machineNumber, fromProjectIdStr);
     if (!isAvailable) {
       const projectOption = toOptions.find(opt => String(opt.id) === fromProjectIdStr);
-      const projectName = projectOption?.label || projectOption?.name || fromProjectIdStr;      
+      const projectName = projectOption?.label || projectOption?.name || fromProjectIdStr;
       // Find where the item set currently is
       let currentLocation = null;
-      let currentLocationName = 'unknown location';      
+      let currentLocationName = 'unknown location';
       const itemIdsIdStr = String(itemIdsId);
       const brandIdStr = brandId ? String(brandId) : null;
-      const machineNumberStr = machineNumber ? String(machineNumber).trim() : '';      
+      const machineNumberStr = machineNumber ? String(machineNumber).trim() : '';
       // Check stock management
       const stockItem = stockManagementData.find(stock => {
         const stockItemIdsId = stock.item_ids_id || stock.itemIdsId;
         const stockBrandId = stock.brand_name_id || stock.brandNameId;
-        const stockMachineNumber = stock.machine_number || stock.machineNumber || '';        
+        const stockMachineNumber = stock.machine_number || stock.machineNumber || '';
         const itemIdsMatch = stockItemIdsId && String(stockItemIdsId) === itemIdsIdStr;
         const brandMatch = !brandIdStr || (stockBrandId && String(stockBrandId) === brandIdStr);
-        const machineMatch = !machineNumberStr || (stockMachineNumber && String(stockMachineNumber).trim() === machineNumberStr);        
+        const machineMatch = !machineNumberStr || (stockMachineNumber && String(stockMachineNumber).trim() === machineNumberStr);
         return itemIdsMatch && brandMatch && machineMatch;
       });
-      
+
       if (stockItem) {
         const homeLocationId = stockItem.home_location_id || stockItem.homeLocationId;
         if (homeLocationId) {
@@ -1372,27 +1373,27 @@ const Transfer = ({ user }) => {
           currentLocationName = homeOption?.label || homeOption?.name || `Home Location (ID: ${currentLocation})`;
         }
       }
-      
+
       // Check transfer history for current location
       let mostRecentEntry = null;
       let mostRecentDate = null;
       for (const entry of toolsTrackerManagementData) {
         const entryType = entry.tools_entry_type || entry.toolsEntryType || '';
         if (entryType.toLowerCase() !== 'entry') continue;
-        
+
         const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
         const hasMatchingItemSet = entryItems.some(entryItem => {
           const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
           const entryBrandId = entryItem.brand_id || entryItem.brandId;
           const entryMachineNumber = entryItem.machine_number || entryItem.machineNumber || '';
-          
+
           const itemIdsMatch = entryItemIdsId && String(entryItemIdsId) === itemIdsIdStr;
           const brandMatch = !brandIdStr || (entryBrandId && String(entryBrandId) === brandIdStr);
           const machineMatch = !machineNumberStr || (entryMachineNumber && String(entryMachineNumber).trim() === machineNumberStr);
-          
+
           return itemIdsMatch && brandMatch && machineMatch;
         });
-        
+
         if (hasMatchingItemSet) {
           const entryDate = entry.created_date_time || entry.createdDateTime || entry.timestamp || '';
           if (!mostRecentDate || entryDate > mostRecentDate) {
@@ -1401,7 +1402,7 @@ const Transfer = ({ user }) => {
           }
         }
       }
-      
+
       if (mostRecentEntry) {
         const entryToProjectId = mostRecentEntry.to_project_id || mostRecentEntry.toProjectId;
         if (entryToProjectId) {
@@ -1410,19 +1411,19 @@ const Transfer = ({ user }) => {
           currentLocationName = currentOption?.label || currentOption?.name || currentLocation;
         }
       }
-      
+
       const itemSetDetails = [
         `Item ID: ${itemIdsId}`,
         brandId ? `Brand ID: ${brandId}` : null,
         machineNumber ? `Machine Number: ${machineNumber}` : null
       ].filter(Boolean).join(', ');
-      
+
       return {
         isValid: false,
         errorMessage: `Cannot transfer item "${itemName}" (${itemSetDetails}). This item set is currently at "${currentLocationName}" (ID: ${currentLocation || 'unknown'}), not at the selected "From" project "${projectName}" (Project ID: ${fromProjectIdStr}).`
       };
     }
-    
+
     return { isValid: true };
   };
 
@@ -1438,7 +1439,7 @@ const Transfer = ({ user }) => {
         addItemFormData.itemName,
         selectedFrom.id
       );
-      
+
       if (!itemSetValidation.isValid) {
         alert(itemSetValidation.errorMessage);
         return;
@@ -1453,7 +1454,7 @@ const Transfer = ({ user }) => {
         addItemFormData.quantity,
         selectedFrom.id
       );
-      
+
       if (!validation.isValid) {
         alert(validation.errorMessage);
         return;
@@ -1480,7 +1481,7 @@ const Transfer = ({ user }) => {
       machine_status: uploadStatus,
       description: uploadDescription,
       tools_item_live_images: uploadedImages, // For backend (base64 bytes)
-      localImageUrls: localImageUrls, 
+      localImageUrls: localImageUrls,
       itemName: addItemFormData.itemName,
       brand: addItemFormData.brand,
       itemId: addItemFormData.itemId
@@ -1574,7 +1575,7 @@ const Transfer = ({ user }) => {
       if (!response.ok) {
         throw new Error(`Failed to update: ${response.status} ${response.statusText}`);
       }
-      
+
       // Save machine_status to the new API for each item that has itemIdsId and machine_number
       const machineStatusPromises = payload.tools_tracker_item_name_table
         .filter(item => item.item_ids_id && item.machine_number && item.machine_status)
@@ -1598,10 +1599,10 @@ const Transfer = ({ user }) => {
             console.error('Error saving machine status:', error);
           }
         });
-      
+
       // Wait for all machine status saves to complete (don't block on errors)
       await Promise.allSettled(machineStatusPromises);
-      
+
       alert('Updated successfully!');
       localStorage.removeItem('editingToolsTrackerEntryId');
       setIsEditMode(false);
@@ -1656,10 +1657,10 @@ const Transfer = ({ user }) => {
     // Skip validation for Relocate mode as it uses different flow
     if (entryServiceMode !== 'Relocate' && selectedFrom) {
       const fromProjectId = String(selectedFrom.id);
-      
+
       for (const item of items) {
         if (!item.item_name_id) continue;
-        
+
         // If itemId is selected, only check the full set (itemIdsId + brandId + machineNumber)
         // Don't check itemNameId separately when itemId is selected
         if (item.item_ids_id) {
@@ -1671,7 +1672,7 @@ const Transfer = ({ user }) => {
             item.itemName,
             fromProjectId
           );
-          
+
           if (!itemSetValidation.isValid) {
             alert(itemSetValidation.errorMessage);
             setIsSaving(false);
@@ -1687,7 +1688,7 @@ const Transfer = ({ user }) => {
             item.quantity,
             fromProjectId
           );
-          
+
           if (!validation.isValid) {
             alert(validation.errorMessage);
             setIsSaving(false);
@@ -1701,7 +1702,7 @@ const Transfer = ({ user }) => {
     if (entryServiceMode === 'Entry' && selectedTo && selectedFrom) {
       const targetProjectId = String(selectedTo.id);
       const fromProjectId = String(selectedFrom.id);
-      
+
       for (const item of items) {
         // If itemId is selected, check by full set (itemIdsId + brandId + machineNumber)
         // Otherwise, check by itemNameId (for quantity-based transfers)
@@ -1713,13 +1714,13 @@ const Transfer = ({ user }) => {
             item.machine_number
           );
           if (!locationInfo) continue; // Item set location not found - allow transfer
-          
+
           const { locationId, locationType } = locationInfo;
-          
+
           // If item set is in a project (not home), check if it's different from both FROM and TO
           if (locationType === 'project') {
             const currentProjectId = String(locationId);
-            
+
             // Allow transfer if we're transferring FROM the project where item set currently is
             // Block if item set is in a different project than both FROM and TO
             if (currentProjectId !== fromProjectId && currentProjectId !== targetProjectId) {
@@ -1740,13 +1741,13 @@ const Transfer = ({ user }) => {
           // Check by itemNameId + brandId (for quantity-based transfers)
           const locationInfo = getItemCurrentLocation(item.item_name_id, item.brand_id);
           if (!locationInfo) continue; // Item location not found - allow transfer
-          
+
           const { locationId, locationType } = locationInfo;
-          
+
           // If item is in a project (not home), check if it's different from both FROM and TO
           if (locationType === 'project') {
             const currentProjectId = String(locationId);
-            
+
             // Allow transfer if we're transferring FROM the project where item currently is
             // Block if item is in a different project than both FROM and TO
             if (currentProjectId !== fromProjectId && currentProjectId !== targetProjectId) {
@@ -1765,20 +1766,20 @@ const Transfer = ({ user }) => {
     setIsSaving(true);
     try {
       let payload;
-      
+
       if (entryServiceMode === 'Relocate') {
         // For Relocate mode, get item details from stock management
         const stockItem = stockManagementData.find(item => {
           const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
           return String(itemIdsId) === String(selectedRelocateItemId);
         });
-        
+
         if (!stockItem) {
           alert('Item not found in stock management');
           setIsSaving(false);
           return;
         }
-        
+
         payload = {
           from_project_id: selectedCurrentLocation?.id ? String(selectedCurrentLocation.id) : null,
           to_project_id: null,
@@ -1836,7 +1837,7 @@ const Transfer = ({ user }) => {
         throw new Error(`Failed to save: ${response.status} ${response.statusText}`);
       }
       const result = await response.json();
-      
+
       // Save machine_status to the new API for each item that has itemIdsId and machine_number
       const machineStatusPromises = payload.tools_tracker_item_name_table
         .filter(item => item.item_ids_id && item.machine_number && item.machine_status)
@@ -1860,10 +1861,10 @@ const Transfer = ({ user }) => {
             console.error('Error saving machine status:', error);
           }
         });
-      
+
       // Wait for all machine status saves to complete (don't block on errors)
       await Promise.allSettled(machineStatusPromises);
-      
+
       alert('Transfer saved successfully!');
       setSelectedFrom(null);
       setSelectedTo(null);
@@ -2254,13 +2255,13 @@ const Transfer = ({ user }) => {
           item => (item?.item_id?.trim() ?? item?.itemId?.trim()) === value
         );
         updated.itemIdDbId = itemIdObj?.id ?? null;
-        
+
         if (itemIdObj?.id) {
           const itemIdsIdStr = String(itemIdObj.id);
-          
+
           // Find all entries with this item_ids_id from both stockManagementData and toolsTrackerManagementData
           const allEntries = [];
-          
+
           // Get from stockManagementData
           stockManagementData.forEach(item => {
             const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
@@ -2274,7 +2275,7 @@ const Transfer = ({ user }) => {
               });
             }
           });
-          
+
           // Get from toolsTrackerManagementData
           toolsTrackerManagementData.forEach(entry => {
             const entryItems = entry?.tools_tracker_item_name_table ?? entry?.toolsTrackerItemNameTable ?? [];
@@ -2291,7 +2292,7 @@ const Transfer = ({ user }) => {
               }
             });
           });
-          
+
           // Sort by id descending (highest id = most recent) or timestamp descending
           allEntries.sort((a, b) => {
             // First try to sort by id (numeric comparison)
@@ -2306,10 +2307,10 @@ const Transfer = ({ user }) => {
             }
             return 0;
           });
-          
+
           // Get the last (most recent) entry
           const lastEntry = allEntries.length > 0 ? allEntries[0] : null;
-          
+
           if (lastEntry) {
             // Set Item Name from the last entry
             if (lastEntry.item_name_id) {
@@ -2321,7 +2322,7 @@ const Transfer = ({ user }) => {
                 updated.itemNameId = itemNameObj?.id ?? null;
               }
             }
-            
+
             // Set Brand from the last entry
             if (lastEntry.brand_id) {
               const brandObj = toolsBrandFullData.find(
@@ -2332,15 +2333,15 @@ const Transfer = ({ user }) => {
                 updated.brandId = brandObj?.id ?? null;
               }
             }
-            
+
             // Get latest machine number from new API that doesn't have "Machine Dead" status
-            const machineStatusesForItemId = Array.isArray(machineStatusData) 
+            const machineStatusesForItemId = Array.isArray(machineStatusData)
               ? machineStatusData.filter(status => {
-                  const statusItemIdsId = String(status.item_ids_id || status.itemIdsId || '');
-                  return statusItemIdsId === itemIdsIdStr;
-                })
+                const statusItemIdsId = String(status.item_ids_id || status.itemIdsId || '');
+                return statusItemIdsId === itemIdsIdStr;
+              })
               : [];
-            
+
             // Group by machine number and get latest status for each
             const machineStatusMap = new Map();
             machineStatusesForItemId.forEach(status => {
@@ -2352,18 +2353,18 @@ const Transfer = ({ user }) => {
                 }
               }
             });
-            
+
             // Find the latest machine number that doesn't have "Machine Dead" status
             let latestMachineNumber = null;
             let latestStatusId = 0;
-            
+
             machineStatusMap.forEach((status, machineNum) => {
               const machineStatus = (status.machine_status || status.machineStatus || '').trim();
               const machineStatusLower = machineStatus.toLowerCase();
               // Include all statuses EXCEPT "Machine Dead" and "Not Working"
               // This includes: "Working", "Under Repair", empty string, or any other status
-              if (machineStatusLower !== 'machine dead' && 
-                  machineStatusLower !== 'not working') {
+              if (machineStatusLower !== 'machine dead' &&
+                machineStatusLower !== 'not working') {
                 const statusId = status.id || 0;
                 if (statusId > latestStatusId) {
                   latestStatusId = statusId;
@@ -2371,7 +2372,7 @@ const Transfer = ({ user }) => {
                 }
               }
             });
-            
+
             // If found in new API, use it
             if (latestMachineNumber) {
               updated.machineNumber = latestMachineNumber;
@@ -2386,10 +2387,10 @@ const Transfer = ({ user }) => {
                   const lastEntryMachineStatus = (lastEntryStatus.machine_status || lastEntryStatus.machineStatus || '').trim();
                   const lastEntryMachineStatusLower = lastEntryMachineStatus.toLowerCase();
                   // Only use fallback if it's not "Machine Dead" or "Not Working"
-                  if (lastEntryMachineStatusLower !== 'machine dead' && 
-                      lastEntryMachineStatusLower !== 'not working' &&
-                      lastEntryMachineStatus !== 'Machine Dead' &&
-                      lastEntryMachineStatus !== 'Not Working') {
+                  if (lastEntryMachineStatusLower !== 'machine dead' &&
+                    lastEntryMachineStatusLower !== 'not working' &&
+                    lastEntryMachineStatus !== 'Machine Dead' &&
+                    lastEntryMachineStatus !== 'Not Working') {
                     updated.machineNumber = lastEntryMachineNum;
                     setSelectedItemMachineNumber(lastEntryMachineNum);
                   } else {
@@ -2414,7 +2415,7 @@ const Transfer = ({ user }) => {
               const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
               return String(itemIdsId) === itemIdsIdStr;
             });
-            
+
             if (stockItem?.item_name_id) {
               const itemNameObj = toolsItemNameListData.find(
                 item => String(item?.id) === String(stockItem.item_name_id)
@@ -2424,15 +2425,15 @@ const Transfer = ({ user }) => {
                 updated.itemNameId = itemNameObj?.id ?? null;
               }
             }
-            
+
             // Get latest machine number from new API that doesn't have "Machine Dead" status
-            const machineStatusesForItemId = Array.isArray(machineStatusData) 
+            const machineStatusesForItemId = Array.isArray(machineStatusData)
               ? machineStatusData.filter(status => {
-                  const statusItemIdsId = String(status.item_ids_id || status.itemIdsId || '');
-                  return statusItemIdsId === itemIdsIdStr;
-                })
+                const statusItemIdsId = String(status.item_ids_id || status.itemIdsId || '');
+                return statusItemIdsId === itemIdsIdStr;
+              })
               : [];
-            
+
             // Group by machine number and get latest status for each
             const machineStatusMap = new Map();
             machineStatusesForItemId.forEach(status => {
@@ -2444,18 +2445,18 @@ const Transfer = ({ user }) => {
                 }
               }
             });
-            
+
             // Find the latest machine number that doesn't have "Machine Dead" status
             let latestMachineNumber = null;
             let latestStatusId = 0;
-            
+
             machineStatusMap.forEach((status, machineNum) => {
               const machineStatus = (status.machine_status || status.machineStatus || '').trim();
               const machineStatusLower = machineStatus.toLowerCase();
               // Include all statuses EXCEPT "Machine Dead" and "Not Working"
               // This includes: "Working", "Under Repair", empty string, or any other status
-              if (machineStatusLower !== 'machine dead' && 
-                  machineStatusLower !== 'not working') {
+              if (machineStatusLower !== 'machine dead' &&
+                machineStatusLower !== 'not working') {
                 const statusId = status.id || 0;
                 if (statusId > latestStatusId) {
                   latestStatusId = statusId;
@@ -2463,7 +2464,7 @@ const Transfer = ({ user }) => {
                 }
               }
             });
-            
+
             // If found in new API, use it
             if (latestMachineNumber) {
               updated.machineNumber = latestMachineNumber;
@@ -2479,10 +2480,10 @@ const Transfer = ({ user }) => {
                   const stockMachineStatusValue = (stockMachineStatus.machine_status || stockMachineStatus.machineStatus || '').trim();
                   const stockMachineStatusLower = stockMachineStatusValue.toLowerCase();
                   // Only use fallback if it's not "Machine Dead" or "Not Working"
-                  if (stockMachineStatusLower !== 'machine dead' && 
-                      stockMachineStatusLower !== 'not working' &&
-                      stockMachineStatusValue !== 'Machine Dead' &&
-                      stockMachineStatusValue !== 'Not Working') {
+                  if (stockMachineStatusLower !== 'machine dead' &&
+                    stockMachineStatusLower !== 'not working' &&
+                    stockMachineStatusValue !== 'Machine Dead' &&
+                    stockMachineStatusValue !== 'Not Working') {
                     updated.machineNumber = stockMachineNumStr;
                     setSelectedItemMachineNumber(stockMachineNumStr);
                   } else {
@@ -2550,7 +2551,7 @@ const Transfer = ({ user }) => {
       } catch {
         // If response doesn't have JSON, continue to refresh
       }
-      
+
       const refreshed = await fetch(`${TOOLS_ITEM_NAME_BASE_URL}/getAll`, {
         method: 'GET',
         credentials: 'include',
@@ -2563,7 +2564,7 @@ const Transfer = ({ user }) => {
           .map(item => item?.item_name ?? item?.itemName)
           .filter(Boolean);
         setItemNameOptions(Array.from(new Set(names)));
-        
+
         // Find the ID from refreshed data if not in response
         if (!savedItemId) {
           const newItem = (Array.isArray(data) ? data : []).find(
@@ -2571,7 +2572,7 @@ const Transfer = ({ user }) => {
           );
           savedItemId = newItem?.id ?? newItem?._id ?? null;
         }
-        
+
         // Set both itemName and itemNameId
         setAddItemFormData(prev => ({
           ...prev,
@@ -2617,7 +2618,7 @@ const Transfer = ({ user }) => {
       } catch {
         // If response doesn't have JSON, continue to refresh
       }
-      
+
       const refreshed = await fetch(`${TOOLS_BRAND_BASE_URL}/getAll`, {
         method: 'GET',
         credentials: 'include',
@@ -2630,7 +2631,7 @@ const Transfer = ({ user }) => {
           .map(b => b?.tools_brand?.trim() ?? b?.toolsBrand?.trim())
           .filter(b => b);
         setBrandOptions(Array.from(new Set(brandOpts)));
-        
+
         // Find the ID from refreshed data if not in response
         if (!savedBrandId) {
           const newBrand = (Array.isArray(data) ? data : []).find(
@@ -2638,7 +2639,7 @@ const Transfer = ({ user }) => {
           );
           savedBrandId = newBrand?.id ?? newBrand?._id ?? null;
         }
-        
+
         // Set both brand and brandId
         setAddItemFormData(prev => ({
           ...prev,
@@ -2684,7 +2685,7 @@ const Transfer = ({ user }) => {
       } catch {
         // If response doesn't have JSON, continue to refresh
       }
-      
+
       const refreshed = await fetch(`${TOOLS_ITEM_ID_BASE_URL}/getAll`, {
         method: 'GET',
         credentials: 'include',
@@ -2699,7 +2700,7 @@ const Transfer = ({ user }) => {
           .filter(item => !/^\d+$/.test(item));
         setApiItemIdOptions(itemIdOpts);
         setItemIdOptions(itemIdOpts);
-        
+
         // Find the ID from refreshed data if not in response
         if (!savedItemIdDbId) {
           const newItemId = (Array.isArray(data) ? data : []).find(
@@ -2707,7 +2708,7 @@ const Transfer = ({ user }) => {
           );
           savedItemIdDbId = newItemId?.id ?? newItemId?._id ?? null;
         }
-        
+
         // Set both itemId and itemIdDbId
         setAddItemFormData(prev => ({
           ...prev,
@@ -2722,7 +2723,7 @@ const Transfer = ({ user }) => {
   };
   return (
     <div className="flex flex-col min-h-[calc(100vh-90px-80px)] bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
-      <div className="flex-shrink-0 px-4 pt-2 pb-1 flex items-center justify-between">
+      <div className="flex-shrink-0 px-4 pt-1 pb-0.5 flex items-center justify-between">
         <div className="flex items-center gap-1">
           <p className="text-[12px] font-medium text-black leading-normal">
             #{entryNo || 'NO'}
@@ -2878,7 +2879,7 @@ const Transfer = ({ user }) => {
                 <div className="flex justify-between items-center px-6 pt-5">
                   <p className="text-[16px] font-semibold text-black">Select From</p>
                   <button onClick={() => setShowFromDropdown(false)} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
-                    ×
+                    <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
                   </button>
                 </div>
                 <div className="px-6 pt-4 pb-4">
@@ -2899,7 +2900,7 @@ const Transfer = ({ user }) => {
                     </div>
                   </div>
                 </div>
-                <div className="flex-1 overflow-y-auto mb-4 px-6">
+                <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6">
                   <div className="shadow-md rounded-lg overflow-hidden">
                     {fromSearchQuery.trim() && !fromOptions.some(opt => {
                       const normalizedOpt = normalizeSearchText(opt.label);
@@ -2933,7 +2934,7 @@ const Transfer = ({ user }) => {
                                   const invalidItems = [];
                                   for (const item of items) {
                                     if (!item.item_name_id) continue;
-                                    
+
                                     // If itemId is selected, only check the full set (itemIdsId + brandId + machineNumber)
                                     // Don't check itemNameId separately when itemId is selected
                                     if (item.item_ids_id) {
@@ -2945,7 +2946,7 @@ const Transfer = ({ user }) => {
                                         item.itemName,
                                         option.id
                                       );
-                                      
+
                                       if (!itemSetValidation.isValid) {
                                         invalidItems.push({
                                           name: item.itemName || 'Unknown Item',
@@ -2962,7 +2963,7 @@ const Transfer = ({ user }) => {
                                         item.quantity,
                                         option.id
                                       );
-                                      
+
                                       if (!validation.isValid) {
                                         invalidItems.push({
                                           name: item.itemName || 'Unknown Item',
@@ -2971,7 +2972,7 @@ const Transfer = ({ user }) => {
                                       }
                                     }
                                   }
-                                  
+
                                   if (invalidItems.length > 0) {
                                     const errorMessage = invalidItems
                                       .map(inv => inv.error)
@@ -2981,7 +2982,7 @@ const Transfer = ({ user }) => {
                                     return;
                                   }
                                 }
-                                
+
                                 setSelectedFrom(option);
                                 setShowFromDropdown(false);
                                 setIsEditingTransferDetails(false);
@@ -3133,7 +3134,7 @@ const Transfer = ({ user }) => {
                 <div className="flex justify-between items-center px-6 pt-5">
                   <p className="text-[16px] font-semibold text-black">Select To</p>
                   <button onClick={() => setShowToDropdown(false)} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
-                    ×
+                  <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
                   </button>
                 </div>
                 <div className="px-6 pt-4 pb-4">
@@ -3154,7 +3155,7 @@ const Transfer = ({ user }) => {
                     </div>
                   </div>
                 </div>
-                <div className="flex-1 overflow-y-auto mb-4 px-6">
+                <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6">
                   <div className="shadow-md rounded-lg overflow-hidden">
                     {toSearchQuery.trim() && !toOptions.some(opt => {
                       const normalizedOpt = normalizeSearchText(opt.label);
@@ -3248,7 +3249,7 @@ const Transfer = ({ user }) => {
                 <div className="flex justify-between items-center px-6 pt-5">
                   <p className="text-[16px] font-semibold text-black">Select Service Store</p>
                   <button onClick={() => setShowServiceStoreDropdown(false)} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
-                    ×
+                  <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
                   </button>
                 </div>
                 <div className="px-6 pt-4 pb-4">
@@ -3269,7 +3270,7 @@ const Transfer = ({ user }) => {
                     </div>
                   </div>
                 </div>
-                <div className="flex-1 overflow-y-auto mb-4 px-6">
+                <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6">
                   <div className="shadow-md rounded-lg overflow-hidden">
                     {serviceStoreSearchQuery.trim() && !serviceStoreOptions.some(opt => {
                       const normalizedOpt = normalizeSearchText(opt.label);
@@ -3402,7 +3403,7 @@ const Transfer = ({ user }) => {
                 <div className="flex justify-between items-center px-6 pt-5">
                   <p className="text-[16px] font-semibold text-black">Select Project Incharge</p>
                   <button onClick={() => setShowInchargeDropdown(false)} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity" >
-                    ×
+                  <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
                   </button>
                 </div>
                 <div className="px-6 pt-4 pb-4">
@@ -3423,7 +3424,7 @@ const Transfer = ({ user }) => {
                     </div>
                   </div>
                 </div>
-                <div className="flex-1 overflow-y-auto mb-4 px-6">
+                <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6">
                   <div className="shadow-md rounded-lg overflow-hidden">
                     {inchargeSearchQuery.trim() && !inchargeOptions.some(opt => {
                       const normalizedOpt = normalizeSearchText(opt.label);
@@ -3561,7 +3562,7 @@ const Transfer = ({ user }) => {
                   <div className="flex justify-between items-center px-6 pt-5">
                     <p className="text-[16px] font-semibold text-black">Select Item ID</p>
                     <button onClick={() => setShowRelocateItemIdDropdown(false)} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
-                      ×
+                    <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
                     </button>
                   </div>
                   <div className="px-6 pt-4 pb-4">
@@ -3582,27 +3583,27 @@ const Transfer = ({ user }) => {
                       </div>
                     </div>
                   </div>
-                  <div className="flex-1 overflow-y-auto mb-4 px-6 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                  <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                     <div className="shadow-md rounded-lg overflow-hidden">
                       {relocateItemIdSearchQuery.trim() && !itemIdOptions.some(opt => {
                         const normalizedOpt = normalizeSearchText(opt);
                         const normalizedQuery = normalizeSearchText(relocateItemIdSearchQuery.trim());
                         return normalizedOpt === normalizedQuery;
                       }) && (
-                        <button
-                          onClick={() => {
-                            handleAddNewItemId(relocateItemIdSearchQuery.trim());
-                          }}
-                          className="w-full h-[36px] px-6 flex items-center bg-gray-100 gap-2 hover:bg-[#F5F5F5] transition-colors"
-                        >
-                          <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M7 3V11M3 7H11" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
-                            </svg>
-                          </div>
-                          <p className="text-[14px] text-gray-600 font-normal text-left truncate">New Item ID</p>
-                        </button>
-                      )}
+                          <button
+                            onClick={() => {
+                              handleAddNewItemId(relocateItemIdSearchQuery.trim());
+                            }}
+                            className="w-full h-[36px] px-6 flex items-center bg-gray-100 gap-2 hover:bg-[#F5F5F5] transition-colors"
+                          >
+                            <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M7 3V11M3 7H11" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
+                              </svg>
+                            </div>
+                            <p className="text-[14px] text-gray-600 font-normal text-left truncate">New Item ID</p>
+                          </button>
+                        )}
                       {getFilteredItemIdOptions().length > 0 ? (
                         <div className="space-y-0">
                           {getFilteredItemIdOptions().map((option) => {
@@ -3621,23 +3622,23 @@ const Transfer = ({ user }) => {
                                   if (itemIdObj) {
                                     setSelectedRelocateItemId(itemIdObj.id);
                                     const itemIdsIdStr = String(itemIdObj.id);
-                                    
+
                                     // First, check transfer history for the most recent toProjectId
                                     let currentLocationId = null;
                                     let mostRecentEntry = null;
                                     let mostRecentDate = null;
-                                    
+
                                     // Find the most recent transfer entry for this itemId
                                     for (const entry of toolsTrackerManagementData) {
                                       const entryType = entry.tools_entry_type || entry.toolsEntryType || '';
                                       if (entryType.toLowerCase() !== 'entry') continue; // Only check Entry type transfers
-                                      
+
                                       const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
                                       const hasMatchingItemId = entryItems.some(entryItem => {
                                         const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
                                         return entryItemIdsId && String(entryItemIdsId) === itemIdsIdStr;
                                       });
-                                      
+
                                       if (hasMatchingItemId) {
                                         const entryDate = entry.created_date_time || entry.createdDateTime || entry.timestamp || '';
                                         if (!mostRecentDate || entryDate > mostRecentDate) {
@@ -3646,7 +3647,7 @@ const Transfer = ({ user }) => {
                                         }
                                       }
                                     }
-                                    
+
                                     // If found a transfer entry with toProjectId, use that as current location
                                     if (mostRecentEntry) {
                                       const toProjectId = mostRecentEntry.to_project_id || mostRecentEntry.toProjectId;
@@ -3654,14 +3655,14 @@ const Transfer = ({ user }) => {
                                         currentLocationId = String(toProjectId);
                                       }
                                     }
-                                    
+
                                     // If no toProjectId found in transfer history, use home_location_id from stock management
                                     if (!currentLocationId) {
                                       const stockItem = stockManagementData.find(item => {
                                         const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
                                         return String(itemIdsId) === itemIdsIdStr;
                                       });
-                                      
+
                                       if (stockItem) {
                                         const homeLocationId = stockItem.home_location_id || stockItem.homeLocationId;
                                         if (homeLocationId) {
@@ -3669,7 +3670,7 @@ const Transfer = ({ user }) => {
                                         }
                                       }
                                     }
-                                    
+
                                     // Set the current location
                                     let locationOption = null;
                                     if (currentLocationId) {
@@ -3678,34 +3679,34 @@ const Transfer = ({ user }) => {
                                         setSelectedCurrentLocation(locationOption);
                                       }
                                     }
-                                    
+
                                     // Get item details from stock management
                                     const stockItem = stockManagementData.find(item => {
                                       const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
                                       return String(itemIdsId) === itemIdsIdStr;
                                     });
-                                    
+
                                     if (stockItem) {
                                       // Get item name
                                       const itemNameId = stockItem.item_name_id || stockItem.itemNameId;
                                       const itemNameObj = toolsItemNameListData.find(i => String(i?.id) === String(itemNameId));
                                       const itemName = itemNameObj?.item_name || itemNameObj?.itemName || '';
-                                      
+
                                       // Get purchase store name
                                       const purchaseStoreId = stockItem.purchase_store_id || stockItem.purchaseStoreId;
-                                      const purchaseStore = purchaseStoreId 
+                                      const purchaseStore = purchaseStoreId
                                         ? vendorOptions.find(v => String(v.id) === String(purchaseStoreId))?.label || ''
                                         : '';
-                                      
+
                                       // Get birth location (original home location)
                                       const birthLocationId = stockItem.home_location_id || stockItem.homeLocationId;
                                       const birthLocation = birthLocationId
                                         ? toOptions.find(opt => String(opt.id) === String(birthLocationId))?.label || ''
                                         : '';
-                                      
+
                                       // Get current location label
                                       const currentLocationLabel = locationOption?.label || '';
-                                      
+
                                       // Get last updated image from transfer history
                                       let lastImageUrl = '';
                                       if (mostRecentEntry) {
@@ -3714,7 +3715,7 @@ const Transfer = ({ user }) => {
                                           const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
                                           return entryItemIdsId && String(entryItemIdsId) === itemIdsIdStr;
                                         });
-                                        
+
                                         if (matchingEntryItem) {
                                           const images = matchingEntryItem.tools_item_live_images || matchingEntryItem.toolsItemLiveImages || [];
                                           if (images.length > 0) {
@@ -3727,10 +3728,10 @@ const Transfer = ({ user }) => {
                                           }
                                         }
                                       }
-                                      
+
                                       // Fallback to stock management image if no transfer history image found
                                       const imageUrl = lastImageUrl || stockItem.file_url || stockItem.fileUrl || '';
-                                      
+
                                       // Set item details for display
                                       setRelocateItemDetails({
                                         itemName: itemName,
@@ -3912,9 +3913,9 @@ const Transfer = ({ user }) => {
               </div>
               {relocateItemDetails.imageUrl && (
                 <div className="mt-4 flex justify-center">
-                  <img 
-                    src={relocateItemDetails.imageUrl} 
-                    alt={relocateItemDetails.itemName || 'Product'} 
+                  <img
+                    src={relocateItemDetails.imageUrl}
+                    alt={relocateItemDetails.itemName || 'Product'}
                     className="max-w-full h-auto rounded-lg shadow-md"
                     style={{ maxHeight: '300px' }}
                     onError={(e) => {
@@ -3944,7 +3945,7 @@ const Transfer = ({ user }) => {
                 setShowRelocateLocationDropdown(false);
                 setRelocateLocationSearchQuery('');
               }} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
-                ×
+                <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
               </button>
             </div>
             <div className="px-6 pt-4 pb-4">
@@ -3965,7 +3966,7 @@ const Transfer = ({ user }) => {
                 </div>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto mb-4 px-6">
+            <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6">
               <div className="shadow-md rounded-lg overflow-hidden">
                 {relocateLocationSearchQuery.trim() && !fromOptions.some(opt => {
                   const normalizedOpt = normalizeSearchText(opt.label);
@@ -4061,7 +4062,7 @@ const Transfer = ({ user }) => {
                 setShowCurrentLocationDropdown(false);
                 setCurrentLocationSearchQuery('');
               }} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
-                ×
+                <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
               </button>
             </div>
             <div className="px-6 pt-4 pb-4">
@@ -4082,7 +4083,7 @@ const Transfer = ({ user }) => {
                 </div>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto mb-4 px-6">
+            <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6">
               <div className="shadow-md rounded-lg overflow-hidden">
                 {currentLocationSearchQuery.trim() && !fromOptions.some(opt => {
                   const normalizedOpt = normalizeSearchText(opt.label);
@@ -4182,7 +4183,7 @@ const Transfer = ({ user }) => {
         </div>
       )}
       {items.length > 0 && (
-        <div className="flex-1 overflow-y-auto px-4 pt-2 pb-[120px]">
+        <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none px-4 pt-2 pb-[120px]">
           <div className="shadow-md rounded-lg">
             {items.map((item, index) => {
               const itemId = item.id;
@@ -4232,7 +4233,7 @@ const Transfer = ({ user }) => {
                   const state = prev[itemId];
                   if (!state) return prev;
                   const deltaX = state.currentX - state.startX;
-                  const absDeltaX = Math.abs(deltaX);                  
+                  const absDeltaX = Math.abs(deltaX);
                   if (absDeltaX >= minSwipeDistance) {
                     if (deltaX < 0) {
                       setExpandedItemId(itemId);
@@ -4426,19 +4427,19 @@ const Transfer = ({ user }) => {
                         onClick={() => handleFieldChange('quantity', '')}
                         className="absolute top-1/2 transform -translate-y-1/2 right-2 w-5 h-5 flex items-center justify-center hover:bg-gray-200 rounded-full transition-colors"
                       >
-                        <svg 
-                          width="12" 
-                          height="12" 
-                          viewBox="0 0 12 12" 
-                          fill="none" 
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 12 12"
+                          fill="none"
                           xmlns="http://www.w3.org/2000/svg"
                         >
-                          <path 
-                            d="M9 3L3 9M3 3L9 9" 
-                            stroke="#666" 
-                            strokeWidth="1.5" 
-                            strokeLinecap="round" 
-                            strokeLinejoin="round" 
+                          <path
+                            d="M9 3L3 9M3 3L9 9"
+                            stroke="#666"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
                           />
                         </svg>
                       </button>
@@ -4519,7 +4520,7 @@ const Transfer = ({ user }) => {
                 ×
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none">
               <div className="px-6 py-4">
                 <label
                   htmlFor="file-upload-input"
@@ -4545,7 +4546,7 @@ const Transfer = ({ user }) => {
               {uploadFiles.length > 0 && (
                 <div className="px-6 pb-4">
                   <p className="text-[12px] font-medium text-black mb-2">File Uploading</p>
-                  <div className="space-y-2 max-h-[150px] overflow-y-auto">
+                  <div className="space-y-2 max-h-[150px] overflow-y-auto no-scrollbar scrollbar-none">
                     {uploadFiles.map((fileItem) => (
                       <div key={fileItem.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -4824,7 +4825,7 @@ const Transfer = ({ user }) => {
                 />
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto px-4 pb-4">
+            <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none px-4 pb-4">
               {getFilteredSearchItems().length === 0 ? (
                 <div className="flex items-center justify-center py-8">
                   <p className="text-[12px] text-gray-500">No items found</p>
@@ -4935,7 +4936,7 @@ const Transfer = ({ user }) => {
                 ×
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none">
               <div className="px-6 py-4">
                 <label htmlFor="search-file-upload-input"
                   className="flex flex-col items-center justify-center w-full h-[100px] border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
@@ -4960,7 +4961,7 @@ const Transfer = ({ user }) => {
               {searchUploadFiles.length > 0 && (
                 <div className="px-6 pb-4">
                   <p className="text-[12px] font-medium text-black mb-2">File Uploading</p>
-                  <div className="space-y-2 max-h-[150px] overflow-y-auto">
+                  <div className="space-y-2 max-h-[150px] overflow-y-auto no-scrollbar scrollbar-none">
                     {searchUploadFiles.map((fileItem) => (
                       <div key={fileItem.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
                         <div className="flex items-center gap-3 flex-1 min-w-0">

@@ -1079,17 +1079,17 @@ const AddInput = ({ user }) => {
   );
   return (
     <div className="flex flex-col min-h-[calc(100vh-90px-80px)] bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
-      <div className="flex-shrink-0 px-4 pt-2 pb-3">
-        <div className="flex items-center justify-between border-b border-gray-200 gap-2">
-          <p className="text-[12px] mb-2 font-medium text-black leading-normal">Category</p>
-          <button onClick={() => setShowVendorsModal(true)} className="text-[12px] mb-2 font-medium text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity">
+      <div className="flex-shrink-0 px-4 pt-2 pb-1.5">
+        <div className="flex items-center pb-1.5 justify-between border-b border-gray-200 gap-2">
+          <p className="text-[12px] font-medium text-black leading-normal">Category</p>
+          <button onClick={() => setShowVendorsModal(true)} className="text-[12px] font-medium text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity">
             Manage shops
           </button>
         </div>
       </div>
-      <div className="flex-shrink-0 px-4 pb-4">
-        <div className="mb-4">
-          <p className="text-[12px] font-medium text-black leading-normal mb-1">
+      <div className="flex-shrink-0 px-4 pb-2 space-y-[6px]">
+        <div className="">
+          <p className="text-[12px] font-medium text-black leading-normal mb-0.5">
             Item Name<span className="text-[#eb2f8e]">*</span>
           </p>
           <SearchableDropdown
@@ -1102,9 +1102,9 @@ const AddInput = ({ user }) => {
             showAllOptions={true}
           />
         </div>
-        <div className="flex gap-3 mb-4">
+        <div className="flex gap-3">
           <div className="flex-1">
-            <p className="text-[12px] font-medium text-black leading-normal mb-1">
+            <p className="text-[12px] font-medium text-black leading-normal mb-0.5">
               Brand<span className="text-[#eb2f8e]">*</span>
             </p>
             <SearchableDropdown
@@ -1118,7 +1118,7 @@ const AddInput = ({ user }) => {
             />
           </div>
           <div className="flex-1">
-            <p className="text-[12px] font-medium text-black leading-normal mb-1">
+            <p className="text-[12px] font-medium text-black leading-normal mb-0.5">
               Item ID<span className="text-[#eb2f8e]">*</span>
             </p>
             <SearchableDropdown

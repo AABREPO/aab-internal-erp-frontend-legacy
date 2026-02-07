@@ -205,7 +205,7 @@ const Summary = () => {
           <button
             type="button"
             onClick={() => setShowDatePicker(true)}
-            className="text-[12px] font-medium text-black leading-normal underline-offset-2 hover:underline"
+            className="text-[12px] font-semibold text-black leading-normal underline-offset-2 hover:underline"
           >
             {selectedDate}
           </button>

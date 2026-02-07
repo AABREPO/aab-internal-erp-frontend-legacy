@@ -72,18 +72,15 @@ const BankReconciliation = () => {
         // Vendors
         const vRes = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll");
         const vData = vRes.ok ? await vRes.json() : [];
-        setVendorOptions(vData.map(item => ({ id: item.id, label: item.vendorName })));
-        
+        setVendorOptions(vData.map(item => ({ id: item.id, label: item.vendorName })));        
         // Contractors
         const cRes = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll");
         const cData = cRes.ok ? await cRes.json() : [];
-        setContractorOptions(cData.map(item => ({ id: item.id, label: item.contractorName })));
-        
+        setContractorOptions(cData.map(item => ({ id: item.id, label: item.contractorName })));        
         // Employees
         const eRes = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll");
         const eData = eRes.ok ? await eRes.json() : [];
-        setEmployeeOptions(eData.map(item => ({ id: item.id, label: item.employee_name })));
-        
+        setEmployeeOptions(eData.map(item => ({ id: item.id, label: item.employee_name })));        
         // Projects with predefined options
         const pRes = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll");
         const pData = pRes.ok ? await pRes.json() : [];

@@ -1463,7 +1463,7 @@ const Incoming = ({ user }) => {
     }
   };
   return (
-    <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden">
+    <div className="flex flex-col px-4 h-[calc(100vh-90px-80px)] overflow-hidden">
       {/* PO Number and Date Row - Only show when not in empty state */}
       {!isEmptyState && (
         <div className="">
@@ -1525,7 +1525,7 @@ const Incoming = ({ user }) => {
         <div className="">
           {/* Date in empty state */}
           {isEmptyState && (
-            <div className="sticky z-30 px-4 bg-white flex items-center justify-between mt-2 border-b border-[#E0E0E0]">
+            <div className="sticky z-30 bg-white flex items-center justify-between mt-2 border-b border-[#E0E0E0]">
               <div className="flex items-center gap-2 mb-1">
                 <button
                   type="button"
@@ -1555,7 +1555,7 @@ const Incoming = ({ user }) => {
             </div>
           )}
           {/* Vendor Name Field */}
-          <div className="space-y-[6px] px-4">
+          <div className="space-y-[6px]">
             <div className="mt-2 relative">
               <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
                 Vendor Name<span className="text-[#eb2f8e]">*</span>
@@ -1662,7 +1662,7 @@ const Incoming = ({ user }) => {
         <>
           {/* Items Section - Show only when all fields are filled */}
           {(!isEmptyState || isEditMode) && incomingData.vendorName && incomingData.stockingLocation && (
-            <div className="flex flex-col flex-1 min-h-0 mx-4 mb-4 mt-2">
+            <div className="flex flex-col flex-1 min-h-0 mb-4 mt-2">
               {/* Items Header - Fixed */}
               <div className="flex-shrink-0 flex items-center gap-2 mb-2 border-b border-[#E0E0E0] pb-2">
                 <p className="text-[14px] font-medium text-black leading-normal">Items</p>

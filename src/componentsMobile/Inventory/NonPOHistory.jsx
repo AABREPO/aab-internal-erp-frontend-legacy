@@ -709,7 +709,7 @@ const NonPOHistory = ({ onTabChange }) => {
               }
 
               return (
-                <div key={recordId} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-gray-50 rounded-[8px] h-[100px]">
+                <div key={recordId} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] h-[100px]">
                   {/* History Card */}
                   <div
                     ref={(el) => {

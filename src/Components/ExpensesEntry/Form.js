@@ -382,11 +382,42 @@ const Form = ({ username, userRoles = [] }) => {
             }
         }
     }, [ebNumberOptions]);
-    const getCurrentWeekNumber = () => {
-        const now = new Date();
-        const startOfYear = new Date(now.getFullYear(), 0, 1);
-        const days = Math.floor((now - startOfYear) / (24 * 60 * 60 * 1000));
-        return Math.ceil((days + startOfYear.getDay() + 1) / 7);
+    // ISO 8601 week number calculation
+    // Week belongs to the year that contains the Thursday of that week
+    // Week 1 is the week with the year's first Thursday
+    // Monday to Sunday weeks
+    const getISOWeekNumber = (date) => {
+        const d = new Date(date);
+        d.setHours(0, 0, 0, 0);        
+        // Get Thursday of the week containing the date
+        // Monday = 1, Tuesday = 2, ..., Sunday = 0 (convert to 7)
+        const dayOfWeek = d.getDay() || 7; // Convert Sunday (0) to 7
+        const thursday = new Date(d);
+        thursday.setDate(d.getDate() + 4 - dayOfWeek); // Thursday is 4 days after Monday
+        thursday.setHours(0, 0, 0, 0);
+        
+        // Use the year that Thursday falls in (ISO 8601 rule)
+        const weekYear = thursday.getFullYear();
+        
+        // Get January 1st of that year
+        const jan1 = new Date(weekYear, 0, 1);
+        jan1.setHours(0, 0, 0, 0);
+        
+        // Get the Thursday of week 1 (first Thursday of the year)
+        const jan1DayOfWeek = jan1.getDay() || 7;
+        const firstThursday = new Date(jan1);
+        firstThursday.setDate(jan1.getDate() + 4 - jan1DayOfWeek);
+        firstThursday.setHours(0, 0, 0, 0);
+        
+        // Calculate week number: difference in days divided by 7, plus 1
+        const daysDiff = Math.floor((thursday - firstThursday) / 86400000);
+        const weekNo = Math.floor(daysDiff / 7) + 1;
+        
+        return weekNo;
+    };
+
+    const getCurrentWeekNumber = (date) => {
+        return getISOWeekNumber(date || new Date());
     };
     const fetchProjectData = async (projectId) => {
         try {
@@ -835,7 +866,7 @@ const Form = ({ username, userRoles = [] }) => {
                     vendor_id: vendorId,
                     employee_id: null,
                     project_id: projectId,
-                    type: utilityType,
+                    type: selectedAccountType === 'Claim' ? "Claim" : selectedAccountType === 'Weekly Payment' ? "Weekly Payment" : selectedAccountType === 'Utility Bills' ? (utilityType || "Utility Bills") : "Expense",
                     amount: selectedAccountType === 'Bill Refund' ? -Math.abs(parseFloat(amount)) : parseFloat(amount),
                     status: true,
                     weekly_number: getCurrentWeekNumber(),

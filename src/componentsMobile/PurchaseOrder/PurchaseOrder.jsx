@@ -20,6 +20,7 @@ import InputData from './InputData';
 import SearchItemsModal from './SearchItemsModal';
 import Summary from './Summary';
 import editIcon from '../Images/edit.png';
+import SearchBlack from '../Images/search black.png';
 
 // Module-level cache that persists across component remounts
 const siteEngineersCache = { data: null };
@@ -2623,10 +2624,10 @@ const PurchaseOrder = ({ user, onLogout }) => {
         {activeTab === 'summary' && <Summary />}
         {/* Create PO Tab Content */}
         {activeTab === 'create' && (
-          <div className="flex flex-col h-[calc(100vh-85px-80px)] overflow-hidden">
+          <div className="flex px-4 flex-col h-[calc(100vh-85px-80px)] overflow-hidden">
             {/* PO Number and Date Row - Only show date when not in empty state */}
             {!isEmptyState && (
-              <div className="flex-shrink-0 px-4 pt-3 pb-1.5 border-b border-gray-100">
+              <div className="flex-shrink-0 pt-3 pb-1.5 border-b border-gray-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {poData.poNumber && (
@@ -2697,7 +2698,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
             {/* For edit/clone mode: show dropdowns before clicking + */}
             {/* For regular flow: show dropdowns before clicking + (when selecting fields) */}
             {(!hasOpenedAdd && isEditMode) || ((!showAddItems && !hasOpenedAdd) && !isEditMode) || (items.length > 0 && hasOpenedAdd && (!poData.vendorName || !poData.projectName || !poData.projectIncharge)) ? (
-              <div className="flex-shrink-0 px-4 pt-4 space-y-[6px]">
+              <div className="flex-shrink-0 pt-4 space-y-[6px]">
                 {/* Vendor Name Field */}
                 <div className=" relative">
                   <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
@@ -2865,7 +2866,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                 {/* Items Section - Show when items exist (from NetStock) or when all three fields are filled */}
                 {/* For edit/clone mode, always show items if they exist, regardless of hasOpenedAdd */}
                 {((items.length > 0 && (hasOpenedAdd || isEditMode)) || ((!isEmptyState || isEditMode) && poData.vendorName && poData.projectName && poData.projectIncharge)) && (
-                  <div className="flex flex-col flex-1 min-h-0 mx-4 mb-4 mt-2">
+                  <div className="flex flex-col flex-1 min-h-0 mb-4 mt-2">
                     {/* Items Header - Fixed */}
                     <div className="flex-shrink-0 flex items-center gap-2 mb-2 border-b border-[#E0E0E0] pb-2">
                       <p className="text-[14px] font-medium text-black leading-normal">Items</p>
@@ -2876,10 +2877,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                         className="w-[30px] h-[30px] border border-[rgba(0,0,0,0.16)] rounded-full px-2 text-[12px] font-medium text-black bg-gray-200 text-center"
                       />
                       <div className="ml-auto cursor-pointer" onClick={() => setShowSearchItemsModal(true)}>
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <circle cx="7" cy="7" r="5.5" stroke="#747474" strokeWidth="1.5" />
-                          <path d="M11 11L14 14" stroke="#747474" strokeWidth="1.5" strokeLinecap="round" />
-                        </svg>
+                        <img src={SearchBlack} alt='search' className=' w-[16px] h-[16px]' />
                       </div>
                     </div>
                     {/* Items List - Scrollable */}

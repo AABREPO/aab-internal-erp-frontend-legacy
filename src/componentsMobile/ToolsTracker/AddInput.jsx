@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import SearchableDropdown from '../PurchaseOrder/SearchableDropdown';
 import SelectLocatorsModal from '../Inventory/SelectLocatorsModal';
 import DatePickerModal from '../PurchaseOrder/DatePickerModal';
+import Close from '../Images/close.png';
 
 const AddInput = ({ user }) => {
   const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_name';
   const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_brand';
   const TOOLS_ITEM_ID_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_id';
   const TOOLS_STOCK_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_stock_management';
+  const TOOLS_MACHINE_NUMBER_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_machine_number';
   const TOOLS_MACHINE_STATUS_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools-machine-status';
   const GOOGLE_UPLOAD_URL = 'https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive';
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -38,6 +40,7 @@ const AddInput = ({ user }) => {
   const [homeLocationFullData, setHomeLocationFullData] = useState([]); // Full project objects with id, siteName, and branch
   const [stockManagementData, setStockManagementData] = useState([]); // For checking item_ids_id usage
   const [machineStatusData, setMachineStatusData] = useState([]); // Machine status data from new API
+  const [machineNumbersList, setMachineNumbersList] = useState([]); // For resolving machine_number_id to text
   const [addSheetForm, setAddSheetForm] = useState({
     itemName: '',
     itemNameId: null, // Store the ID
@@ -61,32 +64,56 @@ const AddInput = ({ user }) => {
   const [homeLocationOptions, setHomeLocationOptions] = useState([]); // Project names from project_Names API
   const [showNewItemIdInput, setShowNewItemIdInput] = useState(false);
   const [newItemIdValue, setNewItemIdValue] = useState('');
+  const machineNumberTextById = React.useMemo(() => {
+    const map = {};
+    machineNumbersList.forEach((m) => {
+      const id = m?.id ?? m?._id;
+      const machineText = (m?.machine_number ?? m?.machineNumber ?? '').trim();
+      if (id != null && machineText) {
+        map[String(id)] = machineText;
+      }
+    });
+    return map;
+  }, [machineNumbersList]);
+
   // Helper to get latest machine status for an itemIdsId + machineNumber combination
   const getLatestMachineStatus = React.useMemo(() => {
-    const statusMap = new Map();
-    
+    const statusMap = new Map();    
     // Group machine statuses by itemIdsId + machineNumber and get latest for each
     machineStatusData.forEach(status => {
       const itemIdsId = String(status.item_ids_id || status.itemIdsId || '');
-      const machineNum = String(status.machine_number || status.machineNumber || '');
-      const key = `${itemIdsId}_${machineNum}`;
-      
+      const machineNumId = status.machine_number_id || status.machineNumberId;
+      const machineNum = String(
+        (machineNumId != null ? machineNumberTextById[String(machineNumId)] : null) ||
+        status.machine_number ||
+        status.machineNumber ||
+        ''
+      ).trim();
+      const key = `${itemIdsId}_${machineNum}`;      
       if (itemIdsId && machineNum) {
         const existing = statusMap.get(key);
         if (!existing || (status.id || 0) > (existing.id || 0)) {
           statusMap.set(key, status);
         }
       }
-    });
-    
+    });    
     return statusMap;
-  }, [machineStatusData]);
+  }, [machineStatusData, machineNumberTextById]);
+
+  const resolveMachineNumFromStock = React.useCallback((item) => {
+    const mnId = item?.machine_number_id ?? item?.machineNumberId;
+    if (mnId && machineNumbersList.length > 0) {
+      const rec = machineNumbersList.find(m => String(m?.id ?? m?._id) === String(mnId));
+      return rec ? (rec.machine_number ?? rec.machineNumber ?? '').trim() : '';
+    }
+    return (item?.machine_number ?? item?.machineNumber ?? '').trim();
+  }, [machineNumbersList]);
 
   const usedItemIds = React.useMemo(() => {
     const usedIds = new Set();
     stockManagementData.forEach(item => {
       const itemIdId = item?.item_ids_id ?? item?.itemIdsId;
-      const machineNum = item?.machine_number ?? item?.machineNumber;
+      const machineNum = resolveMachineNumFromStock(item);
       
       if (itemIdId && machineNum) {
         // Check machine status from new API
@@ -97,63 +124,63 @@ const AddInput = ({ user }) => {
           // Use status from new API
           const machineStatus = (latestStatus.machine_status || latestStatus.machineStatus || '').toLowerCase();
           // Only mark as used if status is NOT "Machine Dead" or "Not Working"
-          if (machineStatus !== 'machine dead') {
+          if (machineStatus !== 'machine dead' && machineStatus !== 'not working') {
             usedIds.add(String(itemIdId));
           }
         } else {
           // If no status in new API, fallback to checking tool_status from stock management
           const toolStatus = (item?.tool_status ?? item?.toolStatus)?.toLowerCase();
-          if (toolStatus && toolStatus !== 'machine dead') {
+          if (toolStatus && toolStatus !== 'machine dead' && toolStatus !== 'not working') {
             usedIds.add(String(itemIdId));
           }
         }
       }
     });
     return usedIds;
-  }, [stockManagementData, getLatestMachineStatus]);
-  // Helper function to check if an itemId has any machine with Dead/Not Working status
-  const hasDeadOrNotWorkingMachine = React.useMemo(() => {
-    const itemIdsWithDeadStatus = new Set();
-    
+  }, [stockManagementData, getLatestMachineStatus, resolveMachineNumFromStock]);
+  // Helper function to check if an itemId has any machine with Machine Dead status
+  const hasMachineDeadStatus = React.useMemo(() => {
+    const itemIdsWithDeadStatus = new Set();    
     // Group machine statuses by itemIdsId
     const statusByItemId = {};
     machineStatusData.forEach(status => {
       const itemIdsId = String(status.item_ids_id || status.itemIdsId || '');
-      const machineStatus = (status.machine_status || status.machineStatus || '')      
-      if (itemIdsId && (machineStatus === 'Machine Dead')) {
+      const machineStatus = String(status.machine_status || status.machineStatus || '').trim().toLowerCase();
+      if (itemIdsId && machineStatus === 'machine dead') {
         if (!statusByItemId[itemIdsId]) {
           statusByItemId[itemIdsId] = [];
         }
         statusByItemId[itemIdsId].push(status);
       }
-    });
-    
+    });    
     // For each itemIdsId, get the latest status for each machine number
     Object.keys(statusByItemId).forEach(itemIdsId => {
       const statuses = statusByItemId[itemIdsId];
       // Group by machine number and get latest status for each
       const byMachineNumber = {};
       statuses.forEach(status => {
-        const machineNum = String(status.machine_number || status.machineNumber || '');
+        const machineNumId = status.machine_number_id || status.machineNumberId;
+        const machineNum = String(
+          (machineNumId != null ? machineNumberTextById[String(machineNumId)] : null) ||
+          status.machine_number ||
+          status.machineNumber ||
+          ''
+        ).trim();
         if (!byMachineNumber[machineNum] || (status.id || 0) > (byMachineNumber[machineNum].id || 0)) {
           byMachineNumber[machineNum] = status;
         }
-      });
-      
-      // Check if any machine has Dead or Not Working status
+      });      
+      // Check if any machine has Machine Dead status
       const hasDeadMachine = Object.values(byMachineNumber).some(status => {
-        const statusLower = (status.machine_status || status.machineStatus || '')
-        return statusLower === 'Machine Dead';
-      });
-      
+        const statusLower = String(status.machine_status || status.machineStatus || '').trim().toLowerCase();
+        return statusLower === 'machine dead';
+      });      
       if (hasDeadMachine) {
         itemIdsWithDeadStatus.add(itemIdsId);
       }
-    });
-    
+    });    
     return itemIdsWithDeadStatus;
-  }, [machineStatusData]);
-
+  }, [machineStatusData, machineNumberTextById]);
   const sheetItemIdOptions = React.useMemo(() => {
     return apiItemIdOptions.filter(itemIdName => {
       const itemIdObj = toolsItemIdFullData.find(
@@ -164,15 +191,13 @@ const AddInput = ({ user }) => {
         // If itemId not found in database, check if it exists in machine status data
         // This handles cases where itemId might be referenced in status but not in tools_item_id table
         return false;
-      }
-      
-      // Check if this itemId has any machine with Dead/Not Working status
-      const hasDeadStatus = hasDeadOrNotWorkingMachine.has(String(dbId));
-      
-      // Only show itemIds that have Dead/Not Working status AND are not currently in use
+      }      
+      // Check if this itemId has any machine with Machine Dead status
+      const hasDeadStatus = hasMachineDeadStatus.has(String(dbId));      
+      // Only show itemIds that have Machine Dead status AND are not currently in use
       return hasDeadStatus && !usedItemIds.has(String(dbId));
     });
-  }, [apiItemIdOptions, toolsItemIdFullData, usedItemIds, hasDeadOrNotWorkingMachine]);
+  }, [apiItemIdOptions, toolsItemIdFullData, usedItemIds, hasMachineDeadStatus]);
   const [tableData, setTableData] = useState([]);
   useEffect(() => {
     const fetchItemNames = async () => {
@@ -217,15 +242,27 @@ const AddInput = ({ user }) => {
       itemId: d?.item_ids_id ?? d?.itemIdsId ?? '',
       brand: d?.brand_id ?? d?.brandId ?? '',
       model: d?.model ?? '',
-      machine: d?.machine_number ?? d?.machineNumber ?? ''
+      machine: resolveMachineNumFromStock(d)
     }));
     setTableData(mappedTable);
     const idsFromDetails = details
       .map(d => d?.item_ids_id ?? d?.itemIdsId)
       .filter(Boolean);
-    const allIds = Array.from(new Set([...apiItemIdOptions, ...idsFromDetails]));
-    setItemIdOptions(allIds);
-  }, [selectedItemName, toolsItemNameListData, apiItemIdOptions]);
+    const detailItemIdOptions = idsFromDetails
+      .map((itemIdDbId) => {
+        const match = toolsItemIdFullData.find(
+          (item) => String(item?.id) === String(itemIdDbId)
+        );
+        return (match?.item_id ?? match?.itemId ?? '').trim();
+      })
+      .filter(Boolean);
+    if (detailItemIdOptions.length > 0) {
+      const detailSet = new Set(detailItemIdOptions.map((x) => x.toLowerCase()));
+      setItemIdOptions(apiItemIdOptions.filter((x) => detailSet.has(String(x).toLowerCase())));
+    } else {
+      setItemIdOptions(apiItemIdOptions);
+    }
+  }, [selectedItemName, toolsItemNameListData, apiItemIdOptions, machineNumbersList, resolveMachineNumFromStock, toolsItemIdFullData]);
   useEffect(() => {
     const fetchBrands = async () => {
       try {
@@ -289,7 +326,25 @@ const AddInput = ({ user }) => {
     };
     fetchStockManagement();
   }, []);
-
+  // Fetch machine numbers (to resolve machine_number_id for display)
+  useEffect(() => {
+    const fetchMachineNumbers = async () => {
+      try {
+        const res = await fetch(`${TOOLS_MACHINE_NUMBER_BASE_URL}/getAll`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setMachineNumbersList(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        console.error('Error fetching machine numbers:', err);
+      }
+    };
+    fetchMachineNumbers();
+  }, []);
   // Fetch machine status data from the new API
   useEffect(() => {
     const fetchMachineStatus = async () => {
@@ -629,10 +684,10 @@ const AddInput = ({ user }) => {
   const isItemIdInUseWithMachine = (itemIdDbId, itemIdName) => {
     if (!itemIdDbId && !itemIdName) return { inUse: false, machineNumber: null };
     
-    // Find matching items in stock management
+    // Find matching items in stock management (stock has machine_number_id, resolve to text for status lookup)
     const matchingStockItems = stockManagementData.filter(item => {
       const storedItemIdId = item?.item_ids_id ?? item?.itemIdsId;
-      const machineNum = item?.machine_number ?? item?.machineNumber;
+      const machineNum = resolveMachineNumFromStock(item);
       const idMatches = itemIdDbId
         ? String(storedItemIdId) === String(itemIdDbId)
         : String(storedItemIdId) === String(itemIdName);
@@ -642,7 +697,7 @@ const AddInput = ({ user }) => {
     // Check machine status from new API for each matching item
     for (const stockItem of matchingStockItems) {
       const itemIdsId = String(stockItem?.item_ids_id ?? stockItem?.itemIdsId);
-      const machineNum = String(stockItem?.machine_number ?? stockItem?.machineNumber);
+      const machineNum = String(resolveMachineNumFromStock(stockItem));
       const key = `${itemIdsId}_${machineNum}`;
       const latestStatus = getLatestMachineStatus.get(key);
       
@@ -670,12 +725,12 @@ const AddInput = ({ user }) => {
     
     return { inUse: false, machineNumber: null };
   };
-  const buildNewToolDetail = () => ({
+  const buildNewToolDetail = (machineNumberId) => ({
     timestamp: toLocalDateTimeString(new Date()),
     item_ids_id: addSheetForm.itemIdDbId ? String(addSheetForm.itemIdDbId) : null,
     brand_id: addSheetForm.brandId ? String(addSheetForm.brandId) : null,
     model: (addSheetForm.model || '').trim() || null,
-    machine_number: (addSheetForm.machineNumber || '').trim() || null,
+    machine_number_id: machineNumberId ? String(machineNumberId) : null,
     tool_status: 'Available'
   });
   const handleAddNewItemName = async (newItemName) => {
@@ -840,12 +895,31 @@ const AddInput = ({ user }) => {
         }
       );
       let itemNameId = existingItemName?.id ?? addSheetForm.itemNameId;
+      let machineNumberId = '';
+      const machineNumberTrimmed = addSheetForm.machineNumber?.trim() || '';
+      if (machineNumberTrimmed) {
+        const machineNumPayload = {
+          machine_number: machineNumberTrimmed,
+          tool_status: 'Available'
+        };
+        const machineNumRes = await fetch(`${TOOLS_MACHINE_NUMBER_BASE_URL}/save`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(machineNumPayload)
+        });
+        if (!machineNumRes.ok) {
+          throw new Error(`Failed to save machine number: ${machineNumRes.status} ${machineNumRes.statusText}`);
+        }
+        const savedMachine = await machineNumRes.json();
+        machineNumberId = savedMachine?.id ? String(savedMachine.id) : '';
+      }
       const stockManagementPayload = {
         item_name_id: itemNameId ? String(itemNameId) : itemName,
         brand_name_id: addSheetForm.brandId ? String(addSheetForm.brandId) : '',
         item_ids_id: addSheetForm.itemIdDbId ? String(addSheetForm.itemIdDbId) : '',
         model: addSheetForm.model?.trim() || '',
-        machine_number: addSheetForm.machineNumber?.trim() || '',
+        machine_number_id: machineNumberId,
         purchase_store_id: addSheetForm.purchaseStoreId ? String(addSheetForm.purchaseStoreId) : '',
         home_location_id: addSheetForm.homeLocationId ? String(addSheetForm.homeLocationId) : '',
         purchase_date: addSheetForm.purchaseDate || '',
@@ -868,7 +942,7 @@ const AddInput = ({ user }) => {
       // Only update ToolsItemNameList if quantity is not entered (quantity is empty, '0', or not set)
       const hasQuantity = addSheetForm.quantity && addSheetForm.quantity !== '0' && addSheetForm.quantity.trim() !== '';
       if (!hasQuantity) {
-        const newDetail = buildNewToolDetail();
+        const newDetail = buildNewToolDetail(machineNumberId);
         if (existingItemName?.id) {
           const existingDetails = Array.isArray(existingItemName?.tools_details)
             ? existingItemName.tools_details
@@ -1058,7 +1132,7 @@ const AddInput = ({ user }) => {
   const renderSheetDropdown = (field, value, placeholder) => (
     <div className="relative w-full">
       <div onClick={() => openSheetPicker(field)}
-        className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+        className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
         style={{ color: value ? '#000' : '#9E9E9E', boxSizing: 'border-box', paddingRight: '40px' }}
       >
         {value || placeholder}
@@ -1078,11 +1152,11 @@ const AddInput = ({ user }) => {
     </div>
   );
   return (
-    <div className="flex flex-col min-h-[calc(100vh-90px-80px)] bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
-      <div className="flex-shrink-0 px-4 pt-2 pb-1.5">
+    <div className="flex flex-col  min-h-[calc(100vh-90px-80px)] bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
+      <div className="flex-shrink-0  px-4 pt-1.5 pb-1.5">
         <div className="flex items-center pb-1.5 justify-between border-b border-gray-200 gap-2">
-          <p className="text-[12px] font-medium text-black leading-normal">Category</p>
-          <button onClick={() => setShowVendorsModal(true)} className="text-[12px] font-medium text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity">
+          <p className="text-[12px] font-semibold text-black leading-normal">Category</p>
+          <button onClick={() => setShowVendorsModal(true)} className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity">
             Manage shops
           </button>
         </div>
@@ -1138,7 +1212,7 @@ const AddInput = ({ user }) => {
         <div className="bg-white rounded-[8px] border border-[#E0E0E0]">
           {/* Table Header */}
           <div className="bg-[#F5F5F5] px-2 py-2 border-b border-[#E0E0E0]">
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-[24px_1fr_1fr_1fr_1fr] gap-2">
               <div className="text-[10px] font-bold text-black leading-normal"></div>
               <div className="text-[10px] font-bold text-black leading-normal">Item ID</div>
               <div className="text-[10px] font-bold text-black leading-normal">Brand</div>
@@ -1148,6 +1222,25 @@ const AddInput = ({ user }) => {
           </div>
           {/* Table Body */}
           <div>
+            {tableData.length > 0 ? (
+              tableData.map((row, index) => {
+                const itemIdName = row.itemId ? (toolsItemIdFullData.find(item => String(item?.id) === String(row.itemId))?.item_id || toolsItemIdFullData.find(item => String(item?.id) === String(row.itemId))?.itemId || row.itemId || '-') : '-';
+                const brandName = row.brand ? (toolsBrandFullData.find(b => String(b?.id) === String(row.brand))?.tools_brand || toolsBrandFullData.find(b => String(b?.id) === String(row.brand))?.toolsBrand || row.brand || '-') : '-';
+                return (
+                  <div key={row.id || index} className="grid grid-cols-[24px_1fr_1fr_1fr_1fr] gap-2 px-2 py-2 border-b border-[#E0E0E0] last:border-b-0">
+                    <div className="text-[12px] font-medium text-black leading-normal">{index + 1}</div>
+                    <div className="text-[12px] font-medium text-black leading-normal truncate">{itemIdName}</div>
+                    <div className="text-[12px] font-medium text-black leading-normal truncate">{brandName}</div>
+                    <div className="text-[12px] font-medium text-black leading-normal truncate">{row.model || '-'}</div>
+                    <div className="text-[12px] font-medium text-black leading-normal truncate">{row.machine || '-'}</div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="px-2 py-4 text-center">
+                <p className="text-[12px] text-gray-500">No data available</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1168,7 +1261,7 @@ const AddInput = ({ user }) => {
             <div className="flex-shrink-0 flex items-center justify-between px-6 pt-5 pb-1">
               <p className="text-[16px] font-bold text-black">Select Filters</p>
               <button type="button" onClick={handleCloseAddNewSheet} className="text-[#e06256] text-xl font-bold leading-none">
-                ×
+                <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
               </button>
             </div>
             {/* Form - scrollable */}
@@ -1190,7 +1283,7 @@ const AddInput = ({ user }) => {
                     value={addSheetForm.quantity}
                     onChange={(e) => handleAddSheetFieldChange('quantity', e.target.value)}
                     disabled={!!addSheetForm.itemId}
-                    className={`w-full h-[32px] border border-[#d6d6d6] px-3 text-[12px] font-medium focus:outline-none text-gray-700 ${!!addSheetForm.itemId ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                    className={`w-full h-[32px] border border-[#d6d6d6] rounded px-3 text-[12px] font-medium focus:outline-none text-gray-700 ${!!addSheetForm.itemId ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                     placeholder="0"
                   />
                 </div>
@@ -1211,7 +1304,7 @@ const AddInput = ({ user }) => {
                     type="text"
                     value={addSheetForm.model}
                     onChange={(e) => handleAddSheetFieldChange('model', e.target.value)}
-                    className="w-full h-[32px] border border-[#d6d6d6] px-3 text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500"
+                    className="w-full h-[32px] border border-[#d6d6d6] rounded px-3 text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500"
                     placeholder="Enter"
                   />
                 </div>
@@ -1226,7 +1319,7 @@ const AddInput = ({ user }) => {
                     type="text"
                     value={addSheetForm.machineNumber}
                     onChange={(e) => handleAddSheetFieldChange('machineNumber', e.target.value)}
-                    className="w-full h-[32px] border border-[#d6d6d6] px-3 text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500"
+                    className="w-full h-[32px] border border-[#d6d6d6] rounded px-3 text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500"
                     placeholder="Enter"
                   />
                 </div>
@@ -1283,7 +1376,7 @@ const AddInput = ({ user }) => {
                       onClick={() => handleDatePickerOpen('purchaseDate')}
                       onFocus={() => handleDatePickerOpen('purchaseDate')}
                       placeholder="dd-mm-yyyy"
-                      className="w-[150px] h-[32px] border border-[#d6d6d6] pl-3 pr-10 text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500 cursor-pointer"
+                      className="w-[150px] h-[32px] border border-[#d6d6d6] rounded pl-3 pr-10 text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500 cursor-pointer"
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1305,7 +1398,7 @@ const AddInput = ({ user }) => {
                       onClick={() => handleDatePickerOpen('warrantyDate')}
                       onFocus={() => handleDatePickerOpen('warrantyDate')}
                       placeholder="dd-mm-yyyy"
-                      className="w-[150px] h-[32px] border border-[#d6d6d6] pl-3 pr-10 text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500 cursor-pointer"
+                      className="w-[150px] h-[32px] border border-[#d6d6d6] rounded pl-3 pr-10 text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500 cursor-pointer"
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">

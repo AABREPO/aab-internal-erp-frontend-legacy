@@ -558,10 +558,10 @@ const NetStock = () => {
     doc.save(`NetStock_${selectedDate.replace(/\//g, '-')}.pdf`);
   };
   return (
-    <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden">
+    <div className="flex flex-col px-4 h-[calc(100vh-90px-80px)] overflow-hidden">
       {/* Date Row */}
       <div className="">
-        <div className=" px-4 pt-2 border-b border-gray-200">
+        <div className=" pt-2 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <button
               type="button"
@@ -612,7 +612,7 @@ const NetStock = () => {
         </div>
       </div>
       {/* Filters Section */}
-      <div className="px-4 pt-2 mb-2">
+      <div className="pt-2 mb-2">
         {/* Category Filter */}
         <div className="space-y-[6px]">
           <div className="">
@@ -803,7 +803,7 @@ const NetStock = () => {
         </div>
       </div>
       {/* Product List */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4 scrollbar-hide no-scrollbar scrollbar-none">
+      <div className="flex-1 overflow-y-auto pb-4 scrollbar-hide no-scrollbar scrollbar-none">
         {loading ? (
           <div className="flex justify-center items-center h-full">
             <p className="text-[14px] text-gray-500">Loading...</p>

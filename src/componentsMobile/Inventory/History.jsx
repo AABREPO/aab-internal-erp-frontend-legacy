@@ -1014,7 +1014,7 @@ const History = ({ onTabChange }) => {
               }
 
               return (
-                <div key={item.id} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-gray-50 rounded-[8px] h-[100px]">
+                <div key={item.id} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] h-[100px]">
                   {/* Clone Button - Behind the card on the left, revealed on right swipe */}
                   <div
                     className="absolute left-0 top-0 flex gap-2 flex-shrink-0 z-0"

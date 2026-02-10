@@ -11,6 +11,7 @@ const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_bra
 const TOOLS_ITEM_ID_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_id';
 
 const History = ({ user, onTabChange }) => {
+  const [historyType, setHistoryType] = useState('entry'); // 'entry' or 'relocate'
   const [historyData, setHistoryData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fullEntriesData, setFullEntriesData] = useState([]); // Store full entries before flattening
@@ -131,17 +132,14 @@ const History = ({ user, onTabChange }) => {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
-        });        
+        });
         if (response.ok) {
           const data = await response.json();
-          const fullEntries = (Array.isArray(data) ? data : []).filter(entry => {
-            const entryType = entry.tools_entry_type || entry.toolsEntryType || 'Entry';
-            return entryType.toLowerCase() === 'entry';
-          });
-          setFullEntriesData(fullEntries);
+          const allEntries = Array.isArray(data) ? data : [];
+          setFullEntriesData(allEntries);
           const flattenedData = [];
-          fullEntries.forEach(entry => {
-            const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];            
+          allEntries.forEach(entry => {
+            const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
             if (entryItems.length === 0) {
               flattenedData.push({
                 id: `${entry.id}-0`,
@@ -198,14 +196,13 @@ const History = ({ user, onTabChange }) => {
                 });
               });
             }
-          });          
+          });
           flattenedData.sort((a, b) => {
             const dateA = new Date(a.createdDateTime);
             const dateB = new Date(b.createdDateTime);
             return dateB - dateA;
-          });          
-          const filteredData = flattenedData.filter(entry => entry.toolsEntryType === 'entry');
-          setHistoryData(filteredData);
+          });
+          setHistoryData(flattenedData);
         } else {
           console.error('Failed to fetch history data');
           setHistoryData([]);
@@ -239,8 +236,8 @@ const History = ({ user, onTabChange }) => {
     }
   };
   const getLocationName = (id, checkVendorsFirst = false) => {
-    if (!id) return '-';    
-    const idStr = String(id);    
+    if (!id) return '-';
+    const idStr = String(id);
     if (checkVendorsFirst) {
       if (vendorsMap[idStr]) {
         return vendorsMap[idStr];
@@ -248,26 +245,26 @@ const History = ({ user, onTabChange }) => {
       if (vendorsMap[id]) {
         return vendorsMap[id];
       }
-    }    
+    }
     if (projectsMap[idStr]) {
       return projectsMap[idStr];
     }
     if (projectsMap[id]) {
       return projectsMap[id];
-    }    
+    }
     if (vendorsMap[idStr]) {
       return vendorsMap[idStr];
     }
     if (vendorsMap[id]) {
       return vendorsMap[id];
-    }    
+    }
     return '-';
   };
   const handleOpenImageViewer = (entry, itemName, itemId) => {
     if (entry.images.length === 0) {
       alert('No images available for this item');
       return;
-    }    
+    }
     setImageViewerData({
       images: entry.images,
       currentIndex: 0,
@@ -419,23 +416,52 @@ const History = ({ user, onTabChange }) => {
       document.removeEventListener('mouseup', globalMouseUpHandler);
     };
   }, [historyData]);
+  const filteredHistoryData = historyData.filter(entry => {
+    const entryType = entry.toolsEntryType || 'Entry';
+    if (historyType === 'entry') {
+      return entryType.toLowerCase() === 'entry';
+    } else {
+      return entryType.toLowerCase() === 'relocate';
+    }
+  });
+
   return (
     <div className="flex flex-col px-4 bg-white min-h-[calc(100vh-90px-80px)]" style={{ fontFamily: "'Manrope', sans-serif" }}>
-      <div className="flex items-center justify-between pt-2 pb-1.5 border-b border-gray-200">
-        <p className="text-[12px] text-black font-medium">Category</p>
+      <div className="flex items-center justify-between pt-1.5 pb-1.5">
+        <p className="text-[12px] text-black font-semibold">Category</p>
       </div>
-      <div className="flex-1 px-4 overflow-y-auto pb-4">
+      <div className="flex bg-[#E0E0E0] items-center h-9 rounded-md">
+        <button
+          onClick={() => setHistoryType('entry')}
+          className={`flex-1 ml-0.5 h-8 rounded text-[12px] font-semibold leading-normal duration-1000 ease-out transition-colors ${historyType === 'entry'
+              ? 'bg-white text-black shadow-sm'
+              : 'text-[#9E9E9E]'
+            }`}
+        >
+          Entry History
+        </button>
+        <button
+          onClick={() => setHistoryType('relocate')}
+          className={`flex-1 mr-0.5 h-8 rounded text-[12px] font-semibold leading-normal duration-1000 ease-out transition-colors ${historyType === 'relocate'
+              ? 'bg-white text-black shadow-sm'
+              : 'text-[#9E9E9E]'
+            }`}
+        >
+          Relocate History
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto pb-4">
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <p className="text-[12px] text-gray-500">Loading...</p>
           </div>
-        ) : historyData.length === 0 ? (
+        ) : filteredHistoryData.length === 0 ? (
           <div className="flex items-center justify-center py-8">
             <p className="text-[12px] text-gray-500">No history entries found.</p>
           </div>
         ) : (
-          <div className="mt-3 shadow-lg rounded-lg">
-            {historyData.map((entry) => {
+          <div className="mt-3 space-y-0.5">
+            {filteredHistoryData.map((entry) => {
               const { date, time } = formatDateTime(entry.createdDateTime);
               const fromLocation = getLocationName(entry.fromProjectId, false);
               let toLocation = '-';
@@ -449,11 +475,11 @@ const History = ({ user, onTabChange }) => {
                 if (toLocation === '-') {
                   toLocation = getLocationName(entry.toProjectId, false);
                 }
-              }              
+              }
               const inchargeName = employeesMap[entry.projectInchargeId] || employeesMap[String(entry.projectInchargeId)] || '-';
               const itemName = itemNamesMap[entry.itemNameId] || itemNamesMap[String(entry.itemNameId)] || entry.itemNameId || '-';
               const itemIdName = entry.itemIdsId ? (itemIdsMap[entry.itemIdsId] || itemIdsMap[String(entry.itemIdsId)] || '') : '';
-              const hasImages = entry.images.length > 0;              
+              const hasImages = entry.images.length > 0;
               const displayValue = itemIdName || (entry.quantity > 0 ? String(entry.quantity) : '');
               const entryId = entry.id;
               const swipeState = swipeStates[entryId];
@@ -466,9 +492,9 @@ const History = ({ user, onTabChange }) => {
                     ? -buttonWidth
                     : 0;
               return (
-                <div key={entry.id} className="relative overflow-hidden">
+                <div key={entry.id} className=" overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] h-[100px]">
                   <div
-                    className="bg-white border-2 border-[#E0E0E0] rounded-[8px] px-3 py-2 cursor-pointer transition-transform duration-300 ease-out select-none"
+                    className=" bg-white rounded-[8px] h-full px-3 py-3 cursor-pointer transition-all duration-300 ease-out select-none"
                     style={{
                       transform: `translateX(${swipeOffset}px)`,
                       touchAction: 'pan-y',
@@ -481,69 +507,67 @@ const History = ({ user, onTabChange }) => {
                     onMouseDown={(e) => handleMouseDown(e, entryId)}
                     onClick={handleCardClick}
                   >
-                  <div className="flex items-start justify-between mb-1">
-                    <p className="text-[12px] font-semibold text-black leading-snug truncate flex-1 min-w-0">
-                      #{entry.eno}, {itemName}
-                    </p>
-                    <div className="flex flex-col items-end flex-shrink-0 ml-2">
-                      {displayValue ? (
-                        <p className={`text-[12px] font-semibold leading-snug ${hasImages ? 'text-[#E4572E] cursor-pointer underline' : 'text-black'}`}
-                          onClick={() => hasImages && handleOpenImageViewer(entry, itemName, displayValue)}
-                        >
-                          {displayValue}
-                        </p>
-                      ) : hasImages ? (
-                        <p className="text-[12px] font-semibold leading-snug text-[#E4572E] cursor-pointer underline"
-                          onClick={() => handleOpenImageViewer(entry, itemName, 'View')}
-                        >
-                          📷 Image
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="flex items-start justify-between mb-1">
-                    <p className="text-[11px] text-[#848484] leading-snug truncate flex-1 min-w-0">
-                      From - {fromLocation}
-                    </p>
-                    {entry.machineNumber && (
-                      <p className="text-[12px] leading-snug text-black flex-shrink-0 ml-2">
-                        {entry.machineNumber}
+                    <div className="flex items-start justify-between mb-1">
+                      <p className="text-[12px] font-semibold text-black leading-snug truncate">
+                        #{entry.eno}, {itemName}
                       </p>
-                    )}
-                  </div>
-                  <div className="flex items-start justify-between mb-1">
-                    <p className="text-[11px] text-[#BF9853] leading-snug truncate flex-1 min-w-0">
-                      To - {toLocation}
-                    </p>
-                    <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          entry.machineStatus === 'Working' ? 'bg-[#4CAF50]' : 
-                          entry.machineStatus === 'Not Working' ? 'bg-[#F44336]' :
-                          entry.machineStatus === 'Under Repair' ? 'bg-[#FF9800]' :
-                          'bg-[#9E9E9E]'
-                        }`}
-                      ></span>
-                      <p
-                        className={`text-[11px] font-medium leading-snug ${
-                          entry.machineStatus === 'Working' ? 'text-[#4CAF50]' : 
-                          entry.machineStatus === 'Not Working' ? 'text-[#F44336]' :
-                          entry.machineStatus === 'Under Repair' ? 'text-[#FF9800]' :
-                          'text-[#9E9E9E]'
-                        }`}
-                      >
-                        {entry.machineStatus}
+                      <div className="flex flex-col items-end flex-shrink-0 ml-2">
+                        {displayValue ? (
+                          <p className={`text-[12px] font-semibold leading-snug ${hasImages ? 'text-[#E4572E] cursor-pointer underline' : 'text-black'}`}
+                            onClick={() => hasImages && handleOpenImageViewer(entry, itemName, displayValue)}
+                          >
+                            {displayValue}
+                          </p>
+                        ) : hasImages ? (
+                          <p className="text-[12px] font-semibold leading-snug text-[#E4572E] cursor-pointer underline"
+                            onClick={() => handleOpenImageViewer(entry, itemName, 'View')}
+                          >
+                            📷 Image
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="flex items-start justify-between mb-1">
+                      <p className="text-[11px] text-[#848484] leading-snug truncate flex-1 min-w-0">
+                        From - {fromLocation}
+                      </p>
+                      {entry.machineNumber && (
+                        <p className="text-[12px] leading-snug text-black flex-shrink-0 ml-2">
+                          {entry.machineNumber}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-start justify-between mb-1">
+                      <p className="text-[11px] text-[#BF9853] leading-snug truncate flex-1 min-w-0">
+                        To - {toLocation}
+                      </p>
+                      <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${entry.machineStatus === 'Working' ? 'bg-[#4CAF50]' :
+                              entry.machineStatus === 'Not Working' ? 'bg-[#F44336]' :
+                                entry.machineStatus === 'Under Repair' ? 'bg-[#FF9800]' :
+                                  'bg-[#9E9E9E]'
+                            }`}
+                        ></span>
+                        <p
+                          className={`text-[11px] font-medium leading-snug ${entry.machineStatus === 'Working' ? 'text-[#4CAF50]' :
+                              entry.machineStatus === 'Not Working' ? 'text-[#F44336]' :
+                                entry.machineStatus === 'Under Repair' ? 'text-[#FF9800]' :
+                                  'text-[#9E9E9E]'
+                            }`}
+                        >
+                          {entry.machineStatus}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start justify-between">
+                      <p className="text-[11px] text-[#848484] leading-snug truncate flex-1 min-w-0">
+                        {date} • {time}
+                      </p>
+                      <p className="text-[12px] font-medium text-black leading-snug flex-shrink-0 ml-2">
+                        {inchargeName}
                       </p>
                     </div>
-                  </div>
-                  <div className="flex items-start justify-between">
-                    <p className="text-[11px] text-[#848484] leading-snug truncate flex-1 min-w-0">
-                      {date} • {time}
-                    </p>
-                    <p className="text-[12px] font-medium text-black leading-snug flex-shrink-0 ml-2">
-                      {inchargeName}
-                    </p>
-                  </div>
                   </div>
                   <div
                     className="absolute right-0 top-0 bottom-0 flex gap-2 flex-shrink-0 z-0"
@@ -570,7 +594,7 @@ const History = ({ user, onTabChange }) => {
                     >
                       <img src={EditIcon} alt="Edit" className="w-[18px] h-[18px]" />
                     </button>
-                    <button onClick={(e) => {e.stopPropagation();setExpandedEntryId(null);}}
+                    <button onClick={(e) => { e.stopPropagation(); setExpandedEntryId(null); }}
                       className="action-button w-[40px] h-full bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm"
                     >
                       <img src={DeleteIcon} alt="Delete" className="w-[18px] h-[18px]" />
@@ -591,18 +615,18 @@ const History = ({ user, onTabChange }) => {
                 src={imageViewerData.images[imageViewerData.currentIndex]}
                 alt={`${imageViewerData.itemName} - ${imageViewerData.currentIndex + 1}`}
                 className="w-full h-auto max-h-[60vh] object-contain rounded-lg shadow-2xl"
-              />              
+              />
               <button onClick={handleCloseImageViewer} className="absolute -top-7 -right-1 w-8 h-8 rounded-full flex items-center justify-center z-20 ">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M18 6L6 18M6 6L18 18" stroke="#E4572E" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M18 6L6 18M6 6L18 18" stroke="#E4572E" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-              </button>              
+              </button>
               {imageViewerData.images.length > 1 && (
                 <button onClick={handlePrevImage}
                   className="absolute left-2 top-1/2 transform -translate-y-1/2 w-10 h-10 bg-black/50 rounded-full flex items-center justify-center"
                 >
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M15 18L9 12L15 6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M15 18L9 12L15 6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
               )}
@@ -611,7 +635,7 @@ const History = ({ user, onTabChange }) => {
                   className="absolute right-2 top-1/2 transform -translate-y-1/2 w-10 h-10 bg-black/50 rounded-full flex items-center justify-center"
                 >
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M9 18L15 12L9 6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M9 18L15 12L9 6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
               )}
@@ -625,20 +649,18 @@ const History = ({ user, onTabChange }) => {
             </div>
             <div className="flex items-center justify-center gap-2 mt-3">
               <span
-                className={`w-2 h-2 rounded-full ${
-                  imageViewerData.machineStatus === 'Working' ? 'bg-[#4CAF50]' : 
-                  imageViewerData.machineStatus === 'Not Working' ? 'bg-[#F44336]' :
-                  imageViewerData.machineStatus === 'Under Repair' ? 'bg-[#FF9800]' :
-                  'bg-[#9E9E9E]'
-                }`}
+                className={`w-2 h-2 rounded-full ${imageViewerData.machineStatus === 'Working' ? 'bg-[#4CAF50]' :
+                    imageViewerData.machineStatus === 'Not Working' ? 'bg-[#F44336]' :
+                      imageViewerData.machineStatus === 'Under Repair' ? 'bg-[#FF9800]' :
+                        'bg-[#9E9E9E]'
+                  }`}
               ></span>
               <p
-                className={`text-[12px] font-medium ${
-                  imageViewerData.machineStatus === 'Working' ? 'text-[#4CAF50]' : 
-                  imageViewerData.machineStatus === 'Not Working' ? 'text-[#F44336]' :
-                  imageViewerData.machineStatus === 'Under Repair' ? 'text-[#FF9800]' :
-                  'text-[#9E9E9E]'
-                }`}
+                className={`text-[12px] font-medium ${imageViewerData.machineStatus === 'Working' ? 'text-[#4CAF50]' :
+                    imageViewerData.machineStatus === 'Not Working' ? 'text-[#F44336]' :
+                      imageViewerData.machineStatus === 'Under Repair' ? 'text-[#FF9800]' :
+                        'text-[#9E9E9E]'
+                  }`}
               >
                 {imageViewerData.machineStatus}
               </p>

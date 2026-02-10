@@ -691,9 +691,9 @@ const NetStock = ({ user }) => {
   return (
     <div className="flex flex-col bg-white px-4" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* Category and Brand Section */}
-      <div className="flex justify-between mt-2">
-        <p className="text-[12px] text-black font-medium leading-normal mb-2">Category</p>
-        <p className="text-[12px] text-black font-medium leading-normal mb-2">Brand</p>
+      <div className="flex justify-between mt-1.5">
+        <p className="text-[12px] text-black font-semibold leading-normal mb-2">Category</p>
+        <p className="text-[12px] text-black font-semibold leading-normal mb-2">Brand</p>
       </div>
       
       {/* Table/List Segmented Control */}
@@ -823,13 +823,8 @@ const NetStock = ({ user }) => {
         </div>
       </div>
 
-      {/* Download Link */}
-      <div className="flex justify-end mt-2">
-        <span className="text-[12px] text-blue-600 underline cursor-pointer">Download</span>
-      </div>
-
       {/* Main Content Area */}
-      <div key={viewMode} className="flex-1 px-4 pb-4 mt-4 min-h-[400px]">
+      <div key={viewMode} className="flex-1 pb-4 mt-2 min-h-[400px]">
         {loading ? (
           <div className="flex justify-center items-center h-64">
             <p className="text-[14px] text-gray-500">Loading...</p>
@@ -840,7 +835,12 @@ const NetStock = ({ user }) => {
             {tableData.length === 0 ? (
               <p className="text-[14px] text-gray-500 text-center mt-8">No data available</p>
             ) : (
-              <div className="space-y-3">
+              <>
+                {/* Download Link */}
+                <div className="flex justify-end mb-0.5">
+                  <span className="text-[12px] text-gray-400 font-semibold cursor-pointer">Download</span>
+                </div>
+                <div className="space-y-0.5">
                 {tableData.map((item, index) => {
                   const itemId = item.id || index;
                   const swipeState = swipeStates[itemId];
@@ -857,7 +857,7 @@ const NetStock = ({ user }) => {
                       : 0;
 
                   return (
-                    <div key={itemId} className="relative overflow-hidden">
+                    <div key={itemId} className="overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] h-[100px]">
                       {/* Edit Button - Behind the card on the right, revealed on swipe */}
                       {canEdit && (
                         <div
@@ -888,7 +888,7 @@ const NetStock = ({ user }) => {
                       )}                      
                       {/* Card */}
                       <div
-                        className="border border-gray-200 rounded-lg p-3 bg-white relative transition-all duration-300 ease-out"
+                        className="bg-white rounded-[8px] h-full px-3 py-3 transition-all duration-300 ease-out"
                         style={{
                           transform: `translateX(${swipeOffset}px)`,
                           touchAction: canEdit ? 'pan-y' : 'auto',
@@ -937,7 +937,8 @@ const NetStock = ({ user }) => {
                     </div>
                   );
                 })}
-              </div>
+                </div>
+              </>
             )}
           </div>
         ) : (
@@ -946,7 +947,12 @@ const NetStock = ({ user }) => {
             {aggregatedSummary.length === 0 ? (
               <p className="text-[14px] text-gray-500 text-center mt-8">No data available</p>
             ) : (
-              <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
+              <>
+                {/* Download Link */}
+                <div className="flex justify-end mb-2">
+                  <span className="text-[12px] text-gray-400 font-semibold cursor-pointer">Download</span>
+                </div>
+                <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
                 {/* Table Header */}
                 <div className="bg-gray-50 border-b border-gray-200">
                   <div className="grid grid-cols-12 gap-2 px-3 py-2">
@@ -975,6 +981,7 @@ const NetStock = ({ user }) => {
                   ))}
                 </div>
               </div>
+              </>
             )}
           </div>
         )}
@@ -1083,3 +1090,4 @@ const NetStock = ({ user }) => {
 };
 
 export default NetStock;
+

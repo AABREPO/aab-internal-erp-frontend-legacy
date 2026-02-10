@@ -17,6 +17,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     const [totalAmount, setTotalAmount] = useState(0);
     const [filteredExpenses, setFilteredExpenses] = useState([]);
     const [editId, setEditId] = useState(null);
+    const sentToWeeklyPaymentBillsRef = useRef(new Set());
     const [showModal, setShowModal] = useState(false);
     const [audits, setAudits] = useState([]);
     const [siteOptions, setSiteOptions] = useState([]);
@@ -209,6 +210,29 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     useEffect(() => {
         localStorage.setItem('expenseFilter_eno', selectedEno);
     }, [selectedEno]);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [paymentModalData, setPaymentModalData] = useState({
+        chequeNo: '',
+        chequeDate: '',
+        transactionNumber: '',
+        accountNumber: ''
+    });
+    const [accountDetails, setAccountDetails] = useState([]);
+    const pendingUpdateFormDataRef = useRef(null);
+    useEffect(() => {
+        const fetchAccountDetails = async () => {
+            try {
+                const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/getAll');
+                if (response.ok) {
+                    const data = await response.json();
+                    setAccountDetails(data);
+                }
+            } catch (err) {
+                console.error('Error fetching account details:', err);
+            }
+        };
+        fetchAccountDetails();
+    }, []);
     const [formData, setFormData] = useState({
         accountType: '',
         date: '',
@@ -699,16 +723,87 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
             billCopy: updatedBillCopy,
             editedBy: username,
         };
+        const isPaymentType = (updatedFormData.accountType === 'Claim' || updatedFormData.accountType === 'Utility Bills' || updatedFormData.accountType === 'Weekly Payment');
+        const isNonCashPaymentMode = ['GPay', 'PhonePe', 'Net Banking', 'Cheque'].includes(updatedFormData.paymentMode);
+        if (isPaymentType && isNonCashPaymentMode) {
+            pendingUpdateFormDataRef.current = updatedFormData;
+            setPaymentModalData({ chequeNo: '', chequeDate: '', transactionNumber: '', accountNumber: '' });
+            setShowPaymentModal(true);
+            setIsSubmitting(false);
+            return;
+        }
         try {
-            const response = await fetch(`https://backendaab.in/aabuilderDash/expenses_form/update/${editId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(updatedFormData)
-            });
-            if (!response.ok) throw new Error('Failed to update expense');
-            setExpenses(expenses.map(exp => (exp.id === editId ? { ...exp, ...updatedFormData } : exp)));
+            await performUpdateAndWeeklyBills(updatedFormData);
+            setModalIsOpen(false);
+            setIsSubmitting(false);
+            alert('Updated successfully!');
+            window.location.reload();
+        } catch (error) {
+            console.error('Error updating expense:', error);
+            alert('Failed to update expense');
+            setIsSubmitting(false);
+        }
+    };
+    const performUpdateAndWeeklyBills = async (updatedFormData, modalPaymentData = null) => {
+        const response = await fetch(`https://backendaab.in/aabuilderDash/expenses_form/update/${editId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatedFormData)
+        });
+        if (!response.ok) throw new Error('Failed to update expense');
+        setExpenses(expenses.map(exp => (exp.id === editId ? { ...exp, ...updatedFormData } : exp)));
+        const isPaymentType = (updatedFormData.accountType === 'Claim' || updatedFormData.accountType === 'Utility Bills' || updatedFormData.accountType === 'Weekly Payment');
+        const isNonCashPaymentMode = ['GPay', 'PhonePe', 'Net Banking', 'Cheque'].includes(updatedFormData.paymentMode);
+        if (isPaymentType && isNonCashPaymentMode && editId && !sentToWeeklyPaymentBillsRef.current.has(editId)) {
+            try {
+                const weeklyPaymentBillPayload = {
+                    date: updatedFormData.date,
+                    created_at: new Date().toISOString(),
+                    contractor_id: updatedFormData.contractorId || null,
+                    vendor_id: updatedFormData.vendorId || null,
+                    employee_id: null,
+                    project_id: updatedFormData.projectId || null,
+                    type: updatedFormData.accountType === 'Claim' ? 'Claim Payment' : updatedFormData.accountType === 'Weekly Payment' ? 'Weekly Payment' : 'Utility Payment',
+                    bill_payment_mode: updatedFormData.paymentMode,
+                    amount: parseFloat(updatedFormData.amount) || 0,
+                    status: true,
+                    weekly_number: '',
+                    expenses_entry_id: editId,
+                    advance_portal_id: null,
+                    staff_advance_portal_id: null,
+                    claim_payment_id: null,
+                    cheque_number: (modalPaymentData && modalPaymentData.chequeNo) || null,
+                    cheque_date: (modalPaymentData && modalPaymentData.chequeDate) || null,
+                    transaction_number: (modalPaymentData && modalPaymentData.transactionNumber) || null,
+                    account_number: (modalPaymentData && modalPaymentData.accountNumber) || null
+                };
+                const weeklyResponse = await fetch('https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(weeklyPaymentBillPayload)
+                });
+                if (weeklyResponse.ok) sentToWeeklyPaymentBillsRef.current.add(editId);
+            } catch (weeklyErr) {
+                console.error('Weekly payment bills save error:', weeklyErr);
+            }
+        }
+    };
+    const handlePaymentModalSubmit = async () => {
+        if (!paymentModalData.accountNumber) {
+            alert('Please select account number.');
+            return;
+        }
+        if (formData.paymentMode === 'Cheque' && (!paymentModalData.chequeNo || !paymentModalData.chequeDate)) {
+            alert('Please enter cheque number and date.');
+            return;
+        }
+        const updatedFormData = pendingUpdateFormDataRef.current;
+        if (!updatedFormData) return;
+        setIsSubmitting(true);
+        try {
+            await performUpdateAndWeeklyBills(updatedFormData, paymentModalData);
+            setShowPaymentModal(false);
             setModalIsOpen(false);
             setIsSubmitting(false);
             alert('Updated successfully!');
@@ -1700,7 +1795,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                         <input type="file" className="hidden" id="fileInput" onChange={handleFileChange} />
                                     </div>                                    
                                     {/* Conditional fields based on Account Type */}
-                                    {(formData.accountType === 'Claim' || formData.accountType === 'Utility Bills') && (
+                                    {(formData.accountType === 'Claim' || formData.accountType === 'Utility Bills' || formData.accountType === 'Weekly Payment') && (
                                         <div>
                                             <label className="block text-gray-500 font-semibold text-left">Payment Mode *</label>
                                             <select
@@ -1789,6 +1884,115 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                 </form>
                             </div>
                         </Modal>
+            {showPaymentModal && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[9999]">
+                    <div className="bg-white text-left rounded-xl p-6 w-[800px] max-h-[90vh] overflow-y-auto flex flex-col relative">
+                        <h3 className="text-lg font-semibold mb-4 text-center">Payment Details</h3>
+                        <div className="flex-1 overflow-hidden">
+                            <div className="space-y-4 mb-4">
+                                <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                                            <input
+                                                type="date"
+                                                value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.date) || ''}
+                                                readOnly
+                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full bg-gray-100"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                                            <input
+                                                type="text"
+                                                value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.amount) || ''}
+                                                readOnly
+                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>
+                                            <input
+                                                type="text"
+                                                value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.paymentMode) || ''}
+                                                readOnly
+                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                                {(formData.paymentMode === 'GPay' || formData.paymentMode === 'PhonePe' || formData.paymentMode === 'Net Banking' || formData.paymentMode === 'Cheque') && (
+                                    <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
+                                        <div className="space-y-4">
+                                            {formData.paymentMode === 'Cheque' && (
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No <span className="text-red-500">*</span></label>
+                                                        <input
+                                                            type="text"
+                                                            value={paymentModalData.chequeNo}
+                                                            onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeNo: e.target.value }))}
+                                                            placeholder="Enter cheque number"
+                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date <span className="text-red-500">*</span></label>
+                                                        <input
+                                                            type="date"
+                                                            value={paymentModalData.chequeDate}
+                                                            onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeDate: e.target.value }))}
+                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
+                                                    <input
+                                                        type="text"
+                                                        value={paymentModalData.transactionNumber}
+                                                        onChange={(e) => setPaymentModalData(prev => ({ ...prev, transactionNumber: e.target.value }))}
+                                                        placeholder="Enter transaction number (optional)"
+                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Account Number <span className="text-red-500">*</span></label>
+                                                    <select
+                                                        value={paymentModalData.accountNumber}
+                                                        onChange={(e) => setPaymentModalData(prev => ({ ...prev, accountNumber: e.target.value }))}
+                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                    >
+                                                        <option value="">Select Account</option>
+                                                        {accountDetails.map((account) => (
+                                                            <option key={account.id} value={account.account_number}>
+                                                                {account.account_number}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-3 mt-6 p-4 bg-white border-t">
+                            <button type="button" onClick={() => setShowPaymentModal(false)} className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg">
+                                Cancel
+                            </button>
+                            <button type="button" onClick={handlePaymentModalSubmit} disabled={isSubmitting} className="px-4 py-2 bg-[#BF9853] text-white rounded-lg disabled:bg-gray-400">
+                                {isSubmitting ? 'Saving...' : 'Submit'}
+                            </button>
+                        </div>
+                        <button type="button" onClick={() => setShowPaymentModal(false)} className="absolute top-3 right-4 text-xl font-bold text-gray-500 hover:text-black">
+                            ×
+                        </button>
+                    </div>
+                </div>
+            )}
                         <AuditModal show={showModal} onClose={() => setShowModal(false)} audits={audits} />
                     </div>
                 </div>

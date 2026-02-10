@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import SelectVendorModal from './SelectVendorModal';
+import Search from '../Images/Search.png';
 
 // Helper function to highlight matching text (highlights all matching terms)
 const highlightText = (text, searchQuery) => {
@@ -1413,9 +1414,9 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                         onClick={onClose}
                         className="w-6 h-6 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                     >
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M12 4L4 12M4 4L12 12" stroke="#e4572e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 4L4 12M4 4L12 12" stroke="#e4572e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
                     </button>
                 </div>
                 {/* Project Name Dropdown - ONLY for Update → Other Returns */}
@@ -1455,7 +1456,7 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                 )}
                 {/* Search Input */}
                 <div className="px-4 pt-1">
-                    <div className="relative">
+                    <div className="relative items-center">
                         <input
                             type="text"
                             value={searchQuery}
@@ -1470,14 +1471,11 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                                 }, 300);
                             }}
                             placeholder="Search by Item Name, Model, Brand, or Type"
-                            className="w-full h-[40px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-full text-[14px] font-medium text-black placeholder:text-[#bdbbbb] placeholder:text-[12px] placeholder:font-extralight bg-white focus:outline-none"
+                            className="w-full h-[40px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-full text-[14px] font-medium text-black placeholder:text-[#bdbbbb] placeholder:text-[12px]  placeholder:font-extralight bg-white focus:outline-none"
                             autoFocus={false}
                         />
                         <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="7" cy="7" r="5.5" stroke="#9E9E9E" strokeWidth="1.5" />
-                                <path d="M11 11L14 14" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" />
-                            </svg>
+                            <img src={Search} alt='search' className=' w-[12px] h-[12px]' />
                         </div>
                     </div>
                 </div>

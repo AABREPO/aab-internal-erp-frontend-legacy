@@ -6,6 +6,7 @@ import SelectVendorModal from './SelectVendorModal';
 import Edit from '../Images/edit1.png'
 import Delete from '../Images/delete.png'
 import Filter from '../Images/Filter.png'
+import Search from '../Images/Search.png'
 const History = () => {
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   // Cache for fast "get by id" lookups during clone (prevents repeated network calls)
@@ -50,25 +51,25 @@ const History = () => {
 
   // Swipe detection state - track per card
   const [swipeStates, setSwipeStates] = useState({});
-  
+
   // Refs to store element references for non-passive event listeners
   const cardRefs = useRef({});
-  
+
   // Refs to track current state values for event handlers
   const expandedPoIdRef = useRef(expandedPoId);
   const cloneExpandedPoIdRef = useRef(cloneExpandedPoId);
   const isFirstCardClosedRef = useRef(isFirstCardClosed);
   const isInitialMount = useRef(true);
-  
+
   // Keep refs in sync with state
   useEffect(() => {
     expandedPoIdRef.current = expandedPoId;
   }, [expandedPoId]);
-  
+
   useEffect(() => {
     cloneExpandedPoIdRef.current = cloneExpandedPoId;
   }, [cloneExpandedPoId]);
-  
+
   useEffect(() => {
     isFirstCardClosedRef.current = isFirstCardClosed;
   }, [isFirstCardClosed]);
@@ -184,10 +185,10 @@ const History = () => {
     if (allVendors.length === 0 && allProjects.length === 0) {
       return;
     }
-    
+
     // Check if any filters are active
     const hasActiveFilters = searchQuery || filters.vendorName || filters.clientName || filters.siteIncharge || filters.startDate || filters.endDate || filters.poNumber || filters.branch;
-    
+
     // If filters are active and we have cached data, load from cache first for instant display
     if (!skipCache && hasActiveFilters) {
       try {
@@ -208,10 +209,10 @@ const History = () => {
       }
     }
     try {
-      const apiUrl = hasActiveFilters 
+      const apiUrl = hasActiveFilters
         ? 'https://backendaab.in/aabuildersDash/api/purchase_orders/getAll'
         : 'https://backendaab.in/aabuildersDash/api/purchase_orders/get/latest';
-      
+
       const response = await fetch(apiUrl);
       if (!response.ok) {
         throw new Error('Failed to fetch purchase orders');
@@ -222,100 +223,100 @@ const History = () => {
           return !(po.delete_status === true || po.deleteStatus === true);
         })
         .map((po) => {
-        let vendorName = '';
-        if (po.vendor_id && allVendors.length > 0) {
-          const vendorMatch = allVendors.find(v => v.id === po.vendor_id);
-          vendorName = vendorMatch?.vendorName || '';
-        }
-        let projectName = '';
-        let projectBranch = '';
-        if (po.client_id && allProjects.length > 0) {
-          const projectMatch = allProjects.find(p => p.id === po.client_id);
-          projectName = projectMatch?.siteName || projectMatch?.projectName || '';
-          projectBranch = projectMatch?.branch || '';
-        }
-        let projectIncharge = '';
-        if (po.site_incharge_id) {
-          const inchargeType = po.site_incharge_type || po.siteInchargeType;
-          if (inchargeType === 'support staff' || inchargeType === 'support_staff') {
-            if (allSupportStaff.length > 0) {
-              const supportStaffMatch = allSupportStaff.find(s => s.id === po.site_incharge_id);
-              projectIncharge = supportStaffMatch?.support_staff_name || supportStaffMatch?.supportStaffName || '';
+          let vendorName = '';
+          if (po.vendor_id && allVendors.length > 0) {
+            const vendorMatch = allVendors.find(v => v.id === po.vendor_id);
+            vendorName = vendorMatch?.vendorName || '';
+          }
+          let projectName = '';
+          let projectBranch = '';
+          if (po.client_id && allProjects.length > 0) {
+            const projectMatch = allProjects.find(p => p.id === po.client_id);
+            projectName = projectMatch?.siteName || projectMatch?.projectName || '';
+            projectBranch = projectMatch?.branch || '';
+          }
+          let projectIncharge = '';
+          if (po.site_incharge_id) {
+            const inchargeType = po.site_incharge_type || po.siteInchargeType;
+            if (inchargeType === 'support staff' || inchargeType === 'support_staff') {
+              if (allSupportStaff.length > 0) {
+                const supportStaffMatch = allSupportStaff.find(s => s.id === po.site_incharge_id);
+                projectIncharge = supportStaffMatch?.support_staff_name || supportStaffMatch?.supportStaffName || '';
+              }
+            } else {
+              if (allEmployees.length > 0) {
+                const inchargeMatch = allEmployees.find(e => e.id === po.site_incharge_id);
+                projectIncharge = inchargeMatch?.employeeName || inchargeMatch?.name || inchargeMatch?.fullName || inchargeMatch?.employee_name || '';
+              }
             }
-          } else {
-            if (allEmployees.length > 0) {
-              const inchargeMatch = allEmployees.find(e => e.id === po.site_incharge_id);
-              projectIncharge = inchargeMatch?.employeeName || inchargeMatch?.name || inchargeMatch?.fullName || inchargeMatch?.employee_name || '';
+          }
+
+          // Transform purchaseTable to items format
+          const items = (po.purchaseTable || []).map(item => ({
+            name: item.itemName || `${item.item_id || ''}`,
+            brand: item.brandName || '',
+            model: item.modelName || '',
+            type: item.typeName || '',
+            quantity: item.quantity || 0,
+            price: item.price || (item.amount / (item.quantity || 1)) || 0,
+            amount: item.amount || 0,
+            itemId: item.item_id,
+            categoryId: item.category_id,
+            modelId: item.model_id,
+            brandId: item.brand_id,
+            typeId: item.type_id,
+          }));
+
+          // Extract year from date (format: DD/MM/YYYY)
+          const getYearFromDate = (dateStr) => {
+            if (!dateStr) return new Date().getFullYear();
+            if (dateStr.includes('/')) {
+              const parts = dateStr.split('/');
+              return parts[2] || new Date().getFullYear();
             }
+            try {
+              const date = new Date(dateStr);
+              return date.getFullYear();
+            } catch {
+              return new Date().getFullYear();
+            }
+          };
+          const year = getYearFromDate(po.date);
+
+          // Determine payment status from payment_complete_status field
+          let paymentStatus = 'Unpaid';
+          if (po.payment_complete_status !== undefined) {
+            paymentStatus = po.payment_complete_status === true ? 'Paid' : 'Unpaid';
+          } else if (po.paymentCompleteStatus !== undefined) {
+            paymentStatus = po.paymentCompleteStatus === true ? 'Paid' : 'Unpaid';
+          } else if (po.paymentStatus) {
+            // Fallback to existing paymentStatus field if available
+            paymentStatus = po.paymentStatus;
           }
-        }
 
-        // Transform purchaseTable to items format
-        const items = (po.purchaseTable || []).map(item => ({
-          name: item.itemName || `${item.item_id || ''}`,
-          brand: item.brandName || '',
-          model: item.modelName || '',
-          type: item.typeName || '',
-          quantity: item.quantity || 0,
-          price: item.price || (item.amount / (item.quantity || 1)) || 0,
-          amount: item.amount || 0,
-          itemId: item.item_id,
-          categoryId: item.category_id,
-          modelId: item.model_id,
-          brandId: item.brand_id,
-          typeId: item.type_id,
-        }));
-
-        // Extract year from date (format: DD/MM/YYYY)
-        const getYearFromDate = (dateStr) => {
-          if (!dateStr) return new Date().getFullYear();
-          if (dateStr.includes('/')) {
-            const parts = dateStr.split('/');
-            return parts[2] || new Date().getFullYear();
-          }
-          try {
-            const date = new Date(dateStr);
-            return date.getFullYear();
-          } catch {
-            return new Date().getFullYear();
-          }
-        };
-        const year = getYearFromDate(po.date);
-
-        // Determine payment status from payment_complete_status field
-        let paymentStatus = 'Unpaid';
-        if (po.payment_complete_status !== undefined) {
-          paymentStatus = po.payment_complete_status === true ? 'Paid' : 'Unpaid';
-        } else if (po.paymentCompleteStatus !== undefined) {
-          paymentStatus = po.paymentCompleteStatus === true ? 'Paid' : 'Unpaid';
-        } else if (po.paymentStatus) {
-          // Fallback to existing paymentStatus field if available
-          paymentStatus = po.paymentStatus;
-        }
-
-        return {
-          id: po.id || po._id,
-          poNumber: po.eno ? `PO - ${year} - ${po.eno}` : po.poNumber || '',
-          eno: po.eno || null, // Preserve eno for edit screen
-          date: po.date || '',
-          vendorName: vendorName || po.vendorName || '',
-          projectName: projectName || po.projectName || '',
-          projectBranch: projectBranch || po.branch || '',
-          projectIncharge: projectIncharge || po.site_incharge_name || '',
-          contact: po.site_incharge_mobile_number || po.contact || '',
-          created_by: po.created_by || '',
-          items: items,
-          paymentStatus: paymentStatus,
-          createdAt: po.createdAt || po.created_at || po.created_date_time || po.date || new Date().toISOString(),
-          created_date_time: po.created_date_time || po.createdAt || po.created_at || null,
-          // Preserve raw IDs so edit screen can send them back when unchanged
-          vendor_id: po.vendor_id,
-          client_id: po.client_id,
-          site_incharge_id: po.site_incharge_id,
-          site_incharge_mobile_number: po.site_incharge_mobile_number,
-          site_incharge_type: po.site_incharge_type || po.siteInchargeType || null,
-        };
-      });
+          return {
+            id: po.id || po._id,
+            poNumber: po.eno ? `PO - ${year} - ${po.eno}` : po.poNumber || '',
+            eno: po.eno || null, // Preserve eno for edit screen
+            date: po.date || '',
+            vendorName: vendorName || po.vendorName || '',
+            projectName: projectName || po.projectName || '',
+            projectBranch: projectBranch || po.branch || '',
+            projectIncharge: projectIncharge || po.site_incharge_name || '',
+            contact: po.site_incharge_mobile_number || po.contact || '',
+            created_by: po.created_by || '',
+            items: items,
+            paymentStatus: paymentStatus,
+            createdAt: po.createdAt || po.created_at || po.created_date_time || po.date || new Date().toISOString(),
+            created_date_time: po.created_date_time || po.createdAt || po.created_at || null,
+            // Preserve raw IDs so edit screen can send them back when unchanged
+            vendor_id: po.vendor_id,
+            client_id: po.client_id,
+            site_incharge_id: po.site_incharge_id,
+            site_incharge_mobile_number: po.site_incharge_mobile_number,
+            site_incharge_type: po.site_incharge_type || po.siteInchargeType || null,
+          };
+        });
       // Sort by ID (highest ID first - most recently entered)
       const sorted = transformedPOs.sort((a, b) => {
         const idA = parseInt(a.id) || 0;
@@ -323,7 +324,7 @@ const History = () => {
         return idB - idA; // Descending order (highest ID first)
       });
       setPurchaseOrders(sorted);
-      
+
       // Cache the transformed data for fast loading next time
       try {
         localStorage.setItem('purchaseOrdersHistoryCache', JSON.stringify(sorted));
@@ -810,7 +811,7 @@ const History = () => {
           vendorObj.vendorName || vendorObj.name || vendorObj.vendor_name || clonedPO.vendorName || '';
         // Keep id explicitly for Create page to use without waiting for dropdown options
         clonedPO.vendor_id = vendorId;
-        
+
         // Prefetch next PO number for this vendor in background (non-blocking)
         // Don't await - let it fetch in background while page opens
         fetch('https://backendaab.in/aabuildersDash/api/purchase_orders/getAll')
@@ -1041,7 +1042,7 @@ const History = () => {
     // Search query filter
     if (searchQuery && searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
-      
+
       // Helper function to parse date from various formats
       const parseDate = (dateStr) => {
         if (!dateStr) return null;
@@ -1064,7 +1065,7 @@ const History = () => {
         }
         return null;
       };
-      
+
       // Helper function to check if date matches
       const dateMatches = (poDate, targetDate) => {
         if (!poDate || !targetDate) return false;
@@ -1074,7 +1075,7 @@ const History = () => {
         target.setHours(0, 0, 0, 0);
         return po.getTime() === target.getTime();
       };
-      
+
       // Check for "today" keyword
       if (query === 'today') {
         const today = new Date();
@@ -1121,7 +1122,7 @@ const History = () => {
             dateMatchFound = poDateObj.getTime() === targetDateObj.getTime();
           }
         }
-        
+
         // Check all searchable fields
         const matchesSearch = (
           dateMatchFound ||
@@ -1223,7 +1224,7 @@ const History = () => {
     const deltaY = touch.clientY - state.startY;
     const absDeltaX = Math.abs(deltaX);
     const absDeltaY = Math.abs(deltaY);
-    
+
     // Only handle horizontal swipe if horizontal movement is greater than vertical
     // This allows vertical scrolling to work normally
     if (absDeltaX <= absDeltaY) {
@@ -1235,7 +1236,7 @@ const History = () => {
       });
       return;
     }
-    
+
     const isFirstCard = filteredPOs.length > 0 && filteredPOs[0].id === poId;
     const isExpanded = isFirstCard ? (!isFirstCardClosed || expandedPoId === poId) : expandedPoId === poId;
     const isCloneExpanded = cloneExpandedPoId === poId;
@@ -1274,7 +1275,7 @@ const History = () => {
     const isExpanded = isFirstCard ? (!isFirstCardClosed || expandedPoId === poId) : expandedPoId === poId;
     const wasCloneExpanded = state.wasCloneExpanded || false;
     const wasExpanded = state.wasExpanded || false;
-    
+
     if (absDeltaX >= minSwipeDistance) {
       if (deltaX < 0) {
         // Swiped left
@@ -1332,8 +1333,8 @@ const History = () => {
           const currentExpandedPoId = expandedPoIdRef.current;
           const currentCloneExpandedPoId = cloneExpandedPoIdRef.current;
           // Check if card is expanded
-          const isExpanded = isFirstCard 
-            ? (!currentIsFirstCardClosed || currentExpandedPoId === po.id) 
+          const isExpanded = isFirstCard
+            ? (!currentIsFirstCardClosed || currentExpandedPoId === po.id)
             : currentExpandedPoId === po.id;
           const isCloneExpanded = currentCloneExpandedPoId === po.id;
           // Only update if dragging horizontally
@@ -1372,11 +1373,11 @@ const History = () => {
           const isFirstCard = filteredPOs.length > 0 && filteredPOs[0].id === po.id;
           const currentIsFirstCardClosed = isFirstCardClosedRef.current;
           const currentExpandedPoId = expandedPoIdRef.current;
-          const isExpanded = isFirstCard 
-            ? (!currentIsFirstCardClosed || currentExpandedPoId === po.id) 
+          const isExpanded = isFirstCard
+            ? (!currentIsFirstCardClosed || currentExpandedPoId === po.id)
             : currentExpandedPoId === po.id;
           const wasCloneExpanded = state.wasCloneExpanded || false;
-          const wasExpanded = state.wasExpanded || false;          
+          const wasExpanded = state.wasExpanded || false;
           if (absDeltaX >= minSwipeDistance) {
             if (deltaX < 0) {
               // Swiped left
@@ -1432,8 +1433,8 @@ const History = () => {
         const currentIsFirstCardClosed = isFirstCardClosedRef.current;
         const currentExpandedPoId = expandedPoIdRef.current;
         const currentCloneExpandedPoId = cloneExpandedPoIdRef.current;
-        const wasExpanded = isFirstCard 
-          ? (!currentIsFirstCardClosed || currentExpandedPoId === po.id) 
+        const wasExpanded = isFirstCard
+          ? (!currentIsFirstCardClosed || currentExpandedPoId === po.id)
           : currentExpandedPoId === po.id;
         const wasCloneExpanded = currentCloneExpandedPoId === po.id;
         // Don't prevent default here - wait to see if it's a horizontal swipe
@@ -1459,7 +1460,7 @@ const History = () => {
           const deltaY = touch.clientY - state.startY;
           const absDeltaX = Math.abs(deltaX);
           const absDeltaY = Math.abs(deltaY);
-          
+
           // Only handle horizontal swipe if horizontal movement is greater than vertical
           // This allows vertical scrolling to work normally
           if (absDeltaX <= absDeltaY) {
@@ -1468,15 +1469,15 @@ const History = () => {
             delete newState[po.id];
             return newState;
           }
-          
+
           const isFirstCard = filteredPOs.length > 0 && filteredPOs[0].id === po.id;
           // Use refs to get current values
           const currentIsFirstCardClosed = isFirstCardClosedRef.current;
           const currentExpandedPoId = expandedPoIdRef.current;
           const currentCloneExpandedPoId = cloneExpandedPoIdRef.current;
           // Check if card is expanded
-          const isExpanded = isFirstCard 
-            ? (!currentIsFirstCardClosed || currentExpandedPoId === po.id) 
+          const isExpanded = isFirstCard
+            ? (!currentIsFirstCardClosed || currentExpandedPoId === po.id)
             : currentExpandedPoId === po.id;
           const isCloneExpanded = currentCloneExpandedPoId === po.id;
           // Only prevent default and update if swiping horizontally
@@ -1515,12 +1516,12 @@ const History = () => {
           const isFirstCard = filteredPOs.length > 0 && filteredPOs[0].id === po.id;
           const currentIsFirstCardClosed = isFirstCardClosedRef.current;
           const currentExpandedPoId = expandedPoIdRef.current;
-          const isExpanded = isFirstCard 
-            ? (!currentIsFirstCardClosed || currentExpandedPoId === po.id) 
+          const isExpanded = isFirstCard
+            ? (!currentIsFirstCardClosed || currentExpandedPoId === po.id)
             : currentExpandedPoId === po.id;
           const wasCloneExpanded = state.wasCloneExpanded || false;
           const wasExpanded = state.wasExpanded || false;
-          
+
           if (absDeltaX >= minSwipeDistance) {
             if (deltaX < 0) {
               // Swiped left
@@ -1567,8 +1568,8 @@ const History = () => {
         const currentIsFirstCardClosed = isFirstCardClosedRef.current;
         const currentExpandedPoId = expandedPoIdRef.current;
         const currentCloneExpandedPoId = cloneExpandedPoIdRef.current;
-        const wasExpanded = isFirstCard 
-          ? (!currentIsFirstCardClosed || currentExpandedPoId === po.id) 
+        const wasExpanded = isFirstCard
+          ? (!currentIsFirstCardClosed || currentExpandedPoId === po.id)
           : currentExpandedPoId === po.id;
         const wasCloneExpanded = currentCloneExpandedPoId === po.id;
         setSwipeStates(prev => ({
@@ -1659,7 +1660,7 @@ const History = () => {
   // Extract unique branches from projects
   const uniqueBranches = [...new Set(allProjects.map(p => p.branch).filter(Boolean))].sort();
   // Filter projects by selected branch
-  const filteredProjects = filters.branch 
+  const filteredProjects = filters.branch
     ? allProjects.filter(p => p.branch === filters.branch)
     : allProjects;
   const uniqueClients = [...new Set(filteredProjects.map(p => p.siteName || p.projectName).filter(Boolean))].sort();
@@ -1685,9 +1686,9 @@ const History = () => {
             className="w-[328px] h-[40px] pl-10 pr-4 border border-[#E0E0E0] rounded-3xl text-[14px] font-medium text-black placeholder:text-[#9E9E9E] focus:outline-none"
           />
           <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M7 13C10.3137 13 13 10.3137 13 7C13 3.68629 10.3137 1 7 1C3.68629 1 1 3.68629 1 7C1 10.3137 3.68629 13 7 13Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M15 15L11 11" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M5.79011 10.8302C8.57368 10.8302 10.8302 8.57368 10.8302 5.79011C10.8302 3.00653 8.57368 0.75 5.79011 0.75C3.00653 0.75 0.75 3.00653 0.75 5.79011C0.75 8.57368 3.00653 10.8302 5.79011 10.8302Z" stroke="#747474" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M12.75 12.9716L9.50195 9.72363" stroke="#747474" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </div>
         </div>
@@ -1704,7 +1705,7 @@ const History = () => {
             </button>
             {/* Active Filter Tags - Next to Filter button */}
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scrollbar-none  min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-              {/* Show "Filter" text only when no filters are active */}              
+              {/* Show "Filter" text only when no filters are active */}
               {/* Show filter tags when filters are active */}
               {(filters.vendorName || filters.clientName || filters.siteIncharge || filters.startDate || filters.endDate || filters.branch) && (
                 <div className="flex items-center gap-2 flex-nowrap">
@@ -1785,7 +1786,7 @@ const History = () => {
         </div>
       </div>
       {/* Purchase Orders List - Scrollable */}
-      <div className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide px-4 mt-1 " style={{ height: 'calc(100vh - 180px - 80px)', maxHeight: 'calc(100vh - 180px - 80px)' }}
+      <div className="overflow-y-auto no-scrollbar mx-auto scrollbar-none scrollbar-hide px-4 mt-1 " style={{ height: 'calc(100vh - 180px - 80px)', maxHeight: 'calc(100vh - 180px - 80px)' }}
         onClick={() => {
           setExpandedPoId(null);
           setCloneExpandedPoId(null);
@@ -1844,9 +1845,9 @@ const History = () => {
                 swipeOffset = 0;
               }
               return (
-                <div 
-                  key={po.id} 
-                  className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-gray-50 rounded-[8px] h-[100px]"
+                <div
+                  key={po.id}
+                  className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] h-[100px]"
                   style={{
                     userSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
                     WebkitUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
@@ -1872,8 +1873,8 @@ const History = () => {
                       title="Clone"
                     >
                       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 6.75V3.75C12 3.33579 11.6642 3 11.25 3H3.75C3.33579 3 3 3.33579 3 3.75V11.25C3 11.6642 3.33579 12 3.75 12H6.75" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M15 6.75H7.5C6.67157 6.75 6 7.42157 6 8.25V14.25C6 15.0784 6.67157 15.75 7.5 15.75H14.25C15.0784 15.75 15.75 15.0784 15.75 14.25V8.25C15.75 7.42157 15.0784 6.75 14.25 6.75H15Z" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M12 6.75V3.75C12 3.33579 11.6642 3 11.25 3H3.75C3.33579 3 3 3.33579 3 3.75V11.25C3 11.6642 3.33579 12 3.75 12H6.75" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M15 6.75H7.5C6.67157 6.75 6 7.42157 6 8.25V14.25C6 15.0784 6.67157 15.75 7.5 15.75H14.25C15.0784 15.75 15.75 15.0784 15.75 14.25V8.25C15.75 7.42157 15.0784 6.75 14.25 6.75H15Z" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     </button>
                   </div>
@@ -1973,10 +1974,10 @@ const History = () => {
                     className="absolute right-0 top-0 flex gap-2 flex-shrink-0 z-0"
                     style={{
                       opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
-                      transform: swipeOffset < 0 
-                        ? `translateX(${Math.max(0, 110 + swipeOffset)}px)` 
+                      transform: swipeOffset < 0
+                        ? `translateX(${Math.max(0, 110 + swipeOffset)}px)`
                         : 'translateX(110px)',
-                        transition: 'opacity 0.2s ease-out',
+                      transition: 'opacity 0.2s ease-out',
                       pointerEvents: isExpanded ? 'auto' : 'none'
                     }}
                   >
@@ -1990,7 +1991,7 @@ const History = () => {
                       className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
                       title="Edit"
                     >
-                        <img src={Edit} alt="Edit" className="w-[18px] h-[18px]" />
+                      <img src={Edit} alt="Edit" className="w-[18px] h-[18px]" />
                     </button>
                     <button
                       onClick={(e) => {
@@ -2115,7 +2116,7 @@ const History = () => {
                   </div>
                 </div>
               </div>
-            </div>            
+            </div>
             {/* Action Buttons - Fixed at bottom */}
             <div className="absolute mt-5 left-0 right-0 px-6 flex gap-4">
               <button

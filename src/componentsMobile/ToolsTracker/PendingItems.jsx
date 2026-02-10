@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import Filter from '../Images/Filter.png';
 
 const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_management';
 const TOOLS_STOCK_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_stock_management';
@@ -639,8 +640,8 @@ const PendingItems = ({ user }) => {
   return (
     <div className="flex flex-col min-h-[calc(100vh-90px-80px)] bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* Home Location Filter */}
-      <div className="px-4 pt-2 pb-1.5">
-        <label className="block text-[13px] font-medium text-black mb-1">
+      <div className="px-4 pt-2 pb-2">
+        <label className="block text-[13px] font-medium text-black mb-0.5">
           Home Location<span className="text-[#eb2f8e]">*</span>
         </label>
         <div
@@ -659,24 +660,24 @@ const PendingItems = ({ user }) => {
         <div className="flex bg-gray-100 items-center h-6 shadow-sm rounded-full">
           <button onClick={() => setSelectedDays('all')}
             className={`flex py-1 px-4 ml-0.5 h-5 rounded-full text-[11px] items-center font-medium transition-colors duration-1000 ease-out ${selectedDays === 'all'
-                ? 'bg-white text-black'
-                : 'bg-gray-100 text-gray-600'
+              ? 'bg-white text-black'
+              : 'bg-gray-100 text-gray-600'
               }`}
           >
             All Days
           </button>
           <button onClick={() => setSelectedDays('30')}
             className={`flex py-1 px-4 h-5 rounded-full text-[11px] items-center font-medium transition-colors duration-1000 ease-out ${selectedDays === '30'
-                ? 'bg-white text-black'
-                : 'bg-gray-100 text-gray-600'
+              ? 'bg-white text-black'
+              : 'bg-gray-100 text-gray-600'
               }`}
           >
             30 Days
           </button>
           <button onClick={() => setSelectedDays('60')}
             className={`flex py-1 px-4 mr-0.5 h-5 rounded-full text-[11px] items-center font-medium transition-colors duration-1000 ease-out ${selectedDays === '60'
-                ? 'bg-white text-black'
-                : 'bg-gray-100 text-gray-600'
+              ? 'bg-white text-black'
+              : 'bg-gray-100 text-gray-600'
               }`}
           >
             60 Days
@@ -684,10 +685,7 @@ const PendingItems = ({ user }) => {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[12px] font-medium text-black leading-normal">Download</span>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M2 4H14M2 8H14M2 12H14" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
-            <path d="M12 2L14 4L12 6M12 10L14 12L12 14" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <img src={Filter} alt="Filter" className="w-[12px] h-[12px]" />
         </div>
       </div>
       <div className="flex-1 overflow-y-auto px-4 pb-4">

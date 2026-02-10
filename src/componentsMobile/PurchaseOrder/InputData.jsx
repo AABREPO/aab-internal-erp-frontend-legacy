@@ -1105,9 +1105,9 @@ const InputData = () => {
     return (
         <div className="relative w-full bg-white max-w-[360px] mx-auto" style={{ fontFamily: "'Manrope', sans-serif" }}>
             {/* New Input Section */}
-            <div className="mt-2">
+            <div className="mt-2 px-4">
                 {/* New Input Header - Sticky */}
-                <div className="sticky top-[100px] z-30 px-4 bg-white flex items-center justify-between mb-3 border-b border-[#E0E0E0] pb-1.5">
+                <div className="sticky top-[100px] z-30 bg-white flex items-center justify-between mb-3 border-b border-[#E0E0E0] pb-1.5">
                     {/* Group Dropdown - Left Side */}
                     <button
                         onClick={() => setShowGroupModal(true)}
@@ -1126,7 +1126,7 @@ const InputData = () => {
                 </div>
 
                 {/* Form Fields */}
-                <div className="space-y-[6px] px-4  mb-4">
+                <div className="space-y-[6px] mb-4">
                     {/* Item Name */}
                     <div>
                         <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
@@ -1375,7 +1375,7 @@ const InputData = () => {
 
                 </div>
                 {/* Add to List / Update List Button */}
-                <div className="px-4">
+                <div className="">
                     <button
                         onClick={handleAddToList}
                         disabled={!formData.itemName || !formData.model || !formData.type || !formData.brand}

@@ -8,6 +8,7 @@ const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_bra
 const TOOLS_ITEM_ID_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_id';
 const TOOLS_STOCK_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_stock_management';
 const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_management';
+const TOOLS_MACHINE_NUMBER_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_machine_number';
 const TOOLS_MACHINE_STATUS_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools-machine-status';
 const PROJECT_NAMES_BASE_URL = 'https://backendaab.in/aabuilderDash/api/project_Names';
 const VENDOR_NAMES_BASE_URL = 'https://backendaab.in/aabuilderDash/api/vendor_Names';
@@ -23,6 +24,7 @@ const ToolsHistory = ({ user }) => {
   const [selectedMachineNumber, setSelectedMachineNumber] = useState('');
   const [stockManagementData, setStockManagementData] = useState([]);
   const [toolsTrackerManagementData, setToolsTrackerManagementData] = useState([]);
+  const [machineNumbersList, setMachineNumbersList] = useState([]);
   const [projectsMap, setProjectsMap] = useState({});
   const [vendorsMap, setVendorsMap] = useState({});
   const [machineStatusHistory, setMachineStatusHistory] = useState([]);
@@ -53,6 +55,7 @@ const ToolsHistory = ({ user }) => {
     itemIdDbId: null,
     model: '',
     machineNumber: '',
+    machineNumberId: null,
     brand: '',
     brandId: null,
     purchaseDate: '',
@@ -181,6 +184,26 @@ const ToolsHistory = ({ user }) => {
     fetchData();
   }, []);
 
+  // Fetch machine numbers (to resolve machine_number text -> machine_number_id for stock matching)
+  useEffect(() => {
+    const fetchMachineNumbers = async () => {
+      try {
+        const res = await fetch(`${TOOLS_MACHINE_NUMBER_BASE_URL}/getAll`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setMachineNumbersList(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        console.error('Error fetching machine numbers:', err);
+      }
+    };
+    fetchMachineNumbers();
+  }, []);
+
   // Fetch projects and vendors for location name resolution (like NetStock.jsx)
   useEffect(() => {
     const fetchMaps = async () => {
@@ -280,6 +303,38 @@ const ToolsHistory = ({ user }) => {
     });
   }, [selectedItemNameId, selectedToolsDetails, itemIdOptions, toolsItemIdFullData]);
 
+  // Resolve selected machine number text to machine_number_id (stock management API has machine_number_id, not machine_number text)
+  const selectedMachineNumberId = useMemo(() => {
+    if (!selectedMachineNumber || machineNumbersList.length === 0) return null;
+    const mnTrimmed = selectedMachineNumber.trim();
+    const found = machineNumbersList.find(
+      m => (m.machine_number || m.machineNumber || '').trim() === mnTrimmed
+    );
+    return found ? (found.id ?? found._id) : null;
+  }, [selectedMachineNumber, machineNumbersList]);
+
+  // Helper to resolve machine_number_id to text (tools_details and stock now use machine_number_id)
+  const resolveMachineNumberText = React.useCallback((item) => {
+    const mnId = item?.machine_number_id ?? item?.machineNumberId;
+    if (mnId && machineNumbersList.length > 0) {
+      const rec = machineNumbersList.find(m => String(m?.id ?? m?._id) === String(mnId));
+      return rec ? (rec.machine_number ?? rec.machineNumber ?? '').trim() : '';
+    }
+    return (item?.machine_number ?? item?.machineNumber ?? '').trim();
+  }, [machineNumbersList]);
+  const resolveMachineNumberFromStatus = React.useCallback((status) => {
+    const statusMachineNumberId = status?.machine_number_id ?? status?.machineNumberId;
+    if (statusMachineNumberId != null && machineNumbersList.length > 0) {
+      const rec = machineNumbersList.find(
+        m => String(m?.id ?? m?._id) === String(statusMachineNumberId)
+      );
+      if (rec) {
+        return (rec.machine_number ?? rec.machineNumber ?? '').trim();
+      }
+    }
+    return String(status?.machine_number ?? status?.machineNumber ?? '').trim();
+  }, [machineNumbersList]);
+
   // Machine Number dropdown: one itemId can have multiple machine numbers (current + old), so show all in popup
   const machineNumberOptions = useMemo(() => {
     if (!selectedItemIdDbId || selectedToolsDetails.length === 0) return [];
@@ -288,12 +343,12 @@ const ToolsHistory = ({ user }) => {
     selectedToolsDetails.forEach(d => {
       const iid = d?.item_ids_id ?? d?.itemIdsId;
       if (iid != null && String(iid) === idStr) {
-        const mn = (d?.machine_number ?? d?.machineNumber ?? '').trim();
+        const mn = resolveMachineNumberText(d);
         if (mn) collected.add(mn);
       }
     });
     return Array.from(collected).sort();
-  }, [selectedItemIdDbId, selectedToolsDetails]);
+  }, [selectedItemIdDbId, selectedToolsDetails, resolveMachineNumberText]);
 
   // When Item ID is cleared, clear Machine Number
   useEffect(() => {
@@ -333,7 +388,7 @@ const ToolsHistory = ({ user }) => {
           // Group by machine number to detect changes
           const statusByMachineNumber = new Map();
           sortedStatuses.forEach(status => {
-            const machineNum = String(status.machine_number || status.machineNumber || '').trim();
+            const machineNum = resolveMachineNumberFromStatus(status);
             if (machineNum) {
               if (!statusByMachineNumber.has(machineNum)) {
                 statusByMachineNumber.set(machineNum, []);
@@ -344,7 +399,7 @@ const ToolsHistory = ({ user }) => {
           
           // Process each status entry
           sortedStatuses.forEach((status, index) => {
-            const machineNum = String(status.machine_number || status.machineNumber || '').trim();
+            const machineNum = resolveMachineNumberFromStatus(status);
             const machineStatus = String(status.machine_status || status.machineStatus || '').trim();
             const statusId = status.id || 0;
             
@@ -357,7 +412,7 @@ const ToolsHistory = ({ user }) => {
             
             if (index > 0 && machineNum) {
               const prevStatus = sortedStatuses[index - 1];
-              const prevMachineNum = String(prevStatus.machine_number || prevStatus.machineNumber || '').trim();
+              const prevMachineNum = resolveMachineNumberFromStatus(prevStatus);
               
               if (prevMachineNum && machineNum !== prevMachineNum) {
                 isMachineNumberChange = true;
@@ -431,7 +486,7 @@ const ToolsHistory = ({ user }) => {
     };
     
     fetchMachineStatusHistory();
-  }, [selectedItemIdDbId]);
+  }, [selectedItemIdDbId, resolveMachineNumberFromStatus]);
 
   // Location name from project or vendor ID (like NetStock.jsx)
   const getLocationName = (id) => {
@@ -444,85 +499,144 @@ const ToolsHistory = ({ user }) => {
     return '';
   };
 
-  // Home location ID: most recent from tools_tracker_management, else from stock_management (like NetStock.jsx)
-  const getHomeLocationId = (itemIdsId, brandId, machineNumber, stockHomeLocationId) => {
-    const matchingEntries = [];
+  const getEntryTypeNormalized = (entry) => {
+    return String(entry?.tools_entry_type || entry?.toolsEntryType || '').toLowerCase();
+  };
+  const isRelocateEntryType = (entryType) => {
+    return entryType === 'relocate' || entryType === 'relocation';
+  };
+  const isMovementEntryType = (entryType) => {
+    return entryType === 'entry' || isRelocateEntryType(entryType);
+  };
+  const getEntrySortTime = (entry) => {
+    const rawDate = entry?.created_date_time || entry?.createdDateTime || entry?.timestamp || '';
+    const parsed = Date.parse(rawDate);
+    if (!Number.isNaN(parsed)) return parsed;
+    const numeric = Number(rawDate);
+    return Number.isFinite(numeric) ? numeric : 0;
+  };
+  const machineNumberMatches = (entryMachineNumber, entryMachineNumberId, targetMachineNumber, targetMachineNumberId) => {
+    const targetNumber = (targetMachineNumber || '').trim();
+    if (!targetNumber && (targetMachineNumberId == null || targetMachineNumberId === '')) return true;
+
+    const entryNumber = (entryMachineNumber || '').trim();
+    const entryNumberId = entryMachineNumberId != null ? String(entryMachineNumberId) : '';
+    const targetNumberId = targetMachineNumberId != null ? String(targetMachineNumberId) : '';
+
+    if (targetNumberId && entryNumberId && entryNumberId === targetNumberId) return true;
+    if (targetNumber && entryNumber && entryNumber === targetNumber) return true;
+
+    return false;
+  };
+  const getCurrentLocationId = (itemIdsId, brandId, machineNumber, machineNumberId, stockHomeLocationId) => {
+    if (!itemIdsId) return stockHomeLocationId;
+
+    let latestMovement = null;
+    for (const entry of toolsTrackerManagementData) {
+      const entryType = getEntryTypeNormalized(entry);
+      if (!isMovementEntryType(entryType)) continue;
+
+      const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
+      const matchingEntryItem = entryItems.find(entryItem => {
+        const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
+        const entryBrandId = entryItem.brand_id || entryItem.brandId;
+        const entryMachineNumber = entryItem.machine_number || entryItem.machineNumber || '';
+        const entryMachineNumberId = entryItem.machine_number_id || entryItem.machineNumberId;
+        const itemIdsMatch = entryItemIdsId && String(entryItemIdsId) === String(itemIdsId);
+        const brandMatch = !brandId || (entryBrandId && String(entryBrandId) === String(brandId));
+        const machineMatch = machineNumberMatches(entryMachineNumber, entryMachineNumberId, machineNumber, machineNumberId);
+        return itemIdsMatch && brandMatch && machineMatch;
+      });
+
+      if (!matchingEntryItem) continue;
+      const entrySortTime = getEntrySortTime(entry);
+      if (!latestMovement || entrySortTime > latestMovement.entrySortTime) {
+        latestMovement = { entry, entryType, matchingEntryItem, entrySortTime };
+      }
+    }
+
+    if (latestMovement) {
+      if (isRelocateEntryType(latestMovement.entryType)) {
+        const relocatedHomeLocationId = latestMovement.matchingEntryItem?.home_location_id || latestMovement.matchingEntryItem?.homeLocationId;
+        if (relocatedHomeLocationId) return relocatedHomeLocationId;
+      }
+
+      const toProjectId = latestMovement.entry?.to_project_id || latestMovement.entry?.toProjectId;
+      if (toProjectId) return toProjectId;
+
+      const movementHomeLocationId = latestMovement.matchingEntryItem?.home_location_id || latestMovement.matchingEntryItem?.homeLocationId;
+      if (movementHomeLocationId) return movementHomeLocationId;
+    }
+
+    return stockHomeLocationId;
+  };
+
+  // Matching stock management record for details card (from TOOLS_STOCK_MANAGEMENT_BASE_URL/getAll)
+  // Stock API returns machine_number_id, not machine_number text - match by machine_number_id when available
+  const selectedStockForCard = useMemo(() => {
+    if (!selectedItemIdDbId || !selectedMachineNumber || stockManagementData.length === 0) return null;
+    const idStr = String(selectedItemIdDbId);
+    const brandStr = selectedBrandId != null ? String(selectedBrandId) : null;
+    const mnTrimmed = selectedMachineNumber.trim();
+    return stockManagementData.find(stock => {
+      const stockItemIdsId = stock.item_ids_id ?? stock.itemIdsId;
+      const stockBrandId = stock.brand_name_id ?? stock.brandNameId;
+      const stockMachineNumberId = stock.machine_number_id ?? stock.machineNumberId;
+      const stockMachineNumber = (stock.machine_number ?? stock.machineNumber ?? '').trim();
+      const itemBrandMatch = stockItemIdsId != null && String(stockItemIdsId) === idStr &&
+        (!brandStr || (stockBrandId != null && String(stockBrandId) === brandStr));
+      if (!itemBrandMatch) return false;
+      if (selectedMachineNumberId != null && stockMachineNumberId != null) {
+        return String(stockMachineNumberId) === String(selectedMachineNumberId);
+      }
+      return stockMachineNumber === mnTrimmed;
+    }) || null;
+  }, [selectedItemIdDbId, selectedBrandId, selectedMachineNumber, selectedMachineNumberId, stockManagementData]);
+
+  // Whether the selected item exists in tools_tracker_management (transfers)
+  const isItemInToolsTrackerManagement = useMemo(() => {
+    if (!selectedItemIdDbId || !selectedMachineNumber) return false;
+    const idStr = String(selectedItemIdDbId);
     for (const entry of toolsTrackerManagementData) {
       const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
       for (const entryItem of entryItems) {
         const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
         const entryBrandId = entryItem.brand_id || entryItem.brandId;
-        const entryMachineNumber = entryItem.machine_number || entryItem.machineNumber || '';
-        const itemIdsMatch = entryItemIdsId && String(entryItemIdsId) === String(itemIdsId);
-        const brandMatch = !brandId || (entryBrandId && String(entryBrandId) === String(brandId));
-        const machineMatch = !machineNumber || (entryMachineNumber && String(entryMachineNumber).trim() === machineNumber.trim());
-        if (itemIdsMatch && brandMatch && machineMatch) {
-          let itemHomeLocationId = entryItem.home_location_id || entryItem.homeLocationId;
-          if (!itemHomeLocationId) {
-            const stockItem = stockManagementData.find(stock => {
-              const stockItemIdsId = stock.item_ids_id || stock.itemIdsId;
-              const stockBrandId = stock.brand_name_id || stock.brandNameId;
-              const stockMachineNumber = stock.machine_number || stock.machineNumber || '';
-              return stockItemIdsId && String(stockItemIdsId) === String(itemIdsId) &&
-                (!brandId || (stockBrandId && String(stockBrandId) === String(brandId))) &&
-                (!machineNumber || (stockMachineNumber && String(stockMachineNumber).trim() === machineNumber.trim()));
-            });
-            if (stockItem) itemHomeLocationId = stockItem.home_location_id || stockItem.homeLocationId;
-          }
-          if (itemHomeLocationId) {
-            const entryDate = entry.created_date_time || entry.createdDateTime || entry.timestamp || '';
-            matchingEntries.push({ homeLocationId: itemHomeLocationId, date: entryDate });
-          }
-        }
+        const entryMachineNumber = (entryItem.machine_number || entryItem.machineNumber || '').trim();
+        const itemIdsMatch = entryItemIdsId && String(entryItemIdsId) === idStr;
+        const brandMatch = !selectedBrandId || (entryBrandId && String(entryBrandId) === String(selectedBrandId));
+        const machineMatch = entryMachineNumber && entryMachineNumber === selectedMachineNumber.trim();
+        if (itemIdsMatch && brandMatch && machineMatch) return true;
       }
     }
-    if (matchingEntries.length > 0) {
-      matchingEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
-      return matchingEntries[0].homeLocationId;
-    }
-    const stockItem = stockManagementData.find(stock => {
-      const stockItemIdsId = stock.item_ids_id || stock.itemIdsId;
-      const stockBrandId = stock.brand_name_id || stock.brandNameId;
-      const stockMachineNumber = stock.machine_number || stock.machineNumber || '';
-      return stockItemIdsId && String(stockItemIdsId) === String(itemIdsId) &&
-        (!brandId || (stockBrandId && String(stockBrandId) === String(brandId))) &&
-        (!machineNumber || (stockMachineNumber && String(stockMachineNumber).trim() === machineNumber.trim()));
-    });
-    if (stockItem) return stockItem.home_location_id || stockItem.homeLocationId;
-    return stockHomeLocationId;
-  };
-
-  // Matching stock management record for details card (from TOOLS_STOCK_MANAGEMENT_BASE_URL/getAll)
-  const selectedStockForCard = useMemo(() => {
-    if (!selectedItemIdDbId || !selectedMachineNumber || stockManagementData.length === 0) return null;
-    const idStr = String(selectedItemIdDbId);
-    const brandStr = selectedBrandId != null ? String(selectedBrandId) : null;
-    return stockManagementData.find(stock => {
-      const stockItemIdsId = stock.item_ids_id ?? stock.itemIdsId;
-      const stockBrandId = stock.brand_name_id ?? stock.brandNameId;
-      const stockMachineNumber = (stock.machine_number ?? stock.machineNumber ?? '').trim();
-      return stockItemIdsId != null && String(stockItemIdsId) === idStr &&
-        (!brandStr || (stockBrandId != null && String(stockBrandId) === brandStr)) &&
-        stockMachineNumber === selectedMachineNumber.trim();
-    }) || null;
-  }, [selectedItemIdDbId, selectedBrandId, selectedMachineNumber, stockManagementData]);
+    return false;
+  }, [selectedItemIdDbId, selectedBrandId, selectedMachineNumber, toolsTrackerManagementData]);
 
   // Current location for selected item set (output field)
+  // Home location comes from stock management API (TOOLS_STOCK_MANAGEMENT_BASE_URL/getAll) - match by machine_number_id
   const currentLocation = useMemo(() => {
     if (!selectedItemIdDbId || !selectedMachineNumber) return '';
     const idStr = String(selectedItemIdDbId);
+    const mnTrimmed = selectedMachineNumber.trim();
     const stockItem = stockManagementData.find(stock => {
       const stockItemIdsId = stock.item_ids_id || stock.itemIdsId;
       const stockBrandId = stock.brand_name_id || stock.brandNameId;
-      const stockMachineNumber = stock.machine_number || stock.machineNumber || '';
-      return stockItemIdsId && String(stockItemIdsId) === idStr &&
-        (!selectedBrandId || (stockBrandId && String(stockBrandId) === String(selectedBrandId))) &&
-        stockMachineNumber && String(stockMachineNumber).trim() === selectedMachineNumber.trim();
+      const stockMachineNumberId = stock.machine_number_id || stock.machineNumberId;
+      const stockMachineNumber = (stock.machine_number || stock.machineNumber || '').trim();
+      const itemBrandMatch = stockItemIdsId && String(stockItemIdsId) === idStr &&
+        (!selectedBrandId || (stockBrandId && String(stockBrandId) === String(selectedBrandId)));
+      if (!itemBrandMatch) return false;
+      if (selectedMachineNumberId != null && stockMachineNumberId != null) {
+        return String(stockMachineNumberId) === String(selectedMachineNumberId);
+      }
+      return stockMachineNumber && stockMachineNumber.trim() === mnTrimmed;
     });
     const homeLocationId = stockItem ? (stockItem.home_location_id || stockItem.homeLocationId) : null;
-    const locationId = getHomeLocationId(selectedItemIdDbId, selectedBrandId, selectedMachineNumber, homeLocationId);
+    const locationId = isItemInToolsTrackerManagement
+      ? getCurrentLocationId(selectedItemIdDbId, selectedBrandId, selectedMachineNumber, selectedMachineNumberId, homeLocationId)
+      : homeLocationId;
     return getLocationName(locationId) || '';
-  }, [selectedItemIdDbId, selectedBrandId, selectedMachineNumber, stockManagementData, toolsTrackerManagementData, projectsMap, vendorsMap]);
+  }, [selectedItemIdDbId, selectedBrandId, selectedMachineNumber, selectedMachineNumberId, stockManagementData, toolsTrackerManagementData, projectsMap, vendorsMap, isItemInToolsTrackerManagement]);
 
   // When Item Name is cleared, clear dependent Brand, Item ID, Machine Number
   useEffect(() => {
@@ -582,7 +696,7 @@ const ToolsHistory = ({ user }) => {
         : null;
       if (detail) {
         const brandId = detail?.brand_id ?? detail?.brandId;
-        const machineNum = (detail?.machine_number ?? detail?.machineNumber ?? '').trim();
+        const machineNum = resolveMachineNumberText(detail);
         if (brandId != null) {
           const brandRecord = toolsBrandFullData.find(b => b != null && String(b.id) === String(brandId));
           const brandName = brandRecord ? (brandRecord?.tools_brand ?? brandRecord?.toolsBrand ?? '').trim() : '';
@@ -596,7 +710,26 @@ const ToolsHistory = ({ user }) => {
         setSelectedMachineNumber('');
       }
     } else {
-      setSelectedMachineNumber('');
+      // Fallback: try stock management - if stock exists for this itemId, auto-fill brand + machine number
+      const matchingStocks = stockManagementData.filter(s =>
+        String(s?.item_ids_id ?? s?.itemIdsId) === String(itemIdDbId)
+      );
+      if (matchingStocks.length >= 1) {
+        const stock = matchingStocks[0];
+        const brandId = stock?.brand_name_id ?? stock?.brandNameId;
+        const machineNum = resolveMachineNumberText(stock);
+        if (brandId != null) {
+          const brandRecord = toolsBrandFullData.find(b => b != null && String(b.id) === String(brandId));
+          const brandName = brandRecord ? (brandRecord?.tools_brand ?? brandRecord?.toolsBrand ?? '').trim() : '';
+          if (brandName) {
+            setSelectedBrand(brandName);
+            setSelectedBrandId(brandRecord.id);
+          }
+        }
+        if (machineNum) setSelectedMachineNumber(machineNum);
+      } else {
+        setSelectedMachineNumber('');
+      }
     }
 
     setShowItemIdPopup(false);
@@ -667,6 +800,15 @@ const ToolsHistory = ({ user }) => {
     const homeLocationObj = homeLocationFullData.find(l => String(l?.id) === String(homeLocationId));
     const homeLocationName = homeLocationObj?.siteName || homeLocationObj?.site_name || homeLocationObj?.projectName || homeLocationObj?.project_name || '';
     
+    // Resolve machine_number from machine_number_id (stock API returns machine_number_id, not machine_number text)
+    const machineNumberId = stockItem.machine_number_id || stockItem.machineNumberId;
+    const machineNumberRecord = machineNumberId && machineNumbersList.length > 0
+      ? machineNumbersList.find(m => String(m?.id ?? m?._id) === String(machineNumberId))
+      : null;
+    const machineNumberText = machineNumberRecord
+      ? (machineNumberRecord.machine_number || machineNumberRecord.machineNumber || '').trim()
+      : (stockItem.machine_number || stockItem.machineNumber || '').trim();
+    
     setEditFormData({
       itemName: itemName,
       itemNameId: itemNameId || null,
@@ -674,7 +816,8 @@ const ToolsHistory = ({ user }) => {
       itemId: itemIdName,
       itemIdDbId: itemIdsId || null,
       model: stockItem.model || '',
-      machineNumber: stockItem.machine_number || stockItem.machineNumber || '',
+      machineNumber: machineNumberText,
+      machineNumberId: machineNumberId || null,
       brand: brandName,
       brandId: brandId || null,
       purchaseDate: stockItem.purchase_date || stockItem.purchaseDate || '',
@@ -849,6 +992,16 @@ const ToolsHistory = ({ user }) => {
         return;
       }
 
+      const editedBy = user?.name || user?.username || 'mobile';
+      const stockItem = selectedStockForCard;
+
+      // Original values for comparison
+      const origItemNameId = stockItem.item_name_id || stockItem.itemNameId;
+      const origItemNameObj = toolsItemNameListData.find(item => String(item?.id) === String(origItemNameId));
+      const origItemName = origItemNameObj?.item_name || origItemNameObj?.itemName || '';
+      const origMachineNumber = (stockItem.machine_number || stockItem.machineNumber || '').trim();
+      const newMachineNumber = (editFormData.machineNumber || '').trim();
+
       const normalizedItemName = itemName.toLowerCase().trim();
       const existingItemName = toolsItemNameListData.find(
         item => {
@@ -858,12 +1011,101 @@ const ToolsHistory = ({ user }) => {
       );
       const itemNameId = existingItemName?.id ?? editFormData.itemNameId;
 
+      // Check if only machine number changed (other fields same)
+      const onlyMachineNumberChanged = (
+        origMachineNumber !== newMachineNumber &&
+        (editFormData.itemName || '').trim() === (origItemName || '').trim() &&
+        String(editFormData.brandId || '') === String(stockItem.brand_name_id || stockItem.brandNameId || '') &&
+        String(editFormData.itemIdDbId || '') === String(stockItem.item_ids_id || stockItem.itemIdsId || '') &&
+        (editFormData.model || '').trim() === (stockItem.model || '').trim() &&
+        String(editFormData.purchaseStoreId || '') === String(stockItem.purchase_store_id || stockItem.purchaseStoreId || '') &&
+        String(editFormData.homeLocationId || '') === String(stockItem.home_location_id || stockItem.homeLocationId || '') &&
+        (editFormData.purchaseDate || '') === (stockItem.purchase_date || stockItem.purchaseDate || '') &&
+        (editFormData.warrantyDate || '') === (stockItem.warranty_date || stockItem.warrantyDate || '') &&
+        (editFormData.contact || '').trim() === (stockItem.contact || '').trim() &&
+        (editFormData.shopAddress || '').trim() === (stockItem.shop_address || stockItem.shopAddress || '').trim() &&
+        String(editFormData.quantity || '0') === String(stockItem.quantity || '0') &&
+        (fileUrl || '') === (stockItem.file_url || stockItem.fileUrl || '')
+      );
+
+      // If only machine number changed and we have machine_number_id: edit machine number table only
+      if (onlyMachineNumberChanged && editFormData.machineNumberId) {
+        const machineNumRes = await fetch(
+          `${TOOLS_MACHINE_NUMBER_BASE_URL}/edit/${editFormData.machineNumberId}?editedBy=${encodeURIComponent(editedBy)}`,
+          {
+            method: 'PUT',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              machine_number: newMachineNumber,
+              tool_status: stockItem.tool_status || stockItem.toolStatus || 'Available'
+            })
+          }
+        );
+        if (!machineNumRes.ok) {
+          throw new Error(`Failed to update machine number: ${machineNumRes.status} ${machineNumRes.statusText}`);
+        }
+        const refreshRes = await fetch(`${TOOLS_STOCK_MANAGEMENT_BASE_URL}/getAll`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (refreshRes.ok) {
+          const data = await refreshRes.json();
+          setStockManagementData(Array.isArray(data) ? data : []);
+        }
+        setSelectedMachineNumber(newMachineNumber);
+        alert('Updated successfully!');
+        handleCloseEditSheet();
+        setIsSaving(false);
+        return;
+      }
+
+      let machineNumberId = editFormData.machineNumberId ? String(editFormData.machineNumberId) : '';
+      if (newMachineNumber) {
+        if (editFormData.machineNumberId) {
+          // Edit existing machine number row
+          const machineNumRes = await fetch(
+            `${TOOLS_MACHINE_NUMBER_BASE_URL}/edit/${editFormData.machineNumberId}?editedBy=${encodeURIComponent(editedBy)}`,
+            {
+              method: 'PUT',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                machine_number: newMachineNumber,
+                tool_status: stockItem.tool_status || stockItem.toolStatus || 'Available'
+              })
+            }
+          );
+          if (!machineNumRes.ok) {
+            throw new Error(`Failed to update machine number: ${machineNumRes.status} ${machineNumRes.statusText}`);
+          }
+          machineNumberId = String(editFormData.machineNumberId);
+        } else {
+          // Create new machine number and use its id
+          const machineNumRes = await fetch(`${TOOLS_MACHINE_NUMBER_BASE_URL}/save`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              machine_number: newMachineNumber,
+              tool_status: stockItem.tool_status || stockItem.toolStatus || 'Available'
+            })
+          });
+          if (!machineNumRes.ok) {
+            throw new Error(`Failed to save machine number: ${machineNumRes.status} ${machineNumRes.statusText}`);
+          }
+          const savedMachine = await machineNumRes.json();
+          machineNumberId = savedMachine?.id ? String(savedMachine.id) : '';
+        }
+      }
+
       const updatePayload = {
         item_name_id: itemNameId ? String(itemNameId) : null,
         brand_name_id: editFormData.brandId ? String(editFormData.brandId) : null,
         item_ids_id: editFormData.itemIdDbId ? String(editFormData.itemIdDbId) : null,
         model: editFormData.model?.trim() || null,
-        machine_number: editFormData.machineNumber?.trim() || null,
+        machine_number_id: machineNumberId || null,
         purchase_store_id: editFormData.purchaseStoreId ? String(editFormData.purchaseStoreId) : null,
         home_location_id: editFormData.homeLocationId ? String(editFormData.homeLocationId) : null,
         purchase_date: editFormData.purchaseDate || null,
@@ -872,10 +1114,9 @@ const ToolsHistory = ({ user }) => {
         shop_address: editFormData.shopAddress?.trim() || null,
         quantity: editFormData.quantity || '0',
         file_url: fileUrl || null,
-        tool_status: selectedStockForCard.tool_status || selectedStockForCard.toolStatus || 'Available'
+        tool_status: stockItem.tool_status || stockItem.toolStatus || 'Available'
       };
 
-      const editedBy = user?.name || user?.username || 'mobile';
       const response = await fetch(`${TOOLS_STOCK_MANAGEMENT_BASE_URL}/edit/${stockId}?editedBy=${encodeURIComponent(editedBy)}`, {
         method: 'PUT',
         credentials: 'include',
@@ -961,23 +1202,26 @@ const ToolsHistory = ({ user }) => {
 
   return (
     <div className="flex flex-col bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
-      {/* Top row: Item Name (left) + Edit button (right) when Item tab active, Item ID button when Log tab active */}
-      <div className="flex-shrink-0 px-4 pt-2">
+      {/* Top row: Item Name (left) + Edit button (right) when Item tab active, Item Name (left) + Item ID (right) when Log tab active */}
+      <div className="flex-shrink-0 px-4 pt-1.5">
         <div className="flex justify-between items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setShowItemNamePopup(true);
-              setShowBrandPopup(false);
-              setShowItemIdPopup(false);
-              setShowMachineNumberPopup(false);
-            }}
-            className="text-[12px] font-medium text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent text-left"
-          >
-            {selectedItemName ? selectedItemName : 'Item Name'}
-          </button>
-          {/* Show Edit button when Item tab is active and item is selected */}
-          {activeSegment === 'item' && selectedStockForCard && (
+          {/* Show Item Name button when Item tab or Log tab is active */}
+          {(activeSegment === 'item' || activeSegment === 'log') && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowItemNamePopup(true);
+                setShowBrandPopup(false);
+                setShowItemIdPopup(false);
+                setShowMachineNumberPopup(false);
+              }}
+              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent text-left"
+            >
+              {selectedItemName ? selectedItemName : 'Item Name'}
+            </button>
+          )}
+          {/* Show Edit button only when item is selected and NOT in tools_tracker_management (so user can edit stock management data) */}
+          {activeSegment === 'item' && selectedStockForCard && !isItemInToolsTrackerManagement && (
             <button
               type="button"
               onClick={handleEditClick}
@@ -990,8 +1234,8 @@ const ToolsHistory = ({ user }) => {
               Edit
             </button>
           )}
-          {/* Only show Item ID button when Log tab is active */}
-          {activeSegment === 'log' && selectedItemName && (
+          {/* Show Item ID button when Log tab is active */}
+          {activeSegment === 'log' && (
             <button
               type="button"
               onClick={() => {
@@ -1000,7 +1244,7 @@ const ToolsHistory = ({ user }) => {
                 setShowBrandPopup(false);
                 setShowMachineNumberPopup(false);
               }}
-              className="text-[12px] font-medium text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent text-right flex-shrink-0"
+              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent text-right flex-shrink-0"
             >
               {selectedItemId || 'Item ID'}
             </button>
@@ -1011,7 +1255,7 @@ const ToolsHistory = ({ user }) => {
           <button
             type="button"
             onClick={() => setActiveSegment('item')}
-            className={`flex-1 py-1 px-4 ml-1 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${
+            className={`flex-1 py-1 px-4 ml-0.5 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${
               activeSegment === 'item' ? 'bg-white text-black' : 'bg-gray-100 text-gray-600'
             }`}
           >
@@ -1020,7 +1264,7 @@ const ToolsHistory = ({ user }) => {
           <button
             type="button"
             onClick={() => setActiveSegment('log')}
-            className={`flex-1 py-1 px-4 ml-1 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${
+            className={`flex-1 py-1 px-4 mr-0.5 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${
               activeSegment === 'log' ? 'bg-white text-black' : 'bg-gray-100 text-gray-600'
             }`}
           >

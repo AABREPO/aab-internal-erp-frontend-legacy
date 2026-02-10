@@ -1219,10 +1219,10 @@ const Outgoing = ({ user }) => {
     }
   };
   return (
-    <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden">
+    <div className="flex flex-col px-4 h-[calc(100vh-90px-80px)] overflow-hidden">
       {/* Date and Actions Row - Only show when not in empty state */}
       {!isEmptyState && (
-        <div className="items-center border-b border-[#E0E0E0]">
+        <div className="items-center px-4 border-b border-[#E0E0E0]">
           <div className="sticky top-[100px] z-30 bg-white flex items-center justify-between mb-2 ">
             <button
               type="button"
@@ -1298,7 +1298,7 @@ const Outgoing = ({ user }) => {
         <div className=" ">
           {/* Date in empty state */}
           {isEmptyState && (
-            <div className="mb-2 items-center px-4 border-b border-gray-200 pb-1 mt-0.5">
+            <div className="mb-2 items-center border-b border-gray-200 pb-1 mt-0.5">
               <button
                 type="button"
                 onClick={() => setShowDatePicker(true)}
@@ -1309,7 +1309,7 @@ const Outgoing = ({ user }) => {
             </div>
           )}
           {/* Project Name Field */}
-          <div className="space-y-[6px] px-4">
+          <div className="space-y-[6px]">
             <div className=" relative">
               <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
                 Project Name<span className="text-[#eb2f8e]">*</span>

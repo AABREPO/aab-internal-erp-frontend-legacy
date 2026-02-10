@@ -836,7 +836,7 @@ const ServiceHistory = ({ user, onTabChange }) => {
                     : 0;
 
               return (
-                <div key={entry.id} className="overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] h-[100px]">
+                <div key={entry.id} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] h-[100px]">
                   {/* Card */}
                   <div
                     data-entry-id={entryId}

@@ -198,9 +198,12 @@ const History = ({ user, onTabChange }) => {
             }
           });
           flattenedData.sort((a, b) => {
-            const dateA = new Date(a.createdDateTime);
-            const dateB = new Date(b.createdDateTime);
-            return dateB - dateA;
+            const idA = Number(a.entryId ?? a.id ?? 0);
+            const idB = Number(b.entryId ?? b.id ?? 0);
+            if (!Number.isNaN(idA) && !Number.isNaN(idB)) {
+              return idB - idA; // latest entry id first
+            }
+            return String(b.entryId ?? b.id ?? '').localeCompare(String(a.entryId ?? a.id ?? ''));
           });
           setHistoryData(flattenedData);
         } else {
@@ -276,6 +279,67 @@ const History = ({ user, onTabChange }) => {
   };
   const handleCloseImageViewer = () => {
     setShowImageViewer(false);
+  };
+  // Handle edit (for update)
+  const handleEdit = async (entry) => {
+    try {
+      // Get the entry ID
+      const entryId = entry.entryId || entry.id;
+      if (!entryId) {
+        console.error('Entry ID not found');
+        return;
+      }
+
+      // Try to fetch the full entry data from the backend
+      try {
+        const response = await fetch(`${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/get/${entryId}`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const editData = await response.json();
+          // Mark as edit mode (update, not create)
+          editData.isEditMode = true;
+          // Mark as from History (for showing appropriate UI in Transfer page)
+          editData.fromHistory = true;
+
+          // Store entry ID in localStorage for Transfer page compatibility
+          localStorage.setItem('editingToolsTrackerEntryId', String(entryId));
+          // Store full entry data in localStorage (for potential future use)
+          localStorage.setItem('editingToolsTrackerEntry', JSON.stringify(editData));
+          // Dispatch custom event for Transfer component to listen
+          window.dispatchEvent(new CustomEvent('editToolsTrackerEntry', { detail: editData }));
+        } else {
+          // If fetch fails, still store the ID and navigate
+          localStorage.setItem('editingToolsTrackerEntryId', String(entryId));
+        }
+      } catch (fetchError) {
+        console.error('Error fetching entry details:', fetchError);
+        // Continue with ID-only approach if fetch fails
+        localStorage.setItem('editingToolsTrackerEntryId', String(entryId));
+      }
+
+      // Navigate to transfer tab for editing
+      if (onTabChange) {
+        onTabChange('transfer');
+      }
+      setExpandedEntryId(null);
+    } catch (error) {
+      console.error('Error in handleEdit:', error);
+      // Fallback: still try to navigate even if there's an error
+      const entryId = entry.entryId || entry.id;
+      if (entryId) {
+        localStorage.setItem('editingToolsTrackerEntryId', String(entryId));
+        if (onTabChange) {
+          onTabChange('transfer');
+        }
+      }
+      setExpandedEntryId(null);
+    }
   };
   const handlePrevImage = () => {
     setImageViewerData(prev => ({
@@ -430,7 +494,7 @@ const History = ({ user, onTabChange }) => {
       <div className="flex items-center justify-between pt-1.5 pb-1.5">
         <p className="text-[12px] text-black font-semibold">Category</p>
       </div>
-      <div className="flex bg-[#E0E0E0] items-center h-9 rounded-md">
+      <div className="flex bg-[#F2F4F7] items-center h-9 rounded-md">
         <button
           onClick={() => setHistoryType('entry')}
           className={`flex-1 ml-0.5 h-8 rounded text-[12px] font-semibold leading-normal duration-1000 ease-out transition-colors ${historyType === 'entry'
@@ -570,32 +634,29 @@ const History = ({ user, onTabChange }) => {
                     </div>
                   </div>
                   <div
-                    className="absolute right-0 top-0 bottom-0 flex gap-2 flex-shrink-0 z-0"
+                    className="absolute right-0 top-0 flex gap-2 flex-shrink-0 z-0"
                     style={{
-                      opacity:
-                        isExpanded ||
-                          (swipeState && swipeState.isSwiping && swipeOffset < -20)
-                          ? 1
-                          : 0,
-                      transition: 'opacity 0.2s ease-out',
+                      opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
+                      transform: swipeOffset < 0
+                        ? `translateX(${Math.max(0, 96 + swipeOffset)}px)`
+                        : 'translateX(96px)',
+                      transition: (swipeState && swipeState.isSwiping) ? 'none' : 'opacity 0.2s ease-out, transform 0.3s ease-out',
                       pointerEvents: isExpanded ? 'auto' : 'none'
                     }}
                   >
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setExpandedEntryId(null);
-                        localStorage.setItem('editingToolsTrackerEntryId', String(entry.entryId));
-                        if (onTabChange) {
-                          onTabChange('transfer');
-                        }
+                        handleEdit(entry);
                       }}
-                      className="action-button w-[40px] h-full bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
+                      className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
+                      title="Edit"
                     >
                       <img src={EditIcon} alt="Edit" className="w-[18px] h-[18px]" />
                     </button>
                     <button onClick={(e) => { e.stopPropagation(); setExpandedEntryId(null); }}
-                      className="action-button w-[40px] h-full bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm"
+                      className="action-button w-[48px] h-[95px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm"
+                      title="Delete"
                     >
                       <img src={DeleteIcon} alt="Delete" className="w-[18px] h-[18px]" />
                     </button>

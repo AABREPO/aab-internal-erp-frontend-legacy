@@ -39,11 +39,11 @@ import TestToolsTrackerHeading from './Components/TestToolsTracker/TestToolsTrac
 function AppContent({ user, handleLogout }) {
   const location = useLocation();
   const [isMobile, setIsMobile] = useState(() => {
-    return window.innerWidth <= 768;
+    return window.innerWidth <= 800;
   })
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
+      setIsMobile(window.innerWidth <= 800);
     };
     window.addEventListener('resize', handleResize);
     return () => {

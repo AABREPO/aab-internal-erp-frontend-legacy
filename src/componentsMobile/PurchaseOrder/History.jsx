@@ -1673,7 +1673,7 @@ const History = () => {
     )
   ].filter(Boolean))].sort();
   return (
-    <div className="relative w-full bg-white max-w-[360px] mx-auto flex flex-col scrollbar-none overflow-hidden" style={{ fontFamily: "'Manrope', sans-serif" }}>
+    <div className="relative w-full h-screen bg-white max-w-[360px] mx-auto flex flex-col scrollbar-none overflow-hidden" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* Header Section - Fixed */}
       <div className="flex-shrink-0 bg-white px-4 pt-4 z-30">
         {/* Search Bar */}
@@ -1847,7 +1847,7 @@ const History = () => {
               return (
                 <div
                   key={po.id}
-                  className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] h-[100px]"
+                  className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] min-w-[330px]"
                   style={{
                     userSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
                     WebkitUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
@@ -1904,8 +1904,8 @@ const History = () => {
                   >
                     <div className="flex items-start justify-between gap-2">
                       {/* Left: PO Details */}
-                      <div className=" min-w-0 mb-1">
-                        <div className="flex items-center gap-2 mb-1">
+                      <div className=" min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1920,14 +1920,14 @@ const History = () => {
                           </button>
 
                         </div>
-                        <p className="text-[12px] font-semibold text-black leading-snug truncate mb-0.5">
+                        <p className="text-[12px] font-semibold text-black leading-snug break-words mb-0.5" style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
                           {po.vendorName || 'N/A'}
                         </p>
-                        <p className="text-[11px] font-medium text-[#777777] leading-snug truncate">
+                        <p className="text-[11px] font-medium text-[#777777] leading-snug break-words" style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
                           {po.projectName || 'N/A'}
                         </p>
                         {!isExpanded && (
-                          <span className="text-[11px] font-medium text-[#777777] leading-snug">
+                          <span className="text-[11px] font-medium text-[#777777] leading-snug mb-0">
                             {formatDateTime(po.created_date_time || po.createdAt)}
                           </span>
                         )}
@@ -1960,7 +1960,7 @@ const History = () => {
                         )}
                         {totalAmount > 0 && (
                           <>
-                            <p className="text-[12px] font-semibold text-black block leading-snug mt-5 mb-0">
+                            <p className="text-[12px] font-semibold text-black block leading-snug mt-5">
                               ₹{totalAmount.toLocaleString('en-IN')}
                             </p>
                             <p className="text-[10px] font-medium text-[#9E9E9E]"> Incl Tax</p>

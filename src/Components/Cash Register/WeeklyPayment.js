@@ -304,18 +304,19 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         const { name, value } = e.target;
         if (name === "date") {
             // Validate date against current week range
-            if (!value || !currentWeekNumber) {
+            const validationWeekNumber = actualCurrentWeekNumber || currentWeekNumber;
+            if (!value || !validationWeekNumber) {
                 setEditFormData((prev) => ({ ...prev, date: value }));
                 return;
             }
             const year = new Date().getFullYear();
-            const { startDate, endDate } = getStartAndEndDateOfISOWeek(currentWeekNumber, year);
+            const { startDate, endDate } = getStartAndEndDateOfISOWeek(validationWeekNumber, year);
             const selectedDate = new Date(value);
             selectedDate.setHours(0, 0, 0, 0);
             if (selectedDate < startDate || selectedDate > endDate) {
                 setPopup({
                     show: true,
-                    message: `Selected date is out of current week range (${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()})`,
+                    message: `Selected date is out of current week range (${startDate.toLocaleDateString("en-GB")} - ${endDate.toLocaleDateString("en-GB")})`,
                     type: "edit-expense",
                     dateStr: value,
                     editRowId: editingRowId,
@@ -515,7 +516,9 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 throw new Error("File upload failed");
             }
             const uploadResult = await uploadResponse.json();
+            console.log("Upload result:", uploadResult);
             const pdfUrl = uploadResult.url;
+            console.log("File uploaded successfully. URL:", pdfUrl);
             const updateResponse = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/${currentFileRow.id}/bill-copy-url`, {
                 method: 'PUT',
                 headers: {
@@ -585,19 +588,20 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     const handleEditPaymentChange = (e) => {
         const { name, value } = e.target;
         if (name === "date") {
-            if (!value || !currentWeekNumber) {
+            const validationWeekNumber = actualCurrentWeekNumber || currentWeekNumber;
+            if (!value || !validationWeekNumber) {
                 setEditPaymentData((prev) => ({ ...prev, date: value }));
                 return;
             }
             const year = new Date().getFullYear();
-            const { startDate, endDate } = getStartAndEndDateOfISOWeek(currentWeekNumber, year);
+            const { startDate, endDate } = getStartAndEndDateOfISOWeek(validationWeekNumber, year);
             const selectedDate = new Date(value);
             selectedDate.setHours(0, 0, 0, 0);
             if (selectedDate < startDate || selectedDate > endDate) {
                 const paymentIndex = payments.findIndex(p => p.id === editingPaymentId);
                 setPopup({
                     show: true,
-                    message: `Selected date is out of current week range (${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()})`,
+                    message: `Selected date is out of current week range (${startDate.toLocaleDateString("en-GB")} - ${endDate.toLocaleDateString("en-GB")})`,
                     type: "edit-payment",
                     dateStr: value,
                     editRowId: null,
@@ -1325,15 +1329,16 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         return response.json();
     };
     const validateExpenseDate = (dateStr) => {
-        if (!dateStr || !currentWeekNumber) return;
+        const validationWeekNumber = actualCurrentWeekNumber || currentWeekNumber;
+        if (!dateStr || !validationWeekNumber) return;
         const year = new Date().getFullYear();
-        const { startDate, endDate } = getStartAndEndDateOfISOWeek(currentWeekNumber, year);
+        const { startDate, endDate } = getStartAndEndDateOfISOWeek(validationWeekNumber, year);
         const selectedDate = new Date(dateStr);
         selectedDate.setHours(0, 0, 0, 0);
         if (selectedDate < startDate || selectedDate > endDate) {
             setPopup({
                 show: true,
-                message: `Selected date is out of current week range (${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()})`,
+                message: `Selected date is out of current week range (${startDate.toLocaleDateString("en-GB")} - ${endDate.toLocaleDateString("en-GB")})`,
                 type: "expense",
                 dateStr,
                 editRowId: null,
@@ -1556,7 +1561,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         if (selectedDate < startDate || selectedDate > endDate) {
             setPopup({
                 show: true,
-                message: `Selected date is out of current week range (${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()})`,
+                message: `Selected date is out of current week range (${startDate.toLocaleDateString("en-GB")} - ${endDate.toLocaleDateString("en-GB")})`,
                 type: "payment",
                 dateStr,
                 editRowId: null,

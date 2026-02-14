@@ -358,14 +358,25 @@ const ToolsHistory = ({ user }) => {
     }
   }, [selectedItemIdDbId]);
 
-  // Fetch machine status history when itemId is selected
+  // Fetch log history (status + machine number edits) when itemId is selected
   useEffect(() => {
+    const formatDateTime = (rawValue) => {
+      if (!rawValue) return { date: '', time: '', sortTime: 0 };
+      const parsed = new Date(rawValue);
+      if (Number.isNaN(parsed.getTime())) return { date: '', time: '', sortTime: 0 };
+      return {
+        date: parsed.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+        time: parsed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+        sortTime: parsed.getTime()
+      };
+    };
+
     const fetchMachineStatusHistory = async () => {
       if (!selectedItemIdDbId) {
         setMachineStatusHistory([]);
         return;
       }
-      
+
       setLoadingLog(true);
       try {
         const response = await fetch(`${TOOLS_MACHINE_STATUS_BASE_URL}/item/${selectedItemIdDbId}`, {
@@ -373,110 +384,115 @@ const ToolsHistory = ({ user }) => {
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
         });
-        
-        if (response.ok) {
-          const data = await response.json();
-          const statusList = Array.isArray(data) ? data : [];
-          
-          // Sort by id descending (newest first)
-          const sortedStatuses = statusList.sort((a, b) => (b.id || 0) - (a.id || 0));
-          
-          // Process to detect "Machine Number Changed" events and create log entries
-          const processedLogs = [];
-          const seenStatusIds = new Set();
-          
-          // Group by machine number to detect changes
-          const statusByMachineNumber = new Map();
-          sortedStatuses.forEach(status => {
-            const machineNum = resolveMachineNumberFromStatus(status);
-            if (machineNum) {
-              if (!statusByMachineNumber.has(machineNum)) {
-                statusByMachineNumber.set(machineNum, []);
-              }
-              statusByMachineNumber.get(machineNum).push(status);
-            }
-          });
-          
-          // Process each status entry
-          sortedStatuses.forEach((status, index) => {
-            const machineNum = resolveMachineNumberFromStatus(status);
-            const machineStatus = String(status.machine_status || status.machineStatus || '').trim();
-            const statusId = status.id || 0;
-            
-            if (seenStatusIds.has(statusId)) return;
-            seenStatusIds.add(statusId);
-            
-            // Check if machine number changed from previous entry
-            let isMachineNumberChange = false;
-            let oldMachineNumber = null;
-            
-            if (index > 0 && machineNum) {
-              const prevStatus = sortedStatuses[index - 1];
-              const prevMachineNum = resolveMachineNumberFromStatus(prevStatus);
-              
-              if (prevMachineNum && machineNum !== prevMachineNum) {
-                isMachineNumberChange = true;
-                oldMachineNumber = prevMachineNum;
-              }
-            }
-            
-            // Format date - check for common timestamp field names
-            // Spring Boot JPA entities often have createdAt, createdDate, or timestamp fields
-            const logDate = status.createdAt || status.created_at || status.createdDate || 
-                           status.created_date || status.timestamp || status.dateCreated || null;
-            let formattedDate = '';
-            let formattedTime = '';
-            
-            if (logDate) {
-              try {
-                const date = new Date(logDate);
-                if (!isNaN(date.getTime())) {
-                  formattedDate = date.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-                  formattedTime = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-                }
-              } catch (e) {
-                console.error('Error parsing date:', e);
-              }
-            }
-            
-            // If no date available, show empty (or you could use a placeholder)
-            // The UI will still show the status and machine number
-            
-            // If machine number changed, add a change entry
-            if (isMachineNumberChange && oldMachineNumber) {
-              processedLogs.push({
-                id: statusId,
-                type: 'machine_number_changed',
-                status: 'Machine Number Changed',
-                machineNumber: machineNum,
-                oldMachineNumber: oldMachineNumber,
-                timestamp: statusId,
-                date: formattedDate,
-                time: formattedTime
-              });
-            }
-            
-            // Add status entry
-            if (machineStatus) {
-              processedLogs.push({
-                id: statusId,
-                type: 'status_change',
-                status: machineStatus,
-                machineNumber: machineNum,
-                timestamp: statusId,
-                date: formattedDate,
-                time: formattedTime
-              });
-            }
-          });
-          
-          // Sort processed logs by id descending (newest first)
-          processedLogs.sort((a, b) => (b.id || 0) - (a.id || 0));
-          
-          setMachineStatusHistory(processedLogs);
-        } else {
-          setMachineStatusHistory([]);
+
+        const statusData = response.ok ? await response.json() : [];
+        const statusList = Array.isArray(statusData) ? statusData : [];
+
+        const itemIdString = String(selectedItemIdDbId);
+        const machineNumberIds = new Set();
+
+        // Collect all machine number ids related to this selected item id
+        stockManagementData.forEach((stock) => {
+          const itemId = stock?.item_ids_id ?? stock?.itemIdsId;
+          const machineNumberId = stock?.machine_number_id ?? stock?.machineNumberId;
+          if (itemId != null && machineNumberId != null && String(itemId) === itemIdString) {
+            machineNumberIds.add(String(machineNumberId));
+          }
+        });
+
+        selectedToolsDetails.forEach((detail) => {
+          const itemId = detail?.item_ids_id ?? detail?.itemIdsId;
+          const machineNumberId = detail?.machine_number_id ?? detail?.machineNumberId;
+          if (itemId != null && machineNumberId != null && String(itemId) === itemIdString) {
+            machineNumberIds.add(String(machineNumberId));
+          }
+        });
+
+        if (selectedMachineNumberId != null) {
+          machineNumberIds.add(String(selectedMachineNumberId));
         }
+
+        const historyResults = await Promise.all(
+          Array.from(machineNumberIds).map(async (machineNumberId) => {
+            try {
+              const historyRes = await fetch(
+                `${TOOLS_MACHINE_NUMBER_BASE_URL}/history/getByMachineNumberId/${machineNumberId}`,
+                {
+                  method: 'GET',
+                  credentials: 'include',
+                  headers: { 'Content-Type': 'application/json' }
+                }
+              );
+              if (!historyRes.ok) return [];
+              const historyData = await historyRes.json();
+              return Array.isArray(historyData) ? historyData : [];
+            } catch (historyError) {
+              console.error(`Error fetching machine edit history for ${machineNumberId}:`, historyError);
+              return [];
+            }
+          })
+        );
+
+        const machineNumberHistory = historyResults.flat();
+
+        const statusLogs = statusList.map((status, index) => {
+          const machineNum = resolveMachineNumberFromStatus(status);
+          const machineStatus = String(status.machine_status || status.machineStatus || '').trim();
+          const logDate =
+            status.createdAt ||
+            status.created_at ||
+            status.createdDate ||
+            status.created_date ||
+            status.timestamp ||
+            status.dateCreated ||
+            null;
+          const { date, time, sortTime } = formatDateTime(logDate);
+          const fallbackSort = Number(status?.id) || 0;
+
+          return {
+            id: status?.id ?? `status-${index}`,
+            key: `status-${status?.id ?? index}`,
+            type: 'status_change',
+            status: machineStatus || '-',
+            machineNumber: machineNum,
+            oldMachineNumber: null,
+            date,
+            time,
+            sortTime: sortTime || fallbackSort
+          };
+        });
+
+        // Use dedicated history table for machine-number edits
+        const machineEditLogs = machineNumberHistory
+          .filter((row) => {
+            const oldMachine = String(row?.old_machine_number ?? row?.oldMachineNumber ?? '').trim();
+            const newMachine = String(row?.new_machine_number ?? row?.newMachineNumber ?? '').trim();
+            return oldMachine && newMachine && oldMachine !== newMachine;
+          })
+          .map((row, index) => {
+            const oldMachine = String(row?.old_machine_number ?? row?.oldMachineNumber ?? '').trim();
+            const newMachine = String(row?.new_machine_number ?? row?.newMachineNumber ?? '').trim();
+            const editedDate = row?.edited_date ?? row?.editedDate ?? row?.timestamp ?? null;
+            const { date, time, sortTime } = formatDateTime(editedDate);
+            const fallbackSort = Number(row?.id) || 0;
+
+            return {
+              id: row?.id ?? `machine-edit-${index}`,
+              key: `machine-edit-${row?.id ?? index}`,
+              type: 'machine_number_changed',
+              status: 'Machine Number Changed',
+              machineNumber: newMachine,
+              oldMachineNumber: oldMachine,
+              date,
+              time,
+              sortTime: sortTime || fallbackSort
+            };
+          });
+
+        const combinedLogs = [...machineEditLogs, ...statusLogs]
+          .sort((a, b) => (b.sortTime || 0) - (a.sortTime || 0));
+
+        setMachineStatusHistory(combinedLogs);
       } catch (error) {
         console.error('Error fetching machine status history:', error);
         setMachineStatusHistory([]);
@@ -484,9 +500,15 @@ const ToolsHistory = ({ user }) => {
         setLoadingLog(false);
       }
     };
-    
+
     fetchMachineStatusHistory();
-  }, [selectedItemIdDbId, resolveMachineNumberFromStatus]);
+  }, [
+    selectedItemIdDbId,
+    selectedMachineNumberId,
+    selectedToolsDetails,
+    stockManagementData,
+    resolveMachineNumberFromStatus
+  ]);
 
   // Location name from project or vendor ID (like NetStock.jsx)
   const getLocationName = (id) => {
@@ -1251,11 +1273,10 @@ const ToolsHistory = ({ user }) => {
           )}
         </div>
         {/* Item / Log segmented control */}
-        <div className="flex bg-gray-100 items-center h-9 shadow-sm flex-1 rounded-md mt-2">
+        <div className="flex bg-[#F2F4F7] items-center h-9 shadow-sm rounded-md mt-2">
           <button
-            type="button"
-            onClick={() => setActiveSegment('item')}
-            className={`flex-1 py-1 px-4 ml-0.5 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${
+            type="button" onClick={() => setActiveSegment('item')}
+            className={`flex-1 px-4 ml-0.5 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${
               activeSegment === 'item' ? 'bg-white text-black' : 'bg-gray-100 text-gray-600'
             }`}
           >
@@ -1264,7 +1285,7 @@ const ToolsHistory = ({ user }) => {
           <button
             type="button"
             onClick={() => setActiveSegment('log')}
-            className={`flex-1 py-1 px-4 mr-0.5 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${
+            className={`flex-1 px-4 mr-0.5 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${
               activeSegment === 'log' ? 'bg-white text-black' : 'bg-gray-100 text-gray-600'
             }`}
           >
@@ -1375,7 +1396,7 @@ const ToolsHistory = ({ user }) => {
           ) : (
             <div className="space-y-3">
               {machineStatusHistory.map((logEntry, index) => (
-                <div key={logEntry.id || index} className="bg-white border-2 border-[#E0E0E0] rounded-[8px] px-3 py-2">
+                <div key={logEntry.key || logEntry.id || index} className="bg-white border-2 border-[#E0E0E0] rounded-[8px] px-3 py-2">
                   <div className="flex items-start justify-between">
                     {/* Left side: Status and Date */}
                     <div className="flex-1 min-w-0">
@@ -1385,13 +1406,12 @@ const ToolsHistory = ({ user }) => {
                       <p className="text-[11px] text-[#848484] leading-snug">
                         {logEntry.date} • {logEntry.time}
                       </p>
-                    </div>
-                    
+                    </div>                    
                     {/* Right side: Machine Number(s) */}
                     <div className="flex-shrink-0 ml-2 text-right">
                       {logEntry.type === 'machine_number_changed' ? (
                         <div className="flex flex-col items-end">
-                          <p className="text-[13px] font-semibold text-[#848484] line-through leading-snug mb-1">
+                          <p className="text-[13px] font-semibold text-[#848484] leading-snug mb-1">
                             {logEntry.oldMachineNumber}
                           </p>
                           <p className="text-[13px] font-semibold text-[#4CAF50] leading-snug">
@@ -1411,12 +1431,10 @@ const ToolsHistory = ({ user }) => {
           )}
         </div>
       )}
-
       {/* Main content area for Item tab (spacer when no details card) */}
       {activeSegment === 'item' && (
         <div className="flex-1 px-4 pb-4 mt-4 min-h-[200px]" />
       )}
-
       {/* Popups */}
       <SelectOptionModal
         isOpen={showItemNamePopup}
@@ -1450,7 +1468,6 @@ const ToolsHistory = ({ user }) => {
         options={machineNumberOptions}
         fieldName="Machine Number"
       />
-
       {/* Edit Bottom Sheet Modal */}
       {showEditSheet && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif" }} onClick={handleCloseEditSheet}>
@@ -1690,7 +1707,6 @@ const ToolsHistory = ({ user }) => {
           </div>
         </div>
       )}
-
       {/* Sheet dropdown picker modal */}
       {showEditSheet && sheetOpenPicker && (
         <div
@@ -1749,7 +1765,6 @@ const ToolsHistory = ({ user }) => {
           </div>
         </div>
       )}
-
       {/* Date Picker Modal */}
       {showDatePicker && (
         <DatePickerModal
@@ -1764,5 +1779,4 @@ const ToolsHistory = ({ user }) => {
     </div>
   );
 };
-
 export default ToolsHistory;

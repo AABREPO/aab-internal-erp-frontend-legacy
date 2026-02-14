@@ -872,12 +872,12 @@ const History = ({ onTabChange }) => {
       </div>
 
       {/* Filter */}
-      <div className="flex-shrink-0 px-4 pb-3">
+      <div className="flex-shrink-0 px-4">
         <div className="flex items-center gap-2 flex-wrap">
           <button type="button" onClick={() => setShowFilterModal(true)} className="flex items-center gap-2 cursor-pointer">
-            <img src={Filter} alt="Filter" className="w-[13px] h-[11px]" />
+            <img src={Filter} alt="Filter" className="w-[11px] h-[11px]" />
             {!(filterProjectName || filterProjectIncharge || filterStockingLocation || filterSRNumber || filterDate) && (
-              <span className="text-[12px] font-medium text-black">Filter</span>
+              <span className="text-[14px] font-medium text-[#9E9E9E]">Filter</span>
             )}
           </button>
           {filterProjectName && (
@@ -1014,7 +1014,7 @@ const History = ({ onTabChange }) => {
               }
 
               return (
-                <div key={item.id} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] h-[100px]">
+                <div key={item.id} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px]">
                   {/* Clone Button - Behind the card on the left, revealed on right swipe */}
                   <div
                     className="absolute left-0 top-0 flex gap-2 flex-shrink-0 z-0"
@@ -1065,9 +1065,9 @@ const History = ({ onTabChange }) => {
                       {/* Left side: Transaction ID, Customer/Location Name, Date and Time */}
                       <div className="flex-1">
                         {/* Transaction ID */}
-                        <div className="mb-1">
+                        <div className="mb-0.5">
                           <p
-                            className="text-[14px] font-semibold text-black leading-normal cursor-pointer hover:underline"
+                            className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline"
                             onClick={(e) => {
                               e.stopPropagation();
                               if (!isExpanded && !isCloneExpanded) {
@@ -1081,32 +1081,33 @@ const History = ({ onTabChange }) => {
                         </div>
 
                         {/* Customer/Location Name */}
-                        <div className="mb-1">
-                          <p className="text-[12px] font-medium text-black leading-normal">
+                        <div className="mb-0.5">
+                          <p className="text-[12px] font-semibold text-black leading-normal">
                             {customerLocation}
                           </p>
                         </div>
 
                         {/* Date and Time */}
                         <div>
-                          <p className="text-[12px] font-medium text-[#616161] leading-normal">
+                          <p className="text-[11px] font-medium text-[#777777] leading-normal">
                             {displayDate} • {displayTime}
                           </p>
                         </div>
                       </div>
 
                       {/* Right side: Number of Items, Quantity, and Price */}
-                      <div className="flex flex-col items-end text-right flex-shrink-0 ml-4">
-                        <p className="text-[11px] font-medium text-[#616161] leading-normal mb-1">
+                      <div className="flex flex-col items-end text-right flex-shrink-0">
+                        <p className="text-[11px] font-medium text-[#616161] leading-normal mb-0.5">
                           No. of Items - {item.numberOfItems}
                         </p>
-                        <p className="text-[12px] font-semibold text-[#BF9853] leading-normal mb-1">
+                        <p className="text-[12px] font-semibold text-[#BF9853] leading-normal mb-0.5">
                           Quantity - {Math.abs(item.quantity)}
                         </p>
-                        <p className="text-[14px] font-semibold text-black leading-normal">
+                        <p className="text-[11px] font-semibold text-black leading-normal">
                           {formatPrice(item.price)}
                         </p>
                       </div>
+                      <div className="flex flex-col items-end text-right flex-shrink-0"></div>
                     </div>
                   </div>
 

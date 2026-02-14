@@ -1,9 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
-  const dayRef = useRef(null);
-  const monthRef = useRef(null);
-  const yearRef = useRef(null);
   const [focusedColumn, setFocusedColumn] = useState(null); // 'day', 'month', 'year'
   // Parse initial date or use current date
   const getInitialDate = () => {
@@ -70,16 +67,16 @@ const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
         const column = focusedColumn || 'day';
         
         if (column === 'day') {
-          if (e.key === 'ArrowUp' && selectedDay > 1) {
-            setSelectedDay(selectedDay - 1);
-          } else if (e.key === 'ArrowDown' && selectedDay < daysInMonth) {
-            setSelectedDay(selectedDay + 1);
+          if (e.key === 'ArrowUp') {
+            setSelectedDay((prev) => (prev === 1 ? daysInMonth : prev - 1));
+          } else if (e.key === 'ArrowDown') {
+            setSelectedDay((prev) => (prev === daysInMonth ? 1 : prev + 1));
           }
         } else if (column === 'month') {
-          if (e.key === 'ArrowUp' && selectedMonth > 0) {
-            setSelectedMonth(selectedMonth - 1);
-          } else if (e.key === 'ArrowDown' && selectedMonth < 11) {
-            setSelectedMonth(selectedMonth + 1);
+          if (e.key === 'ArrowUp') {
+            setSelectedMonth((prev) => (prev === 0 ? 11 : prev - 1));
+          } else if (e.key === 'ArrowDown') {
+            setSelectedMonth((prev) => (prev === 11 ? 0 : prev + 1));
           }
         } else if (column === 'year') {
           // Unlimited year selection - no bounds
@@ -106,40 +103,6 @@ const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, selectedDay, selectedMonth, selectedYear, focusedColumn]);
 
-  // Scroll to selected item when it changes
-  useEffect(() => {
-    if (isOpen && dayRef.current) {
-      const selectedButton = dayRef.current.querySelector(`[data-day="${selectedDay}"]`);
-      if (selectedButton) {
-        setTimeout(() => {
-          selectedButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 100);
-      }
-    }
-  }, [selectedDay, isOpen]);
-
-  useEffect(() => {
-    if (isOpen && monthRef.current) {
-      const selectedButton = monthRef.current.querySelector(`[data-month="${selectedMonth}"]`);
-      if (selectedButton) {
-        setTimeout(() => {
-          selectedButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 100);
-      }
-    }
-  }, [selectedMonth, isOpen]);
-
-  useEffect(() => {
-    if (isOpen && yearRef.current) {
-      const selectedButton = yearRef.current.querySelector(`[data-year="${selectedYear}"]`);
-      if (selectedButton) {
-        setTimeout(() => {
-          selectedButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 100);
-      }
-    }
-  }, [selectedYear, isOpen]);
-
   // Handle mouse wheel scrolling
   const handleWheel = (e, type) => {
     e.preventDefault();
@@ -147,16 +110,16 @@ const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
     const daysInMonth = getDaysInMonth(selectedMonth, selectedYear);
     
     if (type === 'day') {
-      if (delta > 0 && selectedDay < daysInMonth) {
-        setSelectedDay(selectedDay + 1);
-      } else if (delta < 0 && selectedDay > 1) {
-        setSelectedDay(selectedDay - 1);
+      if (delta > 0) {
+        setSelectedDay((prev) => (prev === daysInMonth ? 1 : prev + 1));
+      } else if (delta < 0) {
+        setSelectedDay((prev) => (prev === 1 ? daysInMonth : prev - 1));
       }
     } else if (type === 'month') {
-      if (delta > 0 && selectedMonth < 11) {
-        setSelectedMonth(selectedMonth + 1);
-      } else if (delta < 0 && selectedMonth > 0) {
-        setSelectedMonth(selectedMonth - 1);
+      if (delta > 0) {
+        setSelectedMonth((prev) => (prev === 11 ? 0 : prev + 1));
+      } else if (delta < 0) {
+        setSelectedMonth((prev) => (prev === 0 ? 11 : prev - 1));
       }
     } else if (type === 'year') {
       // Unlimited year selection - no bounds
@@ -185,28 +148,17 @@ const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
     onClose();
   };
 
-  // Get all items for scrollable columns
-  const getAllDays = () => {
+  const getCircularDays = () => {
     const daysInMonth = getDaysInMonth(selectedMonth, selectedYear);
-    return days.slice(0, daysInMonth);
+    const prevDay = selectedDay === 1 ? daysInMonth : selectedDay - 1;
+    const nextDay = selectedDay === daysInMonth ? 1 : selectedDay + 1;
+    return [prevDay, selectedDay, nextDay];
   };
 
-  const allDays = getAllDays();
-  const allMonths = months;
-
-  // Get visible range for each column (showing 3 items with selected in middle)
-  const getVisibleDays = () => {
-    const daysInMonth = getDaysInMonth(selectedMonth, selectedYear);
-    const validDays = allDays;
-    const index = validDays.indexOf(selectedDay);
-    const start = Math.max(0, Math.min(index - 1, validDays.length - 3));
-    return validDays.slice(start, start + 3);
-  };
-
-  const getVisibleMonths = () => {
-    const index = selectedMonth;
-    const start = Math.max(0, Math.min(index - 1, allMonths.length - 3));
-    return allMonths.slice(start, start + 3);
+  const getCircularMonths = () => {
+    const prevMonth = selectedMonth === 0 ? 11 : selectedMonth - 1;
+    const nextMonth = selectedMonth === 11 ? 0 : selectedMonth + 1;
+    return [months[prevMonth], months[selectedMonth], months[nextMonth]];
   };
 
   // Generate visible years dynamically based on selectedYear (no limit)
@@ -214,8 +166,8 @@ const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
     return [selectedYear - 1, selectedYear, selectedYear + 1];
   };
 
-  const visibleDays = getVisibleDays();
-  const visibleMonths = getVisibleMonths();
+  const visibleDays = getCircularDays();
+  const visibleMonths = getCircularMonths();
   const visibleYears = getVisibleYears();
 
   return (
@@ -226,7 +178,6 @@ const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
         <div className="flex justify-center gap-8 mb-6">
           {/* Day */}
           <div 
-            ref={dayRef}
             className="flex flex-col items-center relative"
             onFocus={() => setFocusedColumn('day')}
             onWheel={(e) => handleWheel(e, 'day')}
@@ -260,7 +211,6 @@ const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
           
           {/* Month */}
           <div 
-            ref={monthRef}
             className="flex flex-col items-center relative"
             onFocus={() => setFocusedColumn('month')}
             onWheel={(e) => handleWheel(e, 'month')}
@@ -294,7 +244,6 @@ const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
           
           {/* Year */}
           <div 
-            ref={yearRef}
             className="flex flex-col items-center relative"
             onFocus={() => setFocusedColumn('year')}
             onWheel={(e) => handleWheel(e, 'year')}

@@ -150,6 +150,10 @@ const History = ({ username, userRoles = [] }) => {
     
     const handleMouseDown = (e, ref) => {
         if (!ref.current) return;
+        const interactiveSelector = 'input, select, textarea, button, a, [contenteditable="true"], [role="button"]';
+        if (e.target instanceof Element && e.target.closest(interactiveSelector)) {
+            return; // Allow native click/focus for form controls and action buttons
+        }
         e.preventDefault(); // Prevent default behavior
         e.stopPropagation(); // Prevent event from bubbling to other scroll containers
         isDragging.current = true;
@@ -169,21 +173,17 @@ const History = ({ username, userRoles = [] }) => {
     
     const handleMouseMove = (e, ref) => {
         if (!isDragging.current || !ref.current || activeScrollRef.current !== ref.current) return;
-        e.stopPropagation(); // Prevent event from bubbling to other scroll containers
-        
+        e.stopPropagation(); // Prevent event from bubbling to other scroll containers        
         const now = Date.now();
-        const dt = now - lastMove.current.time || 16;
-        
+        const dt = now - lastMove.current.time || 16;        
         // Calculate delta movement (incremental change)
         const deltaX = e.clientX - lastPosition.current.x;
-        const deltaY = e.clientY - lastPosition.current.y;
-        
+        const deltaY = e.clientY - lastPosition.current.y;        
         // Update velocity for momentum (based on last move, not start position)
         velocity.current = {
             x: (e.clientX - lastMove.current.x) / dt,
             y: (e.clientY - lastMove.current.y) / dt,
-        };
-        
+        };        
         // Use scrollBy for smooth, continuous scrolling based on incremental movement
         // This feels more natural like normal scrolling
         if (ref.current && (deltaX !== 0 || deltaY !== 0)) {
@@ -192,11 +192,9 @@ const History = ({ username, userRoles = [] }) => {
                 top: -deltaY,
                 behavior: 'auto' // Instant but smooth
             });
-        }
-        
+        }        
         // Update last position for next incremental calculation
-        lastPosition.current = { x: e.clientX, y: e.clientY };
-        
+        lastPosition.current = { x: e.clientX, y: e.clientY };        
         lastMove.current = {
             time: now,
             x: e.clientX,
@@ -213,8 +211,7 @@ const History = ({ username, userRoles = [] }) => {
         }
         applyMomentum();
         activeScrollRef.current = null; // Clear the active ref after momentum is applied
-    };
-    
+    };    
     const cancelMomentum = () => {
         if (animationFrame.current) {
             cancelAnimationFrame(animationFrame.current);

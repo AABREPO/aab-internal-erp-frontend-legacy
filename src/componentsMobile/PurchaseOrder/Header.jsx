@@ -17,7 +17,7 @@ const Header = ({ title = "Purchase Order", showBack = true, showNotification = 
   };
   return (
     <>
-      <div className="fixed top-0 left-1/2 transform -translate-x-1/2 w-full max-w-[360px] h-[50px] bg-white z-40" style={{ fontFamily: "'Manrope', sans-serif" }}>
+      <div className="fixed top-0 left-1/2 transform -translate-x-1/2 w-full max-w-[400px] h-[50px] bg-white z-40" style={{ fontFamily: "'Manrope', sans-serif" }}>
         <div className="relative flex items-center justify-between px-4 h-full">
           {/* Hamburger menu button */}
           {showBack && (

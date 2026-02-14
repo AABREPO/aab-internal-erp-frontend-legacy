@@ -81,6 +81,8 @@ const PurchaseOrder = ({ user, onLogout }) => {
   const [isPdfGenerated, setIsPdfGenerated] = useState(false); // track if PDF has been generated
   const [pdfBlob, setPdfBlob] = useState(null); // store generated PDF blob
   const [isGenerating, setIsGenerating] = useState(false); // track if PO is being generated
+  const [isGeneratePrecheckRunning, setIsGeneratePrecheckRunning] = useState(false); // instant loading state before API save starts
+  const generatePoClickLockRef = useRef(false); // immediate lock to prevent rapid duplicate clicks
   // State for vendor name options from API
   const [vendorNameOptions, setVendorNameOptions] = useState([]);
   // State for project name options from API
@@ -1091,7 +1093,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
             }
           })
         ]);
-
         // Process responses immediately without waiting
         if (employeeResponse.ok) {
           const employeeData = await employeeResponse.json();
@@ -1113,7 +1114,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
     // Don't await - fire and forget, let it update in background
     fetchBothLists();
   }, []);
-
   // Extract employee and support staff names as strings for the dropdown - merge both lists
   // Use useMemo for immediate computation (no render delay like useEffect)
   const [customInchargeOptions, setCustomInchargeOptions] = useState([]);
@@ -1123,18 +1123,15 @@ const PurchaseOrder = ({ user, onLogout }) => {
       const name = employee.employeeName || employee.name || employee.fullName || employee.employee_name || employee.employee_name || '';
       return name;
     }).filter(name => name !== '' && name.trim() !== '');
-
     // Extract support staff names
     const supportStaffNames = supportStaffList.map(staff => {
       const name = staff.support_staff_name || staff.supportStaffName || staff.name || '';
       return name;
     }).filter(name => name !== '' && name.trim() !== '');
-
     // Merge and remove duplicates, including custom options
     const merged = [...new Set([...employeeNames, ...supportStaffNames, ...customInchargeOptions])].sort();
     return merged;
   }, [employeeList, supportStaffList, customInchargeOptions]);
-
   // Create siteInchargeOptions with IDs for lookup in PDF - includes both employees and support staff
   const siteInchargeOptions = [
     ...employeeList.map(emp => ({
@@ -1160,7 +1157,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
       console.error('Error fetching PO item names:', error);
     }
   }, []);
-
   // Fetch PO model from API - extracted as reusable function
   const fetchPoModel = useCallback(async () => {
     try {
@@ -1173,7 +1169,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
       console.error('Error fetching PO models:', error);
     }
   }, []);
-
   // Fetch PO brand from API - extracted as reusable function
   const fetchPoBrand = useCallback(async () => {
     try {
@@ -1186,7 +1181,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
       console.error('Error fetching PO brands:', error);
     }
   }, []);
-
   // Fetch PO type from API - extracted as reusable function
   const fetchPoType = useCallback(async () => {
     try {
@@ -1199,24 +1193,19 @@ const PurchaseOrder = ({ user, onLogout }) => {
       console.error('Error fetching PO types:', error);
     }
   }, []);
-
   // Initial fetch on mount
   useEffect(() => {
     fetchPoItemName();
   }, []);
-
   useEffect(() => {
     fetchPoModel();
   }, []);
-
   useEffect(() => {
     fetchPoBrand();
   }, []);
-
   useEffect(() => {
     fetchPoType();
   }, []);
-
   // Fetch PO categories (id + label)
   useEffect(() => {
     const fetchPoCategory = async () => {
@@ -1241,7 +1230,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
     };
     fetchPoCategory();
   }, []);
-
   // Fetch tiles data (for TILE category)
   const fetchTiles = useCallback(async () => {
     try {
@@ -1255,7 +1243,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
       setTileData([]);
     }
   }, []);
-
   // Fetch tile sizes data (for TILE category)
   const fetchTileSizes = useCallback(async () => {
     try {
@@ -1269,13 +1256,11 @@ const PurchaseOrder = ({ user, onLogout }) => {
       setTileSizeData([]);
     }
   }, []);
-
   // Initial fetch for tiles and tile sizes
   useEffect(() => {
     fetchTiles();
     fetchTileSizes();
   }, [fetchTiles, fetchTileSizes]);
-
   // Helper function to extract numeric value from eno
   const getNumericEno = (order) => {
     const eno = order.eno || order.ENO || order.poNumber || order.po_number || '';
@@ -1287,7 +1272,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
     const match = str.match(/\d+/);
     return match ? parseInt(match[0], 10) : 0;
   };
-
   // Fetch next PO number for vendor
   const fetchNextPoNumberForVendor = async (vendorId) => {
     if (!vendorId) {
@@ -1507,13 +1491,11 @@ const PurchaseOrder = ({ user, onLogout }) => {
   const handleSearchAdd = (item, quantity, isIncremental = false) => {
     // Normalize values for comparison
     const normalizeValue = (val) => (val || '').toString().toLowerCase().trim();
-
     const newItemName = normalizeValue(item.itemName);
     const newCategory = normalizeValue(item.category);
     const newModel = normalizeValue(item.model);
     const newBrand = normalizeValue(item.brand);
     const newType = normalizeValue(item.type);
-
     // Check if an item with the same properties (including category) already exists
     const existingItemIndex = items.findIndex(existingItem => {
       const nameParts = existingItem.name ? existingItem.name.split(',') : [];
@@ -1522,7 +1504,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
       const existingModel = normalizeValue(existingItem.model);
       const existingBrand = normalizeValue(existingItem.brand);
       const existingType = normalizeValue(existingItem.type);
-
       // Match if all properties including category are the same
       return (
         existingItemName === newItemName &&
@@ -1532,7 +1513,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
         existingType === newType
       );
     });
-
     if (existingItemIndex !== -1) {
       // Update existing item quantity (merge quantities)
       const updatedItems = [...items];
@@ -1594,7 +1574,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
       window.removeEventListener('poNumberPrefetched', handlePoNumberPrefetched);
     };
   }, [isEditMode, selectedVendor, poData.poNumber]);
-
   useEffect(() => {
     const fetchPoNumber = async () => {
       if (isViewOnlyFromHistory) {
@@ -1632,11 +1611,9 @@ const PurchaseOrder = ({ user, onLogout }) => {
     }
     previousVendorName.current = poData.vendorName;
   }, [poData.vendorName, isEditMode]);
-
   // Load selected items from NetStock page
   useEffect(() => {
     if (hasLoadedNetStockItems.current) return; // Only run once
-
     const netStockItems = localStorage.getItem('netStockSelectedItems');
     if (netStockItems && items.length === 0 && !isEditMode && !isViewOnlyFromHistory) {
       try {
@@ -1644,7 +1621,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
         if (Array.isArray(selectedItems) && selectedItems.length > 0) {
           // Normalize function for comparison
           const normalizeValue = (val) => (val || '').toString().toLowerCase().trim();
-
           // Process each item and add to items array
           const newItems = [];
           selectedItems.forEach((itemData) => {
@@ -1655,7 +1631,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
             const newType = normalizeValue(itemData.type);
             // Ensure quantity is a number
             const newQuantity = Number(itemData.quantity) || 1;
-
             // Check if item already exists in newItems array
             const existingItemIndex = newItems.findIndex(item => {
               const itemNameParts = item.name ? item.name.split(',') : [];
@@ -1672,7 +1647,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
                 existingType === newType
               );
             });
-
             if (existingItemIndex !== -1) {
               // Merge with existing item - preserve IDs and add quantities
               const existingItem = newItems[existingItemIndex];
@@ -1712,7 +1686,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
               });
             }
           });
-
           if (newItems.length > 0) {
             setItems(newItems);
             if (!poData.poNumber) {
@@ -1723,7 +1696,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
             setActiveTab('create');
             localStorage.setItem('activeTab', 'create');
           }
-
           // Clear the stored items after adding
           localStorage.removeItem('netStockSelectedItems');
           hasLoadedNetStockItems.current = true;
@@ -1738,7 +1710,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
       hasLoadedNetStockItems.current = true;
     }
   }, [items.length, isEditMode, isViewOnlyFromHistory]); // Run when items array is empty
-
   const handleAddItem = (itemData) => {
     if (editingItem) {
       const updatedItems = items.map(item =>
@@ -1855,7 +1826,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
   };
-
   // Function to fetch the previous PO for the same vendor and project
   const fetchPreviousPO = async (vendorId, clientId) => {
     if (!vendorId || !clientId) {
@@ -1868,8 +1838,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
       }
       const data = await response.json();
       const normalizedVendorId = String(vendorId);
-      const normalizedClientId = String(clientId);
-      
+      const normalizedClientId = String(clientId);      
       // Filter POs for the same vendor and project, sorted by eno descending (most recent first)
       const matchingPOs = data
         .filter(order => 
@@ -1880,8 +1849,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
           const enoA = getNumericEno(a);
           const enoB = getNumericEno(b);
           return enoB - enoA; // Descending order
-        });
-      
+        });      
       // Return the most recent PO (first in sorted array)
       return matchingPOs.length > 0 ? matchingPOs[0] : null;
     } catch (error) {
@@ -1889,13 +1857,11 @@ const PurchaseOrder = ({ user, onLogout }) => {
       return null;
     }
   };
-
   // Function to compare items (ignoring quantity) - check if the set of items is exactly the same
   const areItemsSame = (items1, items2) => {
     if (!items1 || !items2 || items1.length !== items2.length) {
       return false;
-    }
-    
+    }    
     // Create normalized item sets (ignoring quantity)
     const normalizeItem = (item) => {
       return {
@@ -1905,26 +1871,22 @@ const PurchaseOrder = ({ user, onLogout }) => {
         brand_id: item.brand_id || null,
         type_id: item.type_id || null,
       };
-    };
-    
+    };    
     const normalizedItems1 = items1.map(normalizeItem).sort((a, b) => {
       // Sort by item_id, then category_id, etc. for consistent comparison
       const keyA = `${a.item_id || ''}-${a.category_id || ''}-${a.model_id || ''}-${a.brand_id || ''}-${a.type_id || ''}`;
       const keyB = `${b.item_id || ''}-${b.category_id || ''}-${b.model_id || ''}-${b.brand_id || ''}-${b.type_id || ''}`;
       return keyA.localeCompare(keyB);
-    });
-    
+    });    
     const normalizedItems2 = items2.map(normalizeItem).sort((a, b) => {
       const keyA = `${a.item_id || ''}-${a.category_id || ''}-${a.model_id || ''}-${a.brand_id || ''}-${a.type_id || ''}`;
       const keyB = `${b.item_id || ''}-${b.category_id || ''}-${b.model_id || ''}-${b.brand_id || ''}-${b.type_id || ''}`;
       return keyA.localeCompare(keyB);
-    });
-    
+    });    
     // Compare each item
     for (let i = 0; i < normalizedItems1.length; i++) {
       const item1 = normalizedItems1[i];
-      const item2 = normalizedItems2[i];
-      
+      const item2 = normalizedItems2[i];      
       if (
         item1.item_id !== item2.item_id ||
         item1.category_id !== item2.category_id ||
@@ -1934,11 +1896,9 @@ const PurchaseOrder = ({ user, onLogout }) => {
       ) {
         return false;
       }
-    }
-    
+    }    
     return true;
   };
-
   const proceedWithPOGeneration = async () => {
     setIsGenerating(true);
     try {
@@ -2057,87 +2017,104 @@ const PurchaseOrder = ({ user, onLogout }) => {
       alert("Server not responding");
     } finally {
       setIsGenerating(false);
+      generatePoClickLockRef.current = false;
     }
   };
 
   const generatePO = async () => {
-    if (!selectedVendor?.id) {
-      alert("Please select a Vendor before generating a PO.");
-      return;
-    }
-    
-    // Check for duplicate PO only when creating new PO (not editing)
-    if (!isEditMode || !poData.originalId) {
-      const clientIdForCheck = selectedSite?.id ?? poData.originalClientId ?? null;
+    if (generatePoClickLockRef.current || isGenerating) return;
+    generatePoClickLockRef.current = true;
+    setIsGeneratePrecheckRunning(true); // show "Generating..." immediately on first click
+    let waitingForDuplicateConfirmation = false;
+    try {
+      if (!selectedVendor?.id) {
+        alert("Please select a Vendor before generating a PO.");
+        return;
+      }
       
-      if (clientIdForCheck && items.length > 0) {
-        // Fetch previous PO for same vendor and project
-        const previousPO = await fetchPreviousPO(selectedVendor.id, clientIdForCheck);
+      // Check for duplicate PO only when creating new PO (not editing)
+      if (!isEditMode || !poData.originalId) {
+        const clientIdForCheck = selectedSite?.id ?? poData.originalClientId ?? null;
         
-        if (previousPO && previousPO.purchaseTable && previousPO.purchaseTable.length > 0) {
-          // Prepare current items for comparison (same structure as payload.purchaseTable)
-          const currentItemsForComparison = items.map(item => {
-            const nameParts = item.name ? item.name.split(',') : [];
-            const itemNameOnly = nameParts[0] ? nameParts[0].trim() : '';
-            const categoryName = item.category || (nameParts[1] ? nameParts[1].trim() : '');
-            let itemId = item.itemId;
-            let brandId = item.brandId;
-            let modelId = item.modelId;
-            let typeId = item.typeId;
-            let categoryId = item.categoryId;
-            
-            if (!itemId && itemNameOnly && poItemName && poItemName.length > 0) {
-              const foundItem = poItemName.find(i =>
-                (i.itemName || i.name || '').toLowerCase() === itemNameOnly.toLowerCase()
-              );
-              itemId = foundItem ? (foundItem.id || foundItem._id) : null;
-            }
-            if (!brandId && item.brand && poBrand && poBrand.length > 0) {
-              const foundBrand = poBrand.find(b =>
-                (b.brand || b.brandName || b.name || '').toLowerCase() === item.brand.toLowerCase()
-              );
-              brandId = foundBrand ? (foundBrand.id || foundBrand._id) : null;
-            }
-            if (!modelId && item.model && poModel && poModel.length > 0) {
-              const foundModel = poModel.find(m =>
-                (m.model || m.modelName || m.name || '').toLowerCase() === item.model.toLowerCase()
-              );
-              modelId = foundModel ? (foundModel.id || foundModel._id) : null;
-            }
-            if (!typeId && item.type && poType && poType.length > 0) {
-              const foundType = poType.find(t =>
-                (t.typeColor || t.type || t.typeName || t.name || '').toLowerCase() === item.type.toLowerCase()
-              );
-              typeId = foundType ? (foundType.id || foundType._id) : null;
-            }
-            if (!categoryId && categoryName && categoryOptions && categoryOptions.length > 0) {
-              categoryId = resolveCategoryId(categoryName);
-            }
-            
-            return {
-              item_id: itemId || null,
-              category_id: categoryId || null,
-              model_id: modelId || null,
-              brand_id: brandId || null,
-              type_id: typeId || null,
-            };
-          });
+        if (clientIdForCheck && items.length > 0) {
+          // Fetch previous PO for same vendor and project
+          const previousPO = await fetchPreviousPO(selectedVendor.id, clientIdForCheck);
           
-          // Compare items (ignoring quantity)
-          if (areItemsSame(currentItemsForComparison, previousPO.purchaseTable)) {
-            // Items are the same - show custom confirmation modal
-            const previousPONumber = previousPO.eno || previousPO.poNumber || 'N/A';
-            setDuplicatePONumber(previousPONumber);
-            setShowDuplicatePOConfirm(true);
-            return; // Exit early, will proceed when user confirms
+          if (previousPO && previousPO.purchaseTable && previousPO.purchaseTable.length > 0) {
+            // Prepare current items for comparison (same structure as payload.purchaseTable)
+            const currentItemsForComparison = items.map(item => {
+              const nameParts = item.name ? item.name.split(',') : [];
+              const itemNameOnly = nameParts[0] ? nameParts[0].trim() : '';
+              const categoryName = item.category || (nameParts[1] ? nameParts[1].trim() : '');
+              let itemId = item.itemId;
+              let brandId = item.brandId;
+              let modelId = item.modelId;
+              let typeId = item.typeId;
+              let categoryId = item.categoryId;
+              
+              if (!itemId && itemNameOnly && poItemName && poItemName.length > 0) {
+                const foundItem = poItemName.find(i =>
+                  (i.itemName || i.name || '').toLowerCase() === itemNameOnly.toLowerCase()
+                );
+                itemId = foundItem ? (foundItem.id || foundItem._id) : null;
+              }
+              if (!brandId && item.brand && poBrand && poBrand.length > 0) {
+                const foundBrand = poBrand.find(b =>
+                  (b.brand || b.brandName || b.name || '').toLowerCase() === item.brand.toLowerCase()
+                );
+                brandId = foundBrand ? (foundBrand.id || foundBrand._id) : null;
+              }
+              if (!modelId && item.model && poModel && poModel.length > 0) {
+                const foundModel = poModel.find(m =>
+                  (m.model || m.modelName || m.name || '').toLowerCase() === item.model.toLowerCase()
+                );
+                modelId = foundModel ? (foundModel.id || foundModel._id) : null;
+              }
+              if (!typeId && item.type && poType && poType.length > 0) {
+                const foundType = poType.find(t =>
+                  (t.typeColor || t.type || t.typeName || t.name || '').toLowerCase() === item.type.toLowerCase()
+                );
+                typeId = foundType ? (foundType.id || foundType._id) : null;
+              }
+              if (!categoryId && categoryName && categoryOptions && categoryOptions.length > 0) {
+                categoryId = resolveCategoryId(categoryName);
+              }
+              
+              return {
+                item_id: itemId || null,
+                category_id: categoryId || null,
+                model_id: modelId || null,
+                brand_id: brandId || null,
+                type_id: typeId || null,
+              };
+            });
+            
+            // Compare items (ignoring quantity)
+            if (areItemsSame(currentItemsForComparison, previousPO.purchaseTable)) {
+              // Items are the same - show custom confirmation modal
+              const previousPONumber = previousPO.eno || previousPO.poNumber || 'N/A';
+              setDuplicatePONumber(previousPONumber);
+              setShowDuplicatePOConfirm(true);
+              setIsGeneratePrecheckRunning(false);
+              waitingForDuplicateConfirmation = true;
+              return; // Exit early, will proceed when user confirms
+            }
+            // Items are different - proceed without asking
           }
-          // Items are different - proceed without asking
         }
       }
+      
+      // No duplicate detected or editing mode - proceed directly
+      await proceedWithPOGeneration();
+    } catch (error) {
+      console.error("Error during PO generation pre-check:", error);
+      alert("Unable to generate PO. Please try again.");
+    } finally {
+      setIsGeneratePrecheckRunning(false);
+      if (!waitingForDuplicateConfirmation && !isGenerating) {
+        generatePoClickLockRef.current = false;
+      }
     }
-    
-    // No duplicate detected or editing mode - proceed directly
-    proceedWithPOGeneration();
   };
 
   const generatePDF = (payload, skipSaveAndDownload = false) => {
@@ -2651,10 +2628,10 @@ const PurchaseOrder = ({ user, onLogout }) => {
                       <button
                         type="button"
                         onClick={generatePO}
-                        disabled={isGenerating}
-                        className={`text-[13px] font-medium leading-normal ${isGenerating ? 'text-gray-400 cursor-not-allowed' : 'text-black'}`}
+                        disabled={isGenerating || isGeneratePrecheckRunning}
+                        className={`text-[13px] font-medium leading-normal ${(isGenerating || isGeneratePrecheckRunning) ? 'text-gray-400 cursor-not-allowed' : 'text-black'}`}
                       >
-                        {isGenerating ? (isEditFromHistory ? 'Updating...' : 'Generating...') : (isEditFromHistory ? 'Update PO' : 'Generate PO')}
+                        {(isGenerating || isGeneratePrecheckRunning) ? (isEditFromHistory ? 'Updating...' : 'Generating...') : (isEditFromHistory ? 'Update PO' : 'Generate PO')}
                       </button>
                     ) : null}
                     {!isViewOnlyFromHistory && (
@@ -3154,6 +3131,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
           onCancel={() => {
             setShowDuplicatePOConfirm(false);
             setDuplicatePONumber(null);
+            generatePoClickLockRef.current = false;
           }}
           onConfirm={() => {
             setShowDuplicatePOConfirm(false);

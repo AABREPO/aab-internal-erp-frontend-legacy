@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import EditIcon from '../Images/edit1.png';
 
 const TOOLS_STOCK_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_stock_management';
 const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_management';
@@ -7,6 +8,7 @@ const TOOLS_ITEM_ID_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_i
 const PROJECT_NAMES_BASE_URL = 'https://backendaab.in/aabuilderDash/api/project_Names';
 const VENDOR_NAMES_BASE_URL = 'https://backendaab.in/aabuilderDash/api/vendor_Names';
 const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_brand';
+const TOOLS_MACHINE_NUMBER_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_machine_number';
 
 const NetStock = ({ user }) => {
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'list'
@@ -24,6 +26,7 @@ const NetStock = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [itemNameOptions, setItemNameOptions] = useState([]);
   const [itemIdOptions, setItemIdOptions] = useState([]);
+  const [machineNumbersList, setMachineNumbersList] = useState([]);
   
   // Edit stock bottom sheet state
   const [showEditStockModal, setShowEditStockModal] = useState(false);
@@ -31,6 +34,10 @@ const NetStock = ({ user }) => {
   const [newCount, setNewCount] = useState('');
   const [swipeStates, setSwipeStates] = useState({});
   const [expandedItemId, setExpandedItemId] = useState(null);
+  const expandedItemIdRef = useRef(expandedItemId);
+  useEffect(() => {
+    expandedItemIdRef.current = expandedItemId;
+  }, [expandedItemId]);
 
   // Fetch lookup data
   useEffect(() => {
@@ -126,12 +133,39 @@ const NetStock = ({ user }) => {
           });
           setVendorsMap(map);
         }
+
+        // Fetch machine numbers (for resolving machine_number_id to display text)
+        const machineNumbersRes = await fetch(`${TOOLS_MACHINE_NUMBER_BASE_URL}/getAll`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (machineNumbersRes.ok) {
+          const data = await machineNumbersRes.json();
+          setMachineNumbersList(Array.isArray(data) ? data : []);
+        }
       } catch (error) {
         console.error('Error fetching lookup data:', error);
       }
     };
     fetchLookupData();
   }, []);
+
+  // Resolve machine number id/text to display text (same idea as ToolsHistory Log tab)
+  const resolveMachineNumberText = useCallback((machineNumberOrId) => {
+    if (machineNumberOrId === null || machineNumberOrId === undefined) return '';
+    const value = String(machineNumberOrId).trim();
+    if (!value) return '';
+    if (machineNumbersList.length > 0) {
+      const byId = machineNumbersList.find((m) => String(m?.id ?? m?._id) === value);
+      if (byId) return String(byId.machine_number ?? byId.machineNumber ?? '').trim();
+      const byText = machineNumbersList.find(
+        (m) => String(m?.machine_number ?? m?.machineNumber ?? '').trim() === value
+      );
+      if (byText) return String(byText.machine_number ?? byText.machineNumber ?? '').trim();
+    }
+    return value;
+  }, [machineNumbersList]);
 
   // Fetch stock management and tools tracker management data
   useEffect(() => {
@@ -288,7 +322,10 @@ const NetStock = ({ user }) => {
       const brandId = stock.brand_name_id || stock.brandNameId;
       const homeLocationId = stock.home_location_id || stock.homeLocationId;
       const quantity = parseInt(stock.quantity || 0, 10);
-      const machineNumber = stock.machine_number || stock.machineNumber || '';
+      // Resolve machine number: check machine_number_id first, then machine_number
+      const machineNumberId = stock.machine_number_id || stock.machineNumberId;
+      const machineNumberRaw = stock.machine_number || stock.machineNumber || '';
+      const machineNumber = machineNumberId ? resolveMachineNumberText(machineNumberId) : machineNumberRaw;
       const status = stock.machine_status || stock.machineStatus || 'Working';
 
       const itemName = itemNamesMap[itemNameId] || itemNamesMap[String(itemNameId)] || '-';
@@ -409,7 +446,7 @@ const NetStock = ({ user }) => {
     }
 
     return filtered;
-  }, [stockManagementData, toolsTrackerManagementData, itemNamesMap, itemIdsMap, brandsMap, projectsMap, vendorsMap, selectedItemName, selectedItemId, getHomeLocationId, getCurrentLocationForItem, getLocationName]);
+  }, [stockManagementData, toolsTrackerManagementData, itemNamesMap, itemIdsMap, brandsMap, projectsMap, vendorsMap, selectedItemName, selectedItemId, machineNumbersList, getHomeLocationId, getCurrentLocationForItem, getLocationName, resolveMachineNumberText]);
 
   // Calculate aggregated summary for List view table display
   const aggregatedSummary = useMemo(() => {
@@ -545,6 +582,7 @@ const NetStock = ({ user }) => {
   };
 
   const handleTouchMove = (e, itemId) => {
+    e.preventDefault();
     const touch = e.touches ? e.touches[0] : { clientX: e.clientX };
     const state = swipeStates[itemId];
     if (!state) return;
@@ -552,20 +590,7 @@ const NetStock = ({ user }) => {
     const deltaX = touch.clientX - state.startX;
     const isExpanded = expandedItemId === itemId;
 
-    // Only allow swiping left to reveal edit action for items without itemId
-    if (deltaX < 0) {
-      e.preventDefault();
-      setSwipeStates(prev => ({
-        ...prev,
-        [itemId]: {
-          ...prev[itemId],
-          currentX: touch.clientX,
-          isSwiping: true
-        }
-      }));
-    } else if (isExpanded && deltaX > 0) {
-      // Allow swiping right to hide if already expanded
-      e.preventDefault();
+    if (deltaX < 0 || (isExpanded && deltaX > 0)) {
       setSwipeStates(prev => ({
         ...prev,
         [itemId]: {
@@ -577,20 +602,21 @@ const NetStock = ({ user }) => {
     }
   };
 
-  const handleTouchEnd = (itemId, item) => {
+  const handleTouchEnd = (itemId) => {
     const state = swipeStates[itemId];
     if (!state) return;
 
     const deltaX = state.currentX - state.startX;
     const absDeltaX = Math.abs(deltaX);
 
-    // Only allow edit for items without itemId but with quantity
-    if (absDeltaX >= minSwipeDistance && deltaX < 0 && !item.hasItemId && item.quantity > 0) {
-      // Swiped left - reveal edit button
-      setExpandedItemId(itemId);
-    } else if (absDeltaX >= minSwipeDistance && deltaX > 0) {
-      // Swiped right - hide buttons
-      setExpandedItemId(null);
+    if (absDeltaX >= minSwipeDistance) {
+      if (deltaX < 0) {
+        // Swiped left - reveal edit button
+        setExpandedItemId(itemId);
+      } else {
+        // Swiped right - hide buttons
+        setExpandedItemId(null);
+      }
     } else {
       // Small movement - snap back
       if (expandedItemId === itemId) {
@@ -605,6 +631,87 @@ const NetStock = ({ user }) => {
       return newState;
     });
   };
+
+  const handleMouseDown = (e, itemId) => {
+    if (e.button !== 0) return;
+    const syntheticEvent = {
+      touches: [{ clientX: e.clientX }],
+      preventDefault: () => e.preventDefault()
+    };
+    handleTouchStart(syntheticEvent, itemId);
+  };
+
+  const handleCardClick = (e) => {
+    if (e.target.closest('.action-button')) {
+      return;
+    }
+    if (expandedItemId) {
+      setExpandedItemId(null);
+    }
+  };
+
+  // Global mouse handlers for desktop support
+  useEffect(() => {
+    if (tableData.length === 0) return;
+
+    const globalMouseMoveHandler = (e) => {
+      setSwipeStates(prev => {
+        let hasChanges = false;
+        const newState = { ...prev };
+        tableData.forEach(item => {
+          const itemId = item.id;
+          const state = prev[itemId];
+          if (!state) return;
+          const deltaX = e.clientX - state.startX;
+          const isExpanded = expandedItemIdRef.current === itemId;
+          if (deltaX < 0 || (isExpanded && deltaX > 0)) {
+            newState[itemId] = {
+              ...state,
+              currentX: e.clientX,
+              isSwiping: true
+            };
+            hasChanges = true;
+          }
+        });
+        return hasChanges ? newState : prev;
+      });
+    };
+
+    const globalMouseUpHandler = () => {
+      setSwipeStates(prev => {
+        let hasChanges = false;
+        const newState = { ...prev };
+        tableData.forEach(item => {
+          const itemId = item.id;
+          const state = prev[itemId];
+          if (!state) return;
+          const deltaX = state.currentX - state.startX;
+          const absDeltaX = Math.abs(deltaX);
+          if (absDeltaX >= minSwipeDistance) {
+            if (deltaX < 0) {
+              setExpandedItemId(itemId);
+            } else {
+              setExpandedItemId(null);
+            }
+          } else {
+            if (expandedItemIdRef.current === itemId) {
+              setExpandedItemId(null);
+            }
+          }
+          delete newState[itemId];
+          hasChanges = true;
+        });
+        return hasChanges ? newState : prev;
+      });
+    };
+
+    document.addEventListener('mousemove', globalMouseMoveHandler);
+    document.addEventListener('mouseup', globalMouseUpHandler);
+    return () => {
+      document.removeEventListener('mousemove', globalMouseMoveHandler);
+      document.removeEventListener('mouseup', globalMouseUpHandler);
+    };
+  }, [tableData]);
 
   // Handle save edit stock
   const handleSaveEditStock = async () => {
@@ -698,10 +805,10 @@ const NetStock = ({ user }) => {
       
       {/* Table/List Segmented Control */}
       <div className="flex-shrink-0">
-        <div className="flex bg-gray-100 items-center h-9 shadow-sm flex-1 rounded-md">
+        <div className="flex bg-[#F2F4F7] items-center h-9 shadow-sm rounded-md">
           <button
             onClick={() => setViewMode('table')}
-            className={`flex-1 py-1 px-4 ml-0.5 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${viewMode === 'table'
+            className={`flex-1 px-4 ml-0.5 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${viewMode === 'table'
               ? 'bg-white text-black'
               : 'bg-gray-100 text-gray-600'
               }`}
@@ -710,7 +817,7 @@ const NetStock = ({ user }) => {
           </button>
           <button
             onClick={() => setViewMode('list')}
-            className={`flex-1 py-1 px-4 mr-0.5 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${viewMode === 'list'
+            className={`flex-1 px-4 mr-0.5 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${viewMode === 'list'
               ? 'bg-white text-black'
               : 'bg-gray-100 text-gray-600'
               }`}
@@ -822,22 +929,21 @@ const NetStock = ({ user }) => {
           </div>
         </div>
       </div>
-
       {/* Main Content Area */}
-      <div key={viewMode} className="flex-1 pb-4 mt-2 min-h-[400px]">
+      <div key={viewMode} className="flex-1 pb-4 min-h-[400px] overflow-y-auto">
         {loading ? (
           <div className="flex justify-center items-center h-64">
             <p className="text-[14px] text-gray-500">Loading...</p>
           </div>
         ) : viewMode === 'table' ? (
           /* Table View - Individual Items */
-          <div className="mt-4">
+          <div className="mt-1.5">
             {tableData.length === 0 ? (
               <p className="text-[14px] text-gray-500 text-center mt-8">No data available</p>
             ) : (
               <>
                 {/* Download Link */}
-                <div className="flex justify-end mb-0.5">
+                <div className="flex justify-end mb-1">
                   <span className="text-[12px] text-gray-400 font-semibold cursor-pointer">Download</span>
                 </div>
                 <div className="space-y-0.5">
@@ -848,76 +954,46 @@ const NetStock = ({ user }) => {
                   // Allow editing for items without itemId that have a non-zero quantity (can be positive or negative)
                   const canEdit = !item.hasItemId && item.quantity !== 0;
                   
-                  // Calculate swipe offset for items that can be edited (button width is 96px)
-                  const buttonWidth = 96;
-                  const swipeOffset = canEdit && swipeState && swipeState.isSwiping
+                  // Calculate swipe offset (button width is 48px)
+                  const buttonWidth = 48;
+                  const swipeOffset = swipeState && swipeState.isSwiping
                     ? Math.max(-buttonWidth, Math.min(0, swipeState.currentX - swipeState.startX))
-                    : isExpanded && canEdit
+                    : isExpanded
                       ? -buttonWidth
                       : 0;
 
                   return (
-                    <div key={itemId} className="overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] h-[100px]">
-                      {/* Edit Button - Behind the card on the right, revealed on swipe */}
-                      {canEdit && (
-                        <div
-                          className="absolute right-0 top-0 h-full w-10 bg-green-800 flex items-center justify-center z-10 transition-all duration-300 ease-out rounded-md"
-                          style={{
-                            opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
-                            transform: swipeOffset < 0 
-                              ? `translateX(${Math.max(0, 96 + swipeOffset)}px)` 
-                              : 'translateX(96px)',
-                            transition: (swipeState && swipeState.isSwiping) ? 'none' : 'opacity 0.2s ease-out, transform 0.3s ease-out',
-                          }}
-                        >
-                          <button
-                            onClick={() => {
-                              setSelectedItemForEdit(item);
-                              setNewCount(String(item.quantity));
-                              setShowEditStockModal(true);
-                              setExpandedItemId(null);
-                            }}
-                            className="w-full h-full flex items-center justify-center"
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                          </button>
-                        </div>
-                      )}                      
+                    <div key={itemId} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] h-[85px]">
                       {/* Card */}
                       <div
-                        className="bg-white rounded-[8px] h-full px-3 py-3 transition-all duration-300 ease-out"
+                        className="bg-white rounded-[8px] h-full px-3 py-3 cursor-pointer transition-all duration-300 ease-out select-none"
                         style={{
                           transform: `translateX(${swipeOffset}px)`,
-                          touchAction: canEdit ? 'pan-y' : 'auto',
-                          userSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
-                          WebkitUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
-                          MozUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
-                          msUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto'
+                          touchAction: 'pan-y',
+                          userSelect: 'none',
+                          WebkitUserSelect: 'none'
                         }}
-                        onTouchStart={canEdit ? (e) => handleTouchStart(e, itemId) : undefined}
-                        onTouchMove={canEdit ? (e) => handleTouchMove(e, itemId) : undefined}
-                        onTouchEnd={canEdit ? () => handleTouchEnd(itemId, item) : undefined}
+                        onTouchStart={(e) => handleTouchStart(e, itemId)}
+                        onTouchMove={(e) => handleTouchMove(e, itemId)}
+                        onTouchEnd={() => handleTouchEnd(itemId)}
+                        onMouseDown={(e) => handleMouseDown(e, itemId)}
+                        onClick={handleCardClick}
                       >
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1 min-w-0">
-                            {/* Top line: Location, Item Name - larger bold */}
-                            <p className="text-[14px] font-semibold text-black leading-tight mb-1">
-                              {item.location !== '-' ? `${item.location}, ${item.itemName}` : item.itemName}
+                        <div className="flex flex-col">
+                          {/* Top line: Location, Item Name and Status badge */}
+                          <div className="flex justify-between items-start mb-1">
+                            <p className="text-[12px] font-semibold leading-tight">
+                              {item.location !== '-' ? (
+                                <>
+                                  <span className="text-[#A6A6A6] font-medium">{item.location}, </span>
+                                  <span className="text-black">{item.itemName}</span>
+                                </>
+                              ) : (
+                                <span className="text-black">{item.itemName}</span>
+                              )}
                             </p>
-                            {/* Middle line: Machine number - smaller regular */}
-                            {item.machineNumber !== '-' && (
-                              <p className="text-[12px] text-gray-700 leading-tight mb-1">{item.machineNumber}</p>
-                            )}
-                            {/* Bottom line: Brand - smaller regular */}
-                            <p className="text-[12px] text-gray-700 leading-tight">{item.brand}</p>
-                          </div>
-                          <div className="flex flex-col items-end gap-2 ml-3 flex-shrink-0">
-                            {/* Status badge - top right */}
                             {item.status !== '-' && (
-                              <span className={`px-2 py-1 rounded-full text-[11px] font-medium whitespace-nowrap ${
+                              <span className={`px-2 rounded-full text-[11px] font-medium whitespace-nowrap flex-shrink-0 ml-3 ${
                                 item.status === 'Working' ? 'bg-green-100 text-green-800' : 
                                 item.status === 'Dead' ? 'bg-orange-100 text-orange-800' : 
                                 'bg-gray-100 text-gray-800'
@@ -925,14 +1001,54 @@ const NetStock = ({ user }) => {
                                 {item.status}
                               </span>
                             )}
-                            {/* Item ID or Quantity - bottom right */}
-                            <p className="text-[12px] font-medium text-black">
+                          </div>
+                          {/* Middle line: Machine number - empty opposite */}
+                          <div className="flex justify-between items-start mb-1">
+                            <p className="text-[12px] text-gray-700 leading-tight">
+                              {item.machineNumber !== '-' ? resolveMachineNumberText(item.machineNumber) : ''}
+                            </p>
+                            <div className="flex-shrink-0 ml-3"></div>
+                          </div>
+                          {/* Bottom line: Brand and Item ID/Quantity */}
+                          <div className="flex justify-between items-start">
+                            <p className="text-[12px] text-gray-700 leading-tight">{item.brand}</p>
+                            <p className="text-[12px] font-medium text-black flex-shrink-0 ml-3">
                               {item.hasItemId 
                                 ? (item.isMerged ? item.quantity : item.itemId) 
                                 : item.quantity}
                             </p>
                           </div>
                         </div>
+                      </div>
+                      {/* Edit Button - Behind the card on the right, revealed on swipe */}
+                      <div
+                        className="absolute right-0 top-0 flex gap-2 flex-shrink-0 z-0"
+                        style={{
+                          opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
+                          transform: swipeOffset < 0
+                            ? `translateX(${Math.max(0, 48 + swipeOffset)}px)`
+                            : 'translateX(48px)',
+                          transition: (swipeState && swipeState.isSwiping) ? 'none' : 'opacity 0.2s ease-out, transform 0.3s ease-out',
+                          pointerEvents: isExpanded ? 'auto' : 'none'
+                        }}
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (canEdit) {
+                              setSelectedItemForEdit(item);
+                              setNewCount(String(item.quantity));
+                              setShowEditStockModal(true);
+                              setExpandedItemId(null);
+                            } else {
+                              setExpandedItemId(null);
+                            }
+                          }}
+                          className="action-button w-[48px] h-[80px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
+                          title="Edit"
+                        >
+                          <img src={EditIcon} alt="Edit" className="w-[18px] h-[18px]" />
+                        </button>
                       </div>
                     </div>
                   );
@@ -943,13 +1059,13 @@ const NetStock = ({ user }) => {
           </div>
         ) : (
           /* List View - Aggregated Summary Table Only */
-          <div className="mt-4">
+          <div className="mt-1.5">
             {aggregatedSummary.length === 0 ? (
               <p className="text-[14px] text-gray-500 text-center mt-8">No data available</p>
             ) : (
               <>
                 {/* Download Link */}
-                <div className="flex justify-end mb-2">
+                <div className="flex justify-end mb-1">
                   <span className="text-[12px] text-gray-400 font-semibold cursor-pointer">Download</span>
                 </div>
                 <div className="bg-white rounded-lg overflow-hidden border border-gray-200">

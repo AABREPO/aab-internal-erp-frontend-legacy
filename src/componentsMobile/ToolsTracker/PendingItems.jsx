@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Filter from '../Images/Filter.png';
+import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 
 const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_management';
 const TOOLS_STOCK_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_stock_management';
@@ -26,6 +27,21 @@ const PendingItems = ({ user }) => {
   const [employeesMap, setEmployeesMap] = useState({});
   const [itemNamesMap, setItemNamesMap] = useState({});
   const [itemIdsMap, setItemIdsMap] = useState({});
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
+  const [filterItemName, setFilterItemName] = useState(null);
+  const [filterLocation, setFilterLocation] = useState(null);
+  const [filterItemId, setFilterItemId] = useState(null);
+  const [filterDate, setFilterDate] = useState(null);
+  const [filterEntryNo, setFilterEntryNo] = useState(null);
+  const [filterProjectIncharge, setFilterProjectIncharge] = useState(null);
+  const [itemNameOptions, setItemNameOptions] = useState([]);
+  const [locationOptions, setLocationOptions] = useState([]);
+  const [itemIdOptions, setItemIdOptions] = useState([]);
+  const [entryNoOptions, setEntryNoOptions] = useState([]);
+  const [projectInchargeOptions, setProjectInchargeOptions] = useState([]);
+  const [filterOpenPicker, setFilterOpenPicker] = useState(null);
+  const [filterPickerSearch, setFilterPickerSearch] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
   useEffect(() => {
     const fetchLookupData = async () => {
       try {
@@ -114,7 +130,7 @@ const PendingItems = ({ user }) => {
           const data = await transferRes.json();
           const entries = (Array.isArray(data) ? data : []).filter(entry => {
             const entryType = entry.tools_entry_type || entry.toolsEntryType || 'Entry';
-            return entryType.toLowerCase() === 'entry' || entryType.toLowerCase() === 'relocation';
+            return entryType.toLowerCase() === 'entry' || entryType.toLowerCase() === 'relocate';
           });
           setToolsTrackerManagementData(entries);
         }
@@ -194,7 +210,31 @@ const PendingItems = ({ user }) => {
     // Sort alphabetically
     options.sort((a, b) => a.value.localeCompare(b.value));
     setHomeLocationOptions(options);
+    setLocationOptions(options);
   }, [toolsTrackerManagementData, stockManagementData, getLocationName]);
+  
+  // Populate filter options
+  useEffect(() => {
+    // Item Name options
+    const itemNames = Array.from(new Set(Object.values(itemNamesMap))).filter(Boolean).sort();
+    setItemNameOptions(itemNames.map(name => ({ value: name, label: name })));
+    
+    // Item ID options
+    const itemIds = Array.from(new Set(Object.values(itemIdsMap))).filter(Boolean).sort();
+    setItemIdOptions(itemIds.map(id => ({ value: id, label: id })));
+    
+    // Entry No options
+    const entryNos = new Set();
+    toolsTrackerManagementData.forEach(entry => {
+      const eno = entry.eno || '';
+      if (eno) entryNos.add(eno);
+    });
+    setEntryNoOptions(Array.from(entryNos).sort().map(eno => ({ value: eno, label: eno })));
+    
+    // Project Incharge options
+    const incharges = Array.from(new Set(Object.values(employeesMap))).filter(Boolean).sort();
+    setProjectInchargeOptions(incharges.map(name => ({ value: name, label: name })));
+  }, [itemNamesMap, itemIdsMap, toolsTrackerManagementData, employeesMap]);
   const calculateDays = (date1, date2) => {
     if (!date1 || !date2) return 0;
     const d1 = new Date(date1);
@@ -447,13 +487,17 @@ const PendingItems = ({ user }) => {
               }
             }
             if (mostRecentEntry) {
+              console.log("Most Recent Entry: ", mostRecentEntry);
               const fromLocationId = mostRecentEntry.from_project_id || mostRecentEntry.fromProjectId;
               const toLocationId = mostRecentEntry.to_project_id || mostRecentEntry.toProjectId;
+              console.log("To Location ID: ", toLocationId);
+              console.log("From Location ID: ", fromLocationId);
               const createdDateTime = mostRecentEntry.created_date_time || mostRecentEntry.createdDateTime || mostRecentEntry.timestamp || '';
               const projectInchargeId = mostRecentEntry.project_incharge_id || mostRecentEntry.projectInchargeId;
               const eno = mostRecentEntry.eno || '';
               const fromLocation = getLocationName(fromLocationId);
               const toLocation = getLocationName(toLocationId);
+              console.log("To Location: ", toLocation);
               const inchargeName = employeesMap[projectInchargeId] || employeesMap[String(projectInchargeId)] || '-';
               const homeLocationName = getLocationName(homeLocationId);
               const dateObj = new Date(createdDateTime);
@@ -636,6 +680,118 @@ const PendingItems = ({ user }) => {
       option.label.toLowerCase().includes(query)
     );
   };
+  
+  // Filter dropdown helpers
+  const getFilterPickerOptions = () => {
+    if (!filterOpenPicker) return [];
+    const opts = {
+      itemName: itemNameOptions,
+      location: locationOptions,
+      itemId: itemIdOptions,
+      entryNo: entryNoOptions,
+      projectIncharge: projectInchargeOptions
+    }[filterOpenPicker] || [];
+    const q = (filterPickerSearch || '').trim().toLowerCase();
+    if (!q) return opts;
+    return opts.filter(o => String(o.value || o.label || o).toLowerCase().includes(q));
+  };
+  
+  const openFilterPicker = (field) => {
+    setFilterOpenPicker(field);
+    setFilterPickerSearch('');
+  };
+  
+  const closeFilterPicker = () => {
+    setFilterOpenPicker(null);
+    setFilterPickerSearch('');
+  };
+  
+  const handleFilterPickerSelect = (field, value) => {
+    if (field === 'itemName') setFilterItemName(value);
+    else if (field === 'location') setFilterLocation(value);
+    else if (field === 'itemId') setFilterItemId(value);
+    else if (field === 'entryNo') setFilterEntryNo(value);
+    else if (field === 'projectIncharge') setFilterProjectIncharge(value);
+    closeFilterPicker();
+  };
+  
+  const formatDateForDisplay = (dateStr) => {
+    if (!dateStr) return '';
+    if (dateStr.includes('-') && dateStr.length === 10) {
+      const [year, month, day] = dateStr.split('-');
+      return `${day}/${month}/${year}`;
+    }
+    return dateStr;
+  };
+  
+  const handleDatePickerOpen = () => {
+    setShowDatePicker(true);
+  };
+  
+  const handleDatePickerConfirm = (formattedDate) => {
+    setFilterDate(formattedDate);
+    setShowDatePicker(false);
+  };
+  
+  const renderFilterDropdown = (field, value, placeholder) => {
+    const fieldLabels = {
+      itemName: 'Item Name',
+      location: 'Location',
+      itemId: 'Item ID',
+      entryNo: 'Entry. No',
+      projectIncharge: 'Project Incharge'
+    };
+    
+    return (
+      <div className="relative w-full">
+        {showFilterSheet && filterOpenPicker === field ? (
+          <input
+            type="text"
+            value={filterPickerSearch}
+            onChange={(e) => setFilterPickerSearch(e.target.value)}
+            placeholder={placeholder}
+            className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white focus:outline-none"
+            style={{ color: '#000', boxSizing: 'border-box', paddingRight: '40px' }}
+            autoFocus
+          />
+        ) : (
+          <div onClick={() => openFilterPicker(field)}
+            className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+            style={{ color: value ? '#000' : '#9E9E9E', boxSizing: 'border-box', paddingRight: '40px' }}
+          >
+            {value || placeholder}
+          </div>
+        )}
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+          <svg width="12" height="8" viewBox="0 0 12 8" fill="none"><path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </div>
+        {/* Dropdown options */}
+        {showFilterSheet && filterOpenPicker === field && (
+          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[rgba(0,0,0,0.16)] rounded-[8px] shadow-lg max-h-[150px] overflow-hidden flex flex-col" style={{ zIndex: 9 }}>
+            <div className="overflow-y-auto max-h-[150px]">
+              {getFilterPickerOptions().length > 0 ? (
+                getFilterPickerOptions().map((opt, idx) => {
+                  const optValue = opt.value || opt.label || opt;
+                  const optLabel = opt.label || opt.value || opt;
+                  return (
+                    <button key={idx} type="button" onClick={() => handleFilterPickerSelect(field, optValue)}
+                      className="w-full h-[36px] px-3 flex items-center text-left hover:bg-[#F5F5F5] transition-colors text-[12px] font-medium text-black"
+                    >
+                      {optLabel}
+                    </button>
+                  );
+                })
+              ) : (
+                <p className="text-[12px] font-medium text-[#9E9E9E] text-center py-3">
+                  {filterPickerSearch.trim() ? 'No options found' : 'No options available'}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-90px-80px)] bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
@@ -657,9 +813,9 @@ const PendingItems = ({ user }) => {
         </div>
       </div>
       <div className="flex justify-between px-4 mb-2">
-        <div className="flex bg-gray-100 items-center h-6 shadow-sm rounded-full">
+        <div className="flex bg-[#F2F4F7] items-center h-6 shadow-sm rounded-full">
           <button onClick={() => setSelectedDays('all')}
-            className={`flex py-1 px-4 ml-0.5 h-5 rounded-full text-[11px] items-center font-medium transition-colors duration-1000 ease-out ${selectedDays === 'all'
+            className={`flex px-4 ml-0.5 h-5 rounded-full text-[11px] items-center font-medium transition-colors duration-1000 ease-out ${selectedDays === 'all'
               ? 'bg-white text-black'
               : 'bg-gray-100 text-gray-600'
               }`}
@@ -667,7 +823,7 @@ const PendingItems = ({ user }) => {
             All Days
           </button>
           <button onClick={() => setSelectedDays('30')}
-            className={`flex py-1 px-4 h-5 rounded-full text-[11px] items-center font-medium transition-colors duration-1000 ease-out ${selectedDays === '30'
+            className={`flex px-4 h-5 rounded-full text-[11px] items-center font-medium transition-colors duration-1000 ease-out ${selectedDays === '30'
               ? 'bg-white text-black'
               : 'bg-gray-100 text-gray-600'
               }`}
@@ -675,7 +831,7 @@ const PendingItems = ({ user }) => {
             30 Days
           </button>
           <button onClick={() => setSelectedDays('60')}
-            className={`flex py-1 px-4 mr-0.5 h-5 rounded-full text-[11px] items-center font-medium transition-colors duration-1000 ease-out ${selectedDays === '60'
+            className={`flex px-4 mr-0.5 h-5 rounded-full text-[11px] items-center font-medium transition-colors duration-1000 ease-out ${selectedDays === '60'
               ? 'bg-white text-black'
               : 'bg-gray-100 text-gray-600'
               }`}
@@ -685,7 +841,7 @@ const PendingItems = ({ user }) => {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[12px] font-medium text-black leading-normal">Download</span>
-          <img src={Filter} alt="Filter" className="w-[12px] h-[12px]" />
+          <img src={Filter} alt="Filter" className="w-[12px] h-[12px] cursor-pointer" onClick={() => setShowFilterSheet(true)} />
         </div>
       </div>
       <div className="flex-1 overflow-y-auto px-4 pb-4">
@@ -865,6 +1021,98 @@ const PendingItems = ({ user }) => {
           </div>
         </div>
       )}
+      {/* Filter Bottom Sheet Modal */}
+      {showFilterSheet && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif" }} onClick={() => setShowFilterSheet(false)}>
+          <div className="bg-white w-full max-w-[360px] max-h-[70vh] rounded-tl-[16px] rounded-tr-[16px] relative z-50 overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex-shrink-0 flex items-center justify-between px-6 pt-5 pb-1">
+              <p className="text-[16px] font-bold text-black">Select Filters</p>
+              <button type="button" onClick={() => setShowFilterSheet(false)} className="text-[#e06256] text-xl font-bold leading-none">
+                ×
+              </button>
+            </div>
+            {/* Backdrop for dropdown */}
+            {filterOpenPicker && (
+              <div
+                className="fixed inset-0 z-[45]"
+                onClick={closeFilterPicker}
+              />
+            )}
+            {/* Form - scrollable */}
+            <div className="flex-1 overflow-y-auto px-6 py-1">
+              <div className="flex gap-3 mb-2">
+                <div className="flex-1">
+                  <p className="text-[12px] font-medium text-black mb-1">Item Name</p>
+                  {renderFilterDropdown('itemName', filterItemName, 'Select')}
+                </div>
+                <div className="flex-1">
+                  <p className="text-[12px] font-medium text-black mb-1">Date</p>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      readOnly
+                      value={formatDateForDisplay(filterDate) || ''}
+                      onClick={handleDatePickerOpen}
+                      onFocus={handleDatePickerOpen}
+                      placeholder="dd-mm-yyyy"
+                      className="w-full h-[32px] border border-[#d6d6d6] rounded pl-3 pr-10 text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500 cursor-pointer"
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2H4C2.89543 2 2 2.89543 2 4V12C2 13.1046 2.89543 14 4 14H12C13.1046 14 14 13.1046 14 12V4C14 2.89543 13.1046 2 12 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M11 1V4M5 1V4M2 7H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-3 mb-2">
+                <div className="flex-1">
+                  <p className="text-[12px] font-medium text-black mb-1">Location</p>
+                  {renderFilterDropdown('location', filterLocation, 'Select')}
+                </div>
+                <div className="flex-1">
+                  <p className="text-[12px] font-medium text-black mb-1">Entry. No</p>
+                  {renderFilterDropdown('entryNo', filterEntryNo, 'Select')}
+                </div>
+              </div>
+              <div className="flex gap-3 mb-2">
+                <div className="flex-1">
+                  <p className="text-[12px] font-medium text-black mb-1">Item ID</p>
+                  {renderFilterDropdown('itemId', filterItemId, 'Select')}
+                </div>
+                <div className="flex-1">
+                  <p className="text-[12px] font-medium text-black mb-1">Project Incharge</p>
+                  {renderFilterDropdown('projectIncharge', filterProjectIncharge, 'Select')}
+                </div>
+              </div>
+            </div>
+            {/* Footer: Cancel + Save */}
+            <div className="flex-shrink-0 flex gap-4 px-6 pb-6 pt-2">
+              <button type="button" onClick={() => setShowFilterSheet(false)}
+                className="flex-1 h-[40px] border border-black rounded-[8px] text-[14px] font-bold text-black bg-white"
+              >
+                Cancel
+              </button>
+              <button type="button" onClick={() => setShowFilterSheet(false)}
+                className="flex-1 h-[40px] rounded-[8px] text-[14px] font-bold text-white bg-black"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Date Picker Modal */}
+      <DatePickerModal
+        isOpen={showDatePicker}
+        onClose={() => {
+          setShowDatePicker(false);
+        }}
+        onConfirm={handleDatePickerConfirm}
+        initialDate={filterDate || ''}
+      />
     </div>
   );
 };

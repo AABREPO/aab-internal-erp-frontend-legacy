@@ -9,6 +9,25 @@ import edit from '../Images/Edit.svg';
 import axios from 'axios';
 
 const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
+  const resolveActiveBranchId = () => {
+    try {
+      const selectedBranchId = localStorage.getItem("selectedBranchId");
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const fallbackBranchId = user?.branchId ?? user?.branch_id ?? user?.brachId;
+      const resolved = Number(selectedBranchId || fallbackBranchId);
+      return Number.isFinite(resolved) && resolved > 0 ? resolved : null;
+    } catch {
+      return null;
+    }
+  };
+  const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId());
+  const withBranchUrl = useCallback((baseUrl) => {
+    const url = new URL(baseUrl);
+    if (activeBranchId !== null && activeBranchId !== undefined && activeBranchId !== "") {
+      url.searchParams.set("branchId", String(activeBranchId));
+    }
+    return url.toString();
+  }, [activeBranchId]);
   const [selectedLoanType, setSelectedLoanType] = useState('Loan')
   const [selectedOption, setSelectedOption] = useState(null);
   const [combinedOptions, setCombinedOptions] = useState([]);
@@ -70,6 +89,16 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   ], []);
 
   const finalPaymentModeOptions = paymentModeOptions.length > 0 ? paymentModeOptions : defaultPaymentModeOptions;
+
+  useEffect(() => {
+    const syncBranch = () => {
+      const nextBranchId = resolveActiveBranchId();
+      setActiveBranchId((prevBranchId) => (prevBranchId === nextBranchId ? prevBranchId : nextBranchId));
+    };
+    syncBranch();
+    window.addEventListener("branchSelectionChanged", syncBranch);
+    return () => window.removeEventListener("branchSelectionChanged", syncBranch);
+  }, []);
 
   useEffect(() => {
     const savedselectedLoanType = sessionStorage.getItem('selectedLoanType');
@@ -494,9 +523,11 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
 
   // Fetch loan data
   useEffect(() => {
+    setLoanData([]);
+    setOverallLoan(0);
     const fetchData = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/loans/all');
+        const response = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/loans/all'));
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
@@ -542,7 +573,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       }
     };
     fetchData();
-  }, []);
+  }, [withBranchUrl]);
   // Optimized handleChange with useCallback
   const handleChange = useCallback(async (selected) => {
     setSelectedOption(selected);
@@ -552,7 +583,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       localStorage.removeItem("loanContractorVendor");
     }
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/loans/all');
+      const response = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/loans/all'));
       if (!response.ok) {
         throw new Error('Failed to fetch data');
       }
@@ -595,7 +626,31 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       console.error('Error fetching or processing loan data:', error);
       setOverallLoan(0);
     }
-  }, []);
+  }, [withBranchUrl]);
+  useEffect(() => {
+    if (!selectedOption) {
+      setOverallLoan(0);
+      return;
+    }
+    const total = loanData
+      .filter((item) => {
+        if (selectedOption.type === 'Vendor') return item.vendor_id === selectedOption.id;
+        if (selectedOption.type === 'Contractor') return item.contractor_id === selectedOption.id;
+        if (selectedOption.type === 'Employee') return item.employee_id === selectedOption.id;
+        if (selectedOption.type === 'Labour') return item.labour_id === selectedOption.id;
+        return false;
+      })
+      .reduce((sum, curr) => {
+        if (curr.type === 'Loan') return sum + (parseFloat(curr.amount) || 0);
+        if (curr.type === 'Refund') return sum - (parseFloat(curr.loan_refund_amount) || 0);
+        if (curr.type === 'Transfer') {
+          if (curr.transfer_Project_id) return sum + (parseFloat(curr.amount) || 0);
+          return sum;
+        }
+        return sum;
+      }, 0);
+    setOverallLoan(total);
+  }, [loanData, selectedOption]);
   // Combine vendor, contractor, employee, and labour options
   useEffect(() => {
     setCombinedOptions([...vendorOptions, ...contractorOptions, ...employeeOptions, ...labourOptions]);
@@ -846,7 +901,8 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         project_id: 0,
         description: transferDesc,
         file_url: "",
-        advance_portal_id: null
+        advance_portal_id: null,
+        branch_id: activeBranchId
       };
 
       // Create Loan entry for receiver (add amount)
@@ -870,12 +926,13 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         project_id: 0,
         description: receiverLoanDesc,
         file_url: "",
-        advance_portal_id: null
+        advance_portal_id: null,
+        branch_id: activeBranchId
       };
 
       try {
         // Save sender transfer entry
-        const senderResponse = await fetch("https://backendaab.in/aabuildersDash/api/loans/save", {
+        const senderResponse = await fetch(withBranchUrl("https://backendaab.in/aabuildersDash/api/loans/save"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -888,7 +945,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         }
 
         // Save receiver loan entry
-        const receiverResponse = await fetch("https://backendaab.in/aabuildersDash/api/loans/save", {
+        const receiverResponse = await fetch(withBranchUrl("https://backendaab.in/aabuildersDash/api/loans/save"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -926,7 +983,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         // Refresh loan data to show the new entries
         setTimeout(async () => {
           try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/loans/all');
+            const response = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/loans/all'));
             if (!response.ok) {
               throw new Error(`HTTP error! Status: ${response.status}`);
             }
@@ -955,7 +1012,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       // First, create advance portal entry with positive amount
       try {
         // Get entry number for advance portal
-        const res = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/getAll');
+        const res = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/getAll'));
         if (!res.ok) throw new Error('Failed to fetch advance portal entry numbers');
         const allData = await res.json();
         const maxEntryNo = allData.length > 0 ? Math.max(...allData.map(item => item.entry_no || 0)) : 0;
@@ -975,10 +1032,11 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
           entry_no: nextEntryNo,
           week_no: getWeekNumber(),
           description: "Transfer from Loan Portal",
-          file_url: ""
+          file_url: "",
+          branch_id: activeBranchId
         };
 
-        const advanceResponse = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/save', {
+        const advanceResponse = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(advancePayload)
@@ -1025,11 +1083,12 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       project_id: 0,
       description,
       file_url: "",
-      advance_portal_id: advancePortalId || null
+      advance_portal_id: advancePortalId || null,
+      branch_id: activeBranchId
     };
     console.log("Submitting loan data with payload:", payload);
     try {
-      const response = await fetch("https://backendaab.in/aabuildersDash/api/loans/save", {
+      const response = await fetch(withBranchUrl("https://backendaab.in/aabuildersDash/api/loans/save"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -1064,11 +1123,12 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
           cheque_number: paymentMode === "Cheque" ? paymentPopupData.chequeNo : null,
           cheque_date: paymentMode === "Cheque" ? paymentPopupData.chequeDate : null,
           transaction_number: paymentPopupData.transactionNumber || null,
-          account_number: paymentPopupData.accountNumber || null
+          account_number: paymentPopupData.accountNumber || null,
+          branch_id: activeBranchId
         };
 
         const weeklyPaymentBillResponse = await axios.post(
-          "https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save",
+          withBranchUrl("https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save"),
           weeklyPaymentBillPayload,
           { headers: { "Content-Type": "application/json" } }
         );
@@ -1105,7 +1165,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       // Refresh loan data to show the new entry
       setTimeout(async () => {
         try {
-          const response = await fetch('https://backendaab.in/aabuildersDash/api/loans/all');
+          const response = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/loans/all'));
           if (!response.ok) {
             throw new Error(`HTTP error! Status: ${response.status}`);
           }
@@ -1612,13 +1672,17 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   }, []);
   const handleUpdate = useCallback(async () => {
     try {
-      const res = await fetch(`https://backendaab.in/aabuildersDash/api/loans/${editingId}`, {
+      const payload = {
+        ...editFormData,
+        branch_id: editFormData.branch_id ?? activeBranchId
+      };
+      const res = await fetch(withBranchUrl(`https://backendaab.in/aabuildersDash/api/loans/${editingId}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editFormData)
+        body: JSON.stringify(payload)
       });
       if (!res.ok) throw new Error('Failed to update');
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/loans/all');
+      const response = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/loans/all'));
       if (response.ok) {
         const data = await response.json();
         setLoanData(data);
@@ -1637,7 +1701,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         theme: "colored"
       });
     }
-  }, [editingId, editFormData, username]);
+  }, [editingId, editFormData, username, activeBranchId, withBranchUrl]);
   return (
     <body>
       <div>

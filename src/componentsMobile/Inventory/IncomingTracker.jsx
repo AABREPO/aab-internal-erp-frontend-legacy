@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import SearchableDropdown from '../PurchaseOrder/SearchableDropdown';
 import Filter from '../Images/Filter.png'
 import Close from '../Images/close.png'
+import Edit from '../Images/edit1.png';
 
-const IncomingTracker = ({ user }) => {
+const IncomingTracker = ({ user, onTabChange }) => {
   const [activeStatus, setActiveStatus] = useState('live'); // 'live', 'closed', or 'history'
   const [incomingRecords, setIncomingRecords] = useState([]);
   const [filteredRecords, setFilteredRecords] = useState([]);
@@ -27,7 +28,109 @@ const IncomingTracker = ({ user }) => {
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const [showPODropdown, setShowPODropdown] = useState(false);
+  const [swipeStates, setSwipeStates] = useState({});
+  const [expandedClosedCardId, setExpandedClosedCardId] = useState(null);
   
+  const minSwipeDistance = 50;
+  const getRecordDate = (entry) => new Date(entry?.date || entry?.created_at || entry?.createdAt || 0).getTime();
+  const getLatestEntry = (record) => {
+    const entries = Array.isArray(record?.mergedEntries) && record.mergedEntries.length > 0
+      ? record.mergedEntries
+      : [record];
+    return entries.reduce((latest, current) => {
+      return getRecordDate(current) > getRecordDate(latest) ? current : latest;
+    }, entries[0]);
+  };
+  const handleClosedCardSwipeStart = (event, recordId) => {
+    const touch = event.touches ? event.touches[0] : { clientX: event.clientX, clientY: event.clientY };
+    setSwipeStates(prev => ({
+      ...prev,
+      [recordId]: {
+        startX: touch.clientX,
+        startY: touch.clientY || event.clientY || 0,
+        currentX: touch.clientX,
+        currentY: touch.clientY || event.clientY || 0,
+        isSwiping: false,
+      }
+    }));
+  };
+  const handleClosedCardSwipeMove = (event, recordId) => {
+    const state = swipeStates[recordId];
+    if (!state) return;
+    const touch = event.touches ? event.touches[0] : { clientX: event.clientX, clientY: event.clientY };
+    const deltaX = touch.clientX - state.startX;
+    const currentY = touch.clientY || event.clientY || 0;
+    const deltaY = Math.abs(currentY - (state.startY || 0));
+    const absDeltaX = Math.abs(deltaX);
+    if (absDeltaX <= deltaY) return;
+    const isExpanded = expandedClosedCardId === recordId;
+    if (deltaX < 0 || (isExpanded && deltaX > 0)) {
+      if (event.preventDefault) {
+        event.preventDefault();
+      }
+      setSwipeStates(prev => ({
+        ...prev,
+        [recordId]: {
+          ...prev[recordId],
+          currentX: touch.clientX,
+          currentY: currentY,
+          isSwiping: true,
+        }
+      }));
+    }
+  };
+  const handleClosedCardSwipeEnd = (recordId) => {
+    const state = swipeStates[recordId];
+    if (!state) return;
+    const deltaX = state.currentX - state.startX;
+    const deltaY = Math.abs((state.currentY || 0) - (state.startY || 0));
+    const absDeltaX = Math.abs(deltaX);
+    if (absDeltaX <= deltaY) {
+      setSwipeStates(prev => {
+        const newState = { ...prev };
+        delete newState[recordId];
+        return newState;
+      });
+      return;
+    }
+    if (absDeltaX >= minSwipeDistance) {
+      if (deltaX < 0) {
+        setExpandedClosedCardId(recordId);
+      } else {
+        setExpandedClosedCardId(null);
+      }
+    } else if (expandedClosedCardId === recordId) {
+      setExpandedClosedCardId(null);
+    }
+    setSwipeStates(prev => {
+      const newState = { ...prev };
+      delete newState[recordId];
+      return newState;
+    });
+  };
+  const handleEditClosedRecord = (record) => {
+    const latestEntry = getLatestEntry(record);
+    if (!latestEntry) return;
+    const inventoryItem = {
+      ...latestEntry,
+      isEditMode: true,
+      fromHistory: true,
+    };
+    localStorage.setItem('editingInventory', JSON.stringify(inventoryItem));
+    if (typeof onTabChange === 'function') {
+      onTabChange('incoming');
+    } else {
+      localStorage.setItem('inventoryActiveTab', 'incoming');
+    }
+    setExpandedClosedCardId(null);
+    window.dispatchEvent(new CustomEvent('editInventory', { detail: inventoryItem }));
+  };
+  useEffect(() => {
+    if (activeStatus !== 'closed') {
+      setExpandedClosedCardId(null);
+      setSwipeStates({});
+    }
+  }, [activeStatus]);
 
   // Fetch vendor data
   useEffect(() => {
@@ -1123,7 +1226,16 @@ const IncomingTracker = ({ user }) => {
                   return colorPalette[colorIndex];
                 };
 
-                return itemsToDisplay.map((item, index) => {
+                // Sort items so that items with quantity 0 appear first
+                const sortedItems = [...itemsToDisplay].sort((a, b) => {
+                  const quantityA = Math.abs(a.quantity || 0);
+                  const quantityB = Math.abs(b.quantity || 0);
+                  if (quantityA === 0 && quantityB !== 0) return -1;
+                  if (quantityA !== 0 && quantityB === 0) return 1;
+                  return 0;
+                });
+
+                return sortedItems.map((item, index) => {
                   const itemId = item.item_id || item.itemId || null;
                   const brandId = item.brand_id || item.brandId || null;
                   const modelId = item.model_id || item.modelId || null;
@@ -1160,9 +1272,10 @@ const IncomingTracker = ({ user }) => {
 
                   // Check if quantity matches PO quantity (different if they don't match)
                   const isQuantityDifferent = quantity !== poQuantity;
+                  const isQuantityZero = quantity === 0;
 
                   return (
-                    <div key={index} className="bg-white border border-[#E0E0E0] rounded-[8px] p-3">
+                    <div key={index} className={`bg-white border rounded-[8px] p-3 ${isQuantityZero ? 'border-[#FF6B6B] border-2' : 'border-[#E0E0E0]'}`}>
                       <div className=" ">
                         <div className="flex items-center justify-between">
                           <p className="text-[14px] font-semibold text-black">{itemName}</p>
@@ -1269,70 +1382,121 @@ const IncomingTracker = ({ user }) => {
                 // Live and Closed tabs - detailed card format
                 const recordId = record.id || record._id || `${record.purchaseNo}_${record.vendorName}`;
                 const isSelected = activeStatus === 'live' && selectedLiveCardId === recordId;
+                const isClosedCard = activeStatus === 'closed';
                 const isClickable = activeStatus === 'live';
+                const swipeState = swipeStates[recordId];
+                const isExpanded = expandedClosedCardId === recordId;
+                let swipeOffset = 0;
+                if (isClosedCard && swipeState && swipeState.isSwiping) {
+                  const deltaX = swipeState.currentX - swipeState.startX;
+                  swipeOffset = Math.max(-48, Math.min(0, deltaX));
+                } else if (isClosedCard && isExpanded) {
+                  swipeOffset = -48;
+                }
                 return (
                   <div key={recordId}>
-                    <div
-                      className={`bg-white border rounded-lg p-4 relative ${isClickable ? 'cursor-pointer hover:bg-gray-50' : ''} ${isSelected ? 'border-[#007233]' : 'border-gray-200'}`}
-                      style={isSelected ? { borderWidth: '1px', borderColor: '#007233' } : {}}
-                      onClick={isClickable ? () => {
-                        if (selectedLiveCardId === recordId) {
-                          setSelectedLiveCardId(null);
-                        } else {
-                          setSelectedLiveCardId(recordId);
-                        }
-                      } : undefined}
-                    >
-                      {/* Green Checkmark Icon - Top Left */}
-                      {isSelected && (
-                        <div className="absolute top-0 left-[-1px]">
-                          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="10" cy="10" r="10" fill="#007233" />
-                            <path d="M6 10L9 13L14 7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        </div>
-                      )}
-                      <div className="flex justify-between items-start">
-                        {/* Left Side */}
-                        <div className="flex-1 pr-2">
-                          <div
-                            className="flex items-center gap-1 mb-1 cursor-pointer hover:opacity-80"
+                    <div className={`relative overflow-hidden rounded-[8px] ${isClosedCard ? 'shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8]' : ''}`}>
+                      {isClosedCard && (
+                        <div
+                          className="absolute right-0 top-0 flex gap-2 flex-shrink-0 z-0"
+                          style={{
+                            opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
+                            transform: swipeOffset < 0
+                              ? `translateX(${Math.max(0, 48 + swipeOffset)}px)`
+                              : 'translateX(48px)',
+                            transition: (swipeState && swipeState.isSwiping) ? 'none' : 'opacity 0.2s ease-out, transform 0.3s ease-out',
+                            pointerEvents: isExpanded ? 'auto' : 'none'
+                          }}
+                        >
+                          <button
+                            type="button"
+                            className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setSelectedRecord(record);
-                              setShowDetailView(true);
+                              handleEditClosedRecord(record);
                             }}
+                            title="Edit"
                           >
-                            <span className="text-[12px] font-semibold text-black">
-                              #{record.purchaseNo || record.entryNumber}
-                            </span>
-                            <span className="text-[12px] font-semibold text-black">
-                              , {record.vendorName}
-                            </span>
-                          </div>
-                          <p className="text-[12px] text-gray-600 mb-1">
-                            {record.stockingLocation}
-                          </p>
-                          <p className="text-[12px] text-gray-500">
-                            {record.created_date_time && new Date(record.created_date_time).toLocaleString('en-GB', {
-                              day: '2-digit',
-                              month: '2-digit',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              hour12: true
-                            })}
-                          </p>
+                            <img src={Edit} alt="Edit" className="w-[18px] h-[18px]" />
+                          </button>
                         </div>
-                        {/* Right Side */}
-                        <div className="flex flex-col items-end">
-                          <p className="text-[12px] text-gray-600 mb-1">
-                            No. of Items - {displayItems}
-                          </p>
-                          <p className='mb-[20px]'></p>
-                          <p className="text-[12px] font-semibold text-[#BF9853] mb-1">
-                            Quantity - {displayQuantity}
-                          </p>
+                      )}
+                      <div
+                        className={`bg-white border rounded-lg p-4 relative ${isClickable ? 'cursor-pointer hover:bg-gray-50' : ''} ${isSelected ? 'border-[#007233]' : 'border-gray-200'}`}
+                        style={{
+                          ...(isSelected ? { borderWidth: '1px', borderColor: '#007233' } : {}),
+                          ...(isClosedCard ? {
+                            transform: `translateX(${swipeOffset}px)`,
+                            transition: (swipeState && swipeState.isSwiping) ? 'none' : 'transform 0.3s ease-out',
+                            touchAction: 'pan-y',
+                            userSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+                            WebkitUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+                            MozUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+                            msUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto'
+                          } : {})
+                        }}
+                        onClick={isClickable ? () => {
+                          if (selectedLiveCardId === recordId) {
+                            setSelectedLiveCardId(null);
+                          } else {
+                            setSelectedLiveCardId(recordId);
+                          }
+                        } : undefined}
+                        onTouchStart={isClosedCard ? (e) => handleClosedCardSwipeStart(e, recordId) : undefined}
+                        onTouchMove={isClosedCard ? (e) => handleClosedCardSwipeMove(e, recordId) : undefined}
+                        onTouchEnd={isClosedCard ? () => handleClosedCardSwipeEnd(recordId) : undefined}
+                      >
+                        {/* Green Checkmark Icon - Top Left */}
+                        {isSelected && (
+                          <div className="absolute top-0 left-[-1px]">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <circle cx="10" cy="10" r="10" fill="#007233" />
+                              <path d="M6 10L9 13L14 7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </div>
+                        )}
+                        <div className="flex justify-between items-start">
+                          {/* Left Side */}
+                          <div className="flex-1 pr-2">
+                            <div
+                              className="flex items-center gap-1 mb-1 cursor-pointer hover:opacity-80"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedRecord(record);
+                                setShowDetailView(true);
+                              }}
+                            >
+                              <span className="text-[12px] font-semibold text-black">
+                                #{record.purchaseNo || record.entryNumber}
+                              </span>
+                              <span className="text-[12px] font-semibold text-black">
+                                , {record.vendorName}
+                              </span>
+                            </div>
+                            <p className="text-[12px] text-gray-600 mb-1">
+                              {record.stockingLocation}
+                            </p>
+                            <p className="text-[12px] text-gray-500">
+                              {record.created_date_time && new Date(record.created_date_time).toLocaleString('en-GB', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: true
+                              })}
+                            </p>
+                          </div>
+                          {/* Right Side */}
+                          <div className="flex flex-col items-end">
+                            <p className="text-[12px] text-gray-600 mb-1">
+                              No. of Items - {displayItems}
+                            </p>
+                            <p className='mb-[20px]'></p>
+                            <p className="text-[12px] font-semibold text-[#BF9853] mb-1">
+                              Quantity - {displayQuantity}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>

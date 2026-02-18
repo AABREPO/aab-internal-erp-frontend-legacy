@@ -8,6 +8,25 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import axios from 'axios';
 const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => {
+  const resolveActiveBranchId = () => {
+    try {
+      const selectedBranchId = localStorage.getItem("selectedBranchId");
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const fallbackBranchId = user?.branchId ?? user?.branch_id ?? user?.brachId;
+      const resolved = Number(selectedBranchId || fallbackBranchId);
+      return Number.isFinite(resolved) && resolved > 0 ? resolved : null;
+    } catch {
+      return null;
+    }
+  };
+  const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId());
+  const withBranchUrl = useCallback((baseUrl) => {
+    const url = new URL(baseUrl);
+    if (activeBranchId !== null && activeBranchId !== undefined && activeBranchId !== "") {
+      url.searchParams.set("branchId", String(activeBranchId));
+    }
+    return url.toString();
+  }, [activeBranchId]);
   // Form state management
   const [formData, setFormData] = useState({
     fromDate: '',
@@ -63,6 +82,15 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
   const [employeeOptions, setEmployeeOptions] = useState([]);
   const [laboursList, setLaboursList] = useState([]);
   const [staffAdvanceCombinedOptions, setStaffAdvanceCombinedOptions] = useState([]);
+  useEffect(() => {
+    const syncBranch = () => {
+      const nextBranchId = resolveActiveBranchId();
+      setActiveBranchId((prevBranchId) => (prevBranchId === nextBranchId ? prevBranchId : nextBranchId));
+    };
+    syncBranch();
+    window.addEventListener("branchSelectionChanged", syncBranch);
+    return () => window.removeEventListener("branchSelectionChanged", syncBranch);
+  }, []);
   // Fetch employee details on component mount
   useEffect(() => {
     // Fetch employee details
@@ -281,7 +309,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
   // Fetch all records and update table data state
   const fetchRecords = useCallback(async () => {
     try {
-      const res = await fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all');
+      const res = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/staff-advance/all'));
       if (!res.ok) {
         console.warn('Staff advance API not available, using empty data');
         setTableData([]);
@@ -293,7 +321,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
       console.warn('Error fetching records:', err);
       setTableData([]);
     }
-  }, []);
+  }, [withBranchUrl]);
 
   const filterTableData = useCallback(() => {
     if (!formData.empName || !formData.purpose) {
@@ -319,6 +347,9 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     setFilteredTableData(filtered);
   }, [tableData, formData.empName, formData.purpose]);
   useEffect(() => {
+    // Clear old-branch data immediately, then load new-branch records
+    setTableData([]);
+    setFilteredTableData([]);
     fetchRecords();
   }, [fetchRecords]);
 
@@ -584,7 +615,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
         }
       }
 
-      const resAll = await fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all');
+      const resAll = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/staff-advance/all'));
       let allData = [];
       if (resAll.ok) {
         allData = await resAll.json();
@@ -607,6 +638,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
         file_url: fileUrl || null,
         entryNo: nextEntryNo,
         weekNo: 0,
+        branch_id: activeBranchId,
       };
       if (dataToSubmit.selectedType === 'Transfer') {
         payload.from_purpose_id = dataToSubmit.purpose.id;
@@ -617,7 +649,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
         payload.to_purpose_id = null;
         payload.amount = dataToSubmit.selectedType === 'Advance' ? parseFloat(dataToSubmit.amountGivenInput) || 0 : 0;
       }
-      const saveRes = await fetch('https://backendaab.in/aabuildersDash/api/staff-advance/save', {
+      const saveRes = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/staff-advance/save'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -655,11 +687,12 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
           cheque_number: paymentDetails.chequeNo || null,
           cheque_date: paymentDetails.chequeDate || null,
           transaction_number: paymentDetails.transactionNumber || null,
-          account_number: paymentDetails.accountNumber || null
+          account_number: paymentDetails.accountNumber || null,
+          branch_id: activeBranchId
         };
         try {
           const weeklyPaymentBillResponse = await axios.post(
-            "https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save",
+            withBranchUrl("https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save"),
             weeklyPaymentBillPayload,
             { headers: { "Content-Type": "application/json" } }
           );
@@ -691,7 +724,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedFile, fetchRecords]);
+  }, [selectedFile, fetchRecords, withBranchUrl, activeBranchId]);
 
   // Handle payment popup submission
   const handlePaymentSubmit = useCallback(async () => {
@@ -1185,13 +1218,14 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
         labour_id: editFormData.empName?.type === "Labour" ? editFormData.empName.id : null,
         from_purpose_id: editFormData.purpose?.id,
         amount: editFormData.amountGivenInput,
-        staff_payment_mode: editFormData.paymentMode
+        staff_payment_mode: editFormData.paymentMode,
+        branch_id: editFormData.branch_id ?? activeBranchId
       };
       if (editFormData.selectedType === 'Transfer') {
         updatePayload.to_purpose_id = editFormData.transferPurpose?.id;
         updatePayload.amount = editFormData.transferAmount;
       }
-      const res = await fetch(`https://backendaab.in/aabuildersDash/api/staff-advance/edit/${editingId}`, {
+      const res = await fetch(withBranchUrl(`https://backendaab.in/aabuildersDash/api/staff-advance/edit/${editingId}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatePayload)
@@ -1208,7 +1242,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
       console.error('Error updating record:', err);
       alert('Error updating record');
     }
-  }, [editingId, editFormData, fetchRecords]);
+  }, [editingId, editFormData, fetchRecords, activeBranchId, withBranchUrl]);
   return (
     <div className=" bg-[#FAF6ED]">
       <div className='overflow-hidden bg-[#FAF6ED] w-full'>

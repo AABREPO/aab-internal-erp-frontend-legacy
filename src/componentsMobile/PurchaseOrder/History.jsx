@@ -1852,7 +1852,8 @@ const History = () => {
                     userSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
                     WebkitUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
                     MozUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
-                    msUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto'
+                    msUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+                    height: '95px'
                   }}
                 >
                   {/* Clone Button - Behind the card on the left, revealed on right swipe */}
@@ -1894,7 +1895,10 @@ const History = () => {
                       userSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
                       WebkitUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
                       MozUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
-                      msUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto'
+                      msUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+                      willChange: 'transform',
+                      backfaceVisibility: 'hidden',
+                      WebkitBackfaceVisibility: 'hidden'
                     }}
                     onClick={(e) => {
                       if (!isExpanded && !isCloneExpanded) {

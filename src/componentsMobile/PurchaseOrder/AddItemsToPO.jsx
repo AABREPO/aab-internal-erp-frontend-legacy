@@ -934,7 +934,7 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
                   onChange={(value) => handleFieldSelect('itemName', value)}
                   onAddNew={(value) => handleFieldAddNew('itemName', value)}
                   options={itemNameOptions}
-                  placeholder="12A Switch"
+                  placeholder="Select ..."
                   fieldName="Item Name"
                   showAllOptions={true}
                 />
@@ -949,7 +949,7 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
                   onChange={(value) => handleFieldSelect('model', value)}
                   onAddNew={(value) => handleFieldAddNew('model', value)}
                   options={modelOptions}
-                  placeholder="Natural Cream"
+                  placeholder="Select ..."
                   fieldName="Model"
                   showAllOptions={true}
                 />
@@ -964,7 +964,7 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
                   onChange={(value) => handleFieldSelect('type', value)}
                   onAddNew={(value) => handleFieldAddNew('type', value)}
                   options={typeOptions}
-                  placeholder="Flip Type"
+                  placeholder="Select ..."
                   className="w-full h-[32px]"
                   fieldName="Type"
                   showAllOptions={true}
@@ -982,7 +982,7 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
                     onChange={(value) => handleFieldSelect('brand', value)}
                     onAddNew={(value) => handleFieldAddNew('brand', value)}
                     options={brandOptions}
-                    placeholder="Kundan"
+                    placeholder="Select ..."
                     fieldName="Brand"
                     showAllOptions={true}
                   />

@@ -6,6 +6,25 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import jsPDF from 'jspdf';
 const Form = ({ username, userRoles = [] }) => {
+    const resolveActiveBranchId = () => {
+        try {
+            const selectedBranchId = localStorage.getItem("selectedBranchId");
+            const user = JSON.parse(localStorage.getItem("user") || "{}");
+            const fallbackBranchId = user?.branchId ?? user?.branch_id ?? user?.brachId;
+            const resolved = Number(selectedBranchId || fallbackBranchId);
+            return Number.isFinite(resolved) && resolved > 0 ? resolved : null;
+        } catch {
+            return null;
+        }
+    };
+    const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId());
+    const buildBranchUrl = (baseUrl) => {
+        const url = new URL(baseUrl);
+        if (activeBranchId !== null && activeBranchId !== undefined && activeBranchId !== "") {
+            url.searchParams.set("branchId", String(activeBranchId));
+        }
+        return url.toString();
+    };
     const [eno, setEno] = useState(null);
     const [date, setDate] = useState('');
     const [amount, setAmount] = useState('');
@@ -51,6 +70,19 @@ const Form = ({ username, userRoles = [] }) => {
     const [showReviewModal, setShowReviewModal] = useState(false);
     const [isReviewEditMode, setIsReviewEditMode] = useState(false);
     const [filePreviewUrl, setFilePreviewUrl] = useState(null);
+    useEffect(() => {
+        const syncBranch = () => {
+            const nextBranchId = resolveActiveBranchId();
+            setActiveBranchId((prevBranchId) =>
+                prevBranchId === nextBranchId ? prevBranchId : nextBranchId
+            );
+        };
+        syncBranch();
+        window.addEventListener("branchSelectionChanged", syncBranch);
+        return () => {
+            window.removeEventListener("branchSelectionChanged", syncBranch);
+        };
+    }, []);
     useEffect(() => {
         const fetchUserRoles = async () => {
             try {
@@ -268,7 +300,9 @@ const Form = ({ username, userRoles = [] }) => {
 
                 const fetchPreviousEntry = async () => {
                     try {
-                        const response = await axios.get('https://backendaab.in/aabuilderDash/expenses_form/utility/electricity');
+                        const response = await axios.get(
+                            buildBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/utility/electricity")
+                        );
                         const electricityEntries = Array.isArray(response.data) ? response.data : [];
 
                         const previousEntry = electricityEntries
@@ -627,7 +661,7 @@ const Form = ({ username, userRoles = [] }) => {
     };
     const fetchLatestEno = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/expenses_form/get_form');
+            const response = await fetch(buildBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/get_form"));
             if (!response.ok) {
                 throw new Error('Failed to fetch ENo');
             }
@@ -785,9 +819,10 @@ const Form = ({ username, userRoles = [] }) => {
                 utilityType: utilityType || '',
                 utilityTypeNumber: selectedEbNumber ? selectedEbNumber.label : '',
                 utilityForTheMonth: selectedMonths || '',
-                utilityValidityDays: thirdInput || ''
+                utilityValidityDays: thirdInput || '',
+                branchId: activeBranchId
             };
-            const formResponse = await fetch("https://backendaab.in/aabuilderDash/expenses_form/save", {
+            const formResponse = await fetch(buildBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/save"), {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -807,7 +842,7 @@ const Form = ({ username, userRoles = [] }) => {
                     savedExpenseData = expensesResult;
                 } else {
                     try {
-                        const allFormsRes = await fetch("https://backendaab.in/aabuilderDash/expenses_form/get_form");
+                        const allFormsRes = await fetch(buildBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/get_form"));
                         if (allFormsRes.ok) {
                             const allForms = await allFormsRes.json();
                             if (allForms.length > 0) {
@@ -842,7 +877,7 @@ const Form = ({ username, userRoles = [] }) => {
             }
             if (expensesId) {
                 try {
-                    const verifyResponse = await fetch(`https://backendaab.in/aabuilderDash/expenses_form/get_form`);
+                    const verifyResponse = await fetch(buildBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/get_form"));
                     if (verifyResponse.ok) {
                         const allForms = await verifyResponse.json();
                         const savedForm = allForms.find(f => f.id === expensesId);
@@ -876,7 +911,8 @@ const Form = ({ username, userRoles = [] }) => {
                     rent_management_id: null,
                     expenses_entry_id: expensesId,
                     send_to_expenses_entry: false,
-                    bill_copy_url: pdfUrl || ''
+                    bill_copy_url: pdfUrl || '',
+                    branch_id: activeBranchId
                 };
                 try {
                     const weeklyExpenseResponse = await fetch("https://backendaab.in/aabuildersDash/api/weekly-expenses/save", {
@@ -1032,9 +1068,10 @@ const Form = ({ username, userRoles = [] }) => {
                 utilityType: utilityType || '',
                 utilityTypeNumber: selectedEbNumber ? selectedEbNumber.label : '',
                 utilityForTheMonth: selectedMonths || '',
-                utilityValidityDays: thirdInput || ''
+                utilityValidityDays: thirdInput || '',
+                branchId: activeBranchId
             };
-            const expensesResponse = await fetch("https://backendaab.in/aabuilderDash/expenses_form/save", {
+            const expensesResponse = await fetch(buildBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/save"), {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -1056,7 +1093,7 @@ const Form = ({ username, userRoles = [] }) => {
                 } else {
                     expensesResult = { message: responseText };
                     try {
-                        const allFormsRes = await fetch("https://backendaab.in/aabuilderDash/expenses_form/get_form");
+                        const allFormsRes = await fetch(buildBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/get_form"));
                         if (allFormsRes.ok) {
                             const allForms = await allFormsRes.json();
                             if (allForms.length > 0) {
@@ -1100,7 +1137,7 @@ const Form = ({ username, userRoles = [] }) => {
             }
             if (expensesId) {
                 try {
-                    const verifyResponse = await fetch(`https://backendaab.in/aabuilderDash/expenses_form/get_form`);
+                    const verifyResponse = await fetch(buildBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/get_form"));
                     if (verifyResponse.ok) {
                         const allForms = await verifyResponse.json();
                         const savedForm = allForms.find(f => f.id === expensesId);
@@ -1128,7 +1165,8 @@ const Form = ({ username, userRoles = [] }) => {
                 cheque_number: paymentModalData.chequeNo || null,
                 cheque_date: paymentModalData.chequeDate || null,
                 transaction_number: paymentModalData.transactionNumber || null,
-                account_number: paymentModalData.accountNumber || null
+                account_number: paymentModalData.accountNumber || null,
+                branch_id: activeBranchId
             };
             const weeklyResponse = await fetch('https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save', {
                 method: 'POST',

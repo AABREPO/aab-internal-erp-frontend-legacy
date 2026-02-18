@@ -78,7 +78,9 @@ const Transfer = ({ user }) => {
     return saved ? JSON.parse(saved) : [];
   });
   const [entryServiceMode, setEntryServiceMode] = useState('Entry');
+  const [serviceFlowMode, setServiceFlowMode] = useState('sent'); // 'sent' | 'return' - for Service tab
   const [isSwapIconToggled, setIsSwapIconToggled] = useState(false);
+  const [isServiceSwapIconToggled, setIsServiceSwapIconToggled] = useState(false);
   const [showAddItemsModal, setShowAddItemsModal] = useState(false);
   const [itemNameOptions, setItemNameOptions] = useState([]);
   const [brandOptions, setBrandOptions] = useState([]);
@@ -145,6 +147,7 @@ const Transfer = ({ user }) => {
     machineStatus: ''
   });
   const [isEditMode, setIsEditMode] = useState(false);
+  const [cloneModeActive, setCloneModeActive] = useState(false);
   const [editEntryId, setEditEntryId] = useState(null);
   const [originalEditData, setOriginalEditData] = useState(null);
   const [customAlert, setCustomAlert] = useState({
@@ -252,7 +255,9 @@ const Transfer = ({ user }) => {
       try {
         let endpoint;
         if (entryServiceMode === 'Service') {
-          endpoint = `${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getServiceCount`;
+          endpoint = serviceFlowMode === 'return'
+            ? `${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getServiceReturnCount`
+            : `${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getServiceCount`;
         } else if (entryServiceMode === 'Relocate') {
           endpoint = `${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getRelocationCount`;
         } else {
@@ -262,13 +267,19 @@ const Transfer = ({ user }) => {
         if (response.ok) {
           const data = await response.json();
           setEntryNo(data + 1);
+        } else if (entryServiceMode === 'Service' && serviceFlowMode === 'return') {
+          const fallbackRes = await fetch(`${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getServiceCount`);
+          if (fallbackRes.ok) {
+            const fallbackData = await fallbackRes.json();
+            setEntryNo(fallbackData + 1);
+          }
         }
       } catch (error) {
         console.error('Error fetching entry number:', error);
       }
     };
     fetchEntryNo();
-  }, [entryServiceMode]);
+  }, [entryServiceMode, serviceFlowMode]);
   useEffect(() => {
     // Update current location in relocateItemDetails when selectedCurrentLocation changes
     if (entryServiceMode === 'Relocate' && relocateItemDetails && selectedCurrentLocation) {
@@ -564,7 +575,9 @@ const Transfer = ({ user }) => {
     ? (selectedFrom && selectedTo && selectedIncharge)
     : entryServiceMode === 'Relocate'
       ? (selectedRelocateItemId && selectedCurrentLocation && selectedRelocateLocation)
-      : (selectedFrom && selectedServiceStore && selectedIncharge);
+      : entryServiceMode === 'Service' && serviceFlowMode === 'return'
+        ? (selectedServiceStore && selectedTo && selectedIncharge)
+        : (selectedFrom && selectedServiceStore && selectedIncharge);
   const handleSwitchToEntry = () => {
     if (isEditMode && originalEditData && (originalEditData.tools_entry_type === 'relocate' || originalEditData.tools_entry_type === 'Relocate')) {
       return;
@@ -581,6 +594,8 @@ const Transfer = ({ user }) => {
       return;
     }
     setEntryServiceMode('Service');
+    setServiceFlowMode('sent');
+    setIsServiceSwapIconToggled(false);
     setSelectedTo(null);
     setSelectedRelocateItemId(null);
     setSelectedCurrentLocation(null);
@@ -597,17 +612,31 @@ const Transfer = ({ user }) => {
     setSelectedFrom(null);
     setRelocateLocationSearchQuery('');
   };
-  const handleSwapFromTo = () => {
-    if (entryServiceMode !== 'Entry') return;
+  const handleSwapFromTo = (overrideMode = null) => {
+    if (entryServiceMode !== 'Entry' && entryServiceMode !== 'Service') return;
     const currentFrom = selectedFrom || null;
-    const currentTo = selectedTo || null;
-    setSelectedFrom(currentTo);
-    setSelectedTo(currentFrom);
-    setIsSwapIconToggled(prev => !prev);
+    const modeToUse = overrideMode !== null ? overrideMode : serviceFlowMode;
+    if (entryServiceMode === 'Service' && modeToUse === 'sent') {
+      const currentServiceStore = selectedServiceStore || null;
+      setSelectedFrom(currentServiceStore);
+      setSelectedServiceStore(currentFrom);
+      setIsServiceSwapIconToggled(prev => !prev);
+    } else {
+      const currentTo = selectedTo || null;
+      setSelectedFrom(currentTo);
+      setSelectedTo(currentFrom);
+      setIsSwapIconToggled(prev => !prev);
+    }
     setShowFromDropdown(false);
     setShowToDropdown(false);
+    setShowServiceStoreDropdown(false);
     setShowInchargeDropdown(false);
   };
+  useEffect(() => {
+    if (entryServiceMode === 'Service') {
+      setIsServiceSwapIconToggled(false);
+    }
+  }, [entryServiceMode]);
   useEffect(() => {
     const fetchToolsItemNames = async () => {
       try {
@@ -759,6 +788,10 @@ const Transfer = ({ user }) => {
     const loadEditData = async () => {
       try {
         const editEntryId = localStorage.getItem('editingToolsTrackerEntryId');
+        const isCloneMode = localStorage.getItem('toolsTrackerCloneMode') === 'true';
+        const cloneItemIdsId = localStorage.getItem('toolsTrackerCloneItemIdsId') || '';
+        setCloneModeActive(isCloneMode);
+        setIsEditingTransferDetails(isCloneMode);
         if (editEntryId) {
           const response = await fetch(`${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/get/${editEntryId}`, {
             method: 'GET',
@@ -769,7 +802,26 @@ const Transfer = ({ user }) => {
             throw new Error('Failed to fetch entry data');
           }
           const editData = await response.json();
-          if (editData.eno) {
+          const entryType = editData.tools_entry_type || editData.toolsEntryType || 'entry';
+          if (isCloneMode) {
+            try {
+              let endpoint;
+              if (String(entryType).toLowerCase() === 'service') {
+                endpoint = `${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getServiceCount`;
+              } else if (String(entryType).toLowerCase() === 'relocate') {
+                endpoint = `${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getRelocationCount`;
+              } else {
+                endpoint = `${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getEntryCount`;
+              }
+              const countResponse = await fetch(endpoint);
+              if (countResponse.ok) {
+                const countData = await countResponse.json();
+                setEntryNo(countData + 1);
+              }
+            } catch (enoError) {
+              console.error('Error fetching next entry number in clone mode:', enoError);
+            }
+          } else if (editData.eno) {
             setEntryNo(editData.eno);
           }
           if (editData.created_date_time || editData.createdDateTime) {
@@ -778,7 +830,6 @@ const Transfer = ({ user }) => {
               setDate(normalizedDate);
             }
           }
-          const entryType = editData.tools_entry_type || editData.toolsEntryType || 'entry';
           if (entryType === 'service') {
             setEntryServiceMode('Service');
           } else if (entryType === 'relocate' || entryType === 'Relocate') {
@@ -786,10 +837,67 @@ const Transfer = ({ user }) => {
           } else {
             setEntryServiceMode('Entry');
           }
+          const resolveCloneFromIdFromApi = async (fallbackFromId) => {
+            if (!isCloneMode) return fallbackFromId;
+            const entryItems = editData.tools_tracker_item_name_table || editData.toolsTrackerItemNameTable || [];
+            const cloneTargetItem = (Array.isArray(entryItems) ? entryItems : []).find((it) =>
+              cloneItemIdsId && String(it.item_ids_id || it.itemIdsId || '') === String(cloneItemIdsId)
+            ) || (Array.isArray(entryItems) ? entryItems.find((it) => it.item_ids_id || it.itemIdsId) : null);
+            const targetItemIdsId = cloneTargetItem?.item_ids_id || cloneTargetItem?.itemIdsId || cloneItemIdsId || null;
+            if (!targetItemIdsId) return fallbackFromId;
+            try {
+              const allEntriesResponse = await fetch(`${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getAll`, {
+                method: 'GET',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' }
+              });
+              if (!allEntriesResponse.ok) return fallbackFromId;
+              const allEntriesData = await allEntriesResponse.json();
+              const allEntries = Array.isArray(allEntriesData) ? allEntriesData : [];
+              let latestMovement = null;
+              const targetItemIdsIdStr = String(targetItemIdsId);
+              for (const entry of allEntries) {
+                const movementType = getEntryTypeNormalized(entry);
+                if (!isMovementEntryType(movementType)) continue;
+                const movementItem = findMatchingItemSetInEntry(entry, targetItemIdsIdStr, null, '');
+                if (!movementItem) continue;
+                const sortTime = getEntrySortTime(entry);
+                const movementId = Number(entry?.id || 0);
+                const latestId = Number(latestMovement?.entry?.id || 0);
+                const isMoreRecent = !latestMovement
+                  || sortTime > latestMovement.sortTime
+                  || (sortTime === latestMovement.sortTime && movementId > latestId);
+                if (isMoreRecent) {
+                  latestMovement = {
+                    entry,
+                    movementType,
+                    movementItem,
+                    sortTime
+                  };
+                }
+              }
+              if (!latestMovement) return fallbackFromId;
+              if (isRelocateEntryType(latestMovement.movementType)) {
+                const relocatedHomeLocationId = latestMovement.movementItem?.home_location_id || latestMovement.movementItem?.homeLocationId;
+                return relocatedHomeLocationId ? String(relocatedHomeLocationId) : fallbackFromId;
+              }
+              if (isServiceEntryType(latestMovement.movementType)) {
+                const serviceStoreId = latestMovement.entry?.service_store_id || latestMovement.entry?.serviceStoreId;
+                return serviceStoreId ? String(serviceStoreId) : fallbackFromId;
+              }
+              const latestToProjectId = latestMovement.entry?.to_project_id || latestMovement.entry?.toProjectId;
+              return latestToProjectId ? String(latestToProjectId) : fallbackFromId;
+            } catch (resolveError) {
+              console.error('Error resolving clone from location from API:', resolveError);
+              return fallbackFromId;
+            }
+          };
+          const cloneFallbackFromId = editData.to_project_id || editData.toProjectId || '';
+          const resolvedCloneFromId = await resolveCloneFromIdFromApi(cloneFallbackFromId);
           const loadItems = () => {
             const entryItems = editData.tools_tracker_item_name_table || editData.toolsTrackerItemNameTable || [];
             const loadedItems = entryItems.map((item, index) => {
-              const rawImages = item.tools_item_live_images || item.toolsItemLiveImages || [];
+              const rawImages = isCloneMode ? [] : (item.tools_item_live_images || item.toolsItemLiveImages || []);
               const processedImages = rawImages.map(img => {
                 if (img.tools_image || img.toolsImage) {
                   const base64Data = img.tools_image || img.toolsImage;
@@ -813,7 +921,7 @@ const Transfer = ({ user }) => {
                 model: item.model || '',
                 machine_number: item.machine_number || item.machineNumber || '',
                 quantity: item.quantity || 0,
-                machine_status: item.machine_status || item.machineStatus || 'Working',
+                machine_status: isCloneMode ? 'Working' : (item.machine_status || item.machineStatus || 'Working'),
                 description: item.description || '',
                 tools_item_live_images: rawImages.map(img => ({
                   tools_image: img.tools_image || img.toolsImage
@@ -826,36 +934,46 @@ const Transfer = ({ user }) => {
             });
             setItems(loadedItems);
           };
-          setIsEditMode(true);
-          setEditEntryId(editEntryId);
-          setOriginalEditData({
-            from_project_id: editData.from_project_id || editData.fromProjectId,
-            to_project_id: editData.to_project_id || editData.toProjectId,
-            service_store_id: editData.service_store_id || editData.serviceStoreId,
-            project_incharge_id: editData.project_incharge_id || editData.projectInchargeId,
-            tools_entry_type: editData.tools_entry_type || editData.toolsEntryType,
-            created_date_time: normalizeDisplayDate(editData.created_date_time || editData.createdDateTime || ''),
-            items: (editData.tools_tracker_item_name_table || editData.toolsTrackerItemNameTable || []).map(it => ({
-              id: it.id,
-              item_name_id: it.item_name_id ? String(it.item_name_id) : null,
-              item_ids_id: it.item_ids_id ? String(it.item_ids_id) : null,
-              brand_id: it.brand_id ? String(it.brand_id) : null,
-              model: it.model || '',
-              machine_number: it.machine_number || it.machineNumber || '',
-              quantity: it.quantity || 0,
-              machine_status: it.machine_status || it.machineStatus || 'Working',
-              description: it.description || ''
-            }))
-          });
+          setIsEditMode(!isCloneMode);
+          setEditEntryId(isCloneMode ? null : editEntryId);
+          if (isCloneMode) {
+            setOriginalEditData(null);
+          } else {
+            setOriginalEditData({
+              from_project_id: editData.from_project_id || editData.fromProjectId,
+              to_project_id: editData.to_project_id || editData.toProjectId,
+              service_store_id: editData.service_store_id || editData.serviceStoreId,
+              project_incharge_id: editData.project_incharge_id || editData.projectInchargeId,
+              tools_entry_type: editData.tools_entry_type || editData.toolsEntryType,
+              created_date_time: normalizeDisplayDate(editData.created_date_time || editData.createdDateTime || ''),
+              items: (editData.tools_tracker_item_name_table || editData.toolsTrackerItemNameTable || []).map(it => ({
+                id: it.id,
+                item_name_id: it.item_name_id ? String(it.item_name_id) : null,
+                item_ids_id: it.item_ids_id ? String(it.item_ids_id) : null,
+                brand_id: it.brand_id ? String(it.brand_id) : null,
+                model: it.model || '',
+                machine_number: it.machine_number || it.machineNumber || '',
+                quantity: it.quantity || 0,
+                machine_status: it.machine_status || it.machineStatus || 'Working',
+                description: it.description || ''
+              }))
+            });
+          }
           if (fromOptions.length > 0 && inchargeOptions.length > 0) {
-            const fromOption = fromOptions.find(opt => String(opt.id) === String(editData.from_project_id || editData.fromProjectId));
+            const fromOption = fromOptions.find(opt => String(opt.id) === String(isCloneMode ? resolvedCloneFromId : (editData.from_project_id || editData.fromProjectId)));
             if (fromOption) {
               setSelectedFrom(fromOption);
+            } else if (isCloneMode) {
+              setSelectedFrom(null);
             }
             if (entryType === 'service') {
-              const serviceStoreOption = serviceStoreOptions.find(opt => String(opt.id) === String(editData.service_store_id || editData.serviceStoreId));
-              if (serviceStoreOption) {
-                setSelectedServiceStore(serviceStoreOption);
+              if (isCloneMode) {
+                setSelectedServiceStore(null);
+              } else {
+                const serviceStoreOption = serviceStoreOptions.find(opt => String(opt.id) === String(editData.service_store_id || editData.serviceStoreId));
+                if (serviceStoreOption) {
+                  setSelectedServiceStore(serviceStoreOption);
+                }
               }
             } else if (entryType === 'relocate' || entryType === 'Relocate') {
               // For Relocate entries, set Relocate-specific fields
@@ -915,9 +1033,13 @@ const Transfer = ({ user }) => {
                 setSelectedRelocateLocation(relocateLocationOption);
               }
             } else {
-              const toOption = toOptions.find(opt => String(opt.id) === String(editData.to_project_id || editData.toProjectId));
-              if (toOption) {
-                setSelectedTo(toOption);
+              if (isCloneMode) {
+                setSelectedTo(null);
+              } else {
+                const toOption = toOptions.find(opt => String(opt.id) === String(editData.to_project_id || editData.toProjectId));
+                if (toOption) {
+                  setSelectedTo(toOption);
+                }
               }
             }
             const inchargeOption = inchargeOptions.find(opt => String(opt.id) === String(editData.project_incharge_id || editData.projectInchargeId));
@@ -931,14 +1053,20 @@ const Transfer = ({ user }) => {
             const checkInterval = setInterval(() => {
               if (fromOptions.length > 0 && inchargeOptions.length > 0) {
                 clearInterval(checkInterval);
-                const fromOption = fromOptions.find(opt => String(opt.id) === String(editData.from_project_id || editData.fromProjectId));
+                const fromOption = fromOptions.find(opt => String(opt.id) === String(isCloneMode ? resolvedCloneFromId : (editData.from_project_id || editData.fromProjectId)));
                 if (fromOption) {
                   setSelectedFrom(fromOption);
+                } else if (isCloneMode) {
+                  setSelectedFrom(null);
                 }
                 if (entryType === 'service') {
-                  const serviceStoreOption = serviceStoreOptions.find(opt => String(opt.id) === String(editData.service_store_id || editData.serviceStoreId));
-                  if (serviceStoreOption) {
-                    setSelectedServiceStore(serviceStoreOption);
+                  if (isCloneMode) {
+                    setSelectedServiceStore(null);
+                  } else {
+                    const serviceStoreOption = serviceStoreOptions.find(opt => String(opt.id) === String(editData.service_store_id || editData.serviceStoreId));
+                    if (serviceStoreOption) {
+                      setSelectedServiceStore(serviceStoreOption);
+                    }
                   }
                 } else if (entryType === 'relocate' || entryType === 'Relocate') {
                   // For Relocate entries, set Relocate-specific fields
@@ -998,9 +1126,13 @@ const Transfer = ({ user }) => {
                     setSelectedRelocateLocation(relocateLocationOption);
                   }
                 } else {
-                  const toOption = toOptions.find(opt => String(opt.id) === String(editData.to_project_id || editData.toProjectId));
-                  if (toOption) {
-                    setSelectedTo(toOption);
+                  if (isCloneMode) {
+                    setSelectedTo(null);
+                  } else {
+                    const toOption = toOptions.find(opt => String(opt.id) === String(editData.to_project_id || editData.toProjectId));
+                    if (toOption) {
+                      setSelectedTo(toOption);
+                    }
                   }
                 }
                 const inchargeOption = inchargeOptions.find(opt => String(opt.id) === String(editData.project_incharge_id || editData.projectInchargeId));
@@ -1013,10 +1145,21 @@ const Transfer = ({ user }) => {
             setTimeout(() => clearInterval(checkInterval), 5000);
           }
           localStorage.removeItem('editingToolsTrackerEntryId');
+          localStorage.removeItem('toolsTrackerCloneMode');
+          localStorage.removeItem('toolsTrackerCloneItemIdsId');
+          localStorage.removeItem('toolsTrackerCloneBrandId');
+          localStorage.removeItem('toolsTrackerCloneMachineNumber');
+        } else {
+          setCloneModeActive(false);
         }
       } catch (error) {
         console.error('Error loading edit data:', error);
         localStorage.removeItem('editingToolsTrackerEntryId');
+        localStorage.removeItem('toolsTrackerCloneMode');
+        localStorage.removeItem('toolsTrackerCloneItemIdsId');
+        localStorage.removeItem('toolsTrackerCloneBrandId');
+        localStorage.removeItem('toolsTrackerCloneMachineNumber');
+        setCloneModeActive(false);
       }
     };
     loadEditData();
@@ -2022,7 +2165,13 @@ const Transfer = ({ user }) => {
         return;
       }
     } else {
-      if (!selectedFrom || !selectedIncharge) {
+      const isServiceReturn = entryServiceMode === 'Service' && serviceFlowMode === 'return';
+      if (isServiceReturn) {
+        if (!selectedServiceStore || !selectedTo || !selectedIncharge) {
+          alert('Please fill in all required fields (Service Store, To, and Project Incharge)');
+          return;
+        }
+      } else if (!selectedFrom || !selectedIncharge) {
         alert('Please fill in all required fields (From and Project Incharge)');
         return;
       }
@@ -2030,9 +2179,15 @@ const Transfer = ({ user }) => {
         alert('Please select the "To" field');
         return;
       }
-      if (entryServiceMode === 'Service' && !selectedServiceStore) {
-        alert('Please select the Service Store');
-        return;
+      if (entryServiceMode === 'Service') {
+        if (!selectedServiceStore) {
+          alert('Please select the Service Store');
+          return;
+        }
+        if (serviceFlowMode === 'return' && !selectedTo) {
+          alert('Please select the "To" field');
+          return;
+        }
       }
       if (items.length === 0) {
         alert('Please add at least one item');
@@ -2225,7 +2380,6 @@ const Transfer = ({ user }) => {
         const itemRows = [];
         for (const item of items) {
           const itemRow = {
-            timestamp: item.timestamp || new Date().toISOString().slice(0, 19),
             item_name_id: item.item_name_id || null,
             item_ids_id: item.item_ids_id || null,
             brand_id: item.brand_id || null,
@@ -2268,14 +2422,14 @@ const Transfer = ({ user }) => {
           itemRows.push(itemRow);
         }
 
+        const isServiceReturn = entryServiceMode === 'Service' && serviceFlowMode === 'return';
         payload = {
-          from_project_id: selectedFrom?.id ? String(selectedFrom.id) : null,
-          to_project_id: entryServiceMode === 'Entry' && selectedTo?.id ? String(selectedTo.id) : null,
+          from_project_id: isServiceReturn ? null : (selectedFrom?.id ? String(selectedFrom.id) : null),
+          to_project_id: (entryServiceMode === 'Entry' || isServiceReturn) && selectedTo?.id ? String(selectedTo.id) : null,
           project_incharge_id: selectedIncharge?.id ? String(selectedIncharge.id) : null,
           service_store_id: entryServiceMode === 'Service' && selectedServiceStore?.id ? String(selectedServiceStore.id) : null,
-          created_date_time: getApiDateTimeFromDisplayDate(date),
           created_by: user?.name || user?.username || 'mobile',
-          tools_entry_type: entryServiceMode.toLowerCase(), // "entry" or "service"
+          tools_entry_type: isServiceReturn ? 'service_return' : entryServiceMode.toLowerCase(),
           eno: String(entryNo),
           tools_tracker_item_name_table: itemRows
         };
@@ -2316,7 +2470,6 @@ const Transfer = ({ user }) => {
             console.error('Error saving machine status:', error);
           }
         });
-
       // Wait for all machine status saves to complete (don't block on errors)
       await Promise.allSettled(machineStatusPromises);
 
@@ -2330,7 +2483,29 @@ const Transfer = ({ user }) => {
       setSelectedRelocateLocation(null);
       setRelocateItemDetails(null);
       setItems([]);
-      setEntryNo(prev => prev + 1);
+      setCloneModeActive(false);
+      const wasServiceReturn = entryServiceMode === 'Service' && serviceFlowMode === 'return';
+      if (wasServiceReturn) {
+        try {
+          const returnCountRes = await fetch(`${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getServiceReturnCount`);
+          if (returnCountRes.ok) {
+            const returnData = await returnCountRes.json();
+            setEntryNo(returnData + 1);
+          } else {
+            const fallbackRes = await fetch(`${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getServiceCount`);
+            if (fallbackRes.ok) {
+              const fallbackData = await fallbackRes.json();
+              setEntryNo(fallbackData + 1);
+            } else {
+              setEntryNo(prev => prev + 1);
+            }
+          }
+        } catch {
+          setEntryNo(prev => prev + 1);
+        }
+      } else {
+        setEntryNo(prev => prev + 1);
+      }
     } catch (error) {
       console.error('Error saving transfer:', error);
       alert('Failed to save transfer. Please try again.');
@@ -3502,12 +3677,16 @@ const Transfer = ({ user }) => {
             </>
           ) : (
             <>
-              {((items.length > 0 && areFieldsFilled) || (entryServiceMode === 'Relocate' && areFieldsFilled)) && (
-                <button onClick={() => setShowConfirmModal(true)} disabled={isSaving} className="flex items-center gap-1 text-[14px] font-medium text-black">
+              {(cloneModeActive || ((items.length > 0 && areFieldsFilled) || (entryServiceMode === 'Relocate' && areFieldsFilled))) && (
+                <button
+                  onClick={() => setShowConfirmModal(true)}
+                  disabled={isSaving || !areFieldsFilled || (entryServiceMode !== 'Relocate' && items.length === 0)}
+                  className={`flex items-center gap-1 text-[14px] font-medium ${isSaving || !areFieldsFilled || (entryServiceMode !== 'Relocate' && items.length === 0) ? 'text-gray-400' : 'text-black'}`}
+                >
                   {isSaving ? (
                     <span className="text-gray-500">...</span>
                   ) : (
-                    <span>{entryServiceMode === 'Service' ? 'Sent to service' : entryServiceMode === 'Relocate' ? 'Relocate' : 'Transfer'}</span>
+                    <span>{entryServiceMode === 'Service' ? (serviceFlowMode === 'return' ? 'Return from Service' : 'Sent to service') : entryServiceMode === 'Relocate' ? 'Relocate' : 'Transfer'}</span>
                   )}
                 </button>
               )}
@@ -3558,11 +3737,13 @@ const Transfer = ({ user }) => {
         <div className="flex-shrink-0 px-4">
           <div className="border border-gray-200 rounded-lg p-3">
             <div className="space-y-1">
+              {!(entryServiceMode === 'Service' && serviceFlowMode === 'return') && (
               <div className="flex items-center">
                 <span className="text-[12px] text-gray-500 w-[100px]">From</span>
                 <span className="text-[12px] text-gray-500 mx-2">:</span>
                 <span className="text-[12px] text-gray-700">{selectedFrom?.label || '-'}</span>
               </div>
+              )}
               <div className="flex items-center">
                 <span className="text-[12px] text-gray-500 w-[100px]">{entryServiceMode === 'Entry' ? 'To' : 'Service Store'}</span>
                 <span className="text-[12px] text-gray-500 mx-2">:</span>
@@ -3570,6 +3751,13 @@ const Transfer = ({ user }) => {
                   {entryServiceMode === 'Entry' ? (selectedTo?.label || '-') : (selectedServiceStore?.label || '-')}
                 </span>
               </div>
+              {(entryServiceMode === 'Service' && serviceFlowMode === 'return') && (
+              <div className="flex items-center">
+                <span className="text-[12px] text-gray-500 w-[100px]">To</span>
+                <span className="text-[12px] text-gray-500 mx-2">:</span>
+                <span className="text-[12px] text-gray-700">{selectedTo?.label || '-'}</span>
+              </div>
+              )}
               <div className="flex items-center">
                 <span className="text-[12px] text-gray-500 w-[100px]">Project Incharge</span>
                 <span className="text-[12px] text-gray-500 mx-2">:</span>
@@ -3581,6 +3769,8 @@ const Transfer = ({ user }) => {
       )}
       {(items.length === 0 || isEditingTransferDetails) && entryServiceMode !== 'Relocate' && (
         <div className="flex-shrink-0 px-4 space-y-[6px]">
+          {!(entryServiceMode === 'Service' && serviceFlowMode === 'return') && (
+          <>
           <div className="relative dropdown-container">
             <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
               From<span className="text-[#eb2f8e]">*</span>
@@ -3622,7 +3812,7 @@ const Transfer = ({ user }) => {
               </div>
             </div>
           </div>
-          {showFromDropdown && entryServiceMode !== 'Relocate' && (
+          {showFromDropdown && entryServiceMode !== 'Relocate' && !(entryServiceMode === 'Service' && serviceFlowMode === 'return') && (
             <div
               className="fixed inset-0 bg-black bg-opacity-50 z-50 -top-4 flex items-center justify-center p-4"
               onClick={(e) => {
@@ -3659,24 +3849,6 @@ const Transfer = ({ user }) => {
                 </div>
                 <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6">
                   <div className="shadow-md rounded-lg overflow-hidden">
-                    {fromSearchQuery.trim() && !fromOptions.some(opt => {
-                      const normalizedOpt = normalizeSearchText(opt.label);
-                      const normalizedQuery = normalizeSearchText(fromSearchQuery.trim());
-                      return normalizedOpt === normalizedQuery;
-                    }) && (
-                        <button
-                          onClick={() => {
-                          }}
-                          className="w-full h-[36px] px-6 flex items-center bg-gray-100 gap-2 hover:bg-[#F5F5F5] transition-colors"
-                        >
-                          <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M7 3V11M3 7H11" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
-                            </svg>
-                          </div>
-                          <p className="text-[14px] text-gray-600 font-normal text-left truncate">"{fromSearchQuery.trim()}"</p>
-                        </button>
-                      )}
                     {getFilteredFromOptions().length > 0 ? (
                       <div className="space-y-0">
                         {getFilteredFromOptions().map((option) => {
@@ -3780,16 +3952,82 @@ const Transfer = ({ user }) => {
                       </div>
                     )}
                   </div>
+              </div>
+            </div>
+          </div>
+          )}
+          </>
+          )}
+          {entryServiceMode === 'Service' && (
+            <div className=" relative dropdown-container">
+              <div className="flex items-center justify-between">
+                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                  {isServiceSwapIconToggled ? 'From' : 'To'}<span className="text-[#eb2f8e]">*</span>
+                </p>
+                {serviceFlowMode === 'sent' && (
+                <button onClick={() => {
+                  setIsServiceSwapIconToggled(prev => !prev);
+                  setSelectedServiceStore(null);
+                  setShowFromDropdown(false);
+                  setShowToDropdown(false);
+                  setShowServiceStoreDropdown(false);
+                  setShowInchargeDropdown(false);
+                  setServiceFlowMode('return');
+                }} className="flex items-center justify-center">
+                  <img
+                    src={isServiceSwapIconToggled ? Swap1 : Swap}
+                    alt="change"
+                    className="w-5 h-5"
+                  />
+                </button>
+                )}
+              </div>
+              <div className="relative">
+                <div
+                  onClick={() => {
+                    setShowServiceStoreDropdown(!showServiceStoreDropdown);
+                    setShowFromDropdown(false);
+                    setShowToDropdown(false);
+                    setShowInchargeDropdown(false);
+                  }}
+                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                  style={{
+                    color: selectedServiceStore ? '#000' : '#9E9E9E',
+                    boxSizing: 'border-box',
+                    paddingRight: selectedServiceStore ? '40px' : '40px'
+                  }}
+                >
+                  {selectedServiceStore ? selectedServiceStore.label : 'Select Service Store'}
+                </div>
+                {selectedServiceStore && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedServiceStore(null);
+                    }}
+                    className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                )}
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                 </div>
               </div>
             </div>
           )}
-          {entryServiceMode === 'Entry' && (
+          {(entryServiceMode === 'Entry' || (entryServiceMode === 'Service' && serviceFlowMode === 'return')) && (
             <div className="relative dropdown-container">
               <div className="flex items-center justify-between">
                 <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
                   To<span className="text-[#eb2f8e]">*</span>
                 </p>
+                {entryServiceMode === 'Entry' && (
                 <button onClick={() => handleSwapFromTo()} className="flex items-center justify-center">
                   <img
                     src={isSwapIconToggled ? Swap1 : Swap}
@@ -3797,6 +4035,24 @@ const Transfer = ({ user }) => {
                     className="w-5 h-5"
                   />
                 </button>
+                )}
+                {entryServiceMode === 'Service' && (
+                <button onClick={() => {
+                  setIsServiceSwapIconToggled(prev => !prev);
+                  setSelectedTo(null);
+                  setServiceFlowMode('sent');
+                  setShowFromDropdown(false);
+                  setShowToDropdown(false);
+                  setShowServiceStoreDropdown(false);
+                  setShowInchargeDropdown(false);
+                }} className="flex items-center justify-center">
+                  <img
+                    src={isServiceSwapIconToggled ? Swap1 : Swap}
+                    alt="change"
+                    className="w-5 h-5"
+                  />
+                </button>
+                )}
               </div>
               <div className="relative">
                 <div
@@ -3821,50 +4077,6 @@ const Transfer = ({ user }) => {
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedTo(null);
-                    }}
-                    className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                )}
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-          )}
-          {entryServiceMode === 'Service' && (
-            <div className="mb-4 relative dropdown-container">
-              <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-                Service Store<span className="text-[#eb2f8e]">*</span>
-              </p>
-              <div className="relative">
-                <div
-                  onClick={() => {
-                    setShowServiceStoreDropdown(!showServiceStoreDropdown);
-                    setShowFromDropdown(false);
-                    setShowToDropdown(false);
-                    setShowInchargeDropdown(false);
-                  }}
-                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
-                  style={{
-                    color: selectedServiceStore ? '#000' : '#9E9E9E',
-                    boxSizing: 'border-box',
-                    paddingRight: selectedServiceStore ? '40px' : '40px'
-                  }}
-                >
-                  {selectedServiceStore ? selectedServiceStore.label : 'Select'}
-                </div>
-                {selectedServiceStore && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedServiceStore(null);
                     }}
                     className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                   >
@@ -3918,24 +4130,6 @@ const Transfer = ({ user }) => {
                 </div>
                 <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6">
                   <div className="shadow-md rounded-lg overflow-hidden">
-                    {toSearchQuery.trim() && !toOptions.some(opt => {
-                      const normalizedOpt = normalizeSearchText(opt.label);
-                      const normalizedQuery = normalizeSearchText(toSearchQuery.trim());
-                      return normalizedOpt === normalizedQuery;
-                    }) && (
-                        <button
-                          onClick={() => {
-                          }}
-                          className="w-full h-[36px] px-6 flex items-center bg-gray-100 gap-2 hover:bg-[#F5F5F5] transition-colors"
-                        >
-                          <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M7 3V11M3 7H11" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
-                            </svg>
-                          </div>
-                          <p className="text-[14px] text-gray-600 font-normal text-left truncate">"{toSearchQuery.trim()}"</p>
-                        </button>
-                      )}
                     {getFilteredToOptions().length > 0 ? (
                       <div className="space-y-0">
                         {getFilteredToOptions().map((option) => {
@@ -4691,24 +4885,6 @@ const Transfer = ({ user }) => {
             </div>
             <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6">
               <div className="shadow-md rounded-lg overflow-hidden">
-                {relocateLocationSearchQuery.trim() && !fromOptions.some(opt => {
-                  const normalizedOpt = normalizeSearchText(opt.label);
-                  const normalizedQuery = normalizeSearchText(relocateLocationSearchQuery.trim());
-                  return normalizedOpt === normalizedQuery;
-                }) && (
-                    <button
-                      onClick={() => {
-                      }}
-                      className="w-full h-[36px] px-6 flex items-center bg-gray-100 gap-2 hover:bg-[#F5F5F5] transition-colors"
-                    >
-                      <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M7 3V11M3 7H11" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
-                        </svg>
-                      </div>
-                      <p className="text-[14px] text-gray-600 font-normal text-left truncate">"{relocateLocationSearchQuery.trim()}"</p>
-                    </button>
-                  )}
                 {getFilteredRelocateLocationOptions().length > 0 ? (
                   <div className="space-y-0">
                     {getFilteredRelocateLocationOptions().map((option) => {
@@ -4769,22 +4945,14 @@ const Transfer = ({ user }) => {
         </div>
       )}
       {showCurrentLocationDropdown && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowCurrentLocationDropdown(false);
-            }
-          }}
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4"
+          onClick={(e) => {if (e.target === e.currentTarget) {setShowCurrentLocationDropdown(false);}}}
           style={{ fontFamily: "'Manrope', sans-serif", zIndex: 9999 }}
         >
           <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[60vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center px-6 pt-5">
               <p className="text-[16px] font-semibold text-black">Select Current Location</p>
-              <button onClick={() => {
-                setShowCurrentLocationDropdown(false);
-                setCurrentLocationSearchQuery('');
-              }} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
+              <button onClick={() => {setShowCurrentLocationDropdown(false); setCurrentLocationSearchQuery('');}} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
                 <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
               </button>
             </div>
@@ -4808,24 +4976,6 @@ const Transfer = ({ user }) => {
             </div>
             <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6">
               <div className="shadow-md rounded-lg overflow-hidden">
-                {currentLocationSearchQuery.trim() && !fromOptions.some(opt => {
-                  const normalizedOpt = normalizeSearchText(opt.label);
-                  const normalizedQuery = normalizeSearchText(currentLocationSearchQuery.trim());
-                  return normalizedOpt === normalizedQuery;
-                }) && (
-                    <button
-                      onClick={() => {
-                      }}
-                      className="w-full h-[36px] px-6 flex items-center bg-gray-100 gap-2 hover:bg-[#F5F5F5] transition-colors"
-                    >
-                      <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M7 3V11M3 7H11" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
-                        </svg>
-                      </div>
-                      <p className="text-[14px] text-gray-600 font-normal text-left truncate">"{currentLocationSearchQuery.trim()}"</p>
-                    </button>
-                  )}
                 {getFilteredCurrentLocationOptions().length > 0 ? (
                   <div className="space-y-0">
                     {getFilteredCurrentLocationOptions().map((option) => {
@@ -4994,6 +5144,7 @@ const Transfer = ({ user }) => {
               const brandModelText = resolvedBrandText && resolvedModelText
                 ? `${resolvedBrandText}, ${resolvedModelText}`
                 : (resolvedBrandText || resolvedModelText);
+              const machineStatus = item.machine_status || item.machineStatus || '';
               return (
                 <div key={itemId} className="relative overflow-hidden">
                   <div
@@ -5030,13 +5181,7 @@ const Transfer = ({ user }) => {
                       </div>
                       <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                         {item.localImageUrls?.length > 0 && (
-                          <div
-                            className="flex items-center gap-1 text-[#E4572E] cursor-pointer"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenImageViewer(item, 0);
-                            }}
-                          >
+                          <div className="flex items-center gap-1 text-[#E4572E] cursor-pointer" onClick={(e) => { e.stopPropagation(); handleOpenImageViewer(item, 0); }}>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                               <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="currentColor" strokeWidth="2" />
                               <circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" strokeWidth="2" />
@@ -5045,16 +5190,29 @@ const Transfer = ({ user }) => {
                             <span className="text-[10px] font-medium">Image</span>
                           </div>
                         )}
-                        <p
-                          className={`text-[12px] font-semibold text-black leading-snug ${item.localImageUrls?.length > 0 ? '' : 'cursor-pointer'}`}
-                          onClick={(e) => {
-                            if (item.localImageUrls?.length > 0) return;
-                            e.stopPropagation();
-                            handleOpenImageViewer(item, 0);
-                          }}
+                        <p className={`text-[12px] font-semibold text-black leading-snug ${item.localImageUrls?.length > 0 ? '' : 'cursor-pointer'}`}
+                          onClick={(e) => { if (item.localImageUrls?.length > 0) return; e.stopPropagation();  handleOpenImageViewer(item, 0); }}
                         >
                           {item.itemId || getItemIdLabelById(item.item_ids_id || item.itemIdsId) || (item.quantity > 0 ? `${item.quantity} Qty` : '')}
                         </p>
+                        {machineStatus && (
+                          <div className="flex items-center justify-end gap-1 w-full">
+                            <span className={`w-1.5 h-1.5 rounded-full ${machineStatus === 'Working' ? 'bg-[#4CAF50]' :
+                              machineStatus === 'Not Working' ? 'bg-[#F44336]' :
+                                machineStatus === 'Under Repair' ? 'bg-[#FF9800]' :
+                                  machineStatus === 'Machine Dead' ? 'bg-[#616161]' :
+                                    'bg-[#9E9E9E]'
+                              }`}></span>
+                            <p className={`text-[10px] font-medium ${machineStatus === 'Working' ? 'text-[#4CAF50]' :
+                              machineStatus === 'Not Working' ? 'text-[#F44336]' :
+                                machineStatus === 'Under Repair' ? 'text-[#FF9800]' :
+                                  machineStatus === 'Machine Dead' ? 'text-[#616161]' :
+                                    'text-[#9E9E9E]'
+                              }`}>
+                              {machineStatus}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -5070,22 +5228,12 @@ const Transfer = ({ user }) => {
                       pointerEvents: isExpanded ? 'auto' : 'none'
                     }}
                   >
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setExpandedItemId(null);
-                        handleEditItem(item);
-                      }}
+                    <button onClick={(e) => { e.stopPropagation(); setExpandedItemId(null); handleEditItem(item); }}
                       className="action-button w-[40px] h-full bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
                     >
                       <img src={EditIcon} alt="Edit" className="w-[18px] h-[18px]" />
                     </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setExpandedItemId(null);
-                        handleRemoveItem(item.id);
-                      }}
+                    <button onClick={(e) => { e.stopPropagation(); setExpandedItemId(null); handleRemoveItem(item.id); }}
                       className="action-button w-[40px] h-full bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm"
                     >
                       <img src={DeleteIcon} alt="Delete" className="w-[18px] h-[18px]" />
@@ -5133,7 +5281,7 @@ const Transfer = ({ user }) => {
                     onChange={(value) => handleFieldChange('itemName', value)}
                     onAddNew={handleAddNewItemName}
                     options={itemNameOptions}
-                    placeholder="Drilling Machine"
+                    placeholder="Select ..."
                     fieldName="Item Name"
                     showAllOptions={true}
                     disabled={!!addItemFormData.itemId}
@@ -5165,7 +5313,7 @@ const Transfer = ({ user }) => {
                   onChange={(value) => handleFieldChange('brand', value)}
                   onAddNew={handleAddNewBrand}
                   options={filteredAddModalBrandOptions}
-                  placeholder="Stanley"
+                  placeholder="Select ..."
                   fieldName="Brand"
                   showAllOptions={true}
                 />
@@ -5185,17 +5333,14 @@ const Transfer = ({ user }) => {
                     onChange={(value) => handleFieldChange('itemId', value)}
                     onAddNew={handleAddNewItemId}
                     options={filteredAddModalItemIdOptions}
-                    placeholder="AA DM 01"
+                    placeholder="Select ..."
                     fieldName="Item ID"
                     showAllOptions={true}
                   />
                 </div>
               </div>
               <div className="flex gap-4">
-                <button
-                  onClick={handleCloseAddItemsModal}
-                  className="flex-1 h-[40px] border border-[#949494] rounded-[8px] text-[14px] font-bold text-[#363636] bg-white leading-normal"
-                >
+                <button onClick={handleCloseAddItemsModal} className="flex-1 h-[40px] border border-[#949494] rounded-[8px] text-[14px] font-bold text-[#363636] bg-white leading-normal">
                   Cancel
                 </button>
                 <button
@@ -5214,11 +5359,7 @@ const Transfer = ({ user }) => {
         </div>
       )}
       {showUploadModal && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-          onClick={handleCloseUploadModal}
-          style={{ fontFamily: "'Manrope', sans-serif" }}
-        >
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" onClick={handleCloseUploadModal} style={{ fontFamily: "'Manrope', sans-serif" }}>
           <div className="bg-white w-full max-w-[360px] rounded-[16px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 pt-5 pb-2 flex-shrink-0">
               <div>
@@ -5231,8 +5372,7 @@ const Transfer = ({ user }) => {
             </div>
             <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none">
               <div className="px-6 py-4">
-                <label
-                  htmlFor="file-upload-input"
+                <label htmlFor="file-upload-input"
                   className="flex flex-col items-center justify-center w-full h-[100px] border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
                 >
                   <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -5419,9 +5559,7 @@ const Transfer = ({ user }) => {
                 {showImageViewerStatusDropdown && (
                   <div className="absolute right-0 bottom-full mb-2 w-[130px] bg-white border border-gray-300 rounded-lg shadow-lg z-10 overflow-hidden">
                     {statusOptions.map((status) => (
-                      <button
-                        key={status}
-                        onClick={() => handleUpdateImageViewerStatus(status)}
+                      <button key={status} onClick={() => handleUpdateImageViewerStatus(status)}
                         className={`w-full px-3 py-2 text-left text-[12px] text-black hover:bg-gray-100 ${imageViewerData.machineStatus === status ? 'bg-gray-50 font-semibold' : ''
                           }`}
                       >
@@ -5448,11 +5586,7 @@ const Transfer = ({ user }) => {
                     />
                   </div>
                   {index === imageViewerData.currentIndex && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteViewerImage(index);
-                      }}
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteViewerImage(index); }}
                       className="absolute -top-1 -right-1 w-[18px] h-[18px] bg-[#E4572E] rounded-full flex items-center justify-center shadow-md"
                     >
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -5502,12 +5636,7 @@ const Transfer = ({ user }) => {
               >
                 Cancel
               </button>
-              <button
-                onClick={() => {
-                  setShowConfirmModal(false);
-                  handleSaveTransfer();
-                }}
-                disabled={isSaving}
+              <button onClick={() => { setShowConfirmModal(false); handleSaveTransfer(); }} disabled={isSaving}
                 className="flex-1 h-[44px] bg-black rounded-[8px] text-[14px] font-semibold text-white hover:bg-gray-800 transition-colors disabled:bg-gray-400"
               >
                 {isSaving ? 'Saving...' : 'Confirm'}
@@ -5740,12 +5869,7 @@ const Transfer = ({ user }) => {
                   {showSearchStatusDropdown && (
                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10">
                       {statusOptions.map((status) => (
-                        <button
-                          key={status}
-                          onClick={() => {
-                            setSearchUploadStatus(status);
-                            setShowSearchStatusDropdown(false);
-                          }}
+                        <button key={status} onClick={() => { setSearchUploadStatus(status); setShowSearchStatusDropdown(false);}}
                           className={`w-full px-4 py-2 text-left text-[14px] hover:bg-gray-100 ${searchUploadStatus === status ? 'bg-gray-50 font-semibold' : ''
                             }`}
                         >
@@ -5775,15 +5899,8 @@ const Transfer = ({ user }) => {
         </div>
       )}
       {customAlert.isOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-[120] flex items-center justify-center p-4"
-          onClick={closeCustomAlert}
-          style={{ fontFamily: "'Manrope', sans-serif" }}
-        >
-          <div
-            className="bg-white w-full max-w-[360px] rounded-[16px] p-5 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[120] flex items-center justify-center p-4" onClick={closeCustomAlert} style={{ fontFamily: "'Manrope', sans-serif" }}>
+          <div className="bg-white w-full max-w-[360px] rounded-[16px] p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-full bg-[#FFF4F0] flex items-center justify-center">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -5796,8 +5913,7 @@ const Transfer = ({ user }) => {
               {customAlert.message}
             </p>
             <div className="mt-5 flex justify-end">
-              <button
-                onClick={closeCustomAlert}
+              <button onClick={closeCustomAlert}
                 className="min-w-[88px] h-[38px] px-5 rounded-full bg-[#8A4B2D] text-white text-[14px] font-semibold hover:opacity-90 transition-opacity"
               >
                 OK

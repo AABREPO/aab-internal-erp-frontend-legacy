@@ -6,6 +6,40 @@ import deletes from '../Images/Delete.svg';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 const PendingBill = ({ username, userRoles = [] }) => {
+    const resolveActiveBranchId = () => {
+        try {
+            const selectedBranchId = localStorage.getItem("selectedBranchId")
+            const user = JSON.parse(localStorage.getItem("user") || "{}")
+            const fallbackBranchId = user?.branchId ?? user?.branch_id ?? user?.brachId
+            const resolved = Number(selectedBranchId || fallbackBranchId)
+            return Number.isFinite(resolved) && resolved > 0 ? resolved : null
+        } catch {
+            return null
+        }
+    }
+    const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId())
+    const withBranchUrl = (baseUrl) => {
+        const url = new URL(baseUrl);
+        if (activeBranchId !== null && activeBranchId !== undefined && activeBranchId !== "") {
+            url.searchParams.set("branchId", String(activeBranchId));
+        }
+        return url.toString();
+    };
+    const fetch = (input, init) => {
+        if (typeof input === 'string') {
+            return window.fetch(withBranchUrl(input), init)
+        }
+        return window.fetch(input, init)
+    }
+    useEffect(() => {
+        const syncBranch = () => {
+            const nextBranchId = resolveActiveBranchId()
+            setActiveBranchId((prevBranchId) => (prevBranchId === nextBranchId ? prevBranchId : nextBranchId))
+        }
+        syncBranch()
+        window.addEventListener('branchSelectionChanged', syncBranch)
+        return () => window.removeEventListener('branchSelectionChanged', syncBranch)
+    }, [])
     const [showModal, setShowModal] = useState(false)
     const [selectedBill, setSelectedBill] = useState(null)
     const [poNumbers, setPoNumbers] = useState([])
@@ -435,10 +469,16 @@ const PendingBill = ({ username, userRoles = [] }) => {
         }
     };
     useEffect(() => {
+        // Clear branch-specific table data first to avoid stale display during branch switch
+        setApiData([]);
+        setAllBillEntries([]);
+        setPaymentStatuses({});
+        setLastPaymentDates({});
+        setPaidTodayBills({});
         fetchTrackerData();
         fetchPurchaseOrders();
         fetchExpensesData();
-    }, []);
+    }, [activeBranchId]);
     useEffect(() => {
         if (apiData.length > 0 && expensesData.length > 0 && allBillEntries.length > 0) {
             calculateExpenseMatchStatus(expensesData, allBillEntries);
@@ -500,15 +540,11 @@ const PendingBill = ({ username, userRoles = [] }) => {
         filteredData = filteredData.filter(item => {
             const status = paymentStatuses[item.id] || 'To Pay';
             const hasPaidToday = paidTodayBills[item.id] || false;
-            // Show bills that are not paid (To Pay status)
-            if (status === 'To Pay') {
-                return true;
-            }
-            // Show bills that have payments made today (regardless of payment status)
-            if (hasPaidToday) {
-                return true;
-            }
-            // Hide bills that are fully paid or partially paid but not paid today
+            // Show bills that are not fully paid - include To Pay, Partially Paid, and any paid today
+            if (status === 'To Pay') return true;
+            if (status === 'Paid') return true; // Partially paid - still has remaining amount
+            if (hasPaidToday) return true; // Recently paid (e.g. today) - keep visible
+            // Hide only fully paid bills
             return false;
         });
         if (filters.vendorName) {
@@ -1252,7 +1288,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     bill_number: isNoPo ? 'NO_PO' : (billNumber || ''),
                     status: finalStatus,
                     is_verified: finalIsVerified,
-                    verified_date: finalIsVerified ? new Date().toISOString() : null
+                        verified_date: finalIsVerified ? new Date().toISOString() : null,
+                        branch_id: activeBranchId
                 }
                 if (existingBill) {
                     billData.id = existingBill.id
@@ -1393,7 +1430,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     : (selectedEditItem.extra_bills || selectedEditItem.extraBills || 0),
                 total_amount: editFormData.totalAmount !== '' && editFormData.totalAmount !== null && editFormData.totalAmount !== undefined
                     ? parseFloat(editFormData.totalAmount)
-                    : (selectedEditItem.total_amount || 0)
+                    : (selectedEditItem.total_amount || 0),
+                branch_id: activeBranchId
             }
             const originalDate = selectedEditItem.bill_arrival_date ?
                 new Date(selectedEditItem.bill_arrival_date).toISOString().split('T')[0] : ''
@@ -1414,7 +1452,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 return
             }
             const response = await axios.put(
-                `https://backendaab.in/aabuildersDash/api/vendor-payments/tracker/${selectedEditItem.id}/update-details`,
+                withBranchUrl(`https://backendaab.in/aabuildersDash/api/vendor-payments/tracker/${selectedEditItem.id}/update-details`),
                 payload,
                 {
                     headers: {
@@ -2433,7 +2471,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
             const billEntryData = {
                 vendor_payments_tracker_id: selectedEntryBill.id,
                 entered_by: username,
-                entered_date: entryFormData.date
+                entered_date: entryFormData.date,
+                branch_id: activeBranchId
             }
             const response = await fetch("https://backendaab.in/aabuildersDash/api/bill-entry/save", {
                 method: "POST",
@@ -2517,7 +2556,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 },
                 body: JSON.stringify({
                     enteredBy: previousEntryEditData.enteredBy,
-                    enteredDate: previousEntryEditData.date
+                    enteredDate: previousEntryEditData.date,
+                    branch_id: activeBranchId
                 })
             })
             if (!response.ok) {
@@ -2867,28 +2907,31 @@ const PendingBill = ({ username, userRoles = [] }) => {
             return { ...entry, [field]: value }
         }))
     }
-    // Auto-fill amount when carry forward checkbox is checked
+    // Auto-fill amount and set mode when carry forward checkbox is checked
     useEffect(() => {
         if (useCarryForward && carryForwardAmount > 0 && paymentEntries.length > 0 && showPaymentModal) {
             const firstEntry = paymentEntries[0];
-            // Only auto-fill if amount is empty
-            if (!firstEntry.amount || firstEntry.amount === '') {
-                const carryForwardToUse = Math.min(carryForwardAmount, remainingAmount);
-                if (carryForwardToUse > 0) {
-                    const displayValue = formatIndianCurrency(carryForwardToUse);
-                    setPaymentEntries(prev => prev.map((entry, index) => {
-                        if (index === 0) {
-                            return {
-                                ...entry,
+            const carryForwardToUse = Math.min(carryForwardAmount, remainingAmount);
+            const needsAmount = !firstEntry.amount || firstEntry.amount === '';
+            const needsMode = firstEntry.mode !== 'Carry Forward';
+            if ((needsAmount && carryForwardToUse > 0) || needsMode) {
+                setPaymentEntries(prev => prev.map((entry, index) => {
+                    if (index === 0) {
+                        const displayValue = needsAmount && carryForwardToUse > 0
+                            ? formatIndianCurrency(carryForwardToUse)
+                            : (entry.amountDisplay || entry.amount || '');
+                        return {
+                            ...entry,
+                            ...(needsAmount && carryForwardToUse > 0 ? {
                                 amount: carryForwardToUse.toString(),
                                 amountDisplay: displayValue,
-                                mode: entry.mode || 'Carry Forward',
                                 date: entry.date || new Date().toISOString().split('T')[0]
-                            };
-                        }
-                        return entry;
-                    }));
-                }
+                            } : {}),
+                            mode: 'Carry Forward'
+                        };
+                    }
+                    return entry;
+                }));
             }
         } else if (!useCarryForward && paymentEntries.length > 0 && showPaymentModal) {
             // Clear amount when unchecked if it was set by carry forward
@@ -3056,7 +3099,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 headers: {
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify({ bill_url: billUrl })
+                body: JSON.stringify({ bill_url: billUrl, branch_id: activeBranchId })
             });
             if (!updateResponse.ok) {
                 throw new Error(`Failed to update bill URL: ${updateResponse.statusText}`);
@@ -3307,7 +3350,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
                         cheque_date: entry.chequeDate || '',
                         transaction_number: entry.transactionNumber || '',
                         account_number: entry.accountNumber || '',
-                        bill_url: billUrl
+                        bill_url: billUrl,
+                        branch_id: activeBranchId
                     }
                     const response = await fetch("https://backendaab.in/aabuildersDash/api/vendor-bill-tracker/save", {
                         method: "POST",
@@ -3341,7 +3385,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
                         cheque_date: '',
                         transaction_number: '',
                         account_number: '',
-                        bill_url: ''
+                        bill_url: '',
+                        branch_id: activeBranchId
                     };
                     const carryForwardPaymentResponse = await fetch("https://backendaab.in/aabuildersDash/api/vendor-bill-tracker/save", {
                         method: "POST",
@@ -3390,6 +3435,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                         vendor_payment_tracker_id: selectedPaymentBill.id,
                         tenant_id: null,
                         tenant_complex_name: null,
+                        branch_id: activeBranchId,
                     };
                     try {
                         const weeklyPaymentBillResponse = await fetch(
@@ -3431,7 +3477,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
                         expenses_entry_id: null,
                         vendor_payment_tracker_id: selectedPaymentBill.id,
                         send_to_expenses_entry: false,
-                        bill_copy_url: billUrl
+                        bill_copy_url: billUrl,
+                        branch_id: activeBranchId
                     };
                     try {
                         const weeklyExpenseResponse = await fetch(
@@ -3476,7 +3523,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
                         payment_mode: "Carry Forward",
                         amount: 0,
                         bill_amount: actualCarryForwardUsed,
-                        refund_amount: 0
+                        refund_amount: 0,
+                        branch_id: activeBranchId
                     };
                     const carryForwardResponse = await fetch("https://backendaab.in/aabuildersDash/api/vendor_carry_forward/save", {
                         method: "POST",
@@ -3504,7 +3552,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
                         payment_mode: "",
                         amount: excessAmount,
                         bill_amount: 0,
-                        refund_amount: 0
+                        refund_amount: 0,
+                        branch_id: activeBranchId
                     };
                     const excessAmountResponse = await fetch("https://backendaab.in/aabuildersDash/api/vendor_carry_forward/save", {
                         method: "POST",
@@ -4313,8 +4362,9 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 vendor_id: vendorId?.id,
                 no_of_bills: Number(formData.noOfBills),
                 total_amount: Number(formData.totalAmount),
+                branch_id: activeBranchId,
             };
-            const response = await axios.post("https://backendaab.in/aabuildersDash/api/vendor-payments/tracker", payload);
+            const response = await axios.post(withBranchUrl("https://backendaab.in/aabuildersDash/api/vendor-payments/tracker"), payload);
             alert(`Tracker created with ID: ${response.data.id}`);
             window.location.reload();
         } catch (error) {
@@ -4912,7 +4962,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                 </div>
                                 <div className="flex gap-3">
                                     <button className="px-4 py-2 bg-white text-gray-600 border border-gray-300 rounded font-medium hover:bg-gray-50 transition-colors duration-200"
-                                        onClick={handleCancel}>
+                                        onClick={handleCancel}
+                                    >
                                         Cancel
                                     </button>
                                     {(!selectedBill?.send_request || isAdminUser()) && (
@@ -4939,7 +4990,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
                         <div className="flex justify-between items-center p-6 ">
                             <h3 className="text-lg font-bold text-black">Bill Entry Details</h3>
                             <button className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-orange-500 text-lg font-bold"
-                                onClick={handleEntryCancel}>
+                                onClick={handleEntryCancel}
+                            >
                                 ×
                             </button>
                         </div>
@@ -5113,7 +5165,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                 ✓
                                             </button>
                                             <button className="px-3 py-1.5 w-[100px] h-10 bg-[#BF9853] text-white rounded text-sm font-medium transition-colors duration-200"
-                                                onClick={handleCheck}>
+                                                onClick={handleCheck}
+                                            >
                                                 Check
                                             </button>
                                         </div>
@@ -5131,7 +5184,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
                             <div className="flex justify-between items-center">
                                 <h3 className="text-lg font-semibold text-center flex-1">Entry Payment Details</h3>
                                 <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl font-bold"
-                                    onClick={handlePaymentCancel}>
+                                    onClick={handlePaymentCancel}
+                                >
                                     ×
                                 </button>
                             </div>
@@ -5174,12 +5228,13 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                             <div className="flex-1">
                                                                 <label className="block font-semibold mb-1 text-sm">Mode</label>
                                                                 <select
-                                                                    value={entry.mode}
+                                                                    value={entry.mode || (index === 0 && useCarryForward ? 'Carry Forward' : '')}
                                                                     onChange={(e) => handlePaymentEntryChange(entry.id, 'mode', e.target.value)}
-                                                                    disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
-                                                                    className={`w-[180px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                                                    disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' || (index === 0 && useCarryForward)}
+                                                                    className={`w-[180px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' || (index === 0 && useCarryForward) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                                                                 >
                                                                     <option value="">Select</option>
+                                                                    <option value="Carry Forward">Carry Forward</option>
                                                                     <option value="Cash">Cash</option>
                                                                     <option value="Net Banking">Net Banking</option>
                                                                     <option value="Gpay">Gpay</option>

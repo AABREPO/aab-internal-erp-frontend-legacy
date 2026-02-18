@@ -27,7 +27,7 @@ const NetStock = ({ user }) => {
   const [itemNameOptions, setItemNameOptions] = useState([]);
   const [itemIdOptions, setItemIdOptions] = useState([]);
   const [machineNumbersList, setMachineNumbersList] = useState([]);
-  
+
   // Edit stock bottom sheet state
   const [showEditStockModal, setShowEditStockModal] = useState(false);
   const [selectedItemForEdit, setSelectedItemForEdit] = useState(null);
@@ -172,7 +172,7 @@ const NetStock = ({ user }) => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        
+
         const stockRes = await fetch(`${TOOLS_STOCK_MANAGEMENT_BASE_URL}/getAll`, {
           method: 'GET',
           credentials: 'include',
@@ -221,43 +221,43 @@ const NetStock = ({ user }) => {
   const getHomeLocationId = (itemIdsId, brandId, machineNumber, stockHomeLocationId) => {
     // First, find all entries in tools_tracker_management that match this item and have home_location_id
     const matchingEntries = [];
-    
+
     for (const entry of toolsTrackerManagementData) {
       const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
-      
+
       // Check each item in the entry for matching item and home_location_id
       for (const entryItem of entryItems) {
         const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
         const entryBrandId = entryItem.brand_id || entryItem.brandId;
         const entryMachineNumber = entryItem.machine_number || entryItem.machineNumber || '';
-        
+
         const itemIdsMatch = entryItemIdsId && String(entryItemIdsId) === String(itemIdsId);
         const brandMatch = !brandId || (entryBrandId && String(entryBrandId) === String(brandId));
         const machineMatch = !machineNumber || (entryMachineNumber && String(entryMachineNumber).trim() === machineNumber.trim());
-        
+
         if (itemIdsMatch && brandMatch && machineMatch) {
           // Check if this specific item has home_location_id
           let itemHomeLocationId = entryItem.home_location_id || entryItem.homeLocationId;
-          
+
           // If no home_location_id in entryItem, get it from stock_management for this itemIdsId
           if (!itemHomeLocationId) {
             const stockItem = stockManagementData.find(stock => {
               const stockItemIdsId = stock.item_ids_id || stock.itemIdsId;
               const stockBrandId = stock.brand_name_id || stock.brandNameId;
               const stockMachineNumber = stock.machine_number || stock.machineNumber || '';
-              
+
               const itemIdsMatch = stockItemIdsId && String(stockItemIdsId) === String(itemIdsId);
               const brandMatch = !brandId || (stockBrandId && String(stockBrandId) === String(brandId));
               const machineMatch = !machineNumber || (stockMachineNumber && String(stockMachineNumber).trim() === machineNumber.trim());
-              
+
               return itemIdsMatch && brandMatch && machineMatch;
             });
-            
+
             if (stockItem) {
               itemHomeLocationId = stockItem.home_location_id || stockItem.homeLocationId;
             }
           }
-          
+
           // If we have a home_location_id (from entryItem or stock_management), add it to matching entries
           if (itemHomeLocationId) {
             const entryDate = entry.created_date_time || entry.createdDateTime || entry.timestamp || '';
@@ -303,10 +303,10 @@ const NetStock = ({ user }) => {
   // Helper to get current location for an item set - use getHomeLocationId to get the correct home location
   const getCurrentLocationForItem = (itemIdsId, brandId, machineNumber, stockHomeLocationId) => {
     if (!itemIdsId) return stockHomeLocationId;
-    
+
     // Use getHomeLocationId to get the correct home location (most recent from tools_tracker_management, or from stock_management)
     const correctHomeLocationId = getHomeLocationId(itemIdsId, brandId, machineNumber, stockHomeLocationId);
-    
+
     return correctHomeLocationId || stockHomeLocationId;
   };
 
@@ -342,10 +342,10 @@ const NetStock = ({ user }) => {
           // Get current location (which is the home location)
           const currentLocationId = getCurrentLocationForItem(itemIdsId, brandId, machineNumber, actualHomeLocationId);
           const currentLocation = getLocationName(currentLocationId);
-          
+
           // Create merge key: location + itemName + brand + machineNumber + status
           const mergeKey = `${currentLocation}_${itemName}_${brand}_${machineNumber}_${status}`;
-          
+
           if (itemsMap.has(mergeKey)) {
             // Merge: increment itemId count
             const existing = itemsMap.get(mergeKey);
@@ -371,10 +371,10 @@ const NetStock = ({ user }) => {
       } else if (!itemIdsId) {
         // Item with quantity only (can be positive or negative) - use home location
         const homeLocation = getLocationName(homeLocationId);
-        
+
         // Create merge key: location + itemName + brand
         const mergeKey = `${homeLocation}_${itemName}_${brand}_qty`;
-        
+
         if (itemsMap.has(mergeKey)) {
           // Merge: add quantities (including negative values)
           const existing = itemsMap.get(mergeKey);
@@ -465,7 +465,7 @@ const NetStock = ({ user }) => {
       const itemName = itemNamesMap[itemNameId] || itemNamesMap[String(itemNameId)] || '-';
       const brand = brandsMap[brandId] || brandsMap[String(brandId)] || '-';
       const key = `${itemName}_${brand}`;
-      
+
       if (!aggregated[key]) {
         aggregated[key] = {
           itemName,
@@ -501,7 +501,7 @@ const NetStock = ({ user }) => {
         const itemName = itemNamesMap[itemNameId] || itemNamesMap[String(itemNameId)] || '-';
         const brand = brandsMap[brandId] || brandsMap[String(brandId)] || '-';
         const key = `${itemName}_${brand}`;
-        
+
         if (!aggregated[key]) {
           aggregated[key] = {
             itemName,
@@ -722,7 +722,7 @@ const NetStock = ({ user }) => {
 
     const oldCount = selectedItemForEdit.quantity || 0;
     const newCountNum = parseInt(newCount, 10);
-    
+
     if (isNaN(newCountNum)) {
       alert('Please enter a valid number');
       return;
@@ -738,7 +738,7 @@ const NetStock = ({ user }) => {
     try {
       // Get the stock record IDs for this item
       const stockRecordIds = selectedItemForEdit.stockRecordIds || [];
-      
+
       if (stockRecordIds.length === 0) {
         alert('Unable to find stock records for this item');
         return;
@@ -802,7 +802,7 @@ const NetStock = ({ user }) => {
         <p className="text-[12px] text-black font-semibold leading-normal mb-2">Category</p>
         <p className="text-[12px] text-black font-semibold leading-normal mb-2">Brand</p>
       </div>
-      
+
       {/* Table/List Segmented Control */}
       <div className="flex-shrink-0">
         <div className="flex bg-[#F2F4F7] items-center h-9 shadow-sm rounded-md">
@@ -930,7 +930,7 @@ const NetStock = ({ user }) => {
         </div>
       </div>
       {/* Main Content Area */}
-      <div key={viewMode} className="flex-1 pb-4 min-h-[400px] overflow-y-auto">
+      <div key={viewMode} className="flex-1 pb-4">
         {loading ? (
           <div className="flex justify-center items-center h-64">
             <p className="text-[14px] text-gray-500">Loading...</p>
@@ -946,113 +946,112 @@ const NetStock = ({ user }) => {
                 <div className="flex justify-end mb-1">
                   <span className="text-[12px] text-gray-400 font-semibold cursor-pointer">Download</span>
                 </div>
-                <div className="space-y-0.5">
-                {tableData.map((item, index) => {
-                  const itemId = item.id || index;
-                  const swipeState = swipeStates[itemId];
-                  const isExpanded = expandedItemId === itemId;
-                  // Allow editing for items without itemId that have a non-zero quantity (can be positive or negative)
-                  const canEdit = !item.hasItemId && item.quantity !== 0;
-                  
-                  // Calculate swipe offset (button width is 48px)
-                  const buttonWidth = 48;
-                  const swipeOffset = swipeState && swipeState.isSwiping
-                    ? Math.max(-buttonWidth, Math.min(0, swipeState.currentX - swipeState.startX))
-                    : isExpanded
-                      ? -buttonWidth
-                      : 0;
+                <div className=" max-h-[410px] overflow-y-auto scrollbar-none no-scrollbar">
+                  {tableData.map((item, index) => {
+                    const itemId = item.id || index;
+                    const swipeState = swipeStates[itemId];
+                    const isExpanded = expandedItemId === itemId;
+                    // Allow editing for items without itemId that have a non-zero quantity (can be positive or negative)
+                    const canEdit = !item.hasItemId && item.quantity !== 0;
 
-                  return (
-                    <div key={itemId} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] h-[85px]">
-                      {/* Card */}
-                      <div
-                        className="bg-white rounded-[8px] h-full px-3 py-3 cursor-pointer transition-all duration-300 ease-out select-none"
-                        style={{
-                          transform: `translateX(${swipeOffset}px)`,
-                          touchAction: 'pan-y',
-                          userSelect: 'none',
-                          WebkitUserSelect: 'none'
-                        }}
-                        onTouchStart={(e) => handleTouchStart(e, itemId)}
-                        onTouchMove={(e) => handleTouchMove(e, itemId)}
-                        onTouchEnd={() => handleTouchEnd(itemId)}
-                        onMouseDown={(e) => handleMouseDown(e, itemId)}
-                        onClick={handleCardClick}
-                      >
-                        <div className="flex flex-col">
-                          {/* Top line: Location, Item Name and Status badge */}
-                          <div className="flex justify-between items-start mb-1">
-                            <p className="text-[12px] font-semibold leading-tight">
-                              {item.location !== '-' ? (
-                                <>
-                                  <span className="text-[#A6A6A6] font-medium">{item.location}, </span>
+                    // Calculate swipe offset (button width is 48px)
+                    const buttonWidth = 48;
+                    const swipeOffset = swipeState && swipeState.isSwiping
+                      ? Math.max(-buttonWidth, Math.min(0, swipeState.currentX - swipeState.startX))
+                      : isExpanded
+                        ? -buttonWidth
+                        : 0;
+
+                    return (
+                      <div key={itemId} className="relative shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px]">
+                        {/* Card */}
+                        <div
+                          className="bg-white rounded-[8px] h-full px-3 py-3 cursor-pointer transition-all duration-300 ease-out select-none"
+                          style={{
+                            transform: `translateX(${swipeOffset}px)`,
+                            touchAction: 'pan-y',
+                            userSelect: 'none',
+                            WebkitUserSelect: 'none'
+                          }}
+                          onTouchStart={(e) => handleTouchStart(e, itemId)}
+                          onTouchMove={(e) => handleTouchMove(e, itemId)}
+                          onTouchEnd={() => handleTouchEnd(itemId)}
+                          onMouseDown={(e) => handleMouseDown(e, itemId)}
+                          onClick={handleCardClick}
+                        >
+                          <div className="flex flex-col">
+                            {/* Top line: Location, Item Name and Status badge */}
+                            <div className="flex justify-between items-start mb-0.5">
+                              <p className="text-[12px] font-semibold leading-tight">
+                                {item.location !== '-' ? (
+                                  <>
+                                    <span className="text-[#A6A6A6] font-medium">{item.location}, </span>
+                                    <span className="text-black">{item.itemName}</span>
+                                  </>
+                                ) : (
                                   <span className="text-black">{item.itemName}</span>
-                                </>
-                              ) : (
-                                <span className="text-black">{item.itemName}</span>
+                                )}
+                              </p>
+                              {item.status !== '-' && (
+                                <span className={`px-2 rounded-full text-[11px] font-medium whitespace-nowrap flex-shrink-0 ml-3 ${item.status === 'Working' ? 'bg-green-100 text-green-800' :
+                                    item.status === 'Dead' ? 'bg-orange-100 text-orange-800' :
+                                      'bg-gray-100 text-gray-800'
+                                  }`}>
+                                  {item.status}
+                                </span>
                               )}
-                            </p>
-                            {item.status !== '-' && (
-                              <span className={`px-2 rounded-full text-[11px] font-medium whitespace-nowrap flex-shrink-0 ml-3 ${
-                                item.status === 'Working' ? 'bg-green-100 text-green-800' : 
-                                item.status === 'Dead' ? 'bg-orange-100 text-orange-800' : 
-                                'bg-gray-100 text-gray-800'
-                              }`}>
-                                {item.status}
-                              </span>
-                            )}
-                          </div>
-                          {/* Middle line: Machine number - empty opposite */}
-                          <div className="flex justify-between items-start mb-1">
-                            <p className="text-[12px] text-gray-700 leading-tight">
-                              {item.machineNumber !== '-' ? resolveMachineNumberText(item.machineNumber) : ''}
-                            </p>
-                            <div className="flex-shrink-0 ml-3"></div>
-                          </div>
-                          {/* Bottom line: Brand and Item ID/Quantity */}
-                          <div className="flex justify-between items-start">
-                            <p className="text-[12px] text-gray-700 leading-tight">{item.brand}</p>
-                            <p className="text-[12px] font-medium text-black flex-shrink-0 ml-3">
-                              {item.hasItemId 
-                                ? (item.isMerged ? item.quantity : item.itemId) 
-                                : item.quantity}
-                            </p>
+                            </div>
+                            {/* Middle line: Machine number - empty opposite */}
+                            <div className="flex justify-between items-start mb-0.5">
+                              <p className="text-[12px] text-gray-700 leading-tight">
+                                {item.machineNumber !== '-' ? resolveMachineNumberText(item.machineNumber) : ''}
+                              </p>
+                              <div className="flex-shrink-0 ml-3"></div>
+                            </div>
+                            {/* Bottom line: Brand and Item ID/Quantity */}
+                            <div className="flex justify-between items-start">
+                              <p className="text-[12px] text-gray-700 leading-tight">{item.brand}</p>
+                              <p className="text-[12px] font-medium text-black flex-shrink-0 ml-3">
+                                {item.hasItemId
+                                  ? (item.isMerged ? item.quantity : item.itemId)
+                                  : item.quantity}
+                              </p>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      {/* Edit Button - Behind the card on the right, revealed on swipe */}
-                      <div
-                        className="absolute right-0 top-0 flex gap-2 flex-shrink-0 z-0"
-                        style={{
-                          opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
-                          transform: swipeOffset < 0
-                            ? `translateX(${Math.max(0, 48 + swipeOffset)}px)`
-                            : 'translateX(48px)',
-                          transition: (swipeState && swipeState.isSwiping) ? 'none' : 'opacity 0.2s ease-out, transform 0.3s ease-out',
-                          pointerEvents: isExpanded ? 'auto' : 'none'
-                        }}
-                      >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (canEdit) {
-                              setSelectedItemForEdit(item);
-                              setNewCount(String(item.quantity));
-                              setShowEditStockModal(true);
-                              setExpandedItemId(null);
-                            } else {
-                              setExpandedItemId(null);
-                            }
+                        {/* Edit Button - Behind the card on the right, revealed on swipe */}
+                        <div
+                          className="absolute right-0 top-0 flex gap-2 flex-shrink-0 z-0"
+                          style={{
+                            opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
+                            transform: swipeOffset < 0
+                              ? `translateX(${Math.max(0, 48 + swipeOffset)}px)`
+                              : 'translateX(48px)',
+                            transition: (swipeState && swipeState.isSwiping) ? 'none' : 'opacity 0.2s ease-out, transform 0.3s ease-out',
+                            pointerEvents: isExpanded ? 'auto' : 'none'
                           }}
-                          className="action-button w-[48px] h-[80px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
-                          title="Edit"
                         >
-                          <img src={EditIcon} alt="Edit" className="w-[18px] h-[18px]" />
-                        </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (canEdit) {
+                                setSelectedItemForEdit(item);
+                                setNewCount(String(item.quantity));
+                                setShowEditStockModal(true);
+                                setExpandedItemId(null);
+                              } else {
+                                setExpandedItemId(null);
+                              }
+                            }}
+                            className="action-button w-[48px] h-[80px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
+                            title="Edit"
+                          >
+                            <img src={EditIcon} alt="Edit" className="w-[18px] h-[18px]" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
                 </div>
               </>
             )}
@@ -1069,34 +1068,34 @@ const NetStock = ({ user }) => {
                   <span className="text-[12px] text-gray-400 font-semibold cursor-pointer">Download</span>
                 </div>
                 <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
-                {/* Table Header */}
-                <div className="bg-gray-50 border-b border-gray-200">
-                  <div className="grid grid-cols-12 gap-2 px-3 py-2">
-                    <div className="col-span-1 text-[12px] font-medium text-gray-700">#</div>
-                    <div className="col-span-5 text-[12px] font-medium text-gray-700">Item Name</div>
-                    <div className="col-span-3 text-[12px] font-medium text-gray-700">Brand</div>
-                    <div className="col-span-3 text-[12px] font-medium text-gray-700 text-right">Total Stock</div>
+                  {/* Table Header */}
+                  <div className="bg-gray-50 border-b border-gray-200">
+                    <div className="grid grid-cols-12 gap-2 px-3 py-2">
+                      <div className="col-span-1 text-[12px] font-medium text-gray-700">#</div>
+                      <div className="col-span-5 text-[12px] font-medium text-gray-700">Item Name</div>
+                      <div className="col-span-3 text-[12px] font-medium text-gray-700">Brand</div>
+                      <div className="col-span-3 text-[12px] font-medium text-gray-700 text-right">Total Stock</div>
+                    </div>
                   </div>
-                </div>
-                {/* Table Body */}
-                <div>
-                  {aggregatedSummary.map((item, index) => (
-                    <div 
-                      key={`${item.itemName}_${item.brand}_${index}`} 
-                      className="border-b border-gray-100 last:border-b-0"
-                    >
-                      <div className="grid grid-cols-12 gap-2 px-3 py-3">
-                        <div className="col-span-1 text-[12px] text-gray-700">{index + 1}</div>
-                        <div className="col-span-5 text-[12px] text-black">{item.itemName}</div>
-                        <div className="col-span-3 text-[12px] text-gray-700">{item.brand}</div>
-                        <div className="col-span-3 text-[12px] font-medium text-black text-right">
-                          {String(item.total).padStart(2, '0')}
+                  {/* Table Body */}
+                  <div>
+                    {aggregatedSummary.map((item, index) => (
+                      <div
+                        key={`${item.itemName}_${item.brand}_${index}`}
+                        className="border-b border-gray-100 last:border-b-0"
+                      >
+                        <div className="grid grid-cols-12 gap-2 px-3 py-3">
+                          <div className="col-span-1 text-[12px] text-gray-700">{index + 1}</div>
+                          <div className="col-span-5 text-[12px] text-black">{item.itemName}</div>
+                          <div className="col-span-3 text-[12px] text-gray-700">{item.brand}</div>
+                          <div className="col-span-3 text-[12px] font-medium text-black text-right">
+                            {String(item.total).padStart(2, '0')}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
               </>
             )}
           </div>

@@ -56,7 +56,15 @@ function AppContent({ user, handleLogout }) {
     <div>
       {!shouldHideDesktopBars && (
         <>
-          <Navbar username={user.username} userImage={user.userImage} position={user.position} email={user.email} userRoles={user?.userRoles || []} onLogout={handleLogout} />
+          <Navbar
+            username={user.username}
+            userImage={user.userImage}
+            position={user.position}
+            email={user.email}
+            userRoles={user?.userRoles || []}
+            branchId={user?.branchId ?? user?.branch_id ?? user?.brachId ?? ''}
+            onLogout={handleLogout}
+          />
           <Sidebar userRoles={user?.userRoles || []} />
         </>
       )}
@@ -103,14 +111,23 @@ function App() {
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      const parsedUser = JSON.parse(storedUser);
+      const normalizedUser = {
+        ...parsedUser,
+        branchId: parsedUser?.branchId ?? parsedUser?.branch_id ?? parsedUser?.brachId ?? ''
+      };
+      setUser(normalizedUser);
       setIsLoggedIn(true);
     }
   }, []);
   const handleLogin = (userData) => {
-    setUser(userData);
+    const normalizedUser = {
+      ...userData,
+      branchId: userData?.branchId ?? userData?.branch_id ?? userData?.brachId ?? ''
+    };
+    setUser(normalizedUser);
     setIsLoggedIn(true);
-    localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem('user', JSON.stringify(normalizedUser));
   };
   const handleLogout = () => {
     setUser(null);

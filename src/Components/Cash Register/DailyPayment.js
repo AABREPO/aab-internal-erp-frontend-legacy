@@ -16,6 +16,39 @@ import NotesStart from '../Images/notes _start.png';
 import NotesEnd from '../Images/notes_end.png';
 import Filter from '../Images/filter (3).png';
 const DailyPayment = ({ username, userRoles = [] }) => {
+    const resolveActiveBranchId = () => {
+        try {
+            const selectedBranchId = localStorage.getItem("selectedBranchId");
+            const user = JSON.parse(localStorage.getItem("user") || "{}");
+            const fallbackBranchId = user?.branchId ?? user?.branch_id ?? user?.brachId;
+            const resolved = Number(selectedBranchId || fallbackBranchId);
+            return Number.isFinite(resolved) && resolved > 0 ? resolved : null;
+        } catch {
+            return null;
+        }
+    };
+    const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId());
+    const withBranchUrl = useCallback((baseUrl) => {
+        const url = new URL(baseUrl);
+        if (activeBranchId !== null && activeBranchId !== undefined && activeBranchId !== "") {
+            url.searchParams.set("branchId", String(activeBranchId));
+        }
+        return url.toString();
+    }, [activeBranchId]);
+    const withBranchParams = useCallback(() => (
+        activeBranchId !== null && activeBranchId !== undefined && activeBranchId !== ""
+            ? { params: { branchId: activeBranchId } }
+            : {}
+    ), [activeBranchId]);
+    useEffect(() => {
+        const syncBranch = () => {
+            const nextBranchId = resolveActiveBranchId();
+            setActiveBranchId((prevBranchId) => (prevBranchId === nextBranchId ? prevBranchId : nextBranchId));
+        };
+        syncBranch();
+        window.addEventListener("branchSelectionChanged", syncBranch);
+        return () => window.removeEventListener("branchSelectionChanged", syncBranch);
+    }, []);
     const [expenses, setExpenses] = useState([]);
     const [dailyExpenses, setDailyExpenses] = useState([]);
     const [refundPayments, setRefundPayments] = useState([]);
@@ -579,14 +612,14 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     }
     const fetchExpenses = useCallback(() => {
         if (!currentWeekNumber) return;
-        fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${currentWeekNumber}`)
+        fetch(withBranchUrl(`https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${currentWeekNumber}`))
             .then((res) => res.json())
             .then(setExpenses)
             .catch(console.error);
-    }, [currentWeekNumber]);
+    }, [currentWeekNumber, withBranchUrl]);
     const fetchPayments = useCallback(() => {
         if (!currentWeekNumber) return;
-        fetch(`https://backendaab.in/aabuildersDash/api/payments-received/week/${currentWeekNumber}`)
+        fetch(withBranchUrl(`https://backendaab.in/aabuildersDash/api/payments-received/week/${currentWeekNumber}`))
             .then((res) => res.json())
             .then((data) => {
                 // Filter out records where type is "Handover"
@@ -594,16 +627,16 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 setPayments(filtered);
             })
             .catch(console.error);
-    }, [currentWeekNumber]);
+    }, [currentWeekNumber, withBranchUrl]);
     const fetchRefundPayments = useCallback(() => {
         if (!currentWeekNumber) return;
-        fetch(`https://backendaab.in/aabuildersDash/api/refund_received/getAll`)
+        fetch(withBranchUrl(`https://backendaab.in/aabuildersDash/api/refund_received/getAll`))
             .then((res) => res.json())
             .then((data) => {
                 setAllRefundAmount(data);
             })
             .catch(console.error);
-    }, [currentWeekNumber]);
+    }, [currentWeekNumber, withBranchUrl]);
     useEffect(() => {
         if (currentWeekNumber) {
             fetchPayments();
@@ -796,7 +829,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchWeeks = async () => {
             try {
-                const response = await axios.get('https://backendaab.in/aabuildersDash/api/payments-received/active_weeks');
+                const response = await axios.get('https://backendaab.in/aabuildersDash/api/payments-received/active_weeks', withBranchParams());
                 const currentYear = new Date().getFullYear();
                 const enrichedWeeks = response.data.map((weekNumber) =>
                     getStartAndEndDateOfWeek(weekNumber, currentYear)
@@ -807,7 +840,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             }
         };
         fetchWeeks();
-    }, []);
+    }, [withBranchParams]);
     const handleInputChange = (e) => {
         setNewDailyExpense((prev) => ({ ...prev, [e.target.name]: e.target.value }));
     };
@@ -856,6 +889,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             transfer_Project_id: 0,
             entry_no,
             description: "",
+            branch_id: activeBranchId,
         };
         const response = await fetch(`https://backendaab.in/aabuildersDash/api/loans/${loanPortalId}?editedBy=${encodeURIComponent(username)}`, {
             method: "PUT",
@@ -882,6 +916,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             file_url: null,
             staff_refund_amount: null,
             entry_no,
+            branch_id: activeBranchId,
         };
         const response = await fetch(
             `https://backendaab.in/aabuildersDash/api/staff-advance/${staffAdvancePortalId}?editedBy=${encodeURIComponent(username)}`,
@@ -914,7 +949,8 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     week_no: Number(currentWeekNumber),
                     staff_payment_mode: "Cash",
                     from_purpose_id: 5,
-                    entry_no: entryNo
+                    entry_no: entryNo,
+                    branch_id: activeBranchId
                 };
                 const staffAdvanceResponse = await axios.post(
                     "https://backendaab.in/aabuildersDash/api/staff-advance/save",
@@ -928,7 +964,8 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     employee_id: Number(newRefundReceived.employee_id) || null,
                     amount: Number(newRefundReceived.amount),
                     weekly_number: Number(currentWeekNumber),
-                    staff_advance_portal_id: staffAdvancePortalId
+                    staff_advance_portal_id: staffAdvancePortalId,
+                    branch_id: activeBranchId
                 };
                 await axios.post(
                     "https://backendaab.in/aabuildersDash/api/refund_received/save",
@@ -941,7 +978,8 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     vendor_id: Number(newRefundReceived.vendor_id) || null,
                     contractor_id: Number(newRefundReceived.contractor_id) || null,
                     amount: Number(newRefundReceived.amount),
-                    weekly_number: Number(currentWeekNumber)
+                    weekly_number: Number(currentWeekNumber),
+                    branch_id: activeBranchId
                 });
                 setShowPurposePopup(true);
                 return;
@@ -994,7 +1032,8 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 project_id: 0,
                 week_no: Number(weekNo),
                 description: "Refund from Cash Register",
-                file_url: ""
+                file_url: "",
+                branch_id: activeBranchId
             };
             const loanPortalResponse = await axios.post(
                 "https://backendaab.in/aabuildersDash/api/loans/save",
@@ -1010,7 +1049,8 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 amount: Number(pendingRefundData.amount),
                 weekly_number: Number(correctWeeklyNumber),
                 staff_advance_portal_id: null,
-                loan_portal_id: loanPortalResponse.data?.id || loanPortalResponse.data?.loanPortalId
+                loan_portal_id: loanPortalResponse.data?.id || loanPortalResponse.data?.loanPortalId,
+                branch_id: activeBranchId
             };
             await axios.post(
                 "https://backendaab.in/aabuildersDash/api/refund_received/save",
@@ -1067,6 +1107,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 description: editDailyExpenseData.description || "",
                 file_url: editDailyExpenseData.file_url || null,  // 🔹 send url here
                 staff_advance_portal_id: editDailyExpenseData.staff_advance_portal_id || null,
+                branch_id: row.branch_id ?? row.branchId ?? activeBranchId ?? null,
             };
             const wasStaffAdvance = row.type === "Staff Advance";
             const isNowStaffAdvance = editDailyExpenseData.type === "Staff Advance";
@@ -1108,7 +1149,8 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         week_no: Number(currentWeekNumber),
                         staff_payment_mode: "Cash",
                         from_purpose_id: 5,
-                        entry_no: entryNo
+                        entry_no: entryNo,
+                        branch_id: activeBranchId
                     };
                     const staffAdvanceResponse = await axios.post(
                         "https://backendaab.in/aabuildersDash/api/staff-advance/save",
@@ -1133,7 +1175,8 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         amount: Number(editDailyExpenseData.amount),
                         staff_refund_amount: 0,
                         description: editDailyExpenseData.description || "",
-                        file_url: editDailyExpenseData.file_url || null
+                        file_url: editDailyExpenseData.file_url || null,
+                        branch_id: row.branch_id ?? row.branchId ?? activeBranchId ?? null,
                     };
                     await axios.put(
                         `https://backendaab.in/aabuildersDash/api/staff-advance/${row.staff_advance_portal_id}?editedBy=${encodeURIComponent(username)}`,
@@ -1207,7 +1250,8 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         amount: 0,
                         staff_refund_amount: Number(editRefundPaymentData.amount),
                         description: "",
-                        file_url: null
+                        file_url: null,
+                        branch_id: refundData?.branch_id ?? refundData?.branchId ?? activeBranchId ?? null,
                     };
                     await axios.put(
                         `https://backendaab.in/aabuildersDash/api/staff-advance/${refundData.staff_advance_portal_id}?editedBy=${encodeURIComponent(username)}`,
@@ -1218,13 +1262,21 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     console.error("Error updating staff advance portal for refund:", error);
                 }
             }
+            const refundPayload = {
+                labour_id: editRefundPaymentData.labour_id ? Number(editRefundPaymentData.labour_id) : null,
+                vendor_id: editRefundPaymentData.vendor_id ? Number(editRefundPaymentData.vendor_id) : null,
+                contractor_id: editRefundPaymentData.contractor_id ? Number(editRefundPaymentData.contractor_id) : null,
+                employee_id: editRefundPaymentData.employee_id ? Number(editRefundPaymentData.employee_id) : null,
+                amount: Number(editRefundPaymentData.amount),
+                branch_id: refundData?.branch_id ?? refundData?.branchId ?? activeBranchId ?? null,
+            };
             await axios.put(
                 `https://backendaab.in/aabuildersDash/api/refund_received/edit/${id}?username=${encodeURIComponent(username)}`,
-                editRefundPaymentData
+                refundPayload
             );
             setRefundPayments((prev) =>
                 prev.map((row) =>
-                    row.id === id ? { ...row, ...editRefundPaymentData } : row
+                    row.id === id ? { ...row, ...refundPayload } : row
                 )
             );
             setEditingPaymentId(null);
@@ -1347,7 +1399,8 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     week_no: Number(currentWeekNumber),
                     staff_payment_mode: "Cash",
                     from_purpose_id: 5,
-                    entry_no: entryNo
+                    entry_no: entryNo,
+                    branch_id: activeBranchId
                 };
                 const staffAdvanceResponse = await axios.post(
                     "https://backendaab.in/aabuildersDash/api/staff-advance/save",
@@ -1368,7 +1421,8 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     amount: Number(newDailyExpense.amount),
                     extra_amount: newDailyExpense.extra_amount ? Number(newDailyExpense.extra_amount) : 0,
                     weekly_number: Number(currentWeekNumber),
-                    staff_advance_portal_id: staffAdvancePortalId
+                    staff_advance_portal_id: staffAdvancePortalId,
+                    branch_id: activeBranchId
                 };
                 await axios.post(
                     "https://backendaab.in/aabuildersDash/api/daily-payments/save",
@@ -1384,6 +1438,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     amount: 0,
                     weekly_number: currentWeekNumber,
                     status: false,
+                    branch_id: activeBranchId,
                 };
                 await axios.post(
                     "https://backendaab.in/aabuildersDash/api/weekly-expenses/save-daily",
@@ -1404,6 +1459,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     amount: Number(newDailyExpense.amount),
                     extra_amount: newDailyExpense.extra_amount ? Number(newDailyExpense.extra_amount) : 0,
                     weekly_number: Number(currentWeekNumber),
+                    branch_id: activeBranchId,
                 };
                 await axios.post(
                     "https://backendaab.in/aabuildersDash/api/daily-payments/save",
@@ -1419,6 +1475,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     amount: 0,
                     weekly_number: currentWeekNumber,
                     status: false,
+                    branch_id: activeBranchId,
                 };
                 await axios.post(
                     "https://backendaab.in/aabuildersDash/api/weekly-expenses/save-daily",
@@ -1447,6 +1504,14 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     useEffect(() => {
         if (weeks.length > 0) {
             setSelectedWeek(weeks[weeks.length - 1].number);
+        } else {
+            setSelectedWeek("");
+            setSelectedDate(null);
+            setDailyExpenses([]);
+            setRefundPayments([]);
+            setExpenses([]);
+            setPayments([]);
+            setAllRefundAmount([]);
         }
     }, [weeks]);
     const getCurrentWeekDays = () => {
@@ -1485,34 +1550,31 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             setNewDailyExpense((prev) => ({ ...prev, date: defaultDate }));
         }
     }, []);
+    useEffect(() => {
+        if (!selectedDate) return;
+        const fetchDataForDate = async () => {
+            try {
+                const [dailyRes, refundRes] = await Promise.all([
+                    axios.get(`https://backendaab.in/aabuildersDash/api/daily-payments/date/${selectedDate}`, withBranchParams()),
+                    axios.get(`https://backendaab.in/aabuildersDash/api/refund_received/date/${selectedDate}`, withBranchParams())
+                ]);
+                setDailyExpenses(dailyRes.data);
+                setRefundPayments(refundRes.data);
+            } catch (error) {
+                console.error("Error fetching data:", error);
+                setDailyExpenses([]);
+                setRefundPayments([]);
+            }
+        };
+        fetchDataForDate();
+    }, [selectedDate, withBranchParams]);
     const formatDate = (date) =>
         date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
     const handleDateClick = async (dateStr) => {
         setSelectedDate(dateStr);
         setNewDailyExpense((prev) => ({ ...prev, date: dateStr }));
-        try {
-            const [dailyRes, refundRes] = await Promise.all([
-                axios.get(`https://backendaab.in/aabuildersDash/api/daily-payments/date/${dateStr}`),
-                axios.get(`https://backendaab.in/aabuildersDash/api/refund_received/date/${dateStr}`)
-            ]);
-            setDailyExpenses(dailyRes.data);
-            setRefundPayments(refundRes.data);
-        } catch (error) {
-            console.error("Error fetching data:", error);
-            setDailyExpenses([]);
-            setRefundPayments([]);
-        }
     };
     const today = new Date().toISOString().split("T")[0];
-    if (!selectedDate && currentWeekDays.length > 0) {
-        const todayInWeek = currentWeekDays.find(
-            (d) => d.toISOString().split("T")[0] === today
-        );
-        const defaultDate = todayInWeek
-            ? today
-            : currentWeekDays[0].toISOString().split("T")[0];
-        handleDateClick(defaultDate);
-    }
     const totalAmount = filteredExpenses
         .filter(row => row.date === selectedDate)
         .reduce((sum, row) => sum + (Number(row.amount || 0) + Number(row.extra_amount || 0)), 0);
@@ -2029,6 +2091,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 extra_amount: Number(currentExpense.extra_amount || 0),
                 description: description.trim(),
                 file_url: currentExpense.file_url || null,
+                branch_id: currentExpense.branch_id ?? currentExpense.branchId ?? activeBranchId ?? null,
             };
             await axios.put(
                 `https://backendaab.in/aabuildersDash/api/daily-payments/edits/${entryId}?username=${encodeURIComponent(username)}`,
@@ -2115,7 +2178,8 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 amount: Number(currentFileRow.amount),
                 extra_amount: Number(currentFileRow.extra_amount || 0),
                 description: currentFileRow.description || "",
-                file_url: pdfUrl
+                file_url: pdfUrl,
+                branch_id: currentFileRow.branch_id ?? currentFileRow.branchId ?? activeBranchId ?? null,
             };
             const response = await axios.put(
                 `https://backendaab.in/aabuildersDash/api/daily-payments/edit/${currentFileRow.id}?username=${encodeURIComponent(username)}`,

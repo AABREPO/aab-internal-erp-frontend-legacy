@@ -247,7 +247,7 @@ const Summary = () => {
                     color: selectedVendor ? '#000' : '#9E9E9E'
                   }}
                 >
-                  {selectedVendor || 'Select Vendor'}
+                  {selectedVendor || 'Select ...'}
                 </div>
                 <svg
                   width="12"
@@ -291,7 +291,7 @@ const Summary = () => {
                     color: selectedProject ? '#000' : '#9E9E9E'
                   }}
                 >
-                  {selectedProject || 'Select Project'}
+                  {selectedProject || 'Select ...'}
                 </div>
                 <svg
                   width="12"

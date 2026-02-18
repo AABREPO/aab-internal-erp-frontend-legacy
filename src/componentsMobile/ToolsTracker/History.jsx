@@ -31,10 +31,20 @@ const History = ({ user, onTabChange }) => {
   });
   const [swipeStates, setSwipeStates] = useState({});
   const [expandedEntryId, setExpandedEntryId] = useState(null);
+  const [cloneExpandedEntryId, setCloneExpandedEntryId] = useState(null);
   const expandedEntryIdRef = useRef(expandedEntryId);
+  const cloneExpandedEntryIdRef = useRef(cloneExpandedEntryId);
   useEffect(() => {
     expandedEntryIdRef.current = expandedEntryId;
   }, [expandedEntryId]);
+  useEffect(() => {
+    cloneExpandedEntryIdRef.current = cloneExpandedEntryId;
+  }, [cloneExpandedEntryId]);
+  useEffect(() => {
+    if (historyType !== 'entry' && cloneExpandedEntryIdRef.current) {
+      setCloneExpandedEntryId(null);
+    }
+  }, [historyType]);
   useEffect(() => {
     const fetchLookupData = async () => {
       try {
@@ -148,6 +158,7 @@ const History = ({ user, onTabChange }) => {
                 toolsEntryType: entry.tools_entry_type || entry.toolsEntryType || 'Entry',
                 fromProjectId: entry.from_project_id || entry.fromProjectId || '',
                 toProjectId: entry.to_project_id || entry.toProjectId || '',
+                homeLocationId: entry.home_location_id || entry.homeLocationId || '',
                 serviceStoreId: entry.service_store_id || entry.serviceStoreId || '',
                 projectInchargeId: entry.project_incharge_id || entry.projectInchargeId || '',
                 createdDateTime: entry.created_date_time || entry.createdDateTime || entry.timestamp || '',
@@ -181,6 +192,7 @@ const History = ({ user, onTabChange }) => {
                   toolsEntryType: entry.tools_entry_type || entry.toolsEntryType || 'Entry',
                   fromProjectId: entry.from_project_id || entry.fromProjectId || '',
                   toProjectId: entry.to_project_id || entry.toProjectId || '',
+                  homeLocationId: item.home_location_id || item.homeLocationId || entry.home_location_id || entry.homeLocationId || '',
                   serviceStoreId: entry.service_store_id || entry.serviceStoreId || '',
                   projectInchargeId: entry.project_incharge_id || entry.projectInchargeId || '',
                   createdDateTime: entry.created_date_time || entry.createdDateTime || entry.timestamp || '',
@@ -309,6 +321,7 @@ const History = ({ user, onTabChange }) => {
 
           // Store entry ID in localStorage for Transfer page compatibility
           localStorage.setItem('editingToolsTrackerEntryId', String(entryId));
+          localStorage.removeItem('toolsTrackerCloneMode');
           // Store full entry data in localStorage (for potential future use)
           localStorage.setItem('editingToolsTrackerEntry', JSON.stringify(editData));
           // Dispatch custom event for Transfer component to listen
@@ -316,11 +329,13 @@ const History = ({ user, onTabChange }) => {
         } else {
           // If fetch fails, still store the ID and navigate
           localStorage.setItem('editingToolsTrackerEntryId', String(entryId));
+          localStorage.removeItem('toolsTrackerCloneMode');
         }
       } catch (fetchError) {
         console.error('Error fetching entry details:', fetchError);
         // Continue with ID-only approach if fetch fails
         localStorage.setItem('editingToolsTrackerEntryId', String(entryId));
+        localStorage.removeItem('toolsTrackerCloneMode');
       }
 
       // Navigate to transfer tab for editing
@@ -328,17 +343,84 @@ const History = ({ user, onTabChange }) => {
         onTabChange('transfer');
       }
       setExpandedEntryId(null);
+      setCloneExpandedEntryId(null);
     } catch (error) {
       console.error('Error in handleEdit:', error);
       // Fallback: still try to navigate even if there's an error
       const entryId = entry.entryId || entry.id;
       if (entryId) {
         localStorage.setItem('editingToolsTrackerEntryId', String(entryId));
+          localStorage.removeItem('toolsTrackerCloneMode');
         if (onTabChange) {
           onTabChange('transfer');
         }
       }
       setExpandedEntryId(null);
+      setCloneExpandedEntryId(null);
+    }
+  };
+  // Handle clone (for create new)
+  const handleClone = async (entry) => {
+    try {
+      const entryId = entry.entryId || entry.id;
+      if (!entryId) {
+        console.error('Entry ID not found for clone');
+        return;
+      }
+
+      let cloneData = null;
+      try {
+        const response = await fetch(`${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/get/${entryId}`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (response.ok) {
+          cloneData = await response.json();
+        }
+      } catch (fetchError) {
+        console.error('Error fetching entry details for clone:', fetchError);
+      }
+
+      if (!cloneData) {
+        cloneData = fullEntriesData.find((item) => String(item.id) === String(entryId)) || null;
+      }
+      if (!cloneData) {
+        console.error('No clone data found');
+        return;
+      }
+
+      const normalizedCloneData = { ...cloneData };
+      delete normalizedCloneData.id;
+      delete normalizedCloneData.eno;
+      normalizedCloneData.isEditMode = false;
+      normalizedCloneData.fromHistory = true;
+
+      const entryItems = normalizedCloneData.tools_tracker_item_name_table || normalizedCloneData.toolsTrackerItemNameTable || [];
+      const clonedItems = (Array.isArray(entryItems) ? entryItems : []).map((item) => {
+        const clonedItem = { ...item };
+        delete clonedItem.id;
+        return clonedItem;
+      });
+
+      normalizedCloneData.tools_tracker_item_name_table = clonedItems;
+      normalizedCloneData.toolsTrackerItemNameTable = clonedItems;
+
+      localStorage.setItem('editingToolsTrackerEntryId', String(entryId));
+      localStorage.setItem('toolsTrackerCloneMode', 'true');
+      localStorage.setItem('toolsTrackerCloneItemIdsId', entry.itemIdsId ? String(entry.itemIdsId) : '');
+      localStorage.setItem('toolsTrackerCloneBrandId', entry.brandId ? String(entry.brandId) : '');
+      localStorage.setItem('toolsTrackerCloneMachineNumber', entry.machineNumber ? String(entry.machineNumber) : '');
+      window.dispatchEvent(new CustomEvent('editToolsTrackerEntry', { detail: normalizedCloneData }));
+
+      if (onTabChange) {
+        onTabChange('transfer');
+      }
+      setExpandedEntryId(null);
+      setCloneExpandedEntryId(null);
+    } catch (error) {
+      console.error('Error in handleClone:', error);
+      setCloneExpandedEntryId(null);
     }
   };
   const handlePrevImage = () => {
@@ -356,12 +438,14 @@ const History = ({ user, onTabChange }) => {
   const minSwipeDistance = 50;
   const handleTouchStart = (e, entryId) => {
     const touch = e.touches ? e.touches[0] : { clientX: e.clientX };
+    const wasCloneExpanded = cloneExpandedEntryIdRef.current === entryId;
     setSwipeStates(prev => ({
       ...prev,
       [entryId]: {
         startX: touch.clientX,
         currentX: touch.clientX,
-        isSwiping: false
+        isSwiping: false,
+        wasCloneExpanded: wasCloneExpanded
       }
     }));
   };
@@ -373,7 +457,9 @@ const History = ({ user, onTabChange }) => {
       if (!state) return prev;
       const deltaX = touch.clientX - state.startX;
       const isExpanded = expandedEntryIdRef.current === entryId;
-      if (deltaX < 0 || (isExpanded && deltaX > 0)) {
+      const isCloneExpanded = cloneExpandedEntryIdRef.current === entryId;
+      const canRevealClone = historyType === 'entry';
+      if (deltaX < 0 || (canRevealClone && deltaX > 0 && !isExpanded) || (isExpanded && deltaX > 0) || (isCloneExpanded && deltaX < 0)) {
         return {
           ...prev,
           [entryId]: {
@@ -392,11 +478,25 @@ const History = ({ user, onTabChange }) => {
       if (!state) return prev;
       const deltaX = state.currentX - state.startX;
       const absDeltaX = Math.abs(deltaX);
+      const wasCloneExpanded = state.wasCloneExpanded || false;
       if (absDeltaX >= minSwipeDistance) {
         if (deltaX < 0) {
-          setExpandedEntryId(entryId);
+          if (wasCloneExpanded) {
+            setCloneExpandedEntryId(null);
+          } else {
+            setExpandedEntryId(entryId);
+            setCloneExpandedEntryId(null);
+          }
         } else {
-          setExpandedEntryId(null);
+          if (historyType === 'entry') {
+            if (expandedEntryIdRef.current === entryId) {
+              setExpandedEntryId(null);
+            } else {
+              setCloneExpandedEntryId(entryId);
+            }
+          } else {
+            setExpandedEntryId(null);
+          }
         }
       } else {
         if (expandedEntryIdRef.current === entryId) {
@@ -423,6 +523,9 @@ const History = ({ user, onTabChange }) => {
     if (expandedEntryId) {
       setExpandedEntryId(null);
     }
+    if (cloneExpandedEntryId) {
+      setCloneExpandedEntryId(null);
+    }
   };
   useEffect(() => {
     if (historyData.length === 0) return;
@@ -435,7 +538,9 @@ const History = ({ user, onTabChange }) => {
           if (!state) return;
           const deltaX = e.clientX - state.startX;
           const isExpanded = expandedEntryIdRef.current === entry.id;
-          if (deltaX < 0 || (isExpanded && deltaX > 0)) {
+          const isCloneExpanded = cloneExpandedEntryIdRef.current === entry.id;
+          const canRevealClone = historyType === 'entry';
+          if (deltaX < 0 || (canRevealClone && deltaX > 0 && !isExpanded) || (isExpanded && deltaX > 0) || (isCloneExpanded && deltaX < 0)) {
             newState[entry.id] = {
               ...state,
               currentX: e.clientX,
@@ -456,11 +561,25 @@ const History = ({ user, onTabChange }) => {
           if (!state) return;
           const deltaX = state.currentX - state.startX;
           const absDeltaX = Math.abs(deltaX);
+          const wasCloneExpanded = state.wasCloneExpanded || false;
           if (absDeltaX >= minSwipeDistance) {
             if (deltaX < 0) {
-              setExpandedEntryId(entry.id);
+              if (wasCloneExpanded) {
+                setCloneExpandedEntryId(null);
+              } else {
+                setExpandedEntryId(entry.id);
+                setCloneExpandedEntryId(null);
+              }
             } else {
-              setExpandedEntryId(null);
+              if (historyType === 'entry') {
+                if (expandedEntryIdRef.current === entry.id) {
+                  setExpandedEntryId(null);
+                } else {
+                  setCloneExpandedEntryId(entry.id);
+                }
+              } else {
+                setExpandedEntryId(null);
+              }
             }
           } else {
             if (expandedEntryIdRef.current === entry.id) {
@@ -479,42 +598,56 @@ const History = ({ user, onTabChange }) => {
       document.removeEventListener('mousemove', globalMouseMoveHandler);
       document.removeEventListener('mouseup', globalMouseUpHandler);
     };
-  }, [historyData]);
+  }, [historyData, historyType]);
   const filteredHistoryData = historyData.filter(entry => {
     const entryType = entry.toolsEntryType || 'Entry';
     if (historyType === 'entry') {
       return entryType.toLowerCase() === 'entry';
+    } else if (historyType === 'service') {
+      return entryType.toLowerCase() === 'service_return';
     } else {
       return entryType.toLowerCase() === 'relocate';
     }
   });
 
   return (
-    <div className="flex flex-col px-4 bg-white min-h-[calc(100vh-90px-80px)]" style={{ fontFamily: "'Manrope', sans-serif" }}>
-      <div className="flex items-center justify-between pt-1.5 pb-1.5">
+    <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden px-4 bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
+      <div className="flex items-center justify-between pt-1.5 pb-1.5 flex-shrink-0">
         <p className="text-[12px] text-black font-semibold">Category</p>
       </div>
-      <div className="flex bg-[#F2F4F7] items-center h-9 rounded-md">
+      <div className="flex bg-[#F2F4F7] items-center h-9 rounded-md flex-shrink-0">
         <button
           onClick={() => setHistoryType('entry')}
-          className={`flex-1 ml-0.5 h-8 rounded text-[12px] font-semibold leading-normal duration-1000 ease-out transition-colors ${historyType === 'entry'
+          className={`flex-1 ml-0.5 h-8 rounded text-[12px] font-semibold leading-normal transition-colors ${historyType === 'entry'
               ? 'bg-white text-black shadow-sm'
               : 'text-[#9E9E9E]'
             }`}
+          style={{ minWidth: 0 }}
         >
           Entry History
         </button>
         <button
-          onClick={() => setHistoryType('relocate')}
-          className={`flex-1 mr-0.5 h-8 rounded text-[12px] font-semibold leading-normal duration-1000 ease-out transition-colors ${historyType === 'relocate'
+          onClick={() => setHistoryType('service')}
+          className={`flex-1 ml-0.5 h-8 rounded text-[12px] font-semibold leading-normal transition-colors ${historyType === 'service'
               ? 'bg-white text-black shadow-sm'
               : 'text-[#9E9E9E]'
             }`}
+          style={{ minWidth: 0 }}
+        >
+          Service History
+        </button>
+        <button
+          onClick={() => setHistoryType('relocate')}
+          className={`flex-1 mr-0.5 h-8 rounded text-[12px] font-semibold leading-normal transition-colors ${historyType === 'relocate'
+              ? 'bg-white text-black shadow-sm'
+              : 'text-[#9E9E9E]'
+            }`}
+          style={{ minWidth: 0 }}
         >
           Relocate History
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto pb-4">
+      <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none pb-4">
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <p className="text-[12px] text-gray-500">Loading...</p>
@@ -524,15 +657,27 @@ const History = ({ user, onTabChange }) => {
             <p className="text-[12px] text-gray-500">No history entries found.</p>
           </div>
         ) : (
-          <div className="mt-3 space-y-0.5">
+          <div className="mt-3">
             {filteredHistoryData.map((entry) => {
               const { date, time } = formatDateTime(entry.createdDateTime);
-              const fromLocation = getLocationName(entry.fromProjectId, false);
+              const entryType = String(entry.toolsEntryType || '').toLowerCase();
+              let fromLocation = getLocationName(entry.fromProjectId, false);
               let toLocation = '-';
-              if (entry.toolsEntryType === 'Entry') {
+              if (entryType === 'entry') {
                 toLocation = getLocationName(entry.toProjectId, false);
                 if (toLocation === '-') {
                   toLocation = getLocationName(entry.serviceStoreId, true);
+                }
+              } else if (entryType === 'relocate' || entryType === 'relocation') {
+                toLocation = getLocationName(entry.homeLocationId, false);
+                if (toLocation === '-') {
+                  toLocation = getLocationName(entry.toProjectId, false);
+                }
+              } else if (entryType === 'service_return') {
+                fromLocation = getLocationName(entry.serviceStoreId, true);
+                toLocation = getLocationName(entry.toProjectId, false);
+                if (toLocation === '-') {
+                  toLocation = getLocationName(entry.fromProjectId, false);
                 }
               } else {
                 toLocation = getLocationName(entry.serviceStoreId, true);
@@ -548,15 +693,53 @@ const History = ({ user, onTabChange }) => {
               const entryId = entry.id;
               const swipeState = swipeStates[entryId];
               const isExpanded = expandedEntryId === entryId;
+              const isCloneExpanded = cloneExpandedEntryId === entryId;
+              const canShowClone = historyType === 'entry';
               const buttonWidth = 96;
-              const swipeOffset =
-                swipeState && swipeState.isSwiping
-                  ? Math.max(-buttonWidth, swipeState.currentX - swipeState.startX)
-                  : isExpanded
-                    ? -buttonWidth
-                    : 0;
+              const cloneButtonWidth = canShowClone ? 48 : 0;
+              let swipeOffset = 0;
+              if (swipeState && swipeState.isSwiping) {
+                const deltaX = swipeState.currentX - swipeState.startX;
+                if (deltaX < 0) {
+                  swipeOffset = Math.max(-buttonWidth, deltaX);
+                } else if (canShowClone) {
+                  swipeOffset = Math.min(cloneButtonWidth, deltaX);
+                } else {
+                  swipeOffset = 0;
+                }
+              } else if (isExpanded) {
+                swipeOffset = -buttonWidth;
+              } else if (isCloneExpanded && canShowClone) {
+                swipeOffset = cloneButtonWidth;
+              } else {
+                swipeOffset = 0;
+              }
               return (
-                <div key={entry.id} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] h-[100px]">
+                <div key={entry.id} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px]">
+                  {canShowClone && (
+                    <div
+                      className="absolute left-0 top-0 flex gap-2 flex-shrink-0 z-0"
+                      style={{
+                        opacity: isCloneExpanded || (swipeState && swipeState.isSwiping && swipeOffset > 20) ? 1 : 0,
+                        transition: 'opacity 0.2s ease-out',
+                        pointerEvents: isCloneExpanded ? 'auto' : 'none'
+                      }}
+                    >
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleClone(entry);
+                        }}
+                        className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                        title="Clone"
+                      >
+                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M12 6.75V3.75C12 3.33579 11.6642 3 11.25 3H3.75C3.33579 3 3 3.33579 3 3.75V11.25C3 11.6642 3.33579 12 3.75 12H6.75" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M15 6.75H7.5C6.67157 6.75 6 7.42157 6 8.25V14.25C6 15.0784 6.67157 15.75 7.5 15.75H14.25C15.0784 15.75 15.75 15.0784 15.75 14.25V8.25C15.75 7.42157 15.0784 6.75 14.25 6.75H15Z" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
                   <div
                     className="bg-white rounded-[8px] h-full px-3 py-3 cursor-pointer transition-all duration-300 ease-out select-none"
                     style={{
@@ -571,7 +754,7 @@ const History = ({ user, onTabChange }) => {
                     onMouseDown={(e) => handleMouseDown(e, entryId)}
                     onClick={handleCardClick}
                   >
-                    <div className="flex items-start justify-between mb-1">
+                    <div className="flex items-start justify-between mb-0.5">
                       <p className="text-[12px] font-semibold text-black leading-snug truncate">
                         #{entry.eno}, {itemName}
                       </p>
@@ -591,7 +774,7 @@ const History = ({ user, onTabChange }) => {
                         ) : null}
                       </div>
                     </div>
-                    <div className="flex items-start justify-between mb-1">
+                    <div className="flex items-start justify-between mb-0.5">
                       <p className="text-[11px] text-[#848484] leading-snug truncate flex-1 min-w-0">
                         From - {fromLocation}
                       </p>
@@ -601,7 +784,7 @@ const History = ({ user, onTabChange }) => {
                         </p>
                       )}
                     </div>
-                    <div className="flex items-start justify-between mb-1">
+                    <div className="flex items-start justify-between mb-0.5">
                       <p className="text-[11px] text-[#BF9853] leading-snug truncate flex-1 min-w-0">
                         To - {toLocation}
                       </p>

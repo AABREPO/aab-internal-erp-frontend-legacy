@@ -1291,7 +1291,7 @@ const AddInput = () => {
                 }}
               >
                 <span className={formData.itemName ? 'text-black' : 'text-[#9E9E9E]'}>
-                  {formData.itemName || '12A Switch'}
+                  {formData.itemName || 'Select ...'}
                 </span>
                 {!formData.itemName && (
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1345,7 +1345,7 @@ const AddInput = () => {
                 }}
               >
                 <span className={formData.model ? 'text-black' : 'text-[#9E9E9E]'}>
-                  {formData.model || 'Select Model'}
+                  {formData.model || 'Select ...'}
                 </span>
                 {!formData.model && (
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1399,7 +1399,7 @@ const AddInput = () => {
                 }}
               >
                 <span className={formData.type ? 'text-black' : 'text-[#9E9E9E]'}>
-                  {formData.type || 'Select Type'}
+                  {formData.type || 'Select ...'}
                 </span>
                 {!formData.type && (
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1454,7 +1454,7 @@ const AddInput = () => {
                   }}
                 >
                   <span className={formData.brand ? 'text-black' : 'text-[#9E9E9E]'}>
-                    {formData.brand || 'Select Brand'}
+                    {formData.brand || 'Select ...'}
                   </span>
                   {!formData.brand && (
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1501,7 +1501,7 @@ const AddInput = () => {
                 type="text"
                 value={formData.minQty}
                 onChange={(e) => handleFieldChange('minQty', e.target.value)}
-                placeholder="Type Min Qty"
+                placeholder="Enter"
                 className="w-[90px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-4 text-[12px] font-medium text-black bg-white placeholder:text-[#9E9E9E] focus:outline-none"
               />
             </div>
@@ -1514,7 +1514,7 @@ const AddInput = () => {
                 type="text"
                 value={formData.defaultQty}
                 onChange={(e) => handleFieldChange('defaultQty', e.target.value)}
-                placeholder="Type Default Qty"
+                placeholder="Enter"
                 className="w-[90px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-4 text-[12px] font-medium text-black bg-white placeholder:text-[#9E9E9E] focus:outline-none"
               />
             </div>

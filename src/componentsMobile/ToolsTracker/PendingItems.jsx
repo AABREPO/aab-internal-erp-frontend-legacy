@@ -466,10 +466,34 @@ const PendingItems = ({ user }) => {
             const itemName = itemNameId ? (itemNamesMap[itemNameId] || itemNamesMap[String(itemNameId)] || 'Unknown Item') : 'Unknown Item';
             const itemId = itemIdsMap[itemIdsId] || itemIdsMap[String(itemIdsId)] || '';
             let mostRecentEntry = null;
-            let mostRecentDate = null;
+            let mostRecentEntryItem = null;
+            let mostRecentSortTime = -1;
+            const getEntrySortTime = (entry) => {
+              const rawDate = entry.created_date_time || entry.createdDateTime || entry.timestamp || '';
+              const raw = String(rawDate || '').trim();
+              if (raw) {
+                const ddMmYyyyMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+                if (ddMmYyyyMatch) {
+                  const day = Number(ddMmYyyyMatch[1]);
+                  const month = Number(ddMmYyyyMatch[2]) - 1;
+                  const year = Number(ddMmYyyyMatch[3]);
+                  const hour = Number(ddMmYyyyMatch[4] || 0);
+                  const minute = Number(ddMmYyyyMatch[5] || 0);
+                  const second = Number(ddMmYyyyMatch[6] || 0);
+                  const parsedDdMm = new Date(year, month, day, hour, minute, second).getTime();
+                  if (!Number.isNaN(parsedDdMm)) return parsedDdMm;
+                }
+              }
+              const parsed = Date.parse(rawDate);
+              if (!Number.isNaN(parsed)) return parsed;
+              const numeric = Number(rawDate);
+              if (Number.isFinite(numeric)) return numeric;
+              const entryId = Number(entry.id || entry.entryId || 0);
+              return Number.isFinite(entryId) ? entryId : 0;
+            };
             for (const entry of toolsTrackerManagementData) {
               const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
-              const hasMatchingItem = entryItems.some(entryItem => {
+              const matchingEntryItem = entryItems.find(entryItem => {
                 const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
                 const entryBrandId = entryItem.brand_id || entryItem.brandId;
                 const entryMachineNumber = entryItem.machine_number || entryItem.machineNumber || '';
@@ -478,18 +502,28 @@ const PendingItems = ({ user }) => {
                 const machineMatch = !machineNumber || (entryMachineNumber && String(entryMachineNumber).trim() === machineNumber.trim());
                 return itemIdsMatch && brandMatch && machineMatch;
               });
-              if (hasMatchingItem) {
-                const entryDate = entry.created_date_time || entry.createdDateTime || entry.timestamp || '';
-                if (!mostRecentDate || entryDate > mostRecentDate) {
-                  mostRecentDate = entryDate;
+              if (matchingEntryItem) {
+                const entrySortTime = getEntrySortTime(entry);
+                const mostRecentEntryId = Number(mostRecentEntry?.id || mostRecentEntry?.entryId || 0);
+                const currentEntryId = Number(entry.id || entry.entryId || 0);
+                if (
+                  entrySortTime > mostRecentSortTime
+                  || (entrySortTime === mostRecentSortTime && currentEntryId > mostRecentEntryId)
+                ) {
+                  mostRecentSortTime = entrySortTime;
                   mostRecentEntry = entry;
+                  mostRecentEntryItem = matchingEntryItem;
                 }
               }
             }
             if (mostRecentEntry) {
               console.log("Most Recent Entry: ", mostRecentEntry);
               const fromLocationId = mostRecentEntry.from_project_id || mostRecentEntry.fromProjectId;
-              const toLocationId = mostRecentEntry.to_project_id || mostRecentEntry.toProjectId;
+              const entryType = String(mostRecentEntry.tools_entry_type || mostRecentEntry.toolsEntryType || '').toLowerCase();
+              const relocateHomeLocationId = mostRecentEntryItem?.home_location_id || mostRecentEntryItem?.homeLocationId;
+              const toLocationId = (entryType === 'relocate' || entryType === 'relocation')
+                ? relocateHomeLocationId
+                : (mostRecentEntry.to_project_id || mostRecentEntry.toProjectId);
               console.log("To Location ID: ", toLocationId);
               console.log("From Location ID: ", fromLocationId);
               const createdDateTime = mostRecentEntry.created_date_time || mostRecentEntry.createdDateTime || mostRecentEntry.timestamp || '';

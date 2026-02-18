@@ -6,7 +6,7 @@ import Sidebar from './Sidebar';
 import Logout from '../Images/Logout.png'
 import DownloadIcon from '../Images/download.png';
 import EditIcon from '../Images/Edit.svg';
-const Navbar = ({ username, userImage, position, email, onLogout, userRoles = [] }) => {
+const Navbar = ({ username, userImage, position, email, onLogout, userRoles = [], branchId, brachId }) => {
   const [isSidebarVisible, setIsSidebarVisible] = useState(false);
   const [isProfileDropdownVisible, setIsProfileDropdownVisible] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -22,6 +22,8 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
   const [siteLookup, setSiteLookup] = useState({});
   const [editRequests, setEditRequests] = useState([]);
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  const [branchOptions, setBranchOptions] = useState([]);
+  const [selectedBranchId, setSelectedBranchId] = useState('');
   const sidebarRef = useRef(null);
   const profileRef = useRef(null);
   const [roleModels, setRoleModels] = useState([]);
@@ -50,6 +52,94 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
   const normalizedUsername = username?.trim().toLowerCase();
   const canDownloadExpenses = normalizedUsername === 'admin' || normalizedUsername === 'mahalingam m';
   const canViewEditRequests = normalizedUsername === 'admin' || normalizedUsername === 'mahalingam m';
+  const canSelectBranch = normalizedUsername === 'admin' || normalizedUsername === 'mahalingam m';
+  const getStoredUser = () => {
+    try {
+      return JSON.parse(localStorage.getItem('user') || '{}');
+    } catch {
+      return {};
+    }
+  };
+  const storedUser = getStoredUser();
+  const parsedBranchId = Number(
+    branchId ??
+    brachId ??
+    storedUser?.branchId ??
+    storedUser?.branch_id ??
+    storedUser?.brachId
+  );
+  const userBranchId = Number.isFinite(parsedBranchId) ? parsedBranchId : '';
+  useEffect(() => {
+    let isMounted = true;
+    const fetchBranches = async () => {
+      try {
+        const response = await axios.get('https://backendaab.in/aabuildersDash/api/branch/getAll', { withCredentials: true });
+        if (!isMounted) return;
+        const branches = Array.isArray(response.data) ? response.data : [];
+        setBranchOptions(branches);
+      } catch (error) {
+        console.error('Error fetching branch list:', error);
+      }
+    };
+    fetchBranches();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+  useEffect(() => {
+    const savedBranchId = localStorage.getItem('selectedBranchId');
+    const savedBranchIdAsNumber = Number(savedBranchId);
+    const hasValidSavedBranch = Number.isFinite(savedBranchIdAsNumber) && savedBranchIdAsNumber > 0;
+    if (canSelectBranch) {
+      const nextBranchId = hasValidSavedBranch ? String(savedBranchIdAsNumber) : '';
+      setSelectedBranchId(nextBranchId);
+      if (nextBranchId) {
+        localStorage.setItem('selectedBranchId', nextBranchId);
+        window.dispatchEvent(new CustomEvent('branchSelectionChanged', { detail: { branchId: nextBranchId } }));
+      }
+      return;
+    }
+    if (userBranchId !== '') {
+      const fixedBranchId = String(userBranchId);
+      setSelectedBranchId(fixedBranchId);
+      localStorage.setItem('selectedBranchId', fixedBranchId);
+      window.dispatchEvent(new CustomEvent('branchSelectionChanged', { detail: { branchId: fixedBranchId } }));
+    }
+  }, [canSelectBranch, userBranchId]);
+  useEffect(() => {
+    if (!Array.isArray(branchOptions) || branchOptions.length === 0) return;
+    if (canSelectBranch) {
+      if (selectedBranchId) return;
+      const fallbackBranchId = userBranchId || branchOptions[0]?.id;
+      if (fallbackBranchId) {
+        const branchIdString = String(fallbackBranchId);
+        setSelectedBranchId(branchIdString);
+        localStorage.setItem('selectedBranchId', branchIdString);
+        window.dispatchEvent(new CustomEvent('branchSelectionChanged', { detail: { branchId: branchIdString } }));
+      }
+      return;
+    }
+    if (userBranchId !== '') {
+      const fixedBranchId = String(userBranchId);
+      if (selectedBranchId !== fixedBranchId) {
+        setSelectedBranchId(fixedBranchId);
+        localStorage.setItem('selectedBranchId', fixedBranchId);
+        window.dispatchEvent(new CustomEvent('branchSelectionChanged', { detail: { branchId: fixedBranchId } }));
+      }
+    }
+  }, [branchOptions, canSelectBranch, selectedBranchId, userBranchId]);
+  const handleBranchChange = (event) => {
+    const nextBranchId = event.target.value;
+    setSelectedBranchId(nextBranchId);
+    if (nextBranchId) {
+      localStorage.setItem('selectedBranchId', nextBranchId);
+      const selectedBranch = branchOptions.find((branch) => String(branch.id) === String(nextBranchId));
+      if (selectedBranch?.branch) {
+        localStorage.setItem('selectedBranchName', selectedBranch.branch);
+      }
+    }
+    window.dispatchEvent(new CustomEvent('branchSelectionChanged', { detail: { branchId: nextBranchId } }));
+  };
   const handleDownloadExpenses = async () => {
     if (isDownloading || !canDownloadExpenses) return;
     setIsDownloading(true);
@@ -1050,6 +1140,23 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
             <p className="text-[#BF9853] ml-2 font-medium text-lg">BUILDERS</p>
           </div>
           <div className="relative flex items-center space-x-4" ref={profileRef}>
+            {canSelectBranch && (
+              <div className="flex items-center">
+                <select
+                  value={selectedBranchId}
+                  onChange={handleBranchChange}
+                  className="h-9 px-2 rounded-md border border-[#BF9853] text-[#5B4636] text-sm focus:outline-none focus:ring-1 focus:ring-[#BF9853]"
+                  title="Select Branch"
+                >
+                  <option value="">Select Branch</option>
+                  {branchOptions.map((item) => (
+                    <option key={item.id} value={String(item.id)}>
+                      {item.branch}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             {canDownloadExpenses && (
               <button type="button" onClick={handleDownloadExpenses} disabled={isDownloading}
                 className="flex items-center border border-[#BF9853] rounded-md text-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed"

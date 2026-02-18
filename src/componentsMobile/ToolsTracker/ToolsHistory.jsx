@@ -173,7 +173,8 @@ const ToolsHistory = ({ user }) => {
           const data = await trackerRes.json();
           const entries = (Array.isArray(data) ? data : []).filter(entry => {
             const entryType = entry.tools_entry_type || entry.toolsEntryType || 'Entry';
-            return entryType.toLowerCase() === 'entry' || entryType.toLowerCase() === 'relocation';
+            const normalizedType = String(entryType).toLowerCase();
+            return normalizedType === 'entry' || normalizedType === 'relocate' || normalizedType === 'relocation';
           });
           setToolsTrackerManagementData(entries);
         }
@@ -358,10 +359,28 @@ const ToolsHistory = ({ user }) => {
     }
   }, [selectedItemIdDbId]);
 
-  // Fetch log history (status + machine number edits) when itemId is selected
+  // Fetch log history (status + machine number edits + home location changes) when itemId is selected
   useEffect(() => {
     const formatDateTime = (rawValue) => {
       if (!rawValue) return { date: '', time: '', sortTime: 0 };
+      const rawString = String(rawValue || '').trim();
+      const ddMmYyyyMatch = rawString.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+      if (ddMmYyyyMatch) {
+        const day = Number(ddMmYyyyMatch[1]);
+        const month = Number(ddMmYyyyMatch[2]) - 1;
+        const year = Number(ddMmYyyyMatch[3]);
+        const hour = Number(ddMmYyyyMatch[4] || 0);
+        const minute = Number(ddMmYyyyMatch[5] || 0);
+        const second = Number(ddMmYyyyMatch[6] || 0);
+        const parsedDdMm = new Date(year, month, day, hour, minute, second);
+        if (!Number.isNaN(parsedDdMm.getTime())) {
+          return {
+            date: parsedDdMm.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+            time: parsedDdMm.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+            sortTime: parsedDdMm.getTime()
+          };
+        }
+      }
       const parsed = new Date(rawValue);
       if (Number.isNaN(parsed.getTime())) return { date: '', time: '', sortTime: 0 };
       return {
@@ -434,6 +453,91 @@ const ToolsHistory = ({ user }) => {
         );
 
         const machineNumberHistory = historyResults.flat();
+        const resolveLocationById = (locationId) => {
+          if (locationId == null || locationId === '') return '';
+          const idStr = String(locationId);
+          return projectsMap[idStr] || projectsMap[locationId] || vendorsMap[idStr] || vendorsMap[locationId] || idStr;
+        };
+        const resolveMachineNumberById = (machineNumberId) => {
+          if (machineNumberId == null || machineNumberId === '') return '';
+          const rec = machineNumbersList.find(
+            m => String(m?.id ?? m?._id) === String(machineNumberId)
+          );
+          return rec ? String(rec.machine_number ?? rec.machineNumber ?? '').trim() : '';
+        };
+
+        // Build home-location history from relocate entries for selected itemId
+        const homeLocationHistory = [];
+        const selectedItemIdStr = String(selectedItemIdDbId);
+        const selectedBrandIdStr = selectedBrandId != null && selectedBrandId !== '' ? String(selectedBrandId) : null;
+        const selectedMachineNumberTrimmed = String(selectedMachineNumber || '').trim();
+        const selectedMachineNumberIdStr = selectedMachineNumberId != null && selectedMachineNumberId !== '' ? String(selectedMachineNumberId) : null;
+        for (const entry of toolsTrackerManagementData) {
+          const entryType = String(entry?.tools_entry_type || entry?.toolsEntryType || '').toLowerCase();
+          if (entryType !== 'relocate' && entryType !== 'relocation') continue;
+          const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
+          for (const entryItem of entryItems) {
+            const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
+            const entryBrandId = entryItem.brand_id || entryItem.brandId;
+            const entryMachineNumber = String(entryItem.machine_number || entryItem.machineNumber || '').trim();
+            const entryMachineNumberId = entryItem.machine_number_id || entryItem.machineNumberId;
+            const itemHomeLocationId = entryItem.home_location_id || entryItem.homeLocationId;
+
+            const itemIdsMatch = entryItemIdsId && String(entryItemIdsId) === selectedItemIdStr;
+            const brandMatch = !selectedBrandIdStr || !entryBrandId || String(entryBrandId) === selectedBrandIdStr;
+            const machineMatch = (!selectedMachineNumberTrimmed && !selectedMachineNumberIdStr)
+              || (selectedMachineNumberIdStr && entryMachineNumberId != null && String(entryMachineNumberId) === selectedMachineNumberIdStr)
+              || (selectedMachineNumberTrimmed && entryMachineNumber && entryMachineNumber === selectedMachineNumberTrimmed)
+              || (!entryMachineNumberId && !entryMachineNumber);
+
+            if (itemIdsMatch && brandMatch && machineMatch && itemHomeLocationId) {
+              const entryDate = entry.created_date_time || entry.createdDateTime || entry.timestamp || '';
+              const { sortTime } = formatDateTime(entryDate);
+              const resolvedEntryMachineNumber = entryMachineNumber || resolveMachineNumberById(entryMachineNumberId) || selectedMachineNumberTrimmed || '-';
+              homeLocationHistory.push({
+                homeLocationId: itemHomeLocationId,
+                homeLocationName: resolveLocationById(itemHomeLocationId),
+                machineNumber: resolvedEntryMachineNumber,
+                date: entryDate,
+                sortTime,
+                entryId: Number(entry?.id || entry?.entryId || 0)
+              });
+            }
+          }
+        }
+
+        homeLocationHistory.sort((a, b) => {
+          const aSort = Number(a?.sortTime || 0);
+          const bSort = Number(b?.sortTime || 0);
+          if (aSort !== bSort) return aSort - bSort;
+          return Number(a?.entryId || 0) - Number(b?.entryId || 0);
+        });
+
+        const homeLocationChangeLogs = [];
+        for (let i = 0; i < homeLocationHistory.length; i++) {
+          const current = homeLocationHistory[i];
+          const previous = i > 0 ? homeLocationHistory[i - 1] : null;
+          const oldHomeLocationName = previous?.homeLocationName || resolveLocationById(previous?.homeLocationId) || '-';
+          const newHomeLocationName = current?.homeLocationName || resolveLocationById(current?.homeLocationId) || '-';
+          if (previous && String(previous?.homeLocationId || '') === String(current?.homeLocationId || '')) {
+            continue;
+          }
+          const { date, time, sortTime } = formatDateTime(current?.date);
+          const fallbackSort = Number(current?.entryId || 0);
+          homeLocationChangeLogs.push({
+            id: `home-location-change-${i}-${current?.entryId || current?.date || ''}`,
+            key: `home-location-change-${i}-${current?.entryId || current?.date || ''}`,
+            type: 'home_location_changed',
+            status: 'Location Changed',
+            machineNumber: current?.machineNumber || selectedMachineNumberTrimmed || '-',
+            oldMachineNumber: null,
+            oldHomeLocation: oldHomeLocationName,
+            newHomeLocation: newHomeLocationName,
+            date,
+            time,
+            sortTime: sortTime || fallbackSort
+          });
+        }
 
         const statusLogs = statusList.map((status, index) => {
           const machineNum = resolveMachineNumberFromStatus(status);
@@ -489,7 +593,7 @@ const ToolsHistory = ({ user }) => {
             };
           });
 
-        const combinedLogs = [...machineEditLogs, ...statusLogs]
+        const combinedLogs = [...homeLocationChangeLogs, ...machineEditLogs, ...statusLogs]
           .sort((a, b) => (b.sortTime || 0) - (a.sortTime || 0));
 
         setMachineStatusHistory(combinedLogs);
@@ -505,8 +609,13 @@ const ToolsHistory = ({ user }) => {
   }, [
     selectedItemIdDbId,
     selectedMachineNumberId,
+    selectedMachineNumber,
+    selectedBrandId,
     selectedToolsDetails,
     stockManagementData,
+    toolsTrackerManagementData,
+    projectsMap,
+    vendorsMap,
     resolveMachineNumberFromStatus
   ]);
 
@@ -1394,39 +1503,63 @@ const ToolsHistory = ({ user }) => {
               <p className="text-[12px] text-gray-500">No log history found for this Item ID</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {machineStatusHistory.map((logEntry, index) => (
-                <div key={logEntry.key || logEntry.id || index} className="bg-white border-2 border-[#E0E0E0] rounded-[8px] px-3 py-2">
-                  <div className="flex items-start justify-between">
-                    {/* Left side: Status and Date */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-black leading-snug mb-1">
-                        {logEntry.status}
-                      </p>
-                      <p className="text-[11px] text-[#848484] leading-snug">
-                        {logEntry.date} • {logEntry.time}
-                      </p>
-                    </div>                    
-                    {/* Right side: Machine Number(s) */}
-                    <div className="flex-shrink-0 ml-2 text-right">
-                      {logEntry.type === 'machine_number_changed' ? (
-                        <div className="flex flex-col items-end">
-                          <p className="text-[13px] font-semibold text-[#848484] leading-snug mb-1">
-                            {logEntry.oldMachineNumber}
-                          </p>
-                          <p className="text-[13px] font-semibold text-[#4CAF50] leading-snug">
-                            {logEntry.machineNumber}
-                          </p>
-                        </div>
-                      ) : (
-                        <p className="text-[13px] font-semibold text-[#4CAF50] leading-snug">
-                          {logEntry.machineNumber || '-'}
+            <div className="bg-white rounded-lg overflow-hidden border border-gray-200 shadow-lg">
+              {/* Table Header */}
+              <div className="">
+                <div className="grid grid-cols-2 gap-2 px-3 py-2">
+                  <div className="text-[12px] font-medium text-[#848484]">Date</div>
+                  <div className="text-[12px] font-semibold text-[#848484] text-right">Machine Number</div>
+                </div>
+              </div>
+              {/* Table Body */}
+              <div>
+                {machineStatusHistory.map((logEntry, index) => (
+                  <div 
+                    key={logEntry.key || logEntry.id || index} 
+                    className="border-b border-gray-100 last:border-b-0"
+                  >
+                    <div className="grid grid-cols-2 gap-2 px-3 py-3">
+                      {/* Left column: Event/Status and Date & Time */}
+                      <div className="flex flex-col">
+                        <p className="text-[13px] font-semibold text-black leading-snug mb-1">
+                          {logEntry.status}
                         </p>
-                      )}
+                        <p className="text-[11px] text-[#848484] leading-snug">
+                          {logEntry.date} • {logEntry.time}
+                        </p>
+                      </div>
+                      {/* Right column: Machine Number */}
+                      <div className="text-right">
+                        {logEntry.type === 'machine_number_changed' ? (
+                          <div className="flex flex-col items-end">
+                            <p className="text-[13px] font-semibold text-black leading-snug mb-1">
+                              {logEntry.oldMachineNumber}
+                            </p>
+                            <p className="text-[13px] font-semibold text-[#007233] leading-snug">
+                              {logEntry.machineNumber}
+                            </p>
+                          </div>
+                        ) : logEntry.type === 'home_location_changed' ? (
+                          <div className="flex flex-col items-end">
+                            <p className="text-[13px] font-semibold text-[#007233] leading-snug mb-1">
+                              {logEntry.machineNumber || '-'}
+                            </p>
+                            <p className="text-[11px] font-medium text-[#848484] leading-snug">
+                              {(logEntry.oldHomeLocation && logEntry.oldHomeLocation !== '-')
+                                ? `${logEntry.oldHomeLocation} -> ${logEntry.newHomeLocation || '-'}`
+                                : (logEntry.newHomeLocation || '-')}
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-[13px] font-semibold text-[#007233] leading-snug">
+                            {logEntry.machineNumber || '-'}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
         </div>

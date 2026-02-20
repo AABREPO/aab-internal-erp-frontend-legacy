@@ -732,7 +732,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchEmployeeDetails = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
+                const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/basic/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {

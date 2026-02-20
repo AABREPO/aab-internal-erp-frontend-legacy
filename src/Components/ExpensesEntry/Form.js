@@ -301,7 +301,7 @@ const Form = ({ username, userRoles = [] }) => {
                 const fetchPreviousEntry = async () => {
                     try {
                         const response = await axios.get(
-                            buildBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/utility/electricity")
+                            "https://backendaab.in/aabuilderDash/expenses_form/utility/electricity"
                         );
                         const electricityEntries = Array.isArray(response.data) ? response.data : [];
 
@@ -661,7 +661,7 @@ const Form = ({ username, userRoles = [] }) => {
     };
     const fetchLatestEno = async () => {
         try {
-            const response = await fetch(buildBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/get_form"));
+            const response = await fetch("https://backendaab.in/aabuilderDash/expenses_form/get_form");
             if (!response.ok) {
                 throw new Error('Failed to fetch ENo');
             }
@@ -842,7 +842,7 @@ const Form = ({ username, userRoles = [] }) => {
                     savedExpenseData = expensesResult;
                 } else {
                     try {
-                        const allFormsRes = await fetch(buildBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/get_form"));
+                        const allFormsRes = await fetch("https://backendaab.in/aabuilderDash/expenses_form/get_form");
                         if (allFormsRes.ok) {
                             const allForms = await allFormsRes.json();
                             if (allForms.length > 0) {
@@ -877,7 +877,7 @@ const Form = ({ username, userRoles = [] }) => {
             }
             if (expensesId) {
                 try {
-                    const verifyResponse = await fetch(buildBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/get_form"));
+                    const verifyResponse = await fetch("https://backendaab.in/aabuilderDash/expenses_form/get_form");
                     if (verifyResponse.ok) {
                         const allForms = await verifyResponse.json();
                         const savedForm = allForms.find(f => f.id === expensesId);
@@ -1093,7 +1093,7 @@ const Form = ({ username, userRoles = [] }) => {
                 } else {
                     expensesResult = { message: responseText };
                     try {
-                        const allFormsRes = await fetch(buildBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/get_form"));
+                        const allFormsRes = await fetch("https://backendaab.in/aabuilderDash/expenses_form/get_form");
                         if (allFormsRes.ok) {
                             const allForms = await allFormsRes.json();
                             if (allForms.length > 0) {
@@ -1137,7 +1137,7 @@ const Form = ({ username, userRoles = [] }) => {
             }
             if (expensesId) {
                 try {
-                    const verifyResponse = await fetch(buildBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/get_form"));
+                    const verifyResponse = await fetch("https://backendaab.in/aabuilderDash/expenses_form/get_form");
                     if (verifyResponse.ok) {
                         const allForms = await verifyResponse.json();
                         const savedForm = allForms.find(f => f.id === expensesId);

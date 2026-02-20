@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import Select from 'react-select';
@@ -8,6 +8,25 @@ import edit from '../Images/Edit.svg';
 import Attach from '../Images/Attachfile.svg';
 import cross from '../Images/cross.png';
 const AdvanceTableView = ({ username, userRoles = [] }) => {
+  const resolveActiveBranchId = useCallback(() => {
+    try {
+      const selectedBranchId = localStorage.getItem("selectedBranchId");
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const fallbackBranchId = user?.branchId ?? user?.branch_id ?? user?.brachId;
+      const resolved = Number(selectedBranchId || fallbackBranchId);
+      return Number.isFinite(resolved) && resolved > 0 ? resolved : null;
+    } catch {
+      return null;
+    }
+  }, []);
+  const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId());
+  const buildBranchUrl = useCallback((baseUrl) => {
+    const url = new URL(baseUrl);
+    if (activeBranchId !== null && activeBranchId !== undefined && activeBranchId !== "") {
+      url.searchParams.set("branchId", String(activeBranchId));
+    }
+    return url.toString();
+  }, [activeBranchId]);
   const [vendorOptions, setVendorOptions] = useState([]);
   const [contractorOptions, setContractorOptions] = useState([]);
   const [combinedOptions, setCombinedOptions] = useState([]);
@@ -102,6 +121,19 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     };
     sessionStorage.setItem('advanceTableViewFilters', JSON.stringify(filters));
   }, [selectDate, selectContractororVendorName, selectProjectName, selectTransfer, selectType, selectMode, selectEntryNo, startDate, endDate, showFilters]);
+  useEffect(() => {
+    const syncBranch = () => {
+      const nextBranchId = resolveActiveBranchId();
+      setActiveBranchId((prevBranchId) =>
+        prevBranchId === nextBranchId ? prevBranchId : nextBranchId
+      );
+    };
+    syncBranch();
+    window.addEventListener("branchSelectionChanged", syncBranch);
+    return () => {
+      window.removeEventListener("branchSelectionChanged", syncBranch);
+    };
+  }, [resolveActiveBranchId]);
 
   const scrollRef = useRef(null);
   const isDragging = useRef(false);
@@ -238,7 +270,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
       return;
     }
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/getAll');
+      const response = await fetch(buildBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/getAll'));
       if (!response.ok) {
         throw new Error('Failed to fetch data');
       }
@@ -517,7 +549,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     const fetchData = async () => {
       try {
         setProgress(85);
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/getAll');
+        const response = await fetch(buildBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/getAll'));
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
@@ -532,7 +564,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
       }
     };
     fetchData();
-  }, []);
+  }, [buildBranchUrl]);
   const formatDateOnly = (dateString) => {
     const date = new Date(dateString);
     const day = String(date.getDate()).padStart(2, '0');

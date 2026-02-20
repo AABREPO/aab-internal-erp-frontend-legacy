@@ -30,7 +30,6 @@ const IncomingTracker = ({ user, onTabChange }) => {
   const [showPODropdown, setShowPODropdown] = useState(false);
   const [swipeStates, setSwipeStates] = useState({});
   const [expandedClosedCardId, setExpandedClosedCardId] = useState(null);
-  
   const minSwipeDistance = 50;
   const getRecordDate = (entry) => new Date(entry?.date || entry?.created_at || entry?.createdAt || 0).getTime();
   const getLatestEntry = (record) => {
@@ -131,7 +130,6 @@ const IncomingTracker = ({ user, onTabChange }) => {
       setSwipeStates({});
     }
   }, [activeStatus]);
-
   // Fetch vendor data
   useEffect(() => {
     const fetchVendors = async () => {
@@ -147,7 +145,6 @@ const IncomingTracker = ({ user, onTabChange }) => {
     };
     fetchVendors();
   }, []);
-
   // Fetch site data
   useEffect(() => {
     const fetchSites = async () => {
@@ -169,7 +166,6 @@ const IncomingTracker = ({ user, onTabChange }) => {
     };
     fetchSites();
   }, []);
-
   // Fetch all purchase orders
   useEffect(() => {
     const fetchPurchaseOrders = async () => {
@@ -185,7 +181,6 @@ const IncomingTracker = ({ user, onTabChange }) => {
     };
     fetchPurchaseOrders();
   }, []);
-
   // Fetch PO item names, brands, models, types, and categories
   useEffect(() => {
     const fetchPOData = async () => {
@@ -197,7 +192,6 @@ const IncomingTracker = ({ user, onTabChange }) => {
           fetch('https://backendaab.in/aabuildersDash/api/po_type/getAll'),
           fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll')
         ]);
-
         if (itemNamesRes.ok) {
           const data = await itemNamesRes.json();
           setPoItemName(data);
@@ -229,34 +223,27 @@ const IncomingTracker = ({ user, onTabChange }) => {
     };
     fetchPOData();
   }, []);
-
   // Helper function to find name by ID
   const findNameById = (array, id, fieldName) => {
     if (!array || !id) return '';
     const found = array.find(item => String(item.id || item._id) === String(id));
     return found ? (found[fieldName] || found.name || '') : '';
   };
-
   const resolveItemName = (itemId) => {
     return findNameById(poItemName, itemId, 'itemName') || findNameById(poItemName, itemId, 'name') || '';
   };
-
   const resolveBrandName = (brandId) => {
     return findNameById(poBrand, brandId, 'brand') || findNameById(poBrand, brandId, 'brandName') || findNameById(poBrand, brandId, 'name') || '';
   };
-
   const resolveModelName = (modelId) => {
     return findNameById(poModel, modelId, 'model') || findNameById(poModel, modelId, 'modelName') || findNameById(poModel, modelId, 'name') || '';
   };
-
   const resolveTypeName = (typeId) => {
     return findNameById(poType, typeId, 'typeColor') || findNameById(poType, typeId, 'type') || findNameById(poType, typeId, 'typeName') || findNameById(poType, typeId, 'name') || '';
   };
-
   const resolveCategoryName = (categoryId) => {
     return findNameById(categoryOptions, categoryId, 'category') || findNameById(categoryOptions, categoryId, 'name') || findNameById(categoryOptions, categoryId, 'label') || '';
   };
-
   // Helper function to extract numeric value from eno
   const getNumericEno = (eno) => {
     if (!eno) return 0;
@@ -267,7 +254,6 @@ const IncomingTracker = ({ user, onTabChange }) => {
     const match = str.match(/\d+/);
     return match ? parseInt(match[0], 10) : 0;
   };
-
   // Check if an incoming record has balance quantity
   const checkBalanceQuantity = (incomingRecord, poData) => {
     if (!poData || !poData.purchaseTable && !poData.purchase_table && !poData.items) {
@@ -507,12 +493,10 @@ const IncomingTracker = ({ user, onTabChange }) => {
           'Content-Type': 'application/json'
         }
       });
-
       if (response.ok) {
         // Save to ClosedPORecords
         const closedBy = (user && user.username) || '';
         const timestamp = new Date().toISOString();
-
         try {
           await fetch('https://backendaab.in/aabuildersDash/api/closed_po_records/save', {
             method: 'POST',
@@ -546,16 +530,13 @@ const IncomingTracker = ({ user, onTabChange }) => {
             if (!response.ok) {
               throw new Error('Network response was not ok');
             }
-
             const inventoryData = await response.json();
-
             const incomingItems = inventoryData.filter(item => {
               const inventoryType = item.inventory_type || item.inventoryType || '';
               const isIncoming = String(inventoryType).toLowerCase() === 'incoming';
               const isDeleted = item.delete_status || item.deleteStatus;
               return isIncoming && !isDeleted;
             });
-
             const processedRecords = await Promise.all(
               incomingItems
                 .filter(record => {
@@ -568,27 +549,22 @@ const IncomingTracker = ({ user, onTabChange }) => {
                 .map(async (record) => {
                   const purchaseNo = record.purchase_no || record.purchaseNo || record.purchase_number || '';
                   const poNumberStr = String(purchaseNo).replace('#', '').trim();
-
                   let poData = null;
                   if (poNumberStr && allPurchaseOrders.length > 0) {
                     const targetEno = getNumericEno(poNumberStr);
                     const vendorId = record.vendor_id || record.vendorId;
-
                     const vendorPOs = vendorId
                       ? allPurchaseOrders.filter(p => String(p.vendor_id || p.vendorId) === String(vendorId))
                       : allPurchaseOrders;
-
                     const matchingPOs = vendorPOs.filter(p => {
                       const poEno = getNumericEno(p.eno || p.ENO || p.poNumber || p.po_number || '');
                       return poEno === targetEno && poEno !== 0;
                     });
-
                     if (matchingPOs.length > 0) {
                       const posWithItems = matchingPOs.filter(p => {
                         const items = p.purchaseTable || p.purchase_table || p.items || [];
                         return items.length > 0;
                       });
-
                       if (posWithItems.length > 0) {
                         poData = posWithItems.reduce((latest, current) => {
                           const latestId = parseInt(latest.id || latest._id || 0);
@@ -604,27 +580,21 @@ const IncomingTracker = ({ user, onTabChange }) => {
                       }
                     }
                   }
-
                   const hasBalance = checkBalanceQuantity(record, poData);
-
                   const vendorId = record.vendor_id || record.vendorId;
                   const vendor = vendorData.find(v => v.id === vendorId);
                   const vendorName = vendor ? vendor.vendorName : 'Unknown Vendor';
-
                   const stockingLocationId = record.stocking_location_id || record.stockingLocationId;
                   const site = siteData.find(s => s.id === stockingLocationId);
                   const stockingLocation = site ? site.siteName : 'Unknown Location';
-
                   const inventoryItems = record.inventoryItems || record.inventory_items || [];
                   const numberOfItems = inventoryItems.length;
                   const totalQuantity = inventoryItems.reduce((sum, item) => {
                     return sum + Math.abs(item.quantity || 0);
                   }, 0);
-
                   const totalAmount = inventoryItems.reduce((sum, item) => {
                     return sum + Math.abs(item.amount || 0);
                   }, 0);
-
                   const itemDate = record.date || record.created_at || record.createdAt;
                   const dateObj = new Date(itemDate);
                   const formattedDate = dateObj.toLocaleDateString('en-GB', {
@@ -637,10 +607,8 @@ const IncomingTracker = ({ user, onTabChange }) => {
                     minute: '2-digit',
                     hour12: true
                   });
-
                   const entryNumber = record.eno || record.ENO || record.entry_number || record.entryNumber || record.id || '';
                   const poClosedStatus = record.po_closed_status || record.poClosedStatus || false;
-
                   return {
                     ...record,
                     entryNumber,
@@ -662,7 +630,6 @@ const IncomingTracker = ({ user, onTabChange }) => {
                   };
                 })
             );
-
             setIncomingRecords(processedRecords);
             setSelectedLiveCardId(null);
           } catch (error) {
@@ -671,7 +638,6 @@ const IncomingTracker = ({ user, onTabChange }) => {
             setLoading(false);
           }
         };
-
         await fetchIncomingRecords();
       } else {
         console.error('Failed to close PO');
@@ -680,7 +646,6 @@ const IncomingTracker = ({ user, onTabChange }) => {
       console.error('Error closing PO:', error);
     }
   };
-
   // Filter records based on status and search
   useEffect(() => {
     let filtered = incomingRecords;
@@ -870,17 +835,11 @@ const IncomingTracker = ({ user, onTabChange }) => {
         <div className="px-4 pt-2">
           <div className="flex items-center justify-between  mb-1">
             {/* Date Button */}
-            <button
-              type="button"
-              className="text-[12px] font-semibold text-black"
-            >
+            <button type="button" className="text-[12px] font-semibold text-black">
               Date
             </button>
             {/* Category Button */}
-            <button
-              type="button"
-              className=" text-[12px] font-semibold text-black"
-            >
+            <button type="button" className=" text-[12px] font-semibold text-black">
               Category
             </button>
           </div>
@@ -973,16 +932,11 @@ const IncomingTracker = ({ user, onTabChange }) => {
           </div>
         </div>
       )}
-
       {/* Filter Button */}
       {!showDetailView && (
         <div className=" px-4 pb-3">
           <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={() => setShowFilterModal(true)}
-              className="flex items-center gap-2 text-[14px] font-medium text-gray-700"
-            >
+            <button type="button" onClick={() => setShowFilterModal(true)} className="flex items-center gap-2 text-[14px] font-medium text-gray-700">
               <img src={Filter} alt="Filter" className="w-[13px] h-[11px]" />
               {!(filterVendorName || filterStockingLocation || filterPONo) && (
                 <span className="text-[12px] font-medium text-black">Filter</span>
@@ -1042,7 +996,6 @@ const IncomingTracker = ({ user, onTabChange }) => {
           </div>
         </div>
       )}
-
       {/* Records List */}
       <div className="flex-1 px-4 overflow-hidden  flex flex-col">
         {showDetailView && selectedRecord ? (
@@ -1068,7 +1021,6 @@ const IncomingTracker = ({ user, onTabChange }) => {
                 </div>
               </div>
             </div>
-
             {/* Items Summary */}
             <div className="flex-shrink-0 mb-4 flex items-center gap-2 border-b border-[#E0E0E0] pb-2">
               <p className="text-[14px] font-medium text-black">Items</p>
@@ -1081,17 +1033,24 @@ const IncomingTracker = ({ user, onTabChange }) => {
               <div className="ml-auto">
                 <span className="text-[14px] font-medium text-black">Total Amount: </span>
                 <span className="text-[14px] font-semibold text-[#BF9853]">
-                  ₹{(selectedRecord.totalAmount || selectedRecord.totalMergedAmount || 0).toLocaleString('en-IN')}
+                  {(() => {
+                    // Calculate total from all items (amount * quantity)
+                    const receivedItems = selectedRecord.allInventoryItems || selectedRecord.inventoryItems || selectedRecord.inventory_items || [];
+                    const totalAmount = receivedItems.reduce((sum, item) => {
+                      const amount = Math.abs(item.amount || 0);
+                      const quantity = Math.abs(item.quantity || 0);
+                      return sum + (amount * quantity);
+                    }, 0);
+                    return `₹${totalAmount.toLocaleString('en-IN')}`;
+                  })()}
                 </span>
               </div>
             </div>
-
             {/* Items List */}
-            <div className=" overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide" style={{ maxHeight: '470px' }}>
+            <div className=" overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide pb-14" style={{ maxHeight: '400px' }}>
               {(() => {
                 // First, try to use allInventoryItems/inventoryItems for received items
                 const receivedItems = selectedRecord.allInventoryItems || selectedRecord.inventoryItems || selectedRecord.inventory_items || [];
-
                 // Find the matching PO data
                 let poData = null;
                 if (allPurchaseOrders.length > 0) {
@@ -1126,7 +1085,6 @@ const IncomingTracker = ({ user, onTabChange }) => {
                     }
                   }
                 }
-
                 // Create a map of received items by composite key
                 const receivedMap = {};
                 receivedItems.forEach(item => {
@@ -1143,7 +1101,6 @@ const IncomingTracker = ({ user, onTabChange }) => {
                     receivedMap[compositeKey].push(item);
                   }
                 });
-
                 // Get items to display: from PO if available, otherwise from received items
                 const itemsToDisplay = [];
                 if (poData && (poData.purchaseTable || poData.purchase_table || poData.items)) {
@@ -1156,16 +1113,13 @@ const IncomingTracker = ({ user, onTabChange }) => {
                     const typeId = poItem.type_id || poItem.typeId || null;
                     const compositeKey = `${itemId || 'null'}-${categoryId || 'null'}-${modelId || 'null'}-${brandId || 'null'}-${typeId || 'null'}`;
                     const receivedItemsList = receivedMap[compositeKey] || [];
-
                     // Get received quantity
                     let receivedQty = 0;
                     if (receivedItemsList.length > 0) {
                       receivedQty = receivedItemsList.reduce((sum, item) => sum + Math.abs(item.quantity || 0), 0);
                     }
-
                     // Get PO quantity
                     const poQuantity = Math.abs(poItem.quantity || 0);
-
                     // Use received item if available
                     if (receivedItemsList.length > 0) {
                       receivedItemsList.forEach(item => {
@@ -1189,7 +1143,6 @@ const IncomingTracker = ({ user, onTabChange }) => {
                   // No PO data, use received items as fallback
                   itemsToDisplay.push(...receivedItems);
                 }
-
                 const hashString = (str) => {
                   let hash = 0;
                   for (let i = 0; i < str.length; i++) {
@@ -1199,10 +1152,8 @@ const IncomingTracker = ({ user, onTabChange }) => {
                   }
                   return Math.abs(hash);
                 };
-
                 const getCategoryColor = (category) => {
                   if (!category) return 'bg-[#E3F2FD] text-[#1976D2]';
-
                   // Define a palette of color combinations
                   const colorPalette = [
                     'bg-[#E3F2FD] text-[#1976D2]', // Light blue
@@ -1218,14 +1169,11 @@ const IncomingTracker = ({ user, onTabChange }) => {
                     'bg-[#C8E6C9] text-[#1B5E20]', // Light dark green
                     'bg-[#FFCCBC] text-[#BF360C]', // Light deep orange red
                   ];
-
                   // Hash the category name to get a consistent index
                   const hash = hashString(category.toLowerCase());
                   const colorIndex = hash % colorPalette.length;
-
                   return colorPalette[colorIndex];
                 };
-
                 // Sort items so that items with quantity 0 appear first
                 const sortedItems = [...itemsToDisplay].sort((a, b) => {
                   const quantityA = Math.abs(a.quantity || 0);
@@ -1234,20 +1182,17 @@ const IncomingTracker = ({ user, onTabChange }) => {
                   if (quantityA !== 0 && quantityB === 0) return 1;
                   return 0;
                 });
-
                 return sortedItems.map((item, index) => {
                   const itemId = item.item_id || item.itemId || null;
                   const brandId = item.brand_id || item.brandId || null;
                   const modelId = item.model_id || item.modelId || null;
                   const typeId = item.type_id || item.typeId || null;
                   const categoryId = item.category_id || item.categoryId || null;
-
                   let itemName = item.itemName || item.item_name || '';
                   let brand = item.brandName || item.brand_name || item.brand || '';
                   let model = item.modelName || item.model_name || item.model || '';
                   let type = item.typeName || item.type_name || item.type || '';
                   let category = item.categoryName || item.category_name || item.category || '';
-
                   // Resolve names from IDs if not available
                   if (!itemName && itemId) {
                     itemName = resolveItemName(itemId);
@@ -1264,16 +1209,13 @@ const IncomingTracker = ({ user, onTabChange }) => {
                   if (!category && categoryId) {
                     category = resolveCategoryName(categoryId);
                   }
-
                   const quantity = Math.abs(item.quantity || 0);
                   const amount = Math.abs(item.amount || 0);
                   const unit = item.unit || '';
                   const poQuantity = item.poQuantity || 0;
-
                   // Check if quantity matches PO quantity (different if they don't match)
                   const isQuantityDifferent = quantity !== poQuantity;
                   const isQuantityZero = quantity === 0;
-
                   return (
                     <div key={index} className={`bg-white border rounded-[8px] p-3 ${isQuantityZero ? 'border-[#FF6B6B] border-2' : 'border-[#E0E0E0]'}`}>
                       <div className=" ">
@@ -1289,19 +1231,20 @@ const IncomingTracker = ({ user, onTabChange }) => {
                           </p>
                         </div>
                         <div className="flex items-center justify-between">
-
                           <p className="text-[12px] font-medium text-gray-600">
                             {brand ? `${brand}` : ''} {type ? `${type}` : ''}
-                          </p>
-                        </div>
-                        <div className="flex items-center justify-between">
-
-                          <p className={`text-[12px] font-medium ${isQuantityDifferent ? 'text-[#FF6B6B]' : 'text-[#BF9853]'}`}>
-                            Quantity {quantity}{unit}
                           </p>
                           <p className="text-[14px] font-semibold text-black">
                             ₹{amount.toLocaleString('en-IN')}
                           </p>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <p className={`text-[12px] font-medium ${isQuantityDifferent ? 'text-[#FF6B6B]' : 'text-[#BF9853]'}`}>
+                            Quantity {quantity}{unit}
+                          </p>
+                          <p className="text-[14px] font-semibold text-black">
+                             ₹{(amount * quantity).toLocaleString('en-IN')}
+                          </p>                          
                         </div>
                       </div>
                     </div>
@@ -1334,7 +1277,6 @@ const IncomingTracker = ({ user, onTabChange }) => {
                   month: '2-digit',
                   year: 'numeric'
                 }) : record.formattedDate);
-
               const displayTime = activeStatus !== 'history' && record.formattedTime
                 ? record.formattedTime
                 : (record.latestDate ? new Date(record.latestDate).toLocaleTimeString('en-GB', {
@@ -1342,15 +1284,12 @@ const IncomingTracker = ({ user, onTabChange }) => {
                   minute: '2-digit',
                   hour12: true
                 }) : '');
-
               const displayQuantity = activeStatus === 'history'
                 ? record.totalQuantity
                 : (record.totalMergedQuantity || record.totalQuantity);
-
               const displayItems = activeStatus === 'history'
                 ? record.numberOfItems
                 : (record.totalMergedItems || record.numberOfItems);
-
               if (activeStatus === 'history') {
                 // History tab - simple list format
                 return (
@@ -1687,7 +1626,6 @@ const IncomingTracker = ({ user, onTabChange }) => {
           </button>
         </div>
       )}
-
       {/* Filter Modal */}
       {showFilterModal && (
         <div
@@ -1701,28 +1639,16 @@ const IncomingTracker = ({ user, onTabChange }) => {
             }
           }}
         >
-          <div
-            className="bg-white w-full max-w-[360px] rounded-t-3xl shadow-lg"
-            style={{ maxHeight: '60vh' }}
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="bg-white w-full max-w-[360px] rounded-t-3xl shadow-lg" style={{ maxHeight: '60vh' }}  onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 pt-4 mb-3">
               <h2 className="text-[16px] font-semibold text-black">Select Filters</h2>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowFilterModal(false);
-                  setShowVendorDropdown(false);
-                  setShowLocationDropdown(false);
-                  setShowPODropdown(false);
-                }}
-                className="text-red-500 hover:text-red-700"
+              <button type="button" className="text-red-500 hover:text-red-700"
+                onClick={() => {setShowFilterModal(false); setShowVendorDropdown(false); setShowLocationDropdown(false); setShowPODropdown(false);}}
               >
                 <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
               </button>
             </div>
-
             {/* Modal Content */}
             <div className="px-6 overflow-visible">
               {/* Vendor Name */}
@@ -1731,12 +1657,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
                   <label className="block text-[13px] font-medium text-black mb-0.5">Vendor Name</label>
                   <SearchableDropdown
                     value={filterVendorName}
-                    onChange={(value) => {
-                      setFilterVendorName(value);
-                      setShowVendorDropdown(false);
-                      setShowLocationDropdown(false);
-                      setShowPODropdown(false);
-                    }}
+                    onChange={(value) => {setFilterVendorName(value); setShowVendorDropdown(false); setShowLocationDropdown(false); setShowPODropdown(false);}}
                     options={vendorData.map((v) => v.vendorName || v.name || '').filter(Boolean)}
                     placeholder="Select"
                     fieldName="Vendor Name"
@@ -1750,12 +1671,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
                     <label className="text-[13px] font-medium text-black mb-0.5">Stocking Location</label>
                     <SearchableDropdown
                       value={filterStockingLocation}
-                      onChange={(value) => {
-                        setFilterStockingLocation(value);
-                        setShowVendorDropdown(false);
-                        setShowLocationDropdown(false);
-                        setShowPODropdown(false);
-                      }}
+                      onChange={(value) => {setFilterStockingLocation(value); setShowVendorDropdown(false); setShowLocationDropdown(false); setShowPODropdown(false);}}
                       options={siteData.map((s) => s.siteName || s.name || '').filter(Boolean)}
                       placeholder="Select"
                       fieldName="Stocking Location"
@@ -1771,30 +1687,13 @@ const IncomingTracker = ({ user, onTabChange }) => {
                         type="text"
                         placeholder="Enter"
                         value={filterPONo}
-                        onChange={(e) => {
-                          setFilterPONo(e.target.value);
-                          setShowPODropdown(true);
-                          setShowVendorDropdown(false);
-                          setShowLocationDropdown(false);
-                        }}
-                        onFocus={() => {
-                          setShowPODropdown(true);
-                          setShowVendorDropdown(false);
-                          setShowLocationDropdown(false);
-                        }}
+                        onChange={(e) => {setFilterPONo(e.target.value); setShowPODropdown(true); setShowVendorDropdown(false); setShowLocationDropdown(false);}}
+                        onFocus={() => {setShowPODropdown(true); setShowVendorDropdown(false); setShowLocationDropdown(false);}}
                         className="w-full max-w-[120px] h-[32px] rounded px-3 border border-gray-300 text-[14px] bg-white focus:outline-none focus:border-gray-400"
-                        style={{
-                          paddingRight: filterPONo ? '60px' : '40px'
-                        }}
+                        style={{paddingRight: filterPONo ? '60px' : '40px'}}
                       />
                       {filterPONo && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setFilterPONo('');
-                            setShowPODropdown(false);
-                          }}
+                        <button type="button" onClick={(e) => {e.stopPropagation(); setFilterPONo(''); setShowPODropdown(false);}}
                           className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                           style={{ right: '24px' }}
                         >
@@ -1803,13 +1702,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
                           </svg>
                         </button>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowPODropdown(!showPODropdown);
-                          setShowVendorDropdown(false);
-                          setShowLocationDropdown(false);
-                        }}
+                      <button type="button" onClick={() => {setShowPODropdown(!showPODropdown); setShowVendorDropdown(false); setShowLocationDropdown(false);}}
                         className="absolute right-3 top-1/2 transform -translate-y-1/2"
                       >
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1819,13 +1712,8 @@ const IncomingTracker = ({ user, onTabChange }) => {
                       {showPODropdown && (
                         <div className="absolute z-[100] w-full max-w-[120px] mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
                           {Array.from(new Set(incomingRecords.map(r => r.purchaseNo || r.entryNumber).filter(Boolean))).map((poNo) => (
-                            <div
-                              key={poNo}
-                              className="px-3 py-2 text-[14px] text-gray-700 hover:bg-gray-100 cursor-pointer"
-                              onClick={() => {
-                                setFilterPONo(String(poNo).replace('#', ''));
-                                setShowPODropdown(false);
-                              }}
+                            <div key={poNo} onClick={() => {setFilterPONo(String(poNo).replace('#', '')); setShowPODropdown(false);}}
+                              className="px-3 py-2 text-[14px] text-gray-700 hover:bg-gray-100 cursor-pointer"                              
                             >
                               {String(poNo).replace('#', '')}
                             </div>
@@ -1837,7 +1725,6 @@ const IncomingTracker = ({ user, onTabChange }) => {
                 </div>
               </div>
             </div>
-
             {/* Modal Footer */}
             <div className="flex items-center gap-3 px-6 py-4">
               <button

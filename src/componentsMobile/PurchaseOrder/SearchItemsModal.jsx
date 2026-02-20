@@ -2,6 +2,50 @@ import React, { useState, useEffect } from 'react';
 import SelectVendorModal from './SelectVendorModal';
 import Search from '../Images/Search.png';
 
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const CACHE_KEYS = {
+    poData: 'searchItemsModal_poData_v1',
+    stockInventory: 'searchItemsModal_stock_inventory_v1',
+    stockBasic: 'searchItemsModal_stock_basic_v1',
+    locationNames: 'searchItemsModal_locationNames_v1'
+};
+
+const memoryCache = {};
+
+const readCache = (key) => {
+    if (memoryCache[key]) {
+        return memoryCache[key];
+    }
+
+    try {
+        const raw = sessionStorage.getItem(key);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        memoryCache[key] = parsed;
+        return parsed;
+    } catch (error) {
+        return null;
+    }
+};
+
+const writeCache = (key, data) => {
+    const payload = {
+        timestamp: Date.now(),
+        data
+    };
+    memoryCache[key] = payload;
+    try {
+        sessionStorage.setItem(key, JSON.stringify(payload));
+    } catch (error) {
+        // Ignore storage errors and continue with in-memory cache.
+    }
+};
+
+const isCacheFresh = (cachedPayload) => {
+    if (!cachedPayload || !cachedPayload.timestamp) return false;
+    return Date.now() - cachedPayload.timestamp < CACHE_TTL_MS;
+};
+
 // Helper function to highlight matching text (highlights all matching terms)
 const highlightText = (text, searchQuery) => {
     if (!text || !searchQuery) {
@@ -992,6 +1036,19 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
         if (!isOpen || !useInventoryData) return;
 
         const fetchPOData = async () => {
+            const cachedPOData = readCache(CACHE_KEYS.poData);
+            if (cachedPOData?.data) {
+                setPoItemNames(cachedPOData.data.poItemNames || []);
+                setPoBrands(cachedPOData.data.poBrands || []);
+                setPoModels(cachedPOData.data.poModels || []);
+                setPoTypes(cachedPOData.data.poTypes || []);
+                setPoCategories(cachedPOData.data.poCategories || []);
+            }
+
+            if (isCacheFresh(cachedPOData)) {
+                return;
+            }
+
             try {
                 const [itemNamesRes, brandsRes, modelsRes, typesRes, categoriesRes] = await Promise.all([
                     fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/getAll'),
@@ -1001,26 +1058,41 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                     fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll')
                 ]);
 
+                const nextPoData = {
+                    poItemNames: [],
+                    poBrands: [],
+                    poModels: [],
+                    poTypes: [],
+                    poCategories: []
+                };
+
                 if (itemNamesRes.ok) {
                     const data = await itemNamesRes.json();
                     setPoItemNames(data);
+                    nextPoData.poItemNames = data;
                 }
                 if (brandsRes.ok) {
                     const data = await brandsRes.json();
                     setPoBrands(data);
+                    nextPoData.poBrands = data;
                 }
                 if (modelsRes.ok) {
                     const data = await modelsRes.json();
                     setPoModels(data);
+                    nextPoData.poModels = data;
                 }
                 if (typesRes.ok) {
                     const data = await typesRes.json();
                     setPoTypes(data);
+                    nextPoData.poTypes = data;
                 }
                 if (categoriesRes.ok) {
                     const data = await categoriesRes.json();
                     setPoCategories(data);
+                    nextPoData.poCategories = data;
                 }
+
+                writeCache(CACHE_KEYS.poData, nextPoData);
             } catch (error) {
                 console.error('Error fetching PO data:', error);
             }
@@ -1073,6 +1145,31 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                 if (useInventoryData) {
                     setInventoryItems([]);
                 }
+                return;
+            }
+
+            // Wait until PO data is available in inventory mode to avoid creating empty keys.
+            if (useInventoryData &&
+                poItemNames.length === 0 &&
+                poBrands.length === 0 &&
+                poModels.length === 0 &&
+                poTypes.length === 0 &&
+                poCategories.length === 0) {
+                return;
+            }
+
+            const stockCacheKey = useInventoryData ? CACHE_KEYS.stockInventory : CACHE_KEYS.stockBasic;
+            const cachedStockData = readCache(stockCacheKey);
+            if (cachedStockData?.data) {
+                const cachedStock = cachedStockData.data;
+                setStockQuantities(cachedStock.stockQuantities || {});
+                setStockBreakdown(cachedStock.stockBreakdown || {});
+                if (useInventoryData) {
+                    setInventoryItems(cachedStock.inventoryItems || []);
+                }
+            }
+
+            if (isCacheFresh(cachedStockData)) {
                 return;
             }
 
@@ -1191,9 +1288,15 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                     });
 
                     // Convert itemsMap to array for search results
-                    setInventoryItems(Object.values(itemsMap));
+                    const inventoryItemsList = Object.values(itemsMap);
+                    setInventoryItems(inventoryItemsList);
                     setStockQuantities(stockMap);
                     setStockBreakdown(breakdownMap);
+                    writeCache(stockCacheKey, {
+                        stockQuantities: stockMap,
+                        stockBreakdown: breakdownMap,
+                        inventoryItems: inventoryItemsList
+                    });
                 } else {
                     // Original logic: Calculate net stock for each item_id across ALL locations
                     const stockMap = {}; // Total quantity per item_id
@@ -1258,6 +1361,10 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
 
                     setStockQuantities(stockMap);
                     setStockBreakdown(breakdownMap);
+                    writeCache(stockCacheKey, {
+                        stockQuantities: stockMap,
+                        stockBreakdown: breakdownMap
+                    });
                 }
             } catch (error) {
                 console.error('Error fetching stock quantities:', error);
@@ -1360,6 +1467,15 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
     const [locationNamesMap, setLocationNamesMap] = useState({});
     useEffect(() => {
         const fetchLocationNames = async () => {
+            const cachedLocationNames = readCache(CACHE_KEYS.locationNames);
+            if (cachedLocationNames?.data) {
+                setLocationNamesMap(cachedLocationNames.data);
+            }
+
+            if (isCacheFresh(cachedLocationNames)) {
+                return;
+            }
+
             try {
                 const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
                     method: "GET",
@@ -1377,6 +1493,7 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                         }
                     });
                     setLocationNamesMap(nameMap);
+                    writeCache(CACHE_KEYS.locationNames, nameMap);
                 }
             } catch (error) {
                 console.error('Error fetching location names:', error);

@@ -888,18 +888,18 @@ const PendingItems = ({ user }) => {
             <p className="text-[12px] text-gray-500">No pending items found.</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="shadow-lg">
             {pendingData.map((item) => (
-              <div key={item.id} className="bg-white rounded-[8px] p-4 shadow-sm border border-[#E0E0E0]">
+              <div key={item.id} className="bg-white rounded-[8px] px-4 py-2 shadow-sm border border-[#E0E0E0]">
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+                    <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
                       #{item.entryNo}, {item.itemName}
                     </p>
-                    <p className="text-[12px] font-semibold text-black leading-normal mb-1">
+                    <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
                       From - {item.from}
                     </p>
-                    <p className="text-[12px] font-semibold text-[#BF9853] leading-normal mb-1">
+                    <p className="text-[12px] font-semibold text-[#BF9853] leading-normal mb-0.5">
                       To - {item.to}
                     </p>
                     <p className="text-[11px] text-[#848484] leading-normal">
@@ -1014,7 +1014,7 @@ const PendingItems = ({ user }) => {
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4">
               {selectedItemHistory.history && selectedItemHistory.history.length > 0 ? (
-                <div className="space-y-3">
+                <div className="">
                   {/* Filter out home entries and show only transfer locations */}
                   {selectedItemHistory.history
                     .filter(entry => !entry.isHome)

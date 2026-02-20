@@ -1597,7 +1597,7 @@ const AddInput = ({ user }) => {
       </div>
       {/* Table */}
       <div className="flex-1 overflow-y-auto px-4 pb-20">
-        <div className="bg-white rounded-[18px] ">
+        <div className="bg-white rounded-md shadow-lg">
           {/* Table Header */}
           <div className="bg-[#F5F5F5] px-2 py-2 border-b border-[#E0E0E0]">
             <div className="grid grid-cols-[16px_1.1fr_0.8fr_1.2fr_1.6fr]">

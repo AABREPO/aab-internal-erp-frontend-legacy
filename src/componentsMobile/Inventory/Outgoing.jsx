@@ -105,13 +105,10 @@ const Outgoing = ({ user }) => {
   useEffect(() => {
     const fetchOutgoingEmployeeList = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/employee_details/getAll');
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/employee_details/site_engineers');
         if (response.ok) {
           const data = await response.json();
-          const siteEngineers = data.filter(
-            (emp) => emp.role_of_employee === 'Site Engineer'
-          );
-          setOutgoingEmployeeList(siteEngineers);
+          setOutgoingEmployeeList(data);
         }
       } catch (error) {
         console.error('Error:', error);
@@ -626,7 +623,7 @@ const Outgoing = ({ user }) => {
                   // Get amount and calculate price per unit
                   const amount = Number(invItem.amount) || 0;
                   if (amount > 0 && qty > 0) {
-                    const pricePerUnit = amount / Math.abs(qty); // Use absolute quantity for price calculation
+                    const pricePerUnit = amount; // Use absolute quantity for price calculation
                     matchingAmounts.push(pricePerUnit);
                   }
                 }
@@ -1224,11 +1221,7 @@ const Outgoing = ({ user }) => {
       {!isEmptyState && (
         <div className="items-center px-4 border-b border-[#E0E0E0]">
           <div className="sticky top-[100px] z-30 bg-white flex items-center justify-between mb-2 ">
-            <button
-              type="button"
-              onClick={() => setShowDatePicker(true)}
-              className="text-[12px] font-semibold text-black leading-normal underline-offset-2 hover:underline"
-            >
+            <button type="button" onClick={() => setShowDatePicker(true)} className="text-[12px] font-semibold text-black leading-normal underline-offset-2 hover:underline">
               {outgoingData.date}
             </button>
             <div className="flex items-center">
@@ -1277,13 +1270,7 @@ const Outgoing = ({ user }) => {
                 </>
               )}
               {hasOpenedAdd && isEditMode && fromHistory && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsEditMode(true);
-                    setHasOpenedAdd(false);
-                    setHideSummaryCard(true);
-                  }}
+                <button type="button" onClick={() => {setIsEditMode(true); setHasOpenedAdd(false); setHideSummaryCard(true);}}
                   className="flex items-center font-semibold justify-center rounded"
                 >
                   <img src={editIcon} alt="Edit" className="w-[15px] h-[15px]" />
@@ -1300,8 +1287,7 @@ const Outgoing = ({ user }) => {
           {isEmptyState && (
             <div className="mb-2 items-center border-b border-gray-200 pb-1 mt-0.5">
               <button
-                type="button"
-                onClick={() => setShowDatePicker(true)}
+                type="button" onClick={() => setShowDatePicker(true)}
                 className="text-[12px] font-medium text-black leading-normal underline-offset-2 hover:underline"
               >
                 {outgoingData.date}
@@ -1719,5 +1705,4 @@ const Outgoing = ({ user }) => {
     </div>
   );
 };
-
 export default Outgoing;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
@@ -23,6 +23,25 @@ const getCurrentWeekYear = () => {
 };
 
 const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
+  const resolveActiveBranchId = useCallback(() => {
+    try {
+      const selectedBranchId = localStorage.getItem("selectedBranchId");
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const fallbackBranchId = user?.branchId ?? user?.branch_id ?? user?.brachId;
+      const resolved = Number(selectedBranchId || fallbackBranchId);
+      return Number.isFinite(resolved) && resolved > 0 ? resolved : null;
+    } catch {
+      return null;
+    }
+  }, []);
+  const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId());
+  const buildBranchUrl = useCallback((baseUrl) => {
+    const url = new URL(baseUrl);
+    if (activeBranchId !== null && activeBranchId !== undefined && activeBranchId !== "") {
+      url.searchParams.set("branchId", String(activeBranchId));
+    }
+    return url.toString();
+  }, [activeBranchId]);
   // Use paymentModeOptions from props, fallback to default if not provided
   const defaultPaymentModeOptions = [
     { value: 'Cash', label: 'Cash' },
@@ -308,6 +327,20 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
     };
     fetchSites();
   }, []);
+
+  useEffect(() => {
+    const syncBranch = () => {
+      const nextBranchId = resolveActiveBranchId();
+      setActiveBranchId((prevBranchId) =>
+        prevBranchId === nextBranchId ? prevBranchId : nextBranchId
+      );
+    };
+    syncBranch();
+    window.addEventListener("branchSelectionChanged", syncBranch);
+    return () => {
+      window.removeEventListener("branchSelectionChanged", syncBranch);
+    };
+  }, [resolveActiveBranchId]);
 
   // Fetch Advance Data
   useEffect(() => {

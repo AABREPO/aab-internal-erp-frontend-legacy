@@ -309,7 +309,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
   // Fetch all records and update table data state
   const fetchRecords = useCallback(async () => {
     try {
-      const res = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/staff-advance/all'));
+      const res = await fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all');
       if (!res.ok) {
         console.warn('Staff advance API not available, using empty data');
         setTableData([]);
@@ -321,7 +321,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
       console.warn('Error fetching records:', err);
       setTableData([]);
     }
-  }, [withBranchUrl]);
+  }, []);
 
   const filterTableData = useCallback(() => {
     if (!formData.empName || !formData.purpose) {
@@ -615,7 +615,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
         }
       }
 
-      const resAll = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/staff-advance/all'));
+      const resAll = await fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all');
       let allData = [];
       if (resAll.ok) {
         allData = await resAll.json();
@@ -1225,7 +1225,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
         updatePayload.to_purpose_id = editFormData.transferPurpose?.id;
         updatePayload.amount = editFormData.transferAmount;
       }
-      const res = await fetch(withBranchUrl(`https://backendaab.in/aabuildersDash/api/staff-advance/edit/${editingId}`), {
+      const res = await fetch(withBranchUrl(`https://backendaab.in/aabuildersDash/api/staff-advance/${editingId}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatePayload)

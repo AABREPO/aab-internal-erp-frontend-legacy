@@ -180,7 +180,7 @@ const History = ({ username, userRoles = [] }) => {
     const velocity = useRef({ x: 0, y: 0 });
     const animationFrame = useRef(null);
     const lastMove = useRef({ time: 0, x: 0, y: 0 });
-    
+
     const handleMouseDown = (e, ref) => {
         if (!ref.current) return;
         const interactiveSelector = 'input, select, textarea, button, a, [contenteditable="true"], [role="button"]';
@@ -203,20 +203,20 @@ const History = ({ username, userRoles = [] }) => {
         ref.current.style.scrollBehavior = 'auto'; // Disable smooth scroll during drag for immediate response
         cancelMomentum();
     };
-    
+
     const handleMouseMove = (e, ref) => {
         if (!isDragging.current || !ref.current || activeScrollRef.current !== ref.current) return;
         e.stopPropagation(); // Prevent event from bubbling to other scroll containers        
         const now = Date.now();
-        const dt = now - lastMove.current.time || 16;        
+        const dt = now - lastMove.current.time || 16;
         // Calculate delta movement (incremental change)
         const deltaX = e.clientX - lastPosition.current.x;
-        const deltaY = e.clientY - lastPosition.current.y;        
+        const deltaY = e.clientY - lastPosition.current.y;
         // Update velocity for momentum (based on last move, not start position)
         velocity.current = {
             x: (e.clientX - lastMove.current.x) / dt,
             y: (e.clientY - lastMove.current.y) / dt,
-        };        
+        };
         // Use scrollBy for smooth, continuous scrolling based on incremental movement
         // This feels more natural like normal scrolling
         if (ref.current && (deltaX !== 0 || deltaY !== 0)) {
@@ -225,9 +225,9 @@ const History = ({ username, userRoles = [] }) => {
                 top: -deltaY,
                 behavior: 'auto' // Instant but smooth
             });
-        }        
+        }
         // Update last position for next incremental calculation
-        lastPosition.current = { x: e.clientX, y: e.clientY };        
+        lastPosition.current = { x: e.clientX, y: e.clientY };
         lastMove.current = {
             time: now,
             x: e.clientX,
@@ -244,7 +244,7 @@ const History = ({ username, userRoles = [] }) => {
         }
         applyMomentum();
         activeScrollRef.current = null; // Clear the active ref after momentum is applied
-    };    
+    };
     const cancelMomentum = () => {
         if (animationFrame.current) {
             cancelAnimationFrame(animationFrame.current);
@@ -578,18 +578,18 @@ const History = ({ username, userRoles = [] }) => {
             if (!selectedWeek || !year) {
                 setNextWeekDiscountInfo(null);
                 return;
-            }            
+            }
             const currentWeekNumber = Number(selectedWeek);
-            const selectedYear = parseInt(year, 10);            
+            const selectedYear = parseInt(year, 10);
             // Find the current week's info to determine its year
             const currentWeek = weeks.find(w => w.number === currentWeekNumber);
             if (!currentWeek) {
                 setNextWeekDiscountInfo(null);
                 return;
-            }            
+            }
             // Calculate next week - if we're in week 52, next week is week 1 of next year
             let nextWeekNumber;
-            let nextWeekYear;            
+            let nextWeekYear;
             // Get the end date of current week
             const currentWeekEnd = new Date(currentWeek.end);
             const nextWeekStart = new Date(currentWeekEnd);
@@ -600,7 +600,7 @@ const History = ({ username, userRoles = [] }) => {
             if (!Number.isFinite(nextWeekNumber)) {
                 setNextWeekDiscountInfo(null);
                 return;
-            }            
+            }
             try {
                 const response = await axios.get(
                     `https://backendaab.in/aabuildersDash/api/payments-received/week/${nextWeekNumber}`,
@@ -666,7 +666,7 @@ const History = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchEmployeeDetails = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
+                const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/basic/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -784,8 +784,7 @@ const History = ({ username, userRoles = [] }) => {
                             projectClientNameTemp[optionId] = "";
                         }
                         return option;
-                    })
-                    : [];
+                    }) : [];
                 const combinedSiteOptions = [...predefinedSiteOptions, ...projectOptions];
                 setSiteOptions(combinedSiteOptions);
                 setProjectIdToClientName(projectClientNameTemp);
@@ -827,7 +826,7 @@ const History = ({ username, userRoles = [] }) => {
                 const selectedYear = parseInt(year, 10);
                 const currentWeekNumber = getCurrentISOWeekNumber();
                 const currentWeekYear = getCurrentWeekYear();
-                
+
                 // Fetch all payments to determine which weeks have data
                 let weeksWithData = new Set();
                 try {
@@ -848,7 +847,7 @@ const History = ({ username, userRoles = [] }) => {
                     });
                 } catch (error) {
                     console.error('Error fetching payments for week filtering:', error);
-                }                
+                }
                 // Get all possible weeks for the year (1-53)
                 const allWeeks = [];
                 for (let weekNum = 1; weekNum <= 53; weekNum++) {
@@ -858,7 +857,7 @@ const History = ({ username, userRoles = [] }) => {
                     const weekYear = getWeekYear(weekStartDate);
                     const hasData = weeksWithData.has(weekNum);
                     const isCurrentWeek = (selectedYear === currentWeekYear && weekNum === currentWeekNumber);
-                    const isFutureWeek = weekEndDate > new Date();                    
+                    const isFutureWeek = weekEndDate > new Date();
                     // Include week if:
                     // 1. It has data for the selected year (regardless of ISO week year calculation)
                     // 2. It belongs to the selected year AND (is current week or is future week)
@@ -866,14 +865,14 @@ const History = ({ username, userRoles = [] }) => {
                         allWeeks.push(weekInfo);
                     }
                 }
-                
+
                 // Sort weeks by week number (descending - most recent first)
                 allWeeks.sort((a, b) => b.number - a.number);
-                
+
                 // Find the last week number that has data with status === true
                 const lastWeekWithDataValue = weeksWithData.size > 0 ? Math.max(...Array.from(weeksWithData)) : null;
                 setLastWeekWithData(lastWeekWithDataValue);
-                
+
                 setWeeks(allWeeks);
             } catch (error) {
                 console.error('Error fetching active weeks:', error);
@@ -881,7 +880,7 @@ const History = ({ username, userRoles = [] }) => {
         };
         fetchWeeks();
     }, [year, activeBranchId]);
-    
+
     // Fetch active weeks from API and set the last week as default
     useEffect(() => {
         const fetchActiveWeeks = async () => {
@@ -904,7 +903,7 @@ const History = ({ username, userRoles = [] }) => {
         };
         fetchActiveWeeks();
     }, [weeks.length, selectedWeek, activeBranchId]);
-    
+
     // Find the most recent week (across all years) that has data with status === true
     useEffect(() => {
         const computeEditableWeek = async () => {
@@ -947,7 +946,7 @@ const History = ({ username, userRoles = [] }) => {
         };
         computeEditableWeek();
     }, [activeBranchId]); // Run again when branch changes
-    
+
     useEffect(() => {
         const fetchWeekData = async () => {
             if (!selectedWeek) return;
@@ -956,9 +955,9 @@ const History = ({ username, userRoles = [] }) => {
                     axios.get(`https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${selectedWeek}`, withBranchParams()),
                     axios.get(`https://backendaab.in/aabuildersDash/api/payments-received/week/${selectedWeek}`, withBranchParams())
                 ]);
-                
+
                 const selectedYear = parseInt(year, 10);
-                
+
                 // Filter expenses to only include entries that belong to the selected year (ISO 8601)
                 // Only include expenses with status === true and valid period_end_date
                 const filteredExpenses = expensesRes.data.filter(expense => {
@@ -970,7 +969,7 @@ const History = ({ username, userRoles = [] }) => {
                     const expenseWeekYear = getWeekYear(expenseDate);
                     return expenseWeekYear === selectedYear;
                 });
-                
+
                 // Filter payments to only include entries that belong to the selected year (ISO 8601)
                 // Only include payments with status === true and valid period_end_date
                 const filteredPaymentsByYear = paymentsRes.data.filter(payment => {
@@ -987,7 +986,7 @@ const History = ({ username, userRoles = [] }) => {
                 const filteredPayments = filteredPaymentsByYear.filter(
                     (payment) => payment.type !== "Handover"
                 );
-                
+
                 setExpenses(filteredExpenses);
                 setPayments(filteredPayments);
                 await fetchWeeklyPaymentBills();
@@ -1305,37 +1304,37 @@ const History = ({ username, userRoles = [] }) => {
     const getISOWeekNumber = (date) => {
         const d = new Date(date);
         d.setHours(0, 0, 0, 0);
-        
+
         // Get Thursday of the week containing the date
         const dayOfWeek = d.getDay() || 7; // Convert Sunday (0) to 7
         const thursday = new Date(d);
         thursday.setDate(d.getDate() + 4 - dayOfWeek); // Thursday is 4 days after Monday
         thursday.setHours(0, 0, 0, 0);
-        
+
         // Use the year that Thursday falls in (ISO 8601 rule)
         const weekYear = thursday.getFullYear();
-        
+
         // Get January 1st of that year
         const jan1 = new Date(weekYear, 0, 1);
         jan1.setHours(0, 0, 0, 0);
-        
+
         // Get the Thursday of week 1 (first Thursday of the year)
         const jan1DayOfWeek = jan1.getDay() || 7;
         const firstThursday = new Date(jan1);
         firstThursday.setDate(jan1.getDate() + 4 - jan1DayOfWeek);
         firstThursday.setHours(0, 0, 0, 0);
-        
+
         // Calculate week number: difference in days divided by 7, plus 1
         const daysDiff = Math.floor((thursday - firstThursday) / 86400000);
         const weekNo = Math.floor(daysDiff / 7) + 1;
-        
+
         return weekNo;
     };
-    
+
     const getCurrentISOWeekNumber = () => {
         return getISOWeekNumber(new Date());
     };
-    
+
     // Get the year that a week belongs to (ISO 8601 - based on Thursday's year)
     const getWeekYear = (date) => {
         const d = new Date(date);
@@ -2457,8 +2456,8 @@ const History = ({ username, userRoles = [] }) => {
         doc.save(`PR ${selectedWeek || ""} - Weekly Payment Report ${formatDateOnly(lastPeriodEndDate)}.pdf`);
     };
     // Allow editing only for the most recent week (across all years) that has data with status === true
-    const canEditSelectedWeek = selectedWeek && lastEditableWeek !== null && 
-        Number(selectedWeek) === Number(lastEditableWeek.weekNumber) && 
+    const canEditSelectedWeek = selectedWeek && lastEditableWeek !== null &&
+        Number(selectedWeek) === Number(lastEditableWeek.weekNumber) &&
         parseInt(year, 10) === lastEditableWeek.year;
     const getPaymentsByExpenseId = (expenseId) => {
         if (!weeklyPaymentBills || weeklyPaymentBills.length === 0) {
@@ -2980,8 +2979,8 @@ const History = ({ username, userRoles = [] }) => {
                         </div>
                         <div className="w-full h-[600px] rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden">
                             <div ref={scrollRef} className="overflow-auto max-h-[600px] thin-scrollbar"
-                                style={{ 
-                                    willChange: 'scroll-position', 
+                                style={{
+                                    willChange: 'scroll-position',
                                     WebkitOverflowScrolling: 'touch',
                                     transform: 'translateZ(0)', // Force hardware acceleration
                                     backfaceVisibility: 'hidden' // Optimize rendering
@@ -3173,7 +3172,7 @@ const History = ({ username, userRoles = [] }) => {
                                                 </th>
                                                 <th className="pt-2 pb-2 w-[80px] sm:w-[100px]">
                                                     <select
-                                                        value={selectType} 
+                                                        value={selectType}
                                                         onChange={(e) => setSelectType(e.target.value)}
                                                         className="p-1 rounded-md bg-transparent w-[100px] sm:w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
                                                         placeholder="Type..."
@@ -3627,29 +3626,29 @@ const History = ({ username, userRoles = [] }) => {
                                                         <div className="flex flex-col gap-1">
                                                             <div className="flex items-center gap-2">
                                                                 <span className={row.type === "Claim" && !row.send_to_expenses_entry ? "text-red-500" : ""}>{row.type}</span>
-                                                                
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setCurrentProjectAdvanceRow(row);
-                                                                            setPaymentPopupData({
-                                                                                date: new Date().toISOString().split('T')[0],
-                                                                                amount: "",
-                                                                                paymentMode: "",
-                                                                                chequeNo: "",
-                                                                                chequeDate: "",
-                                                                                transactionNumber: "",
-                                                                                accountNumber: ""
-                                                                            });
-                                                                            const previousPaymentsForExpense = getPaymentsByExpenseId(row.id);
-                                                                            setPreviousPayments(previousPaymentsForExpense);
-                                                                            setShowPaymentPopup(true);
-                                                                        }}
-                                                                        className="bg-green-500 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-green-600 transition-colors text-xs"
-                                                                        title="Add Payment"
-                                                                    >
-                                                                        +
-                                                                    </button>
-                                                                
+
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setCurrentProjectAdvanceRow(row);
+                                                                        setPaymentPopupData({
+                                                                            date: new Date().toISOString().split('T')[0],
+                                                                            amount: "",
+                                                                            paymentMode: "",
+                                                                            chequeNo: "",
+                                                                            chequeDate: "",
+                                                                            transactionNumber: "",
+                                                                            accountNumber: ""
+                                                                        });
+                                                                        const previousPaymentsForExpense = getPaymentsByExpenseId(row.id);
+                                                                        setPreviousPayments(previousPaymentsForExpense);
+                                                                        setShowPaymentPopup(true);
+                                                                    }}
+                                                                    className="bg-green-500 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-green-600 transition-colors text-xs"
+                                                                    title="Add Payment"
+                                                                >
+                                                                    +
+                                                                </button>
+
                                                             </div>
                                                             {(() => {
                                                                 const payments = getPaymentsByExpenseId(row.id);
@@ -3837,8 +3836,8 @@ const History = ({ username, userRoles = [] }) => {
                                 </h1>
                             </div>
                             <div ref={paymentsScrollRef} className="rounded-lg border-l-8 border-l-[#BF9853] w-full overflow-y-auto max-h-[300px] thin-scrollbar"
-                                style={{ 
-                                    willChange: 'scroll-position', 
+                                style={{
+                                    willChange: 'scroll-position',
                                     WebkitOverflowScrolling: 'touch',
                                     transform: 'translateZ(0)', // Force hardware acceleration
                                     backfaceVisibility: 'hidden' // Optimize rendering

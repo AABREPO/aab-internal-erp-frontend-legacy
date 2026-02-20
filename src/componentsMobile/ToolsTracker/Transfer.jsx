@@ -781,6 +781,25 @@ const Transfer = ({ user }) => {
     };
     fetchMachineStatus();
   }, []);
+  const formatDateTime = (timestamp) => {
+    if (!timestamp) return { date: '', time: '' };
+    try {
+      const date = new Date(timestamp);
+      const formattedDate = date.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+      const formattedTime = date.toLocaleTimeString('en-IN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+      return { date: formattedDate, time: formattedTime };
+    } catch {
+      return { date: '', time: '' };
+    }
+  };
   useEffect(() => {
     if (fromOptions.length === 0 || inchargeOptions.length === 0 || toolsItemNameListData.length === 0) {
       return;
@@ -3738,11 +3757,11 @@ const Transfer = ({ user }) => {
           <div className="border border-gray-200 rounded-lg p-3">
             <div className="space-y-1">
               {!(entryServiceMode === 'Service' && serviceFlowMode === 'return') && (
-              <div className="flex items-center">
-                <span className="text-[12px] text-gray-500 w-[100px]">From</span>
-                <span className="text-[12px] text-gray-500 mx-2">:</span>
-                <span className="text-[12px] text-gray-700">{selectedFrom?.label || '-'}</span>
-              </div>
+                <div className="flex items-center">
+                  <span className="text-[12px] text-gray-500 w-[100px]">From</span>
+                  <span className="text-[12px] text-gray-500 mx-2">:</span>
+                  <span className="text-[12px] text-gray-700">{selectedFrom?.label || '-'}</span>
+                </div>
               )}
               <div className="flex items-center">
                 <span className="text-[12px] text-gray-500 w-[100px]">{entryServiceMode === 'Entry' ? 'To' : 'Service Store'}</span>
@@ -3752,11 +3771,11 @@ const Transfer = ({ user }) => {
                 </span>
               </div>
               {(entryServiceMode === 'Service' && serviceFlowMode === 'return') && (
-              <div className="flex items-center">
-                <span className="text-[12px] text-gray-500 w-[100px]">To</span>
-                <span className="text-[12px] text-gray-500 mx-2">:</span>
-                <span className="text-[12px] text-gray-700">{selectedTo?.label || '-'}</span>
-              </div>
+                <div className="flex items-center">
+                  <span className="text-[12px] text-gray-500 w-[100px]">To</span>
+                  <span className="text-[12px] text-gray-500 mx-2">:</span>
+                  <span className="text-[12px] text-gray-700">{selectedTo?.label || '-'}</span>
+                </div>
               )}
               <div className="flex items-center">
                 <span className="text-[12px] text-gray-500 w-[100px]">Project Incharge</span>
@@ -3770,193 +3789,193 @@ const Transfer = ({ user }) => {
       {(items.length === 0 || isEditingTransferDetails) && entryServiceMode !== 'Relocate' && (
         <div className="flex-shrink-0 px-4 space-y-[6px]">
           {!(entryServiceMode === 'Service' && serviceFlowMode === 'return') && (
-          <>
-          <div className="relative dropdown-container">
-            <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-              From<span className="text-[#eb2f8e]">*</span>
-            </p>
-            <div className="relative">
-              <div
-                onClick={() => {
-                  setShowFromDropdown(!showFromDropdown);
-                  setShowToDropdown(false);
-                  setShowInchargeDropdown(false);
-                }}
-                className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
-                style={{
-                  color: selectedFrom ? '#000' : '#9E9E9E',
-                  boxSizing: 'border-box',
-                  paddingRight: selectedFrom ? '40px' : '40px'
-                }}
-              >
-                {selectedFrom ? selectedFrom.label : 'Select'}
-              </div>
-              {selectedFrom && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedFrom(null);
-                  }}
-                  className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              )}
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-            </div>
-          </div>
-          {showFromDropdown && entryServiceMode !== 'Relocate' && !(entryServiceMode === 'Service' && serviceFlowMode === 'return') && (
-            <div
-              className="fixed inset-0 bg-black bg-opacity-50 z-50 -top-4 flex items-center justify-center p-4"
-              onClick={(e) => {
-                if (e.target === e.currentTarget) {
-                  setShowFromDropdown(false);
-                }
-              }}
-              style={{ fontFamily: "'Manrope', sans-serif" }}
-            >
-              <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[60vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-                <div className="flex justify-between items-center px-6 pt-5">
-                  <p className="text-[16px] font-semibold text-black">Select From</p>
-                  <button onClick={() => setShowFromDropdown(false)} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
-                    <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
-                  </button>
-                </div>
-                <div className="px-6 pt-4 pb-4">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={fromSearchQuery}
-                      onChange={(e) => setFromSearchQuery(e.target.value)}
-                      placeholder="Search"
-                      className="w-full h-[32px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
-                      autoFocus
-                    />
-                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="6.5" cy="6.5" r="5.5" stroke="#747474" strokeWidth="1.5" />
-                        <path d="M9.5 9.5L12 12" stroke="#747474" strokeWidth="1.5" strokeLinecap="round" />
+            <>
+              <div className="relative dropdown-container">
+                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                  From<span className="text-[#eb2f8e]">*</span>
+                </p>
+                <div className="relative">
+                  <div
+                    onClick={() => {
+                      setShowFromDropdown(!showFromDropdown);
+                      setShowToDropdown(false);
+                      setShowInchargeDropdown(false);
+                    }}
+                    className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                    style={{
+                      color: selectedFrom ? '#000' : '#9E9E9E',
+                      boxSizing: 'border-box',
+                      paddingRight: selectedFrom ? '40px' : '40px'
+                    }}
+                  >
+                    {selectedFrom ? selectedFrom.label : 'Select'}
+                  </div>
+                  {selectedFrom && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedFrom(null);
+                      }}
+                      className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
+                    </button>
+                  )}
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              {showFromDropdown && entryServiceMode !== 'Relocate' && !(entryServiceMode === 'Service' && serviceFlowMode === 'return') && (
+                <div
+                  className="fixed inset-0 bg-black bg-opacity-50 z-50 -top-4 flex items-center justify-center p-4"
+                  onClick={(e) => {
+                    if (e.target === e.currentTarget) {
+                      setShowFromDropdown(false);
+                    }
+                  }}
+                  style={{ fontFamily: "'Manrope', sans-serif" }}
+                >
+                  <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[60vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex justify-between items-center px-6 pt-5">
+                      <p className="text-[16px] font-semibold text-black">Select From</p>
+                      <button onClick={() => setShowFromDropdown(false)} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
+                        <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
+                      </button>
+                    </div>
+                    <div className="px-6 pt-4 pb-4">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={fromSearchQuery}
+                          onChange={(e) => setFromSearchQuery(e.target.value)}
+                          placeholder="Search"
+                          className="w-full h-[32px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                          autoFocus
+                        />
+                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="6.5" cy="6.5" r="5.5" stroke="#747474" strokeWidth="1.5" />
+                            <path d="M9.5 9.5L12 12" stroke="#747474" strokeWidth="1.5" strokeLinecap="round" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6">
+                      <div className="shadow-md rounded-lg overflow-hidden">
+                        {getFilteredFromOptions().length > 0 ? (
+                          <div className="space-y-0">
+                            {getFilteredFromOptions().map((option) => {
+                              const isFavorite = fromFavorites.includes(option.id);
+                              const isSelected = selectedFrom?.id === option.id;
+                              return (
+                                <button
+                                  key={option.id}
+                                  onClick={() => {
+                                    // Validate existing items before changing "From" project
+                                    if (items.length > 0) {
+                                      const invalidItems = [];
+                                      for (const item of items) {
+                                        if (!item.item_name_id) continue;
+                                        // If itemId is selected, only check the full set (itemIdsId + brandId + machineNumber)
+                                        // Don't check itemNameId separately when itemId is selected
+                                        if (item.item_ids_id) {
+                                          const itemSetValidation = validateItemSetAvailability(
+                                            item.item_ids_id,
+                                            item.brand_id,
+                                            item.machine_number,
+                                            item.item_name_id,
+                                            item.itemName,
+                                            option.id
+                                          );
+                                          if (!itemSetValidation.isValid) {
+                                            invalidItems.push({
+                                              name: item.itemName || 'Unknown Item',
+                                              error: itemSetValidation.errorMessage
+                                            });
+                                          }
+                                        } else {
+                                          // Only check itemNameId if itemId is NOT selected (for quantity-based transfers)
+                                          // Check quantity availability with brandId if provided
+                                          const validation = validateItemLocation(
+                                            item.item_name_id,
+                                            item.itemName,
+                                            item.brand_id,
+                                            item.quantity,
+                                            option.id
+                                          );
+                                          if (!validation.isValid) {
+                                            invalidItems.push({
+                                              name: item.itemName || 'Unknown Item',
+                                              error: validation.errorMessage
+                                            });
+                                          }
+                                        }
+                                      }
+                                      if (invalidItems.length > 0) {
+                                        const errorMessage = invalidItems
+                                          .map(inv => inv.error)
+                                          .join('\n\n');
+                                        alert(`Cannot change "From" project. The following items are not in the selected location:\n\n${errorMessage}`);
+                                        setShowFromDropdown(false);
+                                        return;
+                                      }
+                                    }
+                                    setSelectedFrom(option);
+                                    setShowFromDropdown(false);
+                                    setIsEditingTransferDetails(false);
+                                  }}
+                                  className={`w-full h-[40px] px-6 flex items-center justify-between transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                                    }`}
+                                >
+                                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                                    <button onClick={(e) => handleToggleFromFavorite(e, option.id)} className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                                      {isFavorite ? (
+                                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                          <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                        </svg>
+                                      ) : (
+                                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                          <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                        </svg>
+                                      )}
+                                    </button>
+                                    <p className="text-[14px] font-medium text-black text-left truncate">{option.label}</p>
+                                  </div>
+                                  <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 ml-3">
+                                    {isSelected ? (
+                                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <circle cx="10" cy="10" r="9" stroke="#e4572e" strokeWidth="2" fill="none" />
+                                        <circle cx="10" cy="10" r="4" fill="#e4572e" />
+                                      </svg>
+                                    ) : (
+                                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <circle cx="10" cy="10" r="9" stroke="#9E9E9E" strokeWidth="1.5" fill="none" />
+                                      </svg>
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center py-4">
+                            <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
+                              {fromSearchQuery ? 'No options found' : 'No options available'}
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-                <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6">
-                  <div className="shadow-md rounded-lg overflow-hidden">
-                    {getFilteredFromOptions().length > 0 ? (
-                      <div className="space-y-0">
-                        {getFilteredFromOptions().map((option) => {
-                          const isFavorite = fromFavorites.includes(option.id);
-                          const isSelected = selectedFrom?.id === option.id;
-                          return (
-                            <button
-                              key={option.id}
-                              onClick={() => {
-                                // Validate existing items before changing "From" project
-                                if (items.length > 0) {
-                                  const invalidItems = [];
-                                  for (const item of items) {
-                                    if (!item.item_name_id) continue;
-                                    // If itemId is selected, only check the full set (itemIdsId + brandId + machineNumber)
-                                    // Don't check itemNameId separately when itemId is selected
-                                    if (item.item_ids_id) {
-                                      const itemSetValidation = validateItemSetAvailability(
-                                        item.item_ids_id,
-                                        item.brand_id,
-                                        item.machine_number,
-                                        item.item_name_id,
-                                        item.itemName,
-                                        option.id
-                                      );
-                                      if (!itemSetValidation.isValid) {
-                                        invalidItems.push({
-                                          name: item.itemName || 'Unknown Item',
-                                          error: itemSetValidation.errorMessage
-                                        });
-                                      }
-                                    } else {
-                                      // Only check itemNameId if itemId is NOT selected (for quantity-based transfers)
-                                      // Check quantity availability with brandId if provided
-                                      const validation = validateItemLocation(
-                                        item.item_name_id,
-                                        item.itemName,
-                                        item.brand_id,
-                                        item.quantity,
-                                        option.id
-                                      );
-                                      if (!validation.isValid) {
-                                        invalidItems.push({
-                                          name: item.itemName || 'Unknown Item',
-                                          error: validation.errorMessage
-                                        });
-                                      }
-                                    }
-                                  }
-                                  if (invalidItems.length > 0) {
-                                    const errorMessage = invalidItems
-                                      .map(inv => inv.error)
-                                      .join('\n\n');
-                                    alert(`Cannot change "From" project. The following items are not in the selected location:\n\n${errorMessage}`);
-                                    setShowFromDropdown(false);
-                                    return;
-                                  }
-                                }
-                                setSelectedFrom(option);
-                                setShowFromDropdown(false);
-                                setIsEditingTransferDetails(false);
-                              }}
-                              className={`w-full h-[40px] px-6 flex items-center justify-between transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
-                                }`}
-                            >
-                              <div className="flex items-center gap-3 flex-1 min-w-0">
-                                <button onClick={(e) => handleToggleFromFavorite(e, option.id)} className="w-6 h-6 flex items-center justify-center flex-shrink-0">
-                                  {isFavorite ? (
-                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                      <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
-                                  ) : (
-                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                      <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
-                                  )}
-                                </button>
-                                <p className="text-[14px] font-medium text-black text-left truncate">{option.label}</p>
-                              </div>
-                              <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 ml-3">
-                                {isSelected ? (
-                                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="10" cy="10" r="9" stroke="#e4572e" strokeWidth="2" fill="none" />
-                                    <circle cx="10" cy="10" r="4" fill="#e4572e" />
-                                  </svg>
-                                ) : (
-                                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="10" cy="10" r="9" stroke="#9E9E9E" strokeWidth="1.5" fill="none" />
-                                  </svg>
-                                )}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-4">
-                        <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
-                          {fromSearchQuery ? 'No options found' : 'No options available'}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-              </div>
-            </div>
-          </div>
-          )}
-          </>
+              )}
+            </>
           )}
           {entryServiceMode === 'Service' && (
             <div className=" relative dropdown-container">
@@ -3965,21 +3984,21 @@ const Transfer = ({ user }) => {
                   {isServiceSwapIconToggled ? 'From' : 'To'}<span className="text-[#eb2f8e]">*</span>
                 </p>
                 {serviceFlowMode === 'sent' && (
-                <button onClick={() => {
-                  setIsServiceSwapIconToggled(prev => !prev);
-                  setSelectedServiceStore(null);
-                  setShowFromDropdown(false);
-                  setShowToDropdown(false);
-                  setShowServiceStoreDropdown(false);
-                  setShowInchargeDropdown(false);
-                  setServiceFlowMode('return');
-                }} className="flex items-center justify-center">
-                  <img
-                    src={isServiceSwapIconToggled ? Swap1 : Swap}
-                    alt="change"
-                    className="w-5 h-5"
-                  />
-                </button>
+                  <button onClick={() => {
+                    setIsServiceSwapIconToggled(prev => !prev);
+                    setSelectedServiceStore(null);
+                    setShowFromDropdown(false);
+                    setShowToDropdown(false);
+                    setShowServiceStoreDropdown(false);
+                    setShowInchargeDropdown(false);
+                    setServiceFlowMode('return');
+                  }} className="flex items-center justify-center">
+                    <img
+                      src={isServiceSwapIconToggled ? Swap1 : Swap}
+                      alt="change"
+                      className="w-5 h-5"
+                    />
+                  </button>
                 )}
               </div>
               <div className="relative">
@@ -4028,30 +4047,30 @@ const Transfer = ({ user }) => {
                   To<span className="text-[#eb2f8e]">*</span>
                 </p>
                 {entryServiceMode === 'Entry' && (
-                <button onClick={() => handleSwapFromTo()} className="flex items-center justify-center">
-                  <img
-                    src={isSwapIconToggled ? Swap1 : Swap}
-                    alt="change"
-                    className="w-5 h-5"
-                  />
-                </button>
+                  <button onClick={() => handleSwapFromTo()} className="flex items-center justify-center">
+                    <img
+                      src={isSwapIconToggled ? Swap1 : Swap}
+                      alt="change"
+                      className="w-5 h-5"
+                    />
+                  </button>
                 )}
                 {entryServiceMode === 'Service' && (
-                <button onClick={() => {
-                  setIsServiceSwapIconToggled(prev => !prev);
-                  setSelectedTo(null);
-                  setServiceFlowMode('sent');
-                  setShowFromDropdown(false);
-                  setShowToDropdown(false);
-                  setShowServiceStoreDropdown(false);
-                  setShowInchargeDropdown(false);
-                }} className="flex items-center justify-center">
-                  <img
-                    src={isServiceSwapIconToggled ? Swap1 : Swap}
-                    alt="change"
-                    className="w-5 h-5"
-                  />
-                </button>
+                  <button onClick={() => {
+                    setIsServiceSwapIconToggled(prev => !prev);
+                    setSelectedTo(null);
+                    setServiceFlowMode('sent');
+                    setShowFromDropdown(false);
+                    setShowToDropdown(false);
+                    setShowServiceStoreDropdown(false);
+                    setShowInchargeDropdown(false);
+                  }} className="flex items-center justify-center">
+                    <img
+                      src={isServiceSwapIconToggled ? Swap1 : Swap}
+                      alt="change"
+                      className="w-5 h-5"
+                    />
+                  </button>
                 )}
               </div>
               <div className="relative">
@@ -4946,13 +4965,13 @@ const Transfer = ({ user }) => {
       )}
       {showCurrentLocationDropdown && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4"
-          onClick={(e) => {if (e.target === e.currentTarget) {setShowCurrentLocationDropdown(false);}}}
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowCurrentLocationDropdown(false); } }}
           style={{ fontFamily: "'Manrope', sans-serif", zIndex: 9999 }}
         >
           <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[60vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center px-6 pt-5">
               <p className="text-[16px] font-semibold text-black">Select Current Location</p>
-              <button onClick={() => {setShowCurrentLocationDropdown(false); setCurrentLocationSearchQuery('');}} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
+              <button onClick={() => { setShowCurrentLocationDropdown(false); setCurrentLocationSearchQuery(''); }} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
                 <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
               </button>
             </div>
@@ -5191,7 +5210,7 @@ const Transfer = ({ user }) => {
                           </div>
                         )}
                         <p className={`text-[12px] font-semibold text-black leading-snug ${item.localImageUrls?.length > 0 ? '' : 'cursor-pointer'}`}
-                          onClick={(e) => { if (item.localImageUrls?.length > 0) return; e.stopPropagation();  handleOpenImageViewer(item, 0); }}
+                          onClick={(e) => { if (item.localImageUrls?.length > 0) return; e.stopPropagation(); handleOpenImageViewer(item, 0); }}
                         >
                           {item.itemId || getItemIdLabelById(item.item_ids_id || item.itemIdsId) || (item.quantity > 0 ? `${item.quantity} Qty` : '')}
                         </p>
@@ -5691,8 +5710,8 @@ const Transfer = ({ user }) => {
                   <p className="text-[12px] text-gray-500">No items found</p>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-200">
-                  {getFilteredSearchItems().map((item, index) => {
+                <div className="">
+                  {getFilteredSearchItems().map((item, index, entry) => {
                     const itemNameObj = toolsItemNameListData.find(
                       i => String(i?.id) === String(item?.item_name_id ?? item?.itemNameId)
                     );
@@ -5705,6 +5724,9 @@ const Transfer = ({ user }) => {
                     const inchargeObj = inchargeOptions.find(
                       i => String(i?.id) === String(item?.project_incharge_id ?? item?.projectInchargeId)
                     );
+                    const categoryObj = categoryOptions.find(
+                      i => String(i?.id) === String(item?.category_id ?? item?.categoryId)
+                    );
                     const itemName = itemNameObj?.item_name || itemNameObj?.itemName || 'Unknown';
                     const itemIdName = itemIdObj?.item_id || itemIdObj?.itemId || '';
                     const brandName = brandObj?.tools_brand || brandObj?.toolsBrand || '';
@@ -5715,34 +5737,65 @@ const Transfer = ({ user }) => {
                     const machineNumber = resolveMachineNumFromStock(item);
                     const machineStatus = item?.machine_status ?? item?.machineStatus ?? 'Working';
                     const inchargeName = inchargeObj?.label || '';
-                    const dateTime = formatSearchItemDate(item?.created_date_time ?? item?.createdDateTime);
+                    const { date, time } = formatDateTime(item?.created_date_time || item?.createdDateTime || item?.timestamp || '');
+                    const categoryName = categoryObj?.value || categoryObj?.label || (item?.category_name || item?.categoryName || '');
+                    const quantity = item?.quantity || item?.qty || '';
                     return (
-                      <div key={item.id || index} className="py-4 cursor-pointer hover:bg-gray-50" onClick={() => handleSelectSearchItem(item)}>
-                        <div className="flex items-start justify-between mb-1">
-                          <p className="text-[14px] font-semibold text-black">{itemName}</p>
-                        </div>
-                        <div className="flex items-start justify-between mb-1">
-                          <p className="text-[13px] text-black">{machineNumber || '-'}</p>
-                          <p className="text-[13px] font-medium text-black">{itemIdName}</p>
-                        </div>
-                        <div className="flex items-start justify-between mb-1">
-                          <p className="text-[12px] text-gray-600">{brandModelText || '-'}</p>
-                          <div className="flex items-center gap-1">
-                            <span className={`w-1.5 h-1.5 rounded-full ${machineStatus === 'Working' ? 'bg-[#4CAF50]' :
-                              machineStatus === 'Not Working' ? 'bg-[#F44336]' :
-                                'bg-[#FF9800]'
-                              }`}></span>
-                            <p className={`text-[11px] font-medium ${machineStatus === 'Working' ? 'text-[#4CAF50]' :
-                              machineStatus === 'Not Working' ? 'text-[#F44336]' :
-                                'text-[#FF9800]'
-                              }`}>
-                              {machineStatus}
-                            </p>
+                      <div key={item.id || index} className="bg-white border border-gray-200 rounded-lg px-4 py-1.5 cursor-pointer hover:shadow-md transition-shadow mb-1.5" onClick={() => handleSelectSearchItem(item)}>
+                        <div className="flex justify-between items-start h-full">
+                          <div className="flex-1 flex flex-col">
+                            <div className="mb-0.5">
+                              <p className="text-[14px] font-semibold text-black">{itemName}</p>
+                            </div>
+                            {machineNumber && (
+                              <div className="mb-0.5">
+                                <p className="text-[12px] text-[#848484]">{machineNumber}</p>
+                              </div>
+                            )}
+                            {brandName && (
+                              <div className="mb-0.5">
+                                <p className="text-[13px] text-black">{brandName}</p>
+                              </div>
+                            )}
+                            {categoryName && (
+                              <div className="mb-0.5">
+                                <p className="text-[12px] text-blue-600 line-through decoration-blue-600">{categoryName}</p>
+                              </div>
+                            )}
+                            {date && time && (
+                              <div className="mt-auto">
+                                <p className="text-[11px] text-[#848484] leading-snug truncate flex-1 min-w-0">
+                                  {date} • {time}
+                                </p>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                        <div className="flex items-start justify-between">
-                          <p className="text-[11px] text-gray-500">{dateTime}</p>
-                          <p className="text-[12px] text-gray-600">{inchargeName}</p>
+                          <div className="flex flex-col items-end ml-4 h-full">
+                            <div className="mb-0.5 h-[20px]"></div>
+                            {itemIdName && (
+                              <div className="mb-0.5">
+                                <p className="text-[13px] font-medium text-black">{itemIdName}</p>
+                              </div>
+                            )}
+                            <div className="mb-0.5 flex items-center gap-1">
+                              <p className={`text-[12px] font-medium ${machineStatus === 'Working' ? 'text-[#4CAF50]' :
+                                machineStatus === 'Not Working' ? 'text-[#F44336]' :
+                                  'text-[#FF9800]'
+                                }`}>
+                                • {machineStatus}
+                              </p>
+                            </div>
+                            {quantity && (
+                              <div className="mb-0.5">
+                                <p className="text-[13px] text-black">{quantity}</p>
+                              </div>
+                            )}
+                            {inchargeName && (
+                              <div className="mt-auto">
+                                <p className="text-[12px] font-medium text-black">{inchargeName}</p>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -5869,7 +5922,7 @@ const Transfer = ({ user }) => {
                   {showSearchStatusDropdown && (
                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10">
                       {statusOptions.map((status) => (
-                        <button key={status} onClick={() => { setSearchUploadStatus(status); setShowSearchStatusDropdown(false);}}
+                        <button key={status} onClick={() => { setSearchUploadStatus(status); setShowSearchStatusDropdown(false); }}
                           className={`w-full px-4 py-2 text-left text-[14px] hover:bg-gray-100 ${searchUploadStatus === status ? 'bg-gray-50 font-semibold' : ''
                             }`}
                         >

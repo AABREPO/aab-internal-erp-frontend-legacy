@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import Modal from 'react-modal';
 import edit from '../Images/Edit.svg';
@@ -12,6 +12,18 @@ import autoTable from "jspdf-autotable";
 Modal.setAppElement('#root');
 
 const DatabaseExpenses = ({ username, userRoles = [] }) => {
+    const resolveActiveBranchId = useCallback(() => {
+        try {
+            const selectedBranchId = localStorage.getItem("selectedBranchId");
+            const user = JSON.parse(localStorage.getItem("user") || "{}");
+            const fallbackBranchId = user?.branchId ?? user?.branch_id ?? user?.brachId;
+            const resolved = Number(selectedBranchId || fallbackBranchId);
+            return Number.isFinite(resolved) && resolved > 0 ? resolved : null;
+        } catch {
+            return null;
+        }
+    }, []);
+    const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId());
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [expenses, setExpenses] = useState([]);
     const [totalAmount, setTotalAmount] = useState(0);
@@ -321,8 +333,23 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     }), []);
     const [modalIsOpen, setModalIsOpen] = useState(false);
     useEffect(() => {
+        const syncBranch = () => {
+            const nextBranchId = resolveActiveBranchId();
+            setActiveBranchId((prevBranchId) =>
+                prevBranchId === nextBranchId ? prevBranchId : nextBranchId
+            );
+        };
+        syncBranch();
+        window.addEventListener("branchSelectionChanged", syncBranch);
+        return () => {
+            window.removeEventListener("branchSelectionChanged", syncBranch);
+        };
+    }, [resolveActiveBranchId]);
+    useEffect(() => {
         axios
-            .get('https://backendaab.in/aabuilderDash/expenses_form/get_form')
+            .get('https://backendaab.in/aabuilderDash/expenses_form/get_form', {
+                params: activeBranchId ? { branchId: activeBranchId } : {},
+            })
             .then((response) => {
                 const sortedExpenses = response.data.sort((a, b) => {
                     const enoA = parseInt(a.eno, 10);
@@ -352,7 +379,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
             .catch((error) => {
                 console.error('Error fetching expenses:', error);
             });
-    }, []);
+    }, [activeBranchId]);
     useEffect(() => {
         const fetchSites = async () => {
             try {

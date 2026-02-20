@@ -5777,10 +5777,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                 </h3>
                                 <button
                                     className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl font-bold"
-                                    onClick={() => {
-                                        setShowCheckModal(false)
-                                        setCheckFilteredExpenses([])
-                                    }}
+                                    onClick={() => {setShowCheckModal(false); setCheckFilteredExpenses([]);}}
                                 >
                                     ×
                                 </button>
@@ -5852,17 +5849,10 @@ const PendingBill = ({ username, userRoles = [] }) => {
                             )}
                         </div>
                         <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-between">
-                            <button className="px-4 py-2 bg-[#BF9853] text-white rounded font-medium hover:bg-[#a67c3a] transition-colors duration-200"
-                                onClick={generateExpensePDF}
-                            >
+                            <button className="px-4 py-2 bg-[#BF9853] text-white rounded font-medium hover:bg-[#a67c3a] transition-colors duration-200" onClick={generateExpensePDF}>
                                 Generate PDF
                             </button>
-                            <button className="px-4 py-2 bg-white text-[#BF9853] border border-[#BF9853] rounded"
-                                onClick={() => {
-                                    setShowCheckModal(false)
-                                    setCheckFilteredExpenses([])
-                                }}
-                            >
+                            <button className="px-4 py-2 bg-white text-[#BF9853] border border-[#BF9853] rounded" onClick={() => { setShowCheckModal(false); setCheckFilteredExpenses([])}}>
                                 Close
                             </button>
                         </div>

@@ -527,7 +527,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     setOverallLoan(0);
     const fetchData = async () => {
       try {
-        const response = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/loans/all'));
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/loans/all');
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
@@ -573,7 +573,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       }
     };
     fetchData();
-  }, [withBranchUrl]);
+  }, []);
   // Optimized handleChange with useCallback
   const handleChange = useCallback(async (selected) => {
     setSelectedOption(selected);
@@ -583,7 +583,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       localStorage.removeItem("loanContractorVendor");
     }
     try {
-      const response = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/loans/all'));
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/loans/all');
       if (!response.ok) {
         throw new Error('Failed to fetch data');
       }
@@ -626,7 +626,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       console.error('Error fetching or processing loan data:', error);
       setOverallLoan(0);
     }
-  }, [withBranchUrl]);
+  }, []);
   useEffect(() => {
     if (!selectedOption) {
       setOverallLoan(0);
@@ -983,7 +983,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         // Refresh loan data to show the new entries
         setTimeout(async () => {
           try {
-            const response = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/loans/all'));
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/loans/all');
             if (!response.ok) {
               throw new Error(`HTTP error! Status: ${response.status}`);
             }
@@ -1012,7 +1012,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       // First, create advance portal entry with positive amount
       try {
         // Get entry number for advance portal
-        const res = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/getAll'));
+        const res = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/getAll');
         if (!res.ok) throw new Error('Failed to fetch advance portal entry numbers');
         const allData = await res.json();
         const maxEntryNo = allData.length > 0 ? Math.max(...allData.map(item => item.entry_no || 0)) : 0;
@@ -1165,7 +1165,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       // Refresh loan data to show the new entry
       setTimeout(async () => {
         try {
-          const response = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/loans/all'));
+          const response = await fetch('https://backendaab.in/aabuildersDash/api/loans/all');
           if (!response.ok) {
             throw new Error(`HTTP error! Status: ${response.status}`);
           }
@@ -1676,13 +1676,13 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         ...editFormData,
         branch_id: editFormData.branch_id ?? activeBranchId
       };
-      const res = await fetch(withBranchUrl(`https://backendaab.in/aabuildersDash/api/loans/${editingId}`), {
+      const res = await fetch(`https://backendaab.in/aabuildersDash/api/loans/${editingId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       if (!res.ok) throw new Error('Failed to update');
-      const response = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/loans/all'));
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/loans/all');
       if (response.ok) {
         const data = await response.json();
         setLoanData(data);

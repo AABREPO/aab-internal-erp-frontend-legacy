@@ -985,7 +985,6 @@ const NetStock = ({ user }) => {
                               <p className="text-[12px] font-semibold leading-tight">
                                 {item.location !== '-' ? (
                                   <>
-                                    <span className="text-[#A6A6A6] font-medium">{item.location}, </span>
                                     <span className="text-black">{item.itemName}</span>
                                   </>
                                 ) : (
@@ -1000,6 +999,17 @@ const NetStock = ({ user }) => {
                                   {item.status}
                                 </span>
                               )}
+                            </div>
+                            <div className="flex justify-between items-start mb-0.5">
+                              <p className="text-[11px] leading-tight">
+                                {item.location !== '-' ? (
+                                  <>
+                                    <span className="text-[#848484] font-medium">{item.location} </span>
+                                  </>
+                                ) : (
+                                  <span className="text-[#848484] font-medium">{item.location} </span>
+                                )}
+                              </p>
                             </div>
                             {/* Middle line: Machine number - empty opposite */}
                             <div className="flex justify-between items-start mb-0.5">

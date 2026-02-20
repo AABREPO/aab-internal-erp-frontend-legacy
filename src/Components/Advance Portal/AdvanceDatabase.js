@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import Select from 'react-select';
@@ -12,6 +12,25 @@ import Attach from '../Images/Attachfile.svg';
 import cross from '../Images/cross.png';
 
 const AdvanceDatabase = ({ username, userRoles = [] }) => {
+  const resolveActiveBranchId = useCallback(() => {
+    try {
+      const selectedBranchId = localStorage.getItem("selectedBranchId");
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const fallbackBranchId = user?.branchId ?? user?.branch_id ?? user?.brachId;
+      const resolved = Number(selectedBranchId || fallbackBranchId);
+      return Number.isFinite(resolved) && resolved > 0 ? resolved : null;
+    } catch {
+      return null;
+    }
+  }, []);
+  const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId());
+  const buildBranchUrl = useCallback((baseUrl) => {
+    const url = new URL(baseUrl);
+    if (activeBranchId !== null && activeBranchId !== undefined && activeBranchId !== "") {
+      url.searchParams.set("branchId", String(activeBranchId));
+    }
+    return url.toString();
+  }, [activeBranchId]);
   const [isUploading, setIsUploading] = useState(false);
   const [vendorOptions, setVendorOptions] = useState([]);
   const [contractorOptions, setContractorOptions] = useState([]);
@@ -472,6 +491,19 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
     };
     fetchSites();
   }, []);
+  useEffect(() => {
+    const syncBranch = () => {
+      const nextBranchId = resolveActiveBranchId();
+      setActiveBranchId((prevBranchId) =>
+        prevBranchId === nextBranchId ? prevBranchId : nextBranchId
+      );
+    };
+    syncBranch();
+    window.addEventListener("branchSelectionChanged", syncBranch);
+    return () => {
+      window.removeEventListener("branchSelectionChanged", syncBranch);
+    };
+  }, [resolveActiveBranchId]);
   useEffect(() => {
     const fetchData = async () => {
       try {

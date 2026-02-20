@@ -476,6 +476,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     const [purposeOptions, setPurposeOptions] = useState([]);
     const [showPurposePopup, setShowPurposePopup] = useState(false);
     const [selectedPurpose, setSelectedPurpose] = useState(null);
+    const [loanPurposeDescription, setLoanPurposeDescription] = useState("");
     const [pendingLoanData, setPendingLoanData] = useState(null);
     const [showPaymentDetailsPopup, setShowPaymentDetailsPopup] = useState(false);
     const [selectedPaymentDetails, setSelectedPaymentDetails] = useState([]);
@@ -718,7 +719,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchEmployeeDetails = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
+                const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/basic/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -1291,7 +1292,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             throw new Error("Failed to clear Loan Portal entry");
         }
     };
-    const createLoanPortalEntry = async ({ date, amount, vendorId, contractorId, employeeId, projectId, purposeId = 0 }) => {
+    const createLoanPortalEntry = async ({ date, amount, vendorId, contractorId, employeeId, projectId, purposeId = 0, description = "" }) => {
         const payload = {
             type: "Loan",
             date,
@@ -1305,7 +1306,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             contractor_id: contractorId || 0,
             employee_id: employeeId || 0,
             project_id: projectId || 0,
-            description: "Cash Register",
+            source: "Cash Register",
+            description: description || "",
             file_url: "",
             branch_id: activeBranchId ?? null,
         };
@@ -1322,6 +1324,11 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     const handlePurposeSelection = async () => {
         if (!selectedPurpose) {
             alert("Please select a purpose");
+            return;
+        }
+        const trimmedDescription = (loanPurposeDescription || "").trim();
+        if (!trimmedDescription) {
+            alert("Please enter description");
             return;
         }
         if (!pendingLoanData) {
@@ -1343,6 +1350,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 weekly_number: pendingLoanData.weekly_number,
                 status: false,
                 created_at: new Date().toISOString(),
+                description: trimmedDescription,
                 advance_portal_id: null,
                 staff_advance_portal_id: null,
                 loan_portal_id: null,
@@ -1356,6 +1364,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 employeeId: pendingLoanData.employee_id || 0,
                 projectId: pendingLoanData.project_id || 0,
                 purposeId: selectedPurpose.id,
+                description: trimmedDescription,
             });
             expenseForBackend.loan_portal_id = loanResponse?.id || loanResponse?.loanPortalId || null;
             const res = await fetch("https://backendaab.in/aabuildersDash/api/weekly-expenses/save", {
@@ -1372,6 +1381,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             });
             setShowPurposePopup(false);
             setSelectedPurpose(null);
+            setLoanPurposeDescription("");
             setPendingLoanData(null);
             window.location.reload();
             setNewExpense({
@@ -1415,6 +1425,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             refund_amount: 0,
             week_no: weekNo || editFormData.weekly_number || operationalWeekNumber,
             description: description || "",
+            source: "Cash Register",
             file_url: "",
             branch_id: activeBranchId ?? null,
         };
@@ -1589,6 +1600,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 weekly_number: operationalWeekNumber,
             });
             setSelectedPurpose(null);
+            setLoanPurposeDescription("");
             setShowPurposePopup(true);
             return;
         }
@@ -1650,6 +1662,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     entry_no: nextEntryNo,
                     week_no: getWeekNumber(),
                     description: "",
+                    source: "Cash Register",
                     file_url: "",
                     branch_id: activeBranchId ?? null,
                 };
@@ -1693,6 +1706,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     staff_payment_mode: "Cash",
                     from_purpose_id: 4,
                     entry_no: nextEntryNo,
+                    source: "Cash Register",
                     branch_id: activeBranchId ?? null,
                 };
                 const saveStaffAdvance = await fetch("https://backendaab.in/aabuildersDash/api/staff-advance/save", {
@@ -1960,6 +1974,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                         refund_amount: 0,
                         entry_no: nextEntryNo,
                         week_no: editFormData.weekly_number || operationalWeekNumber,
+                        source: "Cash Register",
                         description: editFormData.description || "",
                         file_url: editFormData.file_url || "",
                         branch_id: activeBranchId ?? null,
@@ -2010,6 +2025,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                         staff_payment_mode: "Cash",
                         from_purpose_id: 4,
                         entry_no: nextEntryNo,
+                        source: "Cash Register",
                         description: editFormData.description || "",
                         staff_refund_amount: 0,
                         file_url: null,
@@ -4659,6 +4675,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             refund_amount: 0,
                                                             payment_mode: paymentPopupData.paymentMode,
                                                             not_allow_to_edit: true,
+                                                            source: "Cash Register",
                                                             branch_id: activeBranchId ?? null,
                                                         };
                                                         const advanceResponse = await fetch(
@@ -4704,6 +4721,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             amount: parseFloat(paymentPopupData.amount),
                                                             staff_refund_amount: 0.0,
                                                             description: "",
+                                                            source: "Cash Register",
                                                             file_url: null,
                                                             labour_id: 0,
                                                             not_allow_to_edit: true,
@@ -5100,6 +5118,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                         if (e.key === 'Escape') {
                             setShowPurposePopup(false);
                             setSelectedPurpose(null);
+                            setLoanPurposeDescription("");
                             setPendingLoanData(null);
                         }
                     }}
@@ -5169,6 +5188,18 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                 }}
                             />
                         </div>
+                        <div className="mb-4">
+                            <label className="block mb-2 text-sm font-medium">
+                                Description <span className="text-red-500">*</span>
+                            </label>
+                            <textarea
+                                value={loanPurposeDescription}
+                                onChange={(e) => setLoanPurposeDescription(e.target.value)}
+                                placeholder="Enter description"
+                                rows={3}
+                                className="w-full border-2 border-[rgba(191, 152, 83, 0.25)] rounded-lg px-3 py-2 focus:outline-none focus:border-[rgba(191, 152, 83, 0.5)]"
+                            />
+                        </div>
                         {pendingLoanData && (
                             <div className="mb-4 p-3 bg-gray-50 rounded-lg">
                                 <p className="text-sm text-gray-600 mb-1">Loan Details:</p>
@@ -5181,6 +5212,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                 onClick={() => {
                                     setShowPurposePopup(false);
                                     setSelectedPurpose(null);
+                                    setLoanPurposeDescription("");
                                     setPendingLoanData(null);
                                 }}
                                 className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg"
@@ -5190,7 +5222,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                             <button
                                 onClick={handlePurposeSelection}
                                 className="px-4 py-2 bg-[#BF9853] text-white rounded-lg"
-                                disabled={!selectedPurpose || isSubmitting}
+                                disabled={!selectedPurpose || !(loanPurposeDescription || "").trim() || isSubmitting}
                             >
                                 {isSubmitting ? "Saving..." : "Save"}
                             </button>

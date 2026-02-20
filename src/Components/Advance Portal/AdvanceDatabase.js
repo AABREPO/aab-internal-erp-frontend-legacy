@@ -1322,9 +1322,9 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
   }
   return (
     <div className='bg-[#FAF6ED]'>
-      <div className='max-w-[1850px] bg-white rounded-md ml-10 xl:h-[128px] h-auto mr-10 px-4 text-left flex flex-wrap justify-between items-center gap-5'>
+      <div className='max-w-[1850px] bg-white rounded-md ml-10 xl:h-[128px] h-auto mr-10 px-4 text-left flex items-center gap-6'>
         <div className='w-full xl:w-auto xl:justify-between'>
-          <div className='flex flex-wrap gap-[16px] p-4'>
+          <div className='flex flex-wrap gap-[10px] p-4'>
             <div className=''>
               <label className='block mb-2 font-semibold'>Advance Amount</label>
               <input
@@ -1362,7 +1362,7 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className='w-full h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2'
+                className='w-full max-w-[150px] h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2'
               />
             </div>
             <div className=''>
@@ -1371,12 +1371,12 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className='w-full h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2'
+                className='w-full max-w-[150px] h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2'
               />
             </div>
           </div>
         </div>
-        <div className='mr-0 lg:mr-10 xl:px-0 px-4 xl:mb-0 mb-4'>
+        <div className='mr-0 xl:px-0 px-4 xl:mb-0 mb-4'>
           <button onClick={() => setIsOpen(true)} className='w-28 h-[35px] border-2 bg-[#BF9853] border-opacity-25 rounded-lg xl:mt-4 text-white'>Migrate</button>
         </div>
       </div>

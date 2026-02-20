@@ -816,7 +816,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             machineTools: '',
             billCopyUrl: fileUrl || '',
             source: "Advance Portal",
-            branch_id: activeBranchId,
+            branchId: activeBranchId,
           };
           const expensesResponse = await fetch(withBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/save"), {
             method: "POST",
@@ -1386,7 +1386,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
           comments: description,
           machineTools: '',
           billCopyUrl: fileUrl || '',
-          branch_id: activeBranchId
+          branchId: activeBranchId
         };
         const expensesResponse = await fetch(withBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/save"), {
           method: "POST",

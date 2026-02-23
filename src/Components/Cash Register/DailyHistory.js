@@ -791,7 +791,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 branch_id: activeBranchId,
             };
             await axios.post(
-                'https://backendaab.in/aabuildersDash/api/daily-payments',
+                'https://backendaab.in/aabuildersDash/api/daily-payments/save',
                 expenseData
             );
             const [dailyRes, refundRes] = await Promise.all([
@@ -2177,7 +2177,8 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                         machineTools: "",
                         billCopyUrl: expense.file_url || "",
                         source: "Cash Register",
-                        paymentMode: "Cash"
+                        paymentMode: "Cash",
+                        branchId: expense.branch_id ?? expense.branchId ?? activeBranchId,
                     };
                     const expensesResponse = await fetch(
                         "https://backendaab.in/aabuilderDash/expenses_form/save",

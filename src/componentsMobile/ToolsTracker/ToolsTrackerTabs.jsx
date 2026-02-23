@@ -10,12 +10,26 @@ const ToolsTrackerTabs = ({ activeTab = 'entry', onTabChange }) => {
     { id: 'tools-history', label: 'Tools History' },
     { id: 'service-history', label: 'Service History' }
   ];
+  const dropdownMenuItems = [
+    { id: 'transfer', label: 'Transfer' },
+    { id: 'history', label: 'History' },
+    { id: 'pending-items', label: 'Pending Items' },
+    { id: 'add-input', label: 'AddInput' },
+    { id: 'net-stock', label: 'Net Stock' },
+    { id: 'tools-history', label: 'Tools History' },
+    { id: 'service-history', label: 'Service History' }
+  ];
   const tabsContainerRef = useRef(null);
   const activeTabRef = useRef(null);
+  const dropdownRef = useRef(null);
+  const kebabButtonRef = useRef(null);
+  const dropdownMenuRef = useRef(null);
   const [underlineStyle, setUnderlineStyle] = useState({ left: 0, width: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
   const updateUnderlinePosition = () => {
     if (activeTabRef.current && tabsContainerRef.current) {
       const container = tabsContainerRef.current;
@@ -62,6 +76,55 @@ const ToolsTrackerTabs = ({ activeTab = 'entry', onTabChange }) => {
       };
     }
   }, [activeTab]);
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        dropdownRef.current && 
+        !dropdownRef.current.contains(event.target) &&
+        dropdownMenuRef.current &&
+        !dropdownMenuRef.current.contains(event.target)
+      ) {
+        setIsDropdownOpen(false);
+      }
+    };
+    const updateDropdownPosition = () => {
+      if (isDropdownOpen && kebabButtonRef.current) {
+        const buttonRect = kebabButtonRef.current.getBoundingClientRect();
+        setDropdownPosition({
+          top: buttonRect.bottom + 5,
+          right: Math.max(8, window.innerWidth - buttonRect.right)
+        });
+      }
+    };
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+      window.addEventListener('resize', updateDropdownPosition);
+      window.addEventListener('scroll', updateDropdownPosition, true);
+      updateDropdownPosition();
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+      window.removeEventListener('resize', updateDropdownPosition);
+      window.removeEventListener('scroll', updateDropdownPosition, true);
+    };
+  }, [isDropdownOpen]);
+  const handleDropdownToggle = (e) => {
+    e.stopPropagation();
+    if (!isDropdownOpen && kebabButtonRef.current) {
+      const buttonRect = kebabButtonRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: buttonRect.bottom + 5,
+        right: Math.max(8, window.innerWidth - buttonRect.right)
+      });
+    }
+    setIsDropdownOpen(!isDropdownOpen);
+  };
+  const handleMenuItemClick = (tabId) => {
+    onTabChange(tabId);
+    setIsDropdownOpen(false);
+  };
   return (
     <>
       <style>{`
@@ -122,8 +185,10 @@ const ToolsTrackerTabs = ({ activeTab = 'entry', onTabChange }) => {
               </button>
             ))}
           </div>
-          <div className="absolute right-2 top-1/2 transform -translate-y-1/2" style={{ zIndex: 31 }}>
-            <button className="w-[20px] h-[20px] flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity bg-white pointer-events-auto">
+          <div ref={dropdownRef} className="absolute right-1 top-1/2 transform -translate-y-1/2" style={{ zIndex: 31 }}>
+            <button ref={kebabButtonRef} onClick={handleDropdownToggle}
+              className="w-[20px] h-[20px] flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity bg-white pointer-events-auto"
+            >
               <svg width="4" height="16" viewBox="0 0 4 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="2" cy="2" r="1.5" fill="#000" />
                 <circle cx="2" cy="8" r="1.5" fill="#000" />
@@ -143,6 +208,33 @@ const ToolsTrackerTabs = ({ activeTab = 'entry', onTabChange }) => {
           ></div>
         </div>
       </div>
+      {isDropdownOpen && (
+        <div 
+          ref={dropdownMenuRef}
+          className="fixed bg-white rounded-lg shadow-lg py-2" 
+          style={{ 
+            zIndex: 9999,
+            top: `${dropdownPosition.top}px`,
+            right: `${dropdownPosition.right}px`,
+            width: '180px',
+            maxWidth: '180px'
+          }}
+        >
+          {dropdownMenuItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => handleMenuItemClick(item.id)}
+              className={`w-full text-left px-4 py-2 text-[12px] font-semibold transition-colors ${
+                activeTab === item.id 
+                  ? 'text-black bg-[#E8E8E8]' 
+                  : 'text-[#333333] hover:bg-[#E8E8E8]'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
     </>
   );
 };

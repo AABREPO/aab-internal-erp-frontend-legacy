@@ -4,10 +4,20 @@ import logo from '../Images/AABBlack.png'
 
 const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) => {
   const [expandedItems, setExpandedItems] = useState({
-    procurement: currentPage === 'purchase-order' || currentPage === 'inventory' || currentPage === 'tools-tracker'
+    procurement: currentPage === 'purchase-order' || currentPage === 'inventory' || currentPage === 'tools-tracker',
+    account: currentPage === 'project-advance'
   });
   const [roleModels, setRoleModels] = useState([]);
   const buildTime = process.env.REACT_APP_BUILD_TIME;
+  
+  // Update expandedItems when currentPage changes
+  useEffect(() => {
+    setExpandedItems({
+      procurement: currentPage === 'purchase-order' || currentPage === 'inventory' || currentPage === 'tools-tracker',
+      account: currentPage === 'project-advance'
+    });
+  }, [currentPage]);
+  
   useEffect(() => {
     const fetchUserRoles = async () => {
       try {
@@ -57,11 +67,22 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
     toggleExpand('procurement');
   };
 
+  const handleAccountClick = () => {
+    toggleExpand('account');
+  };
+
   const menuItems = [
     { id: 'home', label: 'Home', icon: 'grid' },
     { id: 'billing', label: 'Billing', icon: 'bell' },
     { id: 'crm', label: 'CRM', icon: 'gear' },
-    { id: 'account', label: 'Account', icon: 'document' },
+    { 
+      id: 'account', 
+      label: 'Account', 
+      icon: 'document',
+      subItems: [
+        { id: 'project-advance', label: 'Advance Portal', modelName: 'Advance Portal' }
+      ]
+    },
     { 
       id: 'procurement', 
       label: 'Procurement', 
@@ -178,7 +199,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
                       className={`flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 ${
                         expandedItems[item.id] ? 'bg-gray-50' : ''
                       }`}
-                      onClick={handleProcurementClick}
+                      onClick={item.id === 'procurement' ? handleProcurementClick : item.id === 'account' ? handleAccountClick : undefined}
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-5 h-5 text-black">

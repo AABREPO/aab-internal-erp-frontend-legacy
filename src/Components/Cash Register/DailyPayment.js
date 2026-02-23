@@ -1033,6 +1033,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 week_no: Number(weekNo),
                 description: "Refund from Cash Register",
                 file_url: "",
+                source: "Cash Register",
                 branch_id: activeBranchId
             };
             const loanPortalResponse = await axios.post(

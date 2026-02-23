@@ -2575,6 +2575,9 @@ const PurchaseOrder = ({ user, onLogout }) => {
     } else if (page === 'tools-tracker') {
       setCurrentPage('tools-tracker');
       navigate('/toolsTracker');
+    } else if (page === 'project-advance') {
+      setCurrentPage('project-advance');
+      navigate('/portal');
     }
   };
   return (

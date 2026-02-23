@@ -5038,7 +5038,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                             machineTools: "",
                                             source: "Cash Register",
                                             billCopyUrl: currentProjectAdvanceRow.bill_copy_url,
-                                            branch_id: activeBranchId ?? null,
+                                            branchId: activeBranchId ?? null,
                                         };
                                         const expensesFormResponse = await fetch('https://backendaab.in/aabuilderDash/expenses_form/save', {
                                             method: 'POST',

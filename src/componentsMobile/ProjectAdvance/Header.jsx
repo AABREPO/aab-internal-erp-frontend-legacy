@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import ProfileModal from './ProfileModal';
 
-const Header = ({ title = "Purchase Order", showBack = true, showNotification = true, showProfile = true, user, onLogout, onMenuClick  }) => {
+const Header = ({ title = "Project Advance", showBack = true, showNotification = true, showProfile = true, user, onLogout, onMenuClick  }) => {
   const [showProfileModal, setShowProfileModal] = useState(false);
 
   const handleProfileClick = () => {
@@ -85,4 +85,3 @@ const Header = ({ title = "Purchase Order", showBack = true, showNotification = 
 };
 
 export default Header;
-

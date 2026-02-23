@@ -50,7 +50,8 @@ function AppContent({ user, handleLogout }) {
       window.removeEventListener('resize', handleResize);
     };
   }, []);
-  const isMobileRoute = location.pathname.startsWith('/purchaseorder') || location.pathname.startsWith('/inventory') || location.pathname.startsWith('/toolsTracker');
+  const isMobileRoute = location.pathname.startsWith('/purchaseorder') || location.pathname.startsWith('/inventory') || location.pathname.startsWith('/toolsTracker')
+  || location.pathname.startsWith('/portal');
   const shouldHideDesktopBars = isMobile && isMobileRoute;
   return (
     <div>

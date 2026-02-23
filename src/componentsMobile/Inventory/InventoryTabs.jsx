@@ -186,7 +186,7 @@ const InventoryTabs = ({ activeTab = 'net-stock', onTabChange }) => {
           ))}
         </div>
         </div>
-        <div ref={dropdownRef} className="absolute right-2 top-1/2 transform -translate-y-1/2" style={{ zIndex: 31 }}>
+        <div ref={dropdownRef} className="absolute right-1.5 top-1/2 transform -translate-y-1/2" style={{ zIndex: 31 }}>
           <button ref={kebabButtonRef} onClick={handleDropdownToggle}
             className="w-[20px] h-[20px] flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity bg-white pointer-events-auto"
           >

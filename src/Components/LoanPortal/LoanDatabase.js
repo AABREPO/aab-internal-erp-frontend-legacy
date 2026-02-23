@@ -136,6 +136,7 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     return `${day}-${month}-${year}`;
   };
   const [purposeOptions, setPurposeOptions] = useState([]);
+  const [branchOptions, setBranchOptions] = useState([]);
   // Use paymentModeOptions from props, fallback to default if not provided
   const defaultPaymentModeOptions = useMemo(() => [
     { id: 1, value: 'Cash', label: 'Cash' },
@@ -257,6 +258,8 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     laboursList.find(l => l.id === id)?.value || "";
   const getSiteName = (id) =>
     siteOptions.find(s => String(s.id) === String(id))?.value || "";
+  const getBranchName = (id) =>
+    branchOptions.find(b => String(b.id) === String(id))?.branch || "";
   const getClientNameByProjectId = (projectId) => {
     if (projectId === null || projectId === undefined) return "";
     const directMatch = projectClientNamesById[String(projectId)];
@@ -528,6 +531,24 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     };
     fetchData();
   }, []);
+  useEffect(() => {
+    const fetchBranches = async () => {
+      try {
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/branch/getAll', {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (!response.ok) throw new Error('Failed to fetch branches');
+        const data = await response.json();
+        setBranchOptions(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error('Error fetching branches:', error);
+        setBranchOptions([]);
+      }
+    };
+    fetchBranches();
+  }, []);
   const filteredData = loanData.filter((entry) => {
     if (selectDate) {
       const [year, month, day] = selectDate.split("-");
@@ -662,6 +683,8 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
         "Refund",
         "Type",
         "Description",
+        "Source",
+        "Branch",
         "Mode",
         "E.No"
       ]
@@ -704,6 +727,8 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
         refundAmount,
         entry.type || "",
         entry.description || "",
+        entry.source || "",
+        getBranchName(entry.branch_id ?? entry.branchId ?? '') || "",
         paymentMode,
         entry.entry_no || ""
       ];
@@ -752,6 +777,8 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
       "Refund",
       "Type",
       "Description",
+      "Source",
+      "Branch",
       "Mode",
       "E.No"
     ];
@@ -793,6 +820,8 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
         refundAmount,
         entry.type || "",
         entry.description || "",
+        entry.source || "",
+        getBranchName(entry.branch_id ?? entry.branchId ?? '') || "",
         paymentMode,
         entry.entry_no || ""
       ];
@@ -1094,6 +1123,8 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                     Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
                   <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-bold text-left">Description</th>
+                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-bold text-left">Source From</th>
+                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-bold text-left">Branch</th>
                   <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[180px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('mode')}>
                     Mode {sortConfig.key === 'mode' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
@@ -1227,6 +1258,8 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                       </select>
                     </th>
                     <th className="pl-4 pr-4 lg:pl-6 lg:pr-6"></th>
+                    <th className="pl-4 pr-4 lg:pl-6 lg:pr-6"></th>
+                    <th className="pl-4 pr-4 lg:pl-6 lg:pr-6"></th>
                     <th className="pl-4 pr-4 lg:pl-6 lg:pr-6">
                       <select
                         value={selectMode}
@@ -1279,6 +1312,8 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                       </td>
                       <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[100px] font-semibold">{entry.type}</td>
                       <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-semibold">{entry.description}</td>
+                      <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-semibold">{entry.source || ''}</td>
+                      <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-semibold">{getBranchName(entry.branch_id ?? entry.branchId ?? '') || ''}</td>
                       <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[180px] font-semibold">
                         {finalPaymentModeOptions.find(opt => opt.value === entry.loan_payment_mode)?.label || entry.loan_payment_mode || ''}
                       </td>
@@ -1354,7 +1389,7 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                   ))
                 ) : (
                   <tr className="h-12">
-                    <td className="pl-6 pr-6 text-center text-sm text-gray-400" colSpan={12}>
+                    <td className="pl-6 pr-6 text-center text-sm text-gray-400" colSpan={14}>
                       No data available
                     </td>
                   </tr>

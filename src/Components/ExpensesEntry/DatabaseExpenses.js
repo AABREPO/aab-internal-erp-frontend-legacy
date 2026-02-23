@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { Calendar } from 'lucide-react';
 import axios from 'axios';
 import Modal from 'react-modal';
+import DateRangePicker from './DateRangePicker';
 import edit from '../Images/Edit.svg';
 import history from '../Images/History.svg';
 import remove from '../Images/Delete.svg';
@@ -77,10 +79,17 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     const [endDate, setEndDate] = useState(() => {
         return localStorage.getItem('expenseFilter_endDate') || '';
     });
+    const [timestampStartDate, setTimestampStartDate] = useState(() => {
+        return localStorage.getItem('expenseFilter_timestampStartDate') || '';
+    });
+    const [timestampEndDate, setTimestampEndDate] = useState(() => {
+        return localStorage.getItem('expenseFilter_timestampEndDate') || '';
+    });
     const [selectedAccountType, setSelectedAccountType] = useState(() => {
         return localStorage.getItem('expenseFilter_accountType') || '';
     });
     const [showFilters, setShowFilters] = useState(false);
+    const [showDateRangePicker, setShowDateRangePicker] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(50);
     const [sortField, setSortField] = useState('');
@@ -218,6 +227,12 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     useEffect(() => {
         localStorage.setItem('expenseFilter_endDate', endDate);
     }, [endDate]);
+    useEffect(() => {
+        localStorage.setItem('expenseFilter_timestampStartDate', timestampStartDate);
+    }, [timestampStartDate]);
+    useEffect(() => {
+        localStorage.setItem('expenseFilter_timestampEndDate', timestampEndDate);
+    }, [timestampEndDate]);
 
     useEffect(() => {
         localStorage.setItem('expenseFilter_eno', selectedEno);
@@ -636,7 +651,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     };
     useEffect(() => {
         const filtered = expenses.filter(expense => {
-            // Date range filter (Start Date and End Date)
+            // Date range filter (Start Date and End Date) - filters expense.date
             if (startDate && endDate) {
                 const s = new Date(startDate);
                 const e = new Date(endDate);
@@ -653,6 +668,25 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                 e.setHours(23, 59, 59, 999);
                 const expenseDate = new Date(expense.date);
                 if (expenseDate > e) return false;
+            }
+            // Timestamp range filter - filters expense.timestamp
+            if (timestampStartDate && timestampEndDate) {
+                const ts = new Date(timestampStartDate);
+                ts.setHours(0, 0, 0, 0);
+                const te = new Date(timestampEndDate);
+                te.setHours(23, 59, 59, 999);
+                const expenseTs = expense.timestamp ? new Date(expense.timestamp) : null;
+                if (!expenseTs || expenseTs < ts || expenseTs > te) return false;
+            } else if (timestampStartDate) {
+                const ts = new Date(timestampStartDate);
+                ts.setHours(0, 0, 0, 0);
+                const expenseTs = expense.timestamp ? new Date(expense.timestamp) : null;
+                if (!expenseTs || expenseTs < ts) return false;
+            } else if (timestampEndDate) {
+                const te = new Date(timestampEndDate);
+                te.setHours(23, 59, 59, 999);
+                const expenseTs = expense.timestamp ? new Date(expense.timestamp) : null;
+                if (!expenseTs || expenseTs > te) return false;
             }
             return (
                 (selectedSiteName ? expense.siteName === selectedSiteName : true) &&
@@ -687,7 +721,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         setAccountTypeOptions(getOptions(filtered, "accountType"));
         setEnoOptions([...new Set(filtered.map(item => item.eno).filter(Boolean))]);
 
-    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedAccountType, selectedDate, startDate, endDate, selectedEno, expenses]);
+    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedAccountType, selectedDate, startDate, endDate, timestampStartDate, timestampEndDate, selectedEno, expenses]);
     const handleChange = (e) => {
         const { name, type, value, files } = e.target;
         // Prevent clearing the date field
@@ -1051,6 +1085,8 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         setSelectedDate('');
         setStartDate('');
         setEndDate('');
+        setTimestampStartDate('');
+        setTimestampEndDate('');
         setSelectedEno('');
         setFilteredExpenses(expenses);
         setCurrentPage(1);
@@ -1066,6 +1102,8 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         localStorage.removeItem('expenseFilter_date');
         localStorage.removeItem('expenseFilter_startDate');
         localStorage.removeItem('expenseFilter_endDate');
+        localStorage.removeItem('expenseFilter_timestampStartDate');
+        localStorage.removeItem('expenseFilter_timestampEndDate');
         localStorage.removeItem('expenseFilter_eno');
     };
     const exportToCSV = () => {
@@ -1162,22 +1200,28 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                         <div className="flex flex-wrap gap-5 items-end">
                             <div>
                                 <label className="block mb-2 font-semibold text-[#BF9853]">Start Date</label>
-                                <input
-                                    type="date"
-                                    value={startDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
-                                    className="w-[168px] h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2"
-                                />
+                                <div className="relative w-[168px]">
+                                    <input
+                                        type="date"
+                                        value={startDate}
+                                        onChange={(e) => setStartDate(e.target.value)}
+                                        className="w-full h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2 pr-9 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-2 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                                    />
+                                    <Calendar className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                </div>
                             </div>
                             <div>
                                 <label className="block mb-2 font-semibold text-[#BF9853]">End Date</label>
-                                <input
-                                    type="date"
-                                    value={endDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
-                                    className="w-[168px] h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2"
-                                />
-                            </div>                            
+                                <div className="relative w-[168px]">
+                                    <input
+                                        type="date"
+                                        value={endDate}
+                                        onChange={(e) => setEndDate(e.target.value)}
+                                        className="w-full h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2 pr-9 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-2 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                                    />
+                                    <Calendar className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                </div>
+                            </div>
                             {Object.entries(accountTypeSummary)
                                 .sort(([a], [b]) => {
                                     if (a === 'Unknown') return 1;
@@ -1214,28 +1258,34 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                         <div className="flex flex-wrap gap-5 items-end">
                             <div>
                                 <label className="block mb-2 font-semibold text-[#BF9853]">Start Date</label>
-                                <input
-                                    type="date"
-                                    value={startDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
-                                    className="w-[168px] h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2"
-                                />
+                                <div className="relative w-[168px]">
+                                    <input
+                                        type="date"
+                                        value={startDate}
+                                        onChange={(e) => setStartDate(e.target.value)}
+                                        className="w-full h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2 pr-9 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-2 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                                    />
+                                    <Calendar className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                </div>
                             </div>
                             <div>
                                 <label className="block mb-2 font-semibold text-[#BF9853]">End Date</label>
-                                <input
-                                    type="date"
-                                    value={endDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
-                                    className="w-[168px] h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2"
-                                />
+                                <div className="relative w-[168px]">
+                                    <input
+                                        type="date"
+                                        value={endDate}
+                                        onChange={(e) => setEndDate(e.target.value)}
+                                        className="w-full h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2 pr-9 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-2 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                                    />
+                                    <Calendar className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                </div>
                             </div>
                         </div>
                     </div>
-                )}                
+                )}
                 <div className="w-full max-w-[1860px] mx-auto p-4 bg-white shadow-lg overflow-x-auto">
                     <div
-                        className={`text-left flex ${selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || startDate || endDate
+                        className={`text-left flex ${selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || startDate || endDate || timestampStartDate || timestampEndDate
                             ? 'flex-col sm:flex-row sm:justify-between'
                             : 'flex-row justify-between items-center'
                             } mb-3 gap-2`}>
@@ -1247,8 +1297,22 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                     className="w-7 h-7 border border-[#BF9853] rounded-md"
                                 />
                             </button>
-                            {(selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || startDate || endDate) && (
+                            {(selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || startDate || endDate || timestampStartDate || timestampEndDate) && (
                                 <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
+                                    {timestampStartDate && (
+                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
+                                            <span className="font-normal">Timestamp: </span>
+                                            <span className="font-bold">{timestampStartDate}{timestampEndDate ? ` – ${timestampEndDate}` : ' onwards'}</span>
+                                            <button onClick={() => { setTimestampStartDate(''); setTimestampEndDate(''); }} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                        </span>
+                                    )}
+                                    {timestampEndDate && !timestampStartDate && (
+                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
+                                            <span className="font-normal">Timestamp until: </span>
+                                            <span className="font-bold">{timestampEndDate}</span>
+                                            <button onClick={() => setTimestampEndDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                        </span>
+                                    )}
                                     {startDate && (
                                         <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
                                             <span className="font-normal">Start Date: </span>
@@ -1372,15 +1436,29 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                     </tr>
                                     {showFilters && (
                                         <tr className="bg-[#FAF6ED]">
-                                            <th></th>
-                                            <th className=" py-3">
-                                                <input
-                                                    type="date"
-                                                    value={selectedDate}
-                                                    onChange={(e) => setSelectedDate(e.target.value)}
-                                                    className="w-full px-1.5 py-2 text-sm rounded-lg border-2 border-[#BF9853] font-normal border-opacity-30 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent transition-all duration-200"
-                                                    placeholder="Search Date..."
-                                                />
+                                            <th className="py-3 px-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowDateRangePicker(true)}
+                                                    className="w-full min-w-[140px] px-2 py-2 text-sm rounded-lg border-2 border-[#BF9853] font-normal border-opacity-30 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent transition-all duration-200 hover:bg-[#FAF6ED] text-left flex items-center justify-between"
+                                                >
+                                                    <span className="text-gray-700 truncate">
+                                                        {timestampStartDate ? (timestampEndDate ? `${timestampStartDate} – ${timestampEndDate}` : `From ${timestampStartDate}`) : 'Timestamp...'}
+                                                    </span>
+                                                    <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                                </button>
+                                            </th>
+                                            <th className="py-3">
+                                                <div className="relative">
+                                                    <input
+                                                        type="date"
+                                                        value={selectedDate}
+                                                        onChange={(e) => setSelectedDate(e.target.value)}
+                                                        className="w-full px-1.5 py-2 pr-8 text-sm rounded-lg border-2 border-[#BF9853] font-normal border-opacity-30 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent transition-all duration-200 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-2 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                                                        placeholder="Search Date..."
+                                                    />
+                                                    <Calendar className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                                </div>
                                             </th>
                                             <th className="py-3">
                                                 <Select
@@ -1596,10 +1674,13 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                 <form className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-gray-500 font-semibold text-left">Date</label>
-                                        <input type="date" name="date" value={formData.date} onChange={handleChange}
-                                            required
-                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
-                                        />
+                                        <div className="relative mt-1">
+                                            <input type="date" name="date" value={formData.date} onChange={handleChange}
+                                                required
+                                                className="block w-full p-2 pr-9 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-2 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                                            />
+                                            <Calendar className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="block text-gray-500 font-semibold text-left">Account Type *</label>
@@ -1921,12 +2002,15 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                     <div className="grid grid-cols-3 gap-4">
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-                                            <input
-                                                type="date"
-                                                value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.date) || ''}
-                                                readOnly
-                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full bg-gray-100"
-                                            />
+                                            <div className="relative">
+                                                <input
+                                                    type="date"
+                                                    value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.date) || ''}
+                                                    readOnly
+                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 pr-9 rounded-lg w-full bg-gray-100 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-2 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                                                />
+                                                <Calendar className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                            </div>
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
@@ -1965,12 +2049,15 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                     </div>
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date <span className="text-red-500">*</span></label>
-                                                        <input
-                                                            type="date"
-                                                            value={paymentModalData.chequeDate}
-                                                            onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeDate: e.target.value }))}
-                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                                                        />
+                                                        <div className="relative">
+                                                            <input
+                                                                type="date"
+                                                                value={paymentModalData.chequeDate}
+                                                                onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeDate: e.target.value }))}
+                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 pr-9 rounded-lg w-full focus:outline-none [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-2 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                                                            />
+                                                            <Calendar className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                                        </div>
                                                     </div>
                                                 </div>
                                             )}
@@ -2024,6 +2111,16 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
             </div>
+            <DateRangePicker
+                isOpen={showDateRangePicker}
+                onClose={() => setShowDateRangePicker(false)}
+                startDate={timestampStartDate}
+                endDate={timestampEndDate}
+                onApply={(from, to) => {
+                    setTimestampStartDate(from);
+                    setTimestampEndDate(to);
+                }}
+            />
         </body>
     );
 };
